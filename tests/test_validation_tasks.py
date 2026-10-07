@@ -4,7 +4,11 @@ from pathlib import Path
 from typing import Any, cast
 
 from powdrr_lift.structrr.validation import discover_validation_profiles
-from powdrr_lift.structrr.validation_tasks import discover_tox_configuration
+from powdrr_lift.structrr.validation_tasks import (
+    discover_make_configuration,
+    discover_tox_configuration,
+    make_target_closure,
+)
 
 
 def test_discovers_tox_ini_environment_and_preserves_native_wrapper(
@@ -291,3 +295,139 @@ def test_noxfile_parse_failure_emits_unresolved_check(tmp_path: Path) -> None:
     assert profile.execution_kind == "unresolved"
     assert profile.command == ()
     assert "Could not statically parse noxfile.py" in profile.unresolved[0]
+
+
+def test_make_includes_and_dependencies_are_preserved_as_one_aggregate(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "Makefile").write_text(
+        ".PHONY: check lint test types\n"
+        "include make/tasks.mk\n"
+        "check: lint test types\n\t@$(MAKE) lint test types\n",
+        encoding="utf-8",
+    )
+    included = tmp_path / "make/tasks.mk"
+    included.parent.mkdir()
+    included.write_text(
+        "lint:\n\truff check --select 'E,F' src\n\n"
+        "test:\n\tpytest tests -m 'not integration'\n\n"
+        "types:\n\tmypy src\n",
+        encoding="utf-8",
+    )
+
+    configuration = discover_make_configuration(tmp_path)
+    profiles = discover_validation_profiles(tmp_path)
+
+    assert configuration is not None
+    assert configuration.config_files == ("Makefile", "make/tasks.mk")
+    assert [profile.name for profile in profiles] == ["make-check"]
+    profile = profiles[0]
+    assert profile.provider == "aggregate"
+    assert profile.command == ("make", "check")
+    assert profile.config_files == ("Makefile", "make/tasks.mk")
+    assert profile.settings is not None
+    settings = cast(dict[str, Any], profile.settings)
+    target_settings = settings["targets"]
+    assert target_settings["check"]["prerequisites"] == ["lint", "test", "types"]
+    assert target_settings["test"]["recipes"] == ["pytest tests -m 'not integration'"]
+    assert {item.provider for item in profiles} == {"aggregate"}
+    closure, diagnostics = make_target_closure(configuration, ("check",))
+    assert [item.name for item in closure] == ["check", "lint", "test", "types"]
+    assert not diagnostics
+
+
+def test_make_ci_command_and_workflow_path_preserve_quoted_arguments(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "Makefile").write_text(
+        ".PHONY: test\ntest:\n\tpytest tests\n", encoding="utf-8"
+    )
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  test:\n    steps:\n"
+        '      - run: make -C . test PYTEST_ARGS="-k edge case"\n',
+        encoding="utf-8",
+    )
+
+    profile = next(
+        item
+        for item in discover_validation_profiles(tmp_path)
+        if item.name.startswith("make-")
+    )
+
+    assert profile.command == (
+        "make",
+        "-C",
+        ".",
+        "test",
+        "PYTEST_ARGS=-k edge case",
+    )
+    assert profile.selectors == ("test",)
+    assert profile.evidence == (
+        "validation-input:Makefile",
+        "validation-input:.github/workflows/ci.yml",
+    )
+
+
+def test_make_dynamic_recipes_and_include_cycles_remain_unresolved(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "Makefile").write_text(
+        ".PHONY: check\ninclude extra.mk\n"
+        "check: included\n\t$(PYTEST) tests | tee results\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "extra.mk").write_text(
+        "included:\ninclude Makefile\n", encoding="utf-8"
+    )
+
+    profile = next(
+        item
+        for item in discover_validation_profiles(tmp_path)
+        if item.name.startswith("make-")
+    )
+
+    assert any("include cycle" in item for item in profile.unresolved)
+    assert any("Shell or variable expansion" in item for item in profile.unresolved)
+
+
+def test_make_setup_target_is_not_assumed_to_be_validation(tmp_path: Path) -> None:
+    (tmp_path / "Makefile").write_text(
+        ".PHONY: install\ninstall:\n\tpython -m pip install -e .\n",
+        encoding="utf-8",
+    )
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  setup:\n    steps:\n      - run: make install\n", encoding="utf-8"
+    )
+
+    profile = discover_validation_profiles(tmp_path)[0]
+
+    assert profile.provider == "custom"
+    assert any("target names alone" in item for item in profile.unresolved)
+
+
+def test_make_aggregate_does_not_hide_unselected_make_targets(tmp_path: Path) -> None:
+    (tmp_path / "Makefile").write_text(
+        ".PHONY: test lint\ntest:\n\tpytest tests\nlint:\n\truff check src\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.ruff]\nline-length = 88\n", encoding="utf-8"
+    )
+    (tmp_path / "tests").mkdir()
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  test:\n    steps:\n      - run: make test\n", encoding="utf-8"
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+
+    assert "make-test" in [profile.name for profile in profiles]
+    assert "pytest" not in [profile.name for profile in profiles]
+    assert {"ruff-check", "ruff-format-check"}.issubset(
+        {profile.name for profile in profiles}
+    )

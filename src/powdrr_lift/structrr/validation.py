@@ -18,10 +18,16 @@ from powdrr_lift.structrr.validation_models import (
     ValidationContext,
 )
 from powdrr_lift.structrr.validation_tasks import (
+    MakeConfiguration,
     NoxConfiguration,
     ToxConfiguration,
+    discover_make_configuration,
     discover_nox_configuration,
     discover_tox_configuration,
+    likely_make_validation_targets,
+    make_ci_invocations,
+    make_target_closure,
+    make_workflow_invocations,
     nox_ci_invocations,
     nox_workflow_invocations,
     tox_ci_invocations,
@@ -217,18 +223,26 @@ def discover_validation_profiles(
     text = _repository_text(root_path)
     profiles.extend(_discover_tox_profiles(root_path, ci_commands))
     profiles.extend(_discover_nox_profiles(root_path, ci_commands))
+    profiles.extend(_discover_make_profiles(root_path, ci_commands))
     tox_configuration = discover_tox_configuration(root_path)
     nox_configuration = discover_nox_configuration(root_path)
+    make_configuration = discover_make_configuration(root_path)
     task_child_tools = {
         token
-        for command_set in _task_runner_commands(tox_configuration, nox_configuration)
+        for command_set in _task_runner_commands(
+            tox_configuration, nox_configuration, make_configuration, profiles
+        )
         for command in command_set
         for token in command
         if token in {"pytest", "ruff", "mypy", "black", "flake8", "pyright"}
     }
     has_task_aggregate = any(
         profile.provider == "aggregate"
-        and (profile.name.startswith("tox-") or profile.name.startswith("nox-"))
+        and (
+            profile.name.startswith("tox-")
+            or profile.name.startswith("nox-")
+            or profile.name.startswith("make-")
+        )
         for profile in profiles
     )
 
@@ -506,25 +520,186 @@ def _discover_nox_profiles(
 def _task_runner_commands(
     tox_configuration: object,
     nox_configuration: object,
+    make_configuration: object,
+    profiles: Sequence[DiscoveredValidationProfile],
 ) -> tuple[tuple[tuple[str, ...], ...], ...]:
     commands: list[tuple[tuple[str, ...], ...]] = []
-    if tox_configuration is not None:
-        tox_config = cast(ToxConfiguration, tox_configuration)
-        commands.extend(tox_config.commands.values())
-    if nox_configuration is not None:
-        nox_config = cast(NoxConfiguration, nox_configuration)
-        for session in nox_config.sessions:
-            for call in session.calls:
-                if call.get("method") != "run":
-                    continue
-                args = call.get("arguments")
+    tox_config = (
+        cast(ToxConfiguration, tox_configuration)
+        if tox_configuration is not None
+        else None
+    )
+    nox_config = (
+        cast(NoxConfiguration, nox_configuration)
+        if nox_configuration is not None
+        else None
+    )
+    make_config = (
+        cast(MakeConfiguration, make_configuration)
+        if make_configuration is not None
+        else None
+    )
+    for profile in profiles:
+        if profile.name.startswith("tox-") and tox_config:
+            for environment, command_set in tox_config.commands.items():
                 if (
-                    isinstance(args, list)
-                    and args
-                    and all(isinstance(item, str) for item in args)
+                    environment == "*"
+                    or not profile.selectors
+                    or environment in profile.selectors
                 ):
-                    commands.append(tuple(args))
+                    commands.append(command_set)
+        elif profile.name.startswith("nox-") and nox_config:
+            selected = (
+                profile.selectors
+                or nox_config.default_sessions
+                or tuple(session.name for session in nox_config.sessions)
+            )
+            for session in nox_config.sessions:
+                if session.name not in selected:
+                    continue
+                for call in session.calls:
+                    if call.get("method") != "run":
+                        continue
+                    args = call.get("arguments")
+                    if (
+                        isinstance(args, list)
+                        and args
+                        and all(isinstance(item, str) for item in args)
+                    ):
+                        commands.append((tuple(args),))
+        elif profile.name.startswith("make-") and make_config and profile.selectors:
+            closure, _ = make_target_closure(make_config, profile.selectors)
+            for target in closure:
+                for recipe in target.recipes:
+                    try:
+                        commands.append((tuple(shlex.split(recipe, posix=True)),))
+                    except ValueError:
+                        continue
     return tuple(commands)
+
+
+def _discover_make_profiles(
+    root: Path, ci_commands: Sequence[tuple[str, ...]]
+) -> tuple[DiscoveredValidationProfile, ...]:
+    configuration = discover_make_configuration(root)
+    invocations = make_ci_invocations(ci_commands)
+    workflow_invocations = make_workflow_invocations(root)
+    if configuration is None and not invocations:
+        return ()
+
+    selections: tuple[tuple[tuple[str, ...], tuple[str, ...], str | None], ...]
+    if invocations:
+        if workflow_invocations:
+            selections = tuple(
+                (command, targets, path)
+                for command, targets, path in workflow_invocations
+            )
+        else:
+            selections = tuple(
+                (command, targets, None) for command, targets in invocations
+            )
+        declaration = "declared"
+    elif configuration:
+        candidates = likely_make_validation_targets(configuration)
+        selections = tuple((("make", target), (target,), None) for target in candidates)
+        declaration = "inferred"
+    else:
+        return ()
+
+    profiles: list[DiscoveredValidationProfile] = []
+    for command, selected_targets, workflow_path in selections:
+        if configuration and selected_targets:
+            target_records, closure_diagnostics = make_target_closure(
+                configuration, selected_targets
+            )
+        else:
+            target_records = ()
+            closure_diagnostics = ()
+        unresolved = list(configuration.unresolved if configuration else ())
+        unresolved.extend(closure_diagnostics)
+        if not selected_targets:
+            unresolved.append(
+                "Make was invoked without explicit targets; default-goal behavior "
+                "has not been resolved."
+            )
+        if configuration is None:
+            unresolved.append(
+                "No tracked Makefile was found to explain this native command."
+            )
+        for record in target_records:
+            if not record.recipes and not record.prerequisites:
+                unresolved.append(
+                    f"Make target {record.name!r} has no statically visible commands."
+                )
+            for recipe in record.recipes:
+                if any(marker in recipe for marker in ("$(", "${", "&&", "||", "|")):
+                    unresolved.append(
+                        f"Shell or variable expansion in {record.source} target "
+                        f"{record.name!r} was preserved without expansion."
+                    )
+        target_names = ",".join(selected_targets) or "default"
+        known_validation = bool(selected_targets) and all(
+            target
+            in {
+                "check",
+                "ci",
+                "format",
+                "format-check",
+                "lint",
+                "pre-commit",
+                "test",
+                "tests",
+                "typecheck",
+                "type-check",
+                "validate",
+                "verify",
+            }
+            or target.startswith(
+                ("check-", "lint-", "test-", "typecheck-", "validate-")
+            )
+            for target in selected_targets
+        )
+        if not known_validation:
+            unresolved.append(
+                "Make target names alone do not establish that the target validates "
+                "code; inspect the recorded recipe and workflow context."
+            )
+        settings_targets = {
+            record.name: {
+                "prerequisites": list(record.prerequisites),
+                "recipes": list(record.recipes),
+                "source": record.source,
+                "phony": record.phony,
+            }
+            for record in target_records
+        }
+        config_files = configuration.config_files if configuration else ()
+        evidence = tuple(
+            f"validation-input:{path}"
+            for path in dict.fromkeys(
+                (
+                    *config_files,
+                    *((workflow_path,) if workflow_path else ()),
+                )
+            )
+        )
+        profiles.append(
+            DiscoveredValidationProfile(
+                name=f"make-{target_names}",
+                command=command,
+                source="Makefile/GitHub Actions",
+                provider_name="aggregate" if known_validation else "custom",
+                purpose="Run native Make target(s) recorded in the project.",
+                roles=("validation",) if known_validation else (),
+                selectors=selected_targets,
+                config_files=config_files,
+                settings={"targets": settings_targets},
+                declaration=declaration,
+                evidence=evidence,
+                unresolved=tuple(dict.fromkeys(unresolved)),
+            )
+        )
+    return tuple(profiles)
 
 
 def _load_pyproject(root: Path) -> dict[str, object]:
@@ -595,6 +770,8 @@ def _ci_commands(root: Path) -> tuple[tuple[str, ...], ...]:
                         "mypy ",
                         "tox ",
                         "nox ",
+                        "make ",
+                        "gmake ",
                     )
                 ):
                     commands.append(_split_shell_arguments(stripped))

@@ -9,6 +9,7 @@ import tomllib
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import cast
 
 from powdrr_lift.structrr.python_topology import PythonTopology
 from powdrr_lift.structrr.validation_models import (
@@ -17,7 +18,12 @@ from powdrr_lift.structrr.validation_models import (
     ValidationContext,
 )
 from powdrr_lift.structrr.validation_tasks import (
+    NoxConfiguration,
+    ToxConfiguration,
+    discover_nox_configuration,
     discover_tox_configuration,
+    nox_ci_invocations,
+    nox_workflow_invocations,
     tox_ci_invocations,
     tox_workflow_invocations,
 )
@@ -210,21 +216,25 @@ def discover_validation_profiles(
     uv_prefix = ("uv", "run") if (root_path / "pyproject.toml").exists() else ()
     text = _repository_text(root_path)
     profiles.extend(_discover_tox_profiles(root_path, ci_commands))
+    profiles.extend(_discover_nox_profiles(root_path, ci_commands))
     tox_configuration = discover_tox_configuration(root_path)
-    tox_child_tools = {
+    nox_configuration = discover_nox_configuration(root_path)
+    task_child_tools = {
         token
-        for command_set in (
-            tox_configuration.commands.values() if tox_configuration else ()
-        )
+        for command_set in _task_runner_commands(tox_configuration, nox_configuration)
         for command in command_set
         for token in command
         if token in {"pytest", "ruff", "mypy", "black", "flake8", "pyright"}
     }
-    tox_is_aggregate = any(profile.provider == "aggregate" for profile in profiles)
+    has_task_aggregate = any(
+        profile.provider == "aggregate"
+        and (profile.name.startswith("tox-") or profile.name.startswith("nox-"))
+        for profile in profiles
+    )
 
     if _mentions_tool("ruff", pyproject, text) and not (
-        tox_is_aggregate
-        and "ruff" in tox_child_tools
+        has_task_aggregate
+        and "ruff" in task_child_tools
         and _find_command(ci_commands, ("ruff",)) is None
     ):
         profiles.extend(
@@ -244,8 +254,8 @@ def discover_validation_profiles(
             )
         )
     if _mentions_tool("mypy", pyproject, text) and not (
-        tox_is_aggregate
-        and "mypy" in tox_child_tools
+        has_task_aggregate
+        and "mypy" in task_child_tools
         and _find_command(ci_commands, ("mypy",)) is None
     ):
         profiles.append(
@@ -259,8 +269,8 @@ def discover_validation_profiles(
     if (
         _mentions_tool("pytest", pyproject, text) or (root_path / "tests").is_dir()
     ) and not (
-        tox_is_aggregate
-        and "pytest" in tox_child_tools
+        has_task_aggregate
+        and "pytest" in task_child_tools
         and _find_command(ci_commands, ("pytest",)) is None
     ):
         profiles.append(
@@ -384,6 +394,139 @@ def _discover_tox_profiles(
     return tuple(profiles)
 
 
+def _discover_nox_profiles(
+    root: Path, ci_commands: Sequence[tuple[str, ...]]
+) -> tuple[DiscoveredValidationProfile, ...]:
+    configuration = discover_nox_configuration(root)
+    invocations = nox_ci_invocations(ci_commands)
+    workflow_invocations = nox_workflow_invocations(root)
+    if configuration is None and not invocations:
+        return ()
+
+    session_by_name = (
+        {session.name: session for session in configuration.sessions}
+        if configuration
+        else {}
+    )
+    selections: tuple[tuple[tuple[str, ...], tuple[str, ...], str | None], ...]
+    if invocations:
+        if workflow_invocations:
+            selections = tuple(
+                (command, sessions, path)
+                for command, sessions, path in workflow_invocations
+            )
+        else:
+            selections = tuple(
+                (command, sessions, None) for command, sessions in invocations
+            )
+        declaration = "declared"
+    elif configuration and configuration.sessions:
+        selected_sessions = configuration.default_sessions or tuple(session_by_name)
+        selections = tuple(
+            (("nox", "-s", name), (name,), None) for name in selected_sessions
+        )
+        declaration = "inferred"
+    elif configuration and configuration.unresolved:
+        selections = (((), (), None),)
+        declaration = "declared"
+    else:
+        return ()
+
+    profiles: list[DiscoveredValidationProfile] = []
+    for command, session_names, workflow_path in selections:
+        if session_names:
+            effective_session_names = session_names
+        elif configuration:
+            effective_session_names = configuration.default_sessions or tuple(
+                session_by_name
+            )
+        else:
+            effective_session_names = ()
+        selected_definitions = [
+            session_by_name[name]
+            for name in effective_session_names
+            if name in session_by_name
+        ]
+        unresolved = list(configuration.unresolved if configuration else ())
+        unresolved.extend(
+            f"Nox session {name!r} has no statically recognized definition."
+            for name in effective_session_names
+            if name not in session_by_name
+        )
+        session_settings: dict[str, dict[str, object]] = {}
+        for session in selected_definitions:
+            session_settings[session.name] = {
+                "python": session.python,
+                "parameters": dict(session.parameters or {}),
+                "calls": [dict(call) for call in session.calls],
+            }
+            unresolved.extend(session.unresolved)
+            if any(call.get("dynamic") for call in session.calls):
+                unresolved.append(
+                    f"Session {session.name} contains dynamic install/run arguments."
+                )
+        if command and not session_names and not session_by_name:
+            unresolved.append(
+                "Nox was invoked by CI, but no statically recognized session "
+                "definitions were available."
+            )
+        session_label = ",".join(effective_session_names) or "all"
+        profiles.append(
+            DiscoveredValidationProfile(
+                name=f"nox-{session_label}",
+                command=command,
+                source="noxfile.py/GitHub Actions",
+                provider_name="aggregate" if command else "custom",
+                purpose="Run Nox project validation session(s).",
+                roles=("validation",),
+                selectors=effective_session_names,
+                config_files=(configuration.config_file,) if configuration else (),
+                settings={
+                    "sessions": session_settings,
+                    "default_sessions": list(configuration.default_sessions)
+                    if configuration
+                    else [],
+                },
+                execution_kind="argv" if command else "unresolved",
+                declaration=declaration,
+                evidence=tuple(
+                    dict.fromkeys(
+                        (
+                            *((configuration.config_file,) if configuration else ()),
+                            *((workflow_path,) if workflow_path else ()),
+                        )
+                    )
+                ),
+                unresolved=tuple(dict.fromkeys(unresolved)),
+            )
+        )
+    return tuple(profiles)
+
+
+def _task_runner_commands(
+    tox_configuration: object,
+    nox_configuration: object,
+) -> tuple[tuple[tuple[str, ...], ...], ...]:
+    commands: list[tuple[tuple[str, ...], ...]] = []
+    if tox_configuration is not None:
+        tox_config = cast(ToxConfiguration, tox_configuration)
+        commands.extend(tox_config.commands.values())
+    if nox_configuration is not None:
+        nox_config = cast(NoxConfiguration, nox_configuration)
+        for session in nox_config.sessions:
+            for call in session.calls:
+                if call.get("method") != "run":
+                    continue
+                args = call.get("arguments")
+                if (
+                    isinstance(args, list)
+                    and args
+                    and all(isinstance(item, str) for item in args)
+                ):
+                    commands.append(tuple(args))
+    return tuple(commands)
+
+
 def _load_pyproject(root: Path) -> dict[str, object]:
     path = root / "pyproject.toml"
     if not path.exists():
@@ -444,7 +587,15 @@ def _ci_commands(root: Path) -> tuple[tuple[str, ...], ...]:
             else:
                 stripped = line.strip()
                 if stripped.startswith(
-                    ("uv run ", "python -m ", "pytest ", "ruff ", "mypy ", "tox ")
+                    (
+                        "uv run ",
+                        "python -m ",
+                        "pytest ",
+                        "ruff ",
+                        "mypy ",
+                        "tox ",
+                        "nox ",
+                    )
                 ):
                     commands.append(_split_shell_arguments(stripped))
     return tuple(commands)

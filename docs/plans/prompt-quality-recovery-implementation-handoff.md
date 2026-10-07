@@ -578,14 +578,25 @@ run_env["VIRTUAL_ENV"] = "/Users/gregory/code/powdrr-lift/.venv"
 run_env["PATH"] = run_env["VIRTUAL_ENV"] + "/bin:" + run_env["PATH"]
 run_env["POWDRR_CLARIFICATION_POLICY"] = "normative_defaults"
 command = [
-    run_env["VIRTUAL_ENV"] + "/bin/python", "-m", "powdrr_lift.cli",
+    run_env["VIRTUAL_ENV"] + "/bin/python",
+    "-m",
+    "powdrr_lift.cli",
     "harbor-feature",
-    "--feature-description", (task_dir / "instruction.md").read_text(),
-    "--work-item-name", "gql-incremental-graphql-delivery",
-    "--task-id", "gql-incremental-graphql-delivery",
-    "--repo-root", str(target_checkout), "--allowed-path", ".",
-    "--planning-provider", "deepinfra",
-    "--capture-worker-prompts-only", "--output-root", str(output_root),
+    "--feature-description",
+    (task_dir / "instruction.md").read_text(),
+    "--work-item-name",
+    "gql-incremental-graphql-delivery",
+    "--task-id",
+    "gql-incremental-graphql-delivery",
+    "--repo-root",
+    str(target_checkout),
+    "--allowed-path",
+    ".",
+    "--planning-provider",
+    "deepinfra",
+    "--capture-worker-prompts-only",
+    "--output-root",
+    str(output_root),
     "--json",
 ]
 subprocess.run(command, env=run_env, cwd=target_checkout, check=True)

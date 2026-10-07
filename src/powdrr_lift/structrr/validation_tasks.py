@@ -46,6 +46,219 @@ class NoxConfiguration:
     unresolved: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class HatchEnvironment:
+    """One Hatch environment's named scripts and execution settings."""
+
+    name: str
+    scripts: Mapping[str, tuple[str, ...]]
+    settings: Mapping[str, object]
+    unresolved: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class HatchConfiguration:
+    """Hatch environments from pyproject.toml and/or hatch.toml."""
+
+    config_files: tuple[str, ...]
+    environments: Mapping[str, HatchEnvironment]
+    unresolved: tuple[str, ...] = ()
+
+
+def discover_hatch_configuration(root: str | Path) -> HatchConfiguration | None:
+    """Read Hatch environments and named scripts without expanding or running them."""
+    root_path = Path(root).resolve()
+    sources: list[tuple[str, Mapping[str, Any]]] = []
+    unresolved: list[str] = []
+    pyproject = root_path / "pyproject.toml"
+    hatch_toml = root_path / "hatch.toml"
+    if pyproject.is_file():
+        document, error = _read_hatch_toml(pyproject)
+        if error:
+            unresolved.append(error)
+        hatch = _nested(document, ("tool", "hatch"))
+        environments = _nested(document, ("tool", "hatch", "envs"))
+        if isinstance(hatch, Mapping) and isinstance(environments, Mapping):
+            sources.append(("pyproject.toml", environments))
+        elif _contains_table(document, ("tool", "hatch")):
+            unresolved.append(
+                "Could not statically parse Hatch settings in pyproject.toml."
+            )
+    if hatch_toml.is_file():
+        document, error = _read_hatch_toml(hatch_toml)
+        if error:
+            unresolved.append(error)
+        environments = document.get("envs")
+        if isinstance(environments, Mapping):
+            sources.append(("hatch.toml", environments))
+        else:
+            unresolved.append(
+                "Could not statically parse Hatch environments in hatch.toml."
+            )
+    if not sources and not unresolved:
+        return None
+
+    raw_environments: dict[str, tuple[str, Mapping[str, object]]] = {}
+    for source, values in sources:
+        for raw_name, raw_settings in values.items():
+            if not isinstance(raw_name, str) or not isinstance(raw_settings, Mapping):
+                unresolved.append(f"Invalid Hatch environment declaration in {source}.")
+                continue
+            if raw_name in raw_environments:
+                _, previous_settings = raw_environments[raw_name]
+                merged_settings = _merge_toml_mappings(previous_settings, raw_settings)
+                raw_environments[raw_name] = (source, merged_settings)
+            else:
+                raw_environments[raw_name] = (source, raw_settings)
+
+    parsed: dict[str, HatchEnvironment] = {}
+    for name, (source, raw_settings) in raw_environments.items():
+        scripts: dict[str, tuple[str, ...]] = {}
+        environment_unresolved: list[str] = []
+        raw_scripts = raw_settings.get("scripts", {})
+        extra_scripts = raw_settings.get("extra-scripts", {})
+        if not isinstance(raw_scripts, Mapping):
+            environment_unresolved.append(
+                f"Hatch scripts for environment {name!r} in {source} are not a mapping."
+            )
+            raw_scripts = {}
+        if not isinstance(extra_scripts, Mapping):
+            environment_unresolved.append(
+                f"Hatch extra-scripts for environment {name!r} are not a mapping."
+            )
+            extra_scripts = {}
+        for script_name, declaration in (*raw_scripts.items(), *extra_scripts.items()):
+            if not isinstance(script_name, str):
+                environment_unresolved.append(
+                    f"Hatch script name in environment {name!r} is not a string."
+                )
+                continue
+            commands = _hatch_script_commands(declaration)
+            if commands is None:
+                environment_unresolved.append(
+                    f"Hatch script {name}:{script_name} has unsupported dynamic syntax."
+                )
+                continue
+            if script_name in scripts:
+                environment_unresolved.append(
+                    f"Hatch extra-script {name}:{script_name} conflicts with scripts."
+                )
+            else:
+                scripts[script_name] = commands
+        if raw_settings.get("matrix"):
+            environment_unresolved.append(
+                f"Hatch matrix variants for environment {name!r} remain symbolic."
+            )
+        if raw_settings.get("extends"):
+            environment_unresolved.append(
+                f"Hatch environment inheritance for {name!r} was not expanded."
+            )
+        settings = {
+            key: value
+            for key, value in raw_settings.items()
+            if key not in {"scripts", "extra-scripts"}
+        }
+        for script_name, commands in scripts.items():
+            for command in commands:
+                if "{" in command or "}" in command or "${" in command:
+                    environment_unresolved.append(
+                        f"Hatch script {name}:{script_name} uses context or shell "
+                        "expansion that remains unresolved."
+                    )
+        parsed[name] = HatchEnvironment(
+            name, scripts, settings, tuple(dict.fromkeys(environment_unresolved))
+        )
+    return HatchConfiguration(
+        tuple(source for source, _ in sources),
+        parsed,
+        tuple(dict.fromkeys(unresolved)),
+    )
+
+
+def _hatch_script_commands(value: object) -> tuple[str, ...] | None:
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return tuple(value)
+    return None
+
+
+def _read_hatch_toml(path: Path) -> tuple[Mapping[str, Any], str | None]:
+    try:
+        value = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        return {}, f"Could not parse Hatch input {path.name}: {error}."
+    return (value, None) if isinstance(value, Mapping) else ({}, None)
+
+
+def _merge_toml_mappings(
+    base: Mapping[str, object], override: Mapping[str, object]
+) -> Mapping[str, object]:
+    """Apply Hatch's later hatch.toml precedence recursively."""
+    merged: dict[str, object] = dict(base)
+    for key, value in override.items():
+        previous = merged.get(key)
+        if isinstance(previous, Mapping) and isinstance(value, Mapping):
+            merged[key] = _merge_toml_mappings(previous, value)
+        else:
+            merged[key] = value
+    return merged
+
+
+def _contains_table(value: object, keys: Sequence[str]) -> bool:
+    current = value
+    for key in keys:
+        if not isinstance(current, Mapping) or key not in current:
+            return False
+        current = current[key]
+    return True
+
+
+def hatch_script_closure(
+    configuration: HatchConfiguration,
+    environment: str,
+    script: str,
+    *,
+    max_depth: int = 16,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Collect literal Hatch script commands and named-script references."""
+    env = configuration.environments.get(environment)
+    if env is None:
+        return (), (f"Hatch environment {environment!r} is not declared.",)
+    commands: list[str] = []
+    diagnostics = list(configuration.unresolved)
+    diagnostics.extend(env.unresolved)
+
+    def visit(name: str, stack: tuple[str, ...], depth: int) -> None:
+        if name in stack:
+            diagnostics.append(
+                f"Hatch script cycle detected: {' -> '.join((*stack, name))}."
+            )
+            return
+        if depth > max_depth:
+            diagnostics.append(f"Hatch script depth exceeded at {name!r}.")
+            return
+        script_commands = env.scripts.get(name)
+        if script_commands is None:
+            diagnostics.append(f"Hatch script {environment}:{name} is not declared.")
+            return
+        for command in script_commands:
+            normalized = command.lstrip("-").strip()
+            first_word = normalized.split(maxsplit=1)[0] if normalized else ""
+            if first_word in env.scripts:
+                if normalized != first_word:
+                    diagnostics.append(
+                        f"Arguments on Hatch script reference {environment}:{name} "
+                        "remain unresolved."
+                    )
+                visit(first_word, (*stack, name), depth + 1)
+            else:
+                commands.append(command)
+
+    visit(script, (), 0)
+    return tuple(commands), tuple(dict.fromkeys(diagnostics))
+
+
 _MAKE_VALIDATION_TARGETS = {
     "check",
     "ci",

@@ -18,16 +18,19 @@ from powdrr_lift.structrr.validation_models import (
     ValidationContext,
 )
 from powdrr_lift.structrr.validation_tasks import (
+    HatchConfiguration,
     MakeConfiguration,
     NoxConfiguration,
     TaskRunnerConfiguration,
     ToxConfiguration,
+    discover_hatch_configuration,
     discover_just_configuration,
     discover_make_configuration,
     discover_nox_configuration,
     discover_pre_commit_configuration,
     discover_task_configuration,
     discover_tox_configuration,
+    hatch_script_closure,
     likely_make_validation_targets,
     likely_task_targets,
     make_ci_invocations,
@@ -230,6 +233,10 @@ def discover_validation_profiles(
     profiles.extend(_discover_tox_profiles(root_path, ci_commands))
     profiles.extend(_discover_nox_profiles(root_path, ci_commands))
     profiles.extend(_discover_make_profiles(root_path, ci_commands))
+    hatch_configuration = discover_hatch_configuration(root_path)
+    profiles.extend(
+        _discover_hatch_profiles(root_path, ci_commands, hatch_configuration)
+    )
     just_configuration = discover_just_configuration(root_path)
     task_configuration = discover_task_configuration(root_path)
     profiles.extend(
@@ -252,6 +259,7 @@ def discover_validation_profiles(
             tox_configuration,
             nox_configuration,
             make_configuration,
+            hatch_configuration,
             just_configuration,
             task_configuration,
             profiles,
@@ -270,6 +278,7 @@ def discover_validation_profiles(
             or profile.name.startswith("pre-commit-")
             or profile.name.startswith("just-")
             or profile.name.startswith("task-")
+            or profile.name.startswith("hatch-")
         )
         for profile in profiles
     )
@@ -549,6 +558,7 @@ def _task_runner_commands(
     tox_configuration: object,
     nox_configuration: object,
     make_configuration: object,
+    hatch_configuration: object,
     just_configuration: object,
     task_configuration: object,
     profiles: Sequence[DiscoveredValidationProfile],
@@ -572,6 +582,11 @@ def _task_runner_commands(
     just_config = (
         cast(TaskRunnerConfiguration, just_configuration)
         if just_configuration is not None
+        else None
+    )
+    hatch_config = (
+        cast(HatchConfiguration, hatch_configuration)
+        if hatch_configuration is not None
         else None
     )
     task_config = (
@@ -623,6 +638,18 @@ def _task_runner_commands(
                         commands.append((tuple(shlex.split(command, posix=True)),))
                     except ValueError:
                         continue
+        elif (
+            profile.name.startswith("hatch-")
+            and hatch_config
+            and len(profile.selectors) == 2
+        ):
+            environment, script = profile.selectors
+            script_commands, _ = hatch_script_closure(hatch_config, environment, script)
+            for command in script_commands:
+                try:
+                    commands.append((tuple(shlex.split(command, posix=True)),))
+                except ValueError:
+                    continue
         elif profile.name.startswith("task-") and task_config and profile.selectors:
             task_tasks, _ = task_runner_closure(task_config, profile.selectors)
             for task in task_tasks:
@@ -873,6 +900,219 @@ def _discover_task_runner_profiles(
             )
         )
     return tuple(profiles)
+
+
+def _discover_hatch_profiles(
+    root: Path,
+    ci_commands: Sequence[tuple[str, ...]],
+    configuration: HatchConfiguration | None,
+) -> tuple[DiscoveredValidationProfile, ...]:
+    invocations = tuple(command for command in ci_commands if _is_hatch_run(command))
+    if configuration is None and not invocations:
+        return ()
+    if invocations:
+        selections = tuple(
+            (command, _hatch_script_selector(command, configuration))
+            for command in invocations
+        )
+        declaration = "declared"
+    elif configuration:
+        selections = tuple(
+            (
+                ("hatch", "run", f"{environment.name}:{script}"),
+                (environment.name, script),
+            )
+            for environment in configuration.environments.values()
+            for script in environment.scripts
+            if _likely_validation_name(script)
+        )
+        declaration = "inferred"
+    else:
+        return ()
+    config_files = configuration.config_files if configuration else ()
+    workflow_paths = tuple(
+        path
+        for path in sorted((root / ".github" / "workflows").glob("*.y*ml"))
+        if re.search(r"\bhatch\b", _read_text(path))
+    )
+    profiles: list[DiscoveredValidationProfile] = []
+    for index, (command, selectors) in enumerate(selections, start=1):
+        unresolved = list(configuration.unresolved if configuration else ())
+        environment_name, script_name = selectors if len(selectors) == 2 else ("", "")
+        script_commands: tuple[str, ...] = ()
+        environment: object = None
+        if configuration and selectors:
+            environment = configuration.environments.get(environment_name)
+            script_commands, diagnostics = hatch_script_closure(
+                configuration, environment_name, script_name
+            )
+            unresolved.extend(diagnostics)
+            if environment is None:
+                unresolved.append(
+                    f"Hatch environment {environment_name!r} is not statically "
+                    "declared."
+                )
+        elif invocations:
+            unresolved.append(
+                "Hatch CI command selects an environment script, but no Hatch "
+                "configuration was found to explain it."
+                if selectors
+                else "Hatch CI command does not select a statically declared "
+                "environment script."
+            )
+        if len(selectors) == 2:
+            selected_token = f"{environment_name}:{script_name}"
+            hatch_index = next(
+                (i for i, token in enumerate(command) if Path(token).name == "hatch"),
+                -1,
+            )
+            selected_index = next(
+                (i for i, token in enumerate(command) if token == selected_token),
+                len(command) - 1,
+            )
+            if selected_index + 1 < len(command):
+                unresolved.append(
+                    "Arguments after the Hatch script selector may supply script "
+                    "context and remain unresolved."
+                )
+            if hatch_index >= 0 and selected_index <= hatch_index:
+                unresolved.append(
+                    "Could not locate the Hatch script selector in its command."
+                )
+        if environment is not None:
+            environment_unresolved = getattr(environment, "unresolved", ())
+            unresolved.extend(environment_unresolved)
+        declared_script = bool(
+            environment and script_name in getattr(environment, "scripts", {})
+        )
+        known_validation = (
+            declared_script
+            and len(selectors) == 2
+            and _likely_validation_name(script_name)
+        )
+        settings: dict[str, object] = {
+            "environment": environment_name or None,
+            "script": script_name or None,
+            "commands": list(script_commands),
+            "environment_settings": (
+                dict(getattr(environment, "settings", {})) if environment else {}
+            ),
+        }
+        target_name = f"{environment_name}-{script_name}" if selectors else "run"
+        evidence_paths = [*config_files]
+        evidence_paths.extend(
+            path.relative_to(root).as_posix() for path in workflow_paths
+        )
+        profiles.append(
+            DiscoveredValidationProfile(
+                name=f"hatch-{target_name}"
+                if len(selections) == 1
+                else f"hatch-{index}-{target_name}",
+                command=command,
+                source="Hatch environment/GitHub Actions",
+                provider_name="aggregate" if known_validation else "custom",
+                purpose=(
+                    f"Run Hatch environment script {environment_name}:{script_name}."
+                    if selectors
+                    else "Run the native Hatch command recorded by CI."
+                ),
+                roles=("validation",) if known_validation else (),
+                selectors=selectors,
+                config_files=config_files,
+                settings=settings,
+                declaration=declaration,
+                evidence=tuple(
+                    f"validation-input:{path}" for path in dict.fromkeys(evidence_paths)
+                ),
+                unresolved=tuple(dict.fromkeys(unresolved)),
+            )
+        )
+    return tuple(profiles)
+
+
+def _is_hatch_run(command: Sequence[str]) -> bool:
+    hatch_index = next(
+        (index for index, token in enumerate(command) if Path(token).name == "hatch"),
+        None,
+    )
+    if hatch_index is None:
+        return False
+    tail = command[hatch_index + 1 :]
+    return "run" in tail
+
+
+def _hatch_script_selector(
+    command: Sequence[str], configuration: HatchConfiguration | None
+) -> tuple[str, ...]:
+    hatch_index = next(
+        (index for index, token in enumerate(command) if Path(token).name == "hatch"),
+        None,
+    )
+    if hatch_index is None:
+        return ()
+    tail = command[hatch_index + 1 :]
+    try:
+        run_index = tail.index("run")
+    except ValueError:
+        return ()
+    selected_environment: str | None = None
+    skip_next_environment = False
+    for token in tail[:run_index]:
+        if skip_next_environment:
+            selected_environment = token
+            skip_next_environment = False
+        elif token in {"-e", "--env"}:
+            skip_next_environment = True
+        elif token.startswith("--env="):
+            selected_environment = token.split("=", 1)[1]
+    skip_next_option: str | None = None
+    for token in tail[run_index + 1 :]:
+        if skip_next_option:
+            if skip_next_option == "environment":
+                selected_environment = token
+            skip_next_option = None
+            continue
+        if token in {"-e", "--env"}:
+            skip_next_option = "environment"
+            continue
+        if token in {"-i", "--include", "-x", "--exclude"}:
+            skip_next_option = "matrix"
+            continue
+        if token.startswith("--env="):
+            selected_environment = token.split("=", 1)[1]
+            continue
+        if token.startswith(("+", "-")):
+            continue
+        if "=" in token:
+            continue
+        if ":" in token:
+            environment, script = token.split(":", 1)
+            return (environment, script) if environment and script else ()
+        environment = selected_environment or "default"
+        if (
+            configuration is not None
+            and environment in configuration.environments
+            and token in configuration.environments[environment].scripts
+        ):
+            return environment, token
+        return ()
+    return ()
+
+
+def _likely_validation_name(name: str) -> bool:
+    return name in {
+        "check",
+        "ci",
+        "format",
+        "format-check",
+        "lint",
+        "test",
+        "tests",
+        "typecheck",
+        "type-check",
+        "validate",
+        "verify",
+    } or name.startswith(("check-", "lint-", "test-", "typecheck-", "validate-"))
 
 
 def _task_runner_selectors(command: Sequence[str], runner: str) -> tuple[str, ...]:

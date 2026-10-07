@@ -1,0 +1,66 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 936
+title: Preserve failures from parallel Procedrr judges
+intent:
+  problem: When a parallel judge item failed, the evaluator propagated the first exception before copying buffered per-item events to the run log, hiding the paths and trace IDs of sibling failures.
+  goal: Flush each parallel item's events before propagating its error so every failed judge can be matched to its provider attempt telemetry.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 769, end_line: 774}
+    summary: Return item errors alongside buffered events from parallel judge work.
+    rationale: Retain diagnostic events even when one judge fails.
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 779, end_line: 790}
+    summary: Capture each parallel item's exception rather than discarding its local event buffer.
+    rationale: Keep the workflow path and trace ID emitted by a failed judge.
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 807, end_line: 808}
+    summary: Collect errors while iterating completed parallel judge items.
+    rationale: Delay propagation until all item events have been forwarded.
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 804, end_line: 805}
+    summary: Prepare a collection for parallel item errors.
+    rationale: Record batch failures and propagate them after buffered events are delivered.
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 815, end_line: 817}
+    summary: Preserve item failure events and skip result collection for failed items.
+    rationale: Record each failed item's diagnostic event without fabricating a result.
+  - path: src/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 833, end_line: 836}
+    summary: Enforce aggregate limits and then raise the first captured item error.
+    rationale: Ensure all completed parallel events reach the sink before the workflow unwinds.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 111, end_line: 161}
+    summary: Verify all failed parallel judges retain distinct paths and trace IDs.
+    rationale: Prevent regression to logging only the first exception from a parallel batch.
+entities:
+  - id: parallel-procedrr-item-event-flush
+    type: Function
+    action: added
+  - id: parallel-judge-failure-event-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: parallel-failure-events-verify-item-paths
+    type: verifies
+    source: parallel-judge-failure-event-test
+    target: parallel-procedrr-item-event-flush
+    action: added
+    description: The regression test ensures every parallel failure event is delivered with its own workflow item path and trace ID.
+invariants:
+  - id: parallel-judge-failure-events-are-not-dropped
+    description: All events buffered by completed parallel judge items are forwarded before an item error is propagated.
+    action: added
+guidance:
+  - id: match-parallel-failures-to-provider-attempts
+    description: For a parallel judge batch, match each judge_failed event's trace ID and path with its procedrr.provider_attempt records to identify the exact failed item and provider attempts.
+    action: added

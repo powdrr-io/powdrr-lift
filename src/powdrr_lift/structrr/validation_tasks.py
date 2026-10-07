@@ -75,6 +75,94 @@ class PdmConfiguration:
     unresolved: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class PipenvConfiguration:
+    """Custom task scripts declared in a Pipfile."""
+
+    config_file: str
+    scripts: Mapping[str, Mapping[str, object]]
+    unresolved: tuple[str, ...] = ()
+
+
+def discover_pipenv_configuration(root: str | Path) -> PipenvConfiguration | None:
+    """Read Pipenv scripts and retain the command form and environment options."""
+    path = Path(root).resolve() / "Pipfile"
+    if not path.is_file():
+        return None
+    try:
+        document = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        return PipenvConfiguration(
+            "Pipfile", {}, (f"Could not parse Pipenv input Pipfile: {error}.",)
+        )
+    raw = document.get("scripts")
+    if not isinstance(raw, Mapping):
+        if _contains_table(document, ("scripts",)):
+            return PipenvConfiguration(
+                "Pipfile",
+                {},
+                ("Could not statically parse Pipenv scripts in Pipfile.",),
+            )
+        return None
+    scripts: dict[str, Mapping[str, object]] = {}
+    unresolved: list[str] = []
+    for name, value in raw.items():
+        if not isinstance(name, str):
+            unresolved.append(f"Pipenv script name is not a string: {name!r}.")
+            continue
+        if isinstance(value, str):
+            scripts[name] = {"cmd": value}
+        elif isinstance(value, Mapping):
+            scripts[name] = dict(value)
+        else:
+            unresolved.append(
+                f"Pipenv script {name!r} has unsupported declaration syntax."
+            )
+    return PipenvConfiguration("Pipfile", scripts, tuple(unresolved))
+
+
+def pipenv_script_closure(
+    configuration: PipenvConfiguration, name: str
+) -> tuple[tuple[tuple[str, ...], ...], tuple[str, ...]]:
+    """Expand simple command scripts and flag shell/call behavior as unresolved."""
+    declaration = configuration.scripts.get(name)
+    if declaration is None:
+        return (), (f"Pipenv script {name!r} has no static declaration.",)
+    kind = next((key for key in ("cmd", "call") if key in declaration), None)
+    value = declaration.get(kind) if kind else None
+    diagnostics: list[str] = []
+    commands: tuple[tuple[str, ...], ...] = ()
+    if kind == "call":
+        diagnostics.append(
+            f"Pipenv call script {name!r} was retained without interpretation."
+        )
+    elif kind == "cmd" and isinstance(value, str):
+        if any(
+            marker in value
+            for marker in ("&&", "||", "|", ";", ">", "<", "$(", "${", "&")
+        ) or re.search(r"(?:^|\s)[A-Za-z_][A-Za-z0-9_]*=", value):
+            diagnostics.append(
+                f"Pipenv script {name!r} uses shell composition or expansion "
+                "that remains unresolved."
+            )
+        else:
+            try:
+                commands = (tuple(shlex.split(value, posix=True)),)
+            except ValueError:
+                diagnostics.append(
+                    f"Pipenv script {name!r} has malformed command quoting."
+                )
+    else:
+        diagnostics.append(f"Pipenv script {name!r} has no supported static command.")
+    for option in ("env", "working_dir"):
+        if option in declaration:
+            diagnostics.append(
+                f"Pipenv script {name!r} uses {option} settings retained "
+                "in configuration."
+            )
+    return commands, tuple(dict.fromkeys(diagnostics))
+
+
 def discover_pdm_configuration(root: str | Path) -> PdmConfiguration | None:
     """Read PDM scripts while preserving their native type and execution settings."""
     path = Path(root).resolve() / "pyproject.toml"

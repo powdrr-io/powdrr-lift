@@ -22,6 +22,7 @@ from powdrr_lift.structrr.validation_tasks import (
     MakeConfiguration,
     NoxConfiguration,
     PdmConfiguration,
+    PipenvConfiguration,
     TaskRunnerConfiguration,
     ToxConfiguration,
     discover_hatch_configuration,
@@ -29,6 +30,7 @@ from powdrr_lift.structrr.validation_tasks import (
     discover_make_configuration,
     discover_nox_configuration,
     discover_pdm_configuration,
+    discover_pipenv_configuration,
     discover_pre_commit_configuration,
     discover_task_configuration,
     discover_tox_configuration,
@@ -41,6 +43,7 @@ from powdrr_lift.structrr.validation_tasks import (
     nox_ci_invocations,
     nox_workflow_invocations,
     pdm_script_closure,
+    pipenv_script_closure,
     task_runner_closure,
     tox_ci_invocations,
     tox_workflow_invocations,
@@ -236,6 +239,10 @@ def discover_validation_profiles(
     profiles.extend(_discover_tox_profiles(root_path, ci_commands))
     profiles.extend(_discover_nox_profiles(root_path, ci_commands))
     profiles.extend(_discover_make_profiles(root_path, ci_commands))
+    pipenv_configuration = discover_pipenv_configuration(root_path)
+    profiles.extend(
+        _discover_pipenv_profiles(root_path, ci_commands, pipenv_configuration)
+    )
     pdm_configuration = discover_pdm_configuration(root_path)
     profiles.extend(_discover_pdm_profiles(root_path, ci_commands, pdm_configuration))
     hatch_configuration = discover_hatch_configuration(root_path)
@@ -266,6 +273,7 @@ def discover_validation_profiles(
             make_configuration,
             hatch_configuration,
             pdm_configuration,
+            pipenv_configuration,
             just_configuration,
             task_configuration,
             profiles,
@@ -286,6 +294,7 @@ def discover_validation_profiles(
             or profile.name.startswith("task-")
             or profile.name.startswith("hatch-")
             or profile.name.startswith("pdm-")
+            or profile.name.startswith("pipenv-")
         )
         for profile in profiles
     )
@@ -567,6 +576,7 @@ def _task_runner_commands(
     make_configuration: object,
     hatch_configuration: object,
     pdm_configuration: object,
+    pipenv_configuration: object,
     just_configuration: object,
     task_configuration: object,
     profiles: Sequence[DiscoveredValidationProfile],
@@ -600,6 +610,11 @@ def _task_runner_commands(
     pdm_config = (
         cast(PdmConfiguration, pdm_configuration)
         if pdm_configuration is not None
+        else None
+    )
+    pipenv_config = (
+        cast(PipenvConfiguration, pipenv_configuration)
+        if pipenv_configuration is not None
         else None
     )
     task_config = (
@@ -666,6 +681,11 @@ def _task_runner_commands(
         elif profile.name.startswith("pdm-") and pdm_config and profile.selectors:
             pdm_commands, _ = pdm_script_closure(pdm_config, profile.selectors[0])
             commands.extend((command,) for command in pdm_commands)
+        elif profile.name.startswith("pipenv-") and pipenv_config and profile.selectors:
+            pipenv_commands, _ = pipenv_script_closure(
+                pipenv_config, profile.selectors[0]
+            )
+            commands.extend((command,) for command in pipenv_commands)
         elif profile.name.startswith("task-") and task_config and profile.selectors:
             task_tasks, _ = task_runner_closure(task_config, profile.selectors)
             for task in task_tasks:
@@ -916,6 +936,113 @@ def _discover_task_runner_profiles(
             )
         )
     return tuple(profiles)
+
+
+def _discover_pipenv_profiles(
+    root: Path,
+    ci_commands: Sequence[tuple[str, ...]],
+    configuration: PipenvConfiguration | None,
+) -> tuple[DiscoveredValidationProfile, ...]:
+    invocations = tuple(
+        command
+        for command in ci_commands
+        if _pipenv_script_selector(command) is not None
+    )
+    if configuration is None and not invocations:
+        return ()
+    validation_names = {
+        "check",
+        "ci",
+        "format",
+        "format-check",
+        "lint",
+        "test",
+        "tests",
+        "typecheck",
+        "type-check",
+        "validate",
+        "verify",
+    }
+    if invocations:
+        selections = tuple(
+            (command, _pipenv_script_selector(command)) for command in invocations
+        )
+        declaration = "declared"
+    elif configuration:
+        names = tuple(
+            name
+            for name in configuration.scripts
+            if name in validation_names
+            or name.startswith(("check_", "lint_", "test_", "type_check_", "validate_"))
+        )
+        selections = tuple((("pipenv", "run", name), name) for name in names)
+        declaration = "inferred"
+    else:
+        return ()
+    workflow_paths = tuple(
+        path.relative_to(root).as_posix()
+        for path in sorted((root / ".github" / "workflows").glob("*.y*ml"))
+        if re.search(r"\bpipenv\b", _read_text(path))
+    )
+    profiles: list[DiscoveredValidationProfile] = []
+    for index, (command, selector) in enumerate(selections, start=1):
+        unresolved = list(configuration.unresolved if configuration else ())
+        script = (
+            configuration.scripts.get(selector) if configuration and selector else None
+        )
+        expanded: tuple[tuple[str, ...], ...] = ()
+        if configuration and selector:
+            expanded, diagnostics = pipenv_script_closure(configuration, selector)
+            unresolved.extend(diagnostics)
+        elif selector:
+            unresolved.append("Pipenv script invocation has no Pipfile declaration.")
+        if selector is None:
+            unresolved.append("Pipenv run has no statically selected script.")
+        known_validation = selector is not None and (
+            selector in validation_names
+            or selector.startswith(
+                ("check_", "lint_", "test_", "type_check_", "validate_")
+            )
+        )
+        evidence_paths = (
+            (configuration.config_file,) if configuration else ()
+        ) + workflow_paths
+        profiles.append(
+            DiscoveredValidationProfile(
+                name=f"pipenv-{selector or 'default'}"
+                if len(selections) == 1
+                else f"pipenv-{index}-{selector or 'default'}",
+                command=command,
+                source="Pipenv scripts/GitHub Actions",
+                provider_name="aggregate" if known_validation else "custom",
+                purpose="Run the native Pipenv script recorded in the project.",
+                roles=("validation",) if known_validation else (),
+                selectors=(selector,) if selector else (),
+                config_files=(configuration.config_file,) if configuration else (),
+                settings={
+                    "script": dict(script) if script else {},
+                    "expanded_commands": [list(item) for item in expanded],
+                },
+                declaration=declaration,
+                evidence=tuple(
+                    f"validation-input:{path}" for path in dict.fromkeys(evidence_paths)
+                ),
+                unresolved=tuple(dict.fromkeys(unresolved)),
+            )
+        )
+    return tuple(profiles)
+
+
+def _pipenv_script_selector(command: Sequence[str]) -> str | None:
+    pipenv_index = next(
+        (i for i, token in enumerate(command) if Path(token).name == "pipenv"), None
+    )
+    if pipenv_index is None:
+        return None
+    tail = command[pipenv_index + 1 :]
+    if len(tail) < 2 or tail[0] != "run":
+        return None
+    return tail[1] if not tail[1].startswith("-") else None
 
 
 def _discover_pdm_profiles(
@@ -1591,6 +1718,7 @@ def _ci_commands(root: Path) -> tuple[tuple[str, ...], ...]:
                         "just ",
                         "task ",
                         "pdm ",
+                        "pipenv ",
                     )
                 ):
                     commands.append(_split_shell_arguments(stripped))

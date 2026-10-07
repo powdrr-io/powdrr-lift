@@ -9,12 +9,14 @@ from powdrr_lift.structrr.validation_tasks import (
     discover_just_configuration,
     discover_make_configuration,
     discover_pdm_configuration,
+    discover_pipenv_configuration,
     discover_pre_commit_configuration,
     discover_task_configuration,
     discover_tox_configuration,
     hatch_script_closure,
     make_target_closure,
     pdm_script_closure,
+    pipenv_script_closure,
     task_runner_closure,
 )
 
@@ -886,4 +888,58 @@ def test_pdm_shell_and_call_scripts_remain_unresolved(tmp_path: Path) -> None:
     _, shell_diagnostics = pdm_script_closure(configuration, "shellcheck")
     _, call_diagnostics = pdm_script_closure(configuration, "custom")
     assert any("shell script" in item for item in shell_diagnostics)
+    assert any("call script" in item for item in call_diagnostics)
+
+
+def test_pipenv_scripts_and_ci_invocation_preserve_native_command(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "Pipfile").write_text(
+        "[scripts]\n"
+        "check = 'ruff check src'\n"
+        "test = {cmd = 'pytest tests', env = {MODE = 'ci'}}\n",
+        encoding="utf-8",
+    )
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n      - run: pipenv run check\n",
+        encoding="utf-8",
+    )
+
+    configuration = discover_pipenv_configuration(tmp_path)
+    assert configuration is not None
+    commands, diagnostics = pipenv_script_closure(configuration, "test")
+    assert commands == (("pytest", "tests"),)
+    assert any("env settings" in item for item in diagnostics)
+
+    profiles = discover_validation_profiles(tmp_path)
+    profile = next(item for item in profiles if item.name == "pipenv-check")
+    assert profile.command == ("pipenv", "run", "check")
+    assert profile.provider == "aggregate"
+    assert profile.evidence == (
+        "validation-input:Pipfile",
+        "validation-input:.github/workflows/ci.yml",
+    )
+
+
+def test_pipenv_shell_composition_and_call_remain_unresolved(tmp_path: Path) -> None:
+    (tmp_path / "Pipfile").write_text(
+        "[scripts]\n"
+        "combined = 'ruff check src && pytest tests'\n"
+        "inlineenv = 'MODE=ci pytest tests'\n"
+        "custom = {call = 'checks:run'}\n",
+        encoding="utf-8",
+    )
+    configuration = discover_pipenv_configuration(tmp_path)
+    assert configuration is not None
+    shell_commands, shell_diagnostics = pipenv_script_closure(configuration, "combined")
+    _, call_diagnostics = pipenv_script_closure(configuration, "custom")
+    inline_commands, inline_diagnostics = pipenv_script_closure(
+        configuration, "inlineenv"
+    )
+    assert shell_commands == ()
+    assert any("shell composition" in item for item in shell_diagnostics)
+    assert inline_commands == ()
+    assert any("shell composition" in item for item in inline_diagnostics)
     assert any("call script" in item for item in call_diagnostics)

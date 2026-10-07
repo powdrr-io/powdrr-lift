@@ -1,0 +1,322 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 952
+title: Add typed acceptance criterion wire schema
+intent:
+  problem: Prompt capture failed when acceptance criteria were returned in the wrong wire shape or duplicated, and discovered validation profiles could cite evidence absent from the validation context.
+  goal: Make criterion generation and repair use a bounded typed contract, preserve the persisted representation, and complete an auditable prompt-only capture.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/evaluations/prompt-quality-recovery/README.md
+    type: added
+    span: {start_line: 1, end_line: 60}
+    summary: Record prompt-only capture provenance and quality limits.
+    rationale: Make captured prompt evidence reviewable without claiming unsupported quality gains.
+  - path: docs/evaluations/prompt-quality-recovery/criterion-wire-v2-example.json
+    type: added
+    span: {start_line: 1, end_line: 26}
+    summary: Provide a hand-authored typed criterion example.
+    rationale: Show the wire structure separately from live model evidence.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 1205, end_line: 1205}
+    summary: Use one bounded object schema for generated and repaired criteria.
+    rationale: Keep provider outputs typed and bounded across both operations.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 1208, end_line: 1208}
+    summary: Use one bounded object schema for generated and repaired criteria.
+    rationale: Keep provider outputs typed and bounded across both operations.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 1234, end_line: 1234}
+    summary: Use one bounded object schema for generated and repaired criteria.
+    rationale: Keep provider outputs typed and bounded across both operations.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 1237, end_line: 1280}
+    summary: Use one bounded object schema for generated and repaired criteria.
+    rationale: Keep provider outputs typed and bounded across both operations.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 1449, end_line: 1449}
+    summary: Use one bounded object schema for generated and repaired criteria.
+    rationale: Keep provider outputs typed and bounded across both operations.
+  - path: docs/procedrr/skill-definitions/design-interview.yaml
+    type: modified
+    span: {start_line: 1458, end_line: 1458}
+    summary: Use one bounded object schema for generated and repaired criteria.
+    rationale: Keep provider outputs typed and bounded across both operations.
+  - path: src/powdrr_lift/structrr/validation.py
+    type: modified
+    span: {start_line: 113, end_line: 113}
+    summary: Include profile-cited files in validation context evidence.
+    rationale: Allow discovered validation profiles to resolve their evidence references.
+  - path: src/powdrr_lift/structrr/validation.py
+    type: modified
+    span: {start_line: 119, end_line: 140}
+    summary: Include profile-cited files in validation context evidence.
+    rationale: Allow discovered validation profiles to resolve their evidence references.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 14, end_line: 15}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 26, end_line: 30}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 111, end_line: 111}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 217, end_line: 222}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 259, end_line: 259}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1035, end_line: 1035}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1232, end_line: 1232}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1301, end_line: 1330}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1332, end_line: 1332}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1338, end_line: 1340}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1358, end_line: 1374}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1378, end_line: 1380}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1382, end_line: 1382}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1388, end_line: 1396}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1405, end_line: 1405}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1407, end_line: 1409}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1433, end_line: 1433}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1435, end_line: 1437}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/powdrr_lift/workrr/acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 1456, end_line: 1496}
+    summary: Bind typed criteria, enforce bounds, and deduplicate identical IDs.
+    rationale: Reject malformed wire values and let capture continue through repeated identical criteria.
+  - path: src/procedrr/parser.py
+    type: modified
+    span: {start_line: 1677, end_line: 1686}
+    summary: Allow explicitly bounded object arrays in workflow output schemas.
+    rationale: Permit the typed criteria schema while enforcing finite bounds.
+  - path: tests/fixtures/prompt_quality_recovery/captured-prose-criterion.json
+    type: added
+    span: {start_line: 1, end_line: 8}
+    summary: Preserve sanitized malformed criterion output from capture.
+    rationale: Keep the original wire-format failure available as regression provenance.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 27, end_line: 27}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 47, end_line: 64}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 113, end_line: 113}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 144, end_line: 147}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 178, end_line: 311}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 420, end_line: 420}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 286, end_line: 296}
+    summary: Remove string-encoded assertion fixtures from compiler tests.
+    rationale: Keep repaired tests consistent with typed assertion objects.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 423, end_line: 423}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 425, end_line: 425}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 430, end_line: 437}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 490, end_line: 490}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 495, end_line: 495}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 497, end_line: 503}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 507, end_line: 507}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 509, end_line: 512}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 762, end_line: 762}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 764, end_line: 767}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 771, end_line: 774}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_acceptance_criterion_compiler.py
+    type: modified
+    span: {start_line: 786, end_line: 786}
+    summary: Cover typed binding, malformed legacy values, and duplicate handling.
+    rationale: Prevent recurrence of the captured acceptance criterion failures.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2990, end_line: 3006}
+    summary: Return typed criteria from endpoint test doubles.
+    rationale: Keep feature endpoint tests aligned with the provider schema.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 129, end_line: 145}
+    summary: Return typed criteria from end-to-end test doubles.
+    rationale: Exercise the new wire contract through the implementation flow.
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 398, end_line: 398}
+    summary: Cover bounded and unbounded object array schemas.
+    rationale: Protect the Procedrr complexity boundary.
+  - path: tests/test_validation_discovery.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Check that discovered profile evidence is included in context.
+    rationale: Prevent evidence reference resolution errors.
+  - path: tests/test_validation_discovery.py
+    type: modified
+    span: {start_line: 6, end_line: 11}
+    summary: Check that discovered profile evidence is included in context.
+    rationale: Prevent evidence reference resolution errors.
+  - path: tests/test_validation_discovery.py
+    type: modified
+    span: {start_line: 115, end_line: 138}
+    summary: Check that discovered profile evidence is included in context.
+    rationale: Prevent evidence reference resolution errors.
+entities:
+  - id: acceptance-criterion-wire-v2
+    type: Technical specification
+    action: added
+  - id: typed-acceptance-criterion-binding
+    type: Function
+    action: added
+  - id: bounded-object-array-output-schema
+    type: Static analysis rule
+    action: added
+entity_relationships: []
+invariants:
+  - id: generated-and-repaired-criteria-share-one-schema
+    description: Acceptance criterion generation and repair use the same bounded object schema, and the binder rejects criteria or assertions encoded as JSON strings.
+    action: added
+  - id: persisted-criterion-shape-remains-compatible
+    description: Wire v2 event descriptions are adapted to the existing persisted event-object representation.
+    action: added
+  - id: duplicate-criterion-ids-require-identical-content
+    description: Identical duplicate criterion IDs are collapsed, while an ID reused for different content is rejected.
+    action: added
+  - id: prompt-capture-evidence-does-not-imply-quality-gain
+    description: The captured prompt evaluation reports zero checkable criteria and unresolved requirements without claiming a prompt-quality improvement.
+    action: added
+guidance:
+  - id: evaluate-captured-worker-prompt
+    description: Use the actual indexed provider-ready worker prompt for evaluation and treat implementation-prompt projections as non-authoritative.
+    action: added

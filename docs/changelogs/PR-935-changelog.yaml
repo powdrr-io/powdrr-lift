@@ -69,12 +69,12 @@ files:
     rationale: Retain the bounded retry policy while preserving the terminal failure record.
   - path: src/powdrr_lift/workrr/procedrr.py
     type: modified
-    span: {start_line: 194, end_line: 221}
-    summary: Serialize attempt metadata with trace ID, retry outcome, timing, and model identifiers.
+    span: {start_line: 194, end_line: 231}
+    summary: Serialize attempt metadata with trace ID, retry outcome, timing, and direct or delegated client/model identifiers.
     rationale: Diagnose failing provider calls without storing request messages.
   - path: src/powdrr_lift/workrr/procedrr.py
     type: modified
-    span: {start_line: 280, end_line: 282}
+    span: {start_line: 290, end_line: 292}
     summary: Attach the request trace ID to provider attempts.
     rationale: Correlate provider retry telemetry with the failed judge event.
   - path: src/powdrr_lift/workrr/feature_endpoint.py
@@ -129,7 +129,7 @@ files:
     rationale: Prevent regressions that would again leave a failing judge unidentified.
   - path: tests/test_workrr_procedrr.py
     type: modified
-    span: {start_line: 77, end_line: 112}
+    span: {start_line: 77, end_line: 122}
     summary: Verify retry telemetry is correlated across attempts and excludes prompt content.
     rationale: Ensure provider failures can be traced without persisting sensitive prompt text.
 entities:
@@ -164,5 +164,5 @@ invariants:
     action: added
 guidance:
   - id: trace-procedrr-provider-failures
-    description: Use the judge_failed record in procedrr-events.jsonl to identify the failed workflow path and trace ID, then match it to procedrr.provider_attempt records to inspect retries and outcomes.
+    description: Use the judge_failed record in procedrr-events.jsonl to identify the failed workflow path and trace ID, then match it to procedrr.provider_attempt records to inspect retries, outcomes, and any delegated provider client/model.
     action: added

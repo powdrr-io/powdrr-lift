@@ -90,10 +90,19 @@ def test_procedrr_records_provider_retry_attempts_without_prompt_content(
                 raise error
             return {"complete": True}
 
+    class FallbackWrapper:
+        def __init__(self) -> None:
+            self._fallback = RetryOnce()
+
+        def complete_json(
+            self, messages: list[dict[str, str]], **kwargs: Any
+        ) -> dict[str, Any]:
+            return self._fallback.complete_json(messages, **kwargs)
+
     events: list[dict[str, Any]] = []
     monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", lambda _: None)
     client = WorkrrProcedrrClient(
-        cast(Any, RetryOnce()),
+        cast(Any, FallbackWrapper()),
         skills_dir=tmp_path,
         telemetry_sink=lambda record: events.append(dict(record)),
     )
@@ -107,6 +116,7 @@ def test_procedrr_records_provider_retry_attempts_without_prompt_content(
     assert [event["attempt"] for event in events] == [1, 2]
     assert events[0]["retryable"] is True
     assert events[0]["trace_id"] == events[1]["trace_id"]
+    assert events[0]["provider_delegate"] == "RetryOnce"
     assert "secret prompt text" not in str(events)
 
 

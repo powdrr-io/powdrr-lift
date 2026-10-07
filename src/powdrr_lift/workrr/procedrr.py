@@ -204,6 +204,7 @@ class WorkrrProcedrrClient:
         if self._telemetry_sink is None:
             return
         client = self._client
+        delegate = getattr(client, "_fallback", None)
         self._telemetry_sink(
             {
                 "record_type": "procedrr.provider_attempt",
@@ -212,6 +213,15 @@ class WorkrrProcedrrClient:
                 "provider_client": type(client).__name__,
                 "model": getattr(client, "model_name", None)
                 or getattr(client, "_model", None),
+                "provider_delegate": (
+                    type(delegate).__name__ if delegate is not None else None
+                ),
+                "delegate_model": (
+                    getattr(delegate, "model_name", None)
+                    or getattr(delegate, "_model", None)
+                    if delegate is not None
+                    else None
+                ),
                 "duration_ms": round((time.monotonic() - started) * 1000),
                 "outcome": outcome,
                 "error_type": error_type,

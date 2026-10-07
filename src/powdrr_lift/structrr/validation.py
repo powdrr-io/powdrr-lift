@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import tomllib
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
@@ -14,6 +15,11 @@ from powdrr_lift.structrr.validation_models import (
     VALIDATION_INVENTORY_SCHEMA_VERSION,
     ValidationCheck,
     ValidationContext,
+)
+from powdrr_lift.structrr.validation_tasks import (
+    discover_tox_configuration,
+    tox_ci_invocations,
+    tox_workflow_invocations,
 )
 
 VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION = VALIDATION_INVENTORY_SCHEMA_VERSION
@@ -203,8 +209,24 @@ def discover_validation_profiles(
     ci_commands = _ci_commands(root_path)
     uv_prefix = ("uv", "run") if (root_path / "pyproject.toml").exists() else ()
     text = _repository_text(root_path)
+    profiles.extend(_discover_tox_profiles(root_path, ci_commands))
+    tox_configuration = discover_tox_configuration(root_path)
+    tox_child_tools = {
+        token
+        for command_set in (
+            tox_configuration.commands.values() if tox_configuration else ()
+        )
+        for command in command_set
+        for token in command
+        if token in {"pytest", "ruff", "mypy", "black", "flake8", "pyright"}
+    }
+    tox_is_aggregate = any(profile.provider == "aggregate" for profile in profiles)
 
-    if _mentions_tool("ruff", pyproject, text):
+    if _mentions_tool("ruff", pyproject, text) and not (
+        tox_is_aggregate
+        and "ruff" in tox_child_tools
+        and _find_command(ci_commands, ("ruff",)) is None
+    ):
         profiles.extend(
             (
                 _profile(
@@ -221,7 +243,11 @@ def discover_validation_profiles(
                 ),
             )
         )
-    if _mentions_tool("mypy", pyproject, text):
+    if _mentions_tool("mypy", pyproject, text) and not (
+        tox_is_aggregate
+        and "mypy" in tox_child_tools
+        and _find_command(ci_commands, ("mypy",)) is None
+    ):
         profiles.append(
             _profile(
                 "mypy",
@@ -230,7 +256,13 @@ def discover_validation_profiles(
                 "mypy configuration/CI",
             )
         )
-    if _mentions_tool("pytest", pyproject, text) or (root_path / "tests").is_dir():
+    if (
+        _mentions_tool("pytest", pyproject, text) or (root_path / "tests").is_dir()
+    ) and not (
+        tox_is_aggregate
+        and "pytest" in tox_child_tools
+        and _find_command(ci_commands, ("pytest",)) is None
+    ):
         profiles.append(
             _profile(
                 "pytest",
@@ -281,6 +313,75 @@ def _profile(
     name: str, command: tuple[str, ...], source: str
 ) -> DiscoveredValidationProfile:
     return DiscoveredValidationProfile(name, command, source)
+
+
+def _discover_tox_profiles(
+    root: Path, ci_commands: Sequence[tuple[str, ...]]
+) -> tuple[DiscoveredValidationProfile, ...]:
+    configuration = discover_tox_configuration(root)
+    invocations = tox_ci_invocations(ci_commands)
+    workflow_invocations = tox_workflow_invocations(root)
+    if not invocations and configuration is None:
+        return ()
+
+    selections: tuple[tuple[tuple[str, ...], tuple[str, ...], str | None], ...]
+    if invocations:
+        if workflow_invocations:
+            selections = tuple(
+                (command, environments, path)
+                for command, environments, path in workflow_invocations
+            )
+        else:
+            selections = tuple(
+                (command, environments, None) for command, environments in invocations
+            )
+        declaration = "declared"
+    elif configuration and configuration.environments:
+        env_arg = ",".join(configuration.environments)
+        selections = ((("tox", "-e", env_arg), configuration.environments, None),)
+        declaration = "inferred"
+    elif configuration and configuration.commands:
+        selections = ((("tox",), (), None),)
+        declaration = "inferred"
+    else:
+        return ()
+
+    config_files = configuration.config_files if configuration else ()
+    commands_by_env = configuration.commands if configuration else {}
+    unresolved = configuration.unresolved if configuration else ()
+    profiles: list[DiscoveredValidationProfile] = []
+    for index, (command, environments, workflow_path) in enumerate(selections, start=1):
+        suffix = ",".join(environments) or "default"
+        name = f"tox-{suffix}" if len(selections) == 1 else f"tox-{index}-{suffix}"
+        configured_commands = {
+            environment: [list(item) for item in commands]
+            for environment, commands in commands_by_env.items()
+            if environment == "*" or environment in environments
+        }
+        profiles.append(
+            DiscoveredValidationProfile(
+                name=name,
+                command=command,
+                source="tox configuration/CI",
+                provider_name="aggregate",
+                purpose="Run the project-declared tox validation environment(s).",
+                roles=("validation",),
+                selectors=environments,
+                config_files=config_files,
+                settings={
+                    "environments": list(environments),
+                    "configured_commands": configured_commands,
+                },
+                declaration=declaration,
+                evidence=tuple(
+                    dict.fromkeys(
+                        (*config_files, *((workflow_path,) if workflow_path else ()))
+                    )
+                ),
+                unresolved=unresolved,
+            )
+        )
+    return tuple(profiles)
 
 
 def _load_pyproject(root: Path) -> dict[str, object]:
@@ -339,14 +440,21 @@ def _ci_commands(root: Path) -> tuple[tuple[str, ...], ...]:
         for line in content.splitlines():
             match = re.search(r"\brun:\s*(.+)$", line)
             if match:
-                commands.append(tuple(match.group(1).strip().split()))
+                commands.append(_split_shell_arguments(match.group(1).strip()))
             else:
                 stripped = line.strip()
                 if stripped.startswith(
-                    ("uv run ", "python -m ", "pytest ", "ruff ", "mypy ")
+                    ("uv run ", "python -m ", "pytest ", "ruff ", "mypy ", "tox ")
                 ):
-                    commands.append(tuple(stripped.split()))
+                    commands.append(_split_shell_arguments(stripped))
     return tuple(commands)
+
+
+def _split_shell_arguments(command: str) -> tuple[str, ...]:
+    try:
+        return tuple(shlex.split(command, posix=True))
+    except ValueError:
+        return tuple(command.split())
 
 
 def _find_command(

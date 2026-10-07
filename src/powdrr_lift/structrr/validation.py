@@ -6,9 +6,10 @@ import json
 import re
 import tomllib
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
+from powdrr_lift.structrr.python_topology import PythonTopology
 from powdrr_lift.structrr.validation_models import (
     VALIDATION_INVENTORY_SCHEMA_VERSION,
     ValidationCheck,
@@ -63,25 +64,79 @@ def validation_inventory(
 
 def validation_context(
     profiles: Sequence[DiscoveredValidationProfile],
+    topology: PythonTopology | None = None,
 ) -> dict[str, object]:
     """Describe discovery coverage without claiming the search is exhaustive."""
+    diagnostics = list(topology.diagnostics if topology else ())
+    if not profiles:
+        diagnostics.append(
+            {
+                "code": "discovery_scope_limited",
+                "message": (
+                    "Validation discovery is limited to the detectors currently "
+                    "implemented; absence of a check is not proof that none exists."
+                ),
+            }
+        )
     return ValidationContext(
         discovery_status="partial",
-        coverage=("currently implemented validation detectors",),
-        diagnostics=(
-            (
-                {
-                    "code": "discovery_scope_limited",
-                    "message": (
-                        "Validation discovery is limited to the detectors currently "
-                        "implemented; absence of a check is not proof that none exists."
-                    ),
-                },
+        coverage=(
+            "currently implemented validation detectors",
+            "Python component and environment manifests",
+        ),
+        components=topology.components if topology else (),
+        environments=topology.environments if topology else (),
+        evidence=(
+            tuple(
+                {"id": f"validation-input:{path}", "path": path}
+                for path in topology.evidence_files
             )
-            if not profiles
+            if topology
             else ()
         ),
+        diagnostics=tuple(diagnostics),
+        input_fingerprints=topology.input_fingerprints if topology else (),
     ).to_data()
+
+
+def assign_python_topology(
+    profiles: Sequence[DiscoveredValidationProfile], topology: PythonTopology
+) -> tuple[DiscoveredValidationProfile, ...]:
+    """Attach the repository Python component/environment to Python checks."""
+    root_component = next(
+        (item for item in topology.components if item.get("path") == "."), None
+    )
+    if root_component is None:
+        return tuple(profiles)
+    component_id = str(root_component["id"])
+    environment = next(
+        (
+            item
+            for item in topology.environments
+            if item.get("component") == component_id
+        ),
+        None,
+    )
+    environment_id = str(environment["id"]) if environment else None
+    python_providers = {
+        "ruff",
+        "mypy",
+        "pytest",
+        "pyright",
+        "basedpyright",
+        "flake8",
+        "black",
+    }
+    return tuple(
+        replace(
+            profile,
+            component=profile.component or component_id,
+            environment_id=profile.environment_id or environment_id,
+        )
+        if profile.provider in python_providers
+        else profile
+        for profile in profiles
+    )
 
 
 def _profile_record(profile: DiscoveredValidationProfile) -> ValidationCheck:

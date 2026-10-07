@@ -1,0 +1,79 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 934
+title: Retry transient provider failures consistently
+intent:
+  problem: Transient DNS resolution failures, empty streamed responses, and HTTP 429 responses can abort prompt generation before a prompt is produced.
+  goal: Retry these transient provider failures consistently across the workflow and structured-output clients.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/llm.py
+    type: modified
+    span: {start_line: 746, end_line: 749}
+    summary: Classify transient DNS resolution failures as retryable.
+    rationale: Allow bounded provider retries to recover from temporary network name resolution failures.
+  - path: src/powdrr_lift/workrr/llm.py
+    type: modified
+    span: {start_line: 751, end_line: 751}
+    summary: Classify empty streamed responses as retryable.
+    rationale: Allow bounded provider retries to recover from temporary transport and stream failures.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 248, end_line: 248}
+    summary: Retry HTTP 429 responses in structured-output requests.
+    rationale: Recover from temporary provider rate limits using the existing bounded retry policy.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 261, end_line: 264}
+    summary: Classify transient DNS resolution failures as retryable in structured-output requests.
+    rationale: Allow provider retries to recover from temporary network name resolution failures.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 266, end_line: 266}
+    summary: Classify empty streamed responses as retryable in structured-output requests.
+    rationale: Keep Procedrr provider calls resilient to the transient failures observed during prompt generation.
+  - path: tests/test_workflow_chat_agent.py
+    type: modified
+    span: {start_line: 157, end_line: 157}
+    summary: Import the workflow provider retry classifier for regression coverage.
+    rationale: Exercise the retry classifier used by workflow prompt generation.
+  - path: tests/test_workflow_chat_agent.py
+    type: modified
+    span: {start_line: 7761, end_line: 7771}
+    summary: Verify DNS resolution and empty-stream failures are classified as retryable in the workflow client.
+    rationale: Prevent regressions in the provider failure classifier used by workflow prompt generation.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 10, end_line: 10}
+    summary: Import the Procedrr provider retry classifier for regression coverage.
+    rationale: Exercise structured-output provider retry classification directly.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 33, end_line: 76}
+    summary: Verify structured-output retry classification and HTTP 429 retry behavior.
+    rationale: Protect Procedrr's independent provider retry path against the observed transient failures.
+entities:
+  - id: workflow-provider-retry-classifier
+    type: Function
+    action: added
+  - id: procedrr-provider-retry-classifier
+    type: Function
+    action: modified
+  - id: transient-provider-retry-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: retry-tests-cover-provider-retry-classifiers
+    type: verifies
+    source: transient-provider-retry-regression-tests
+    target: workflow-provider-retry-classifier
+    action: added
+    description: Regression tests cover transient failure classification and retry behavior across both provider call paths.
+invariants:
+  - id: transient-provider-failures-receive-bounded-retries
+    description: Transient DNS resolution, empty streamed responses, and HTTP 429 failures are eligible for the existing bounded retry and backoff behavior.
+    action: added
+guidance:
+  - id: retry-provider-transient-failures
+    description: When provider calls fail from temporary name resolution issues, empty streams, or HTTP 429 responses, allow the configured retry policy to make another request.
+    action: added

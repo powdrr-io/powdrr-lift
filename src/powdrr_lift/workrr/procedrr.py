@@ -245,7 +245,7 @@ def _is_retryable_provider_failure(error: Exception) -> bool:
 
     status_code = getattr(error, "status_code", None)
     if isinstance(status_code, int):
-        return 500 <= status_code <= 599
+        return status_code == 429 or 500 <= status_code <= 599
     if isinstance(error, (ConnectionError, TimeoutError)):
         return True
     message = str(error).casefold()
@@ -258,7 +258,12 @@ def _is_retryable_provider_failure(error: Exception) -> bool:
             "remote disconnected",
             "timed out",
             "timeout",
+            "temporary failure in name resolution",
+            "name or service not known",
+            "nodename nor servname provided",
+            "getaddrinfo failed",
             "streaming response did not include any events",
+            "streaming response content was empty",
             "streaming response ended before a completion marker",
         )
     )

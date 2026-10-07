@@ -743,7 +743,12 @@ def is_retryable_provider_error(error: RuntimeError) -> bool:
                 "connection reset",
                 "connection aborted",
                 "broken pipe",
+                "temporary failure in name resolution",
+                "name or service not known",
+                "nodename nor servname provided",
+                "getaddrinfo failed",
                 "streaming response did not include any events",
+                "streaming response content was empty",
             )
         )
     )

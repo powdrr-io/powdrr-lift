@@ -115,6 +115,312 @@ class PreCommitConfiguration:
     unresolved: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class DeclarativeTask:
+    """One source-backed task with literal prerequisites and command text."""
+
+    name: str
+    prerequisites: tuple[str, ...]
+    commands: tuple[str, ...]
+    source: str
+    unresolved: tuple[str, ...] = ()
+    execution_settings: Mapping[str, object] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TaskRunnerConfiguration:
+    """Tasks collected from one Justfile or Taskfile configuration."""
+
+    config_files: tuple[str, ...]
+    tasks: Mapping[str, DeclarativeTask]
+    unresolved: tuple[str, ...] = ()
+
+
+_LIKELY_TASK_NAMES = {
+    "check",
+    "ci",
+    "format",
+    "format-check",
+    "lint",
+    "test",
+    "tests",
+    "typecheck",
+    "type-check",
+    "validate",
+    "verify",
+}
+
+
+def discover_just_configuration(root: str | Path) -> TaskRunnerConfiguration | None:
+    """Read literal Just recipes; keep interpolation and imports unresolved."""
+    root_path = Path(root).resolve()
+    config_file = next(
+        (name for name in ("Justfile", "justfile") if (root_path / name).is_file()),
+        None,
+    )
+    if config_file is None:
+        return None
+    tasks: dict[str, DeclarativeTask] = {}
+    unresolved: list[str] = []
+    active: str | None = None
+    try:
+        lines = (root_path / config_file).read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeError) as error:
+        return TaskRunnerConfiguration(
+            (config_file,), {}, (f"Could not read {config_file}: {error}",)
+        )
+    for line_number, line in enumerate(lines, start=1):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if re.match(r"^(import|mod)\s+", stripped):
+            unresolved.append(
+                f"Just import/module at {config_file}:{line_number} was not followed: "
+                f"{stripped}."
+            )
+            active = None
+            continue
+        if line[:1].isspace():
+            if active and stripped:
+                previous_recipe = tasks[active]
+                tasks[active] = DeclarativeTask(
+                    previous_recipe.name,
+                    previous_recipe.prerequisites,
+                    (*previous_recipe.commands, stripped),
+                    previous_recipe.source,
+                    previous_recipe.unresolved,
+                )
+            continue
+        if stripped.startswith("alias "):
+            unresolved.append(
+                f"Just alias at {config_file}:{line_number} was not resolved: "
+                f"{stripped}."
+            )
+            active = None
+            continue
+        if stripped.startswith("set ") or ":=" in stripped:
+            unresolved.append(
+                f"Just setting/variable at {config_file}:{line_number} may affect "
+                f"execution and was retained: {stripped}."
+            )
+            active = None
+            continue
+        match = re.match(r"^([A-Za-z_][A-Za-z0-9_-]*)([^:]*)\s*:\s*(.*)$", line)
+        if not match:
+            active = None
+            continue
+        name, parameters, dependencies = match.groups()
+        dynamic = bool(parameters.strip())
+        prerequisites = tuple(
+            token
+            for token in dependencies.replace("(", " ").replace(")", " ").split()
+            if not token.startswith("{{") and not token.endswith("}}")
+        )
+        task_unresolved = (
+            (f"Parameterized Just recipe retained symbolically: {name}.",)
+            if dynamic
+            else ()
+        )
+        previous_task = tasks.get(name)
+        tasks[name] = DeclarativeTask(
+            name,
+            (*previous_task.prerequisites, *prerequisites)
+            if previous_task
+            else prerequisites,
+            previous_task.commands if previous_task else (),
+            f"{config_file}:{line_number}",
+            (*previous_task.unresolved, *task_unresolved)
+            if previous_task
+            else task_unresolved,
+        )
+        active = name
+    return TaskRunnerConfiguration((config_file,), tasks, tuple(unresolved))
+
+
+def discover_task_configuration(root: str | Path) -> TaskRunnerConfiguration | None:
+    """Read root Taskfile tasks and dependencies without running Task."""
+    root_path = Path(root).resolve()
+    config_file = next(
+        (
+            name
+            for name in (
+                "Taskfile.yml",
+                "Taskfile.yaml",
+                "taskfile.yml",
+                "taskfile.yaml",
+            )
+            if (root_path / name).is_file()
+        ),
+        None,
+    )
+    if config_file is None:
+        return None
+    unresolved: list[str] = []
+    try:
+        document = yaml.safe_load((root_path / config_file).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as error:
+        return TaskRunnerConfiguration(
+            (config_file,), {}, (f"Could not parse {config_file}: {error}",)
+        )
+    if not isinstance(document, dict):
+        return TaskRunnerConfiguration(
+            (config_file,), {}, (f"{config_file} must contain a YAML mapping.",)
+        )
+    raw_tasks = document.get("tasks", {})
+    if not isinstance(raw_tasks, dict):
+        return TaskRunnerConfiguration(
+            (config_file,), {}, (f"{config_file} tasks must be a mapping.",)
+        )
+    if document.get("includes"):
+        unresolved.append(
+            f"Taskfile includes in {config_file} were retained but not followed."
+        )
+    tasks: dict[str, DeclarativeTask] = {}
+    for name, declaration in raw_tasks.items():
+        if not isinstance(name, str):
+            unresolved.append(f"Taskfile task name is not a string: {name!r}.")
+            continue
+        if isinstance(declaration, str):
+            unresolved.append(
+                f"Task {name!r} in {config_file} uses shorthand string syntax."
+            )
+            tasks[name] = DeclarativeTask(name, (), (declaration,), config_file)
+            continue
+        if not isinstance(declaration, dict):
+            unresolved.append(f"Task {name!r} in {config_file} is not a mapping.")
+            continue
+        raw_deps = declaration.get("deps", [])
+        prerequisites: list[str] = []
+        if isinstance(raw_deps, list):
+            for dependency in raw_deps:
+                if isinstance(dependency, str):
+                    prerequisites.append(dependency)
+                elif isinstance(dependency, dict) and isinstance(
+                    dependency.get("task"), str
+                ):
+                    prerequisites.append(str(dependency["task"]))
+                else:
+                    unresolved.append(
+                        f"Dynamic dependency retained for Task task {name!r}."
+                    )
+        elif raw_deps:
+            unresolved.append(f"Task dependencies for {name!r} are not a list.")
+        raw_cmds = declaration.get("cmds", [])
+        commands: list[str] = []
+        if isinstance(raw_cmds, list):
+            for item in raw_cmds:
+                if isinstance(item, str):
+                    commands.append(item)
+                elif isinstance(item, dict) and isinstance(item.get("cmd"), str):
+                    commands.append(str(item["cmd"]))
+                    if item.get("silent") or item.get("ignore_error"):
+                        unresolved.append(
+                            f"Task command modifiers for {name!r} affect "
+                            "execution semantics."
+                        )
+                elif isinstance(item, dict) and isinstance(item.get("task"), str):
+                    prerequisites.append(str(item["task"]))
+                else:
+                    unresolved.append(
+                        f"Dynamic command retained for Task task {name!r}."
+                    )
+        elif raw_cmds:
+            unresolved.append(f"Task commands for {name!r} are not a list.")
+        task_unresolved: list[str] = []
+        behavior_settings = {
+            key: declaration[key]
+            for key in (
+                "dir",
+                "vars",
+                "env",
+                "preconditions",
+                "sources",
+                "generates",
+                "status",
+                "platforms",
+                "method",
+                "interactive",
+            )
+            if key in declaration
+        }
+        if behavior_settings:
+            task_unresolved.append(
+                f"Task {name!r} has execution settings that require Task semantics: "
+                + ", ".join(sorted(behavior_settings))
+                + "."
+            )
+        tasks[name] = DeclarativeTask(
+            name,
+            tuple(prerequisites),
+            tuple(commands),
+            config_file,
+            tuple(task_unresolved),
+            behavior_settings,
+        )
+    return TaskRunnerConfiguration(
+        (config_file,), tasks, tuple(dict.fromkeys(unresolved))
+    )
+
+
+def likely_task_targets(configuration: TaskRunnerConfiguration) -> tuple[str, ...]:
+    """Select likely validation roots while retaining their inferred status."""
+    candidates = {
+        name
+        for name in configuration.tasks
+        if name in _LIKELY_TASK_NAMES
+        or name.startswith(("check-", "lint-", "test-", "typecheck-", "validate-"))
+    }
+    nested = {
+        dependency
+        for name in candidates
+        for dependency in configuration.tasks[name].prerequisites
+        if dependency in candidates
+    }
+    return tuple(sorted(candidates - nested)) or tuple(sorted(candidates))
+
+
+def task_runner_closure(
+    configuration: TaskRunnerConfiguration,
+    selected: Sequence[str],
+    *,
+    max_depth: int = 16,
+) -> tuple[tuple[DeclarativeTask, ...], tuple[str, ...]]:
+    """Collect selected tasks and literal task dependencies in declaration order."""
+    collected: list[DeclarativeTask] = []
+    diagnostics = list(configuration.unresolved)
+    visited: set[str] = set()
+
+    def visit(name: str, stack: tuple[str, ...], depth: int) -> None:
+        if name in stack:
+            diagnostics.append(
+                f"Task dependency cycle detected: {' -> '.join((*stack, name))}."
+            )
+            return
+        if name in visited:
+            return
+        if depth > max_depth:
+            diagnostics.append(f"Task dependency depth exceeded at {name!r}.")
+            return
+        task = configuration.tasks.get(name)
+        if task is None:
+            diagnostics.append(f"Task dependency {name!r} has no static declaration.")
+            return
+        visited.add(name)
+        collected.append(task)
+        diagnostics.extend(task.unresolved)
+        for prerequisite in task.prerequisites:
+            if "{{" in prerequisite or "${" in prerequisite:
+                diagnostics.append(
+                    f"Dynamic dependency retained for task {name!r}: {prerequisite}."
+                )
+            else:
+                visit(prerequisite, (*stack, name), depth + 1)
+
+    for target in selected:
+        visit(target, (), 0)
+    return tuple(collected), tuple(dict.fromkeys(diagnostics))
+
+
 def discover_pre_commit_configuration(
     root: str | Path, config_path: str | None = None
 ) -> PreCommitConfiguration | None:

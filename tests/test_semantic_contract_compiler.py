@@ -1387,6 +1387,27 @@ def test_invalid_behavioral_group_indexes_fall_back_without_dropping_requirement
         for question in grouped.unresolved_questions
     )
 
+    duplicate_indexes_result = bind_behavioral_contracts(
+        plan,
+        [
+            {
+                "member_indexes": [0, 0, 1],
+                "context_indexes": [],
+                "relationships": [],
+                "unresolved_questions": [],
+            }
+        ],
+    )
+    duplicate_index_contracts = [
+        BehavioralContract.from_data(item)
+        for item in duplicate_indexes_result["contracts"]
+    ]
+    assert len(duplicate_index_contracts) == 2
+    assert all(
+        "member indexes contain duplicates" in contract.unresolved_questions[0]
+        for contract in duplicate_index_contracts
+    )
+
 
 def test_behavioral_contract_partitioning_is_bounded_and_covers_all_members() -> None:
     members = tuple(f"instruction-{index:02d}" for index in range(17))

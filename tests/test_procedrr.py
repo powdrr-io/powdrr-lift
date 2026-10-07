@@ -642,6 +642,36 @@ def test_checked_in_design_interview_definition_parses() -> None:
     assert validate_single_decision(document) == ()
 
 
+def test_behavioral_contract_provider_schema_uses_supported_array_constraints() -> None:
+    from pathlib import Path
+
+    document = parse_and_validate(
+        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    )
+    schemas: list[dict[str, Any]] = []
+
+    def collect_contract_schemas(value: Any) -> None:
+        if isinstance(value, dict):
+            output = value.get("output")
+            if (
+                isinstance(output, dict)
+                and output.get("name") == "behavioral_contract_result"
+            ):
+                schemas.append(cast(dict[str, Any], output["schema"]))
+            for nested in value.values():
+                collect_contract_schemas(nested)
+        elif isinstance(value, list):
+            for nested in value:
+                collect_contract_schemas(nested)
+
+    collect_contract_schemas(document["steps"])
+
+    assert len(schemas) == 1
+    properties = schemas[0]["properties"]
+    assert "uniqueItems" not in properties["member_indexes"]
+    assert "uniqueItems" not in properties["context_indexes"]
+
+
 def test_design_interview_uses_single_field_source_classification() -> None:
     from pathlib import Path
 

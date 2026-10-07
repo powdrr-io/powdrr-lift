@@ -3,6 +3,7 @@ from typing import Any, cast
 
 import pytest
 
+from powdrr_lift.errors import ProviderExecutionError
 from powdrr_lift.workrr.procedrr import (
     ProcedrrResponseError,
     StructuredToolExecutor,
@@ -233,6 +234,38 @@ def test_procedrr_retries_truncated_stream_provider_failures(
     ) == {"complete": True}
     assert provider.calls == 3
     assert delays == [2.0, 4.0]
+
+
+def test_procedrr_does_not_retry_explicit_provider_request_errors(
+    tmp_path: Path,
+) -> None:
+    class UnsupportedSchemaClient:
+        calls = 0
+
+        def complete_json(
+            self, _messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.calls += 1
+            raise ProviderExecutionError(
+                "OpenAI-compatible provider returned an error event: "
+                '{"type":"invalid_request_error","code":400,'
+                '"message":"Unimplemented keys: [uniqueItems]"}'
+            )
+
+    provider = UnsupportedSchemaClient()
+    client = WorkrrProcedrrClient(
+        cast(Any, provider),
+        skills_dir=tmp_path,
+        provider_retry_attempts=3,
+    )
+
+    with pytest.raises(ProviderExecutionError, match="uniqueItems"):
+        client.complete_json(
+            [{"role": "user", "content": "judge this"}],
+            response_schema=SCHEMA,
+        )
+
+    assert provider.calls == 1
 
 
 def test_procedrr_replays_completed_judge_without_provider_call(

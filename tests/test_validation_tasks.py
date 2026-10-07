@@ -6,6 +6,7 @@ from typing import Any, cast
 from powdrr_lift.structrr.validation import discover_validation_profiles
 from powdrr_lift.structrr.validation_tasks import (
     discover_make_configuration,
+    discover_pre_commit_configuration,
     discover_tox_configuration,
     make_target_closure,
 )
@@ -431,3 +432,165 @@ def test_make_aggregate_does_not_hide_unselected_make_targets(tmp_path: Path) ->
     assert {"ruff-check", "ruff-format-check"}.issubset(
         {profile.name for profile in profiles}
     )
+
+
+def test_pre_commit_configuration_preserves_hook_environment_and_filters(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".pre-commit-config.yaml").write_text(
+        "default_stages: [pre-commit, pre-push]\n"
+        "fail_fast: true\n"
+        "repos:\n"
+        "  - repo: https://github.com/astral-sh/ruff-pre-commit\n"
+        "    rev: v0.8.0\n"
+        "    hooks:\n"
+        "      - id: ruff\n"
+        "        args: [--fix]\n"
+        "        files: '\\.py$'\n"
+        "        types: [python]\n"
+        "        pass_filenames: false\n"
+        "        additional_dependencies: [typing-extensions]\n"
+        "  - repo: local\n"
+        "    hooks:\n"
+        "      - id: unit-tests\n"
+        "        name: unit tests\n"
+        "        entry: pytest tests/unit\n"
+        "        language: system\n"
+        "        types: [python]\n",
+        encoding="utf-8",
+    )
+
+    configuration = discover_pre_commit_configuration(tmp_path)
+
+    assert configuration is not None
+    assert configuration.config_file == ".pre-commit-config.yaml"
+    assert configuration.settings == {
+        "default_stages": ["pre-commit", "pre-push"],
+        "fail_fast": True,
+    }
+    ruff_hook, local_hook = configuration.hooks
+    assert (ruff_hook.repo, ruff_hook.rev, ruff_hook.args) == (
+        "https://github.com/astral-sh/ruff-pre-commit",
+        "v0.8.0",
+        ("--fix",),
+    )
+    assert ruff_hook.pass_filenames is False
+    assert ruff_hook.files == r"\.py$"
+    assert ruff_hook.additional_dependencies == ("typing-extensions",)
+    assert (local_hook.repo, local_hook.entry, local_hook.language) == (
+        "local",
+        "pytest tests/unit",
+        "system",
+    )
+    assert not configuration.unresolved
+
+
+def test_pre_commit_ci_invocation_is_an_aggregate_with_config_evidence(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".pre-commit-config.yaml").write_text(
+        "repos:\n"
+        "  - repo: local\n"
+        "    hooks:\n"
+        "      - id: lint\n"
+        "        entry: ruff check src\n"
+        "        language: system\n",
+        encoding="utf-8",
+    )
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n"
+        "      - run: uv run pre-commit run lint --all-files\n",
+        encoding="utf-8",
+    )
+
+    profile = next(
+        item
+        for item in discover_validation_profiles(tmp_path)
+        if item.provider == "aggregate" and item.name.startswith("pre-commit-")
+    )
+
+    assert profile.command == (
+        "uv",
+        "run",
+        "pre-commit",
+        "run",
+        "lint",
+        "--all-files",
+    )
+    assert profile.selectors == ("lint",)
+    assert profile.config_files == (".pre-commit-config.yaml",)
+    assert profile.evidence == (
+        "validation-input:.pre-commit-config.yaml",
+        "validation-input:.github/workflows/ci.yml",
+    )
+    assert profile.settings is not None
+    hook_list = cast(list[dict[str, object]], profile.settings["hooks"])
+    hook_settings = hook_list[0]
+    assert hook_settings["entry"] == "ruff check src"
+
+
+def test_pre_commit_aggregate_does_not_duplicate_its_configured_validator(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".pre-commit-config.yaml").write_text(
+        "repos:\n"
+        "  - repo: local\n"
+        "    hooks:\n"
+        "      - id: lint\n"
+        "        entry: ruff check src\n"
+        "        language: system\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.ruff]\nline-length = 88\n", encoding="utf-8"
+    )
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n      - run: pre-commit run lint --all-files\n",
+        encoding="utf-8",
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+
+    assert "pre-commit-lint" in [profile.name for profile in profiles]
+    assert "ruff-check" not in [profile.name for profile in profiles]
+
+
+def test_pre_commit_cli_config_and_files_arguments_are_not_hook_ids(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / ".pre-commit-config.yaml").write_text(
+        "repos: [{repo: local, hooks: [{id: default, entry: true, "
+        "language: system}]}]\n",
+        encoding="utf-8",
+    )
+    custom_config = tmp_path / "config/hooks.yaml"
+    custom_config.parent.mkdir()
+    custom_config.write_text(
+        "repos: [{repo: local, hooks: [{id: lint, entry: 'ruff check', "
+        "language: system}]}]\n",
+        encoding="utf-8",
+    )
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n"
+        "      - run: pre-commit run lint --config config/hooks.yaml "
+        "--files src/a.py\n",
+        encoding="utf-8",
+    )
+
+    profile = next(
+        item
+        for item in discover_validation_profiles(tmp_path)
+        if item.name.startswith("pre-commit-")
+    )
+
+    assert profile.selectors == ("lint",)
+    assert profile.config_files == ("config/hooks.yaml",)
+    assert profile.settings is not None
+    hook_list = cast(list[dict[str, object]], profile.settings["hooks"])
+    assert hook_list[0]["id"] == "lint"

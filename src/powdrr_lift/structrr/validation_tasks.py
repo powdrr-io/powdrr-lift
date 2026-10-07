@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 
 @dataclass(frozen=True, slots=True)
 class ToxConfiguration:
@@ -79,6 +81,187 @@ class MakeConfiguration:
     config_files: tuple[str, ...]
     targets: Mapping[str, MakeTargetDeclaration]
     unresolved: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class PreCommitHook:
+    """A hook declaration as written in a pre-commit configuration."""
+
+    id: str
+    name: str | None
+    entry: str | None
+    language: str | None
+    args: tuple[str, ...]
+    files: str | None
+    exclude: str | None
+    types: tuple[str, ...]
+    stages: tuple[str, ...]
+    additional_dependencies: tuple[str, ...]
+    pass_filenames: bool | None
+    always_run: bool | None
+    require_serial: bool | None
+    repo: str
+    rev: str | None
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
+class PreCommitConfiguration:
+    """Pre-commit hook configuration and repository defaults."""
+
+    config_file: str
+    hooks: tuple[PreCommitHook, ...]
+    settings: Mapping[str, object]
+    unresolved: tuple[str, ...] = ()
+
+
+def discover_pre_commit_configuration(
+    root: str | Path, config_path: str | None = None
+) -> PreCommitConfiguration | None:
+    """Read pre-commit hook settings without installing or running hooks."""
+    root_path = Path(root).resolve()
+    if config_path is None:
+        config_file = next(
+            (
+                name
+                for name in (".pre-commit-config.yaml", ".pre-commit-config.yml")
+                if (root_path / name).is_file()
+            ),
+            None,
+        )
+    else:
+        candidate = (root_path / config_path).resolve()
+        try:
+            config_file = candidate.relative_to(root_path).as_posix()
+        except ValueError:
+            return PreCommitConfiguration(
+                config_path,
+                (),
+                {},
+                (f"Pre-commit config path escapes the repository: {config_path}.",),
+            )
+    if config_file is None:
+        return None
+    if not (root_path / config_file).is_file():
+        return PreCommitConfiguration(
+            config_file,
+            (),
+            {},
+            (f"Pre-commit config file was not found: {config_file}.",),
+        )
+    unresolved: list[str] = []
+    try:
+        document = yaml.safe_load((root_path / config_file).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError) as error:
+        return PreCommitConfiguration(
+            config_file, (), {}, (f"Could not parse {config_file}: {error}",)
+        )
+    if not isinstance(document, dict):
+        return PreCommitConfiguration(
+            config_file, (), {}, (f"{config_file} must contain a YAML mapping.",)
+        )
+    raw_repositories = document.get("repos", [])
+    if not isinstance(raw_repositories, list):
+        return PreCommitConfiguration(
+            config_file, (), {}, (f"{config_file} repos must be a list.",)
+        )
+    hooks: list[PreCommitHook] = []
+    for repository_index, repository in enumerate(raw_repositories):
+        if not isinstance(repository, dict):
+            unresolved.append(
+                f"{config_file} repos[{repository_index}] is not a mapping."
+            )
+            continue
+        repo = repository.get("repo")
+        rev = repository.get("rev")
+        raw_hooks = repository.get("hooks", [])
+        if not isinstance(repo, str) or not isinstance(raw_hooks, list):
+            unresolved.append(
+                f"{config_file} repos[{repository_index}] needs a literal repo "
+                "and hooks list."
+            )
+            continue
+        for hook_index, hook in enumerate(raw_hooks):
+            if not isinstance(hook, dict) or not isinstance(hook.get("id"), str):
+                unresolved.append(
+                    f"{config_file} repos[{repository_index}].hooks[{hook_index}] "
+                    "needs a mapping with a literal id."
+                )
+                continue
+            if "entry" not in hook and repo == "local":
+                unresolved.append(
+                    f"Local hook {hook['id']!r} in {config_file} has no literal entry."
+                )
+            hooks.append(
+                PreCommitHook(
+                    id=hook["id"],
+                    name=hook.get("name")
+                    if isinstance(hook.get("name"), str)
+                    else None,
+                    entry=hook.get("entry")
+                    if isinstance(hook.get("entry"), str)
+                    else None,
+                    language=(
+                        hook.get("language")
+                        if isinstance(hook.get("language"), str)
+                        else None
+                    ),
+                    args=_string_tuple(hook.get("args")),
+                    files=hook.get("files")
+                    if isinstance(hook.get("files"), str)
+                    else None,
+                    exclude=(
+                        hook.get("exclude")
+                        if isinstance(hook.get("exclude"), str)
+                        else None
+                    ),
+                    types=_string_tuple(hook.get("types")),
+                    stages=_string_tuple(hook.get("stages")),
+                    additional_dependencies=_string_tuple(
+                        hook.get("additional_dependencies")
+                    ),
+                    pass_filenames=(
+                        hook.get("pass_filenames")
+                        if isinstance(hook.get("pass_filenames"), bool)
+                        else None
+                    ),
+                    always_run=(
+                        hook.get("always_run")
+                        if isinstance(hook.get("always_run"), bool)
+                        else None
+                    ),
+                    require_serial=(
+                        hook.get("require_serial")
+                        if isinstance(hook.get("require_serial"), bool)
+                        else None
+                    ),
+                    repo=repo,
+                    rev=rev if isinstance(rev, str) else None,
+                    source=config_file,
+                )
+            )
+    defaults = {
+        key: document[key]
+        for key in (
+            "default_stages",
+            "default_install_hook_types",
+            "default_language_version",
+            "fail_fast",
+            "minimum_pre_commit_version",
+        )
+        if key in document
+    }
+    return PreCommitConfiguration(
+        config_file, tuple(hooks), defaults, tuple(dict.fromkeys(unresolved))
+    )
+
+
+def _string_tuple(value: object) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, list) and all(isinstance(item, str) for item in value):
+        return tuple(value)
+    return ()
 
 
 def discover_tox_configuration(root: str | Path) -> ToxConfiguration | None:

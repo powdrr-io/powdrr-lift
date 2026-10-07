@@ -5,11 +5,13 @@ from typing import Any, cast
 
 from powdrr_lift.structrr.validation import discover_validation_profiles
 from powdrr_lift.structrr.validation_tasks import (
+    discover_hatch_configuration,
     discover_just_configuration,
     discover_make_configuration,
     discover_pre_commit_configuration,
     discover_task_configuration,
     discover_tox_configuration,
+    hatch_script_closure,
     make_target_closure,
     task_runner_closure,
 )
@@ -715,3 +717,123 @@ def test_just_parameter_and_taskfile_include_remain_unresolved(
     )
     assert task_configuration is not None
     assert any("includes" in item for item in task_configuration.unresolved)
+
+
+def test_hatch_scripts_and_ci_invocation_preserve_environment_context(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.ruff]\nline-length = 88\n"
+        "[tool.hatch.envs.test]\n"
+        "dependencies = ['pytest', 'ruff']\n"
+        "[tool.hatch.envs.test.scripts]\n"
+        "lint = 'ruff check src'\n"
+        "check = ['lint', \"pytest tests -m 'not integration'\"]\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests").mkdir()
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n      - run: uv run hatch run test:check\n",
+        encoding="utf-8",
+    )
+
+    configuration = discover_hatch_configuration(tmp_path)
+    profiles = discover_validation_profiles(tmp_path)
+    profile = next(item for item in profiles if item.name == "hatch-test-check")
+
+    assert configuration is not None
+    commands, diagnostics = hatch_script_closure(configuration, "test", "check")
+    assert commands == ("ruff check src", "pytest tests -m 'not integration'")
+    assert not diagnostics
+    assert profile.provider == "aggregate"
+    assert profile.command == ("uv", "run", "hatch", "run", "test:check")
+    assert profile.selectors == ("test", "check")
+    assert profile.evidence == (
+        "validation-input:pyproject.toml",
+        "validation-input:.github/workflows/ci.yml",
+    )
+    assert "ruff-check" not in [item.name for item in profiles]
+    assert "pytest" not in [item.name for item in profiles]
+
+
+def test_hatch_toml_precedence_and_matrix_uncertainty_are_recorded(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.hatch.envs.test]\n"
+        "[tool.hatch.envs.test.scripts]\n"
+        "lint = 'ruff check old'\n"
+        "test = 'pytest tests'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "hatch.toml").write_text(
+        "[envs.test]\n"
+        "dependencies = ['ruff']\n"
+        "[[envs.test.matrix]]\n"
+        "python = ['3.11', '3.12']\n"
+        "[envs.test.scripts]\n"
+        "lint = 'ruff check src'\n",
+        encoding="utf-8",
+    )
+
+    configuration = discover_hatch_configuration(tmp_path)
+
+    assert configuration is not None
+    assert configuration.config_files == ("pyproject.toml", "hatch.toml")
+    assert configuration.environments["test"].scripts["lint"] == ("ruff check src",)
+    assert configuration.environments["test"].scripts["test"] == ("pytest tests",)
+    assert any(
+        "matrix variants" in item
+        for item in configuration.environments["test"].unresolved
+    )
+
+
+def test_hatch_raw_command_argument_with_colon_is_not_an_environment_script(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.hatch.envs.test.scripts]\nlint = 'ruff check src'\n",
+        encoding="utf-8",
+    )
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n"
+        "      - run: hatch run pytest --markers unit:api\n",
+        encoding="utf-8",
+    )
+
+    profile = next(
+        item
+        for item in discover_validation_profiles(tmp_path)
+        if item.name.startswith("hatch-")
+    )
+
+    assert profile.selectors == ()
+    assert profile.provider == "custom"
+    assert profile.command == ("hatch", "run", "pytest", "--markers", "unit:api")
+
+
+def test_hatch_run_default_environment_script_is_resolved_from_config(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.hatch.envs.default.scripts]\ntest = 'pytest tests'\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests").mkdir()
+    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n      - run: hatch run test\n",
+        encoding="utf-8",
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+    profile = next(item for item in profiles if item.name == "hatch-default-test")
+
+    assert profile.provider == "aggregate"
+    assert profile.selectors == ("default", "test")
+    assert "pytest" not in [item.name for item in profiles]

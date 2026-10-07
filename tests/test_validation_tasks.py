@@ -8,11 +8,13 @@ from powdrr_lift.structrr.validation_tasks import (
     discover_hatch_configuration,
     discover_just_configuration,
     discover_make_configuration,
+    discover_pdm_configuration,
     discover_pre_commit_configuration,
     discover_task_configuration,
     discover_tox_configuration,
     hatch_script_closure,
     make_target_closure,
+    pdm_script_closure,
     task_runner_closure,
 )
 
@@ -837,3 +839,51 @@ def test_hatch_run_default_environment_script_is_resolved_from_config(
     assert profile.provider == "aggregate"
     assert profile.selectors == ("default", "test")
     assert "pytest" not in [item.name for item in profiles]
+
+
+def test_pdm_cmd_composite_and_execution_settings_are_preserved(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.pdm.scripts]\n"
+        "_.env_file = '.env'\n"
+        "lint.cmd = ['ruff', 'check', 'src']\n"
+        "lint.working_dir = 'src'\n"
+        "check.composite = ['lint --fix', 'pytest tests']\n",
+        encoding="utf-8",
+    )
+    workflow = tmp_path / ".github/workflows/check.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  checks:\n    steps:\n      - run: pdm run check\n",
+        encoding="utf-8",
+    )
+
+    configuration = discover_pdm_configuration(tmp_path)
+    assert configuration is not None
+    commands, diagnostics = pdm_script_closure(configuration, "check")
+    assert commands == (("ruff", "check", "src"), ("pytest", "tests"))
+    assert any("working_dir" in item for item in diagnostics)
+    assert any("Arguments forwarded" in item for item in diagnostics)
+
+    profiles = discover_validation_profiles(tmp_path)
+    profile = next(item for item in profiles if item.name == "pdm-check")
+    assert profile.command == ("pdm", "run", "check")
+    assert profile.provider == "aggregate"
+    assert profile.evidence == (
+        "validation-input:pyproject.toml",
+        "validation-input:.github/workflows/check.yml",
+    )
+
+
+def test_pdm_shell_and_call_scripts_remain_unresolved(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.pdm.scripts]\n"
+        "shellcheck.shell = 'ruff check src | cat'\n"
+        "custom.call = 'checks:run'\n",
+        encoding="utf-8",
+    )
+    configuration = discover_pdm_configuration(tmp_path)
+    assert configuration is not None
+    _, shell_diagnostics = pdm_script_closure(configuration, "shellcheck")
+    _, call_diagnostics = pdm_script_closure(configuration, "custom")
+    assert any("shell script" in item for item in shell_diagnostics)
+    assert any("call script" in item for item in call_diagnostics)

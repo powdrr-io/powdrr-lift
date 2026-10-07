@@ -21,12 +21,14 @@ from powdrr_lift.structrr.validation_tasks import (
     HatchConfiguration,
     MakeConfiguration,
     NoxConfiguration,
+    PdmConfiguration,
     TaskRunnerConfiguration,
     ToxConfiguration,
     discover_hatch_configuration,
     discover_just_configuration,
     discover_make_configuration,
     discover_nox_configuration,
+    discover_pdm_configuration,
     discover_pre_commit_configuration,
     discover_task_configuration,
     discover_tox_configuration,
@@ -38,6 +40,7 @@ from powdrr_lift.structrr.validation_tasks import (
     make_workflow_invocations,
     nox_ci_invocations,
     nox_workflow_invocations,
+    pdm_script_closure,
     task_runner_closure,
     tox_ci_invocations,
     tox_workflow_invocations,
@@ -233,6 +236,8 @@ def discover_validation_profiles(
     profiles.extend(_discover_tox_profiles(root_path, ci_commands))
     profiles.extend(_discover_nox_profiles(root_path, ci_commands))
     profiles.extend(_discover_make_profiles(root_path, ci_commands))
+    pdm_configuration = discover_pdm_configuration(root_path)
+    profiles.extend(_discover_pdm_profiles(root_path, ci_commands, pdm_configuration))
     hatch_configuration = discover_hatch_configuration(root_path)
     profiles.extend(
         _discover_hatch_profiles(root_path, ci_commands, hatch_configuration)
@@ -260,6 +265,7 @@ def discover_validation_profiles(
             nox_configuration,
             make_configuration,
             hatch_configuration,
+            pdm_configuration,
             just_configuration,
             task_configuration,
             profiles,
@@ -279,6 +285,7 @@ def discover_validation_profiles(
             or profile.name.startswith("just-")
             or profile.name.startswith("task-")
             or profile.name.startswith("hatch-")
+            or profile.name.startswith("pdm-")
         )
         for profile in profiles
     )
@@ -559,6 +566,7 @@ def _task_runner_commands(
     nox_configuration: object,
     make_configuration: object,
     hatch_configuration: object,
+    pdm_configuration: object,
     just_configuration: object,
     task_configuration: object,
     profiles: Sequence[DiscoveredValidationProfile],
@@ -587,6 +595,11 @@ def _task_runner_commands(
     hatch_config = (
         cast(HatchConfiguration, hatch_configuration)
         if hatch_configuration is not None
+        else None
+    )
+    pdm_config = (
+        cast(PdmConfiguration, pdm_configuration)
+        if pdm_configuration is not None
         else None
     )
     task_config = (
@@ -650,6 +663,9 @@ def _task_runner_commands(
                     commands.append((tuple(shlex.split(command, posix=True)),))
                 except ValueError:
                     continue
+        elif profile.name.startswith("pdm-") and pdm_config and profile.selectors:
+            pdm_commands, _ = pdm_script_closure(pdm_config, profile.selectors[0])
+            commands.extend((command,) for command in pdm_commands)
         elif profile.name.startswith("task-") and task_config and profile.selectors:
             task_tasks, _ = task_runner_closure(task_config, profile.selectors)
             for task in task_tasks:
@@ -900,6 +916,149 @@ def _discover_task_runner_profiles(
             )
         )
     return tuple(profiles)
+
+
+def _discover_pdm_profiles(
+    root: Path,
+    ci_commands: Sequence[tuple[str, ...]],
+    configuration: PdmConfiguration | None,
+) -> tuple[DiscoveredValidationProfile, ...]:
+    invocations = tuple(
+        command for command in ci_commands if _pdm_script_selector(command) is not None
+    )
+    if configuration is None and not invocations:
+        return ()
+    validation_names = {
+        "check",
+        "ci",
+        "format",
+        "format-check",
+        "lint",
+        "test",
+        "tests",
+        "typecheck",
+        "type-check",
+        "validate",
+        "verify",
+    }
+    if invocations:
+        selections = tuple(
+            (command, _pdm_script_selector(command)) for command in invocations
+        )
+        declaration = "declared"
+    elif configuration:
+        names = tuple(
+            name
+            for name in configuration.scripts
+            if name in validation_names
+            or name.startswith(("check-", "lint-", "test-", "typecheck-", "validate-"))
+        )
+        selections = tuple((("pdm", "run", name), name) for name in names)
+        declaration = "inferred"
+    else:
+        return ()
+    workflow_paths = tuple(
+        path.relative_to(root).as_posix()
+        for path in sorted((root / ".github" / "workflows").glob("*.y*ml"))
+        if re.search(r"\bpdm\b", _read_text(path))
+    )
+    profiles: list[DiscoveredValidationProfile] = []
+    for index, (command, selector) in enumerate(selections, start=1):
+        unresolved = list(configuration.unresolved if configuration else ())
+        script = (
+            configuration.scripts.get(selector) if configuration and selector else None
+        )
+        commands: tuple[tuple[str, ...], ...] = ()
+        if configuration and selector:
+            commands, diagnostics = pdm_script_closure(configuration, selector)
+            unresolved.extend(diagnostics)
+            if (
+                f"pre_{selector}" in configuration.scripts
+                or f"post_{selector}" in configuration.scripts
+            ):
+                unresolved.append(
+                    f"PDM pre/post scripts for {selector!r} may run around "
+                    "the selected task."
+                )
+        elif selector:
+            unresolved.append(
+                "PDM script invocation has no pyproject.toml declaration."
+            )
+        if selector is None:
+            unresolved.append("PDM run has no statically selected script.")
+        known_validation = selector is not None and (
+            selector in validation_names
+            or selector.startswith(
+                ("check-", "lint-", "test-", "typecheck-", "validate-")
+            )
+        )
+        settings: dict[str, object] = {
+            "script": dict(script) if script else {},
+            "shared_options": dict(configuration.shared_options)
+            if configuration
+            else {},
+            "expanded_commands": [list(item) for item in commands],
+        }
+        evidence_paths = (
+            (configuration.config_file,) if configuration else ()
+        ) + workflow_paths
+        profiles.append(
+            DiscoveredValidationProfile(
+                name=f"pdm-{selector or 'default'}"
+                if len(selections) == 1
+                else f"pdm-{index}-{selector or 'default'}",
+                command=command,
+                source="PDM scripts/GitHub Actions",
+                provider_name="aggregate" if known_validation else "custom",
+                purpose="Run the native PDM script recorded in the project.",
+                roles=("validation",) if known_validation else (),
+                selectors=(selector,) if selector else (),
+                config_files=(configuration.config_file,) if configuration else (),
+                settings=settings,
+                declaration=declaration,
+                evidence=tuple(
+                    f"validation-input:{path}" for path in dict.fromkeys(evidence_paths)
+                ),
+                unresolved=tuple(dict.fromkeys(unresolved)),
+            )
+        )
+    return tuple(profiles)
+
+
+def _pdm_script_selector(command: Sequence[str]) -> str | None:
+    pdm_index = next(
+        (i for i, token in enumerate(command) if Path(token).name == "pdm"), None
+    )
+    if pdm_index is None:
+        return None
+    tail = list(command[pdm_index + 1 :])
+    if not tail:
+        return None
+    if tail[0] == "run":
+        tail = tail[1:]
+    elif not tail[0].startswith("-"):
+        # PDM exposes scripts as root shortcuts unless they collide with commands.
+        return tail[0]
+    else:
+        return None
+    value_options = {
+        "--env",
+        "--env-file",
+        "--working-dir",
+        "--venv",
+        "-p",
+        "--project",
+    }
+    index = 0
+    while index < len(tail):
+        token = tail[index]
+        if token in value_options:
+            index += 2
+        elif token.startswith("-"):
+            index += 1
+        else:
+            return token
+    return None
 
 
 def _discover_hatch_profiles(
@@ -1431,6 +1590,7 @@ def _ci_commands(root: Path) -> tuple[tuple[str, ...], ...]:
                         "gmake ",
                         "just ",
                         "task ",
+                        "pdm ",
                     )
                 ):
                     commands.append(_split_shell_arguments(stripped))

@@ -65,6 +65,159 @@ class HatchConfiguration:
     unresolved: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, slots=True)
+class PdmConfiguration:
+    """PDM user scripts declared in pyproject.toml."""
+
+    config_file: str
+    scripts: Mapping[str, Mapping[str, object]]
+    shared_options: Mapping[str, object]
+    unresolved: tuple[str, ...] = ()
+
+
+def discover_pdm_configuration(root: str | Path) -> PdmConfiguration | None:
+    """Read PDM scripts while preserving their native type and execution settings."""
+    path = Path(root).resolve() / "pyproject.toml"
+    if not path.is_file():
+        return None
+    try:
+        document = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        return PdmConfiguration(
+            "pyproject.toml",
+            {},
+            {},
+            (f"Could not parse PDM input pyproject.toml: {error}.",),
+        )
+    raw = _nested(document, ("tool", "pdm", "scripts"))
+    if not isinstance(raw, Mapping):
+        return None
+    scripts: dict[str, Mapping[str, object]] = {}
+    shared = raw.get("_")
+    unresolved: list[str] = []
+    for name, value in raw.items():
+        if name == "_":
+            continue
+        if not isinstance(name, str):
+            unresolved.append(f"PDM script name is not a string: {name!r}.")
+            continue
+        if isinstance(value, str):
+            scripts[name] = {"cmd": value}
+        elif isinstance(value, list) and all(isinstance(item, str) for item in value):
+            scripts[name] = {"cmd": value}
+        elif isinstance(value, Mapping):
+            scripts[name] = dict(value)
+        else:
+            unresolved.append(
+                f"PDM script {name!r} has unsupported declaration syntax."
+            )
+    return PdmConfiguration(
+        "pyproject.toml",
+        scripts,
+        dict(shared) if isinstance(shared, Mapping) else {},
+        tuple(unresolved),
+    )
+
+
+def pdm_script_closure(
+    configuration: PdmConfiguration, name: str
+) -> tuple[tuple[tuple[str, ...], ...], tuple[str, ...]]:
+    """Expand literal PDM tasks; retain unsupported forms as diagnostics."""
+    commands: list[tuple[str, ...]] = []
+    diagnostics: list[str] = []
+    visiting: list[str] = []
+
+    def visit(script_name: str) -> None:
+        if script_name in visiting:
+            diagnostics.append(
+                "PDM composite cycle detected: "
+                f"{' -> '.join((*visiting, script_name))}."
+            )
+            return
+        declaration = configuration.scripts.get(script_name)
+        if declaration is None:
+            diagnostics.append(
+                f"PDM composite reference {script_name!r} has no static declaration."
+            )
+            return
+        visiting.append(script_name)
+        kind = next(
+            (
+                key
+                for key in ("cmd", "shell", "call", "composite")
+                if key in declaration
+            ),
+            None,
+        )
+        value = declaration.get(kind) if kind else None
+        if kind == "cmd":
+            if isinstance(value, str):
+                try:
+                    commands.append(tuple(shlex.split(value, posix=True)))
+                except ValueError:
+                    diagnostics.append(
+                        f"PDM cmd script {script_name!r} has malformed shell quoting."
+                    )
+            elif isinstance(value, list) and all(
+                isinstance(item, str) for item in value
+            ):
+                commands.append(tuple(value))
+            else:
+                diagnostics.append(
+                    f"PDM cmd script {script_name!r} is not a literal command."
+                )
+        elif kind == "composite" and isinstance(value, list):
+            for item in value:
+                if not isinstance(item, str):
+                    diagnostics.append(
+                        f"PDM composite script {script_name!r} has a non-string task."
+                    )
+                    continue
+                try:
+                    parts = shlex.split(item, posix=True)
+                except ValueError:
+                    diagnostics.append(
+                        f"PDM composite script {script_name!r} has malformed "
+                        "shell quoting."
+                    )
+                    continue
+                if parts:
+                    if parts[0] in configuration.scripts:
+                        visit(parts[0])
+                        if len(parts) > 1:
+                            diagnostics.append(
+                                f"Arguments forwarded through PDM composite "
+                                f"{script_name!r} are retained without expansion."
+                            )
+                    else:
+                        commands.append(tuple(parts))
+        elif kind in {"shell", "call"}:
+            diagnostics.append(
+                f"PDM {kind} script {script_name!r} was retained without "
+                "interpretation."
+            )
+        else:
+            diagnostics.append(
+                f"PDM script {script_name!r} has no supported static command."
+            )
+        for key in ("env", "env_file", "working_dir", "site_packages", "keep_going"):
+            if key in declaration:
+                diagnostics.append(
+                    f"PDM script {script_name!r} uses {key} settings retained "
+                    "in configuration."
+                )
+        for command in commands:
+            if any("{" in part or "}" in part or "${" in part for part in command):
+                diagnostics.append(
+                    f"PDM script {script_name!r} uses dynamic placeholders."
+                )
+                break
+        visiting.pop()
+
+    visit(name)
+    return tuple(commands), tuple(dict.fromkeys(diagnostics))
+
+
 def discover_hatch_configuration(root: str | Path) -> HatchConfiguration | None:
     """Read Hatch environments and named scripts without expanding or running them."""
     root_path = Path(root).resolve()

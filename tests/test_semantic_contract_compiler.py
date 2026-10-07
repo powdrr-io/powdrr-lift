@@ -402,7 +402,10 @@ def test_included_clause_with_missing_product_kind_falls_back_to_invariant(
 
 
 def test_context_route_takes_context_branch_before_child_classifiers() -> None:
-    clause = _clause("The library currently has no per-instance data ownership.")
+    clause = _clause(
+        "States lack built-in data ownership, forcing manual variable management "
+        "without scoping or lifecycle."
+    )
     root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)
     assert root_plan["pending_specs"][0]["spec"]["decision_kind"] == "routing"
     root = bind_source_semantic_decisions(

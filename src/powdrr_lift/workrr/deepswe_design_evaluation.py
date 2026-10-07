@@ -436,6 +436,12 @@ def evaluate_deepswe_worker_prompt(
             )
         symbols = _string_list(criterion, "solution_symbols")
         test_names = _string_list(criterion, "verifier_tests")
+        required_prompt_claims = _optional_string_list(
+            criterion, "required_prompt_claims"
+        )
+        forbidden_prompt_claims = _optional_string_list(
+            criterion, "forbidden_prompt_claims"
+        )
         missing_symbols = [
             item for item in symbols if not _patch_has_symbol(solution_patch, item)
         ]
@@ -476,6 +482,8 @@ def evaluate_deepswe_worker_prompt(
                 solution_evidence=_solution_evidence(solution_patch, symbols),
                 verifier_tests=test_names,
                 candidate_prompts=candidate_prompts,
+                required_prompt_claims=required_prompt_claims,
+                forbidden_prompt_claims=forbidden_prompt_claims,
             )
         quote = decision["evidence_quote"]
         if quote and not any(quote in item["prompt"] for item in prompts):
@@ -508,6 +516,8 @@ def evaluate_deepswe_worker_prompt(
                     solution_patch, symbols
                 ),
                 "verifier_tests": test_names,
+                "required_prompt_claims": required_prompt_claims,
+                "forbidden_prompt_claims": forbidden_prompt_claims,
                 "prompt_request_ids": [item["request_id"] for item in prompts],
                 **decision,
             }
@@ -576,6 +586,8 @@ def _judge_worker_prompt_criterion(
     solution_evidence: Sequence[str],
     verifier_tests: Sequence[str],
     candidate_prompts: Sequence[Mapping[str, str]],
+    required_prompt_claims: Sequence[str] = (),
+    forbidden_prompt_claims: Sequence[str] = (),
 ) -> dict[str, str]:
     payload = {
         "criterion_id": criterion_id,
@@ -586,6 +598,8 @@ def _judge_worker_prompt_criterion(
         "reference_solution_symbols": list(solution_symbols),
         "reference_solution_evidence": list(solution_evidence),
         "reference_verifier_tests": list(verifier_tests),
+        "required_prompt_claims": list(required_prompt_claims),
+        "forbidden_prompt_claims": list(forbidden_prompt_claims),
         "candidate_worker_prompts": list(candidate_prompts),
     }
     messages = [
@@ -604,7 +618,9 @@ def _judge_worker_prompt_criterion(
                 "instruction elsewhere. Distinguish requirements that all apply from "
                 "permitted alternatives: different modes, populations, or conditions "
                 "do not make requirements optional by themselves. For supported or "
-                "contradicted, quote exact text from one candidate prompt. Return "
+                "contradicted, quote exact text from one candidate prompt. Check "
+                "every required_prompt_claim and ensure no forbidden_prompt_claim "
+                "appears as an instruction in any candidate prompt. Return "
                 "missing if absent and ambiguous if the prompts do not resolve the "
                 "behavior."
             ),
@@ -790,6 +806,15 @@ def _solution_evidence(patch: str, symbols: Sequence[str]) -> list[str]:
 def _string_list(data: Mapping[str, Any], key: str) -> list[str]:
     value = data.get(key)
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise DeepSWEEvaluationError(f"rubric field {key!r} must be a string list")
+    return value
+
+
+def _optional_string_list(data: Mapping[str, Any], key: str) -> list[str]:
+    value = data.get(key, [])
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item.strip() for item in value
+    ):
         raise DeepSWEEvaluationError(f"rubric field {key!r} must be a string list")
     return value
 

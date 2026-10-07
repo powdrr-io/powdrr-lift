@@ -227,6 +227,42 @@ def test_atomicity_split_preserves_joint_validation_relationships() -> None:
     assert restored.fingerprint == split.fingerprint
 
 
+def test_history_modes_remain_required_conditional_branches() -> None:
+    source = (
+        "History recall restores saved data snapshots -- deep for full "
+        "descendants, shallow for direct children."
+    )
+    ledger = compile_instruction_ledger("feature", source)
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": [
+                    "Deep history restores saved data for full descendants.",
+                    "Shallow history restores saved data for direct children.",
+                ],
+                "validation_groups": [{"members": [1, 2], "relation": "conditional"}],
+                "semantic_relations": [
+                    "list_relation|independent_required|1,2|saved data snapshots -- "
+                    "deep for full descendants, shallow for direct children"
+                ],
+                "modifier_attachments": [],
+            }
+        },
+    )
+
+    assert [item.text for item in split.clauses] == [
+        "Deep history restores saved data for full descendants.",
+        "Shallow history restores saved data for direct children.",
+    ]
+    assert {item.validation_relation for item in split.clauses} == {"conditional"}
+    assert all(
+        item.validation_group_id == "validation:instruction-001:1"
+        for item in split.clauses
+    )
+
+
 def test_atomicity_split_preserves_scoped_relations_and_modifier_attachments() -> None:
     ledger = compile_instruction_ledger(
         "feature", "Support nested paths through list indexes and null values."

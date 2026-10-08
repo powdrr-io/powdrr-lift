@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import io
 import json
 import subprocess
@@ -105,7 +104,6 @@ from powdrr_lift.workrr.feature_endpoint import (
     run_feature_in_place,
 )
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from powdrr_lift.workrr.semantic_prompt_cases import audit_prompt_claim_presence
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
 
@@ -157,7 +155,7 @@ def test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes(
             ),
         ),
         unresolved_questions=(),
-        quality=CriterionQuality(criterion_status="checkable"),
+        quality=CriterionQuality(criterion_status="unassessed"),
     )
     design["acceptance_criteria"] = [
         replace(criterion, fingerprint=criterion.calculate_fingerprint()).to_data()
@@ -188,24 +186,7 @@ def test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes(
     assert "python -m pytest" in prompt
     assert "Required product changes:" in prompt
     assert "Response.iter_json yields each array element." in prompt
-    captured_prompt = request["prompt"]
-    assert "Observable acceptance checks:" in captured_prompt
-    assert ('1. Start with {"input":["A","B"]}.') in captured_prompt
-    assert 'Check that yielded elements equals ["A","B"].' in captured_prompt
-    assert "acceptance-criterion:test" not in captured_prompt
-    assert (
-        request["prompt_fingerprint"]
-        == "sha256:" + hashlib.sha256(captured_prompt.encode("utf-8")).hexdigest()
-    )
-    audit = audit_prompt_claim_presence(
-        {
-            "case_id": "iter-json-captured-request",
-            "required_prompt_claims": ['Check that yielded elements equals ["A","B"].'],
-            "forbidden_prompt_claims": ["sources: instruction-001"],
-        },
-        captured_prompt,
-    )
-    assert audit["passed"] is True
+    assert "Reviewed observable acceptance criteria:" not in prompt
     assert request["implementation_packet"] == packet
     assert request["planned_additions"][0]["section"] == "features"
     structrr_diff = yaml.safe_load(

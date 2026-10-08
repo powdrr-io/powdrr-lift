@@ -108,8 +108,13 @@ def test_typed_criterion_round_trips_and_fingerprints() -> None:
     restored = ImplementationPacket.from_data(packet.to_data())
     rendered = restored.render()
     assert restored.acceptance_criteria[0].criterion_id == criterion.criterion_id
+<<<<<<< HEAD
     assert "Observable acceptance checks:" in rendered
     assert 'Check that result.items equals "Contains entries A and B."' in rendered
+=======
+    assert "Reviewed observable acceptance criteria:" in rendered
+    assert 'result.items equals ["A", "B"]' in rendered
+>>>>>>> parent of baa0893c (Merge pull request #933 from powdrr-io/codex/acceptance-criteria-pr7)
     legacy_data = packet.to_data()
     legacy_data["schema_version"] = "implementation-packet-v1"
     legacy_data.pop("acceptance_criteria")
@@ -537,7 +542,7 @@ def test_assertion_local_repair_retains_supported_claim_and_records_attempt() ->
         acceptance_criteria=(reviewed_criterion.to_data(),),
     )
     worker_text = packet.render()
-    assert 'Check that result.payload equals "the forwarded payload".' in worker_text
+    assert 'Assert result.payload equals "the forwarded payload"' in worker_text
     assert "result.cancelled" not in worker_text
 
 

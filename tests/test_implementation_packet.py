@@ -2,11 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from powdrr_lift.core.acceptance_contract import (
-    AcceptanceCriterion,
-    CriterionAssertion,
-)
-from powdrr_lift.core.behavior_contract import CriterionQuality
 from powdrr_lift.core.implementation_packet import compile_implementation_packet
 
 
@@ -181,6 +176,7 @@ def test_packet_can_focus_a_compiled_code_task() -> None:
     assert "The reset behavior works." in focused.render()
 
 
+<<<<<<< HEAD
 def test_packet_renders_reviewed_criteria_by_contract_without_metadata() -> None:
     criteria = (
         AcceptanceCriterion(
@@ -351,6 +347,8 @@ def test_packet_keeps_material_open_question_for_unresolved_criterion() -> None:
     assert "process the optional field" not in rendered
 
 
+=======
+>>>>>>> parent of baa0893c (Merge pull request #933 from powdrr-io/codex/acceptance-criteria-pr7)
 def test_packet_prompt_contains_every_required_test_without_compiler_metadata() -> None:
     packet = compile_implementation_packet(
         objective="Add state data support.",

@@ -73,42 +73,6 @@ def load_semantic_prompt_cases(path: Path) -> list[dict[str, Any]]:
     return cases
 
 
-def audit_prompt_claim_presence(case: Mapping[str, Any], prompt: str) -> dict[str, Any]:
-    """Mechanically find omitted required claims and present forbidden claims.
-
-    This is a conservative corpus check, not a semantic judge: it only detects
-    normalized phrase presence. It scans the whole prompt so a correct statement
-    elsewhere cannot mask a contradictory claim.
-    """
-    case_id = _nonempty_text(case, "case_id")
-    if not isinstance(prompt, str):
-        raise SemanticPromptCaseError("prompt must be text")
-    required = _text_list(case, "required_prompt_claims")
-    forbidden = _text_list(case, "forbidden_prompt_claims")
-    normalized_prompt = _normalize_prompt_text(prompt)
-    missing = [
-        claim
-        for claim in required
-        if _normalize_prompt_text(claim) not in normalized_prompt
-    ]
-    present_forbidden = [
-        claim
-        for claim in forbidden
-        if _normalize_prompt_text(claim) in normalized_prompt
-    ]
-    return {
-        "case_id": case_id,
-        "missing_required_claims": missing,
-        "present_forbidden_claims": present_forbidden,
-        "passed": not missing and not present_forbidden,
-        "check": "normalized_phrase_presence_only",
-    }
-
-
-def _normalize_prompt_text(value: str) -> str:
-    return " ".join(value.casefold().split())
-
-
 def validate_semantic_prompt_cases(
     cases: Sequence[Mapping[str, Any]],
     *,

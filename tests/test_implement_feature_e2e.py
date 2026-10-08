@@ -1010,14 +1010,12 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     assert packet["acceptance_criteria"]
     prompt = (run_root / "artifacts" / "prompts").glob("*.txt")
     prompt_text = next(prompt).read_text(encoding="utf-8")
-    assert "Observable acceptance checks:" in prompt_text
+    assert "Reviewed observable acceptance criteria:" in prompt_text
     assert "Product contract:" in prompt_text
     assert "Validation contract:" in prompt_text
-    assert (
-        "Behavior scenarios not yet assessed as acceptance checks:" not in prompt_text
-    )
+    assert "Required behavior checks:" in prompt_text
     assert "expect the stated acceptance outcome is observed" not in prompt_text
-    assert "Run the focused required tests after implementation." in prompt_text
+    assert "Run the tests before reporting completion." in prompt_text
     assert "Worker policy:" in prompt_text
     assert "create the exact selectors" not in prompt_text
     proposal = json.loads(

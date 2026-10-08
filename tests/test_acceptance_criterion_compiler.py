@@ -120,6 +120,108 @@ def test_typed_criterion_round_trips_and_fingerprints() -> None:
         ImplementationPacket.from_data(malformed_v2)
 
 
+def test_boolean_split_logic_survives_per_requirement_criteria() -> None:
+    contract = _contract(("instruction-001", "instruction-002"))
+    source_text = {
+        "instruction-001": "The caller may use the first supported mode.",
+        "instruction-002": "The caller may use the second supported mode.",
+    }
+    boolean_combination = {
+        "parent_clause_id": "candidate:instruction-000",
+        "child_clause_ids": ["instruction-001", "instruction-002"],
+        "expression": {"op": "or", "args": [{"atom": 1}, {"atom": 2}]},
+        "reconstructed_sentence": (
+            "The caller may use the first supported mode or The caller may use "
+            "the second supported mode."
+        ),
+    }
+    plan = prepare_acceptance_criteria(
+        {
+            "schema_version": "behavioral-contract-collection-v1",
+            "ledger_fingerprint": "sha256:ledger",
+            "covered_requirement_ids": list(contract.member_requirement_ids),
+            "contracts": [contract.to_data()],
+        },
+        source_text,
+        [boolean_combination],
+    )
+
+    assert len(plan["requests"]) == 2
+    for source_id, request in zip(
+        contract.member_requirement_ids, plan["requests"], strict=True
+    ):
+        context = request["boolean_contexts"][0]
+        assert context["expression"] == boolean_combination["expression"]
+        assert context["current_requirement_id"] == source_id
+        assert [
+            item["requirement_id"] for item in context["child_requirements"]
+        ] == list(contract.member_requirement_ids)
+        assert any("OR/XOR alternatives" in item for item in request["instructions"])
+
+    draft = bind_acceptance_criteria(
+        plan,
+        [
+            {"criterion": _criterion([0])},
+            {"criterion": _criterion([0])},
+        ],
+    )
+    assert draft["boolean_combinations"] == [
+        {
+            **boolean_combination,
+            "child_requirements": [
+                {"requirement_id": item, "source_text": source_text[item]}
+                for item in contract.member_requirement_ids
+            ],
+        }
+    ]
+
+    review_plan = prepare_acceptance_criterion_reviews(
+        draft,
+        {
+            "schema_version": "behavioral-contract-collection-v1",
+            "ledger_fingerprint": "sha256:ledger",
+            "contracts": [contract.to_data()],
+        },
+        source_text,
+    )
+    assert (
+        review_plan["requests"][0]["boolean_contexts"][0]["current_requirement_id"]
+        == "instruction-001"
+    )
+
+    single_requirement_contract = _contract(("instruction-001",))
+    context_only_branch = prepare_acceptance_criteria(
+        {
+            "schema_version": "behavioral-contract-collection-v1",
+            "ledger_fingerprint": "sha256:ledger",
+            "covered_requirement_ids": ["instruction-001"],
+            "contracts": [single_requirement_contract.to_data()],
+        },
+        source_text,
+        [boolean_combination],
+    )
+    assert context_only_branch["boolean_combinations"] == []
+    assert context_only_branch["requests"][0]["boolean_contexts"] == []
+    criterion = AcceptanceCriterion.from_data(draft["criteria"][0])
+    packet = compile_implementation_packet(
+        objective="Implement accumulated results.",
+        obligations=("Accumulate entries across payloads.",),
+        required_tests=({"description": "observe the combined result"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        acceptance_criteria=(criterion.to_data(),),
+        acceptance_logic=draft["boolean_combinations"],
+    )
+    restored = ImplementationPacket.from_data(packet.to_data())
+    rendered = restored.render()
+    assert restored.acceptance_criteria[0].criterion_id == criterion.criterion_id
+    assert restored.acceptance_logic[0]["expression"]["op"] == "or"
+    assert "Acceptance logic from the original instruction:" in rendered
+    assert "alternatives are not all required at once" in rendered
+    assert '"op": "or"' in rendered
+    assert "The caller may use the first supported mode." in rendered
+
+
 def test_criterion_request_partition_preserves_requirements_and_context() -> None:
     member_ids = tuple(f"instruction-{index:03}" for index in range(1, 7))
     contract = _contract(member_ids, ("context-001",))

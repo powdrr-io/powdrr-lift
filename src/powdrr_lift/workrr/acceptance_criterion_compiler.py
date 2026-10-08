@@ -17,6 +17,7 @@ from powdrr_lift.core.acceptance_contract import (
     CriterionAssertion,
 )
 from powdrr_lift.core.behavior_contract import CriterionQuality
+from powdrr_lift.core.instruction_ledger import BooleanCombination
 
 MAX_CRITERION_REQUIREMENTS = 1
 MAX_CRITERIA_PER_REQUEST = 1
@@ -39,6 +40,7 @@ ASSERTION_REVIEW_CATEGORIES = frozenset(
 def prepare_acceptance_criteria(
     contract_collection: Mapping[str, Any],
     source_text_by_id: Mapping[str, str],
+    boolean_combinations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Create one bounded generation request per related requirement partition."""
     raw_contracts = contract_collection.get("contracts")
@@ -78,6 +80,14 @@ def prepare_acceptance_criteria(
     }
     if not referenced_ids.issubset(source_text_by_id):
         raise AcceptanceContractError("behavioral contract source text is missing")
+    normalized_combinations = _normalize_boolean_combinations(
+        boolean_combinations, source_text_by_id
+    )
+    normalized_combinations = [
+        item
+        for item in normalized_combinations
+        if set(item["child_clause_ids"]).issubset(requirement_ids)
+    ]
     requests: list[dict[str, Any]] = []
     for contract in contracts:
         members = contract.member_requirement_ids
@@ -124,6 +134,15 @@ def prepare_acceptance_criteria(
                         }
                         for context_id in contract.supporting_context_ids
                     ],
+                    "boolean_contexts": [
+                        {
+                            **dict(combination),
+                            "current_requirement_id": source_id,
+                        }
+                        for combination in normalized_combinations
+                        for source_id in partition
+                        if source_id in combination["child_clause_ids"]
+                    ],
                     "relationships": relationships,
                     "shared_constraints": list(contract.shared_constraints),
                     "unresolved_contract_questions": list(
@@ -135,6 +154,10 @@ def prepare_acceptance_criteria(
                         "or resolve new semantic questions.",
                         "Use source text only as evidence for the provided contract "
                         "meaning; do not derive new obligations from it.",
+                        "When boolean_contexts are present, keep this criterion "
+                        "scoped to its one atom and preserve the supplied expression. "
+                        "Do not turn OR/XOR alternatives into jointly required "
+                        "behaviors; the complete expression governs how atoms combine.",
                         "Generate exactly one criterion for this one atomic "
                         "requirement, with no more than four assertions.",
                         "Cover explicitly stated interface and normal behavior "
@@ -160,6 +183,7 @@ def prepare_acceptance_criteria(
         "ledger_fingerprint": contract_collection.get("ledger_fingerprint"),
         "requirement_ids": list(requirement_ids),
         "source_text_by_id": dict(source_text_by_id),
+        "boolean_combinations": normalized_combinations,
         "contracts": [item.to_data() for item in contracts],
         "requests": requests,
     }
@@ -184,6 +208,11 @@ def bind_acceptance_criteria(
         for item in raw_contracts
         if isinstance(item, Mapping)
     )
+    boolean_combinations = plan.get("boolean_combinations", [])
+    if not isinstance(boolean_combinations, list) or not all(
+        isinstance(item, Mapping) for item in boolean_combinations
+    ):
+        raise AcceptanceContractError("criterion boolean logic is malformed")
     if len(contracts) != len(raw_contracts):
         raise AcceptanceContractError("behavioral contract entry is malformed")
     contract_by_id = {item.contract_id: item for item in contracts}
@@ -295,6 +324,7 @@ def bind_acceptance_criteria(
     return {
         "schema_version": ACCEPTANCE_CRITERION_SCHEMA_VERSION,
         "ledger_fingerprint": plan.get("ledger_fingerprint"),
+        "boolean_combinations": [dict(item) for item in boolean_combinations],
         "criteria": [item.to_data() for item in criteria],
         "requirement_coverage": requirement_coverage,
         "counts": {
@@ -370,6 +400,18 @@ def prepare_acceptance_criterion_reviews(
                     "shared_constraints": list(contract.shared_constraints),
                     "unresolved_questions": list(contract.unresolved_questions),
                 },
+                "boolean_contexts": [
+                    {
+                        **dict(combination),
+                        "current_requirement_id": source_id,
+                    }
+                    for combination in criterion_collection.get(
+                        "boolean_combinations", []
+                    )
+                    if isinstance(combination, Mapping)
+                    for source_id in criterion.source_refs
+                    if source_id in combination.get("child_clause_ids", [])
+                ],
                 "source_clauses": [
                     {"source_ref": source_id, "text": source_text_by_id[source_id]}
                     for source_id in criterion.source_refs
@@ -1057,6 +1099,23 @@ def prepare_acceptance_criterion_repairs(
                         }
                         for index, source_id in enumerate(members)
                     ],
+                    "boolean_contexts": [
+                        {
+                            **dict(combination),
+                            "current_requirement_ids": list(
+                                set(members).intersection(
+                                    combination["child_clause_ids"]
+                                )
+                            ),
+                        }
+                        for combination in criterion_collection.get(
+                            "boolean_combinations", []
+                        )
+                        if isinstance(combination, Mapping)
+                        and set(members).intersection(
+                            combination.get("child_clause_ids", [])
+                        )
+                    ],
                     "failed_criteria": failed_reviews,
                     "coverage_failures": {
                         source_id: str(
@@ -1087,6 +1146,9 @@ def prepare_acceptance_criterion_repairs(
                         "criterion.",
                         "Use only cited clauses and the assembled contract. Do not "
                         "use solutions or validation patches.",
+                        "Preserve the supplied boolean expression and keep each "
+                        "criterion scoped to its atom. Do not turn OR/XOR alternatives "
+                        "into jointly required behavior.",
                         "Do not resolve an unspecified material choice without "
                         "cited source or repository evidence.",
                         (
@@ -1106,6 +1168,9 @@ def prepare_acceptance_criterion_repairs(
         "ledger_fingerprint": criterion_collection.get("ledger_fingerprint"),
         "requirement_ids": list(criterion_collection.get("requirement_coverage", {})),
         "contracts": [item.to_data() for item in contracts],
+        "boolean_combinations": list(
+            criterion_collection.get("boolean_combinations", [])
+        ),
         "requests": requests,
         "replaces": request_original_ids,
     }
@@ -1285,6 +1350,35 @@ def _ids_for_indexes(raw: Any, candidate_ids: Sequence[str]) -> tuple[str, ...]:
     except AcceptanceContractError:
         return ()
     return tuple(candidate_ids[index] for index in indexes)
+
+
+def _normalize_boolean_combinations(
+    raw_combinations: Sequence[Mapping[str, Any]],
+    source_text_by_id: Mapping[str, str],
+) -> list[dict[str, Any]]:
+    combinations: list[dict[str, Any]] = []
+    for raw in raw_combinations:
+        if not isinstance(raw, Mapping):
+            raise AcceptanceContractError("boolean combination is malformed")
+        try:
+            combination = BooleanCombination.from_data(dict(raw))
+        except (TypeError, ValueError) as error:
+            raise AcceptanceContractError("boolean combination is malformed") from error
+        if not set(combination.child_clause_ids).issubset(source_text_by_id):
+            raise AcceptanceContractError("boolean combination source text is missing")
+        combinations.append(
+            {
+                **combination.to_data(),
+                "child_requirements": [
+                    {
+                        "requirement_id": requirement_id,
+                        "source_text": source_text_by_id[requirement_id],
+                    }
+                    for requirement_id in combination.child_clause_ids
+                ],
+            }
+        )
+    return combinations
 
 
 def _bind_criterion(

@@ -264,6 +264,26 @@ def test_packet_renders_reviewed_criteria_by_contract_without_metadata() -> None
             },
         ),
         acceptance_criteria=tuple(item.to_data() for item in criteria),
+        acceptance_logic=(
+            {
+                "parent_clause_id": "candidate:instruction-000",
+                "child_clause_ids": ["instruction-001", "instruction-002"],
+                "expression": {"op": "or", "args": [{"atom": 1}, {"atom": 2}]},
+                "reconstructed_sentence": (
+                    "Use the first supported mode or Use the second supported mode."
+                ),
+                "child_requirements": [
+                    {
+                        "requirement_id": "instruction-001",
+                        "source_text": "Use the first supported mode.",
+                    },
+                    {
+                        "requirement_id": "instruction-002",
+                        "source_text": "Use the second supported mode.",
+                    },
+                ],
+            },
+        ),
     )
 
     rendered = packet.render()
@@ -277,6 +297,10 @@ def test_packet_renders_reviewed_criteria_by_contract_without_metadata() -> None
         in rendered
     )
     assert 'Check that result.extensions equals {"cursor":2}.' in rendered
+    assert "Acceptance logic from the original instruction:" in rendered
+    assert "alternatives are not all required at once" in rendered
+    assert '"op": "or"' in rendered
+    assert "Use the first supported mode." in rendered
     assert "criterion-a" not in rendered
     assert "instruction-001" not in rendered
     assert "[state_transition;" not in rendered

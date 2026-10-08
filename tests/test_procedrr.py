@@ -636,7 +636,11 @@ def test_checked_in_design_interview_definition_parses() -> None:
 
     collect_judges(document["steps"])
     assert judge_providers["classify_one"]
-    assert set(judge_providers["classify_one"]) == {"jev", "planning"}
+    assert set(judge_providers["classify_one"]) == {
+        "jev",
+        "jev_required",
+        "planning",
+    }
     assert set(judge_providers["construct_one"]) == {"planning"}
     assert document["name"] == "design-interview"
     assert validate_single_decision(document) == ()
@@ -682,7 +686,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     atomicity_loop = document["steps"][1]["for_each"]
     split_body = document["steps"][3]["for_each"]["body"]
     split_judge = split_body[0]["judge"]
-    body = document["steps"][5]["for_each"]["body"]
+    body = document["steps"][7]["for_each"]["body"]
     root_loop = body[1]["for_each"]
     root_judge = root_loop["body"][0]["judge"]
     dependent_operation = body[3]["operation"]
@@ -707,11 +711,13 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     assert atomicity_judge["output"]["schema"]["required"] == ["multiple"]
     assert atomicity_loop["max_parallel"] == 8
     assert split_judge["question"] == (
-        "How can this clause be decomposed without losing validation dependencies?"
+        "How can this clause be decomposed into independently verifiable atoms "
+        "while preserving its exact boolean structure?"
     )
     assert split_judge["output"]["schema"]["required"] == [
         "statements",
         "validation_groups",
+        "boolean_expression",
     ]
     split_rules = " ".join(split_judge["instructions"])
     assert "Splitting a source clause does not weaken its requiredness" in split_rules
@@ -730,6 +736,12 @@ def test_design_interview_uses_single_field_source_classification() -> None:
         "shallow history restores saved data snapshots for direct children"
         in atomicity_rules
     )
+    assert "Do not flatten nested logic" in split_rules
+
+    reconstruction_judge = document["steps"][5]["for_each"]["body"][0]["judge"]
+    assert reconstruction_judge["provider"] == "jev_required"
+    assert reconstruction_judge["output"]["schema"]["required"] == ["equivalent"]
+    assert "in both directions" in " ".join(reconstruction_judge["instructions"])
 
     assert classifier_loop["snapshot"]["max_items"] == 16
     assert root_judge["question"].startswith("Decide how the pipeline should route")

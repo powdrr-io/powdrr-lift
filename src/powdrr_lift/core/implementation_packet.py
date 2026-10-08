@@ -16,7 +16,12 @@ from powdrr_lift.core.behavior_contract import (
     compile_behavior_scenarios,
     render_behavior_matrix,
 )
+from powdrr_lift.core.boolean_expression import (
+    BooleanExpressionError,
+    render_boolean_sentence,
+)
 from powdrr_lift.core.contract_closure import render_contract_closure
+from powdrr_lift.core.instruction_ledger import BooleanCombination
 from powdrr_lift.structrr.obligation_evidence import ObligationEvidenceContract
 
 
@@ -50,6 +55,7 @@ class ImplementationPacket:
     external_contract_notes: tuple[Mapping[str, Any], ...] = ()
     obligation_evidence_contracts: tuple[ObligationEvidenceContract, ...] = ()
     acceptance_criteria: tuple[AcceptanceCriterion, ...] = ()
+    acceptance_logic: tuple[Mapping[str, Any], ...] = ()
 
     def for_obligation(self, ordinal: int) -> ImplementationPacket:
         """Return the smallest packet needed for one implementation turn."""
@@ -76,6 +82,7 @@ class ImplementationPacket:
                 index : index + 1
             ],
             acceptance_criteria=self.acceptance_criteria,
+            acceptance_logic=self.acceptance_logic,
         )
 
     def for_task(
@@ -106,11 +113,12 @@ class ImplementationPacket:
             external_contract_notes=self.external_contract_notes,
             obligation_evidence_contracts=self.obligation_evidence_contracts,
             acceptance_criteria=self.acceptance_criteria,
+            acceptance_logic=self.acceptance_logic,
         )
 
     def to_data(self) -> dict[str, Any]:
         data = {
-            "schema_version": "implementation-packet-v2",
+            "schema_version": "implementation-packet-v3",
             "objective": self.objective,
             "obligations": [
                 {"ordinal": index, "description": description}
@@ -128,6 +136,7 @@ class ImplementationPacket:
             "acceptance_criteria": [
                 item.to_data() for item in self.acceptance_criteria
             ],
+            "acceptance_logic": [dict(item) for item in self.acceptance_logic],
         }
         if self.contract_closure is not None:
             data["contract_closure"] = dict(self.contract_closure)
@@ -151,12 +160,23 @@ class ImplementationPacket:
         if schema_version not in {
             "implementation-packet-v1",
             "implementation-packet-v2",
+            "implementation-packet-v3",
         }:
             raise ValueError("unsupported implementation packet schema")
-        if schema_version == "implementation-packet-v2" and (
-            "acceptance_criteria" not in raw
-        ):
+        if schema_version in {
+            "implementation-packet-v2",
+            "implementation-packet-v3",
+        } and ("acceptance_criteria" not in raw):
             raise ValueError("implementation packet v2 requires acceptance criteria")
+        raw_acceptance_logic = raw.get("acceptance_logic", [])
+        if not isinstance(raw_acceptance_logic, list) or not all(
+            isinstance(item, Mapping) for item in raw_acceptance_logic
+        ):
+            raise ValueError("implementation packet acceptance logic is malformed")
+        if schema_version == "implementation-packet-v3" and (
+            "acceptance_logic" not in raw
+        ):
+            raise ValueError("implementation packet v3 requires acceptance logic")
         raw_obligations = raw.get("obligations")
         raw_tests = raw.get("required_tests")
         repository = raw.get("repository")
@@ -237,6 +257,7 @@ class ImplementationPacket:
             acceptance_criteria=tuple(
                 AcceptanceCriterion.from_data(item) for item in raw_criteria
             ),
+            acceptance_logic=tuple(_normalize_acceptance_logic(raw_acceptance_logic)),
         )
         if not packet.objective.strip() or not packet.obligations:
             raise ValueError("implementation packet is missing required content")
@@ -307,6 +328,8 @@ class ImplementationPacket:
                 )
             )
         sections = [behavior_text]
+        if self.acceptance_logic:
+            sections.append(_render_acceptance_logic(self.acceptance_logic))
         if accepted_criteria:
             sections.append(
                 _render_acceptance_criteria(
@@ -443,6 +466,30 @@ def _render_acceptance_criteria(
     return "\n".join(lines)
 
 
+def _render_acceptance_logic(combinations: Sequence[Mapping[str, Any]]) -> str:
+    """Render the source split tree that governs how atomic checks combine."""
+    lines = [
+        "Acceptance logic from the original instruction:",
+        "The atomic acceptance checks below combine according to these exact "
+        "expressions. In particular, alternatives are not all required at once.",
+    ]
+    for index, combination in enumerate(combinations, start=1):
+        expression = combination.get("expression")
+        children = combination.get("child_requirements", [])
+        if not isinstance(expression, Mapping) or not isinstance(children, list):
+            raise ValueError("implementation packet acceptance logic is malformed")
+        lines.append(f"{index}. {combination.get('reconstructed_sentence', '')}")
+        lines.append(
+            "   Boolean expression: "
+            + json.dumps(expression, ensure_ascii=False, sort_keys=True)
+        )
+        for atom_index, child in enumerate(children, start=1):
+            if not isinstance(child, Mapping):
+                raise ValueError("implementation packet acceptance logic is malformed")
+            lines.append(f"   Atom {atom_index}: " + str(child.get("source_text", "")))
+    return "\n".join(lines)
+
+
 def compile_implementation_packet(
     *,
     objective: str,
@@ -457,6 +504,7 @@ def compile_implementation_packet(
     external_contract_notes: Sequence[Mapping[str, Any]] = (),
     obligation_evidence_contracts: Sequence[Mapping[str, Any]] = (),
     acceptance_criteria: Sequence[Mapping[str, Any]] = (),
+    acceptance_logic: Sequence[Mapping[str, Any]] = (),
 ) -> ImplementationPacket:
     """Normalize worker inputs and reject incomplete executable contracts."""
     if not objective.strip():
@@ -532,7 +580,67 @@ def compile_implementation_packet(
         external_contract_notes=tuple(dict(item) for item in external_contract_notes),
         obligation_evidence_contracts=evidence_contracts,
         acceptance_criteria=criteria,
+        acceptance_logic=tuple(_normalize_acceptance_logic(acceptance_logic)),
     )
+
+
+def _normalize_acceptance_logic(
+    raw_combinations: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    if isinstance(raw_combinations, (str, bytes)) or not isinstance(
+        raw_combinations, Sequence
+    ):
+        raise ValueError("implementation packet acceptance logic is malformed")
+    normalized: list[dict[str, Any]] = []
+    for raw in raw_combinations:
+        if not isinstance(raw, Mapping):
+            raise ValueError("implementation packet acceptance logic is malformed")
+        base = {
+            key: raw.get(key)
+            for key in (
+                "parent_clause_id",
+                "child_clause_ids",
+                "expression",
+                "reconstructed_sentence",
+            )
+        }
+        children = raw.get("child_requirements")
+        if not isinstance(children, list) or not all(
+            isinstance(item, Mapping) for item in children
+        ):
+            raise ValueError("implementation packet acceptance logic is malformed")
+        try:
+            combination = BooleanCombination.from_data(base)
+        except (BooleanExpressionError, TypeError, ValueError) as error:
+            raise ValueError(
+                "implementation packet acceptance logic is malformed"
+            ) from error
+        child_ids = [item.get("requirement_id") for item in children]
+        child_texts = [item.get("source_text") for item in children]
+        if tuple(child_ids) != combination.child_clause_ids or not all(
+            isinstance(item, str) and item.strip() for item in child_texts
+        ):
+            raise ValueError("implementation packet acceptance logic atoms are invalid")
+        try:
+            _, reconstructed = render_boolean_sentence(
+                child_texts, combination.expression
+            )
+        except BooleanExpressionError as error:
+            raise ValueError(
+                "implementation packet acceptance logic is malformed"
+            ) from error
+        if reconstructed != combination.reconstructed_sentence:
+            raise ValueError("implementation packet acceptance logic is stale")
+        normalized.append(
+            {
+                **combination.to_data(),
+                "child_requirements": [
+                    {"requirement_id": item, "source_text": text}
+                    for item, text in zip(child_ids, child_texts, strict=True)
+                ],
+            }
+        )
+    return normalized
 
 
 __all__ = [

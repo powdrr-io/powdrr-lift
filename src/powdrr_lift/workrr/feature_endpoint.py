@@ -641,6 +641,12 @@ def _execute_procedrr_flow(
             replay_responses=replay_responses,
             telemetry_sink=record_provider_attempt,
         )
+        jev_equivalence_client = WorkrrProcedrrClient(
+            JevSemanticClassifierClient(config.planning_client, fail_closed=True),
+            skills_dir=flow_directory,
+            replay_responses=replay_responses,
+            telemetry_sink=record_provider_attempt,
+        )
         evaluator = Evaluator(
             planning_client,
             execute,
@@ -648,6 +654,7 @@ def _execute_procedrr_flow(
             judge_clients={
                 "planning": planning_client,
                 "jev": jev_classifier_client,
+                "jev_required": jev_equivalence_client,
             },
             command_catalog=command_catalog,
             event_sink=record_procedrr_event,
@@ -5792,6 +5799,15 @@ def _compile_initial_worker_prompt(
                 if isinstance((scenario := item.get("behavior_scenario")), Mapping)
             ),
             acceptance_criteria=tuple(raw_acceptance_criteria),
+            acceptance_logic=tuple(
+                item
+                for item in (
+                    canonical_design.get("acceptance_logic", [])
+                    if isinstance(canonical_design.get("acceptance_logic", []), list)
+                    else []
+                )
+                if isinstance(item, Mapping)
+            ),
         )
         unit = ExecutionUnit(
             unit_id=f"{slugify_workflow_id(config.work_item_name)}-implementation",

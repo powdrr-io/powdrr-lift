@@ -9,6 +9,12 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_lift.core.boolean_expression import (
+    BooleanExpressionError,
+    render_boolean_sentence,
+    validate_boolean_expression,
+)
+
 INSTRUCTION_LEDGER_SCHEMA_VERSION = "instruction-ledger-v1"
 MAX_ATOMIC_SPLIT_CHILDREN = 8
 
@@ -212,24 +218,84 @@ class AtomicitySplitDiagnostic:
 
 
 @dataclass(frozen=True, slots=True)
+class BooleanCombination:
+    """A validated logical expression and its reconstruction for one split."""
+
+    parent_clause_id: str
+    child_clause_ids: tuple[str, ...]
+    expression: dict[str, Any]
+    reconstructed_sentence: str
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "parent_clause_id": self.parent_clause_id,
+            "child_clause_ids": list(self.child_clause_ids),
+            "expression": self.expression,
+            "reconstructed_sentence": self.reconstructed_sentence,
+        }
+
+    @classmethod
+    def from_data(cls, raw: Any) -> BooleanCombination:
+        if not isinstance(raw, dict) or set(raw) != {
+            "parent_clause_id",
+            "child_clause_ids",
+            "expression",
+            "reconstructed_sentence",
+        }:
+            raise InstructionLedgerError("boolean combination is malformed")
+        parent_id = _required_string(raw, "parent_clause_id")
+        child_ids = raw["child_clause_ids"]
+        sentence = _required_string(raw, "reconstructed_sentence")
+        if (
+            not isinstance(child_ids, list)
+            or len(child_ids) < 2
+            or not all(isinstance(item, str) and item for item in child_ids)
+            or len(set(child_ids)) != len(child_ids)
+        ):
+            raise InstructionLedgerError("boolean combination children are invalid")
+        try:
+            expression = validate_boolean_expression(raw["expression"], len(child_ids))
+        except BooleanExpressionError as error:
+            raise InstructionLedgerError(str(error)) from error
+        return cls(parent_id, tuple(child_ids), expression, sentence)
+
+
+@dataclass(frozen=True, slots=True)
 class InstructionLedger:
     source: InstructionSource
     clauses: tuple[InstructionClause, ...]
     split_diagnostics: tuple[AtomicitySplitDiagnostic, ...] = ()
+    boolean_combinations: tuple[BooleanCombination, ...] = ()
 
     @property
     def fingerprint(self) -> str:
         return _fingerprint(self.to_data(include_fingerprint=False))
 
     def to_data(self, *, include_fingerprint: bool = True) -> dict[str, Any]:
+        clause_data = {item.clause_id: item.to_data() for item in self.clauses}
+        for combination in self.boolean_combinations:
+            combination_data = combination.to_data()
+            for atom_index, child_id in enumerate(
+                combination.child_clause_ids, start=1
+            ):
+                child = clause_data[child_id]
+                child["boolean_combination"] = {
+                    **combination_data,
+                    "current_child_id": child_id,
+                    "current_child_index": atom_index,
+                }
         data: dict[str, Any] = {
             "schema_version": INSTRUCTION_LEDGER_SCHEMA_VERSION,
             "source": self.source.to_data(),
-            "clauses": [item.to_data() for item in self.clauses],
+            "clauses": [clause_data[item.clause_id] for item in self.clauses],
         }
         if self.split_diagnostics:
             data["split_diagnostics"] = [
                 item.to_data() for item in self.split_diagnostics
+            ]
+        if self.boolean_combinations:
+            data["boolean_combinations"] = [
+                item.to_data() for item in self.boolean_combinations
             ]
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
@@ -321,7 +387,13 @@ class InstructionLedger:
             source=source,
             clauses=tuple(clauses),
             split_diagnostics=tuple(diagnostics),
+            boolean_combinations=tuple(
+                BooleanCombination.from_data(item)
+                for item in raw.get("boolean_combinations", [])
+            ),
         )
+        if ledger.boolean_combinations:
+            ledger.validate()
         if raw.get("fingerprint") != ledger.fingerprint:
             raise InstructionLedgerError("instruction ledger fingerprint is stale")
         ledger.validate()
@@ -368,11 +440,22 @@ class InstructionLedger:
             if (
                 not diagnostic.source_clause_id.strip()
                 or diagnostic.reason_code
-                not in {"duplicate_child", "empty_child", "invalid_scope_relation"}
+                not in {
+                    "duplicate_child",
+                    "empty_child",
+                    "invalid_scope_relation",
+                    "invalid_boolean_expression",
+                    "reconstruction_not_equivalent",
+                }
                 or len(diagnostic.child_indexes)
                 < (
                     0
-                    if diagnostic.reason_code == "invalid_scope_relation"
+                    if diagnostic.reason_code
+                    in {
+                        "invalid_scope_relation",
+                        "invalid_boolean_expression",
+                        "reconstruction_not_equivalent",
+                    }
                     else 1
                     if diagnostic.reason_code == "empty_child"
                     else 2
@@ -383,6 +466,44 @@ class InstructionLedger:
                 or end > len(self.source.text)
             ):
                 raise InstructionLedgerError("instruction split diagnostic is invalid")
+        combination_parents: set[str] = set()
+        combination_children: set[str] = set()
+        for combination in self.boolean_combinations:
+            if (
+                combination.parent_clause_id in combination_parents
+                or combination_children.intersection(combination.child_clause_ids)
+            ):
+                raise InstructionLedgerError(
+                    "boolean combinations must have unique parents and children"
+                )
+            combination_parents.add(combination.parent_clause_id)
+            combination_children.update(combination.child_clause_ids)
+            children = [
+                item
+                for item in self.clauses
+                if item.clause_id in combination.child_clause_ids
+            ]
+            if len(children) != len(combination.child_clause_ids) or any(
+                item.parent_clause_id != f"candidate:{combination.parent_clause_id}"
+                for item in children
+            ):
+                raise InstructionLedgerError(
+                    "boolean combination references invalid split children"
+                )
+            statements = [
+                next(item.text for item in children if item.clause_id == child_id)
+                for child_id in combination.child_clause_ids
+            ]
+            try:
+                _, reconstructed = render_boolean_sentence(
+                    statements, combination.expression
+                )
+            except BooleanExpressionError as error:
+                raise InstructionLedgerError(str(error)) from error
+            if reconstructed != combination.reconstructed_sentence:
+                raise InstructionLedgerError(
+                    "boolean combination reconstruction is stale"
+                )
 
 
 @dataclass(frozen=True, slots=True)
@@ -397,6 +518,9 @@ class AtomicityDecision:
             "multiple",
             "statements",
             "validation_groups",
+            "boolean_expression",
+            "equivalent",
+            "reconstructed_sentence",
             "semantic_relations",
             "modifier_attachments",
         } or not isinstance(raw.get("multiple"), bool):
@@ -437,6 +561,7 @@ def apply_atomicity_decisions(
     """Apply bounded split results while keeping all IDs compiler-owned."""
     output: list[InstructionClause] = []
     diagnostics = list(ledger.split_diagnostics)
+    boolean_combinations: list[BooleanCombination] = []
     for clause in ledger.clauses:
         raw = decisions.get(clause.clause_id, {"multiple": False})
         decision = AtomicityDecision.from_data(raw)
@@ -461,6 +586,55 @@ def apply_atomicity_decisions(
                     source_clause_id=clause.clause_id,
                     reason_code=("empty_child" if empty_indexes else "duplicate_child"),
                     child_indexes=empty_indexes or duplicate_indexes,
+                    source_span=clause.source_span,
+                )
+            )
+            continue
+        if raw.get("equivalent") is False:
+            diagnostics.append(
+                AtomicitySplitDiagnostic(
+                    source_clause_id=clause.clause_id,
+                    reason_code="reconstruction_not_equivalent",
+                    child_indexes=(),
+                    source_span=clause.source_span,
+                )
+            )
+            output.append(clause)
+            continue
+        expression_raw = raw.get("boolean_expression")
+        if expression_raw is None:
+            # Compatibility for direct callers of the pre-expression API. The
+            # design-interview contract requires an explicit expression before
+            # this core function is reached by the live workflow.
+            expression_raw = {
+                "op": "and",
+                "args": [{"atom": index} for index in range(1, len(statements) + 1)],
+            }
+        try:
+            expression, reconstructed = render_boolean_sentence(
+                statements, expression_raw
+            )
+        except BooleanExpressionError as error:
+            output.append(clause)
+            diagnostics.append(
+                AtomicitySplitDiagnostic(
+                    source_clause_id=clause.clause_id,
+                    reason_code="invalid_boolean_expression",
+                    child_indexes=(),
+                    source_span=clause.source_span,
+                    details=str(error),
+                )
+            )
+            continue
+        equivalent = raw.get("equivalent", True)
+        reconstructed_sentence = raw.get("reconstructed_sentence", reconstructed)
+        if equivalent is not True or reconstructed_sentence != reconstructed:
+            output.append(clause)
+            diagnostics.append(
+                AtomicitySplitDiagnostic(
+                    source_clause_id=clause.clause_id,
+                    reason_code="reconstruction_not_equivalent",
+                    child_indexes=(),
                     source_span=clause.source_span,
                 )
             )
@@ -502,6 +676,7 @@ def apply_atomicity_decisions(
         modifier_attachments = _materialize_scope_relations(
             relation_sets[1], clause.clause_id, next_ordinal
         )
+        child_clause_ids: list[str] = []
         for statement in statements:
             statement_ordinal = (
                 len(
@@ -519,9 +694,11 @@ def apply_atomicity_decisions(
                 len(statements),
                 clause.clause_id,
             )
+            child_clause_id = f"pending-{len(output) + 1}"
+            child_clause_ids.append(child_clause_id)
             output.append(
                 InstructionClause(
-                    clause_id=f"pending-{len(output) + 1}",
+                    clause_id=child_clause_id,
                     source_id=clause.source_id,
                     ordinal=len(output) + 1,
                     text=statement.strip(),
@@ -534,6 +711,14 @@ def apply_atomicity_decisions(
                     modifier_attachments=modifier_attachments,
                 )
             )
+        boolean_combinations.append(
+            BooleanCombination(
+                parent_clause_id=clause.clause_id,
+                child_clause_ids=tuple(child_clause_ids),
+                expression=expression,
+                reconstructed_sentence=reconstructed,
+            )
+        )
     renumbered = tuple(
         InstructionClause(
             clause_id=f"instruction-{index:03d}",
@@ -554,6 +739,18 @@ def apply_atomicity_decisions(
         source=ledger.source,
         clauses=renumbered,
         split_diagnostics=tuple(diagnostics),
+        boolean_combinations=tuple(
+            BooleanCombination(
+                parent_clause_id=item.parent_clause_id,
+                child_clause_ids=tuple(
+                    f"instruction-{int(child.removeprefix('pending-')):03d}"
+                    for child in item.child_clause_ids
+                ),
+                expression=item.expression,
+                reconstructed_sentence=item.reconstructed_sentence,
+            )
+            for item in boolean_combinations
+        ),
     )
     result.validate()
     return result

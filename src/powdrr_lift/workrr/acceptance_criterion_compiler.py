@@ -18,9 +18,10 @@ from powdrr_lift.core.acceptance_contract import (
 )
 from powdrr_lift.core.behavior_contract import CriterionQuality
 
-MAX_CRITERION_REQUIREMENTS = 4
-MAX_CRITERIA_PER_REQUEST = 4
+MAX_CRITERION_REQUIREMENTS = 1
+MAX_CRITERIA_PER_REQUEST = 1
 MAX_CRITERION_REPAIR_ROUNDS = 2
+ACCEPTANCE_CRITERION_WIRE_SCHEMA_VERSION = "acceptance-criterion-wire-v2"
 ACCEPTANCE_REVIEW_SCHEMA_VERSION = "acceptance-criterion-review-plan-v2"
 ACCEPTANCE_REPAIR_SCHEMA_VERSION = "acceptance-criterion-repair-plan-v1"
 ASSERTION_REVIEW_CATEGORIES = frozenset(
@@ -101,6 +102,7 @@ def prepare_acceptance_criteria(
             requests.append(
                 {
                     "request_id": f"criterion-request-{len(requests) + 1:04d}",
+                    "wire_schema_version": ACCEPTANCE_CRITERION_WIRE_SCHEMA_VERSION,
                     "contract_id": contract.contract_id,
                     "contract_operation": contract.operation_description,
                     "candidate_requirements": [
@@ -128,8 +130,13 @@ def prepare_acceptance_criteria(
                         contract.unresolved_questions
                     ),
                     "instructions": [
-                        "Generate no more than four criteria and four assertions "
-                        "per criterion.",
+                        "The behavioral contract is the already-resolved and split "
+                        "meaning of these requirements. Do not reinterpret, regroup, "
+                        "or resolve new semantic questions.",
+                        "Use source text only as evidence for the provided contract "
+                        "meaning; do not derive new obligations from it.",
+                        "Generate exactly one criterion for this one atomic "
+                        "requirement, with no more than four assertions.",
                         "Cover explicitly stated interface and normal behavior "
                         "first, then source-named boundaries and interactions.",
                         "Do not invent requirements from context, examples, "
@@ -139,6 +146,10 @@ def prepare_acceptance_criteria(
                         "imports, shell commands, or test selectors.",
                         "Use a concrete observation and expected relation; "
                         "satisfies requires a specific predicate.",
+                        "Every criterion must state its setup, operation, observable "
+                        "assertions, and source indexes. Each assertion must be "
+                        "grounded "
+                        "in the resolved meaning of its cited requirements.",
                         "Do not turn an unresolved question into an asserted "
                         "expected behavior.",
                     ],
@@ -186,8 +197,15 @@ def bind_acceptance_criteria(
             contract_by_id.get(contract_id) if isinstance(contract_id, str) else None
         )
         candidates = request.get("candidate_requirements")
-        if contract is None or not isinstance(candidates, list):
-            raise AcceptanceContractError("criterion request has invalid contract")
+        if (
+            contract is None
+            or not isinstance(candidates, list)
+            or request.get("wire_schema_version")
+            != ACCEPTANCE_CRITERION_WIRE_SCHEMA_VERSION
+        ):
+            raise AcceptanceContractError(
+                "criterion request contract or wire schema is invalid"
+            )
         candidate_ids = [
             _required_text(item, "requirement_id")
             for item in candidates
@@ -195,24 +213,21 @@ def bind_acceptance_criteria(
         ]
         if len(candidate_ids) != len(candidates):
             raise AcceptanceContractError("criterion candidates are malformed")
-        encoded_criteria = result.get("criteria")
-        if not isinstance(encoded_criteria, list):
-            raise AcceptanceContractError("criteria must be a list")
-        if len(encoded_criteria) > MAX_CRITERIA_PER_REQUEST:
-            encoded_criteria = encoded_criteria[:MAX_CRITERIA_PER_REQUEST]
-            for source_id in candidate_ids:
-                errors_by_requirement[source_id].append(
-                    "criterion generation exceeded the per-request criterion limit"
+        raw_criterion = result.get("criterion")
+        source_ids: tuple[str, ...] = ()
+        try:
+            if not isinstance(raw_criterion, Mapping):
+                raise AcceptanceContractError(
+                    "criterion must be one native JSON object"
                 )
-        for raw_criterion in encoded_criteria:
-            try:
-                value = _decode_object(raw_criterion, "criterion")
-                criterion = _bind_criterion(value, contract, candidate_ids)
-            except AcceptanceContractError as exc:
-                for source_id in candidate_ids:
-                    errors_by_requirement[source_id].append(str(exc))
-                continue
+            source_ids = _ids_for_indexes(
+                raw_criterion.get("source_indexes"), candidate_ids
+            )
+            criterion = _bind_criterion(raw_criterion, contract, candidate_ids)
             criteria.append(criterion)
+        except AcceptanceContractError as exc:
+            for source_id in source_ids or candidate_ids:
+                errors_by_requirement[source_id].append(str(exc))
     criterion_failure_reason: dict[str, str] = {}
     for criterion in criteria:
         reasons = [
@@ -1018,6 +1033,7 @@ def prepare_acceptance_criterion_repairs(
             requests.append(
                 {
                     "request_id": request_id,
+                    "wire_schema_version": ACCEPTANCE_CRITERION_WIRE_SCHEMA_VERSION,
                     "contract_id": contract.contract_id,
                     "repair_round": max(
                         (
@@ -1263,6 +1279,14 @@ def bind_acceptance_criterion_repairs(
     return {"criterion_collection": merged, "criteria": merged["criteria"]}
 
 
+def _ids_for_indexes(raw: Any, candidate_ids: Sequence[str]) -> tuple[str, ...]:
+    try:
+        indexes = _indexes(raw, len(candidate_ids), "source_indexes")
+    except AcceptanceContractError:
+        return ()
+    return tuple(candidate_ids[index] for index in indexes)
+
+
 def _bind_criterion(
     raw: Mapping[str, Any], contract: BehavioralContract, candidate_ids: Sequence[str]
 ) -> AcceptanceCriterion:
@@ -1289,7 +1313,9 @@ def _bind_criterion(
         )
     assertions: list[CriterionAssertion] = []
     for index, item in enumerate(assertion_values, start=1):
-        assertion_data = _decode_object(item, "assertion")
+        if not isinstance(item, Mapping):
+            raise AcceptanceContractError("assertion must be a native JSON object")
+        assertion_data = item
         if set(assertion_data) != {
             "observation",
             "relation",
@@ -1406,6 +1432,7 @@ def _required_text(raw: Mapping[str, Any], name: str) -> str:
 
 __all__ = [
     "ACCEPTANCE_REPAIR_SCHEMA_VERSION",
+    "ACCEPTANCE_CRITERION_WIRE_SCHEMA_VERSION",
     "ACCEPTANCE_REVIEW_SCHEMA_VERSION",
     "MAX_CRITERIA_PER_REQUEST",
     "MAX_CRITERION_REQUIREMENTS",

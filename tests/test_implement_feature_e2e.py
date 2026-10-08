@@ -121,36 +121,48 @@ class DeterministicPlanningClient:
                 "unresolved_questions": [],
             }
 
-        if required == {"criteria"}:
+        if required == {"criterion"}:
             candidates = _find_json_value(text, "candidate_requirements")
             return (
                 {
-                    "criteria": [
-                        json.dumps(
+                    "criterion": {
+                        "kind": "transformation",
+                        "source_indexes": [0],
+                        "setup": "the requested input",
+                        "operation": "apply the requested behavior",
+                        "events": [],
+                        "assertions": [
                             {
-                                "kind": "transformation",
+                                "observation": "result",
+                                "relation": "equals",
+                                "expected": "the requested result",
                                 "source_indexes": [0],
-                                "setup": {"input": "the requested input"},
-                                "operation": "apply the requested behavior",
-                                "events": [],
-                                "assertions": [
-                                    json.dumps(
-                                        {
-                                            "observation": "result",
-                                            "relation": "equals",
-                                            "expected": "the requested result",
-                                            "source_indexes": [0],
-                                            "basis": "source_derived",
-                                        }
-                                    )
-                                ],
-                                "unresolved_questions": [],
+                                "basis": "source_derived",
                             }
-                        )
-                    ]
+                        ],
+                        "unresolved_questions": [],
+                    }
                 }
                 if candidates
-                else {"criteria": []}
+                else {
+                    "criterion": {
+                        "kind": "transformation",
+                        "source_indexes": [0],
+                        "setup": None,
+                        "operation": "apply the requested behavior",
+                        "events": [],
+                        "assertions": [
+                            {
+                                "observation": "result",
+                                "relation": "equals",
+                                "expected": "the requested result",
+                                "source_indexes": [0],
+                                "basis": "source_derived",
+                            }
+                        ],
+                        "unresolved_questions": [],
+                    }
+                }
             )
 
         if required == {

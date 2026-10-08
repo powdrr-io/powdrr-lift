@@ -1,0 +1,117 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 955
+title: Require both conditional history branches in prompts
+intent:
+  problem: The implementation packet described a conditional validation group as preserving conditions branch-by-branch without saying that both deep and shallow behaviors were required. The prompt rubric did not express the two claims as independently required acceptance criteria.
+  goal: Make conditional branches jointly required in rendered worker prompts and evaluate each history behavior directly, while preserving context classification for present-state problem statements.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 581, end_line: 584}
+    summary: Render conditional validation groups as required branches where applicable, with no branch substituting for another.
+    rationale: Ensure implementation prompts state that both deep and shallow history behaviors are required.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 439, end_line: 444}
+    summary: Read optional required and forbidden worker prompt claim lists from each rubric criterion.
+    rationale: Carry concrete claim-level expectations into prompt evaluation.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 485, end_line: 486}
+    summary: Pass required and forbidden claims to the worker prompt judge.
+    rationale: Evaluate concrete prompt requirements and prevent optionality claims from escaping the rubric.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 519, end_line: 520}
+    summary: Include required and forbidden claims in each evaluation finding.
+    rationale: Make rubric checks visible in the evaluation report.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 589, end_line: 590}
+    summary: Add required and forbidden claim parameters to the worker prompt judge.
+    rationale: Pass rubric claim expectations through the judge interface.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 601, end_line: 602}
+    summary: Include claim expectations in the judge request payload.
+    rationale: Give the judge the specific prompt claims it must evaluate.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 621, end_line: 623}
+    summary: Instruct the judge to check every required and forbidden prompt claim.
+    rationale: Prevent the judge from overlooking absent requirements or optionality contradictions.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 813, end_line: 821}
+    summary: Validate optional rubric claim lists as nonempty strings.
+    rationale: Reject malformed rubric claim data with a clear evaluation error.
+  - path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+    type: modified
+    span: {start_line: 4, end_line: 10}
+    summary: Add a criterion that excludes the present-state problem statement from worker prompts.
+    rationale: Keep this exact context sentence from becoming a product obligation.
+  - path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+    type: modified
+    span: {start_line: 96, end_line: 102}
+    summary: State the separate required deep and shallow history claims and forbid treating them as alternatives.
+    rationale: Check both history behaviors independently in captured worker prompts.
+  - path: tests/test_behavior_contract.py
+    type: modified
+    span: {start_line: 231, end_line: 262}
+    summary: Verify rendered conditional history branches are jointly required.
+    rationale: Prevent the implementation packet from describing deep and shallow modes as substitutable.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 130, end_line: 131}
+    summary: Add required and forbidden claim values to the evaluator fixture.
+    rationale: Exercise transport of rubric claims to the prompt judge.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 214, end_line: 255}
+    summary: Verify the exact present-state context sentence is rejected when it appears in a captured worker prompt.
+    rationale: Keep evaluator behavior tied to actual captured worker prompts.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 280, end_line: 281}
+    summary: Assert required and forbidden rubric claims reach the judge payload.
+    rationale: Prevent the evaluator from silently dropping those checks.
+  - path: tests/test_instruction_ledger.py
+    type: modified
+    span: {start_line: 230, end_line: 265}
+    summary: Verify deep and shallow history clauses remain linked as conditional branches through instruction analysis.
+    rationale: Protect the source-to-contract relation required by the prompt renderer.
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 405, end_line: 408}
+    summary: Use the exact present-state problem sentence in the context-routing regression.
+    rationale: Prevent the previously fixed context classification from regressing for this instruction wording.
+entities:
+  - id: conditional-history-prompt-rendering
+    type: Function
+    action: added
+  - id: deepswe-worker-prompt-evaluation-rubric
+    type: Configuration file
+    action: added
+  - id: history-and-context-prompt-regressions
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: history-requirements-are-rendered-and-evaluated
+    type: verifies
+    source: history-and-context-prompt-regressions
+    target: conditional-history-prompt-rendering
+    action: added
+    description: The history-depth rubric checks the jointly required branch language emitted by the behavior contract renderer.
+invariants:
+  - id: conditional-history-branches-remain-jointly-required
+    description: When the stated condition applies, deep and shallow history each retain their own required behavior and one does not substitute for the other.
+    action: added
+  - id: present-state-problem-context-is-not-a-worker-obligation
+    description: The instruction sentence describing missing built-in state data ownership remains context and is absent from worker prompt requirements.
+    action: added
+guidance:
+  - id: evaluate-captured-worker-prompts
+    description: Apply the prompt rubric to captured worker prompts and keep context absence checks distinct from product behavior claims.
+    action: added

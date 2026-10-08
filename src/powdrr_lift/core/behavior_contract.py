@@ -578,7 +578,10 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
                 "all_together": "all checks must pass in the same scenario",
                 "ordered": "checks must pass in this order",
                 "alternatives": "the source allows these alternative outcomes",
-                "conditional": "preserve the condition for each branch",
+                "conditional": (
+                    "each branch is required when its stated condition applies; "
+                    "one branch does not substitute for another"
+                ),
             }
             lines.append(
                 f"- [{group_id}] {explanations[relation]}: {', '.join(scenario_ids)}."

@@ -127,6 +127,8 @@ def _inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
                         "expected_behavior": "The API returns an added value.",
                         "solution_symbols": ["add_value"],
                         "verifier_tests": ["test_add_value"],
+                        "required_prompt_claims": ["The value is added."],
+                        "forbidden_prompt_claims": ["The value may be skipped."],
                     },
                     {
                         "id": "process-only",
@@ -209,6 +211,48 @@ def test_worker_prompt_evaluation_checks_exact_captured_prompt_and_references(
     assert report["findings"][1]["evidence_quote"] == ""
 
 
+def test_worker_prompt_rubric_rejects_problem_context_as_worker_content(
+    tmp_path: Path,
+) -> None:
+    task_dir, run_dir, rubric_path = _inputs(tmp_path)
+    context = (
+        "States lack built-in data ownership, forcing manual variable management "
+        "without scoping or lifecycle."
+    )
+    instruction = f"The API adds a value.\n{context}\n"
+    (task_dir / "instruction.md").write_text(instruction, encoding="utf-8")
+    ledger = json.loads((run_dir / "instruction-ledger.json").read_text())
+    ledger["source"]["text"] = instruction
+    ledger["clauses"][1]["text"] = context
+    ledger["clauses"][1]["source_span"] = {
+        "start": instruction.index(context),
+        "end": instruction.index(context) + len(context),
+    }
+    (run_dir / "instruction-ledger.json").write_text(json.dumps(ledger))
+    rubric = yaml.safe_load(rubric_path.read_text())
+    rubric["criteria"][1].update(
+        {
+            "id": "problem-statement-is-not-a-product-obligation",
+            "instruction_excerpt": context,
+            "expected_behavior": (
+                "The present-state problem statement is not a product behavior."
+            ),
+        }
+    )
+    rubric_path.write_text(yaml.safe_dump(rubric), encoding="utf-8")
+    _capture_prompt_artifacts(run_dir, f"Product contract: Adds value.\n{context}")
+
+    report = evaluate_deepswe_worker_prompt(
+        task_dir=task_dir,
+        run_dir=run_dir,
+        judge=FakeJudge(),
+        rubric_path=rubric_path,
+    )
+
+    assert report["findings"][1]["decision"] == "contradicted"
+    assert "appears in a worker prompt" in report["findings"][1]["reason"]
+
+
 def test_worker_prompt_judge_must_check_for_contradictions_across_sections(
     tmp_path: Path,
 ) -> None:
@@ -233,6 +277,8 @@ def test_worker_prompt_judge_must_check_for_contradictions_across_sections(
                 in messages[0]["content"]
             )
             payload = json.loads(messages[1]["content"])
+            assert payload["required_prompt_claims"] == ["The value is added."]
+            assert payload["forbidden_prompt_claims"] == ["The value may be skipped."]
             candidate = "\n".join(
                 item["prompt"] for item in payload["candidate_worker_prompts"]
             )

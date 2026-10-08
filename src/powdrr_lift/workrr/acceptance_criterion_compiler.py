@@ -17,30 +17,14 @@ from powdrr_lift.core.acceptance_contract import (
     CriterionAssertion,
 )
 from powdrr_lift.core.behavior_contract import CriterionQuality
-from powdrr_lift.core.instruction_ledger import BooleanCombination
 
-MAX_CRITERION_REQUIREMENTS = 1
-MAX_CRITERIA_PER_REQUEST = 1
-MAX_CRITERION_REPAIR_ROUNDS = 2
-ACCEPTANCE_CRITERION_WIRE_SCHEMA_VERSION = "acceptance-criterion-wire-v2"
-ACCEPTANCE_REVIEW_SCHEMA_VERSION = "acceptance-criterion-review-plan-v2"
-ACCEPTANCE_REPAIR_SCHEMA_VERSION = "acceptance-criterion-repair-plan-v1"
-ASSERTION_REVIEW_CATEGORIES = frozenset(
-    {
-        "source_supported",
-        "repository_supported",
-        "illustrative_setup",
-        "decision_required",
-        "unsupported",
-        "contradicts_source",
-    }
-)
+MAX_CRITERION_REQUIREMENTS = 4
+MAX_CRITERIA_PER_REQUEST = 4
 
 
 def prepare_acceptance_criteria(
     contract_collection: Mapping[str, Any],
     source_text_by_id: Mapping[str, str],
-    boolean_combinations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Create one bounded generation request per related requirement partition."""
     raw_contracts = contract_collection.get("contracts")
@@ -80,14 +64,6 @@ def prepare_acceptance_criteria(
     }
     if not referenced_ids.issubset(source_text_by_id):
         raise AcceptanceContractError("behavioral contract source text is missing")
-    normalized_combinations = _normalize_boolean_combinations(
-        boolean_combinations, source_text_by_id
-    )
-    normalized_combinations = [
-        item
-        for item in normalized_combinations
-        if set(item["child_clause_ids"]).issubset(requirement_ids)
-    ]
     requests: list[dict[str, Any]] = []
     for contract in contracts:
         members = contract.member_requirement_ids
@@ -112,7 +88,6 @@ def prepare_acceptance_criteria(
             requests.append(
                 {
                     "request_id": f"criterion-request-{len(requests) + 1:04d}",
-                    "wire_schema_version": ACCEPTANCE_CRITERION_WIRE_SCHEMA_VERSION,
                     "contract_id": contract.contract_id,
                     "contract_operation": contract.operation_description,
                     "candidate_requirements": [
@@ -134,32 +109,14 @@ def prepare_acceptance_criteria(
                         }
                         for context_id in contract.supporting_context_ids
                     ],
-                    "boolean_contexts": [
-                        {
-                            **dict(combination),
-                            "current_requirement_id": source_id,
-                        }
-                        for combination in normalized_combinations
-                        for source_id in partition
-                        if source_id in combination["child_clause_ids"]
-                    ],
                     "relationships": relationships,
                     "shared_constraints": list(contract.shared_constraints),
                     "unresolved_contract_questions": list(
                         contract.unresolved_questions
                     ),
                     "instructions": [
-                        "The behavioral contract is the already-resolved and split "
-                        "meaning of these requirements. Do not reinterpret, regroup, "
-                        "or resolve new semantic questions.",
-                        "Use source text only as evidence for the provided contract "
-                        "meaning; do not derive new obligations from it.",
-                        "When boolean_contexts are present, keep this criterion "
-                        "scoped to its one atom and preserve the supplied expression. "
-                        "Do not turn OR/XOR alternatives into jointly required "
-                        "behaviors; the complete expression governs how atoms combine.",
-                        "Generate exactly one criterion for this one atomic "
-                        "requirement, with no more than four assertions.",
+                        "Generate no more than four criteria and four assertions "
+                        "per criterion.",
                         "Cover explicitly stated interface and normal behavior "
                         "first, then source-named boundaries and interactions.",
                         "Do not invent requirements from context, examples, "
@@ -169,10 +126,6 @@ def prepare_acceptance_criteria(
                         "imports, shell commands, or test selectors.",
                         "Use a concrete observation and expected relation; "
                         "satisfies requires a specific predicate.",
-                        "Every criterion must state its setup, operation, observable "
-                        "assertions, and source indexes. Each assertion must be "
-                        "grounded "
-                        "in the resolved meaning of its cited requirements.",
                         "Do not turn an unresolved question into an asserted "
                         "expected behavior.",
                     ],
@@ -183,7 +136,6 @@ def prepare_acceptance_criteria(
         "ledger_fingerprint": contract_collection.get("ledger_fingerprint"),
         "requirement_ids": list(requirement_ids),
         "source_text_by_id": dict(source_text_by_id),
-        "boolean_combinations": normalized_combinations,
         "contracts": [item.to_data() for item in contracts],
         "requests": requests,
     }
@@ -208,11 +160,6 @@ def bind_acceptance_criteria(
         for item in raw_contracts
         if isinstance(item, Mapping)
     )
-    boolean_combinations = plan.get("boolean_combinations", [])
-    if not isinstance(boolean_combinations, list) or not all(
-        isinstance(item, Mapping) for item in boolean_combinations
-    ):
-        raise AcceptanceContractError("criterion boolean logic is malformed")
     if len(contracts) != len(raw_contracts):
         raise AcceptanceContractError("behavioral contract entry is malformed")
     contract_by_id = {item.contract_id: item for item in contracts}
@@ -226,15 +173,8 @@ def bind_acceptance_criteria(
             contract_by_id.get(contract_id) if isinstance(contract_id, str) else None
         )
         candidates = request.get("candidate_requirements")
-        if (
-            contract is None
-            or not isinstance(candidates, list)
-            or request.get("wire_schema_version")
-            != ACCEPTANCE_CRITERION_WIRE_SCHEMA_VERSION
-        ):
-            raise AcceptanceContractError(
-                "criterion request contract or wire schema is invalid"
-            )
+        if contract is None or not isinstance(candidates, list):
+            raise AcceptanceContractError("criterion request has invalid contract")
         candidate_ids = [
             _required_text(item, "requirement_id")
             for item in candidates
@@ -242,51 +182,24 @@ def bind_acceptance_criteria(
         ]
         if len(candidate_ids) != len(candidates):
             raise AcceptanceContractError("criterion candidates are malformed")
-        raw_criterion = result.get("criterion")
-        source_ids: tuple[str, ...] = ()
-        try:
-            if not isinstance(raw_criterion, Mapping):
-                raise AcceptanceContractError(
-                    "criterion must be one native JSON object"
+        encoded_criteria = result.get("criteria")
+        if not isinstance(encoded_criteria, list):
+            raise AcceptanceContractError("criteria must be a list")
+        if len(encoded_criteria) > MAX_CRITERIA_PER_REQUEST:
+            encoded_criteria = encoded_criteria[:MAX_CRITERIA_PER_REQUEST]
+            for source_id in candidate_ids:
+                errors_by_requirement[source_id].append(
+                    "criterion generation exceeded the per-request criterion limit"
                 )
-            source_ids = _ids_for_indexes(
-                raw_criterion.get("source_indexes"), candidate_ids
-            )
-            criterion = _bind_criterion(raw_criterion, contract, candidate_ids)
+        for raw_criterion in encoded_criteria:
+            try:
+                value = _decode_object(raw_criterion, "criterion")
+                criterion = _bind_criterion(value, contract, candidate_ids)
+            except AcceptanceContractError as exc:
+                for source_id in candidate_ids:
+                    errors_by_requirement[source_id].append(str(exc))
+                continue
             criteria.append(criterion)
-        except AcceptanceContractError as exc:
-            for source_id in source_ids or candidate_ids:
-                errors_by_requirement[source_id].append(str(exc))
-    criterion_failure_reason: dict[str, str] = {}
-    for criterion in criteria:
-        reasons = [
-            reason
-            for source_id in criterion.source_refs
-            for reason in errors_by_requirement.get(source_id, [])
-        ]
-        if reasons:
-            criterion_failure_reason[criterion.criterion_id] = reasons[0]
-    if criterion_failure_reason:
-        criteria = [
-            replace(
-                item,
-                quality=CriterionQuality(
-                    criterion_status="source_only",
-                    failure_stage="criterion_generation",
-                    failure_reason=criterion_failure_reason[item.criterion_id],
-                ),
-                fingerprint="",
-            )
-            if item.criterion_id in criterion_failure_reason
-            else item
-            for item in criteria
-        ]
-        criteria = [
-            replace(item, fingerprint=item.calculate_fingerprint())
-            if not item.fingerprint
-            else item
-            for item in criteria
-        ]
     criterion_ids_by_requirement: dict[str, set[str]] = defaultdict(set)
     for criterion in criteria:
         for source_id in criterion.source_refs:
@@ -294,16 +207,9 @@ def bind_acceptance_criteria(
     requirement_coverage = {}
     for source_id in requirement_ids:
         linked = sorted(criterion_ids_by_requirement.get(source_id, set()))
-        if linked and not errors_by_requirement.get(source_id):
+        if linked:
             status = "unassessed"
             quality = CriterionQuality(criterion_status="unassessed")
-        elif linked:
-            status = "source_only"
-            quality = CriterionQuality(
-                criterion_status="source_only",
-                failure_stage="criterion_generation",
-                failure_reason=errors_by_requirement[source_id][0],
-            )
         else:
             status = "source_only"
             reason = (
@@ -324,7 +230,6 @@ def bind_acceptance_criteria(
     return {
         "schema_version": ACCEPTANCE_CRITERION_SCHEMA_VERSION,
         "ledger_fingerprint": plan.get("ledger_fingerprint"),
-        "boolean_combinations": [dict(item) for item in boolean_combinations],
         "criteria": [item.to_data() for item in criteria],
         "requirement_coverage": requirement_coverage,
         "counts": {
@@ -374,8 +279,6 @@ def prepare_acceptance_criterion_reviews(
     contract_by_id = {item.contract_id: item for item in contracts}
     requests: list[dict[str, Any]] = []
     for criterion in criteria:
-        if criterion.quality.criterion_status != "unassessed":
-            continue
         contract = contract_by_id.get(criterion.contract_id)
         if contract is None:
             raise AcceptanceContractError("criterion references an unknown contract")
@@ -400,34 +303,11 @@ def prepare_acceptance_criterion_reviews(
                     "shared_constraints": list(contract.shared_constraints),
                     "unresolved_questions": list(contract.unresolved_questions),
                 },
-                "boolean_contexts": [
-                    {
-                        **dict(combination),
-                        "current_requirement_id": source_id,
-                    }
-                    for combination in criterion_collection.get(
-                        "boolean_combinations", []
-                    )
-                    if isinstance(combination, Mapping)
-                    for source_id in criterion.source_refs
-                    if source_id in combination.get("child_clause_ids", [])
-                ],
                 "source_clauses": [
                     {"source_ref": source_id, "text": source_text_by_id[source_id]}
                     for source_id in criterion.source_refs
                 ],
                 "assertions": [item.to_data() for item in criterion.assertions],
-                "setup_review_question": (
-                    "Is this setup within the source-supported domain? If it uses "
-                    "illustrative values, explain why those values add no product "
-                    "constraint."
-                ),
-                "repository_evidence_policy": (
-                    "Repository-supported assertions require an exact location and "
-                    "repository revision or content fingerprint. No repository "
-                    "evidence is attached unless listed explicitly in this request."
-                ),
-                "repository_evidence": [],
                 "supporting_context": [
                     {
                         "classification": "context_only_not_a_requirement",
@@ -443,7 +323,7 @@ def prepare_acceptance_criterion_reviews(
             }
         )
     return {
-        "schema_version": ACCEPTANCE_REVIEW_SCHEMA_VERSION,
+        "schema_version": "acceptance-criterion-review-plan-v1",
         "ledger_fingerprint": criterion_collection.get("ledger_fingerprint"),
         "criterion_collection": dict(criterion_collection),
         "requests": requests,
@@ -456,8 +336,7 @@ def bind_acceptance_criterion_reviews(
     requests = plan.get("requests")
     criterion_collection = plan.get("criterion_collection")
     if (
-        plan.get("schema_version") != ACCEPTANCE_REVIEW_SCHEMA_VERSION
-        or not isinstance(requests, list)
+        not isinstance(requests, list)
         or len(requests) != len(provider_results)
         or not isinstance(criterion_collection, Mapping)
         or not isinstance(criterion_collection.get("criteria"), list)
@@ -486,7 +365,6 @@ def bind_acceptance_criterion_reviews(
             raise AcceptanceContractError("criterion review request is stale")
         source_clauses = request.get("source_clauses")
         raw_assertion_reviews = result.get("assertion_reviews")
-        raw_setup_review = result.get("setup_review")
         adequate = result.get("adequate")
         distinguishes = result.get("distinguishes")
         if not isinstance(source_clauses, list) or not isinstance(
@@ -508,62 +386,28 @@ def bind_acceptance_criterion_reviews(
             try:
                 review = _decode_object(raw_review, "assertion review")
                 assertion_id = _required_text(review, "assertion_id")
-                status = review.get("category", review.get("status"))
-                status = {
-                    "supported": "source_supported",
-                    "contradicted": "contradicts_source",
-                    "unresolved": "decision_required",
-                }.get(status, status)
-                evidence = review.get("source_evidence", "")
+                status = review.get("status")
+                evidence = _required_text(review, "source_evidence")
                 review_reason = _required_text(review, "reason")
                 assertion = assertions_by_id.get(assertion_id)
-                if assertion is None or status not in ASSERTION_REVIEW_CATEGORIES:
+                if assertion is None or status not in {
+                    "supported",
+                    "contradicted",
+                    "unsupported",
+                    "unresolved",
+                }:
                     continue
-                evidence_valid = isinstance(evidence, str) and any(
+                evidence_valid = any(
                     evidence in source_texts.get(source_id, "")
                     for source_id in assertion.source_refs
                 )
-                repository_evidence = review.get("repository_evidence")
-                repository_evidence_valid = (
-                    status == "repository_supported"
-                    and isinstance(repository_evidence, Mapping)
-                    and all(
-                        isinstance(repository_evidence.get(key), str)
-                        and repository_evidence[key].strip()
-                        for key in ("location", "revision_or_fingerprint")
-                    )
-                    and isinstance(repository_evidence.get("excerpt"), str)
-                    and bool(repository_evidence["excerpt"].strip())
-                    and isinstance(request.get("repository_evidence"), list)
-                    and dict(repository_evidence) in request["repository_evidence"]
-                )
-                if status == "source_supported" and not evidence_valid:
-                    status = "unsupported"
-                if status == "contradicts_source" and not evidence_valid:
-                    status = "unsupported"
-                if status == "illustrative_setup" and not (
-                    evidence_valid
-                    and any(
-                        marker in review_reason.casefold()
-                        for marker in ("illustrative", "arbitrary", "example value")
-                    )
-                ):
-                    status = "unsupported"
-                if status == "repository_supported" and not repository_evidence_valid:
-                    status = "unsupported"
                 assertion_reviews.append(
                     {
                         "assertion_id": assertion_id,
-                        "category": status,
+                        "status": status if evidence_valid else "unsupported",
                         "source_evidence": evidence,
-                        "repository_evidence": (
-                            dict(repository_evidence)
-                            if repository_evidence_valid
-                            and isinstance(repository_evidence, Mapping)
-                            else None
-                        ),
                         "reason": review_reason,
-                        "evidence_valid": evidence_valid or repository_evidence_valid,
+                        "evidence_valid": evidence_valid,
                     }
                 )
             except AcceptanceContractError:
@@ -574,70 +418,23 @@ def bind_acceptance_criterion_reviews(
             assertion_reviews = [
                 {
                     "assertion_id": item.assertion_id,
-                    "category": "decision_required",
+                    "status": "unresolved",
                     "source_evidence": "",
-                    "repository_evidence": None,
                     "reason": "assertion review was missing or duplicated",
                     "evidence_valid": False,
                 }
                 for item in original.assertions
             ]
-        statuses = {item["category"] for item in assertion_reviews}
+        statuses = {item["status"] for item in assertion_reviews}
         source_status = (
             "supported"
-            if statuses.issubset(
-                {"source_supported", "repository_supported", "illustrative_setup"}
-            )
-            else "decision_required"
-            if "decision_required" in statuses
-            else "contradicts_source"
-            if "contradicts_source" in statuses
+            if statuses == {"supported"}
+            else "unresolved"
+            if "unresolved" in statuses
+            else "contradicted"
+            if "contradicted" in statuses
             else "unsupported"
         )
-        setup_review: dict[str, Any] = {
-            "category": "decision_required",
-            "reason": "setup review was missing or malformed",
-            "evidence_valid": False,
-        }
-        try:
-            decoded_setup = _decode_object(raw_setup_review, "setup review")
-            setup_category = decoded_setup.get("category")
-            setup_reason = _required_text(decoded_setup, "reason")
-            setup_evidence = decoded_setup.get("source_evidence", "")
-            setup_evidence_valid = isinstance(setup_evidence, str) and any(
-                setup_evidence in source_texts.get(source_id, "")
-                for source_id in original.source_refs
-            )
-            if setup_category in {
-                "source_supported",
-                "repository_supported",
-                "illustrative_setup",
-                "decision_required",
-                "unsupported",
-                "contradicts_source",
-            }:
-                if setup_category == "source_supported" and not setup_evidence_valid:
-                    setup_category = "unsupported"
-                if setup_category == "contradicts_source" and not setup_evidence_valid:
-                    setup_category = "unsupported"
-                if setup_category == "repository_supported":
-                    setup_category = "unsupported"
-                if setup_category == "illustrative_setup" and not (
-                    setup_evidence_valid
-                    and any(
-                        marker in setup_reason.casefold()
-                        for marker in ("illustrative", "arbitrary", "example value")
-                    )
-                ):
-                    setup_category = "unsupported"
-                setup_review = {
-                    "category": setup_category,
-                    "reason": setup_reason,
-                    "source_evidence": setup_evidence,
-                    "evidence_valid": setup_evidence_valid,
-                }
-        except AcceptanceContractError:
-            pass
         if not isinstance(adequate, bool):
             adequate = False
         if not isinstance(distinguishes, bool):
@@ -649,51 +446,24 @@ def bind_acceptance_criterion_reviews(
             distinguishes = False
         if not isinstance(reason, str) or not reason.strip():
             reason = "Criterion review did not provide a usable rationale."
-        decision_records = _validated_decision_records(
-            result.get("decision_records"),
-            criterion=original,
-            source_texts=source_texts,
-        )
-        has_unresolved_material_assumption = any(
-            item["dimension_state"] == "needed_for_implementation"
-            and item["is_assumption"]
-            for item in decision_records
-        )
-        if (
-            source_status == "supported"
-            and setup_review["category"]
-            in {"source_supported", "illustrative_setup", "repository_supported"}
-            and adequate
-            and distinguishes
-            and not has_unresolved_material_assumption
-        ):
-            quality = CriterionQuality(
-                criterion_status="checkable",
-                repair_attempts=original.quality.repair_attempts,
-            )
-        elif (
-            source_status == "decision_required"
-            or setup_review["category"] == "decision_required"
-            or has_unresolved_material_assumption
-        ):
+        if source_status == "supported" and adequate and distinguishes:
+            quality = CriterionQuality(criterion_status="checkable")
+        elif source_status == "unresolved":
             quality = CriterionQuality(
                 criterion_status="unresolved",
                 failure_stage="criterion_review",
-                failure_reason="a material implementation decision is unresolved",
-                repair_attempts=original.quality.repair_attempts,
+                failure_reason=reason,
             )
         else:
             failure_reason = (
                 reason
-                if source_status in {"contradicts_source", "unsupported"}
-                or setup_review["category"] in {"contradicts_source", "unsupported"}
+                if source_status in {"contradicted", "unsupported"}
                 else "criterion does not distinguish a plausible incorrect behavior"
             )
             quality = CriterionQuality(
                 criterion_status="source_only",
                 failure_stage="criterion_review",
                 failure_reason=failure_reason,
-                repair_attempts=original.quality.repair_attempts,
             )
         updated = replace(original, quality=quality, fingerprint="")
         updated = replace(updated, fingerprint=updated.calculate_fingerprint())
@@ -704,8 +474,6 @@ def bind_acceptance_criterion_reviews(
                 "criterion_fingerprint": original.fingerprint,
                 "source_status": source_status,
                 "assertion_reviews": assertion_reviews,
-                "setup_review": setup_review,
-                "decision_records": decision_records,
                 "adequate": adequate,
                 "plausible_incorrect_behavior": plausible_incorrect,
                 "distinguishes": distinguishes,
@@ -728,18 +496,6 @@ def bind_acceptance_criterion_reviews(
     if not isinstance(coverage, Mapping):
         raise AcceptanceContractError("criterion requirement coverage is malformed")
     updated_coverage: dict[str, Any] = {}
-    requirement_attempts: dict[str, int] = defaultdict(int)
-    for attempt in criterion_collection.get("repair_attempts", []):
-        if not isinstance(attempt, Mapping):
-            continue
-        round_number = attempt.get("round", 0)
-        requirement_refs = attempt.get("requirement_ids", [])
-        if isinstance(round_number, int) and isinstance(requirement_refs, list):
-            for source_id in requirement_refs:
-                if isinstance(source_id, str):
-                    requirement_attempts[source_id] = max(
-                        requirement_attempts[source_id], round_number
-                    )
     for source_id, record in coverage.items():
         if not isinstance(source_id, str) or not isinstance(record, Mapping):
             raise AcceptanceContractError("criterion coverage record is malformed")
@@ -787,17 +543,9 @@ def bind_acceptance_criterion_reviews(
             "criterion_ids": linked,
             "criterion_quality": quality.to_data(),
             "status": quality.criterion_status,
-            "repair_attempts": max(
-                requirement_attempts[source_id],
-                max(
-                    (item.quality.repair_attempts for item in linked_criteria),
-                    default=0,
-                ),
-            ),
         }
     return {
         **dict(criterion_collection),
-        "review_schema_version": ACCEPTANCE_REVIEW_SCHEMA_VERSION,
         "criteria": reviewed_criteria,
         "requirement_coverage": updated_coverage,
         "counts": {
@@ -814,571 +562,9 @@ def bind_acceptance_criterion_reviews(
             "unresolved": sum(
                 item["status"] == "unresolved" for item in updated_coverage.values()
             ),
-            "needs_repair": sum(
-                item.quality.criterion_status in {"source_only", "unresolved"}
-                and item.quality.repair_attempts < MAX_CRITERION_REPAIR_ROUNDS
-                for item in reviewed_by_id_and_fresh.values()
-            )
-            + sum(
-                record["status"] == "source_only"
-                and int(record.get("repair_attempts", 0)) < MAX_CRITERION_REPAIR_ROUNDS
-                for record in updated_coverage.values()
-            ),
         },
-        "reviews": [
-            *[
-                item
-                for item in criterion_collection.get("reviews", [])
-                if isinstance(item, Mapping)
-                and item.get("criterion_id") not in reviewed_by_id
-            ],
-            *reviews,
-        ],
+        "reviews": reviews,
     }
-
-
-def _validated_decision_records(
-    raw: Any,
-    *,
-    criterion: AcceptanceCriterion,
-    source_texts: Mapping[str, str],
-) -> list[dict[str, Any]]:
-    """Keep necessary choices visible and explicitly separate from source facts."""
-    if not isinstance(raw, list):
-        return []
-    allowed_states = {
-        "specified",
-        "unspecified",
-        "not_applicable",
-        "needed_for_implementation",
-    }
-    result: list[dict[str, Any]] = []
-    for encoded in raw:
-        try:
-            item = _decode_object(encoded, "decision record")
-            required = {
-                "question",
-                "affected_ids",
-                "alternatives",
-                "selected_interpretation",
-                "source_constraints",
-                "basis",
-                "basis_evidence",
-                "confidence",
-                "residual_uncertainty",
-                "dimension_state",
-            }
-            if set(item) != required:
-                continue
-            affected = item["affected_ids"]
-            alternatives = item["alternatives"]
-            constraints = item["source_constraints"]
-            required_texts = (
-                "question",
-                "selected_interpretation",
-                "basis",
-                "basis_evidence",
-                "confidence",
-                "residual_uncertainty",
-            )
-            if (
-                not all(
-                    isinstance(item[key], str) and item[key].strip()
-                    for key in required_texts
-                )
-                or not isinstance(affected, list)
-                or not affected
-                or not all(
-                    value
-                    in {
-                        *criterion.source_refs,
-                        *(entry.assertion_id for entry in criterion.assertions),
-                    }
-                    for value in affected
-                )
-                or not isinstance(alternatives, list)
-                or not alternatives
-                or not all(
-                    isinstance(value, str) and value.strip() for value in alternatives
-                )
-                or not isinstance(constraints, list)
-                or not constraints
-                or not all(
-                    isinstance(value, str) and value.strip() for value in constraints
-                )
-                or item["dimension_state"] not in allowed_states
-                or item["confidence"] not in {"high", "medium", "low"}
-                or item["basis"]
-                not in {"source", "repository", "named_external_source", "assumption"}
-            ):
-                continue
-            evidence = item["basis_evidence"]
-            source_verified = (
-                item["basis"] == "source"
-                and any(
-                    evidence in source_texts.get(source_id, "")
-                    for source_id in criterion.source_refs
-                )
-                and all(
-                    any(
-                        constraint in source_texts.get(source_id, "")
-                        for source_id in criterion.source_refs
-                    )
-                    for constraint in constraints
-                )
-            )
-            repository_reference_present = item["basis"] == "repository" and all(
-                marker in evidence.casefold()
-                for marker in ("revision", "location", "excerpt")
-            )
-            if item["basis"] == "source" and not source_verified:
-                continue
-            if item["basis"] == "repository" and not repository_reference_present:
-                continue
-            if item["basis"] == "named_external_source" and not any(
-                marker in evidence.casefold()
-                for marker in ("https://", "http://", "doi:", "rfc ", "pep ")
-            ):
-                continue
-            result.append(
-                {
-                    **dict(item),
-                    "evidence_status": (
-                        "source_supported"
-                        if source_verified
-                        else "repository_reference_unverified"
-                        if repository_reference_present
-                        else "assumption"
-                    ),
-                    "is_assumption": not source_verified,
-                }
-            )
-        except (AcceptanceContractError, TypeError):
-            continue
-    return result
-
-
-def prepare_acceptance_criterion_repairs(
-    criterion_collection: Mapping[str, Any],
-    contract_collection: Mapping[str, Any],
-    source_text_by_id: Mapping[str, str],
-    uncertainty_policy: str = "clarify",
-) -> dict[str, Any]:
-    """Prepare bounded, contract-scoped repair requests for failed coverage."""
-    if (
-        criterion_collection.get("ledger_fingerprint")
-        != contract_collection.get("ledger_fingerprint")
-        or uncertainty_policy not in {"clarify", "normative_default"}
-        or not isinstance(criterion_collection.get("criteria"), list)
-        or not isinstance(criterion_collection.get("requirement_coverage"), Mapping)
-    ):
-        raise AcceptanceContractError("criterion repair inputs are malformed")
-    criteria = tuple(
-        AcceptanceCriterion.from_data(item)
-        for item in criterion_collection["criteria"]
-        if isinstance(item, Mapping)
-    )
-    if len(criteria) != len(criterion_collection["criteria"]):
-        raise AcceptanceContractError("criterion repair candidate is malformed")
-    contracts_raw = contract_collection.get("contracts")
-    if not isinstance(contracts_raw, list):
-        raise AcceptanceContractError("criterion repair contracts are malformed")
-    contracts = tuple(
-        BehavioralContract.from_data(item)
-        for item in contracts_raw
-        if isinstance(item, Mapping)
-    )
-    if len(contracts) != len(contracts_raw):
-        raise AcceptanceContractError("criterion repair contract is malformed")
-    reviews_by_id = {
-        item.get("criterion_id"): item
-        for item in criterion_collection.get("reviews", [])
-        if isinstance(item, Mapping) and isinstance(item.get("criterion_id"), str)
-    }
-    requirement_attempts: dict[str, int] = defaultdict(int)
-    for attempt in criterion_collection.get("repair_attempts", []):
-        if not isinstance(attempt, Mapping):
-            continue
-        round_number = attempt.get("round", 0)
-        requirement_refs = attempt.get("requirement_ids", [])
-        if isinstance(round_number, int) and isinstance(requirement_refs, list):
-            for source_id in requirement_refs:
-                if isinstance(source_id, str):
-                    requirement_attempts[source_id] = max(
-                        requirement_attempts[source_id], round_number
-                    )
-    criteria_by_requirement: dict[str, list[AcceptanceCriterion]] = defaultdict(list)
-    for criterion in criteria:
-        for source_id in criterion.source_refs:
-            criteria_by_requirement[source_id].append(criterion)
-    requests: list[dict[str, Any]] = []
-    request_original_ids: dict[str, list[str]] = {}
-    for contract in contracts:
-        needed: list[str] = []
-        originals: dict[str, AcceptanceCriterion] = {}
-        for source_id in contract.member_requirement_ids:
-            linked = criteria_by_requirement.get(source_id, [])
-            failed = [
-                item
-                for item in linked
-                if item.quality.criterion_status in {"source_only", "unresolved"}
-            ]
-            can_retry = any(
-                item.quality.repair_attempts < MAX_CRITERION_REPAIR_ROUNDS
-                for item in failed
-            )
-            if (
-                not linked
-                and requirement_attempts[source_id] < MAX_CRITERION_REPAIR_ROUNDS
-            ) or can_retry:
-                needed.append(source_id)
-                originals.update(
-                    {item.criterion_id: item for item in failed if can_retry}
-                )
-        for offset in range(0, len(needed), MAX_CRITERION_REQUIREMENTS):
-            members = needed[offset : offset + MAX_CRITERION_REQUIREMENTS]
-            failed_reviews = []
-            old_ids: list[str] = []
-            for criterion_id, criterion in originals.items():
-                if not set(criterion.source_refs).intersection(members):
-                    continue
-                review = reviews_by_id.get(criterion_id, {})
-                assertion_reviews = review.get("assertion_reviews", [])
-                accepted_ids = {
-                    item.get("assertion_id")
-                    for item in assertion_reviews
-                    if isinstance(item, Mapping)
-                    and item.get("category")
-                    in {
-                        "source_supported",
-                        "repository_supported",
-                        "illustrative_setup",
-                    }
-                }
-                accepted = [
-                    item.to_data()
-                    for item in criterion.assertions
-                    if item.assertion_id in accepted_ids
-                ]
-                failed_reviews.append(
-                    {
-                        "criterion_id": criterion_id,
-                        "criterion_fingerprint": criterion.fingerprint,
-                        "failure_reason": criterion.quality.failure_reason,
-                        "accepted_assertions": accepted,
-                        "criterion": criterion.to_data(),
-                        "review": review,
-                    }
-                )
-                old_ids.append(criterion_id)
-            request_id = f"criterion-repair-{len(requests) + 1:04d}"
-            requests.append(
-                {
-                    "request_id": request_id,
-                    "wire_schema_version": ACCEPTANCE_CRITERION_WIRE_SCHEMA_VERSION,
-                    "contract_id": contract.contract_id,
-                    "repair_round": max(
-                        (
-                            originals[item].quality.repair_attempts + 1
-                            for item in old_ids
-                        ),
-                        default=max(
-                            (requirement_attempts[item] + 1 for item in members),
-                            default=1,
-                        ),
-                    ),
-                    "uncertainty_policy": uncertainty_policy,
-                    "candidate_requirements": [
-                        {
-                            "local_index": index,
-                            "requirement_id": source_id,
-                            "source_text": source_text_by_id.get(source_id, ""),
-                            "role_interpretation": dict(
-                                contract.role_interpretations[source_id]
-                            ),
-                        }
-                        for index, source_id in enumerate(members)
-                    ],
-                    "boolean_contexts": [
-                        {
-                            **dict(combination),
-                            "current_requirement_ids": list(
-                                set(members).intersection(
-                                    combination["child_clause_ids"]
-                                )
-                            ),
-                        }
-                        for combination in criterion_collection.get(
-                            "boolean_combinations", []
-                        )
-                        if isinstance(combination, Mapping)
-                        and set(members).intersection(
-                            combination.get("child_clause_ids", [])
-                        )
-                    ],
-                    "failed_criteria": failed_reviews,
-                    "coverage_failures": {
-                        source_id: str(
-                            criterion_collection.get("requirement_coverage", {})
-                            .get(source_id, {})
-                            .get("criterion_quality", {})
-                            .get("failure_reason")
-                            or "no checked criterion covers this requirement"
-                        )
-                        for source_id in members
-                        if source_id
-                        in criterion_collection.get("requirement_coverage", {})
-                        and criterion_collection.get("requirement_coverage", {})[
-                            source_id
-                        ].get("status")
-                        != "checkable"
-                    },
-                    "requirement_ids": list(members),
-                    "accepted_assertions_must_be_retained": True,
-                    "repair_instructions": [
-                        "Repair only the cited failure and missing requirement "
-                        "coverage.",
-                        "Keep accepted assertions unchanged unless a source conflict "
-                        "is shown.",
-                        "Remove or revise unsupported/contradictory assertions; do "
-                        "not weaken source requirements.",
-                        "Return at most four criteria and four assertions per "
-                        "criterion.",
-                        "Use only cited clauses and the assembled contract. Do not "
-                        "use solutions or validation patches.",
-                        "Preserve the supplied boolean expression and keep each "
-                        "criterion scoped to its atom. Do not turn OR/XOR alternatives "
-                        "into jointly required behavior.",
-                        "Do not resolve an unspecified material choice without "
-                        "cited source or repository evidence.",
-                        (
-                            "With clarify policy, leave an unspecified material "
-                            "choice unresolved for the user."
-                            if uncertainty_policy == "clarify"
-                            else "With normative_default policy, use only an "
-                            "evidenced local convention and label the choice as "
-                            "an assumption."
-                        ),
-                    ],
-                }
-            )
-            request_original_ids[request_id] = old_ids
-    plan = {
-        "schema_version": ACCEPTANCE_REPAIR_SCHEMA_VERSION,
-        "ledger_fingerprint": criterion_collection.get("ledger_fingerprint"),
-        "requirement_ids": list(criterion_collection.get("requirement_coverage", {})),
-        "contracts": [item.to_data() for item in contracts],
-        "boolean_combinations": list(
-            criterion_collection.get("boolean_combinations", [])
-        ),
-        "requests": requests,
-        "replaces": request_original_ids,
-    }
-    return {"done": not requests, "plan": plan, "requests": requests}
-
-
-def bind_acceptance_criterion_repairs(
-    repair_state: Mapping[str, Any], provider_results: Sequence[Mapping[str, Any]]
-) -> dict[str, Any]:
-    """Apply no more than two repair rounds while retaining reviewed assertions."""
-    plan = repair_state.get("plan")
-    prior = repair_state.get("criterion_collection")
-    if (
-        not isinstance(plan, Mapping)
-        or plan.get("schema_version") != ACCEPTANCE_REPAIR_SCHEMA_VERSION
-        or not isinstance(prior, Mapping)
-    ):
-        raise AcceptanceContractError("criterion repair binding plan is malformed")
-    if repair_state.get("done") is True:
-        return {
-            "criterion_collection": dict(prior),
-            "criteria": prior.get("criteria", []),
-        }
-    new_collection = bind_acceptance_criteria(plan, provider_results)
-    replacements = plan.get("replaces")
-    requests = plan.get("requests")
-    if not isinstance(replacements, Mapping) or not isinstance(requests, list):
-        raise AcceptanceContractError("criterion repair provenance is malformed")
-    replaced = {
-        criterion_id
-        for values in replacements.values()
-        if isinstance(values, list)
-        for criterion_id in values
-        if isinstance(criterion_id, str)
-    }
-    previous_criteria = [
-        AcceptanceCriterion.from_data(item)
-        for item in prior.get("criteria", [])
-        if isinstance(item, Mapping)
-    ]
-    repair_round_by_request = {
-        item.get("request_id"): item.get("repair_round")
-        for item in requests
-        if isinstance(item, Mapping)
-    }
-    criteria = [item for item in previous_criteria if item.criterion_id not in replaced]
-    request_by_contract_requirement = {
-        (contract_id, source_id): item
-        for item in requests
-        if isinstance(item, Mapping)
-        for contract_id in [item.get("contract_id")]
-        if isinstance(contract_id, str)
-        for candidate in item.get("candidate_requirements", [])
-        if isinstance(candidate, Mapping)
-        for source_id in [candidate.get("requirement_id")]
-        if isinstance(source_id, str)
-    }
-    for raw in new_collection.get("criteria", []):
-        if not isinstance(raw, Mapping):
-            continue
-        repaired = AcceptanceCriterion.from_data(raw)
-        request = next(
-            (
-                request_by_contract_requirement[(repaired.contract_id, source_id)]
-                for source_id in repaired.source_refs
-                if (repaired.contract_id, source_id) in request_by_contract_requirement
-            ),
-            None,
-        )
-        if request is None:
-            continue
-        prior_failed = next(
-            (
-                AcceptanceCriterion.from_data(item["criterion"])
-                for item in request.get("failed_criteria", [])
-                if isinstance(item, Mapping)
-                and set(repaired.source_refs).intersection(
-                    AcceptanceCriterion.from_data(item["criterion"]).source_refs
-                )
-            ),
-            None,
-        )
-        accepted = []
-        if prior_failed is not None:
-            accepted_ids = {
-                assertion.get("assertion_id")
-                for item in request.get("failed_criteria", [])
-                if isinstance(item, Mapping)
-                for assertion in item.get("accepted_assertions", [])
-                if isinstance(assertion, Mapping)
-                and set(assertion.get("source_refs", [])).issubset(repaired.source_refs)
-            }
-            accepted = [
-                item
-                for item in prior_failed.assertions
-                if item.assertion_id in accepted_ids
-                and set(item.source_refs).issubset(repaired.source_refs)
-            ]
-        merged_assertions = list(accepted)
-        for assertion in repaired.assertions:
-            if all(
-                (assertion.observation, assertion.relation, assertion.expected)
-                != (item.observation, item.relation, item.expected)
-                for item in merged_assertions
-            ):
-                merged_assertions.append(assertion)
-        if len(merged_assertions) > 4:
-            merged_assertions = merged_assertions[:4]
-        raw_repair_round = repair_round_by_request.get(request.get("request_id"), 1)
-        repair_round = raw_repair_round if isinstance(raw_repair_round, int) else 1
-        try:
-            repaired = replace(
-                repaired,
-                assertions=tuple(merged_assertions),
-                quality=CriterionQuality(
-                    criterion_status="unassessed",
-                    repair_attempts=repair_round,
-                ),
-                fingerprint="",
-            )
-            repaired = replace(repaired, fingerprint=repaired.calculate_fingerprint())
-        except (AcceptanceContractError, TypeError, ValueError):
-            continue
-        criteria.append(repaired)
-    merged = {
-        **dict(prior),
-        "criteria": [item.to_data() for item in criteria],
-        "reviews": [
-            item
-            for item in prior.get("reviews", [])
-            if isinstance(item, Mapping) and item.get("criterion_id") not in replaced
-        ],
-        "repair_attempts": [
-            *(
-                item
-                for item in prior.get("repair_attempts", [])
-                if isinstance(item, Mapping)
-            ),
-            {
-                "round": max(
-                    (
-                        value
-                        for value in repair_round_by_request.values()
-                        if isinstance(value, int)
-                    ),
-                    default=1,
-                ),
-                "request_ids": [
-                    item.get("request_id")
-                    for item in requests
-                    if isinstance(item, Mapping)
-                ],
-                "changed_criterion_ids": [
-                    item.criterion_id
-                    for item in criteria
-                    if item.quality.repair_attempts
-                ],
-                "replaced_criterion_ids": sorted(replaced),
-                "requirement_ids": sorted(
-                    {
-                        source_id
-                        for item in requests
-                        if isinstance(item, Mapping)
-                        for source_id in item.get("requirement_ids", [])
-                        if isinstance(source_id, str)
-                    }
-                ),
-            },
-        ],
-    }
-    return {"criterion_collection": merged, "criteria": merged["criteria"]}
-
-
-def _ids_for_indexes(raw: Any, candidate_ids: Sequence[str]) -> tuple[str, ...]:
-    try:
-        indexes = _indexes(raw, len(candidate_ids), "source_indexes")
-    except AcceptanceContractError:
-        return ()
-    return tuple(candidate_ids[index] for index in indexes)
-
-
-def _normalize_boolean_combinations(
-    raw_combinations: Sequence[Mapping[str, Any]],
-    source_text_by_id: Mapping[str, str],
-) -> list[dict[str, Any]]:
-    combinations: list[dict[str, Any]] = []
-    for raw in raw_combinations:
-        if not isinstance(raw, Mapping):
-            raise AcceptanceContractError("boolean combination is malformed")
-        try:
-            combination = BooleanCombination.from_data(dict(raw))
-        except (TypeError, ValueError) as error:
-            raise AcceptanceContractError("boolean combination is malformed") from error
-        if not set(combination.child_clause_ids).issubset(source_text_by_id):
-            raise AcceptanceContractError("boolean combination source text is missing")
-        combinations.append(
-            {
-                **combination.to_data(),
-                "child_requirements": [
-                    {
-                        "requirement_id": requirement_id,
-                        "source_text": source_text_by_id[requirement_id],
-                    }
-                    for requirement_id in combination.child_clause_ids
-                ],
-            }
-        )
-    return combinations
 
 
 def _bind_criterion(
@@ -1407,9 +593,7 @@ def _bind_criterion(
         )
     assertions: list[CriterionAssertion] = []
     for index, item in enumerate(assertion_values, start=1):
-        if not isinstance(item, Mapping):
-            raise AcceptanceContractError("assertion must be a native JSON object")
-        assertion_data = item
+        assertion_data = _decode_object(item, "assertion")
         if set(assertion_data) != {
             "observation",
             "relation",
@@ -1525,15 +709,10 @@ def _required_text(raw: Mapping[str, Any], name: str) -> str:
 
 
 __all__ = [
-    "ACCEPTANCE_REPAIR_SCHEMA_VERSION",
-    "ACCEPTANCE_CRITERION_WIRE_SCHEMA_VERSION",
-    "ACCEPTANCE_REVIEW_SCHEMA_VERSION",
     "MAX_CRITERIA_PER_REQUEST",
     "MAX_CRITERION_REQUIREMENTS",
     "bind_acceptance_criterion_reviews",
-    "bind_acceptance_criterion_repairs",
     "bind_acceptance_criteria",
     "prepare_acceptance_criterion_reviews",
-    "prepare_acceptance_criterion_repairs",
     "prepare_acceptance_criteria",
 ]

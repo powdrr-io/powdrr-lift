@@ -167,8 +167,6 @@ class DeterministicPlanningClient:
 
         if required == {
             "assertion_reviews",
-            "setup_review",
-            "decision_records",
             "adequate",
             "plausible_incorrect_behavior",
             "distinguishes",
@@ -182,24 +180,13 @@ class DeterministicPlanningClient:
                     json.dumps(
                         {
                             "assertion_id": item["assertion_id"],
-                            "category": "source_supported",
+                            "status": "supported",
                             "source_evidence": evidence,
                             "reason": "The source clause supports the assertion.",
                         }
                     )
                     for item in assertions
                 ],
-                "setup_review": json.dumps(
-                    {
-                        "category": "illustrative_setup",
-                        "source_evidence": evidence,
-                        "reason": (
-                            "Fixture values are illustrative and stay within the "
-                            "source-supported domain."
-                        ),
-                    }
-                ),
-                "decision_records": [],
                 "adequate": True,
                 "plausible_incorrect_behavior": "the feature returns no result",
                 "distinguishes": True,

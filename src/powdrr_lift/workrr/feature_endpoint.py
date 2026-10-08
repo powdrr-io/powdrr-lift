@@ -641,12 +641,6 @@ def _execute_procedrr_flow(
             replay_responses=replay_responses,
             telemetry_sink=record_provider_attempt,
         )
-        jev_equivalence_client = WorkrrProcedrrClient(
-            JevSemanticClassifierClient(config.planning_client, fail_closed=True),
-            skills_dir=flow_directory,
-            replay_responses=replay_responses,
-            telemetry_sink=record_provider_attempt,
-        )
         evaluator = Evaluator(
             planning_client,
             execute,
@@ -654,7 +648,6 @@ def _execute_procedrr_flow(
             judge_clients={
                 "planning": planning_client,
                 "jev": jev_classifier_client,
-                "jev_required": jev_equivalence_client,
             },
             command_catalog=command_catalog,
             event_sink=record_procedrr_event,

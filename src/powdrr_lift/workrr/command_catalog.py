@@ -23,10 +23,6 @@ from powdrr_lift.core.behavior_contract import (
     compile_behavior_scenarios,
     validate_normative_assumptions,
 )
-from powdrr_lift.core.boolean_expression import (
-    BooleanExpressionError,
-    render_boolean_sentence,
-)
 from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.core.feature_obligation import (
     SEMANTIC_KINDS,
@@ -352,26 +348,12 @@ def feature_command_catalog(
         "apply_atomicity_splits": CommandSpec(
             name="apply_atomicity_splits",
             input_schema=object_schema(
-                {
-                    "decisions": {},
-                    "splits": {},
-                    "equivalence_decisions": {},
-                },
-                required=("decisions", "splits", "equivalence_decisions"),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("apply_atomicity_splits"),
-        ),
-        "prepare_atomicity_reconstructions": CommandSpec(
-            name="prepare_atomicity_reconstructions",
-            input_schema=object_schema(
                 {"decisions": {}, "splits": {}},
                 required=("decisions", "splits"),
                 additional_properties=False,
             ),
             output_schema={},
-            logic=implementations.get("prepare_atomicity_reconstructions"),
+            logic=implementations.get("apply_atomicity_splits"),
         ),
         "prepare_source_semantic_decisions": CommandSpec(
             name="prepare_source_semantic_decisions",
@@ -1675,55 +1657,6 @@ class FeatureCommandRuntime:
                 ]
             }
 
-        def prepare_atomicity_reconstructions_operation() -> Any:
-            ledger = load_instruction_ledger()
-            decisions = collected_atomicity_decisions()
-            if len(decisions) != len(ledger.clauses):
-                raise PowdrrExecutionError(
-                    "atomicity decision count does not match instruction clauses"
-                )
-            split_results = feature_endpoint._collected_results(
-                parameters.get("splits")
-            )
-            if split_results is None or not all(
-                isinstance(item, Mapping) for item in split_results
-            ):
-                raise PowdrrExecutionError("atomicity splits are missing or malformed")
-            multiple_clauses = [
-                clause
-                for clause, decision in zip(ledger.clauses, decisions, strict=True)
-                if decision["multiple"]
-            ]
-            if len(split_results) != len(multiple_clauses):
-                raise PowdrrExecutionError(
-                    "atomicity split count does not match multi-requirement clauses"
-                )
-            requests: list[dict[str, Any]] = []
-            for clause, split in zip(multiple_clauses, split_results, strict=True):
-                statements = split.get("statements")
-                expression = split.get("boolean_expression")
-                reconstructed = ""
-                valid = isinstance(statements, list) and all(
-                    isinstance(item, str) for item in statements
-                )
-                if valid:
-                    try:
-                        _, reconstructed = render_boolean_sentence(
-                            statements, expression
-                        )
-                    except BooleanExpressionError:
-                        valid = False
-                requests.append(
-                    {
-                        "source_clause_id": clause.clause_id,
-                        "text": clause.text,
-                        "reconstructed_sentence": reconstructed,
-                        "valid": valid,
-                    }
-                )
-            state["atomicity_reconstruction_requests"] = requests
-            return {"reconstruction_requests": requests}
-
         def apply_atomicity_splits_operation() -> Any:
             ledger = load_instruction_ledger()
             decisions = collected_atomicity_decisions()
@@ -1748,51 +1681,22 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     "atomicity split count does not match multi-requirement clauses"
                 )
-            reconstruction_requests = state.get("atomicity_reconstruction_requests")
-            equivalence_results = feature_endpoint._collected_results(
-                parameters.get("equivalence_decisions")
-            )
-            if (
-                not isinstance(reconstruction_requests, list)
-                or len(reconstruction_requests) != len(split_results)
-                or equivalence_results is None
-                or len(equivalence_results) != len(split_results)
-                or not all(isinstance(item, Mapping) for item in equivalence_results)
-            ):
-                raise PowdrrExecutionError(
-                    "atomicity reconstruction equivalence decisions are incomplete"
-                )
             compiler_decisions: dict[str, dict[str, Any]] = {
                 clause.clause_id: {"multiple": False} for clause in ledger.clauses
             }
-            for index, (clause_id, split) in enumerate(
-                zip(multiple_ids, split_results, strict=True)
-            ):
+            for clause_id, split in zip(multiple_ids, split_results, strict=True):
                 if set(split) - {
                     "statements",
                     "validation_groups",
-                    "boolean_expression",
                     "semantic_relations",
                     "modifier_attachments",
-                } or not {
-                    "statements",
-                    "validation_groups",
-                    "boolean_expression",
-                }.issubset(split):
+                } or not {"statements", "validation_groups"}.issubset(split):
                     raise PowdrrExecutionError(
                         "atomicity split has unknown or missing required fields"
                     )
                 compiler_decisions[clause_id] = {
                     "multiple": True,
                     "statements": split.get("statements"),
-                    "boolean_expression": split.get("boolean_expression"),
-                    "equivalent": (
-                        equivalence_results[index].get("equivalent") is True
-                        and reconstruction_requests[index].get("valid") is True
-                    ),
-                    "reconstructed_sentence": reconstruction_requests[index].get(
-                        "reconstructed_sentence"
-                    ),
                     "validation_groups": split.get("validation_groups"),
                     "semantic_relations": split.get("semantic_relations", []),
                     "modifier_attachments": split.get("modifier_attachments", []),
@@ -3827,9 +3731,6 @@ class FeatureCommandRuntime:
                 ),
                 "prepare_atomicity_split_requests": bind_handler(
                     prepare_atomicity_split_requests_operation
-                ),
-                "prepare_atomicity_reconstructions": bind_handler(
-                    prepare_atomicity_reconstructions_operation
                 ),
                 "apply_atomicity_splits": bind_handler(
                     apply_atomicity_splits_operation

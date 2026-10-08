@@ -248,6 +248,35 @@ def test_split_clause_classifier_receives_bounded_neighbor_context() -> None:
     )
 
 
+def test_routing_request_defines_choice_meanings_and_separates_target_context() -> None:
+    target = "The parser must retain offsets."
+    source = f"The parser currently cannot retain offsets. {target}"
+    start = source.index(target)
+    clause = {
+        **_clause(target),
+        "source_span": {"start": start, "end": start + len(target)},
+    }
+
+    request = prepare_source_semantic_decisions(
+        clause, source_text=source, created_at=NOW
+    )["pending_specs"][0]
+
+    assert set(request["criteria"]) == set(DECISION_VALUES["routing"])
+    assert "is" in request["criteria"]["context"]
+    assert "must, should, will" in request["criteria"]["include"]
+    assert "Start by running" in request["criteria"]["include"]
+    assert "On exit, the data is removed" in request["criteria"]["include"]
+    assert (
+        "Repeated writes must not create duplicate records"
+        in request["criteria"]["include_prohibition"]
+    )
+    assert request["provider_state"] == {
+        "proposition": target,
+        "local_context": "The parser currently cannot retain offsets.\n"
+        "The parser must retain offsets.",
+    }
+
+
 def test_source_decision_fingerprint_includes_neighbor_context() -> None:
     target = "State data resets to its defaults on re-entry."
     source_a = f"The current API lacks scoped state. {target} Data is per instance."

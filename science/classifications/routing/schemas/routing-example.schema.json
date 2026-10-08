@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://powdrr.dev/schemas/routing-example-v1.json",
+  "title": "Routing example",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "example_id",
+    "decision_kind",
+    "input_revision",
+    "rubric_revision",
+    "source",
+    "inputs",
+    "annotation",
+    "slice_tags",
+    "split"
+  ],
+  "properties": {
+    "schema_version": {"const": "routing-example-v1"},
+    "example_id": {"type": "string", "minLength": 1},
+    "decision_kind": {"const": "routing"},
+    "input_revision": {"const": "routing-input-v1"},
+    "rubric_revision": {"const": "routing-rubric-v1"},
+    "source": {
+      "type": "object",
+      "required": ["document_id", "family_id", "origin", "source_ref", "source_sha256", "derivation_group_id", "license"],
+      "properties": {
+        "document_id": {"type": "string"},
+        "family_id": {"type": "string"},
+        "origin": {"type": "string"},
+        "source_ref": {"type": "string"},
+        "source_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "target_span": {"$ref": "#/$defs/span"},
+        "parent_span": {"$ref": "#/$defs/span"},
+        "derivation": {"type": "string"},
+        "derivation_group_id": {"type": "string"},
+        "license": {"type": "string"},
+        "task_id": {"type": "string"},
+        "language": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposition", "local_context", "scope_relations"],
+      "properties": {
+        "proposition": {"type": "string", "minLength": 1},
+        "local_context": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["section_heading", "previous_sentence", "source_sentence", "next_sentence"],
+          "properties": {
+            "section_heading": {"type": ["string", "null"]},
+            "previous_sentence": {"type": ["string", "null"]},
+            "source_sentence": {"type": ["string", "null"]},
+            "next_sentence": {"type": ["string", "null"]}
+          }
+        },
+        "scope_relations": {"type": ["object", "null"]}
+      }
+    },
+    "annotation": {
+      "type": "object",
+      "required": ["suggested_label", "status", "reviewer_kind", "reviewer_id", "rationale", "evidence_quotes", "ambiguity_reason"],
+      "properties": {
+        "suggested_label": {"enum": ["context", "include", "include_prohibition", "exclude", "unclear", null]},
+        "status": {"enum": ["unlabeled", "proposed", "reviewed", "adjudicated"]},
+        "reviewer_kind": {"type": ["string", "null"]},
+        "reviewer_id": {"type": ["string", "null"]},
+        "rationale": {"type": ["string", "null"]},
+        "evidence_quotes": {"type": "array", "items": {"type": "string"}},
+        "ambiguity_reason": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "slice_tags": {"type": "array", "items": {"type": "string"}},
+    "split": {"enum": ["development", "fresh_holdout"]}
+  },
+  "$defs": {
+    "span": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"type": "integer", "minimum": 0},
+        "end": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

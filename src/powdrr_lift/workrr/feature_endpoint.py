@@ -5799,6 +5799,15 @@ def _compile_initial_worker_prompt(
                 if isinstance((scenario := item.get("behavior_scenario")), Mapping)
             ),
             acceptance_criteria=tuple(raw_acceptance_criteria),
+            acceptance_logic=tuple(
+                item
+                for item in (
+                    canonical_design.get("acceptance_logic", [])
+                    if isinstance(canonical_design.get("acceptance_logic", []), list)
+                    else []
+                )
+                if isinstance(item, Mapping)
+            ),
         )
         unit = ExecutionUnit(
             unit_id=f"{slugify_workflow_id(config.work_item_name)}-implementation",

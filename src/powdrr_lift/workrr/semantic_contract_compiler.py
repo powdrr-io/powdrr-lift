@@ -45,7 +45,9 @@ from powdrr_lift.workrr.semantic_classifier import (
     resolve_deterministic_source_decision,
 )
 
-SOURCE_CLASSIFIER_REVISION = "source-classifier-v2-decision-tree"
+SOURCE_CLASSIFIER_REVISION = (
+    "source-classifier-v3-bounded-context-no-obligation-fallback"
+)
 SOURCE_EXTRACTOR_REVISION = "source-extractor-v1"
 
 
@@ -931,7 +933,7 @@ def prepare_source_semantic_decisions(
 ) -> dict[str, Any]:
     """Prepare the root routing choice before semantic detail classification."""
     clause_id, text, source_fingerprint = _clause_fields(clause)
-    context_text = _containing_source_sentence(clause, source_text)
+    context_text = _bounded_source_context(clause, source_text)
     spec = _decision_spec(
         clause_id, text, source_fingerprint, "routing", context_text=context_text
     )
@@ -952,7 +954,7 @@ def prepare_dependent_source_semantic_decisions(
 ) -> dict[str, Any]:
     """Create detail decisions only after the route has been selected."""
     clause_id, text, source_fingerprint = _clause_fields(clause)
-    context_text = _containing_source_sentence(clause, source_text)
+    context_text = _bounded_source_context(clause, source_text)
     roots = [
         item if isinstance(item, SemanticDecision) else SemanticDecision.from_data(item)
         for item in root_decisions
@@ -961,7 +963,9 @@ def prepare_dependent_source_semantic_decisions(
         raise SemanticContractError("decision tree requires exactly one routing root")
     root = roots[0]
     if root.result.status != "resolved" or root.result.value is None:
-        raise SemanticContractError("decision tree root must be resolved")
+        # Keep an unresolved route available for diagnosis without creating
+        # downstream product classifications from it.
+        return {"resolved_decisions": [root.to_data()], "pending_specs": []}
     timestamp = created_at or _created_at()
     route = root.result.value
     resolved = [root.to_data()]
@@ -1180,6 +1184,22 @@ def bind_source_semantic_decisions(
         if (
             spec.decision_kind == "routing"
             and result_is_resolved
+            and result.get("value") == "unclear"
+        ):
+            # `unclear` is an abstention, not a route that downstream stages
+            # may interpret as a candidate product obligation.
+            provider_result = {
+                "status": "unresolved",
+                "reason_code": "source_ambiguous",
+            }
+            evidence_refs = (
+                *evidence_refs,
+                "classifier:unclear-route:source-ambiguous",
+            )
+            result_is_resolved = False
+        if (
+            spec.decision_kind == "routing"
+            and result_is_resolved
             and result.get("value") == "include_prohibition"
             and not has_explicit_prohibition_directive(spec.proposition_text)
         ):
@@ -1200,20 +1220,6 @@ def bind_source_semantic_decisions(
                 str(result.get("value")), values.get("routing")
             )
         )
-        if (
-            spec.decision_kind == "disposition"
-            and values.get("routing") == "include"
-            and (not result_is_resolved or result_conflicts_with_route)
-        ):
-            # The router has already committed to product behavior. If the
-            # kind classifier cannot supply an included kind, preserve that
-            # obligation as an invariant instead of aborting or dropping it.
-            provider = SemanticDecisionProvider(kind="deterministic-rule")
-            provider_result = {"status": "resolved", "value": "invariant"}
-            evidence_refs = (
-                *evidence_refs,
-                "fallback:include-without-product-kind:invariant",
-            )
         if benchmark_mode:
             fallback = _normative_source_decision_default(spec, decisions)
             if (
@@ -1247,24 +1253,20 @@ def bind_source_semantic_decisions(
 def _normative_source_decision_default(
     spec: SemanticDecisionSpec, decisions: Sequence[SemanticDecision]
 ) -> str | None:
-    """Keep unattended compilation moving with source-preserving defaults."""
+    """Supply only safe deterministic defaults for secondary source labels."""
     values = {item.decision_kind: item.result.value for item in decisions}
     root = values.get("disposition")
     route = values.get("routing")
     if spec.decision_kind == "routing":
-        # If the router cannot decide, retain the user's words as included
-        # guidance. Dropping an ambiguous clause would silently lose intent.
-        return "include"
+        return None
     if spec.decision_kind == "disposition":
         if route == "include_prohibition":
             return "non_goal"
         if route == "include":
-            return "invariant"
+            return None
         if route in {"context", "exclude"}:
             return "context"
-        # A broad guidance label carries the exact proposition without claiming
-        # whether it is a feature, API, invariant, or domain entity.
-        return "guidance"
+        return None
     if spec.decision_kind in {
         "has_precondition",
         "has_exception",
@@ -1340,6 +1342,11 @@ def _disposition_matches_route(disposition: str, route: str | None) -> bool:
 
 
 def _validate_decision_tree(decisions: Sequence[SemanticDecision]) -> None:
+    # Preserve unresolved decisions for diagnostics. Contract compilation rejects
+    # them explicitly; treating their absent values as resolved contradictions
+    # would turn a processing/analysis failure into a different classifier error.
+    if any(item.result.status != "resolved" for item in decisions):
+        return
     values = {item.decision_kind: item.result.value for item in decisions}
     routing = values.get("routing")
     disposition = values.get("disposition")
@@ -1796,6 +1803,21 @@ def compile_source_contract(
 ) -> PartialSemanticContract:
     clause_id, text, source_fingerprint = _clause_fields(clause)
     all_decisions = (*decisions, behavior_family)
+    unresolved = [
+        item.decision_kind for item in all_decisions if item.result.status != "resolved"
+    ]
+    if unresolved:
+        raise SemanticContractError(
+            "cannot compile a source contract with unresolved decisions: "
+            + ", ".join(unresolved)
+        )
+    if any(
+        item.decision_kind == "routing" and item.result.value == "unclear"
+        for item in all_decisions
+    ):
+        raise SemanticContractError(
+            "cannot compile a source contract with an unclear routing decision"
+        )
     _validate_decision_tree(all_decisions)
     return compile_partial_semantic_contract(
         source_ref=clause_id,
@@ -1955,6 +1977,11 @@ def _classifier_request(
 ) -> dict[str, Any]:
     """Build a source-only classifier request without task-specific exemplars."""
     instructions = list(definition.instructions)
+    context_key = (
+        "surrounding_text"
+        if spec.context_text and "\n" in spec.context_text
+        else "source_sentence"
+    )
     return {
         "spec": spec.to_data(),
         "question": definition.question,
@@ -1962,7 +1989,7 @@ def _classifier_request(
         "allowed_values": sorted(DECISION_VALUES[spec.decision_kind]),
         "subject_text": format_classifier_input(
             spec.proposition_text,
-            {"source_sentence": spec.context_text} if spec.context_text else None,
+            {context_key: spec.context_text} if spec.context_text else None,
         ),
     }
 
@@ -2006,6 +2033,57 @@ def _containing_source_sentence(
         return None
     sentence = source_text[start:end].strip()
     return sentence if sentence and sentence != clause.get("text") else None
+
+
+def _bounded_source_context(
+    clause: Mapping[str, Any], source_text: str | None
+) -> str | None:
+    """Return the clause sentence with no more than one sentence on each side."""
+    span = clause.get("source_span")
+    if not isinstance(source_text, str) or not isinstance(span, Mapping):
+        return None
+    start, end = span.get("start"), span.get("end")
+    if (
+        not isinstance(start, int)
+        or isinstance(start, bool)
+        or not isinstance(end, int)
+        or isinstance(end, bool)
+        or start < 0
+        or end <= start
+        or end > len(source_text)
+    ):
+        return None
+
+    boundaries = [
+        match.end() for match in re.finditer(r"[.!?](?:[\"')\]]*)\s+", source_text)
+    ]
+    starts = [0, *boundaries]
+    ends = [*boundaries, len(source_text)]
+    sentence_spans = [
+        (left, right)
+        for left, right in zip(starts, ends, strict=True)
+        if source_text[left:right].strip()
+    ]
+    target_index = next(
+        (
+            index
+            for index, (left, right) in enumerate(sentence_spans)
+            if left <= start < right or start <= left < end
+        ),
+        None,
+    )
+    if target_index is None:
+        return _containing_source_sentence(clause, source_text)
+
+    first = max(0, target_index - 1)
+    last = min(len(sentence_spans) - 1, target_index + 1)
+    selected = [
+        source_text[left:right].strip()
+        for left, right in sentence_spans[first : last + 1]
+    ]
+    if len(selected) == 1 and selected[0] == clause.get("text"):
+        return None
+    return "\n".join(selected)
 
 
 def _clause_fields(clause: Mapping[str, Any]) -> tuple[str, str, str]:

@@ -515,6 +515,58 @@ def test_atomicity_discards_single_member_validation_group() -> None:
     assert all(item.validation_group_id is None for item in split.clauses)
 
 
+def test_history_mode_mapping_splits_into_conditional_required_branches() -> None:
+    source = (
+        "History recall restores saved data snapshots -- deep for full descendants, "
+        "shallow for direct children."
+    )
+    ledger = compile_instruction_ledger("feature", source)
+    statements = [
+        "Deep history restores saved data snapshots for full descendants.",
+        "Shallow history restores saved data snapshots for direct children.",
+    ]
+
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": statements,
+                "validation_groups": ["members=1,2;relation=conditional"],
+            }
+        },
+    )
+
+    assert [item.text for item in split.clauses] == statements
+    assert len({item.validation_group_id for item in split.clauses}) == 1
+    assert {item.validation_relation for item in split.clauses} == {"conditional"}
+    assert all(
+        item.source_span == ledger.clauses[0].source_span for item in split.clauses
+    )
+    assert all(
+        item.parent_clause_id == "candidate:instruction-001" for item in split.clauses
+    )
+
+
+def test_atomicity_rejects_single_member_conditional_group() -> None:
+    ledger = compile_instruction_ledger("feature", "History recall restores a child.")
+
+    with pytest.raises(InstructionLedgerError, match="conditional validation group"):
+        apply_atomicity_decisions(
+            ledger,
+            {
+                "instruction-001": {
+                    "multiple": True,
+                    "statements": [
+                        "History recall restores a child.",
+                        "History recall restores its data.",
+                    ],
+                    "validation_groups": ["members=1;relation=conditional"],
+                }
+            },
+        )
+
+
 def test_atomicity_rejects_overlapping_groups_with_different_relations() -> None:
     ledger = compile_instruction_ledger("feature", "Add, validate, and commit safely.")
 

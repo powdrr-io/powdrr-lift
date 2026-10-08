@@ -943,7 +943,14 @@ def _normalize_validation_groups(
             raise InstructionLedgerError("validation group is invalid")
         # A one-member group carries no relationship between statements. The
         # model occasionally emits one when only one result needs no grouping.
+        # Unlike an all_together hint, a singleton conditional group signals a
+        # lost branch: silently dropping it would erase the source relationship
+        # that makes each mode-to-outcome branch required when applicable.
         if len(members) == 1:
+            if relation_value == "conditional":
+                raise InstructionLedgerError(
+                    "conditional validation group must contain at least two branches"
+                )
             continue
         groups.append({"members": list(members), "relation": relation_value})
 
@@ -981,6 +988,10 @@ def _normalize_validation_groups(
 def _atomic_validation_group(
     raw_groups: Any, statement_ordinal: int, statement_count: int, parent_id: str
 ) -> tuple[str | None, str]:
+    """Return a child's group and relation.
+
+    A conditional group means each applicable branch is required.
+    """
     if raw_groups is None:
         raw_groups = []
     if not isinstance(raw_groups, list):

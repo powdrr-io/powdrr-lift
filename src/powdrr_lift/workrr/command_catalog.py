@@ -2823,6 +2823,7 @@ class FeatureCommandRuntime:
                 return prepare_acceptance_criteria(
                     contract_collection,
                     {item.clause_id: item.text for item in ledger.clauses},
+                    [item.to_data() for item in ledger.boolean_combinations],
                 )
             except AcceptanceContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
@@ -3668,6 +3669,9 @@ class FeatureCommandRuntime:
             canonical_document["acceptance_criteria"] = [
                 item.to_data() for item in acceptance_criteria
             ]
+            canonical_document["acceptance_logic"] = list(
+                criterion_collection.get("boolean_combinations", [])
+            )
             for canonical_obligation in canonical_document["obligations"]:
                 clause_id = canonical_obligation.get("clause_id")
                 if isinstance(clause_id, str):

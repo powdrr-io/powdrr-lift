@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import replace
+from typing import Any
 
 import pytest
 
@@ -169,7 +171,7 @@ def test_requirements_without_valid_assertions_remain_source_only() -> None:
         },
         {item: f"Source for {item}." for item in contract.member_requirement_ids},
     )
-    results = [
+    results: list[Mapping[str, Any]] = [
         {"criterion": _criterion([0])},
         {"criterion": None},
     ]

@@ -85,6 +85,50 @@ jobs:
     assert profiles[0].command == ("pytest", "-q")
 
 
+def test_records_github_workflow_context_for_multiline_validation(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text("[tool.ruff]\nline-length=88\n")
+    workflow = tmp_path / ".github" / "workflows"
+    workflow.mkdir(parents=True)
+    (workflow / "checks.yml").write_text(
+        """
+name: Checks
+on:
+  pull_request:
+    branches: [main]
+    paths: ['src/**', 'tests/**']
+jobs:
+  validate:
+    if: github.event.pull_request.draft == false
+    defaults:
+      run:
+        shell: bash
+        working-directory: app
+    steps:
+      - name: Run formatter
+        run: |
+          uv run ruff format --check .
+          uv run ruff check .
+""",
+        encoding="utf-8",
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+    formatter = next(
+        profile for profile in profiles if profile.name == "ruff-format-check"
+    )
+
+    assert formatter.ci_origins[0]["triggers"] == {
+        "pull_request": {"branches": ["main"], "paths": ["src/**", "tests/**"]}
+    }
+    origin = formatter.ci_origins[0]
+    assert origin["job_if"] == "github.event.pull_request.draft == false"
+    assert origin["shell"] == "bash"
+    assert origin["working_directory"] == "app"
+    assert "uv run ruff check ." in str(origin["run"])
+
+
 def test_discovers_polyglot_project_validation(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text(
         '{"scripts": {"test": "vitest", "lint": "eslint ."}}\n',

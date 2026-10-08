@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 import re
+import shlex
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -115,6 +117,7 @@ class BootstrapResult:
     source_manifest: SourceManifest | None = None
     manifest_path: Path | None = None
     validation_evidence_files: tuple[str, ...] = field(default_factory=tuple)
+    report_path: Path | None = None
 
 
 def bootstrap_structrr(
@@ -200,6 +203,12 @@ def bootstrap_structrr(
             yaml.safe_dump(document, sort_keys=False, allow_unicode=False),
             encoding="utf-8",
         )
+    report_path = resolved_output.with_suffix(".md")
+    if validation.successful:
+        report_path.write_text(
+            render_bootstrap_markdown(document, report_path=report_path, root=root),
+            encoding="utf-8",
+        )
     manifest_path = resolved_output.with_suffix(".manifest.json")
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(
@@ -218,7 +227,143 @@ def bootstrap_structrr(
             for item in document.get("validation_context", {}).get("evidence", ())
             if isinstance(item, Mapping) and isinstance(item.get("path"), str)
         ),
+        report_path=report_path,
     )
+
+
+def render_bootstrap_markdown(
+    document: Mapping[str, Any], *, report_path: Path, root: Path
+) -> str:
+    """Render a concise code structure overview and evidence-backed checks."""
+    lines = ["# Bootstrap findings", "", "## Code structure", ""]
+    files = document.get("files", [])
+    paths = [str(item.get("path", "")) for item in files if isinstance(item, Mapping)]
+    top_dirs = sorted({path.split("/", 1)[0] for path in paths if "/" in path})
+    structure_summary = (
+        f"The repository snapshot contains {len(paths)} source and configuration files."
+    )
+    if top_dirs:
+        structure_summary += (
+            " Top-level areas: " + ", ".join(f"`{name}/`" for name in top_dirs) + "."
+        )
+    lines.append(structure_summary)
+    entity_types: dict[str, int] = {}
+    for entity in document.get("entities", []):
+        if isinstance(entity, Mapping) and isinstance(entity.get("type"), str):
+            entity_types[str(entity["type"])] = (
+                entity_types.get(str(entity["type"]), 0) + 1
+            )
+    if entity_types:
+        lines.append(
+            "Structrr identified: "
+            + ", ".join(
+                f"{count} {kind}" for kind, count in sorted(entity_types.items())
+            )
+            + "."
+        )
+    lines.extend(["", "## Validation commands", ""])
+    checks = document.get("validation_inventory", [])
+    if not checks:
+        lines.append(
+            "No validation commands were detected in the inspected project files."
+        )
+    for check in checks:
+        if not isinstance(check, Mapping):
+            continue
+        lines.extend(
+            [f"### {check.get('profile', check.get('id', 'Validation check'))}", ""]
+        )
+        execution = check.get("execution", {})
+        execution = execution if isinstance(execution, Mapping) else {}
+        command = check.get("command", [])
+        if execution.get("kind") == "shell" and execution.get("script"):
+            lines.extend(["```sh", str(execution["script"]).rstrip(), "```"])
+        elif isinstance(command, list) and command:
+            lines.append("`" + shlex.join([str(part) for part in command]) + "`")
+        else:
+            lines.append(
+                "Command is declared through a task runner; see evidence below."
+            )
+        details = [
+            f"Purpose: {check.get('purpose') or 'not stated'}",
+            f"Working directory: `{execution.get('cwd', '.')}`",
+        ]
+        if execution.get("shell"):
+            details.append(f"Shell: `{execution['shell']}`")
+        applicability = check.get("applicability", {})
+        if isinstance(applicability, Mapping):
+            details.append(
+                "Applicability: "
+                f"local `{applicability.get('local', 'unknown')}`, "
+                f"evaluation `{applicability.get('evaluation', 'unknown')}`"
+            )
+        settings = check.get("settings", {})
+        if isinstance(settings, Mapping) and settings:
+            details.append(
+                "Settings: `"
+                + yaml.safe_dump(dict(settings), default_flow_style=True).strip()
+                + "`"
+            )
+        requiredness = check.get("requiredness", {})
+        if isinstance(requiredness, Mapping):
+            details.append(f"Requiredness: `{requiredness.get('status', 'unknown')}`")
+        lines.append("  ".join(details))
+        evidence: list[str] = []
+        provenance = check.get("provenance", {})
+        if isinstance(provenance, Mapping) and isinstance(
+            provenance.get("evidence"), list
+        ):
+            evidence.extend(str(item) for item in provenance["evidence"])
+        config_files = check.get("config_files", [])
+        if isinstance(config_files, list):
+            evidence.extend(str(item) for item in config_files)
+        origins = check.get("ci_origins", [])
+        if isinstance(origins, list):
+            for origin in origins:
+                if not isinstance(origin, Mapping):
+                    continue
+                workflow = str(origin.get("workflow", "workflow"))
+                evidence.append(workflow)
+                trigger = origin.get("triggers", {})
+                lines.append(f"- GitHub Actions: `{workflow}`")
+                lines.append(
+                    f"  - Job `{origin.get('job_name', origin.get('job_id', ''))}`, "
+                    f"step `{origin.get('step_name', '')}`."
+                )
+                lines.append(
+                    "  - Triggers: `"
+                    f"{yaml.safe_dump(trigger, default_flow_style=True).strip()}`."
+                )
+                lines.append(
+                    f"  - Job condition: `{origin.get('job_if') or 'none'}`; "
+                    f"step condition: `{origin.get('step_if') or 'none'}`."
+                )
+                lines.append(
+                    "  - Runs with shell `"
+                    f"{origin.get('shell') or 'runner default'}` in `"
+                    f"{origin.get('working_directory', '.')}`."
+                )
+                if origin.get("needs"):
+                    lines.append(f"  - Depends on: `{origin['needs']}`.")
+                if origin.get("matrix"):
+                    lines.append(f"  - Matrix: `{origin['matrix']}`.")
+                run = str(origin.get("run", "")).strip()
+                if run:
+                    lines.append("  - Workflow script evidence:")
+                    lines.extend("    " + line for line in ("```sh", run, "```"))
+        if evidence:
+            unique_evidence = list(dict.fromkeys(evidence))
+            links = []
+            for item in unique_evidence:
+                absolute = root / item
+                target = Path(os.path.relpath(absolute, report_path.parent)).as_posix()
+                links.append(f"[`{item}`]({target})")
+            lines.append("Evidence: " + ", ".join(links) + ".")
+        unresolved = check.get("unresolved", [])
+        if isinstance(unresolved, list) and unresolved:
+            lines.append("Unresolved: " + "; ".join(str(item) for item in unresolved))
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _default_output_path(root: Path) -> Path:

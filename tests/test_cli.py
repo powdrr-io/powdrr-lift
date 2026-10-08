@@ -259,8 +259,11 @@ def test_cli_bootstrap_structrr_json_reports_validated_summary(tmp_path: Path) -
         "source_binding_count": 0,
         "source_subject_count": 2,
         "output_path": str(output_path),
+        "report_path": str(output_path.with_suffix(".md")),
     }
     assert output_path.is_file()
+    assert output_path.with_suffix(".md").is_file()
+    assert "## Code structure" in output_path.with_suffix(".md").read_text()
 
     human_stdout = io.StringIO()
     with redirect_stdout(human_stdout):

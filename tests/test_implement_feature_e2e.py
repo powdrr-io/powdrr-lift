@@ -106,6 +106,9 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
+        if required == {"equivalent"}:
+            return {"equivalent": True}
+
         if required == {
             "member_indexes",
             "context_indexes",
@@ -268,7 +271,7 @@ class DeterministicPlanningClient:
             return {"consistency_review": {"updates": []}}
         if required == {"multiple"}:
             return {"multiple": False}
-        if required == {"statements", "validation_groups"}:
+        if required == {"statements", "validation_groups", "boolean_expression"}:
             raise AssertionError("a non-multiple clause must not be split")
         if required == {"status", "unresolved_dimensions", "scenario"}:
             semantic_dimensions = _find_json_value(text, "semantic_dimensions")
@@ -712,8 +715,8 @@ class StateDataAtomicityPlanningClient(DeterministicPlanningClient):
         required = set((response_schema or {}).get("required", ()))
         text = "\n".join(message.get("content", "") for message in messages)
         if required == {"multiple"}:
-            return {"multiple": "set_state_data(state, key, value)" in text}
-        if required == {"statements", "validation_groups"}:
+            return {"multiple": "set_state_data" in text}
+        if required == {"statements", "validation_groups", "boolean_expression"}:
             return {
                 "statements": [
                     "set_state_data rejects an inactive state.",
@@ -722,6 +725,15 @@ class StateDataAtomicityPlanningClient(DeterministicPlanningClient):
                     "An invalid set_state_data call raises InvalidDefinition.",
                 ],
                 "validation_groups": [],
+                "boolean_expression": {
+                    "op": "and",
+                    "args": [
+                        {"atom": 1},
+                        {"atom": 2},
+                        {"atom": 3},
+                        {"atom": 4},
+                    ],
+                },
             }
         return super().complete_json(messages, response_schema=response_schema)
 
@@ -1044,7 +1056,24 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
 
 def test_implement_feature_decomposes_state_data_api_requirements_before_design(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from powdrr_lift.workrr import jev_classifier
+
+    monkeypatch.setenv("TYPESAFEAI_API_KEY", "test-key")
+
+    def classify_with_jev(classifier: Mapping[str, Any], *_: Any) -> dict[str, str]:
+        question = str(classifier.get("question", ""))
+        return {
+            "choice": (
+                "true"
+                if "more than one independently verifiable" in question
+                or "logically equivalent" in question
+                else "false"
+            )
+        }
+
+    monkeypatch.setattr(jev_classifier, "_call_jev", classify_with_jev)
     repo = _fixture_repo(tmp_path)
     fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
     result = run_feature_in_place(

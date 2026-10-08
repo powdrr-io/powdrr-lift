@@ -821,6 +821,8 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 }
             if command[0] == "prepare_atomicity_split_requests":
                 return {"split_requests": []}
+            if command[0] == "prepare_atomicity_reconstructions":
+                return {"reconstruction_requests": []}
             if command[0] == "apply_atomicity_splits":
                 return {
                     "path": "instruction-ledger.json",

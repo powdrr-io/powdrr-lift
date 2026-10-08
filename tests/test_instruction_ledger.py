@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+from powdrr_lift.core.boolean_expression import (
+    BooleanExpressionError,
+    render_boolean_sentence,
+)
 from powdrr_lift.core.instruction_ledger import (
     InstructionClause,
     InstructionLedger,
@@ -119,6 +123,9 @@ def test_atomicity_split_gets_compiler_owned_ids() -> None:
         "Data is fresh on entry.",
         "Data is removed on exit.",
     ]
+    assert split.boolean_combinations[0].reconstructed_sentence == (
+        "Data is fresh on entry and Data is removed on exit."
+    )
 
 
 def test_atomicity_duplicate_children_fall_back_to_parent_with_diagnostic() -> None:
@@ -153,6 +160,88 @@ def test_atomicity_duplicate_children_fall_back_to_parent_with_diagnostic() -> N
     restored = InstructionLedger.from_data(split.to_data())
     assert restored.fingerprint == split.fingerprint
     assert restored.split_diagnostics == split.split_diagnostics
+
+
+def test_boolean_expression_reconstructs_nested_and_or_with_explicit_grouping() -> None:
+    expression, sentence = render_boolean_sentence(
+        ["A happens.", "B happens.", "C happens."],
+        {
+            "op": "and",
+            "args": [
+                {"atom": 1},
+                {"op": "or", "args": [{"atom": 2}, {"atom": 3}]},
+            ],
+        },
+    )
+
+    assert expression == {
+        "op": "and",
+        "args": [
+            {"atom": 1},
+            {"op": "or", "args": [{"atom": 2}, {"atom": 3}]},
+        ],
+    }
+    assert sentence == "A happens and (B happens or C happens)."
+
+
+def test_boolean_expression_requires_each_atom_exactly_once() -> None:
+    with pytest.raises(BooleanExpressionError, match="every atom exactly once"):
+        render_boolean_sentence(
+            ["A happens.", "B happens."],
+            {"op": "or", "args": [{"atom": 1}, {"atom": 1}]},
+        )
+
+
+def test_boolean_renderer_preserves_conditional_and_exclusive_or() -> None:
+    _, conditional = render_boolean_sentence(
+        ["the token is missing", "reject the request", "accept the request"],
+        {
+            "op": "if_then_else",
+            "args": [{"atom": 1}, {"atom": 2}, {"atom": 3}],
+        },
+    )
+    _, exclusive = render_boolean_sentence(
+        ["use cache", "recompute"],
+        {"op": "xor", "args": [{"atom": 1}, {"atom": 2}]},
+    )
+    _, negated = render_boolean_sentence(
+        ["the request succeeds", "the request is expired"],
+        {
+            "op": "not",
+            "arg": {"op": "and", "args": [{"atom": 1}, {"atom": 2}]},
+        },
+    )
+
+    assert conditional == (
+        "If (the token is missing), then (reject the request); otherwise, "
+        "(accept the request)."
+    )
+    assert exclusive == "Exactly one of these holds: use cache; recompute."
+    assert negated == (
+        "It is not the case that (the request succeeds and the request is expired)."
+    )
+
+
+def test_reconstruction_equivalence_rejects_split_and_preserves_parent_clause() -> None:
+    ledger = compile_instruction_ledger("feature", "A happens or B happens.")
+    split = apply_atomicity_decisions(
+        ledger,
+        {
+            "instruction-001": {
+                "multiple": True,
+                "statements": ["A happens.", "B happens."],
+                "boolean_expression": {
+                    "op": "and",
+                    "args": [{"atom": 1}, {"atom": 2}],
+                },
+                "equivalent": False,
+                "reconstructed_sentence": "A happens and B happens.",
+            }
+        },
+    )
+
+    assert split.clauses == ledger.clauses
+    assert split.split_diagnostics[0].reason_code == "reconstruction_not_equivalent"
 
 
 def test_atomicity_empty_markdown_child_falls_back_to_parent() -> None:

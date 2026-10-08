@@ -1138,11 +1138,15 @@ def _attach_clause_scope_relations(
 ) -> None:
     semantic_relations = clause.get("semantic_relations", [])
     modifier_attachments = clause.get("modifier_attachments", [])
-    if semantic_relations or modifier_attachments:
-        request["scope_relations"] = {
+    boolean_combination = clause.get("boolean_combination")
+    if semantic_relations or modifier_attachments or boolean_combination:
+        scope_relations: dict[str, Any] = {
             "semantic_relations": semantic_relations,
             "modifier_attachments": modifier_attachments,
         }
+        if isinstance(boolean_combination, Mapping):
+            scope_relations["boolean_combination"] = dict(boolean_combination)
+        request["scope_relations"] = scope_relations
 
 
 def bind_source_semantic_decisions(

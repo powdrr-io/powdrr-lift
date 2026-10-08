@@ -29,6 +29,7 @@ class JevSemanticClassifierClient:
         *,
         api_key: str | None = None,
         endpoint: str | None = None,
+        fail_closed: bool = False,
     ) -> None:
         self._fallback = fallback
         self._api_key = (
@@ -43,6 +44,7 @@ class JevSemanticClassifierClient:
             if configured_base_url
             else JEV_DEFAULT_BASE_URL
         )
+        self._fail_closed = fail_closed
 
     def complete_json(
         self,
@@ -60,7 +62,7 @@ class JevSemanticClassifierClient:
                 request_id,
                 endpoint_host,
             )
-            return _fallback(self._fallback, messages, response_schema)
+            return self._fallback_or_false(messages, response_schema)
         if request_data is None:
             LOGGER.warning(
                 "JEV_CALL_SKIPPED "
@@ -68,7 +70,7 @@ class JevSemanticClassifierClient:
                 request_id,
                 endpoint_host,
             )
-            return _fallback(self._fallback, messages, response_schema)
+            return self._fallback_or_false(messages, response_schema)
 
         started_at = time.monotonic()
         LOGGER.warning(
@@ -92,9 +94,11 @@ class JevSemanticClassifierClient:
         except Exception as exc:  # noqa: BLE001
             # Jev is an optional classifier provider.
             http_status = getattr(exc, "code", "none")
+            log_event = "JEV_FAIL_CLOSED" if self._fail_closed else "JEV_FALLBACK"
             LOGGER.warning(
-                "JEV_FALLBACK request_id=%s endpoint_host=%s phase=%s "
+                "%s request_id=%s endpoint_host=%s phase=%s "
                 "error_type=%s http_status=%s duration_ms=%d",
+                log_event,
                 request_id,
                 endpoint_host,
                 phase,
@@ -102,7 +106,7 @@ class JevSemanticClassifierClient:
                 http_status,
                 round((time.monotonic() - started_at) * 1000),
             )
-            return _fallback(self._fallback, messages, response_schema)
+            return self._fallback_or_false(messages, response_schema)
         LOGGER.warning(
             "JEV_RESULT_ACCEPTED request_id=%s endpoint_host=%s duration_ms=%d",
             request_id,
@@ -110,6 +114,18 @@ class JevSemanticClassifierClient:
             round((time.monotonic() - started_at) * 1000),
         )
         return result
+
+    def _fallback_or_false(
+        self,
+        messages: list[dict[str, str]],
+        response_schema: Mapping[str, Any] | None,
+    ) -> dict[str, Any]:
+        if self._fail_closed:
+            output_property = _single_output_property(response_schema)
+            if output_property and output_property.get("type") == "boolean":
+                return {output_property["name"]: False}
+            raise ValueError("Jev is unavailable for a fail-closed decision")
+        return _fallback(self._fallback, messages, response_schema)
 
 
 def _fallback(

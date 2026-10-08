@@ -29,7 +29,6 @@ class JevSemanticClassifierClient:
         *,
         api_key: str | None = None,
         endpoint: str | None = None,
-        model: str | None = None,
         fail_closed: bool = False,
     ) -> None:
         self._fallback = fallback
@@ -45,7 +44,6 @@ class JevSemanticClassifierClient:
             if configured_base_url
             else JEV_DEFAULT_BASE_URL
         )
-        self._model = model or os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL
         self._fail_closed = fail_closed
 
     def complete_json(
@@ -79,21 +77,15 @@ class JevSemanticClassifierClient:
             "JEV_REQUEST_STARTED request_id=%s endpoint_host=%s model=%s",
             request_id,
             endpoint_host,
-            self._model,
+            JEV_MODEL,
         )
         phase = "request"
         try:
-            response = _call_jev(
-                request_data, self._api_key, self._endpoint, self._model
-            )
-            answer = response.get("answer", response)
-            returned_model = response.get("model", self._model)
+            answer = _call_jev(request_data, self._api_key, self._endpoint)
             LOGGER.warning(
-                "JEV_RESPONSE_RECEIVED request_id=%s endpoint_host=%s "
-                "model=%s duration_ms=%d",
+                "JEV_RESPONSE_RECEIVED request_id=%s endpoint_host=%s duration_ms=%d",
                 request_id,
                 endpoint_host,
-                returned_model,
                 round((time.monotonic() - started_at) * 1000),
             )
             phase = "response_mapping"
@@ -116,11 +108,9 @@ class JevSemanticClassifierClient:
             )
             return self._fallback_or_false(messages, response_schema)
         LOGGER.warning(
-            "JEV_RESULT_ACCEPTED request_id=%s endpoint_host=%s model=%s "
-            "duration_ms=%d",
+            "JEV_RESULT_ACCEPTED request_id=%s endpoint_host=%s duration_ms=%d",
             request_id,
             endpoint_host,
-            returned_model,
             round((time.monotonic() - started_at) * 1000),
         )
         return result
@@ -190,66 +180,17 @@ def _classifier_request(
         instructions = classifier.get("instructions")
         source = classifier.get("subject_text", classifier.get("source_text"))
         if isinstance(allowed, list) and isinstance(source, str):
-            criteria = classifier.get("criteria")
-            if criteria is not None and (
-                not isinstance(criteria, Mapping)
-                or set(criteria) != set(allowed)
-                or not all(isinstance(value, str) for value in criteria.values())
-            ):
-                return None
-            is_routing = kind == "routing"
-            provider_state = classifier.get("provider_state")
-            if is_routing and not isinstance(provider_state, Mapping):
-                return None
-            if is_routing:
-                ledger = context.get("atomic_instruction_ledger")
-                if isinstance(ledger, Mapping):
-                    source_text = ledger.get("source_text")
-                    clauses = ledger.get("clauses")
-                    ledger_state: dict[str, Any] = {}
-                    if isinstance(source_text, str):
-                        ledger_state["source_text"] = source_text
-                    if isinstance(clauses, list):
-                        ledger_state["clauses"] = [
-                            {
-                                key: clause[key]
-                                for key in (
-                                    "clause_id",
-                                    "ordinal",
-                                    "text",
-                                    "source_span",
-                                    "semantic_relations",
-                                    "modifier_attachments",
-                                    "boolean_combination",
-                                )
-                                if key in clause
-                            }
-                            for clause in clauses
-                            if isinstance(clause, Mapping)
-                        ]
-                    if ledger_state and isinstance(provider_state, Mapping):
-                        provider_state = {
-                            **provider_state,
-                            "instruction_ledger": ledger_state,
-                        }
             return {
                 "kind": kind,
                 "allowed_values": [item for item in allowed if isinstance(item, str)],
-                "criteria": dict(criteria) if isinstance(criteria, Mapping) else {},
                 "question": str(prompt),
-                "instructions": (
+                "instructions": [prompt_prefix]
+                + (
                     [str(item) for item in instructions]
-                    if is_routing and isinstance(instructions, list)
-                    else [prompt_prefix]
-                    + (
-                        [str(item) for item in instructions]
-                        if isinstance(instructions, list)
-                        else []
-                    )
+                    if isinstance(instructions, list)
+                    else []
                 ),
-                "state": dict(provider_state)
-                if is_routing and isinstance(provider_state, Mapping)
-                else {
+                "state": {
                     "source_text": source,
                     "request": dict(classifier),
                     "context": context,
@@ -356,12 +297,12 @@ def _format_classifier_result(
 
 
 def _call_jev(
-    classifier: Mapping[str, Any], api_key: str, endpoint: str, model: str = JEV_MODEL
+    classifier: Mapping[str, Any], api_key: str, endpoint: str
 ) -> Mapping[str, Any]:
     labels = classifier["allowed_values"]
     instructions = classifier["instructions"]
     body = {
-        "model": model,
+        "model": JEV_MODEL,
         "state": classifier["state"],
         "questions": {
             "decision": {
@@ -370,9 +311,7 @@ def _call_jev(
                 + "\n\n"
                 + "\n".join(f"- {item}" for item in instructions)
                 + "\nChoose unresolved if the proposition does not support a label.",
-                "criteria": {
-                    label: classifier.get("criteria", {}).get(label) for label in labels
-                }
+                "criteria": {label: None for label in labels}
                 | {
                     "unresolved": "The proposition does not support a defensible label."
                 },
@@ -393,8 +332,4 @@ def _call_jev(
     answer = result.get("answers", {}).get("decision")
     if not isinstance(answer, Mapping):
         raise ValueError("Jev response has no decision answer")
-    return {
-        "answer": answer,
-        "model": result.get("model", model),
-        "usage": result.get("usage"),
-    }
+    return answer

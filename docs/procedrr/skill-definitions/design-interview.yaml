@@ -233,11 +233,30 @@ steps:
         - judge:
             kind: construct_one
             provider: planning
-            question: How can this clause be decomposed without losing validation dependencies?
+            question: >-
+              How can this clause be decomposed into independently verifiable
+              atoms while preserving its exact boolean structure?
             subject: atomicity_split_request.clause.text
             prompt_system: Return only the declared JSON object.
             instructions:
-              - Return 2 to 8 short statements and validation_groups, and nothing else.
+              - >-
+                Return 2 to 8 short statements, a boolean_expression, and
+                validation_groups, and nothing else.
+              - >-
+                boolean_expression is a tree over one-based statement indexes:
+                leaves are {"atom": 1}; conjunction, inclusive disjunction,
+                and explicit exclusive disjunction use {"op": "and",
+                "args": [...] }, {"op": "or", "args": [...] }, and
+                {"op": "xor", "args": [...] } respectively;
+                negation is {"op": "not", "arg": ...}; implication is
+                {"op": "implies", "args": [antecedent, consequent]}; and
+                a conditional with an else branch is {"op": "if_then_else",
+                "args": [condition, when_true, when_false]}. Every
+                statement must appear exactly once. Preserve nesting, scope,
+                negation, and whether the source uses AND, inclusive OR,
+                exclusive OR, implication, or an if/else branch. Use xor only
+                when the source says exactly one alternative may hold; ordinary
+                "or" is inclusive.
               - Split statements only when each resulting obligation can independently pass or fail.
               - Keep a trigger, condition, exception, or required outcome attached to the obligation it qualifies.
               - Group statements that must pass together in the same scenario, form an ordered sequence, represent source-authorized alternatives, or describe conditional branches.
@@ -302,6 +321,15 @@ steps:
                 obscuring its meaning, keep it with the smallest requirement
                 that governs it rather than forcing a shorter fragment.
               - >-
+                Example: "A happens and (B happens or C happens)" uses
+                {"op": "and", "args": [{"atom": 1}, {"op": "or", "args":
+                [{"atom": 2}, {"atom": 3}]}]}. Do not flatten nested logic.
+              - >-
+                Example: "If the token is missing, reject the request; otherwise
+                accept it" uses if_then_else with condition, rejection, and
+                acceptance atoms. Do not turn conditional branches into
+                alternatives.
+              - >-
                 Use the supplied parent sentence, containing paragraph, and
                 neighboring sentences only to resolve references and scope. The
                 parent sentence is authoritative; context must not add obligations.
@@ -328,7 +356,7 @@ steps:
               name: atomicity_split
               schema:
                 type: object
-                required: [statements, validation_groups]
+                required: [statements, validation_groups, boolean_expression]
                 additionalProperties: false
                 properties:
                   statements:
@@ -339,6 +367,7 @@ steps:
                   validation_groups:
                     type: array
                     items: {type: string, minLength: 1, maxLength: 100}
+                  boolean_expression: {type: object}
                   semantic_relations:
                     type: array
                     items: {type: string, minLength: 1, maxLength: 500}
@@ -348,10 +377,56 @@ steps:
             validation: {kind: json_schema}
   - operation:
       tool: internal
+      command: [prepare_atomicity_reconstructions]
+      parameters:
+        decisions: {type: reference, value: atomicity_decisions}
+        splits: {type: reference, value: atomicity_splits}
+      returns:
+        type: object
+        required: [reconstruction_requests]
+        properties:
+          reconstruction_requests: {type: array}
+      bind: atomicity_reconstruction_plan
+  - for_each:
+      snapshot:
+        {name: atomicity_reconstruction_plan.reconstruction_requests, max_items: 128}
+      max_parallel: 8
+      item_binding: atomicity_reconstruction_request
+      collect: {binding: atomicity_equivalence_decisions, mode: list, value: atomicity_equivalence}
+      body:
+        - judge:
+            kind: classify_one
+            provider: jev_required
+            question: >-
+              Are the original instruction sentence and the reconstructed sentence
+              logically equivalent?
+            subject: atomicity_reconstruction_request.text
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Compare the original instruction sentence with reconstructed_sentence in the supplied context.
+              - Judge equivalence in both directions; one sentence must not permit outcomes or cases that the other excludes.
+              - Preserve the scope and grouping of AND, OR, implication, negation, conditions, quantifiers, modality, and exceptions.
+              - Answer true only when they express the same requirement. Answer false for any lost, added, weakened, strengthened, or ambiguous meaning.
+              - Treat a missing or empty reconstructed sentence as not equivalent.
+              - This decision must come from Jev. If Jev is unavailable, the split is rejected.
+            context: [atomicity_reconstruction_request]
+            output:
+              name: atomicity_equivalence
+              schema:
+                type: object
+                required: [equivalent]
+                additionalProperties: false
+                properties:
+                  equivalent: {type: boolean}
+            validation: {kind: json_schema}
+  - operation:
+      tool: internal
       command: [apply_atomicity_splits]
       parameters:
         decisions: {type: reference, value: atomicity_decisions}
         splits: {type: reference, value: atomicity_splits}
+        equivalence_decisions:
+          {type: reference, value: atomicity_equivalence_decisions}
       returns:
         type: object
         required: [path, fingerprint, source_text, clauses]
@@ -397,6 +472,7 @@ steps:
                     - Follow the request's question, instructions, and allowed_values exactly.
                     - Treat any containing source sentence as context for this exact proposition. Do not classify sibling clauses or transfer their obligations to this proposition.
                     - When scope_relations are present, use only the relation records that reference this child clause. Preserve an unclear attachment as unresolved; do not transfer its modifier, condition, or requirement to unreferenced siblings.
+                    - When scope_relations.boolean_combination is present, use it to preserve this atom's position in the original AND/OR/NOT/implication expression; do not infer that every atom is independently required when the expression contains alternatives.
                     - Use the complete instruction ledger to distinguish a report of current behavior or a problem statement from requested target behavior. When a sibling clause explicitly specifies the correction to a described limitation, keep the limitation as context and route the corrective clause as product work; do not turn the existing defect into a requirement to preserve it.
                     - This is the root of a decision tree. Choose include for product behavior, interfaces, invariants, entity definitions, or implementation guidance; include_prohibition for explicit product prohibitions; exclude for process instructions or background with no implementation obligation; unclear when meaning or route cannot be determined without guessing. A required rejection, exception, or error for invalid input is product behavior and must route to include, not include_prohibition.
                     - Do not classify detailed product kind, polarity, strength, scope, behavior family, or validation oracle here.

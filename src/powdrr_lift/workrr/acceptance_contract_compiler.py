@@ -118,6 +118,11 @@ def prepare_behavioral_contracts(
                 for clause_id in member_ids
                 if clauses_by_id[clause_id].validation_group_id is not None
             ]
+            boolean_combinations = [
+                item.to_data()
+                for item in ledger.boolean_combinations
+                if set(item.child_clause_ids).issubset(member_set)
+            ]
             parent_texts = []
             parent_ids = dict.fromkeys(
                 clauses_by_id[item].parent_clause_id
@@ -137,6 +142,7 @@ def prepare_behavioral_contracts(
                     "parent_source_texts": parent_texts,
                     "scope_relations": scope_relations,
                     "validation_relations": validation_relations,
+                    "boolean_combinations": boolean_combinations,
                     "candidate_requirements": [
                         {
                             "local_index": index,
@@ -186,6 +192,12 @@ def prepare_behavioral_contracts(
                         (
                             "Do not infer that a relation applies to every transport, "
                             "mode, or API path."
+                        ),
+                        (
+                            "When boolean_combinations are present, preserve their "
+                            "exact grouping when designing acceptance coverage. An "
+                            "OR branch is not a requirement that every alternative "
+                            "pass in one case."
                         ),
                     ],
                 }

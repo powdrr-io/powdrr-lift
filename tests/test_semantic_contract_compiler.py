@@ -280,6 +280,33 @@ def test_split_scope_relations_reach_source_semantic_decisions() -> None:
     assert all("scope_relations" in request for request in child_requests)
 
 
+def test_boolean_combination_reaches_each_split_clause_classifier() -> None:
+    combination = {
+        "parent_clause_id": "instruction-001",
+        "child_clause_ids": ["instruction-001", "instruction-002", "instruction-003"],
+        "expression": {
+            "op": "and",
+            "args": [
+                {"atom": 1},
+                {"op": "or", "args": [{"atom": 2}, {"atom": 3}]},
+            ],
+        },
+        "reconstructed_sentence": "A happens and either B happens or C happens.",
+        "current_child_id": "instruction-002",
+        "current_child_index": 2,
+    }
+    clause = {
+        **_clause("B happens."),
+        "boolean_combination": combination,
+    }
+
+    request = prepare_source_semantic_decisions(clause, created_at=NOW)[
+        "pending_specs"
+    ][0]
+
+    assert request["scope_relations"]["boolean_combination"] == combination
+
+
 def test_graphql_field_overwrite_classifier_has_no_list_navigation_attachment() -> None:
     parent = (
         "Support nested paths navigating through lists by index, null values, "

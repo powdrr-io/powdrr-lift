@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import Any
 
 import pytest
@@ -123,6 +124,116 @@ def test_jev_maps_boolean_atomicity_classifier(monkeypatch: Any) -> None:
 
     assert result == {"multiple": True}
     assert fallback.calls == 0
+
+
+def test_fail_closed_boolean_decision_does_not_use_planning_fallback(
+    monkeypatch: Any,
+) -> None:
+    fallback = _Fallback()
+    monkeypatch.delenv("TYPESAFEAI_API_KEY", raising=False)
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.delenv("SYSTEM_ONE_API_KEY", raising=False)
+
+    client = JevSemanticClassifierClient(fallback, fail_closed=True)
+    result = client.complete_json(
+        [
+            {"role": "system", "content": "Return JSON."},
+            {
+                "role": "user",
+                "content": "Question:\nAre these sentences equivalent?\n\nContext:\n{}",
+            },
+        ],
+        response_schema={
+            "type": "object",
+            "required": ["equivalent"],
+            "properties": {"equivalent": {"type": "boolean"}},
+        },
+    )
+
+    assert result == {"equivalent": False}
+    assert fallback.calls == 0
+
+
+def test_fail_closed_jev_provider_error_rejects_without_planning_fallback(
+    monkeypatch: Any,
+) -> None:
+    fallback = _Fallback()
+
+    def fail(*_: Any) -> Any:
+        raise OSError("Jev unavailable")
+
+    monkeypatch.setattr(jev_classifier, "_call_jev", fail)
+    messages = [
+        {"role": "system", "content": "Return JSON."},
+        {
+            "role": "user",
+            "content": (
+                "Question:\nAre these sentences equivalent?\n\nContext:\n"
+                '{"request": {"text": "A.", "reconstructed_sentence": "B."}}'
+            ),
+        },
+    ]
+
+    result = JevSemanticClassifierClient(
+        fallback, api_key="key", fail_closed=True
+    ).complete_json(
+        messages,
+        response_schema={
+            "type": "object",
+            "required": ["equivalent"],
+            "properties": {"equivalent": {"type": "boolean"}},
+        },
+    )
+
+    assert result == {"equivalent": False}
+    assert fallback.calls == 0
+
+
+def test_jev_receives_original_and_reconstructed_sentences_for_equivalence(
+    monkeypatch: Any,
+) -> None:
+    fallback = _Fallback()
+    captured: dict[str, Any] = {}
+
+    def classify(request: Mapping[str, Any], *_: Any) -> dict[str, str]:
+        captured.update(request)
+        return {"choice": "true"}
+
+    monkeypatch.setattr(jev_classifier, "_call_jev", classify)
+    original = "The request succeeds if A and (B or C)."
+    reconstructed = "The request succeeds if A and either B or C."
+    messages = [
+        {"role": "system", "content": "Return JSON."},
+        {
+            "role": "user",
+            "content": (
+                "Question:\nAre these sentences equivalent?"
+                "\n\nContext:\n"
+                + json.dumps(
+                    {
+                        "atomicity_reconstruction_request": {
+                            "text": original,
+                            "reconstructed_sentence": reconstructed,
+                            "valid": True,
+                        }
+                    }
+                )
+            ),
+        },
+    ]
+
+    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+        messages,
+        response_schema={
+            "type": "object",
+            "required": ["equivalent"],
+            "properties": {"equivalent": {"type": "boolean"}},
+        },
+    )
+
+    assert result == {"equivalent": True}
+    assert captured["state"]["source_text"] == original
+    assert reconstructed in captured["state"]["context"]
 
 
 def test_jev_handles_field_entailment_classifiers(monkeypatch: Any) -> None:

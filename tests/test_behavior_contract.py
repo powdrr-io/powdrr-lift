@@ -23,7 +23,6 @@ from powdrr_lift.workrr.coding_agent_validation import (
 def _scenario() -> dict[str, Any]:
     return {
         "scenario_id": "nested-error-continues",
-        "criterion_quality": {"criterion_status": "checkable"},
         "subject": "record processor",
         "given": {"result": "nested error with source location"},
         "when": "process this record followed by a valid record",
@@ -69,62 +68,6 @@ def test_behavior_scenario_is_rendered_as_a_concrete_check() -> None:
     assert restored.render() == rendered
 
 
-def test_legacy_scenario_defaults_to_unassessed() -> None:
-    scenario = _scenario()
-    scenario.pop("criterion_quality")
-
-    compiled = compile_behavior_scenarios((scenario,))[0]
-    rendered = compile_implementation_packet(
-        objective="process nested results",
-        obligations=("preserve nested error details",),
-        required_tests=({"description": "errors and continuation"},),
-        allowed_paths=("src/", "tests/"),
-        validation_profiles=("pytest",),
-        behavior_scenarios=(scenario,),
-    ).render()
-
-    assert compiled.criterion_status == "unassessed"
-    assert "not yet assessed as acceptance checks" in rendered
-    assert "candidate outcome errors: preserved with location" in rendered
-
-
-def test_source_only_requirement_is_not_rendered_as_an_acceptance_check() -> None:
-    scenario = _scenario()
-    scenario["criterion_quality"] = {
-        "requirement_status": "preserved",
-        "criterion_status": "source_only",
-        "failure_stage": "scenario_faithfulness",
-        "failure_reason": "generated check claims are unsupported",
-        "repair_attempts": 0,
-    }
-    scenario["then"] = "Deferred fields merge at the supplied path."
-
-    rendered = compile_implementation_packet(
-        objective="merge deferred GraphQL fields",
-        obligations=("Deferred fields merge at the supplied path.",),
-        required_tests=({"description": "deferred field merge"},),
-        allowed_paths=("src/", "tests/"),
-        validation_profiles=("pytest",),
-        behavior_scenarios=(scenario,),
-    ).render()
-
-    assert "Source requirements without a derived acceptance check:" in rendered
-    assert (
-        "[nested-error-continues] Deferred fields merge at the supplied path."
-        in rendered
-    )
-    assert "Given" not in rendered
-    assert "No behavior scenario has yet been assessed" in rendered
-
-
-def test_unknown_criterion_quality_status_is_rejected() -> None:
-    scenario = _scenario()
-    scenario["criterion_quality"] = {"criterion_status": "resolved"}
-
-    with pytest.raises(BehaviorContractError, match="criterion_status is invalid"):
-        compile_behavior_scenarios((scenario,))
-
-
 def test_source_semantic_result_remains_distinct_from_its_default() -> None:
     scenario = _scenario()
     scenario["source_dimensions"] = {"copy_depth": "unspecified"}
@@ -162,13 +105,6 @@ def test_semantic_dimension_applicability_and_unresolved_state_are_rendered() ->
     }
     scenario["semantic_dimension_applicability"] = {"copy_depth": "not_applicable"}
     scenario["unresolved_dimensions"] = ["object_identity"]
-    scenario["criterion_quality"] = {
-        "requirement_status": "preserved",
-        "criterion_status": "unresolved",
-        "failure_stage": "scenario_resolution",
-        "failure_reason": "object identity is unspecified",
-        "repair_attempts": 0,
-    }
 
     compiled = compile_behavior_scenarios((scenario,))[0]
     packet = compile_implementation_packet(
@@ -226,59 +162,6 @@ def test_worker_prompt_preserves_joint_validation_groups() -> None:
     rendered = packet.render()
     assert "all checks must pass in the same scenario" in rendered
     assert "status-200, contains-account-id" in rendered
-
-
-def test_worker_prompt_keeps_conditional_branches_jointly_required() -> None:
-    shallow = _scenario()
-    shallow["scenario_id"] = "shallow-history"
-    shallow["subject"] = "shallow history"
-    shallow["then"] = "restores direct children and their saved data"
-    shallow["validation_group_id"] = "history-depth"
-    shallow["validation_relation"] = "conditional"
-    deep = _scenario()
-    deep["scenario_id"] = "deep-history"
-    deep["subject"] = "deep history"
-    deep["then"] = "restores all descendants and their saved data"
-    deep["validation_group_id"] = "history-depth"
-    deep["validation_relation"] = "conditional"
-
-    rendered = compile_implementation_packet(
-        objective="Restore state data with history.",
-        obligations=(
-            "Shallow history restores direct children.",
-            "Deep history restores all descendants.",
-        ),
-        required_tests=({"description": "Test both history modes."},),
-        allowed_paths=("src/", "tests/"),
-        validation_profiles=("pytest",),
-        behavior_scenarios=(shallow, deep),
-    ).render()
-
-    assert (
-        "each branch is required when its stated condition applies; one branch "
-        "does not substitute for another: shallow-history, deep-history."
-    ) in rendered
-
-
-def test_worker_prompt_keeps_contract_context_for_unassessed_scenarios() -> None:
-    scenario = _scenario()
-    scenario["related_requirements"] = [
-        "Related requirement instruction-002: payload data accumulates.",
-        "Context only; this is not an implementation requirement: earlier behavior.",
-    ]
-    packet = compile_implementation_packet(
-        objective="Process delivery payloads.",
-        obligations=("Process delivery payloads.",),
-        required_tests=({"description": "process delivery payloads"},),
-        allowed_paths=("src/", "tests/"),
-        validation_profiles=("pytest",),
-        behavior_scenarios=(scenario,),
-    )
-
-    rendered = packet.render()
-
-    assert "Related requirement instruction-002" in rendered
-    assert "Context only; this is not an implementation requirement" in rendered
 
 
 def test_unclear_routes_continue_with_conservative_headless_assumption() -> None:

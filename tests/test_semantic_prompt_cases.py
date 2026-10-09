@@ -8,7 +8,6 @@ import pytest
 
 from powdrr_lift.workrr.semantic_prompt_cases import (
     SemanticPromptCaseError,
-    audit_prompt_claim_presence,
     load_semantic_prompt_cases,
     validate_semantic_prompt_cases,
 )
@@ -400,87 +399,3 @@ def test_jsonl_reports_malformed_line_number(tmp_path: Path) -> None:
 
     with pytest.raises(SemanticPromptCaseError, match="line 2"):
         load_semantic_prompt_cases(cases_path)
-
-
-def test_prompt_claim_audit_detects_contradiction_anywhere_in_full_prompt() -> None:
-    case = {
-        "case_id": "accumulation-001",
-        "required_prompt_claims": ["Keep values from earlier payloads."],
-        "forbidden_prompt_claims": ["Only the latest payload is retained."],
-    }
-
-    clean = audit_prompt_claim_presence(
-        case,
-        "The output keeps values from earlier payloads. "
-        "It does not discard prior values.",
-    )
-    contradictory = audit_prompt_claim_presence(
-        case,
-        "Keep values from earlier payloads. Elsewhere, only the latest payload "
-        "is retained.",
-    )
-
-    assert clean["passed"] is False
-    assert clean["missing_required_claims"] == ["Keep values from earlier payloads."]
-    assert contradictory["passed"] is False
-    assert contradictory["missing_required_claims"] == []
-    assert contradictory["present_forbidden_claims"] == [
-        "Only the latest payload is retained."
-    ]
-    assert contradictory["check"] == "normalized_phrase_presence_only"
-
-
-@pytest.mark.parametrize(
-    ("required", "forbidden"),
-    (
-        ("Keep earlier values in the output.", "Use only the newest payload output."),
-        (
-            "Continue processing the remaining payloads.",
-            "Stop after the first payload.",
-        ),
-        ("Place an item at its specified index.", "Always append the item to the end."),
-        (
-            "Use metadata from the current payload.",
-            "Accumulate metadata from every payload.",
-        ),
-        ("Preserve the condition for each mode.", "Apply only the default mode."),
-        ("Return a fresh mapping.", "Return the same mapping instance."),
-        (
-            "Keep nested values independent after deep copy.",
-            "A shallow copy is sufficient.",
-        ),
-        ("Support an omitted optional argument.", "Treat omission as explicit null."),
-        (
-            "Reject the explicitly unsupported combination.",
-            "Silently use an undocumented default.",
-        ),
-    ),
-)
-def test_prompt_claim_audit_detects_critical_criterion_mutations(
-    required: str, forbidden: str
-) -> None:
-    case = {
-        "case_id": "criterion-mutation",
-        "required_prompt_claims": [required],
-        "forbidden_prompt_claims": [forbidden],
-    }
-    prompt_with_mutation = f"{required} {forbidden}"
-
-    result = audit_prompt_claim_presence(case, prompt_with_mutation)
-
-    assert result["missing_required_claims"] == []
-    assert result["present_forbidden_claims"] == [forbidden]
-    assert result["passed"] is False
-
-
-def test_prompt_claim_audit_catches_forbidden_mutation_for_every_corpus_case() -> None:
-    cases = load_semantic_prompt_cases(CASE_PATH)
-
-    for case in cases:
-        valid_prompt = "\n".join(case["required_prompt_claims"])
-        assert audit_prompt_claim_presence(case, valid_prompt)["passed"] is True
-
-        mutated_prompt = valid_prompt + "\n" + case["forbidden_prompt_claims"][0]
-        result = audit_prompt_claim_presence(case, mutated_prompt)
-        assert result["passed"] is False, case["case_id"]
-        assert case["forbidden_prompt_claims"][0] in result["present_forbidden_claims"]

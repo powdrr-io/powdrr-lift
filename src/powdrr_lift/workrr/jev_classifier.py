@@ -64,7 +64,7 @@ class JevSemanticClassifierClient:
                 request_id,
                 endpoint_host,
             )
-            return self._fallback_or_false(messages, response_schema)
+            return _fallback(self._fallback, messages, response_schema)
         if request_data is None:
             LOGGER.warning(
                 "JEV_CALL_SKIPPED "
@@ -72,7 +72,7 @@ class JevSemanticClassifierClient:
                 request_id,
                 endpoint_host,
             )
-            return self._fallback_or_false(messages, response_schema)
+            return _fallback(self._fallback, messages, response_schema)
 
         started_at = time.monotonic()
         LOGGER.warning(
@@ -199,7 +199,10 @@ def _classifier_request(
                 return None
             is_routing = kind == "routing"
             provider_state = classifier.get("provider_state")
-            if is_routing and not isinstance(provider_state, Mapping):
+            routing_state = (
+                dict(provider_state) if isinstance(provider_state, Mapping) else None
+            )
+            if is_routing and routing_state is None:
                 return None
             if is_routing:
                 ledger = context.get("atomic_instruction_ledger")
@@ -227,11 +230,9 @@ def _classifier_request(
                             for clause in clauses
                             if isinstance(clause, Mapping)
                         ]
-                    if ledger_state and isinstance(provider_state, Mapping):
-                        provider_state = {
-                            **provider_state,
-                            "instruction_ledger": ledger_state,
-                        }
+                    if ledger_state:
+                        assert routing_state is not None
+                        routing_state["instruction_ledger"] = ledger_state
             return {
                 "kind": kind,
                 "allowed_values": [item for item in allowed if isinstance(item, str)],
@@ -247,8 +248,8 @@ def _classifier_request(
                         else []
                     )
                 ),
-                "state": dict(provider_state)
-                if is_routing and isinstance(provider_state, Mapping)
+                "state": routing_state
+                if is_routing and routing_state is not None
                 else {
                     "source_text": source,
                     "request": dict(classifier),

@@ -9,12 +9,6 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
-from powdrr_lift.core.boolean_expression import (
-    BooleanExpressionError,
-    render_boolean_sentence,
-    validate_boolean_expression,
-)
-
 INSTRUCTION_LEDGER_SCHEMA_VERSION = "instruction-ledger-v1"
 MAX_ATOMIC_SPLIT_CHILDREN = 8
 
@@ -65,8 +59,6 @@ class InstructionClause:
     validation_group_id: str | None = None
     validation_relation: str = "independent"
     derivation: str = "deterministic-sentence-v1"
-    semantic_relations: tuple[ScopeRelation, ...] = ()
-    modifier_attachments: tuple[ScopeRelation, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.clause_id.strip():
@@ -114,85 +106,9 @@ class InstructionClause:
         if self.validation_group_id is not None:
             data["validation_group_id"] = self.validation_group_id
             data["validation_relation"] = self.validation_relation
-        if self.semantic_relations:
-            data["semantic_relations"] = [
-                item.to_data() for item in self.semantic_relations
-            ]
-        if self.modifier_attachments:
-            data["modifier_attachments"] = [
-                item.to_data() for item in self.modifier_attachments
-            ]
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
         return data
-
-
-@dataclass(frozen=True, slots=True)
-class ScopeRelation:
-    """A source-evidenced relation among compiler-owned split children."""
-
-    relation_type: str
-    label: str
-    child_clause_ids: tuple[str, ...]
-    evidence: str
-
-    def to_data(self) -> dict[str, Any]:
-        return {
-            "relation_type": self.relation_type,
-            "label": self.label,
-            "child_clause_ids": list(self.child_clause_ids),
-            "evidence": self.evidence,
-        }
-
-    @classmethod
-    def from_data(cls, raw: Any) -> ScopeRelation:
-        if not isinstance(raw, dict) or set(raw) != {
-            "relation_type",
-            "label",
-            "child_clause_ids",
-            "evidence",
-        }:
-            raise InstructionLedgerError("scope relation is malformed")
-        relation_type = raw["relation_type"]
-        label = raw["label"]
-        ids = raw["child_clause_ids"]
-        evidence = raw["evidence"]
-        allowed = {
-            "list_relation": {
-                "independent_required",
-                "shared_predicate",
-                "allowed_alternatives",
-                "ordered_required",
-                "unclear",
-            },
-            "reference_resolution": {"resolved", "ambiguous", "unresolved"},
-            "modifier_attachment": {
-                "one_child",
-                "specified_children",
-                "entire_group",
-                "unclear",
-            },
-            "condition_attachment": {
-                "one_child",
-                "specified_children",
-                "entire_group",
-                "unclear",
-            },
-        }
-        if (
-            not isinstance(relation_type, str)
-            or relation_type not in allowed
-            or not isinstance(label, str)
-            or label not in allowed[relation_type]
-            or not isinstance(ids, list)
-            or not ids
-            or not all(isinstance(item, str) and item for item in ids)
-            or len(set(ids)) != len(ids)
-            or not isinstance(evidence, str)
-            or not evidence.strip()
-        ):
-            raise InstructionLedgerError("scope relation is invalid")
-        return cls(relation_type, label, tuple(ids), evidence.strip())
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,61 +119,14 @@ class AtomicitySplitDiagnostic:
     reason_code: str
     child_indexes: tuple[int, ...]
     source_span: tuple[int, int]
-    details: str | None = None
 
     def to_data(self) -> dict[str, Any]:
-        data = {
+        return {
             "source_clause_id": self.source_clause_id,
             "reason_code": self.reason_code,
             "child_indexes": list(self.child_indexes),
             "source_span": {"start": self.source_span[0], "end": self.source_span[1]},
         }
-        if self.details is not None:
-            data["details"] = self.details
-        return data
-
-
-@dataclass(frozen=True, slots=True)
-class BooleanCombination:
-    """A validated logical expression and its reconstruction for one split."""
-
-    parent_clause_id: str
-    child_clause_ids: tuple[str, ...]
-    expression: dict[str, Any]
-    reconstructed_sentence: str
-
-    def to_data(self) -> dict[str, Any]:
-        return {
-            "parent_clause_id": self.parent_clause_id,
-            "child_clause_ids": list(self.child_clause_ids),
-            "expression": self.expression,
-            "reconstructed_sentence": self.reconstructed_sentence,
-        }
-
-    @classmethod
-    def from_data(cls, raw: Any) -> BooleanCombination:
-        if not isinstance(raw, dict) or set(raw) != {
-            "parent_clause_id",
-            "child_clause_ids",
-            "expression",
-            "reconstructed_sentence",
-        }:
-            raise InstructionLedgerError("boolean combination is malformed")
-        parent_id = _required_string(raw, "parent_clause_id")
-        child_ids = raw["child_clause_ids"]
-        sentence = _required_string(raw, "reconstructed_sentence")
-        if (
-            not isinstance(child_ids, list)
-            or len(child_ids) < 2
-            or not all(isinstance(item, str) and item for item in child_ids)
-            or len(set(child_ids)) != len(child_ids)
-        ):
-            raise InstructionLedgerError("boolean combination children are invalid")
-        try:
-            expression = validate_boolean_expression(raw["expression"], len(child_ids))
-        except BooleanExpressionError as error:
-            raise InstructionLedgerError(str(error)) from error
-        return cls(parent_id, tuple(child_ids), expression, sentence)
 
 
 @dataclass(frozen=True, slots=True)
@@ -265,37 +134,20 @@ class InstructionLedger:
     source: InstructionSource
     clauses: tuple[InstructionClause, ...]
     split_diagnostics: tuple[AtomicitySplitDiagnostic, ...] = ()
-    boolean_combinations: tuple[BooleanCombination, ...] = ()
 
     @property
     def fingerprint(self) -> str:
         return _fingerprint(self.to_data(include_fingerprint=False))
 
     def to_data(self, *, include_fingerprint: bool = True) -> dict[str, Any]:
-        clause_data = {item.clause_id: item.to_data() for item in self.clauses}
-        for combination in self.boolean_combinations:
-            combination_data = combination.to_data()
-            for atom_index, child_id in enumerate(
-                combination.child_clause_ids, start=1
-            ):
-                child = clause_data[child_id]
-                child["boolean_combination"] = {
-                    **combination_data,
-                    "current_child_id": child_id,
-                    "current_child_index": atom_index,
-                }
         data: dict[str, Any] = {
             "schema_version": INSTRUCTION_LEDGER_SCHEMA_VERSION,
             "source": self.source.to_data(),
-            "clauses": [clause_data[item.clause_id] for item in self.clauses],
+            "clauses": [item.to_data() for item in self.clauses],
         }
         if self.split_diagnostics:
             data["split_diagnostics"] = [
                 item.to_data() for item in self.split_diagnostics
-            ]
-        if self.boolean_combinations:
-            data["boolean_combinations"] = [
-                item.to_data() for item in self.boolean_combinations
             ]
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
@@ -338,14 +190,6 @@ class InstructionLedger:
                         item.get("validation_relation", "independent")
                     ),
                     derivation=_required_string(item, "derivation"),
-                    semantic_relations=tuple(
-                        ScopeRelation.from_data(value)
-                        for value in item.get("semantic_relations", [])
-                    ),
-                    modifier_attachments=tuple(
-                        ScopeRelation.from_data(value)
-                        for value in item.get("modifier_attachments", [])
-                    ),
                 )
             )
         raw_diagnostics = raw.get("split_diagnostics", [])
@@ -376,24 +220,13 @@ class InstructionLedger:
                         _required_int(span, "start"),
                         _required_int(span, "end"),
                     ),
-                    details=(
-                        item.get("details")
-                        if isinstance(item.get("details"), str)
-                        else None
-                    ),
                 )
             )
         ledger = cls(
             source=source,
             clauses=tuple(clauses),
             split_diagnostics=tuple(diagnostics),
-            boolean_combinations=tuple(
-                BooleanCombination.from_data(item)
-                for item in raw.get("boolean_combinations", [])
-            ),
         )
-        if ledger.boolean_combinations:
-            ledger.validate()
         if raw.get("fingerprint") != ledger.fingerprint:
             raise InstructionLedgerError("instruction ledger fingerprint is stale")
         ledger.validate()
@@ -422,88 +255,19 @@ class InstructionLedger:
                 raise InstructionLedgerError(
                     "instruction clause span exceeds source text"
                 )
-            for relation in (*clause.semantic_relations, *clause.modifier_attachments):
-                if any(
-                    child_id not in actual_ids for child_id in relation.child_clause_ids
-                ):
-                    raise InstructionLedgerError(
-                        "scope relation references an unknown child clause"
-                    )
-                evidence = " ".join(relation.evidence.casefold().split())
-                parent_text = " ".join(self.source.text[start:end].casefold().split())
-                if evidence not in parent_text:
-                    raise InstructionLedgerError(
-                        "scope relation evidence is not present in its source clause"
-                    )
         for diagnostic in self.split_diagnostics:
             start, end = diagnostic.source_span
             if (
                 not diagnostic.source_clause_id.strip()
-                or diagnostic.reason_code
-                not in {
-                    "duplicate_child",
-                    "empty_child",
-                    "invalid_scope_relation",
-                    "invalid_boolean_expression",
-                    "reconstruction_not_equivalent",
-                }
+                or diagnostic.reason_code not in {"duplicate_child", "empty_child"}
                 or len(diagnostic.child_indexes)
-                < (
-                    0
-                    if diagnostic.reason_code
-                    in {
-                        "invalid_scope_relation",
-                        "invalid_boolean_expression",
-                        "reconstruction_not_equivalent",
-                    }
-                    else 1
-                    if diagnostic.reason_code == "empty_child"
-                    else 2
-                )
+                < (1 if diagnostic.reason_code == "empty_child" else 2)
                 or any(index < 1 for index in diagnostic.child_indexes)
                 or start < 0
                 or end <= start
                 or end > len(self.source.text)
             ):
                 raise InstructionLedgerError("instruction split diagnostic is invalid")
-        combination_parents: set[str] = set()
-        combination_children: set[str] = set()
-        for combination in self.boolean_combinations:
-            if (
-                combination.parent_clause_id in combination_parents
-                or combination_children.intersection(combination.child_clause_ids)
-            ):
-                raise InstructionLedgerError(
-                    "boolean combinations must have unique parents and children"
-                )
-            combination_parents.add(combination.parent_clause_id)
-            combination_children.update(combination.child_clause_ids)
-            children = [
-                item
-                for item in self.clauses
-                if item.clause_id in combination.child_clause_ids
-            ]
-            if len(children) != len(combination.child_clause_ids) or any(
-                item.parent_clause_id != f"candidate:{combination.parent_clause_id}"
-                for item in children
-            ):
-                raise InstructionLedgerError(
-                    "boolean combination references invalid split children"
-                )
-            statements = [
-                next(item.text for item in children if item.clause_id == child_id)
-                for child_id in combination.child_clause_ids
-            ]
-            try:
-                _, reconstructed = render_boolean_sentence(
-                    statements, combination.expression
-                )
-            except BooleanExpressionError as error:
-                raise InstructionLedgerError(str(error)) from error
-            if reconstructed != combination.reconstructed_sentence:
-                raise InstructionLedgerError(
-                    "boolean combination reconstruction is stale"
-                )
 
 
 @dataclass(frozen=True, slots=True)
@@ -514,16 +278,9 @@ class AtomicityDecision:
 
     @classmethod
     def from_data(cls, raw: dict[str, Any]) -> AtomicityDecision:
-        if set(raw) - {
-            "multiple",
-            "statements",
-            "validation_groups",
-            "boolean_expression",
-            "equivalent",
-            "reconstructed_sentence",
-            "semantic_relations",
-            "modifier_attachments",
-        } or not isinstance(raw.get("multiple"), bool):
+        if set(raw) - {"multiple", "statements", "validation_groups"} or not isinstance(
+            raw.get("multiple"), bool
+        ):
             raise InstructionLedgerError(
                 "atomicity response must contain boolean multiple and optional "
                 "statements"
@@ -561,7 +318,6 @@ def apply_atomicity_decisions(
     """Apply bounded split results while keeping all IDs compiler-owned."""
     output: list[InstructionClause] = []
     diagnostics = list(ledger.split_diagnostics)
-    boolean_combinations: list[BooleanCombination] = []
     for clause in ledger.clauses:
         raw = decisions.get(clause.clause_id, {"multiple": False})
         decision = AtomicityDecision.from_data(raw)
@@ -590,93 +346,9 @@ def apply_atomicity_decisions(
                 )
             )
             continue
-        if raw.get("equivalent") is False:
-            diagnostics.append(
-                AtomicitySplitDiagnostic(
-                    source_clause_id=clause.clause_id,
-                    reason_code="reconstruction_not_equivalent",
-                    child_indexes=(),
-                    source_span=clause.source_span,
-                )
-            )
-            output.append(clause)
-            continue
-        expression_raw = raw.get("boolean_expression")
-        if expression_raw is None:
-            # Compatibility for direct callers of the pre-expression API. The
-            # design-interview contract requires an explicit expression before
-            # this core function is reached by the live workflow.
-            expression_raw = {
-                "op": "and",
-                "args": [{"atom": index} for index in range(1, len(statements) + 1)],
-            }
-        try:
-            expression, reconstructed = render_boolean_sentence(
-                statements, expression_raw
-            )
-        except BooleanExpressionError as error:
-            output.append(clause)
-            diagnostics.append(
-                AtomicitySplitDiagnostic(
-                    source_clause_id=clause.clause_id,
-                    reason_code="invalid_boolean_expression",
-                    child_indexes=(),
-                    source_span=clause.source_span,
-                    details=str(error),
-                )
-            )
-            continue
-        equivalent = raw.get("equivalent", True)
-        reconstructed_sentence = raw.get("reconstructed_sentence", reconstructed)
-        if equivalent is not True or reconstructed_sentence != reconstructed:
-            output.append(clause)
-            diagnostics.append(
-                AtomicitySplitDiagnostic(
-                    source_clause_id=clause.clause_id,
-                    reason_code="reconstruction_not_equivalent",
-                    child_indexes=(),
-                    source_span=clause.source_span,
-                )
-            )
-            continue
         validation_groups = _normalize_validation_groups(
             raw.get("validation_groups", []), len(statements)
         )
-        try:
-            relation_sets = (
-                _normalize_scope_relations(
-                    raw.get("semantic_relations", []),
-                    {"list_relation", "reference_resolution"},
-                    len(statements),
-                    clause,
-                ),
-                _normalize_scope_relations(
-                    raw.get("modifier_attachments", []),
-                    {"modifier_attachment", "condition_attachment"},
-                    len(statements),
-                    clause,
-                ),
-            )
-        except InstructionLedgerError as error:
-            output.append(clause)
-            diagnostics.append(
-                AtomicitySplitDiagnostic(
-                    source_clause_id=clause.clause_id,
-                    reason_code="invalid_scope_relation",
-                    child_indexes=(),
-                    source_span=clause.source_span,
-                    details=str(error),
-                )
-            )
-            continue
-        next_ordinal = len(output)
-        semantic_relations = _materialize_scope_relations(
-            relation_sets[0], clause.clause_id, next_ordinal
-        )
-        modifier_attachments = _materialize_scope_relations(
-            relation_sets[1], clause.clause_id, next_ordinal
-        )
-        child_clause_ids: list[str] = []
         for statement in statements:
             statement_ordinal = (
                 len(
@@ -694,11 +366,9 @@ def apply_atomicity_decisions(
                 len(statements),
                 clause.clause_id,
             )
-            child_clause_id = f"pending-{len(output) + 1}"
-            child_clause_ids.append(child_clause_id)
             output.append(
                 InstructionClause(
-                    clause_id=child_clause_id,
+                    clause_id=f"pending-{len(output) + 1}",
                     source_id=clause.source_id,
                     ordinal=len(output) + 1,
                     text=statement.strip(),
@@ -707,18 +377,8 @@ def apply_atomicity_decisions(
                     validation_group_id=group_id,
                     validation_relation=relation,
                     derivation="bounded-atomicity-v1",
-                    semantic_relations=semantic_relations,
-                    modifier_attachments=modifier_attachments,
                 )
             )
-        boolean_combinations.append(
-            BooleanCombination(
-                parent_clause_id=clause.clause_id,
-                child_clause_ids=tuple(child_clause_ids),
-                expression=expression,
-                reconstructed_sentence=reconstructed,
-            )
-        )
     renumbered = tuple(
         InstructionClause(
             clause_id=f"instruction-{index:03d}",
@@ -730,8 +390,6 @@ def apply_atomicity_decisions(
             validation_group_id=clause.validation_group_id,
             validation_relation=clause.validation_relation,
             derivation=clause.derivation,
-            semantic_relations=clause.semantic_relations,
-            modifier_attachments=clause.modifier_attachments,
         )
         for index, clause in enumerate(output, start=1)
     )
@@ -739,18 +397,6 @@ def apply_atomicity_decisions(
         source=ledger.source,
         clauses=renumbered,
         split_diagnostics=tuple(diagnostics),
-        boolean_combinations=tuple(
-            BooleanCombination(
-                parent_clause_id=item.parent_clause_id,
-                child_clause_ids=tuple(
-                    f"instruction-{int(child.removeprefix('pending-')):03d}"
-                    for child in item.child_clause_ids
-                ),
-                expression=item.expression,
-                reconstructed_sentence=item.reconstructed_sentence,
-            )
-            for item in boolean_combinations
-        ),
     )
     result.validate()
     return result
@@ -790,110 +436,6 @@ def _normalize_split_statement(statement: str) -> str:
         flags=re.DOTALL,
     )
     return " ".join(normalized.split()).casefold()
-
-
-def _normalize_scope_relations(
-    raw_relations: Any,
-    allowed_types: set[str],
-    child_count: int,
-    parent: InstructionClause,
-) -> list[tuple[str, str, tuple[int, ...], str]]:
-    if raw_relations is None:
-        return []
-    if not isinstance(raw_relations, list):
-        raise InstructionLedgerError("scope relations must be a list")
-    normalized: list[tuple[str, str, tuple[int, ...], str]] = []
-    source_text = parent.text.casefold()
-    for raw in raw_relations:
-        if isinstance(raw, str):
-            try:
-                parsed_type, parsed_label, children, parsed_evidence = raw.split("|", 3)
-                raw = {
-                    "relation_type": parsed_type,
-                    "label": parsed_label,
-                    "child_indexes": [int(value) for value in children.split(",")],
-                    "evidence": parsed_evidence,
-                }
-            except (TypeError, ValueError) as error:
-                raise InstructionLedgerError(
-                    "scope relation string is malformed"
-                ) from error
-        if not isinstance(raw, dict) or set(raw) != {
-            "relation_type",
-            "label",
-            "child_indexes",
-            "evidence",
-        }:
-            raise InstructionLedgerError("scope relation response is malformed")
-        kind = raw.get("relation_type")
-        label = raw.get("label")
-        indexes = raw.get("child_indexes")
-        evidence = raw.get("evidence")
-        if (
-            not isinstance(kind, str)
-            or kind not in allowed_types
-            or not isinstance(indexes, list)
-            or not indexes
-            or not all(
-                isinstance(index, int)
-                and not isinstance(index, bool)
-                and 1 <= index <= child_count
-                for index in indexes
-            )
-            or len(set(indexes)) != len(indexes)
-            or not isinstance(evidence, str)
-            or not evidence.strip()
-            or " ".join(evidence.casefold().split())
-            not in " ".join(source_text.split())
-        ):
-            raise InstructionLedgerError(
-                "scope relation has invalid child references or source evidence"
-            )
-        relation = ScopeRelation.from_data(
-            {
-                "relation_type": kind,
-                "label": label,
-                "child_clause_ids": [f"child-{index}" for index in indexes],
-                "evidence": evidence,
-            }
-        )
-        if relation.relation_type.endswith("attachment"):
-            expected_len = {
-                "one_child": 1,
-                "specified_children": None,
-                "entire_group": child_count,
-                "unclear": None,
-            }[relation.label]
-            if expected_len is not None and len(indexes) != expected_len:
-                raise InstructionLedgerError(
-                    f"{relation.label} attachment has the wrong child scope"
-                )
-            if relation.label == "entire_group" and set(indexes) != set(
-                range(1, child_count + 1)
-            ):
-                raise InstructionLedgerError(
-                    "entire_group attachment must reference every child"
-                )
-        normalized.append((kind, relation.label, tuple(indexes), relation.evidence))
-    return normalized
-
-
-def _materialize_scope_relations(
-    relations: list[tuple[str, str, tuple[int, ...], str]],
-    parent_clause_id: str,
-    preceding_children: int,
-) -> tuple[ScopeRelation, ...]:
-    return tuple(
-        ScopeRelation(
-            relation_type=kind,
-            label=label,
-            child_clause_ids=tuple(
-                f"instruction-{preceding_children + index:03d}" for index in indexes
-            ),
-            evidence=evidence,
-        )
-        for kind, label, indexes, evidence in relations
-    )
 
 
 def _normalize_validation_groups(

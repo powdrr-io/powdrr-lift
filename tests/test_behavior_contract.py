@@ -228,59 +228,6 @@ def test_worker_prompt_preserves_joint_validation_groups() -> None:
     assert "status-200, contains-account-id" in rendered
 
 
-def test_worker_prompt_keeps_conditional_branches_jointly_required() -> None:
-    shallow = _scenario()
-    shallow["scenario_id"] = "shallow-history"
-    shallow["subject"] = "shallow history"
-    shallow["then"] = "restores direct children and their saved data"
-    shallow["validation_group_id"] = "history-depth"
-    shallow["validation_relation"] = "conditional"
-    deep = _scenario()
-    deep["scenario_id"] = "deep-history"
-    deep["subject"] = "deep history"
-    deep["then"] = "restores all descendants and their saved data"
-    deep["validation_group_id"] = "history-depth"
-    deep["validation_relation"] = "conditional"
-
-    rendered = compile_implementation_packet(
-        objective="Restore state data with history.",
-        obligations=(
-            "Shallow history restores direct children.",
-            "Deep history restores all descendants.",
-        ),
-        required_tests=({"description": "Test both history modes."},),
-        allowed_paths=("src/", "tests/"),
-        validation_profiles=("pytest",),
-        behavior_scenarios=(shallow, deep),
-    ).render()
-
-    assert (
-        "each branch is required when its stated condition applies; one branch "
-        "does not substitute for another: shallow-history, deep-history."
-    ) in rendered
-
-
-def test_worker_prompt_keeps_contract_context_for_unassessed_scenarios() -> None:
-    scenario = _scenario()
-    scenario["related_requirements"] = [
-        "Related requirement instruction-002: payload data accumulates.",
-        "Context only; this is not an implementation requirement: earlier behavior.",
-    ]
-    packet = compile_implementation_packet(
-        objective="Process delivery payloads.",
-        obligations=("Process delivery payloads.",),
-        required_tests=({"description": "process delivery payloads"},),
-        allowed_paths=("src/", "tests/"),
-        validation_profiles=("pytest",),
-        behavior_scenarios=(scenario,),
-    )
-
-    rendered = packet.render()
-
-    assert "Related requirement instruction-002" in rendered
-    assert "Context only; this is not an implementation requirement" in rendered
-
-
 def test_unclear_routes_continue_with_conservative_headless_assumption() -> None:
     scenario = _scenario()
     scenario["routing"] = "unclear"

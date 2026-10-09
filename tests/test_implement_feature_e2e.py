@@ -106,21 +106,6 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
-        if required == {
-            "member_indexes",
-            "context_indexes",
-            "relationships",
-            "unresolved_questions",
-        }:
-            candidates = _find_json_value(text, "candidate_requirements")
-            contexts = _find_json_value(text, "context_items")
-            return {
-                "member_indexes": list(range(len(candidates or []))),
-                "context_indexes": list(range(len(contexts or []))),
-                "relationships": [],
-                "unresolved_questions": [],
-            }
-
         if required == {"status", "value", "reason_code"} and (
             "scenario claim" in text
         ):

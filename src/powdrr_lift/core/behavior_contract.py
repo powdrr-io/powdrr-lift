@@ -496,6 +496,11 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
                 " Unresolved dimensions: " + ", ".join(item.unresolved_dimensions) + "."
             )
         lines.append(detail)
+        for relationship in item.related_requirements:
+            normalized = " ".join(relationship.casefold().split())
+            if normalized not in seen_related_requirements:
+                seen_related_requirements.add(normalized)
+                related_requirements.append(relationship)
     if not checkable_scenarios:
         lines[2:2] = [
             "No behavior scenario has yet been assessed as a checkable acceptance "
@@ -556,12 +561,6 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
         )
         for item in source_only_scenarios:
             lines.append(f"- [{item.scenario_id}] {_worker_text(item.then)}")
-    for item in implementation_scenarios:
-        for relationship in item.related_requirements:
-            normalized = " ".join(relationship.casefold().split())
-            if normalized not in seen_related_requirements:
-                seen_related_requirements.add(normalized)
-                related_requirements.append(relationship)
     if related_requirements:
         lines.extend(("", "Additional cross-requirement constraints:"))
         lines.extend(f"- {relationship}" for relationship in related_requirements)

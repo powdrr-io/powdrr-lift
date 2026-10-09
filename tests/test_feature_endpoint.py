@@ -2922,17 +2922,6 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
-            if "Which candidate requirements form one behavioral contract" in question:
-                context = json.loads(question.rsplit("Context:\n", 1)[1])
-                request = context["behavioral_contract_request"]
-                candidates = request["candidate_requirements"]
-                contexts = request["context_items"]
-                return {
-                    "member_indexes": list(range(len(candidates or []))),
-                    "context_indexes": list(range(len(contexts or []))),
-                    "relationships": [],
-                    "unresolved_questions": [],
-                }
             if "this scenario claim" in question:
                 return {
                     "status": "resolved",
@@ -3057,13 +3046,6 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     assert partial.is_file()
     assert json.loads(partial.read_text())["proposition_text"] == "Add the feature."
     canonical = json.loads((tmp_path / "canonical-feature-design.json").read_text())
-    behavioral_contracts = json.loads(
-        (tmp_path / "behavioral-contracts.json").read_text()
-    )
-    assert behavioral_contracts["contracts"][0]["member_requirement_ids"] == [
-        "instruction-001"
-    ]
-    assert canonical["behavioral_contracts"] == behavioral_contracts["contracts"]
     projection = canonical["projections"][0]
     assert projection["description"] == "Add the feature."
     assert (

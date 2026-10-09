@@ -874,21 +874,6 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "request": {"subject_text": "Interpret Add a thing."},
                     "behavior_family_decision": {},
                 }
-            if command[0] == "prepare_behavioral_contracts":
-                return {
-                    "ledger_fingerprint": "sha256:ledger",
-                    "requirement_ids": ["instruction-001"],
-                    "context_ids": [],
-                    "role_interpretations": {},
-                    "requests": [],
-                }
-            if command[0] == "bind_behavioral_contracts":
-                return {
-                    "schema_version": "behavioral-contract-collection-v1",
-                    "ledger_fingerprint": "sha256:ledger",
-                    "contracts": [],
-                    "covered_requirement_ids": ["instruction-001"],
-                }
             if command[0] == "compile_partial_semantic_contract":
                 return {
                     "kind": "feature",

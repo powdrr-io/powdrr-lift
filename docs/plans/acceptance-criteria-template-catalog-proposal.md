@@ -4,7 +4,7 @@ Date: 2026-10-08
 
 Status: research proposal; no production pipeline changes
 
-Scope: requirements after routing and splitting → acceptance criteria → coding prompt
+Scope: requirements after routing and splitting → acceptance criteria and a separate baseline-dependent Structrr diff → coding prompt and final verification
 
 ## 1. Recommendation
 
@@ -21,6 +21,8 @@ Three things must be correct separately:
 3. **Composition:** preserve all requested behavior in the final prompt without repeating it or strengthening it beyond the instruction.
 
 Templates make these decisions more explicit and reusable. They do not eliminate the need to understand English.
+
+Generate the proposed Structrr diff through a **separate path** that also reads the current code's Structrr snapshot. Both paths share the analyzed requirements. Acceptance criteria define the desired result; the diff defines the structural changes needed from a particular starting point. At completion, the diff supplies its own structural acceptance check alongside verification of the feature criteria. The separation and dependency rules are described below.
 
 ## 2. What counts as a good acceptance criterion?
 
@@ -54,6 +56,29 @@ The example value `0` is illustrative. The property applies to valid declaration
 An individual criterion usually expresses one predicate. Several predicates may share a setup, table, or short scenario in the final prompt. A criterion does not have to use literal Given/When/Then wording.
 
 The observable boundary is the API being built. A public library method or callback is a valid boundary. If the instruction explicitly requires exports, inheritance, annotations, or file placement, inspection is also a valid verification method; those requirements cannot all be reduced to runtime outputs.
+
+### Relationship to the Structrr diff
+
+The requested result and the changes needed to reach it are separate contracts:
+
+| Contract | Generation inputs | What it describes | Final verification |
+| --- | --- | --- | --- |
+| Feature acceptance criteria | Analyzed instructions, definitions, and relevant semantic context | Properties the completed feature must satisfy | Observe the implemented behavior and requested public/structural properties |
+| Proposed Structrr diff | The same analyzed requirements plus the current code's Structrr snapshot | Structural additions, removals, or modifications needed from that baseline | Compare the actual baseline-to-candidate Structrr diff with the required structural consequences |
+
+Feature criteria generally do not depend on whether a requested capability is already implemented, partially implemented, or absent. Existing code can help resolve references such as “preserve the existing behavior” or locate a named interface. It must not cause an unmet requested outcome to disappear or turn a convenient implementation choice into an obligation.
+
+The Structrr diff is necessarily baseline-dependent. Bind it to the starting revision and extraction version. If the starting code changes, regenerate or reconcile that proposal against the new baseline; do not rewrite feature criteria merely to match whatever changes are now convenient.
+
+**Neither generated artifact is the sole input to the other.** Share the analyzed requirements and their definitions directly with both generators. The diff generator may use completed acceptance criteria as an additional consistency input, but they cannot replace the instructions or the baseline. Criteria generation does not need a proposed diff to define the requested outcomes. Once their shared inputs are available, the paths can run independently; cross-check their results before assembling the implementation prompt.
+
+The template catalog includes public-interface and structural-property criteria such as T01 and T52. Those state required final properties. For example, “`State` accepts a `data` keyword” is a criterion whether that keyword already exists or must be added. The Structrr path determines which operation, if any, is needed to satisfy it. Inferred internal helpers remain implementation proposals unless the instruction mandates them.
+
+**Example:** two repositories can receive the same state-data requirement and therefore the same feature criteria. In one, `State` lacks the `data` parameter, so the proposed diff includes the required signature addition. In another, that parameter already exists but its lifecycle behavior is wrong, so no signature addition is required; implementation changes and behavioral verification are still needed. An empty signature diff does not prove the feature works, and adding the signature does not prove data initializes or resets correctly.
+
+Treat the proposed diff as a **separate structural acceptance criterion at the end**. With baseline `B0`, proposed operations `P`, and independently observed candidate snapshot `B1`, compute the actual diff `A = semantic_diff(B0, B1)`. Verify required structural consequences from `P` against `A` and the snapshots, while separately verifying the feature criteria on that same candidate. Do not require literal equality of operation lists: already-satisfied properties, equivalent implementations, and necessary incidental changes need appropriate evidence and scope review. A body change alone does not establish the requested behavior.
+
+Use the comparison concepts in the [Structrr diff and invariant repair plan](structrr-diff-and-invariant-repair-loop.md) when implementing this verification. This proposal retains its nonblocking prompt-generation rule: missing baseline evidence or an unresolved proposed operation is recorded, and prompt generation continues with the feature criteria and retained requirements. Unknown structural evidence cannot be reported as a passed final check. Failure of a candidate must lead to correction or an explicit unresolved verification result, rather than redefining either contract to fit the candidate.
 
 ### Research informing this design
 
@@ -918,6 +943,8 @@ Do not merge these into “supports streaming JSON.” Correct parsing can coexi
 ```mermaid
 flowchart TD
     R[Requirement and relevant instruction context] --> C[Select candidate template IDs]
+    R --> S[Generate proposed Structrr diff]
+    B0[Current code Structrr snapshot] --> S
     C --> A[Decide applicability for each candidate]
     A --> B[Bind required slots to supported facts]
     B --> V[Check types, evidence, conflicts, and residual requirements]
@@ -925,7 +952,16 @@ flowchart TD
     V --> F[Retain unsupported-to-render requirements verbatim]
     F --> P
     P --> O[Coding prompt plus diagnostic sidecar]
+    S --> O
+    O --> I[Implemented candidate]
+    I --> BV[Verify feature acceptance criteria]
+    P --> BV
+    I --> SV[Observe actual Structrr diff and verify structural consequences]
+    B0 --> SV
+    S --> SV
 ```
+
+The acceptance-criteria path above supplies the feature contract. The Structrr branch is generated separately against the baseline, with the shared requirements as intent. Its completed proposal may be cross-checked against the criteria; no mandatory serial dependency between the two generators is required. Both verification paths assess the same final candidate.
 
 #### Step 1: preserve enough context
 
@@ -1104,6 +1140,6 @@ If the catalog does not beat the direct freeform baseline, retain whichever part
 3. **Build the smallest offline comparison.** Generate criteria directly and through whole-catalog selection/binding from identical instruction inputs. Use no target solution during generation. Review the resulting prompts side by side; do not begin by adding another production pipeline stage.
 4. **Revise the catalog from concrete errors.** Wrong pattern → applicability examples. Right pattern, wrong value → binding examples. Missing pattern → add a card. Duplicate assertions → composition rules. Unrecoverable source detail → preserve uncertainty rather than blame the selector.
 5. **Evaluate on uninspected tasks.** Establish whether the approach transfers. Try retrieval only if selection cost or catalog growth makes it necessary.
-6. **Propose a bounded production change based on the winning result.** Preserve routing/splitting ownership, a working baseline, and the nonblocking fallback. Define exactly which current behavior it replaces and how a regression is detected before rollout.
+6. **Propose a bounded production change based on the winning result.** Preserve routing/splitting ownership, a working baseline, and the nonblocking fallback. Keep feature-criteria generation separate from baseline-dependent Structrr diff generation; combine their outputs for implementation and verify each contract on the final candidate. Define exactly which current behavior it replaces and how a regression is detected before rollout.
 
 The initial implementation should answer one question: **Does selecting and filling these patterns produce a more complete, less ambiguous acceptance-criteria section than direct generation from the same requirements?** Everything beyond that depends on the result.

@@ -301,50 +301,22 @@ steps:
                 If a source element cannot be separated without changing or
                 obscuring its meaning, keep it with the smallest requirement
                 that governs it rather than forcing a shorter fragment.
-              - >-
-                Use the supplied parent sentence, containing paragraph, and
-                neighboring sentences only to resolve references and scope. The
-                parent sentence is authoritative; context must not add obligations.
-              - >-
-                Return each semantic_relations entry as
-                "relation_type|label|child_indexes|evidence". For example,
-                "list_relation|independent_required|1,2|list indexes and null values".
-                list_relation labels are independent_required, shared_predicate,
-                allowed_alternatives, ordered_required, or unclear. Use
-                reference_resolution with resolved, ambiguous, or unresolved when
-                resolving a reference. Evidence must quote the parent exactly.
-              - >-
-                Return each modifier_attachments entry using the same pipe format:
-                "modifier_attachment|one_child|1|nested paths". relation_type is
-                modifier_attachment or condition_attachment; label is one_child,
-                specified_children, entire_group, or unclear. Supply affected child
-                indexes separately. Do not guess an unclear attachment.
-              - >-
-                For anaphoric references, return a semantic relation of type
-                reference_resolution labeled resolved, ambiguous, or unresolved;
-                cite the referenced child indexes and source evidence.
             context: [atomicity_split_request]
             output:
               name: atomicity_split
               schema:
-                type: object
-                required: [statements, validation_groups]
-                additionalProperties: false
-                properties:
-                  statements:
-                    type: array
-                    minItems: 2
-                    maxItems: 8
-                    items: {type: string, minLength: 1, maxLength: 500}
-                  validation_groups:
-                    type: array
-                    items: {type: string, minLength: 1, maxLength: 100}
-                  semantic_relations:
-                    type: array
-                    items: {type: string, minLength: 1, maxLength: 500}
-                  modifier_attachments:
-                    type: array
-                    items: {type: string, minLength: 1, maxLength: 500}
+                    type: object
+                    required: [statements, validation_groups]
+                    additionalProperties: false
+                    properties:
+                      statements:
+                        type: array
+                        minItems: 2
+                        maxItems: 8
+                        items: {type: string, minLength: 1, maxLength: 500}
+                      validation_groups:
+                        type: array
+                        items: {type: string, minLength: 1, maxLength: 100}
             validation: {kind: json_schema}
   - operation:
       tool: internal
@@ -396,7 +368,6 @@ steps:
                   instructions:
                     - Follow the request's question, instructions, and allowed_values exactly.
                     - Treat any containing source sentence as context for this exact proposition. Do not classify sibling clauses or transfer their obligations to this proposition.
-                    - When scope_relations are present, use only the relation records that reference this child clause. Preserve an unclear attachment as unresolved; do not transfer its modifier, condition, or requirement to unreferenced siblings.
                     - Use the complete instruction ledger to distinguish a report of current behavior or a problem statement from requested target behavior. When a sibling clause explicitly specifies the correction to a described limitation, keep the limitation as context and route the corrective clause as product work; do not turn the existing defect into a requirement to preserve it.
                     - This is the root of a decision tree. Choose include for product behavior, interfaces, invariants, entity definitions, or implementation guidance; include_prohibition for explicit product prohibitions; exclude for process instructions or background with no implementation obligation; unclear when meaning or route cannot be determined without guessing. A required rejection, exception, or error for invalid input is product behavior and must route to include, not include_prohibition.
                     - Do not classify detailed product kind, polarity, strength, scope, behavior family, or validation oracle here.
@@ -463,7 +434,6 @@ steps:
                   instructions:
                     - Follow the request's question, instructions, allowed_values, and parent routing decision exactly.
                     - Treat any containing source sentence as context for this exact proposition. Do not classify sibling clauses or transfer their obligations to this proposition.
-                    - When scope_relations are present, honor the recorded child references and attachment labels. An unclear relation stays unclear; do not infer a modifier or condition for another child.
                     - Never select a child value that contradicts the parent branch; abstain when no child value fits.
                     - Return resolved with exactly one allowed value or unresolved with one closed reason_code.
                     - Never return IDs, evidence, provenance, source spans, explanations, confidence, or additional fields.

@@ -1,0 +1,370 @@
+{
+  "run": {
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "catalog_sha256": "694ae31846a317f49d5c6b6fe1c4540323ccbc41a7a9d2a72170ce407b309ff9",
+    "tasks": [
+      "cattrs-partial-structuring-recovery",
+      "helm-array-merge-strategies"
+    ],
+    "arms": [
+      "direct",
+      "templates"
+    ],
+    "batch_size": 6,
+    "output_tokens": 12288,
+    "repairs": 1,
+    "failures": []
+  },
+  "eligible_task_count": 2,
+  "paired_task_ids": [
+    "cattrs-partial-structuring-recovery",
+    "helm-array-merge-strategies"
+  ],
+  "aggregate": {
+    "direct": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 46,
+      "criterion_count": 59,
+      "strict_recall": 1.0,
+      "strict_precision": 0.9661016949152542,
+      "missed_or_partial": 0,
+      "unsupported": 2,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 1.0
+    },
+    "templates": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 46,
+      "criterion_count": 104,
+      "strict_recall": 0.9565217391304348,
+      "strict_precision": 0.9903846153846154,
+      "missed_or_partial": 2,
+      "unsupported": 1,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 0.0
+    }
+  },
+  "paired_aggregate": {
+    "direct": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 46,
+      "criterion_count": 59,
+      "strict_recall": 1.0,
+      "strict_precision": 0.9661016949152542,
+      "missed_or_partial": 0,
+      "unsupported": 2,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 1.0
+    },
+    "templates": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 46,
+      "criterion_count": 104,
+      "strict_recall": 0.9565217391304348,
+      "strict_precision": 0.9903846153846154,
+      "missed_or_partial": 2,
+      "unsupported": 1,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 0.0
+    }
+  },
+  "scores": [
+    {
+      "task_id": "cattrs-partial-structuring-recovery",
+      "arm": "direct",
+      "input_sha256": "2f35c8ee6f0688b697f5e82d1e8e63fa0d1264338cc5ad50b22c6fb22715406f",
+      "generation_sha256": "9298147e34b19600f9c702723d3b4c2fb222537cd99a13c87a56d22b710133b7",
+      "reference_sha256": "c53c695260c2c8cb4cd2a12189fef36a744300f1e4c082c0191b722eebd6deb5",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 17,
+      "full": 17,
+      "partial": 0,
+      "missed_or_partial": 0,
+      "missing": 0,
+      "strict_recall": 1.0,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": true,
+      "criterion_count": 26,
+      "supported": 26,
+      "strict_precision": 1.0,
+      "unsupported": 0,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": null,
+      "accepted_template_label_recall": null,
+      "template_label_reference_count": 0,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 5,
+      "criterion_characters": 9075,
+      "generation_elapsed_seconds": 42.347,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [
+        {
+          "stage": "inventory",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 11.872,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": false
+        }
+      ],
+      "misses": [],
+      "precision_flags": []
+    },
+    {
+      "task_id": "cattrs-partial-structuring-recovery",
+      "arm": "templates",
+      "input_sha256": "2f35c8ee6f0688b697f5e82d1e8e63fa0d1264338cc5ad50b22c6fb22715406f",
+      "generation_sha256": "88377c0ca89f572a8da2dd71ca4e2ea2a1e08c728143db6f21aff888c16c20b5",
+      "reference_sha256": "c53c695260c2c8cb4cd2a12189fef36a744300f1e4c082c0191b722eebd6deb5",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 17,
+      "full": 16,
+      "partial": 1,
+      "missed_or_partial": 1,
+      "missing": 0,
+      "strict_recall": 0.9411764705882353,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": false,
+      "criterion_count": 38,
+      "supported": 38,
+      "strict_precision": 1.0,
+      "unsupported": 0,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": 0.8235294117647058,
+      "accepted_template_label_recall": 0.8235294117647058,
+      "template_label_reference_count": 17,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 6,
+      "criterion_characters": 6864,
+      "generation_elapsed_seconds": 120.813,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [
+        {
+          "stage": "inventory",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 11.872,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": false
+        }
+      ],
+      "misses": [
+        {
+          "reference_id": "v016",
+          "inventory_status": "full",
+          "inventory_requirement_ids": [
+            "r022"
+          ],
+          "criterion_status": "partial",
+          "criterion_ids": [
+            "c032",
+            "c033"
+          ],
+          "rationale": "Criteria c032 and c033 address detailed_validation=False behavior, but v016 requires that detailed_validation is respected without specifying new exception semantics — c032 and c033 only describe the absence of detailed errors, not that the converter's existing detailed_validation setting is honored in all cases (e.g., when True). The criteria do not fully capture the 'respect' requirement as a general invariant."
+        }
+      ],
+      "precision_flags": []
+    },
+    {
+      "task_id": "helm-array-merge-strategies",
+      "arm": "direct",
+      "input_sha256": "9234c56d4ba7f2160fb8989e0a2e51a457e5603e23a03a5650e27a94cf65ce3c",
+      "generation_sha256": "03c3f2b254290d10cb120850506586be6f3e891c150b91cb85b0ea9194dc4723",
+      "reference_sha256": "5c7215db6e4c8f306aa2022a58976660088f5273e573f9a1333d7a5815028fb5",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 29,
+      "full": 29,
+      "partial": 0,
+      "missed_or_partial": 0,
+      "missing": 0,
+      "strict_recall": 1.0,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": true,
+      "criterion_count": 33,
+      "supported": 31,
+      "strict_precision": 0.9393939393939394,
+      "unsupported": 2,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": null,
+      "accepted_template_label_recall": null,
+      "template_label_reference_count": 0,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 4,
+      "generation_call_count": 6,
+      "criterion_characters": 14194,
+      "generation_elapsed_seconds": 301.697,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [
+        {
+          "stage": "inventory",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 15.918,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": false
+        }
+      ],
+      "misses": [],
+      "precision_flags": [
+        {
+          "criterion_id": "c031",
+          "status": "unsupported",
+          "source_ids": [
+            "s002"
+          ],
+          "rationale": "s002 states 'Null user values delete the key during coalescing', while the criterion requires null to be preserved. This is a direct contradiction. The instruction does not support preserving null values during merging; it explicitly states they are deleted. Therefore, this criterion adds an unsupported obligation."
+        },
+        {
+          "criterion_id": "c033",
+          "status": "unsupported",
+          "source_ids": [
+            "s009"
+          ],
+          "rationale": "The criterion text is incomplete ('When a 'merge' strategy is applied and a user object contains'), making it unverifiable. It lacks a complete predicate or observable outcome. No source supports a partial or truncated requirement. This criterion cannot be validated and is therefore unsupported."
+        }
+      ]
+    },
+    {
+      "task_id": "helm-array-merge-strategies",
+      "arm": "templates",
+      "input_sha256": "9234c56d4ba7f2160fb8989e0a2e51a457e5603e23a03a5650e27a94cf65ce3c",
+      "generation_sha256": "5c8387873bf9004fec55b5f39330df0c2f3da89d5192298dbb1c3567007e2f97",
+      "reference_sha256": "5c7215db6e4c8f306aa2022a58976660088f5273e573f9a1333d7a5815028fb5",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 29,
+      "full": 28,
+      "partial": 1,
+      "missed_or_partial": 1,
+      "missing": 0,
+      "strict_recall": 0.9655172413793104,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 0.9655172413793104,
+      "all_reference_validations_present": false,
+      "criterion_count": 66,
+      "supported": 65,
+      "strict_precision": 0.9848484848484849,
+      "unsupported": 1,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": 1.0,
+      "accepted_template_label_recall": 1.0,
+      "template_label_reference_count": 29,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 6,
+      "criterion_characters": 10827,
+      "generation_elapsed_seconds": 196.776,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [
+        {
+          "stage": "inventory",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 15.918,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": false
+        }
+      ],
+      "misses": [
+        {
+          "reference_id": "v024",
+          "inventory_status": "partial",
+          "inventory_requirement_ids": [
+            "r024"
+          ],
+          "criterion_status": "partial",
+          "criterion_ids": [
+            "c055"
+          ],
+          "rationale": "Requirement r024 requires a warning with 'non-array' when a strategy path resolves to a non-array. Criterion c055 captures this message condition. Criterion c056 only states 'validation of the resolved value type' without specifying the 'non-array' message or outcome, so it is incomplete. Only c055 fully satisfies the requirement."
+        }
+      ],
+      "precision_flags": [
+        {
+          "criterion_id": "c039",
+          "status": "unsupported",
+          "source_ids": [
+            "s007"
+          ],
+          "rationale": "s007 describes 'ReuseValues' as merging old config with new values using strategy-aware coalescing with 'append: old before new', but it does not specify that 'old config wins' in collisions for append. The instruction defines behavior for array ordering, not collision resolution between conflicting keys. This criterion adds an unmentioned obligation."
+        }
+      ]
+    }
+  ],
+  "failures": [],
+  "limitations": [
+    "Agent-authored source-based references and automated judgments are not human gold labels.",
+    "Template-group agreement is diagnostic, not proof.",
+    "No coding agent, task validation suite, or Structrr diff was executed.",
+    "Only declared reference validations contribute to recall; references may omit behavior. Inspect source coverage before interpreting scores."
+  ]
+}

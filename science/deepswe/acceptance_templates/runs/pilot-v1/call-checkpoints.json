@@ -1,0 +1,413 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "74331c24e179020ad86c1f1d3c4d023cc0058ac7ca8b894444d49c9445ee3605",
+  "file_count": 58,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/direct/calls/direct-000-0.json",
+      "sha256": "d79da5b79a2067b26fc79d1ad877f3be07162a363e28265421d4074ec8d2a8bd",
+      "status": "completed",
+      "stage": "direct-000",
+      "request_sha256": "421488634a4d8f1ba0182d9cbba61a7fe432e418cecc960183d8eec78319d893"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/direct/calls/direct-001-0.json",
+      "sha256": "3e6b41ce079a503844b5f37dad9c0e4ccfff125f3e6d2ffa7f64964d21c8f55d",
+      "status": "completed",
+      "stage": "direct-001",
+      "request_sha256": "364cb9a44817401cdfa90e1dedb29ac53ea5ebed0373a67cc28db5e6f0301ec7"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/direct/calls/direct-002-0.json",
+      "sha256": "1993ddd1a0f7d9d14ee5f318c159bc49df29ea7b4838b3683feec394c7a89590",
+      "status": "completed",
+      "stage": "direct-002",
+      "request_sha256": "1e4cf0ee0461ea145c8d41c8fe6a929320f705c1b234d9ab1e35438f67d82f9d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/direct/calls/direct-003-0.json",
+      "sha256": "5b81ea5b6d324efd2d8bc2c446f7b63b35c8194f6f92ef41b84acf58ea82eda3",
+      "status": "completed",
+      "stage": "direct-003",
+      "request_sha256": "3fb051fa92b5d58db4a6e9d6b3c230c8a62569ab07c74eeb3998141c0ceb3687"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/direct/calls/direct-004-0.json",
+      "sha256": "c78cad7551011ed0e7d0d103c64ce5923071e62bb451057908c81fa16636a114",
+      "status": "completed",
+      "stage": "direct-004",
+      "request_sha256": "2f744d2d037eaf9f12fa26c413b702d10e591342791aa7c7a044d3f8ed54fdfc"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/direct/review-calls/coverage-000-0.json",
+      "sha256": "42d2ae6335b31e114ca7780b8553f704ee5034f4bc0e71cbc835110a5e25dc25",
+      "status": "completed",
+      "stage": "coverage-000",
+      "request_sha256": "b868048da49eaa2903aad3a8acdc3b8f43f7c6cf58a23723bb02e20f45ee5ab2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/direct/review-calls/coverage-001-0.json",
+      "sha256": "d032bb9f8a3bec0ba065e77f05257e23bd6d51cc175c33c0694b088d06178be3",
+      "status": "completed",
+      "stage": "coverage-001",
+      "request_sha256": "a1ab7c7655c2d7bb641fbe54f4f154173123d9208fbc0cb7c91cafb5f761cb7f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/direct/review-calls/support-000-0.json",
+      "sha256": "013322ba58b12559540ced77d1422e9a6835d5d9d80df0228d5d2398cc0b9c35",
+      "status": "completed",
+      "stage": "support-000",
+      "request_sha256": "52d73a9668a9afd8a430cc0fb57dc3bdc5742081eb6760564c7cc4d85355f628"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/direct/review-calls/support-001-0.json",
+      "sha256": "8c475bd41882878bf06c26412ff759a6b9d6a39723cc762fcb75d6e46ccff4b0",
+      "status": "completed",
+      "stage": "support-001",
+      "request_sha256": "4c16b5f707646176ca1c0b9d30bb5efe3dff4324fa2f8ea4d7f311571b8b03ec"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/direct/review-calls/support-002-0.json",
+      "sha256": "46ee214c9ff64058b0b568aab7e88342c4dc616b4d4c7879a5d8f3555e5ab285",
+      "status": "completed",
+      "stage": "support-002",
+      "request_sha256": "901cb882a1a39a4abc77625548d7fefcec4719ed755a013f8e0a90f0f287d5b2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/inventory-calls/inventory-0.json",
+      "sha256": "51d3a272bc0df0ce9312cdf7a8d59dda15793ce85f3e7886ab2fcba122fc638c",
+      "status": "completed",
+      "stage": "inventory",
+      "request_sha256": "8aa2ab6a0ec1c36d601e68bca317ce776393be69c864d4d293123f6a9409e683"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/calls/bind-000-0.json",
+      "sha256": "94e29cef644857b2435a5e615aec79eb58875d39d98b8c4a812758c2aa3a71cd",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "3f2027b4d9e4d1ed138ca966658cda960ef7f5881fe7cf45039a4e27928f6690"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/calls/bind-001-0.json",
+      "sha256": "17c3355e2cc6b402017f294183869b5715a6da76986fe3e35db8f3b97c6913b5",
+      "status": "completed",
+      "stage": "bind-001",
+      "request_sha256": "0abe10e7e115e191108a04b9ca276e417e750a95cca42b19c06e255e5945c1b9"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/calls/bind-002-0.json",
+      "sha256": "1579c32ab1d25a01e1208b08f1666fca71b2486bf7d5a61fb03e42d5e3df2fa6",
+      "status": "completed",
+      "stage": "bind-002",
+      "request_sha256": "231c908ee85a95fd3ad1ad514126210c304c9b4061e5ec039738de9b86c2e9a9"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/calls/bind-003-0.json",
+      "sha256": "9a6fab98e3e04ec29ee9d914a5c7a789838b2a9676521ce96d6f90e555e4420e",
+      "status": "completed",
+      "stage": "bind-003",
+      "request_sha256": "4538d6441c54ffc6cbbef9502ec93546528d05c43346fb775b44e47915ddcfd3"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/calls/bind-004-0.json",
+      "sha256": "e1bf8bb6cc0e1076541ab20984714555da931630774655065df0a6fb7ca91243",
+      "status": "completed",
+      "stage": "bind-004",
+      "request_sha256": "9018cba90ca05055f727616ce85ee55046369006cb8e2489c3d23062226e4f56"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/calls/select-0.json",
+      "sha256": "6310a465cf939d70f81c42c89e4f06b5734a96ccc439506c8e38e7f6a444260a",
+      "status": "completed",
+      "stage": "select",
+      "request_sha256": "73171b3570984853fcefe6898b6f3803d86f483088d522e3b4d8e1ca7f9971c6"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/review-calls/coverage-000-0.json",
+      "sha256": "5a983c68c2bc71d4fd32167fe5e4c1b7956c518852d0ec2d6fc8db3e902eb0f1",
+      "status": "failed",
+      "stage": "coverage-000",
+      "request_sha256": "fa46583693fc003d265034049737a7e9672a1e2d81adac819590b9ba5640e47e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/review-calls/coverage-000-1.json",
+      "sha256": "123281db70bede83a52b60958884ca1f1f2ffb577ae4c03ae7f004b9e17eb466",
+      "status": "completed",
+      "stage": "coverage-000",
+      "request_sha256": "28a75187a6f3a36ccba22988e325f1a82ed01c3e9039bdcf8e399ad0e710bf91"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/review-calls/coverage-001-0.json",
+      "sha256": "90786bf8fcb8c3beb009591dfff79ca614017a9cc374b21fa3ae8d6f6caeaaef",
+      "status": "failed",
+      "stage": "coverage-001",
+      "request_sha256": "3f8be09cd9a674c63156d08f344847d99136d64067ce5b81154c3568744b87d2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/review-calls/coverage-001-1.json",
+      "sha256": "bbf66abc2264ef17858a3028ddbd50aed6753716865f35d895374e0de92d744f",
+      "status": "completed",
+      "stage": "coverage-001",
+      "request_sha256": "54d9db9dd86e326f9cceadc32e7af3b61235b1db9ed13afa14b0845411c83a81"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/review-calls/superseded-coverage-000-0.json",
+      "sha256": "6ccf11197e0545fc156bc31a2cc2e220c0293ec8896346c51968cbaa3b15666b",
+      "status": "failed",
+      "stage": "coverage-000",
+      "request_sha256": "fa46583693fc003d265034049737a7e9672a1e2d81adac819590b9ba5640e47e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/review-calls/support-000-0.json",
+      "sha256": "220e72101b8d9ad48eab2c8f1fde35858fa8b8c03a40d8a73cc57fe3665d5e05",
+      "status": "completed",
+      "stage": "support-000",
+      "request_sha256": "b8319e4fb8747cc859990eaf1bfd5a33ffb98e60b712e6ea316bd867294015d3"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/review-calls/support-001-0.json",
+      "sha256": "1eefb3bbb9f137c285ab87e406e444cd6e6a86a8d6e20caf03730545bbdad331",
+      "status": "completed",
+      "stage": "support-001",
+      "request_sha256": "dea0b62cb9ec9043049af0088b2d93bc945052e26cafd064108c09dec7d428ba"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/review-calls/support-002-0.json",
+      "sha256": "8494ed5ea01463d42cf50ba1bbbd74f583d5b858efa199d73b93d83119445ce4",
+      "status": "completed",
+      "stage": "support-002",
+      "request_sha256": "ebe9ab146d56a5c46f645b1820e7b2be6a3caae312734caa06cb966bdf8a85ad"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/cattrs-partial-structuring-recovery/templates/review-calls/support-003-0.json",
+      "sha256": "7c7576377657e2c9165f2e5edfcfa564079a3d50023fc186f76cedccd2575202",
+      "status": "completed",
+      "stage": "support-003",
+      "request_sha256": "31e71167a71c214e32d9aa29540c290f44f6f1a7d232d5f3a83ef097d82fce66"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/calls/direct-000-0.json",
+      "sha256": "720f175f1e28025c479b96109fb86be062996acdc540c913826fdf59591a572e",
+      "status": "completed",
+      "stage": "direct-000",
+      "request_sha256": "de8d65f75146eb248c99db3d1276ff4628a674c7d58d4b135e62eabc94a12a26"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/calls/direct-001-0.json",
+      "sha256": "14b4090dcb95d0e438e277963a20b50f2dec291b5c98e302befb41dcc3f65a11",
+      "status": "completed",
+      "stage": "direct-001",
+      "request_sha256": "7f3f31376dce9d17c762e5ee7aad54591b22e8748fcc5715af531d8ea24b610c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/calls/direct-002-0.json",
+      "sha256": "e586b7cfa82975e6dc8647886aca0d3b6325f5942a55d919000ce95bd7e9244d",
+      "status": "completed",
+      "stage": "direct-002",
+      "request_sha256": "94235204a34fa431afd346793cb30709376ed75bae931fd46a5289688eb5d003"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/calls/direct-003-0.json",
+      "sha256": "fbb208a6456767ab1ce942cc88931726e1d434535b177b1e5bc430ae2130ae9f",
+      "status": "completed",
+      "stage": "direct-003",
+      "request_sha256": "dcded57b99d60fa4a01ade301f82a70a1ef308166a6287907832796357d25f80"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/calls/direct-004-0.json",
+      "sha256": "aa1f7037bbb31ba57922feead60f69d20f92e8548d75a1ad0d13bb23f3f60e23",
+      "status": "failed",
+      "stage": "direct-004",
+      "request_sha256": "0940cb7eb4ccaa274567605bd13f89245f58355c56b38ac3adfd0960c2961e51"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/calls/direct-004-1.json",
+      "sha256": "c085e508fc8b6e1b8dcd83c367103c5260210a612add85f56e6cdd0b168707fb",
+      "status": "completed",
+      "stage": "direct-004",
+      "request_sha256": "87616f353adcfc9eaf3d2fc26b27d2bb2a72b2c8bbbf6d05bafb3758ae659ca1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/review-calls/coverage-000-0.json",
+      "sha256": "3328b9f756539cfadb3461142eda1bebfef0b0ec77925c3a98f943ffe74b67a2",
+      "status": "failed",
+      "stage": "coverage-000",
+      "request_sha256": "8c9c851191c71f071bdf24e1365e35f6f66b60780eaac746f15d0003fe12f389"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/review-calls/coverage-000-1.json",
+      "sha256": "ed141d44db420d2ee00307bcf12dfff99a4128d16fb1b8804e155f0d68c5ffbb",
+      "status": "completed",
+      "stage": "coverage-000",
+      "request_sha256": "b2fd01e042df96abc79cb8fad4f24b85cf6e053f81ecaf66a4436dee3d2a7c15"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/review-calls/coverage-001-0.json",
+      "sha256": "54cadd518e1d3ad41879d331ca4d2334ebac90214bef611e43c06ccf1fe777d7",
+      "status": "completed",
+      "stage": "coverage-001",
+      "request_sha256": "3cf2bb0d360fb4a6093053a6647a183bd512df22f5148d1135b26ff784139235"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/review-calls/coverage-002-0.json",
+      "sha256": "b8d797d9faf279cac98ad441f79759cce2467304c5f53d4acc63d57c917fa4f0",
+      "status": "completed",
+      "stage": "coverage-002",
+      "request_sha256": "5b2c88cff09bed67639b507b9c5ea1d64c6f2fc2d19eadc277956b0bd2467ed0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/review-calls/support-000-0.json",
+      "sha256": "28b73a47c93e602032cd37e21d522c6b28eb19028235fd058590e82a2e5d542e",
+      "status": "completed",
+      "stage": "support-000",
+      "request_sha256": "c2788cbf0510bd455e7a1373f347e71b9c113156a949887b568f349477deb1d5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/review-calls/support-001-0.json",
+      "sha256": "ceed1b01f95a6158bac2885c804fa18f6edcf78e5144d8cdfbbcc6be21297976",
+      "status": "completed",
+      "stage": "support-001",
+      "request_sha256": "565c0b77d3b2101ca25a21835c70b2c21a9faac475dfdea4ad931f5769dc9628"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/review-calls/support-002-0.json",
+      "sha256": "75a3fa50bd91cbe96f2452f440f6c37209889e9b8234af71ac722e1dd01a7fd7",
+      "status": "failed",
+      "stage": "support-002",
+      "request_sha256": "44c3ea8c7716029a99f2eef134d32f28766069c49f3d408eb5b7e8b117cf3e2d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/direct/review-calls/support-002-1.json",
+      "sha256": "92cafe8b6d2707efdb6f044e2b0ff5aa2bcf03096bd1ca57e85f0b8e67a79058",
+      "status": "completed",
+      "stage": "support-002",
+      "request_sha256": "fdaeaaf8fd849cda79de3de82f0a4c1b6521b03d4936670eb408872ba1a30414"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/inventory-calls/inventory-0.json",
+      "sha256": "bf089f9a791e05391e03d3b34a089618421d0e4875a0dd5573708a41db694121",
+      "status": "completed",
+      "stage": "inventory",
+      "request_sha256": "d10322c3fee628e55700bb903b7ed0675ece66c03efddf70034cb2ab3312011c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/calls/bind-000-0.json",
+      "sha256": "bd3c35c0c9c194703bb43e0195bdf95869631f5d28315e1c52c8faeee9f38753",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "3dde6dad1daae8635a6f3d905933da29ad640832f6502b48f767cec322520bd3"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/calls/bind-001-0.json",
+      "sha256": "5dc8893a8352a1dd0144f048fe743485448649b4550575d1a145891ba984f3c7",
+      "status": "completed",
+      "stage": "bind-001",
+      "request_sha256": "e76aacf33a7af36e1591d8732a9c7ae1bb86dfe416b5262e7c439c09289b3b80"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/calls/bind-002-0.json",
+      "sha256": "1d4441685b6e60415ec3c2b23fe7d5df63a06218b4038591d497886364904333",
+      "status": "completed",
+      "stage": "bind-002",
+      "request_sha256": "fcbcd9b16ee02d72d78ecd6badd83eb3454d9efaf4050f04209583b39ef3e18f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/calls/bind-003-0.json",
+      "sha256": "a3946b74ababcb50372971edeceeedf1352e7a83ff159a9c69a45406dde3811a",
+      "status": "completed",
+      "stage": "bind-003",
+      "request_sha256": "a351b3ecc720d8fc6ccfa13b9cb2133949183304bb2e1812ec410debeb29b84a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/calls/bind-004-0.json",
+      "sha256": "1c9596f80917e456359bdf8543cba89d782ad3f7e744ece17e32f16f4b8070b5",
+      "status": "completed",
+      "stage": "bind-004",
+      "request_sha256": "5c8a5afce4c73aff2e0a7bca860d04d4f746085d58c3d4fc750f58d30b76393f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/calls/select-0.json",
+      "sha256": "5e4582e55182e1895a9af4f35c83a430e9f4c35f455dea6b5ef14e1d873bf276",
+      "status": "completed",
+      "stage": "select",
+      "request_sha256": "20fdc4734f1d6af4fac619157e9db25eb604e227d3571b72335d3d6afdcb270a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/coverage-000-0.json",
+      "sha256": "0b4c8194b091ebf70665c0b233cb1b3fa3955a95f61bdc02bc43edaf647af845",
+      "status": "failed",
+      "stage": "coverage-000",
+      "request_sha256": "1883549aeb84798fd6bd3f3a226e0d18a7d2b3e8ac3d3a98a49481b3fae2831c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/coverage-000-1.json",
+      "sha256": "7a38cdbb1c8509d7e75055b4744f487c45d3bdac021ac05c9e9528883a55dd9a",
+      "status": "completed",
+      "stage": "coverage-000",
+      "request_sha256": "11cc5bbe25b5f9aca62537ace89e364686b59ad1830fb8fdc0aa4d935ad26a89"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/coverage-001-0.json",
+      "sha256": "02dd3e60f7bdc7ac3b79b4b6315bb74939a07b45690a8bf683c897344b4e63d9",
+      "status": "failed",
+      "stage": "coverage-001",
+      "request_sha256": "fa27efeda5608dfca8df05eb66d6a1831d839847deb7a3d55b6acd08ebd34b18"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/coverage-001-1.json",
+      "sha256": "ffb49584834d0e5fdbe7d9c7b7679c8e4e7eacd1c5b32bd193bb628ca42fe0fd",
+      "status": "completed",
+      "stage": "coverage-001",
+      "request_sha256": "4d612b794602a65a560a0b179579149dd89dd1c68af11f45569f70e978565179"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/coverage-002-0.json",
+      "sha256": "bc2b90f3bb5bbcf0c7427ea5543b92e7e33ca03efde3205319d2cd4fb7fa4d4f",
+      "status": "completed",
+      "stage": "coverage-002",
+      "request_sha256": "935f9dfe56727c291bf54a2aa5dd4f9ffc49c5a0c7d03b248471ebcfb2ae4cb9"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/support-000-0.json",
+      "sha256": "5970527c23b756d6b8799f8f71b3fb6216a50d7e1d58f15c2b9238600616322c",
+      "status": "completed",
+      "stage": "support-000",
+      "request_sha256": "6af03e8aff534aee7d9d034f55d49ca8e38525903d1f22caa84b6708f34c7a84"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/support-001-0.json",
+      "sha256": "304d8e8b36528fd3d0cca970b36f92676398dfc7633718a3df7977ddc9ce9fde",
+      "status": "completed",
+      "stage": "support-001",
+      "request_sha256": "958a8accf54abb93e6a20c2659dfc7dcbf6700051c9c764322cb768a01273b1a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/support-002-0.json",
+      "sha256": "dc78289a42795a02f8031aba9a64dd4fff5259b5e8e5581da6c1a4d4c5a5b931",
+      "status": "completed",
+      "stage": "support-002",
+      "request_sha256": "2c0b7d3165f9c846b6d5e0ca537dbacc1d966676f7720ad4a778dc2d3653813f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/support-003-0.json",
+      "sha256": "e0db8ab386acc7e3b678763a1a8fa3392a79bb687d54a737f3731174305d34f2",
+      "status": "completed",
+      "stage": "support-003",
+      "request_sha256": "37ab9ce2a8f0f74ddce4be8147008d821076a7cfad667080f34b5f974544ddf8"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/support-004-0.json",
+      "sha256": "2cbadca885403ff83c138919d3aef9a81359074283f0fa204465a4c50245d885",
+      "status": "completed",
+      "stage": "support-004",
+      "request_sha256": "429f285ceddd9ce03d52aac3d334768916feeae55893920d451c845c39564586"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-v1/helm-array-merge-strategies/templates/review-calls/support-005-0.json",
+      "sha256": "b24bf8c19e552a2d0c8008ad00025f44e7fb064d6d12aaa887c70cc01f1b779e",
+      "status": "completed",
+      "stage": "support-005",
+      "request_sha256": "fd8662ecaf801b23e1dcb2b410cd2cd9d3777bbdeb7d463a8c9b6fb7b594f169"
+    }
+  ]
+}

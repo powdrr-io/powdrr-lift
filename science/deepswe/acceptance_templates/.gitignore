@@ -1,0 +1,5 @@
+# Full calls are retained locally and committed as compressed archives.
+**/calls/
+**/review-calls/
+**/inventory-calls/
+**/draft-calls/

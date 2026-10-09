@@ -987,13 +987,7 @@ def prepare_source_semantic_decisions(
     spec = _decision_spec(
         clause_id, text, source_fingerprint, "routing", context_text=context_text
     )
-    allowed_values = sorted(DECISION_VALUES[spec.decision_kind])
-    criteria = dict(definition.criteria)
-    if criteria and set(criteria) != set(allowed_values):
-        raise SemanticContractError(
-            f"{spec.decision_kind} classifier criteria do not match allowed values"
-        )
-    request = {
+    return {
         "resolved_decisions": [],
         "pending_specs": [_classifier_request(spec, CLASSIFIER_DEFINITIONS["routing"])],
     }
@@ -1839,7 +1833,13 @@ def _classifier_request(
         if spec.context_text and "\n" in spec.context_text
         else "source_sentence"
     )
-    return {
+    allowed_values = sorted(DECISION_VALUES[spec.decision_kind])
+    criteria = dict(definition.criteria)
+    if criteria and set(criteria) != set(allowed_values):
+        raise SemanticContractError(
+            f"{spec.decision_kind} classifier criteria do not match allowed values"
+        )
+    request = {
         "spec": spec.to_data(),
         "question": definition.question,
         "instructions": instructions,

@@ -16,7 +16,6 @@ from powdrr_lift.core.semantic_decision import (
     SemanticDecisionProvider,
     resolve_exact_source_span,
 )
-from powdrr_lift.core.source_interpretation import SourceInterpretation
 
 PARTIAL_SEMANTIC_CONTRACT_SCHEMA_VERSION = "partial-semantic-contract-v3"
 SOURCE_EXTRACTION_SCHEMA_VERSION = "source-extraction-v1"
@@ -277,7 +276,6 @@ class PartialSemanticContract:
     semantic_dimensions: tuple[tuple[str, str], ...]
     field_provenance: tuple[tuple[str, str], ...]
     unresolved: tuple[UnresolvedSemanticField, ...]
-    source_interpretation: SourceInterpretation | None = None
 
     def __post_init__(self) -> None:
         for name, value in (
@@ -317,20 +315,6 @@ class PartialSemanticContract:
             raise SemanticContractError(
                 "partial contract contains foreign source spans"
             )
-        if (
-            self.source_interpretation is not None
-            and self.source_interpretation.source_refs != (self.source_ref,)
-        ):
-            raise SemanticContractError(
-                "source interpretation refers to another clause"
-            )
-        if self.source_interpretation is not None:
-            try:
-                self.source_interpretation.validate_source(
-                    self.source_ref, self.proposition_text
-                )
-            except ValueError as error:
-                raise SemanticContractError(str(error)) from error
 
     @property
     def fingerprint(self) -> str:
@@ -376,28 +360,6 @@ class PartialSemanticContract:
             "field_provenance": dict(self.field_provenance),
             "unresolved": [item.to_data() for item in self.unresolved],
         }
-        if self.source_interpretation is not None:
-            interpretation = self.source_interpretation
-            result["source_interpretation"] = interpretation.to_data()
-            result["gaps"] = {
-                "source_meaning": {
-                    "status": interpretation.meaning_status,
-                    "fields": [
-                        {"field": field, "reason_code": reason}
-                        for field, reason in interpretation.unresolved_fields
-                    ],
-                },
-                "implementation_binding": {
-                    "status": "unresolved",
-                    "fields": ["subject.binding_refs"],
-                },
-                "registry_label": {
-                    "status": "unregistered"
-                    if self.behavior_family == "other"
-                    else "resolved",
-                    "field": "behavior.family",
-                },
-            }
         if include_fingerprint:
             result["fingerprint"] = self.fingerprint
         return result
@@ -436,7 +398,6 @@ class PartialSemanticContract:
                 "partial contract completion metadata is invalid"
             )
         explicit_raw = raw.get("explicit_result")
-        interpretation_raw = raw.get("source_interpretation")
         precondition_raw = raw.get("preconditions")
         exception_raw = raw.get("exceptions")
         if not isinstance(precondition_raw, list) or not isinstance(
@@ -499,11 +460,6 @@ class PartialSemanticContract:
                 for item in unresolved_raw
                 if isinstance(item, Mapping)
             ),
-            source_interpretation=(
-                SourceInterpretation.from_data(interpretation_raw)
-                if isinstance(interpretation_raw, Mapping)
-                else None
-            ),
         )
         if raw.get("fingerprint") != contract.fingerprint:
             raise SemanticContractError(
@@ -519,7 +475,6 @@ def compile_partial_semantic_contract(
     proposition_text: str,
     decisions: Sequence[SemanticDecision],
     extractions: Sequence[BoundSourceExtraction],
-    source_interpretation: SourceInterpretation | None = None,
 ) -> PartialSemanticContract:
     """Compile bound single-field results without interpreting their prose."""
     decision_by_kind = _unique_by_kind(decisions)
@@ -650,7 +605,6 @@ def compile_partial_semantic_contract(
             for item in items
         ),
         unresolved=tuple(unresolved),
-        source_interpretation=source_interpretation,
     )
 
 

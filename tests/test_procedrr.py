@@ -690,15 +690,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     classifier_judge = classifier_loop["body"][0]["judge"]
     extraction_operation = body[6]["operation"]
     behavior_judge = body[8]["judge"]
-    scenario_judge = next(
-        item["judge"]
-        for item in body
-        if isinstance(item, dict)
-        and isinstance(item.get("judge"), dict)
-        and item["judge"]
-        .get("question", "")
-        .startswith("Compile one lossless behavior scenario")
-    )
+    scenario_judge = body[17]["judge"]
 
     assert atomicity_judge["question"] == (
         "Does this one instruction clause contain more than one independently "

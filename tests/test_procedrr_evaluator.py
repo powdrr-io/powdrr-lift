@@ -745,26 +745,6 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "value": "create",
                     "reason_code": None,
                 }
-            if "source-supported operation and behavior rule" in question:
-                return {
-                    "subject": None,
-                    "operation": None,
-                    "affected_value": None,
-                    "rule": None,
-                    "contrast": None,
-                    "behavior_form": "unclear",
-                    "result_presence": "unspecified",
-                    "event_scope": "unspecified",
-                    "contrast_presence": "absent",
-                    "unresolved_fields": [
-                        "subject|source_underspecified",
-                        "operation|source_underspecified",
-                        "affected_value|source_underspecified",
-                        "rule|source_underspecified",
-                        "behavior_form|source_underspecified",
-                    ],
-                    "field_evidence": [],
-                }
             if "lossless behavior scenario" in question:
                 return {
                     "status": "resolved",
@@ -868,11 +848,6 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "instructions": ["Choose one value."],
                     "allowed_values": ["create"],
                     "subject_text": "Add",
-                }
-            if command[0] == "prepare_source_interpretation":
-                return {
-                    "request": {"subject_text": "Interpret Add a thing."},
-                    "behavior_family_decision": {},
                 }
             if command[0] == "compile_partial_semantic_contract":
                 return {
@@ -1048,7 +1023,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 16
+    assert result.llm_activations == 15
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events

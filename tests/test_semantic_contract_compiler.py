@@ -26,10 +26,6 @@ from powdrr_lift.core.semantic_faithfulness import (
     prepare_field_entailment_reviews,
     prepare_scenario_claim_reviews,
 )
-from powdrr_lift.core.source_interpretation import (
-    SourceInterpretation,
-    SourceInterpretationError,
-)
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
     feature_command_catalog,
@@ -1010,132 +1006,6 @@ def test_legacy_projection_copies_source_instead_of_paraphrasing() -> None:
     }
 
 
-def test_source_interpretation_preserves_sequence_rule_and_contrast() -> None:
-    source = "The .data dict is accumulated across payloads, not raw deltas."
-    interpretation = SourceInterpretation.bind(
-        {
-            "subject": "the .data dict",
-            "operation": "accumulated",
-            "affected_value": ".data",
-            "rule": "accumulated across payloads",
-            "contrast": "raw deltas",
-            "behavior_form": "state_transition",
-            "result_presence": "explicit",
-            "event_scope": "event_sequence",
-            "contrast_presence": "explicit",
-            "unresolved_fields": [],
-            "field_evidence": [
-                "subject|.data dict",
-                "operation|accumulated",
-                "affected_value|.data",
-                "rule|accumulated across payloads",
-                "contrast|raw deltas",
-            ],
-        },
-        source_ref="instruction-001",
-        source_text=source,
-        conditions=(),
-        exceptions=(),
-        decision_fingerprints={"behavior_family": "sha256:family"},
-    )
-
-    assert interpretation.meaning_status == "interpreted"
-    assert interpretation.event_scope == "event_sequence"
-    assert interpretation.contrast == "raw deltas"
-    assert interpretation.to_data()["field_evidence"][-1] == "contrast|raw deltas"
-
-
-def test_source_interpretation_rejects_evidence_not_in_source() -> None:
-    with pytest.raises(SourceInterpretationError, match="not present in the source"):
-        SourceInterpretation.bind(
-            {
-                "subject": "the .data dict",
-                "operation": "accumulated",
-                "affected_value": None,
-                "rule": "accumulated across payloads",
-                "contrast": None,
-                "behavior_form": "state_transition",
-                "result_presence": "unspecified",
-                "event_scope": "event_sequence",
-                "contrast_presence": "absent",
-                "unresolved_fields": ["affected_value|not_stated"],
-                "field_evidence": [
-                    "subject|the .data dict",
-                    "operation|accumulated",
-                    "rule|accumulated across payloads",
-                ],
-            },
-            source_ref="instruction-001",
-            source_text="The .data dict accumulates.",
-            conditions=(),
-            exceptions=(),
-            decision_fingerprints={},
-        )
-
-
-def test_unknown_family_keeps_interpreted_rule_in_contract_and_projection() -> None:
-    source = "The .data dict is accumulated across payloads, not raw deltas."
-    clause = _clause(source)
-    decisions = _bind_source_decisions(
-        clause,
-        disposition="invariant",
-        overrides={"source_predicate": "explicit"},
-    )
-    extractions = compile_deterministic_source_extractions(
-        clause, decisions, source, created_at=NOW
-    )
-    family_request = prepare_behavior_family_decision(clause, extractions[1], decisions)
-    family = bind_behavior_family_decision(
-        family_request,
-        {"status": "unresolved", "value": None, "reason_code": "no_candidate"},
-        created_at=NOW,
-    )
-    interpretation = SourceInterpretation.bind(
-        {
-            "subject": "the .data dict",
-            "operation": "accumulated",
-            "affected_value": ".data",
-            "rule": "accumulated across payloads",
-            "contrast": "raw deltas",
-            "behavior_form": "state_transition",
-            "result_presence": "explicit",
-            "event_scope": "event_sequence",
-            "contrast_presence": "explicit",
-            "unresolved_fields": [],
-            "field_evidence": [
-                "subject|.data dict",
-                "operation|accumulated",
-                "affected_value|.data",
-                "rule|accumulated across payloads",
-                "contrast|raw deltas",
-            ],
-        },
-        source_ref=clause["clause_id"],
-        source_text=source,
-        conditions=(),
-        exceptions=(),
-        decision_fingerprints={},
-    )
-    contract = compile_source_contract(
-        clause=clause,
-        decisions=decisions,
-        extractions=extractions,
-        behavior_family=family,
-        source_interpretation=interpretation,
-    )
-
-    data = contract.to_data()
-    restored = PartialSemanticContract.from_data(data)
-    projection = project_partial_contract_to_legacy_design(restored)
-
-    assert data["behavior"]["family"] == "other"
-    assert data["gaps"]["source_meaning"]["status"] == "interpreted"
-    assert data["gaps"]["registry_label"]["status"] == "unregistered"
-    assert restored.fingerprint == contract.fingerprint
-    assert "across successive events" in projection["expected_test"]
-    assert "rather than raw deltas" in projection["expected_test"]
-
-
 def test_field_faithfulness_rejects_invented_candidate() -> None:
     clause = _clause()
     decisions = _bind_source_decisions(clause)
@@ -1452,40 +1322,6 @@ def test_procedrr_command_boundary_persists_intermediate_artifacts(
             "decisions": bound["decisions"],
         },
     )
-    interpretation_plan = runtime.dispatch(
-        "prepare_source_interpretation",
-        ["prepare_source_interpretation"],
-        {
-            "clause": clause,
-            "decisions": bound["decisions"],
-            "extractions": extracted["extractions"],
-            "behavior_family_request": family_request,
-            "behavior_family_result": {
-                "status": "resolved",
-                "value": "serialize",
-                "reason_code": None,
-            },
-        },
-    )
-    unresolved_interpretation = {
-        "subject": None,
-        "operation": None,
-        "affected_value": None,
-        "rule": None,
-        "contrast": None,
-        "behavior_form": "unclear",
-        "result_presence": "unspecified",
-        "event_scope": "unspecified",
-        "contrast_presence": "absent",
-        "unresolved_fields": [
-            "subject|source_underspecified",
-            "operation|source_underspecified",
-            "affected_value|source_underspecified",
-            "rule|source_underspecified",
-            "behavior_form|source_underspecified",
-        ],
-        "field_evidence": [],
-    }
     projection = runtime.dispatch(
         "compile_partial_semantic_contract",
         ["compile_partial_semantic_contract"],
@@ -1499,9 +1335,6 @@ def test_procedrr_command_boundary_persists_intermediate_artifacts(
                 "value": "serialize",
                 "reason_code": None,
             },
-            "behavior_family_decision": interpretation_plan["behavior_family_decision"],
-            "source_interpretation_request": interpretation_plan["request"],
-            "source_interpretation_result": unresolved_interpretation,
         },
     )
 

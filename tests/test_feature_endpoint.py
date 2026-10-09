@@ -2954,26 +2954,6 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                     "value": "create",
                     "reason_code": None,
                 }
-            if "source-supported operation and behavior rule" in question:
-                return {
-                    "subject": None,
-                    "operation": None,
-                    "affected_value": None,
-                    "rule": None,
-                    "contrast": None,
-                    "behavior_form": "unclear",
-                    "result_presence": "unspecified",
-                    "event_scope": "unspecified",
-                    "contrast_presence": "absent",
-                    "unresolved_fields": [
-                        "subject|source_underspecified",
-                        "operation|source_underspecified",
-                        "affected_value|source_underspecified",
-                        "rule|source_underspecified",
-                        "behavior_form|source_underspecified",
-                    ],
-                    "field_evidence": [],
-                }
             if "candidate field" in question:
                 return {
                     "status": "resolved",

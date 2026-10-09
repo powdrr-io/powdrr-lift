@@ -57,7 +57,6 @@ from powdrr_lift.core.semantic_faithfulness import (
     finalize_scenario_claim_reviews,
     prepare_scenario_claim_reviews,
 )
-from powdrr_lift.core.source_interpretation import SourceInterpretationError
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.obligation_evidence import (
     ObligationEvidenceContract,
@@ -88,7 +87,6 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
     bind_behavior_family_decision,
     bind_field_entailment_reviews,
     bind_source_extractions,
-    bind_source_interpretation,
     bind_source_semantic_decisions,
     compile_deterministic_source_extractions,
     compile_source_contract,
@@ -97,7 +95,6 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
     prepare_dependent_source_semantic_decisions,
     prepare_field_entailment_reviews,
     prepare_source_extractions,
-    prepare_source_interpretation,
     prepare_source_semantic_decisions,
     project_partial_contract_to_legacy_design,
 )
@@ -415,28 +412,6 @@ def feature_command_catalog(
             output_schema={},
             logic=implementations.get("prepare_behavior_family_decision"),
         ),
-        "prepare_source_interpretation": CommandSpec(
-            name="prepare_source_interpretation",
-            input_schema=object_schema(
-                {
-                    "clause": {},
-                    "decisions": {},
-                    "extractions": {},
-                    "behavior_family_request": {},
-                    "behavior_family_result": {},
-                },
-                required=(
-                    "clause",
-                    "decisions",
-                    "extractions",
-                    "behavior_family_request",
-                    "behavior_family_result",
-                ),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("prepare_source_interpretation"),
-        ),
         "compile_partial_semantic_contract": CommandSpec(
             name="compile_partial_semantic_contract",
             input_schema=object_schema(
@@ -446,9 +421,6 @@ def feature_command_catalog(
                     "extractions": {},
                     "behavior_family_request": {},
                     "behavior_family_result": {},
-                    "behavior_family_decision": {},
-                    "source_interpretation_request": {},
-                    "source_interpretation_result": {},
                 },
                 required=(
                     "clause",
@@ -456,9 +428,6 @@ def feature_command_catalog(
                     "extractions",
                     "behavior_family_request",
                     "behavior_family_result",
-                    "behavior_family_decision",
-                    "source_interpretation_request",
-                    "source_interpretation_result",
                 ),
                 additional_properties=False,
             ),
@@ -2319,72 +2288,27 @@ class FeatureCommandRuntime:
             except SemanticContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
-        def prepare_source_interpretation_operation() -> Any:
+        def compile_partial_semantic_contract_operation() -> Any:
+            clause = semantic_clause()
             family_request = parameters.get("behavior_family_request")
             family_result = parameters.get("behavior_family_result")
             if not isinstance(family_request, Mapping) or not isinstance(
                 family_result, Mapping
             ):
                 raise PowdrrExecutionError("behavior-family decision is malformed")
-            decisions = semantic_decisions(parameters.get("decisions"))
             try:
                 family = bind_behavior_family_decision(
                     family_request,
                     family_result,
                     benchmark_mode=benchmark_mode(),
                 )
-                request = prepare_source_interpretation(
-                    semantic_clause(),
-                    decisions,
-                    semantic_extractions(parameters.get("extractions")),
-                    family,
-                )
-            except (SemanticContractError, SemanticDecisionError) as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-            return {
-                "request": request,
-                "behavior_family_decision": family.to_data(),
-            }
-
-        def compile_partial_semantic_contract_operation() -> Any:
-            clause = semantic_clause()
-            family_request = parameters.get("behavior_family_request")
-            family_result = parameters.get("behavior_family_result")
-            family_decision = parameters.get("behavior_family_decision")
-            interpretation_request = parameters.get("source_interpretation_request")
-            interpretation_result = parameters.get("source_interpretation_result")
-            if (
-                not isinstance(family_request, Mapping)
-                or not isinstance(family_result, Mapping)
-                or not isinstance(family_decision, Mapping)
-                or not isinstance(interpretation_request, Mapping)
-                or not isinstance(interpretation_result, Mapping)
-            ):
-                raise PowdrrExecutionError("source interpretation inputs are malformed")
-            try:
-                decisions = semantic_decisions(parameters.get("decisions"))
-                extractions = semantic_extractions(parameters.get("extractions"))
-                family = SemanticDecision.from_data(family_decision)
-                interpretation = bind_source_interpretation(
-                    interpretation_request,
-                    interpretation_result,
-                    decisions,
-                    extractions,
-                    family,
-                    benchmark_mode=benchmark_mode(),
-                )
                 contract = compile_source_contract(
                     clause=clause,
-                    decisions=decisions,
-                    extractions=extractions,
+                    decisions=semantic_decisions(parameters.get("decisions")),
+                    extractions=semantic_extractions(parameters.get("extractions")),
                     behavior_family=family,
-                    source_interpretation=interpretation,
                 )
-            except (
-                SemanticContractError,
-                SemanticDecisionError,
-                SourceInterpretationError,
-            ) as exc:
+            except (SemanticContractError, SemanticDecisionError) as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
             path = semantic_artifact_directory(clause) / "partial-contract.json"
             document = contract.to_data()
@@ -3293,9 +3217,6 @@ class FeatureCommandRuntime:
                 ),
                 "prepare_behavior_family_decision": bind_handler(
                     prepare_behavior_family_decision_operation
-                ),
-                "prepare_source_interpretation": bind_handler(
-                    prepare_source_interpretation_operation
                 ),
                 "compile_partial_semantic_contract": bind_handler(
                     compile_partial_semantic_contract_operation

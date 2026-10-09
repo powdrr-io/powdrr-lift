@@ -226,6 +226,34 @@ def test_split_clause_classifier_receives_parent_sentence_as_context() -> None:
     assert request["spec"]["context_text"] == source
 
 
+def test_routing_request_defines_choice_meanings_and_separates_target_context() -> None:
+    target = "The parser must retain offsets."
+    source = f"The parser currently cannot retain offsets. {target}"
+    start = source.index(target)
+    clause = {
+        **_clause(target),
+        "source_span": {"start": start, "end": start + len(target)},
+    }
+
+    request = prepare_source_semantic_decisions(
+        clause, source_text=source, created_at=NOW
+    )["pending_specs"][0]
+
+    assert set(request["criteria"]) == set(DECISION_VALUES["routing"])
+    assert "is" in request["criteria"]["context"]
+    assert "must, should, will" in request["criteria"]["include"]
+    assert "Start by running" in request["criteria"]["include"]
+    assert "On exit, the data is removed" in request["criteria"]["include"]
+    assert (
+        "Repeated writes must not create duplicate records"
+        in request["criteria"]["include_prohibition"]
+    )
+    assert request["provider_state"] == {
+        "proposition": target,
+        "local_context": "The parser currently cannot retain offsets.\n" + target,
+    }
+
+
 def test_classifier_prompts_do_not_emit_task_specific_worked_examples() -> None:
     clause = _clause("Archived records retain their original field values.")
     root_request = prepare_source_semantic_decisions(clause, created_at=NOW)[

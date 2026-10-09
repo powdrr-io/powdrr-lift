@@ -59,6 +59,7 @@ class ClassifierDefinition:
     question: str
     instructions: tuple[str, ...]
     examples: tuple[ClassificationExample, ...] = ()
+    criteria: tuple[tuple[str, str], ...] = ()
 
 
 CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
@@ -82,6 +83,13 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             "Choose unclear when the source does not support one of these routes "
             "without guessing. Mixed statements should be split first when their "
             "parts can be represented independently.",
+            "Use the complete instruction ledger only to determine whether this "
+            "exact proposition reports current behavior or requests a change. "
+            "Do not classify sibling clauses or transfer their obligations to "
+            "this proposition.",
+            "When scope_relations are present, use only records that apply to "
+            "this child. Preserve Boolean grouping and unclear attachments; do "
+            "not transfer a modifier, condition, or requirement to another child.",
             "Do not decide the detailed product kind, strength, scope, or test "
             "oracle in this routing decision.",
         ),
@@ -102,6 +110,53 @@ CLASSIFIER_DEFINITIONS: dict[str, ClassifierDefinition] = {
             ),
             ClassificationExample("Run the unit tests before submitting.", "exclude"),
             ClassificationExample("It should work well.", "unclear"),
+        ),
+        criteria=(
+            (
+                "context",
+                "A product fact, current condition, limitation, or motivation that "
+                "explains the request without specifying desired behavior. An 'is' "
+                "sentence is often context when it reports the present state: "
+                "'The cache is currently shared by every worker.' A deficiency "
+                "such as 'The parser currently cannot retain offsets' is context, "
+                "not a prohibition. Do not use this for a declarative requirement "
+                "such as 'On exit, the data is removed.'",
+            ),
+            (
+                "include",
+                "Positive product behavior, an interface, invariant, definition, "
+                "or implementation guidance that the product should have. It may "
+                "be stated with must, should, will, or an imperative such as start, "
+                "or as a declarative/passive requirement: 'On exit, the data is "
+                "removed.' 'Should' may express product guidance; workflow verbs "
+                "such as 'Start by running the tests' are exclude instead.",
+            ),
+            (
+                "include_prohibition",
+                "An explicit direction that product behavior must not be built, "
+                "supported, or allowed. Example: 'Do not add automatic retries.' "
+                "This also includes an invariant that explicitly prevents an "
+                "undesired product outcome, such as 'Repeated writes must not "
+                "create duplicate records.' A report that something currently "
+                "cannot happen is context, not an instruction to prohibit it. "
+                "A required rejection such as 'Reject malformed inputs' is "
+                "positive product behavior and belongs to include.",
+            ),
+            (
+                "exclude",
+                "A process, delivery, or repository instruction unrelated to "
+                "product behavior. Example: 'Run the unit tests before "
+                "submitting.' Future-tense wording alone does not make a product "
+                "requirement: 'The release will be reviewed on Friday' is exclude.",
+            ),
+            (
+                "unclear",
+                "The available sentence and source context do not establish "
+                "whether this is a product requirement, background fact, or "
+                "process instruction. Use only when the distinction cannot be "
+                "resolved without guessing. Example without a heading or context: "
+                "'The cache is shared.'",
+            ),
         ),
     ),
     "disposition": ClassifierDefinition(
@@ -932,7 +987,13 @@ def prepare_source_semantic_decisions(
     spec = _decision_spec(
         clause_id, text, source_fingerprint, "routing", context_text=context_text
     )
-    return {
+    allowed_values = sorted(DECISION_VALUES[spec.decision_kind])
+    criteria = dict(definition.criteria)
+    if criteria and set(criteria) != set(allowed_values):
+        raise SemanticContractError(
+            f"{spec.decision_kind} classifier criteria do not match allowed values"
+        )
+    request = {
         "resolved_decisions": [],
         "pending_specs": [_classifier_request(spec, CLASSIFIER_DEFINITIONS["routing"])],
     }
@@ -1782,12 +1843,20 @@ def _classifier_request(
         "spec": spec.to_data(),
         "question": definition.question,
         "instructions": instructions,
-        "allowed_values": sorted(DECISION_VALUES[spec.decision_kind]),
+        "allowed_values": allowed_values,
         "subject_text": format_classifier_input(
             spec.proposition_text,
             {context_key: spec.context_text} if spec.context_text else None,
         ),
     }
+    if criteria:
+        request["criteria"] = criteria
+    if spec.decision_kind == "routing":
+        request["provider_state"] = {
+            "proposition": spec.proposition_text,
+            "local_context": spec.context_text,
+        }
+    return request
 
 
 def _decision_spec(

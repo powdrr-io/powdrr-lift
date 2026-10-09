@@ -39,77 +39,6 @@ class BehaviorContractError(ValueError):
 
 
 @dataclass(frozen=True, slots=True)
-class CriterionQuality:
-    """Keep source preservation separate from acceptance-check quality."""
-
-    requirement_status: str = "preserved"
-    criterion_status: str = "unassessed"
-    failure_stage: str | None = None
-    failure_reason: str | None = None
-    repair_attempts: int = 0
-
-    def to_data(self) -> dict[str, Any]:
-        return {
-            "requirement_status": self.requirement_status,
-            "criterion_status": self.criterion_status,
-            "failure_stage": self.failure_stage,
-            "failure_reason": self.failure_reason,
-            "repair_attempts": self.repair_attempts,
-        }
-
-    @classmethod
-    def from_data(cls, raw: Mapping[str, Any]) -> CriterionQuality:
-        requirement_status = raw.get("requirement_status", "preserved")
-        criterion_status = raw.get("criterion_status", "unassessed")
-        failure_stage = raw.get("failure_stage")
-        failure_reason = raw.get("failure_reason")
-        repair_attempts = raw.get("repair_attempts", 0)
-        if requirement_status not in {"preserved", "missing", "not_applicable"}:
-            raise BehaviorContractError("criterion requirement_status is invalid")
-        if criterion_status not in {
-            "checkable",
-            "source_only",
-            "unresolved",
-            "unassessed",
-            "not_applicable",
-        }:
-            raise BehaviorContractError("criterion_status is invalid")
-        if (requirement_status == "not_applicable") != (
-            criterion_status == "not_applicable"
-        ):
-            raise BehaviorContractError(
-                "criterion requirement and criterion statuses disagree"
-            )
-        if failure_stage is not None and (
-            not isinstance(failure_stage, str) or not failure_stage.strip()
-        ):
-            raise BehaviorContractError("criterion failure_stage is invalid")
-        if failure_reason is not None and (
-            not isinstance(failure_reason, str) or not failure_reason.strip()
-        ):
-            raise BehaviorContractError("criterion failure_reason is invalid")
-        if criterion_status in {"source_only", "unresolved"} and (
-            failure_stage is None or failure_reason is None
-        ):
-            raise BehaviorContractError(
-                "degraded criterion quality requires a failure stage and reason"
-            )
-        if (
-            not isinstance(repair_attempts, int)
-            or isinstance(repair_attempts, bool)
-            or repair_attempts < 0
-        ):
-            raise BehaviorContractError("criterion repair_attempts is invalid")
-        return cls(
-            requirement_status=str(requirement_status),
-            criterion_status=str(criterion_status),
-            failure_stage=failure_stage,
-            failure_reason=failure_reason,
-            repair_attempts=repair_attempts,
-        )
-
-
-@dataclass(frozen=True, slots=True)
 class BehaviorScenario:
     """One observable behavior and its executable proof obligation."""
 
@@ -132,11 +61,6 @@ class BehaviorScenario:
     validation_group_id: str | None = None
     validation_relation: str = "independent"
     routing: str = "include"
-    criterion_quality: CriterionQuality = field(default_factory=CriterionQuality)
-
-    @property
-    def criterion_status(self) -> str:
-        return self.criterion_quality.criterion_status
 
     def to_data(self) -> dict[str, Any]:
         data = {
@@ -150,7 +74,6 @@ class BehaviorScenario:
             "evidence": list(self.evidence),
             "validator": self.validator,
             "routing": self.routing,
-            "criterion_quality": self.criterion_quality.to_data(),
             "related_requirements": list(self.related_requirements),
             "capability_matrix": [
                 {**dict(item), "evidence": list(item["evidence"])}
@@ -387,12 +310,6 @@ def compile_behavior_scenarios(
             "unclear",
         }:
             raise BehaviorContractError(f"scenario {scenario_id} routing is invalid")
-        raw_quality = item.get("criterion_quality", {})
-        if not isinstance(raw_quality, Mapping):
-            raise BehaviorContractError(
-                f"scenario {scenario_id} criterion_quality is malformed"
-            )
-        criterion_quality = CriterionQuality.from_data(raw_quality)
         scenarios.append(
             BehaviorScenario(
                 scenario_id=scenario_id,
@@ -413,7 +330,6 @@ def compile_behavior_scenarios(
                 validation_group_id=validation_group_id,
                 validation_relation=str(validation_relation),
                 routing=str(routing),
-                criterion_quality=criterion_quality,
             )
         )
     return tuple(scenarios)
@@ -440,25 +356,10 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
     implementation_scenarios = [
         item for item in scenarios if item.routing in {"include", "include_prohibition"}
     ]
-    checkable_scenarios = [
-        item
-        for item in implementation_scenarios
-        if item.criterion_status == "checkable"
-    ]
-    unassessed_scenarios = [
-        item
-        for item in implementation_scenarios
-        if item.criterion_status in {"unassessed", "unresolved"}
-    ]
-    source_only_scenarios = [
-        item
-        for item in implementation_scenarios
-        if item.criterion_status == "source_only"
-    ]
     unclear_scenarios = [item for item in scenarios if item.routing == "unclear"]
     related_requirements: list[str] = []
     seen_related_requirements: set[str] = set()
-    for index, item in enumerate(checkable_scenarios, start=1):
+    for index, item in enumerate(implementation_scenarios, start=1):
         detail = (
             f"{index}. [{item.scenario_id}] Given {_worker_text(item.given)}, "
             f"when {item.when}, expect {_worker_text(item.then)} "
@@ -501,66 +402,6 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
             if normalized not in seen_related_requirements:
                 seen_related_requirements.add(normalized)
                 related_requirements.append(relationship)
-    if not checkable_scenarios:
-        lines[2:2] = [
-            "No behavior scenario has yet been assessed as a checkable acceptance "
-            "criterion. Requirements below remain in force.",
-            "",
-        ]
-    if unassessed_scenarios:
-        lines.extend(
-            (
-                "",
-                "Behavior scenarios not yet assessed as acceptance checks:",
-                "These are candidate interpretations. Implement the source "
-                "requirements, and do not treat these scenarios as verified test "
-                "oracles.",
-            )
-        )
-        for index, item in enumerate(unassessed_scenarios, start=1):
-            detail = (
-                f"{index}. [{item.scenario_id}] Given {_worker_text(item.given)}, "
-                f"when {item.when}, candidate outcome {_worker_text(item.then)} "
-                f"(subject: {item.subject}; quality: {item.criterion_status})."
-            )
-            if item.source_dimensions:
-                detail += (
-                    " Source semantic dimensions: "
-                    + "; ".join(
-                        f"{name} = {value}"
-                        for name, value in sorted(item.source_dimensions.items())
-                    )
-                    + "."
-                )
-            if item.semantic_dimension_applicability:
-                detail += (
-                    " Semantic dimensions not applicable to this scenario: "
-                    + "; ".join(
-                        f"{name} = {value}"
-                        for name, value in sorted(
-                            item.semantic_dimension_applicability.items()
-                        )
-                    )
-                    + "."
-                )
-            if item.unresolved_dimensions:
-                detail += (
-                    " Unresolved dimensions: "
-                    + ", ".join(item.unresolved_dimensions)
-                    + "."
-                )
-            lines.append(detail)
-    if source_only_scenarios:
-        lines.extend(
-            (
-                "",
-                "Source requirements without a derived acceptance check:",
-                "Each item remains a product requirement, but the pipeline did "
-                "not derive a behavior check for it.",
-            )
-        )
-        for item in source_only_scenarios:
-            lines.append(f"- [{item.scenario_id}] {_worker_text(item.then)}")
     if related_requirements:
         lines.extend(("", "Additional cross-requirement constraints:"))
         lines.extend(f"- {relationship}" for relationship in related_requirements)
@@ -752,7 +593,6 @@ __all__ = [
     "ASSUMPTION_BASES",
     "BehaviorContractError",
     "BehaviorScenario",
-    "CriterionQuality",
     "compile_behavior_scenarios",
     "render_behavior_matrix",
     "validate_capability_matrix",

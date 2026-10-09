@@ -127,16 +127,6 @@ outputs:
                 evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
                 validator: {type: string, minLength: 1}
                 routing: {type: string, enum: [include, include_prohibition, exclude, unclear]}
-                criterion_quality:
-                  type: object
-                  required: [requirement_status, criterion_status, failure_stage, failure_reason, repair_attempts]
-                  additionalProperties: false
-                  properties:
-                    requirement_status: {type: string, enum: [preserved, missing, not_applicable]}
-                    criterion_status: {type: string, enum: [checkable, source_only, unresolved, unassessed, not_applicable]}
-                    failure_stage: {type: [string, 'null']}
-                    failure_reason: {type: [string, 'null']}
-                    repair_attempts: {type: integer, minimum: 0}
                 validation_group_id: {type: string, minLength: 1}
                 validation_relation: {type: string, enum: [independent, all_together, ordered, alternatives, conditional]}
                 capability_matrix:

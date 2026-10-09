@@ -13,7 +13,6 @@ from typing import Any, cast
 from powdrr_lift.core.behavior_contract import (
     BEHAVIOR_DIMENSIONS,
     SUPPORTED_ASSUMPTION_DIMENSIONS,
-    CriterionQuality,
     compile_behavior_scenarios,
     validate_normative_assumptions,
 )
@@ -1598,32 +1597,7 @@ class FeatureCommandRuntime:
                 "clause_id": clause_id,
                 "source_text": text,
                 "reason": reason,
-                "criterion_quality": CriterionQuality(
-                    requirement_status=(
-                        "not_applicable"
-                        if isinstance(partial_contract, Mapping)
-                        and partial_contract.get("routing") in {"context", "exclude"}
-                        else "preserved"
-                    ),
-                    criterion_status=(
-                        "not_applicable"
-                        if isinstance(partial_contract, Mapping)
-                        and partial_contract.get("routing") in {"context", "exclude"}
-                        else "source_only"
-                    ),
-                    failure_stage=(
-                        "scenario_faithfulness"
-                        if details is not None
-                        else "scenario_generation"
-                    ),
-                    failure_reason=reason,
-                    repair_attempts=0,
-                ).to_data(),
-                "disposition": (
-                    partial_contract.get("disposition", "unknown")
-                    if isinstance(partial_contract, Mapping)
-                    else "unknown"
-                ),
+                "disposition": "invariant",
                 "details": dict(details or {}),
             }
             if isinstance(partial_contract, Mapping):
@@ -1697,34 +1671,10 @@ class FeatureCommandRuntime:
                     "capability_matrix": [],
                 },
             }
-            merged = _merge_behavior_scenario_values(
+            return _merge_behavior_scenario_values(
                 {"clause": clause, "design": fallback_design, "scenario": scenario},
                 benchmark_mode=True,
             )
-            compiled_scenario = merged.get("behavior_scenario")
-            if not isinstance(compiled_scenario, Mapping):
-                raise PowdrrExecutionError(
-                    "source-only fallback has no compiled behavior scenario"
-                )
-            fallback_quality = (
-                fallback.get("criterion_quality")
-                if isinstance(fallback, Mapping)
-                else None
-            )
-            if not isinstance(fallback_quality, Mapping):
-                fallback_quality = CriterionQuality(
-                    criterion_status="source_only",
-                    failure_stage="scenario_faithfulness",
-                    failure_reason="scenario faithfulness review rejected the check",
-                ).to_data()
-            return {
-                **merged,
-                "criterion_quality": dict(fallback_quality),
-                "behavior_scenario": {
-                    **dict(compiled_scenario),
-                    "criterion_quality": dict(fallback_quality),
-                },
-            }
 
         def merge_behavior_scenario_operation() -> Any:
             call_parameters = parameters
@@ -2626,22 +2576,12 @@ class FeatureCommandRuntime:
                 coverage_path.write_text(
                     json.dumps(
                         {
-                            "schema_version": "instruction-coverage-audit-v2",
+                            "schema_version": "instruction-coverage-audit-v1",
                             "instruction_ledger_fingerprint": ledger.fingerprint,
                             "instruction_ledger_artifact": str(
                                 state["instruction_ledger_path"]
                             ),
                             "status": "failed",
-                            "requirement_coverage": {
-                                "status": "incomplete",
-                                "total": len(source_records),
-                                "validated_source": sum(
-                                    record.get("status") == "source_validated"
-                                    for record in source_records
-                                ),
-                                "failed": len(source_errors),
-                            },
-                            "criterion_coverage": {"status": "unavailable"},
                             "records": source_records,
                             "errors": source_errors,
                         },
@@ -2668,20 +2608,12 @@ class FeatureCommandRuntime:
                 coverage_path.write_text(
                     json.dumps(
                         {
-                            "schema_version": "instruction-coverage-audit-v2",
+                            "schema_version": "instruction-coverage-audit-v1",
                             "instruction_ledger_fingerprint": ledger.fingerprint,
                             "instruction_ledger_artifact": str(
                                 state["instruction_ledger_path"]
                             ),
                             "status": "failed",
-                            "requirement_coverage": {
-                                "status": "incomplete",
-                                "total": len(source_records),
-                                "validated_source": len(source_records),
-                                "failed": 0,
-                                "design_compilation_failed": len(source_records),
-                            },
-                            "criterion_coverage": {"status": "unavailable"},
                             "records": source_records,
                             "errors": [str(exc)],
                         },
@@ -2710,11 +2642,6 @@ class FeatureCommandRuntime:
                         "end": clause.source_span[1],
                     },
                     "obligation_created": clause.clause_id in obligation_clause_ids,
-                    "criterion_quality": CriterionQuality(
-                        criterion_status="source_only",
-                        failure_stage="scenario_generation",
-                        failure_reason="no behavior scenario was produced",
-                    ).to_data(),
                 }
                 if not isinstance(raw_contract, Mapping):
                     final_record["status"] = "failed"
@@ -2772,91 +2699,22 @@ class FeatureCommandRuntime:
                             raise ValueError(
                                 "source route and compiled obligation coverage disagree"
                             )
-                        scenario = (
-                            decision.get("behavior_scenario")
-                            if isinstance(decision, Mapping)
-                            else None
-                        )
-                        projection = next(
-                            item
-                            for item in design.projections
-                            if item.clause_id == clause.clause_id
-                        )
-                        criterion_quality = (
-                            projection.criterion_quality
-                            if expected_obligation
-                            else CriterionQuality(
-                                requirement_status="not_applicable",
-                                criterion_status="not_applicable",
-                            )
-                        )
-                        final_record["criterion_quality"] = criterion_quality.to_data()
-                        if isinstance(scenario, Mapping) and expected_obligation:
-                            raw_scenario_quality = scenario.get("criterion_quality")
-                            scenario_status = (
-                                raw_scenario_quality.get("criterion_status")
-                                if isinstance(raw_scenario_quality, Mapping)
-                                else None
-                            )
-                            if scenario_status != projection.criterion_status:
-                                raise ValueError(
-                                    "scenario and design criterion quality disagree"
-                                )
-                        if (
-                            expected_obligation
-                            and criterion_quality.requirement_status != "preserved"
-                        ):
-                            raise ValueError("criterion quality status is invalid")
-                        final_record["requirement_status"] = "covered"
                         final_record["status"] = "covered"
                     except (StopIteration, TypeError, ValueError) as exc:
-                        final_record["requirement_status"] = "failed"
                         final_record["status"] = "failed"
                         final_record["error"] = str(exc)
                         coverage_errors.append(f"{clause.clause_id}: {exc}")
                 coverage_records.append(final_record)
             coverage_path = output_root / "instruction-coverage-audit.json"
-            criterion_counts = {
-                status: sum(
-                    isinstance(record.get("criterion_quality"), Mapping)
-                    and record["criterion_quality"].get("criterion_status") == status
-                    for record in coverage_records
-                )
-                for status in (
-                    "checkable",
-                    "source_only",
-                    "unresolved",
-                    "unassessed",
-                    "not_applicable",
-                )
-            }
-            applicable_criteria = sum(
-                record.get("obligation_created") is True for record in coverage_records
-            )
             coverage_path.write_text(
                 json.dumps(
                     {
-                        "schema_version": "instruction-coverage-audit-v2",
+                        "schema_version": "instruction-coverage-audit-v1",
                         "instruction_ledger_fingerprint": ledger.fingerprint,
                         "instruction_ledger_artifact": str(
                             state["instruction_ledger_path"]
                         ),
                         "status": "failed" if coverage_errors else "complete",
-                        "requirement_coverage": {
-                            "total": len(coverage_records),
-                            "covered": sum(
-                                record.get("requirement_status") == "covered"
-                                for record in coverage_records
-                            ),
-                            "failed": sum(
-                                record.get("requirement_status") == "failed"
-                                for record in coverage_records
-                            ),
-                        },
-                        "criterion_coverage": {
-                            "applicable_requirements": applicable_criteria,
-                            **criterion_counts,
-                        },
                         "records": coverage_records,
                         "errors": coverage_errors,
                     },
@@ -2972,18 +2830,16 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(str(exc)) from exc
             obligations = []
             for index, item in enumerate(design.obligations, start=1):
-                projection_data = item.projection.to_data()
-                projection_data["evidence_contract"] = evidence_by_clause[
-                    item.clause_id
-                ]
+                projection = item.projection.to_data()
+                projection["evidence_contract"] = evidence_by_clause[item.clause_id]
                 repository_binding = repository_bindings_by_clause.get(item.clause_id)
                 if repository_binding is not None:
-                    projection_data["repository_binding"] = dict(repository_binding)
+                    projection["repository_binding"] = dict(repository_binding)
                 obligations.append(
                     {
                         "id": f"sentence-{index}",
                         "description": item.projection.description,
-                        "design": projection_data,
+                        "design": projection,
                     }
                 )
             semantic_cases = [
@@ -4131,34 +3987,7 @@ def _merge_behavior_scenario_values(
         raise PowdrrExecutionError(
             f"behavior scenario is incomplete: {error}"
         ) from error
-    criterion_status = "unresolved" if compiled.unresolved_dimensions else "unassessed"
-    criterion_is_applicable = compiled.routing not in {"context", "exclude"}
-    criterion_quality = CriterionQuality(
-        requirement_status="preserved" if criterion_is_applicable else "not_applicable",
-        criterion_status=criterion_status
-        if criterion_is_applicable
-        else "not_applicable",
-        failure_stage=(
-            "scenario_resolution"
-            if criterion_is_applicable and compiled.unresolved_dimensions
-            else None
-        ),
-        failure_reason=(
-            "scenario retains unresolved dimensions"
-            if criterion_is_applicable and compiled.unresolved_dimensions
-            else None
-        ),
-        repair_attempts=0,
-    )
-    compiled_scenario = {
-        **compiled.to_data(),
-        "criterion_quality": criterion_quality.to_data(),
-    }
-    return {
-        **dict(design),
-        "criterion_quality": criterion_quality.to_data(),
-        "behavior_scenario": compiled_scenario,
-    }
+    return {**dict(design), "behavior_scenario": compiled.to_data()}
 
 
 def _canonicalize_scenario_source_dimensions(

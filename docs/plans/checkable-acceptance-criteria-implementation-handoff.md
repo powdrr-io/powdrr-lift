@@ -189,9 +189,6 @@ Add `CriterionQuality` alongside current scenario serialization:
 
 - `requirement_status`: `preserved` or `missing`; never derive it from quality.
 - `criterion_status`: `checkable`, `source_only`, or `unresolved`.
-- Add `unassessed` for legacy or normally generated scenarios whose adequacy has
-  not yet been reviewed, and `not_applicable` for context/process clauses. Do not
-  mark the current nonfallback scenarios checkable merely because they parsed.
 - `checkable`: supported operation, observation, and assertion have passed review;
   this does not mean an executable test exists or has passed.
 - `source_only`: source obligation retained without a useful check.

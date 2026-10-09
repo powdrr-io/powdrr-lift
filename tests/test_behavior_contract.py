@@ -23,7 +23,6 @@ from powdrr_lift.workrr.coding_agent_validation import (
 def _scenario() -> dict[str, Any]:
     return {
         "scenario_id": "nested-error-continues",
-        "criterion_quality": {"criterion_status": "checkable"},
         "subject": "record processor",
         "given": {"result": "nested error with source location"},
         "when": "process this record followed by a valid record",
@@ -69,62 +68,6 @@ def test_behavior_scenario_is_rendered_as_a_concrete_check() -> None:
     assert restored.render() == rendered
 
 
-def test_legacy_scenario_defaults_to_unassessed() -> None:
-    scenario = _scenario()
-    scenario.pop("criterion_quality")
-
-    compiled = compile_behavior_scenarios((scenario,))[0]
-    rendered = compile_implementation_packet(
-        objective="process nested results",
-        obligations=("preserve nested error details",),
-        required_tests=({"description": "errors and continuation"},),
-        allowed_paths=("src/", "tests/"),
-        validation_profiles=("pytest",),
-        behavior_scenarios=(scenario,),
-    ).render()
-
-    assert compiled.criterion_status == "unassessed"
-    assert "not yet assessed as acceptance checks" in rendered
-    assert "candidate outcome errors: preserved with location" in rendered
-
-
-def test_source_only_requirement_is_not_rendered_as_an_acceptance_check() -> None:
-    scenario = _scenario()
-    scenario["criterion_quality"] = {
-        "requirement_status": "preserved",
-        "criterion_status": "source_only",
-        "failure_stage": "scenario_faithfulness",
-        "failure_reason": "generated check claims are unsupported",
-        "repair_attempts": 0,
-    }
-    scenario["then"] = "Deferred fields merge at the supplied path."
-
-    rendered = compile_implementation_packet(
-        objective="merge deferred GraphQL fields",
-        obligations=("Deferred fields merge at the supplied path.",),
-        required_tests=({"description": "deferred field merge"},),
-        allowed_paths=("src/", "tests/"),
-        validation_profiles=("pytest",),
-        behavior_scenarios=(scenario,),
-    ).render()
-
-    assert "Source requirements without a derived acceptance check:" in rendered
-    assert (
-        "[nested-error-continues] Deferred fields merge at the supplied path."
-        in rendered
-    )
-    assert "Given" not in rendered
-    assert "No behavior scenario has yet been assessed" in rendered
-
-
-def test_unknown_criterion_quality_status_is_rejected() -> None:
-    scenario = _scenario()
-    scenario["criterion_quality"] = {"criterion_status": "resolved"}
-
-    with pytest.raises(BehaviorContractError, match="criterion_status is invalid"):
-        compile_behavior_scenarios((scenario,))
-
-
 def test_source_semantic_result_remains_distinct_from_its_default() -> None:
     scenario = _scenario()
     scenario["source_dimensions"] = {"copy_depth": "unspecified"}
@@ -162,13 +105,6 @@ def test_semantic_dimension_applicability_and_unresolved_state_are_rendered() ->
     }
     scenario["semantic_dimension_applicability"] = {"copy_depth": "not_applicable"}
     scenario["unresolved_dimensions"] = ["object_identity"]
-    scenario["criterion_quality"] = {
-        "requirement_status": "preserved",
-        "criterion_status": "unresolved",
-        "failure_stage": "scenario_resolution",
-        "failure_reason": "object identity is unspecified",
-        "repair_attempts": 0,
-    }
 
     compiled = compile_behavior_scenarios((scenario,))[0]
     packet = compile_implementation_packet(

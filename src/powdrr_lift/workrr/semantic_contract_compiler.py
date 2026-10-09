@@ -1011,8 +1011,6 @@ def prepare_dependent_source_semantic_decisions(
         raise SemanticContractError("decision tree requires exactly one routing root")
     root = roots[0]
     if root.result.status != "resolved" or root.result.value is None:
-        # Keep an unresolved route available for diagnosis without creating
-        # downstream product classifications from it.
         return {"resolved_decisions": [root.to_data()], "pending_specs": []}
     timestamp = created_at or _created_at()
     route = root.result.value
@@ -1214,22 +1212,6 @@ def bind_source_semantic_decisions(
         if (
             spec.decision_kind == "routing"
             and result_is_resolved
-            and result.get("value") == "unclear"
-        ):
-            # `unclear` is an abstention, not a route that downstream stages
-            # may interpret as a candidate product obligation.
-            provider_result = {
-                "status": "unresolved",
-                "reason_code": "source_ambiguous",
-            }
-            evidence_refs = (
-                *evidence_refs,
-                "classifier:unclear-route:source-ambiguous",
-            )
-            result_is_resolved = False
-        if (
-            spec.decision_kind == "routing"
-            and result_is_resolved
             and result.get("value") == "include_prohibition"
             and not has_explicit_prohibition_directive(spec.proposition_text)
         ):
@@ -1250,6 +1232,17 @@ def bind_source_semantic_decisions(
                 str(result.get("value")), values.get("routing")
             )
         )
+        if (
+            spec.decision_kind == "disposition"
+            and values.get("routing") == "include"
+            and (not result_is_resolved or result_conflicts_with_route)
+        ):
+            provider = SemanticDecisionProvider(kind="deterministic-rule")
+            provider_result = {"status": "resolved", "value": "invariant"}
+            evidence_refs = (
+                *evidence_refs,
+                "fallback:include-without-product-kind:invariant",
+            )
         if benchmark_mode:
             fallback = _normative_source_decision_default(spec, decisions)
             if (
@@ -1288,12 +1281,12 @@ def _normative_source_decision_default(
     root = values.get("disposition")
     route = values.get("routing")
     if spec.decision_kind == "routing":
-        return None
+        return "include"
     if spec.decision_kind == "disposition":
         if route == "include_prohibition":
             return "non_goal"
         if route == "include":
-            return None
+            return "invariant"
         if route in {"context", "exclude"}:
             return "context"
         return None

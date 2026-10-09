@@ -642,7 +642,7 @@ def test_checked_in_design_interview_definition_parses() -> None:
     assert validate_single_decision(document) == ()
 
 
-def test_behavioral_contract_provider_schema_uses_supported_array_constraints() -> None:
+def test_design_interview_has_no_behavioral_contract_result_stage() -> None:
     from pathlib import Path
 
     document = parse_and_validate(
@@ -666,10 +666,7 @@ def test_behavioral_contract_provider_schema_uses_supported_array_constraints() 
 
     collect_contract_schemas(document["steps"])
 
-    assert len(schemas) == 1
-    properties = schemas[0]["properties"]
-    assert "uniqueItems" not in properties["member_indexes"]
-    assert "uniqueItems" not in properties["context_indexes"]
+    assert schemas == []
 
 
 def test_design_interview_uses_single_field_source_classification() -> None:
@@ -752,7 +749,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     assert "compile_partial_semantic_contract" in flow_text
 
 
-def test_design_interview_generates_typed_acceptance_criteria_last() -> None:
+def test_design_interview_has_no_acceptance_criteria_compiler_stage() -> None:
     from pathlib import Path
 
     from procedrr import parse_and_validate
@@ -765,42 +762,8 @@ def test_design_interview_generates_typed_acceptance_criteria_last() -> None:
         for step in document["steps"]
         if isinstance(step, dict) and isinstance(step.get("operation"), dict)
     ]
-    assert operation_names.index("prepare_acceptance_criteria") > operation_names.index(
-        "bind_behavioral_contracts"
-    )
-
-    judges: list[dict[str, Any]] = []
-
-    def collect(value: Any) -> None:
-        if isinstance(value, dict):
-            if isinstance(value.get("judge"), dict):
-                judges.append(value["judge"])
-            for nested in value.values():
-                collect(nested)
-        elif isinstance(value, list):
-            for nested in value:
-                collect(nested)
-
-    collect(document["steps"])
-    criterion_judges = [
-        item
-        for item in judges
-        if item.get("question", "").startswith("What one compact acceptance criterion")
-        or item.get("question", "").startswith("Repair only this atomic requirement")
-    ]
-    assert len(criterion_judges) == 2
-    for judge in criterion_judges:
-        schema = judge["output"]["schema"]
-        assert schema["required"] == ["criterion"]
-        assert schema["properties"]["criterion"]["type"] == "object"
-        assert (
-            schema["properties"]["criterion"]["properties"]["assertions"]["items"][
-                "type"
-            ]
-            == "object"
-        )
-        assert "JSON object string" not in " ".join(judge["instructions"])
-        assert any("behavioral contract" in item for item in judge["instructions"])
+    assert "prepare_acceptance_criteria" not in operation_names
+    assert "bind_behavioral_contracts" not in operation_names
 
 
 def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:

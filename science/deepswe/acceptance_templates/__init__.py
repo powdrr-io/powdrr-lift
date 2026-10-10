@@ -1,4 +1,4 @@
 """Offline acceptance-criteria experiments; never invoked by production."""
 
-SCHEMA_VERSION = 1
-PROMPT_VERSION = "acceptance-template-pilot-v1"
+SCHEMA_VERSION = 3
+PROMPT_VERSION = "acceptance-template-evidence-v3"

@@ -1,0 +1,37 @@
+{
+  "provider": "deepinfra",
+  "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "catalog_sha256": "0c35dc83a0e558f09b308df6c68fdf39516a06f43ba18c5f3a633345afcaeb47",
+  "batch_size": 3,
+  "output_tokens": 12288,
+  "repairs": 1,
+  "tasks": [
+    "helm-array-merge-strategies",
+    "dateutil-rfc5545-timezone-interop"
+  ],
+  "arms": [
+    "templates"
+  ],
+  "failures": [],
+  "inventory_sources": {
+    "helm-array-merge-strategies": {
+      "generation_sha256": "5c8387873bf9004fec55b5f39330df0c2f3da89d5192298dbb1c3567007e2f97",
+      "inventory_sha256": "ed0088ba5a81e983aeffa6d24a7cbe92ca52d86245ad348d8a28f0390ee3d7cb",
+      "input_sha256": "9234c56d4ba7f2160fb8989e0a2e51a457e5603e23a03a5650e27a94cf65ce3c"
+    },
+    "dateutil-rfc5545-timezone-interop": {
+      "generation_sha256": "a43d2b2b547fd72d2686f05f972c10e25efb56225f5e8c34f379cdf1564c930e",
+      "inventory_sha256": "590fef0ec885c5f7c2f1d4f1f8264248742660b5ab030c9a9e2f6cf38a631ac9",
+      "input_sha256": "29ed87a69cab68f21e44202c6268fc8df9c16de7f66f9f585a06d732d5892493"
+    }
+  },
+  "prompt_version": "acceptance-template-evidence-v3",
+  "comparison_scope": "Development rerun of template selection and binding. Original inventories and references unchanged; no new inventory or direct-generation calls.",
+  "generation_strategy": "binding_with_guard_confirmation",
+  "guard_provider": "deepinfra",
+  "guard_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "guard_baseline_sha256": {
+    "helm-array-merge-strategies": "abbe2783b943ac46a4ec1cb822cdabf3cce2a25d3289c729d62f82876f96b893",
+    "dateutil-rfc5545-timezone-interop": "15807c926c09f6c9ea811819781ba496dd8a6256e97a0ec7a2b4628a5875cfe5"
+  }
+}

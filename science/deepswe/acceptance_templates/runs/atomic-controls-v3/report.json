@@ -1,0 +1,96 @@
+{
+  "label_status": "agent_authored",
+  "limitations": "Synthetic positive controls for the assertion reviewer; exact source and criteria preserved. Not human gold or a quality estimate.",
+  "fixtures_sha256": "0567047b3cf0e3fcff2f77c1d503e10b219b5d75f9707208d200b8f0c3d1e200",
+  "catalog_sha256": "0c35dc83a0e558f09b308df6c68fdf39516a06f43ba18c5f3a633345afcaeb47",
+  "phase": "atomic",
+  "repairs": 1,
+  "provider": "deepinfra",
+  "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+  "review_version": "v2",
+  "review_prompts_sha256": "3a422b1f7e6b89515da5a3a4ae39ce0f57c021bb45a2ad6cc5d640163b1f0076",
+  "passed": 2,
+  "check_count": 2,
+  "eligible_case_count": 2,
+  "checks": [
+    {
+      "case_id": "readonly-not-identity",
+      "phase": "atomic_support",
+      "target_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "identity-without-keyword",
+      "phase": "atomic_support",
+      "target_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    }
+  ],
+  "failures": [],
+  "calls": [
+    {
+      "stage": "extract-c001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.221,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "readonly-not-identity"
+    },
+    {
+      "stage": "support-c001-a001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.034,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "readonly-not-identity"
+    },
+    {
+      "stage": "support-c001-a002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.24,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "readonly-not-identity"
+    },
+    {
+      "stage": "extract-c001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.173,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "identity-without-keyword"
+    },
+    {
+      "stage": "support-c001-a001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.617,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "identity-without-keyword"
+    }
+  ],
+  "support_method": "isolated_assertions"
+}

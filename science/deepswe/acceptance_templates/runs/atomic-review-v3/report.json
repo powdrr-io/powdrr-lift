@@ -1,0 +1,76 @@
+{
+  "label_status": "agent_authored_spotcheck",
+  "limitations": "Replays of two known pilot reviewer mistakes with exact original model input and schema. Target labels stay outside model requests. Development checks, not a quality estimate.",
+  "fixtures_sha256": "437115afa0dc9e9bf37ecd52fd7bb4eff2b3683a9dc829c9697d612735cba8e3",
+  "catalog_sha256": "0c35dc83a0e558f09b308df6c68fdf39516a06f43ba18c5f3a633345afcaeb47",
+  "phase": "atomic",
+  "repairs": 1,
+  "provider": "deepinfra",
+  "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+  "review_version": "v2",
+  "review_prompts_sha256": "3a422b1f7e6b89515da5a3a4ae39ce0f57c021bb45a2ad6cc5d640163b1f0076",
+  "passed": 1,
+  "check_count": 1,
+  "eligible_case_count": 1,
+  "checks": [
+    {
+      "case_id": "cattrs-invented-policy",
+      "phase": "atomic_support",
+      "target_id": "c022",
+      "expected": [
+        "partial",
+        "unsupported"
+      ],
+      "observed": "partial",
+      "passed": true
+    }
+  ],
+  "failures": [],
+  "calls": [
+    {
+      "stage": "extract",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.174,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "cattrs-invented-policy"
+    },
+    {
+      "stage": "support-c022-a001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.461,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "cattrs-invented-policy"
+    },
+    {
+      "stage": "support-c022-a002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.222,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "cattrs-invented-policy"
+    },
+    {
+      "stage": "support-c022-a003",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.39,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "cattrs-invented-policy"
+    }
+  ],
+  "support_method": "isolated_assertions"
+}

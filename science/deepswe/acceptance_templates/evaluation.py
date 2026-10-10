@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -56,7 +57,39 @@ Residual requirement text is a fallback, not a generated validation, and is not
 scored as criterion coverage. Do not evaluate code execution or reproduce an
 incidental solution choice. Identify partial coverage rather than claiming full.
 Every supplied reference must have one row. Full/partial requires cited IDs;
-missing requires an empty ID list. Return JSON only."""
+missing requires an empty ID list. Coverage is satisfied by a sufficient set of
+criteria: a weak, duplicate, or unsupported extra criterion does not erase a
+correct criterion that fully states the reference. Evaluate those extras in the
+separate support audit. Do not downgrade coverage merely because another related
+criterion is vague. Return JSON only."""
+
+
+def coverage_response_schema(
+    references: list[dict[str, Any]], generation: dict[str, Any]
+) -> dict[str, Any]:
+    """Constrain citation namespaces and verdict count before decoding."""
+    schema = deepcopy(COVERAGE_SCHEMA)
+    props = schema["properties"]["coverage"]["items"]["properties"]
+    props["reference_id"] = choice_schema(*(row["id"] for row in references))
+    for field, rows in (
+        ("inventory_requirement_ids", requirements(generation["inventory"])),
+        ("criterion_ids", generation["criteria"]),
+    ):
+        props[field] = (
+            array_schema(choice_schema(*(row["id"] for row in rows)))
+            if rows
+            else {"type": "array", "items": TEXT, "maxItems": 0}
+        )
+    schema["properties"]["coverage"].update(
+        minItems=len(references), maxItems=len(references)
+    )
+    return schema
+
+
+def rendered_criteria(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Grade final text; hide unrendered slots and generator explanations."""
+    return [{"id": row["id"], "text": row["text"]} for row in rows]
+
 
 SUPPORT_PROMPT = """Review every emitted acceptance criterion against the original
 instruction. This is a separate precision audit, not a patch-test similarity
@@ -69,7 +102,12 @@ cardinality, timing, errors, identity, and allowed alternatives. Illustrative
 values are permissible only as examples of a general supported rule. Duplicate
 wording is not by itself a false positive. Process/branch/commit work must not be
 mandated of the coding agent. Return one row per supplied criterion with exact
-source IDs and an explanation. Return JSON only."""
+source IDs and an explanation. Read-only or equal contents do not imply object
+identity; ordering does not imply conflict precedence. Respecting a flag does
+not invent its policy for result fields. Evaluate all clauses of compound
+criteria independently before assigning their combined support status. Preserve
+operation scope and exceptions in the full source; a rule for coalescing does
+not automatically apply during merging. Return JSON only."""
 
 
 def validate_coverage(
@@ -137,6 +175,7 @@ def review(
     reference: dict[str, Any],
     recorder: Recorder,
     batch_size: int = 10,
+    atomic_support: bool = False,
 ) -> dict[str, Any]:
     if reference["instruction_sha256"] != digest(task["instruction"]):
         raise ValueError(
@@ -155,20 +194,44 @@ def review(
                     **task,
                     "references": batch,
                     "requirements": requirements(generation["inventory"]),
-                    "criteria": generation["criteria"],
+                    "criteria": rendered_criteria(generation["criteria"]),
                 },
-                COVERAGE_SCHEMA,
+                coverage_response_schema(batch, generation),
                 partial(validate_coverage, references=batch, generation=generation),
             )
         )
     criteria = generation["criteria"]
-    for offset in range(0, len(criteria), batch_size):
+    if atomic_support:
+        from .atomic_review import review_assertions
+
+        for criterion in criteria:
+            result = review_assertions(task, criterion, recorder)
+            support.append(
+                {
+                    "criterion_id": criterion["id"],
+                    "status": result["derived_status"],
+                    "source_ids": sorted(
+                        {
+                            sid
+                            for row in result["assertions"]
+                            for sid in row["source_ids"]
+                        }
+                    ),
+                    "rationale": "Derived from isolated assertion judgments: "
+                    + "; ".join(
+                        f"{row['text']}: {row['status']} — {row['rationale']}"
+                        for row in result["assertions"]
+                    ),
+                    "assertions": result["assertions"],
+                }
+            )
+    for offset in range(0, 0 if atomic_support else len(criteria), batch_size):
         batch = criteria[offset : offset + batch_size]
         support.extend(
             recorder.call(
                 f"support-{offset // batch_size:03}",
                 SUPPORT_PROMPT,
-                {**task, "criteria": batch},
+                {**task, "criteria": rendered_criteria(batch)},
                 SUPPORT_SCHEMA,
                 partial(validate_support, criteria=batch, task=task),
             )
@@ -179,6 +242,9 @@ def review(
         "generation_sha256": digest(generation),
         "reference_sha256": digest(reference),
         "review_status": "automated",
+        "support_method": "isolated_assertions"
+        if atomic_support
+        else "criterion_batches",
         "reviewer": {"provider": recorder.provider, "model": recorder.model},
         "coverage": coverage,
         "support": support,

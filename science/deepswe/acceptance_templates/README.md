@@ -4,6 +4,8 @@ A standalone science runner for the [template catalog proposal](../../../docs/pl
 
 The initial dataset has four tasks from repository families outside the twelve used to design the catalog: cattrs partial structuring, Helm merge strategies, Koota entity snapshots, and dateutil timezone interoperability. There are 91 agent-authored source-based reference validations, prepared before inspecting generated criteria. These are development evaluation labels, not human gold and not an untouched final holdout after this experiment.
 
+Start with [FOLLOWUP.md](FOLLOWUP.md) for the latest applicability fixes, failed approaches, reviewer calibration, and the mixed full-task results. [PILOT.md](PILOT.md) preserves the original experiment.
+
 ## Run an experiment
 
 Use the shared environment from AGENTS.md. From the repository root:
@@ -51,6 +53,12 @@ Both arms use the same generator, shared inventory, batch size, and per-call out
 
 The frozen [catalog.json](catalog.json) contains prose renderers, required/optional semantic slots, applicability descriptions, and near misses. Slot values are strings tagged with semantic kinds; validators check kinds, required slots, source IDs, and placeholders. They do not prove the resulting predicates follow from English. The review is intended to expose those semantic errors.
 
+The follow-up adds explicit prerequisites to T17 (value selection), T18 (collision precedence), and T31 (object identity). Order and read-only/equal-value language do not satisfy those prerequisites. Every accepted instance supplies prerequisite evidence; every filled parameter supplies an explanation and separate verbatim `{source_id, quote}` entries. Separate quotes allow evidence from several clauses without concatenating or inventing source text. Local checks verify quotation provenance, not semantic entailment. Negative/unknown decisions emit no instance; their requirements remain eligible for other templates or the retained-requirement fallback.
+
+Quote validation accepts whitespace/backtick formatting differences and restores the original source quote with absolute offsets. Words, punctuation, and case must match. Raw model responses remain separate from these annotations.
+
+For these three cards, a separate call classifies the source relationship before rendering: effective-value selection versus traversal, a conflict winner versus retaining both inputs, or shared reference versus equal/read-only contents. This call sees the instruction, requirement, and an untrusted operation locator; it does not see the proposed criterion or winner. Code derives template eligibility from the returned relation. Ordinary generation uses its configured generator for this call. A missing/ambiguous relationship or provider failure withholds the instance and continues generation. The original requirement remains available downstream in the experiment's retained-requirement section when no other criterion represents it.
+
 To rebuild the catalog from the approved proposal, run `python -m science.deepswe.acceptance_templates.build_catalog` using the shared environment and RTK. The source document hash is recorded. Use a new run directory if the catalog, model, prompt, schema, or input changes.
 
 ## Evaluation
@@ -59,6 +67,10 @@ Evaluation reads reference labels separately from generation. It makes two indep
 
 - **Coverage:** for each reference validation, does the extracted requirement inventory contain it, and do the final rendered criteria fully, partly, or not at all state it? Several criteria may together cover a validation. Different wording and valid alternative templates are accepted. Neither unrendered slots nor retained raw instruction text receives criterion credit.
 - **Support:** for every emitted criterion, are all its mandated assertions supported by the instruction? Status is supported, partly supported, unsupported, or uncertain. A plausible match to a patch test is insufficient; source support must be checked independently.
+
+Review requests contain final criterion IDs/text, rather than unrendered bindings or the generator's explanations. Coverage schemas constrain citation namespaces and the number of verdicts. Those constraints catch format errors; they do not establish semantic correctness.
+
+`evaluate --atomic-support` splits each criterion into its mandated assertions, without giving the splitter the instruction or allowing it to repair the criterion. It then reviews one assertion per request against the full instruction. Code derives the criterion support status from all assertion judgments. This uses more calls and still depends on model judgments, including whether decomposition preserved every assertion. It leaves the existing criterion-level precision denominator unchanged. The targeted cattrs replay demonstrates why this option exists: a rubric reminder alone kept accepting invented flag behavior, while isolated assertion review rejected it.
 
 `score` validates exact review completeness and artifact fingerprints, then calculates:
 
@@ -89,9 +101,62 @@ rtk proxy "$VIRTUAL_ENV/bin/python" -m science.deepswe.acceptance_templates.cli 
 
 The initial pilot uses prewritten labels rather than this drafter, avoiding a model generating its own answer key after seeing its output. The initial patch spot checks are recorded in [data/patch-spotchecks.json](data/patch-spotchecks.json).
 
+## Applicability and reviewer calibration
+
+The [contrasts](data/contrasts.json) include unsupported identity/precedence matches and positive controls for genuine reference sharing, collision winners, and nearest overrides. Their expected labels and descriptive case IDs are withheld from model calls; task IDs are neutral instruction hashes. These are agent-authored development cases, not human gold.
+
+```bash
+rtk proxy "$VIRTUAL_ENV/bin/python" -m science.deepswe.acceptance_templates.calibration \
+  --phase binding --output-dir /tmp/acceptance-binding-contrasts
+
+rtk proxy "$VIRTUAL_ENV/bin/python" -m science.deepswe.acceptance_templates.calibration \
+  --phase review --review-version v1 --output-dir /tmp/acceptance-review-baseline
+
+rtk proxy "$VIRTUAL_ENV/bin/python" -m science.deepswe.acceptance_templates.calibration \
+  --phase review --review-version v2 --output-dir /tmp/acceptance-review-current
+
+rtk proxy "$VIRTUAL_ENV/bin/python" -m science.deepswe.acceptance_templates.calibration \
+  --phase replay --output-dir /tmp/acceptance-pilot-review-replay
+
+rtk proxy "$VIRTUAL_ENV/bin/python" -m science.deepswe.acceptance_templates.calibration \
+  --phase atomic --output-dir /tmp/acceptance-assertion-review
+
+rtk proxy "$VIRTUAL_ENV/bin/python" -m science.deepswe.acceptance_templates.calibration \
+  --phase atomic --fixtures science/deepswe/acceptance_templates/data/atomic-controls-neutral.json \
+  --output-dir /tmp/acceptance-assertion-controls
+```
+
+The replay uses the actual original pilot payloads/schemas. The baseline reviewer prompts are preserved in `data/review-prompts-v1.json`. `--repairs` configures a persisted total attempt budget; raising it explicitly does not overwrite earlier failed attempts. A mismatch exits nonzero and remains in the report, including differences between partial and unsupported that do not change strict precision credit.
+
+To regenerate templates while keeping the original requirement inventories fixed:
+
+```bash
+rtk proxy "$VIRTUAL_ENV/bin/python" -m science.deepswe.acceptance_templates.rerun \
+  --baseline-runs science/deepswe/acceptance_templates/runs/pilot-v1 \
+                  science/deepswe/acceptance_templates/runs/pilot-extra-v1 \
+  --tasks helm-array-merge-strategies dateutil-rfc5545-timezone-interop \
+  --batch-size 3 --output-dir /tmp/acceptance-evidence-rerun
+```
+
+The rerunner validates input and inventory fingerprints, records baseline generation hashes, and makes no inventory or direct-generation calls. Follow with `evaluate` and `score`. Use the same reviewer configuration on original and new outputs when comparing scores. The smaller binding batch and additional evidence are different work budgets; this is a development comparison, not an equal-cost experiment.
+
+To classify relationships on saved bindings without regenerating them, including using a separately configured model:
+
+```bash
+rtk proxy "$VIRTUAL_ENV/bin/python" -m science.deepswe.acceptance_templates.apply_guards \
+  --baseline-run science/deepswe/acceptance_templates/runs/evidence-v3 \
+  --baseline-catalog science/deepswe/acceptance_templates/data/catalog-evidence-v2.json \
+  --tasks helm-array-merge-strategies dateutil-rfc5545-timezone-interop \
+  --model Qwen/Qwen3-Next-80B-A3B-Instruct --output-dir /tmp/acceptance-relations
+```
+
+`--baseline-catalog` permits prerequisite metadata changes only when the old catalog fingerprint matches and every renderer/slot definition is identical. The binding calibration runner offers the same check with `--bindings-from` and `--baseline-catalog`. Saved task bindings must match the original instruction and inventory hashes.
+
 ## Failure diagnostics and resume
 
 Every call checkpoints the exact prompt, allowlisted payload, response schema, provider/model, request fingerprint, parsed response, usage, duration, and failure type/detail. Provider error details are scrubbed for credential environment values. A schema correction is a separate persisted attempt. No automatic transport retry occurs during the initial invocation.
+
+Replacing a generation preserves its previous generation/prompt and matching review under `history/<generation_sha256>/`. Review checkpoint namespaces depend on their actual rendered-text inputs and rubric, so changed text receives fresh review calls. Cached calls and superseded correction attempts retain their original elapsed cost. Primary follow-up artifacts stay unpacked; preliminary trials also include `artifacts.tar.gz` and its file-hash manifest to restore parsed outputs from the repository root.
 
 `--resume` reuses completed calls only when their request fingerprint matches and their response still validates. It also reuses completed schema-repair transcripts. An explicit resume after a transport failure consumes the next persisted attempt within `--repairs` (default 1); it preserves the failed attempt and cannot repeatedly reset the budget. Resume mismatches stop with a diagnostic rather than reuse unrelated output.
 

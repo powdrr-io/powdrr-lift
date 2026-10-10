@@ -1,0 +1,70 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "0278861582de7795287079315ca08047c7c84da9e60e5091b555c0303de78250",
+  "file_count": 9,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/dateutil-rfc5545-timezone-interop/templates/calls/bind-000-0.json",
+      "sha256": "4725453afd78699af2996049e5120e4c4019bf912d4639746b336ca21806d0c3",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "c8282b8de5f130bc84359dd26d726a3ad2a79fcb354cfaa61d960e73671b0bd5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/dateutil-rfc5545-timezone-interop/templates/calls/bind-001-0.json",
+      "sha256": "2cf189b0d2cc575b49b7c0fff2da135b9eec8363fae782e4f8199e954c57e5a6",
+      "status": "completed",
+      "stage": "bind-001",
+      "request_sha256": "6bd8439c6d622252325a5702151489ce332355422862ed5cf08af88a2c7cec56"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/dateutil-rfc5545-timezone-interop/templates/calls/bind-002-0.json",
+      "sha256": "1da701fd08633cdfa21bd8e2ae63baad4c95c8e3cb00864203d88436f02cb6c2",
+      "status": "failed",
+      "stage": "bind-002",
+      "request_sha256": "83c5d8dfac373936f71b292f51627e9ee079c1ea76eeed2bdbb097d342f45172"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/dateutil-rfc5545-timezone-interop/templates/calls/bind-002-1.json",
+      "sha256": "4c153143534d01ac6b5e6e789a4827e26a3dd450ef945e7dda577137736f0df1",
+      "status": "failed",
+      "stage": "bind-002",
+      "request_sha256": "b47bc37730c1e9e11d912940010b9e7b8f3d09adaf99e7b396050c42905d9440"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/dateutil-rfc5545-timezone-interop/templates/calls/select-0.json",
+      "sha256": "5e13347ef4c5e2178894d805e6f6f76151bcb67155115bca92363c054ff9b8e1",
+      "status": "failed",
+      "stage": "select",
+      "request_sha256": "235476ea665d6f2f5e28709574ca74ee6f6bb04fbbcda4f984d377f00d383bb7"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/dateutil-rfc5545-timezone-interop/templates/calls/select-1.json",
+      "sha256": "a1ecfd09c520e057d35670d037cb6500df9e64a1cab33b13e93964f59f410038",
+      "status": "completed",
+      "stage": "select",
+      "request_sha256": "235476ea665d6f2f5e28709574ca74ee6f6bb04fbbcda4f984d377f00d383bb7"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/helm-array-merge-strategies/templates/calls/bind-000-0.json",
+      "sha256": "b077fb8da4d8d258561ee304c00ae311f6d2afdf146a1dd879999f1559874afb",
+      "status": "failed",
+      "stage": "bind-000",
+      "request_sha256": "6de5a2eeb5163464e37dd27c6d23252286246a8440ccd49835434715e87e8e83"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/helm-array-merge-strategies/templates/calls/bind-000-1.json",
+      "sha256": "e6e314e77009a0dd409a9f98e846ac68070ba0effc193f5eb72c757fbebfd727",
+      "status": "failed",
+      "stage": "bind-000",
+      "request_sha256": "6de5a2eeb5163464e37dd27c6d23252286246a8440ccd49835434715e87e8e83"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/helm-array-merge-strategies/templates/calls/select-0.json",
+      "sha256": "1127d1332c2a3b89fcf4c94496f289dd2b643a659e0cfa09ac44c3b7bc928fca",
+      "status": "completed",
+      "stage": "select",
+      "request_sha256": "2598b71b997a2262d84ea42d9538cc7f66ad211d5f180e54d7eeb8057f02278a"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "archive": "artifacts.tar.gz",
+  "archive_sha256": "14b81688c71a3c76780b548e077426f843c7dce0976cb7e299ff17795ad64ced",
+  "file_count": 3,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-v3/identity-without-keyword/assertions.json",
+      "sha256": "828cc389306834da2e5d7c8be71d034f6017bb8bd8805c5e07d75d5d9e68f6bb"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-v3/readonly-not-identity/assertions.json",
+      "sha256": "bc9a74cdb9fa2b2fa7097d08899db655affc5e9ef225ad190020731d30148f67"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-v3/report.json",
+      "sha256": "6685ec8e7339e52a909ce84e4f736398223a0784349d50bf49ae158c676ca6f3"
+    }
+  ]
+}

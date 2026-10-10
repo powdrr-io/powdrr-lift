@@ -8,6 +8,7 @@ import os
 import re
 import time
 from collections.abc import Callable
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -169,14 +170,14 @@ class Recorder:
                         f"stale checkpoint for {stage}; use a new output dir"
                     )
                 if prior.get("status") == "completed":
-                    value = validator(prior["response"])
-                    self.calls.append({**prior["receipt"], "cached": True})
+                    value = validator(deepcopy(prior["response"]))
+                    self._record_cached(stage, attempt, prior, identity)
                     return value
                 if isinstance(prior.get("response"), dict):
                     # Resume a completed schema-repair transcript rather than
                     # calling the failed first attempt again on every resume.
                     try:
-                        value = validator(prior["response"])
+                        value = validator(deepcopy(prior["response"]))
                     except ValueError as exc:
                         self.calls.append({**prior["receipt"], "cached": True})
                         if attempt == self.repairs:
@@ -197,7 +198,7 @@ class Recorder:
                             },
                         ]
                         continue
-                    self.calls.append({**prior["receipt"], "cached": True})
+                    self._record_cached(stage, attempt, prior, identity)
                     return value
                 if prior.get("status") == "failed":
                     self.calls.append({**prior["receipt"], "cached": True})
@@ -219,6 +220,12 @@ class Recorder:
             }
             write_json(path, record)
             label = "/".join(self.directory.parts[-3:])
+            if self.directory.parent.name == "review-calls":
+                label = (
+                    "/".join(self.directory.parts[-4:-1])
+                    + "/"
+                    + self.directory.name[:10]
+                )
             print(f"{label}: {stage} attempt={attempt}", flush=True)
             started = time.monotonic()
             response = None
@@ -227,7 +234,7 @@ class Recorder:
             try:
                 response = complete_json(self.client, messages, response_schema=schema)
                 record["response"] = response
-                value = validator(response)
+                value = validator(deepcopy(response))
             except Exception as exc:
                 receipt = self._receipt(stage, attempt, started, "failed")
                 record.update(
@@ -264,6 +271,29 @@ class Recorder:
             self.calls.append(receipt)
             return value
         raise AssertionError("unreachable repair loop")
+
+    def _record_cached(
+        self, stage: str, attempt: int, prior: dict[str, Any], identity: dict[str, Any]
+    ) -> None:
+        self.calls.append({**prior["receipt"], "cached": True})
+        # Formatting alignment can make a formerly rejected response usable.
+        # Later attempts already made for it still count toward actual cost.
+        for later_attempt in range(attempt + 1, self.repairs + 1):
+            path = self.directory / f"{stage}-{later_attempt}.json"
+            if not path.exists():
+                continue
+            later = load_json(path)
+            request = later.get("request", {})
+            if (
+                request.get("messages", [])[:2] == identity["messages"][:2]
+                and request.get("schema") == identity["schema"]
+                and request.get("model") == self.model
+                and request.get("provider") == self.provider
+                and "receipt" in later
+            ):
+                self.calls.append(
+                    {**later["receipt"], "cached": True, "superseded": True}
+                )
 
     def _receipt(
         self, stage: str, attempt: int, started: float, status: str

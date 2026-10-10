@@ -1,0 +1,244 @@
+{
+  "run": {
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "catalog_sha256": "694ae31846a317f49d5c6b6fe1c4540323ccbc41a7a9d2a72170ce407b309ff9",
+    "tasks": [
+      "helm-array-merge-strategies",
+      "dateutil-rfc5545-timezone-interop"
+    ],
+    "arms": [
+      "templates"
+    ],
+    "batch_size": 6,
+    "output_tokens": 12288,
+    "repairs": 1,
+    "failures": [],
+    "comparison_scope": "Reuses original template generations without new generation calls. Re-reviewed using current evaluation code."
+  },
+  "eligible_task_count": 2,
+  "paired_task_ids": [
+    "helm-array-merge-strategies",
+    "dateutil-rfc5545-timezone-interop"
+  ],
+  "aggregate": {
+    "templates": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 54,
+      "criterion_count": 128,
+      "strict_recall": 1.0,
+      "strict_precision": 0.9296875,
+      "missed_or_partial": 0,
+      "unsupported": 9,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 1.0
+    }
+  },
+  "paired_aggregate": {
+    "templates": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 54,
+      "criterion_count": 128,
+      "strict_recall": 1.0,
+      "strict_precision": 0.9296875,
+      "missed_or_partial": 0,
+      "unsupported": 9,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 1.0
+    }
+  },
+  "scores": [
+    {
+      "task_id": "helm-array-merge-strategies",
+      "arm": "templates",
+      "input_sha256": "9234c56d4ba7f2160fb8989e0a2e51a457e5603e23a03a5650e27a94cf65ce3c",
+      "generation_sha256": "5c8387873bf9004fec55b5f39330df0c2f3da89d5192298dbb1c3567007e2f97",
+      "reference_sha256": "5c7215db6e4c8f306aa2022a58976660088f5273e573f9a1333d7a5815028fb5",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 29,
+      "full": 29,
+      "partial": 0,
+      "missed_or_partial": 0,
+      "missing": 0,
+      "strict_recall": 1.0,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": true,
+      "criterion_count": 66,
+      "supported": 63,
+      "strict_precision": 0.9545454545454546,
+      "unsupported": 3,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": 1.0,
+      "accepted_template_label_recall": 1.0,
+      "template_label_reference_count": 29,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 6,
+      "criterion_characters": 10827,
+      "generation_elapsed_seconds": 196.776,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [
+        {
+          "stage": "inventory",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 15.918,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": false
+        }
+      ],
+      "misses": [],
+      "precision_flags": [
+        {
+          "criterion_id": "c039",
+          "status": "unsupported",
+          "source_ids": [
+            "s007"
+          ],
+          "rationale": "s007 describes 'append: old before new' for array concatenation, but does not state that 'old config wins' in collisions during upgrade. The criterion incorrectly implies conflict resolution semantics for 'append' strategy in upgrade results, which is not specified. 'Wins' implies override logic, but append only defines order, not precedence. No source supports 'old config wins' as a collision rule."
+        },
+        {
+          "criterion_id": "c042",
+          "status": "unsupported",
+          "source_ids": [
+            "s007",
+            "s002"
+          ],
+          "rationale": "s007 describes merging old config on top of new defaults, but s002 states 'user fields win' during merge strategy application. The criterion conflates 'old config wins' with 'user fields win' — but 'old config' is not always 'user values' (e.g., in ResetThenReuseValues, old config is merged on top of new defaults, but user values may be different). No source supports 'old config wins over new chart defaults' as a universal key-level rule. This overgeneralizes and misrepresents the semantics."
+        },
+        {
+          "criterion_id": "c043",
+          "status": "unsupported",
+          "source_ids": [
+            "s007"
+          ],
+          "rationale": "s007 describes merging old config on top of new defaults, but does not state that 'collisions resolve to old config wins'. The term 'wins' implies override precedence, but the instruction only describes order of merging. No source defines collision resolution semantics for non-array values or key-level conflicts. This adds an unsupported obligation."
+        }
+      ]
+    },
+    {
+      "task_id": "dateutil-rfc5545-timezone-interop",
+      "arm": "templates",
+      "input_sha256": "29ed87a69cab68f21e44202c6268fc8df9c16de7f66f9f585a06d732d5892493",
+      "generation_sha256": "a43d2b2b547fd72d2686f05f972c10e25efb56225f5e8c34f379cdf1564c930e",
+      "reference_sha256": "9233d539edda24a645a3d8ed49769105d81dd8d438bf77de61937b04e9d3f847",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 25,
+      "full": 25,
+      "partial": 0,
+      "missed_or_partial": 0,
+      "missing": 0,
+      "strict_recall": 1.0,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": true,
+      "criterion_count": 62,
+      "supported": 56,
+      "strict_precision": 0.9032258064516129,
+      "unsupported": 6,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": 0.88,
+      "accepted_template_label_recall": 0.88,
+      "template_label_reference_count": 25,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 7,
+      "criterion_characters": 9351,
+      "generation_elapsed_seconds": 177.556,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [
+        {
+          "stage": "inventory",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 17.782,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": true
+        }
+      ],
+      "misses": [],
+      "precision_flags": [
+        {
+          "criterion_id": "c003",
+          "status": "unsupported",
+          "source_ids": [
+            "s002"
+          ],
+          "rationale": "The instruction specifies supported parameters but does not mandate rejection of unsupported combinations. This is an additional constraint not present in the source, making it unsupported."
+        },
+        {
+          "criterion_id": "c032",
+          "status": "unsupported",
+          "source_ids": [],
+          "rationale": "The instruction does not specify that identical inputs must produce identical VTIMEZONE blocks. While s010 describes how the block is derived, it does not mandate determinism or equivalence for identical inputs — this is an added semantic obligation."
+        },
+        {
+          "criterion_id": "c035",
+          "status": "unsupported",
+          "source_ids": [],
+          "rationale": "The instruction says the attributes are read-only tuples in insertion order, but does not state they are the exact same internal objects. The criterion demands identity (same object), which is not mandated — only content and order are specified."
+        },
+        {
+          "criterion_id": "c037",
+          "status": "unsupported",
+          "source_ids": [],
+          "rationale": "The instruction requires that dates in component groups be compared in a sorted order for equality (s012), but it does not mandate that the stored tuples themselves be ordered by sorted(). The tuples are specified to be in insertion order (s011), and sorting is only mentioned as a comparison strategy, not a storage requirement. Thus, 'dates in each component group is ordered by sorted' is an added obligation not supported by the source."
+        },
+        {
+          "criterion_id": "c049",
+          "status": "unsupported",
+          "source_ids": [],
+          "rationale": "The instruction specifies that rruleset.to_ical() emits one VTIMEZONE block per unique non-UTC timezone (s017), but does not address behavior for rrulesets differing in order or duplication of components. No source supports the claim that such differences produce identical serialization — this adds an implicit requirement about normalization that is not mandated."
+        },
+        {
+          "criterion_id": "c053",
+          "status": "unsupported",
+          "source_ids": [
+            "s019"
+          ],
+          "rationale": "s019 says rrulestr auto-detects BEGIN:VCALENDAR and extracts VTIMEZONE/VEVENT, but does not state that input not beginning with BEGIN:VCALENDAR is rejected. The criterion demands rejection, which is a stronger obligation than implied by 'auto-detects' — this is an unsupported extension."
+        }
+      ]
+    }
+  ],
+  "failures": [],
+  "limitations": [
+    "Agent-authored source-based references and automated judgments are not human gold labels.",
+    "Template-group agreement is diagnostic, not proof.",
+    "No coding agent, task validation suite, or Structrr diff was executed.",
+    "Only declared reference validations contribute to recall; references may omit behavior. Inspect source coverage before interpreting scores."
+  ]
+}

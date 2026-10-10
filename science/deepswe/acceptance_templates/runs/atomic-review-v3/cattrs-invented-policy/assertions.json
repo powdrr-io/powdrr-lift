@@ -1,0 +1,38 @@
+{
+  "criterion_id": "c022",
+  "criterion_text": "When `partial_structure` is called with `detailed_validation=True`, the `error_map` must contain an entry for each failed field, mapping the field name to the specific exception that caused the failure; when `detailed_validation=False`, the `error_map` must be empty (or not populated with per-field exceptions) and the `errors` attribute must contain a single exception summarizing the failure.",
+  "assertions": [
+    {
+      "text": "When `partial_structure` is called with `detailed_validation=True`, the `error_map` must contain an entry for each failed field, mapping the field name to the specific exception that caused the failure.",
+      "id": "c022-a001",
+      "criterion_id": "c022-a001",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The instruction mandates 'Respect `detailed_validation`' (s004) and requires `error_map` (field name to Exception) to be present in `PartialResult` (s001). While the exact behavior of `detailed_validation` is not explicitly defined, the presence of `error_map` as a field mapping field names to exceptions, combined with the directive to 'respect' the flag, implies that when `detailed_validation=True`, the `error_map` must be populated with specific exceptions per failed field. No alternative interpretation satisfies both the existence of `error_map` and the 'respect' requirement without fulfilling this criterion. The criterion does not add new obligations beyond what is source-supported."
+    },
+    {
+      "text": "When `partial_structure` is called with `detailed_validation=False`, the `error_map` must be empty (or not populated with per-field exceptions).",
+      "id": "c022-a002",
+      "criterion_id": "c022-a002",
+      "status": "unsupported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The instruction mandates to 'Respect detailed_validation' in s004, but does not specify how it affects error_map. No clause defines the behavior of error_map when detailed_validation=False. While it is plausible that error_map would be empty under this setting, the instruction does not require it — an implementation could still populate error_map with aggregated or minimal exceptions even when detailed_validation is off. Since the criterion imposes a specific, concrete obligation (empty error_map) not supported by any source text, it is unsupported."
+    },
+    {
+      "text": "When `partial_structure` is called with `detailed_validation=False`, the `errors` attribute must contain a single exception summarizing the failure.",
+      "id": "c022-a003",
+      "criterion_id": "c022-a003",
+      "status": "unsupported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The instruction mandates to 'Respect `detailed_validation`' (s004), but does not define what behavior is expected when `detailed_validation=False`. It specifies the structure of `errors` (single exception or None) and `error_map` (field-to-Exception mapping), but does not require or imply that `errors` must contain a single summary exception when `detailed_validation=False`. An implementation could satisfy the instruction by always populating `error_map` and leaving `errors` as None when `detailed_validation=False`, or by using a different convention entirely. The assertion invents a specific policy for `detailed_validation=False` that is not source-supported."
+    }
+  ],
+  "derived_status": "partial",
+  "limitation": "Decomposition and entailment are model judgments. Splitting may omit meaning; the original criterion and all extracted assertions remain available for inspection. Not a human review."
+}

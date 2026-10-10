@@ -23,7 +23,15 @@ from .common import (
     load_json,
     write_json,
 )
-from .evaluation import aggregate, report_markdown, review, score
+from .evaluation import (
+    COVERAGE_PROMPT,
+    SUPPORT_PROMPT,
+    aggregate,
+    rendered_criteria,
+    report_markdown,
+    review,
+    score,
+)
 from .generation import generate, inventory, load_catalog, requirements, save_generation
 from .references import draft_reference
 
@@ -293,7 +301,20 @@ def evaluate(args: argparse.Namespace) -> int:
                 raise ValueError("generation input fingerprint mismatch")
             recorder = Recorder(
                 client,
-                arm_dir / "review-calls",
+                arm_dir
+                / "review-calls"
+                / digest(
+                    {
+                        "task": task,
+                        "reference": reference,
+                        "inventory": generation["inventory"],
+                        "criteria": rendered_criteria(generation["criteria"]),
+                        "coverage_prompt": COVERAGE_PROMPT,
+                        "support_prompt": SUPPORT_PROMPT,
+                        "atomic_support": args.atomic_support,
+                        "batch_size": args.batch_size,
+                    }
+                ),
                 provider=args.provider,
                 model=args.model,
                 resume=args.resume,
@@ -301,7 +322,12 @@ def evaluate(args: argparse.Namespace) -> int:
             )
             try:
                 judgments = review(
-                    task, generation, reference, recorder, args.batch_size
+                    task,
+                    generation,
+                    reference,
+                    recorder,
+                    args.batch_size,
+                    atomic_support=args.atomic_support,
                 )
                 write_json(arm_dir / "review.json", judgments)
                 count += 1
@@ -419,6 +445,12 @@ def main(argv: list[str] | None = None) -> int:
         else:
             sub.add_argument("--run-dir", type=Path, required=True)
             sub.add_argument("--references-dir", type=Path, required=True)
+            if command == "evaluate":
+                sub.add_argument(
+                    "--atomic-support",
+                    action="store_true",
+                    help="Review each criterion's assertions separately (more calls)",
+                )
         if command != "score":
             sub.add_argument("--provider", default="deepinfra")
             sub.add_argument(

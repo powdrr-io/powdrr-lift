@@ -1,0 +1,91 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "582c2f30102eb6ba5d97a464e4cf59dabbcec001e8805f049db2e35defd8097d",
+  "file_count": 12,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/append-order-not-precedence/calls/bind-000-0.json",
+      "sha256": "cf8689ddc22b2ca470e292457e151e0a7ac17a8f3942e56b8e74c4343ac96871",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "837542e54f16d751723841822f751dfc0c269116d43a870ca895f05511ca458c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/equality-not-identity/calls/bind-000-0.json",
+      "sha256": "2034091e27be97482dc28accf79defaac701dcc601eeae827edf8fa6f84396d7",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "26989f69ae436f1f4d5ee2b4c963a05c0aad96e1cb672fe8d75c3a201218922f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/explicit-collision-winner/calls/bind-000-0.json",
+      "sha256": "04c1675f19327ce167bd27cf43eae721d06b6d59bc1c4686f7fd478ce2c8586b",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "a2606fc17681060d715cd36e074674c93fcf6564784249f27e3ca3d519f34a23"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/explicit-collision-winner/calls/guard-r001-T18-000-collision_winner-0.json",
+      "sha256": "0ec944e82589420a0c78f200334d25372b981c25e7f3ac591d8755d05768a7bd",
+      "status": "completed",
+      "stage": "guard-r001-T18-000-collision_winner",
+      "request_sha256": "05659f15fc7c96fdac6141e3f857ddddd7cdbe6a012ea9690727b3ee7cf20d92"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/explicit-nearest-override/calls/bind-000-0.json",
+      "sha256": "4987220f850dbc6a3a41bc1540ebd8d91a5418fbe25c5ef3463ba70c389fb3a5",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "a41c2b4b7c73c5070940c26d9ed7b6006aae80ec813f1d18ffff3c1082cceb64"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/explicit-nearest-override/calls/guard-r001-T17-000-value_selection-0.json",
+      "sha256": "722ef2873cb8a0b0b987a18024e75ece49b9ec86ceb6cbba8e77f9f0c8e49d3f",
+      "status": "completed",
+      "stage": "guard-r001-T17-000-value_selection",
+      "request_sha256": "5b923e1bee153fe96eeb177fc0e41a8a0628fb2d6285ca5d68cebd5d5daf0924"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/explicit-reference-identity/calls/bind-000-0.json",
+      "sha256": "059b1dd65712b74bfece789fb01b740afa792c7f771917ed64090066d64630e4",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "4e63f2161f87a96443b402b38476ffb224b038b07334a6ebd8d18df6afbf1471"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/explicit-reference-identity/calls/guard-r001-T31-000-object_identity-0.json",
+      "sha256": "3eacdde2d6d6e89e07442991a69ee1e597ab05b451a019d594a0eb1c0ab2c616",
+      "status": "completed",
+      "stage": "guard-r001-T31-000-object_identity",
+      "request_sha256": "16be38bf8a51c8167ddd227336cb3989e7e27f483f84167fe69afd0adc0e065c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/identity-without-keyword/calls/bind-000-0.json",
+      "sha256": "b8c057f677a2dccf9f2f04f136c4d484b77228237cebe9598dab5f23d595ca43",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "1a5c19c84eb5f2bf6d4bd273890996cc255cb7d5f7d0b9fc4c1b8b9b0b3e53ba"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/identity-without-keyword/calls/guard-r001-T31-000-object_identity-0.json",
+      "sha256": "4d17667dbc3d895832ba4507b5825c4ea7f65f3bbbba1d61491bf0b8104f4761",
+      "status": "completed",
+      "stage": "guard-r001-T31-000-object_identity",
+      "request_sha256": "412e917a0e482d2c72fed8e9822e0eb66ed7cd560d6bcce097036e8313980475"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/readonly-not-identity/calls/bind-000-0.json",
+      "sha256": "d83470c9a7fae9d59c4fd0faef241ee15fb4d0163e5200fcabb5bc9407d4a53f",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "edcba456784411b1d196643babcd8eba885a19bf38cbc7b9f1e147a49f7f503c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/traversal-not-override/calls/bind-000-0.json",
+      "sha256": "1939b5cebaf81d522c7ff83496bf3581862af6df3fefdd29ca975177ca7669f1",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "079c8f45c99c6635b974d41e7a39e07c6ba02dc8f41611f8ea5858f9face7ba4"
+    }
+  ]
+}

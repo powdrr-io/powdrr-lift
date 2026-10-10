@@ -1,0 +1,207 @@
+{
+  "decisions": [
+    {
+      "requirement_id": "r001",
+      "template_id": "T14",
+      "applicability": "yes",
+      "reason": "The instruction explicitly prescribes an order: root then child, and requires retaining both values when keys repeat.",
+      "instances": [
+        {
+          "prerequisites": [],
+          "slots": [
+            {
+              "name": "sequence",
+              "kind": "Sequence",
+              "value": "configuration entries",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "List configuration entries from the root then the child in that order, retaining both values when keys repeat.",
+                  "start": 0,
+                  "end": 110
+                }
+              ],
+              "support_explanation": "The instruction names the sequence as 'configuration entries'."
+            },
+            {
+              "name": "ordering_rule",
+              "kind": "Sequence",
+              "value": "root entries first, then child entries",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "List configuration entries from the root then the child in that order",
+                  "start": 0,
+                  "end": 69
+                }
+              ],
+              "support_explanation": "The instruction explicitly prescribes the order: root then child."
+            },
+            {
+              "name": "tie_or_group_rule",
+              "kind": "Expression",
+              "value": "when keys repeat, retain both values",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "retaining both values when keys repeat",
+                  "start": 71,
+                  "end": 109
+                }
+              ],
+              "support_explanation": "The instruction specifies how to handle repeated keys: retain both values."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r001",
+      "template_id": "T17",
+      "applicability": "no",
+      "reason": "The instruction only lists entries in order and retains both values on key repetition; it does not select an effective value from an ordered hierarchy. The prerequisite 'value_selection' is not satisfied.",
+      "instances": []
+    }
+  ],
+  "criteria": [
+    {
+      "text": "configuration entries is ordered by root entries first, then child entries. For ties or groups, when keys repeat, retain both values.",
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T14"
+      ],
+      "slots": [
+        {
+          "name": "sequence",
+          "kind": "Sequence",
+          "value": "configuration entries",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "List configuration entries from the root then the child in that order, retaining both values when keys repeat.",
+              "start": 0,
+              "end": 110
+            }
+          ],
+          "support_explanation": "The instruction names the sequence as 'configuration entries'."
+        },
+        {
+          "name": "ordering_rule",
+          "kind": "Sequence",
+          "value": "root entries first, then child entries",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "List configuration entries from the root then the child in that order",
+              "start": 0,
+              "end": 69
+            }
+          ],
+          "support_explanation": "The instruction explicitly prescribes the order: root then child."
+        },
+        {
+          "name": "tie_or_group_rule",
+          "kind": "Expression",
+          "value": "when keys repeat, retain both values",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "retaining both values when keys repeat",
+              "start": 71,
+              "end": 109
+            }
+          ],
+          "support_explanation": "The instruction specifies how to handle repeated keys: retain both values."
+        }
+      ],
+      "id": "c001",
+      "bindings": [
+        [
+          {
+            "name": "sequence",
+            "kind": "Sequence",
+            "value": "configuration entries",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "List configuration entries from the root then the child in that order, retaining both values when keys repeat.",
+                "start": 0,
+                "end": 110
+              }
+            ],
+            "support_explanation": "The instruction names the sequence as 'configuration entries'."
+          },
+          {
+            "name": "ordering_rule",
+            "kind": "Sequence",
+            "value": "root entries first, then child entries",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "List configuration entries from the root then the child in that order",
+                "start": 0,
+                "end": 69
+              }
+            ],
+            "support_explanation": "The instruction explicitly prescribes the order: root then child."
+          },
+          {
+            "name": "tie_or_group_rule",
+            "kind": "Expression",
+            "value": "when keys repeat, retain both values",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "retaining both values when keys repeat",
+                "start": 71,
+                "end": 109
+              }
+            ],
+            "support_explanation": "The instruction specifies how to handle repeated keys: retain both values."
+          }
+        ]
+      ]
+    }
+  ]
+}

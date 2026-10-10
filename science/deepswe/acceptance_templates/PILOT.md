@@ -2,6 +2,8 @@
 
 The standalone runner completed direct and template generation for cattrs, Helm, dateutil, and Koota, then reviewed all eight outputs. The generator was DeepInfra `deepseek-ai/DeepSeek-V4-Flash-0731`; the reviewer was DeepInfra `Qwen/Qwen3-Next-80B-A3B-Instruct`. Both arms shared each task's requirement inventory. References were authored from the instructions before inspecting generated output. Neither generator received references, solution patches, or validation patches.
 
+This report preserves the original v1 results. The current catalog and binding schema include the follow-up prerequisites/evidence checks; the original request schemas/cards remain in the archived checkpoints and commit `7ec66b5f`. See the README for follow-up calibration and controlled-rerun commands.
+
 The [combined report](runs/summary-v1/report.md), [machine-readable report](runs/summary-v1/report.json), and [agent spot audit](runs/summary-v1/agent-spot-audit.json) are the primary results. Per-task prompt, binding, and review artifacts are in [pilot-v1](runs/pilot-v1/report.md) and [pilot-extra-v1](runs/pilot-extra-v1/report.md). Full request/response checkpoints are bundled with each cohort.
 
 ## Raw automated estimates

@@ -157,6 +157,7 @@ def _binding() -> tuple[dict[str, Any], dict[str, Any]]:
                 "reason": "entry ownership",
                 "instances": [
                     {
+                        "prerequisites": [],
                         "slots": [
                             {
                                 "name": "owner",
@@ -164,8 +165,15 @@ def _binding() -> tuple[dict[str, Any], dict[str, Any]]:
                                 "value": "each state instance",
                                 "basis": "instruction",
                                 "source_ids": ["s001"],
+                                "source_quotes": [
+                                    {
+                                        "source_id": "s001",
+                                        "quote": "Each entry calls the factory.",
+                                    }
+                                ],
+                                "support_explanation": "Entry owns the factory call.",
                             }
-                        ]
+                        ],
                     }
                 ],
             }
@@ -197,6 +205,547 @@ def test_binding_rejects_unsupported_structure_and_missing_evidence(
             catalog=catalog,
             task=task(),
         )
+
+
+@pytest.mark.parametrize("mutation", ["invented_quote", "wrong_span", "empty_reason"])
+def test_binding_requires_exact_slot_evidence_and_explanation(mutation: str) -> None:
+    catalog, response = _binding()
+    slot = response["decisions"][0]["instances"][0]["slots"][0]
+    if mutation == "invented_quote":
+        slot["source_quotes"][0]["quote"] = "Factory calls return the identical object."
+    elif mutation == "wrong_span":
+        slot["source_ids"] = ["s002"]
+    else:
+        slot["support_explanation"] = ""
+    with pytest.raises(ValueError):
+        validate_bindings(
+            response,
+            selected=[{"requirement_id": "r001", "template_ids": ["T99"]}],
+            catalog=catalog,
+            task=task(),
+        )
+
+
+@pytest.mark.parametrize(
+    "mutation", ["missing", "duplicate", "unknown", "invented_quote"]
+)
+def test_yes_binding_requires_all_catalog_prerequisites(mutation: str) -> None:
+    catalog, response = _binding()
+    catalog["templates"][0]["prerequisites"] = [
+        {
+            "id": "ownership",
+            "claim": "Entry owns the action",
+            "reject_inference": "No global owner",
+        }
+    ]
+    proof: dict[str, Any] = {
+        "id": "ownership",
+        "source_ids": ["s001"],
+        "source_quotes": [
+            {"source_id": "s001", "quote": "Each entry calls the factory."}
+        ],
+        "support_explanation": "The entry performs the call.",
+    }
+    proofs = [proof]
+    if mutation == "missing":
+        proofs = []
+    elif mutation == "duplicate":
+        proofs = [proof, copy.deepcopy(proof)]
+    elif mutation == "unknown":
+        proof["id"] = "unrequested"
+    else:
+        proof["source_quotes"][0]["quote"] = "The child overrides the parent."
+    response["decisions"][0]["instances"][0]["prerequisites"] = proofs
+    with pytest.raises(ValueError):
+        validate_bindings(
+            response,
+            selected=[{"requirement_id": "r001", "template_ids": ["T99"]}],
+            catalog=catalog,
+            task=task(),
+        )
+
+
+def test_valid_yes_proof_and_declined_guard_both_validate() -> None:
+    catalog, response = _binding()
+    catalog["templates"][0]["prerequisites"] = [{"id": "ownership"}]
+    response["decisions"][0]["instances"][0]["prerequisites"] = [
+        {
+            "id": "ownership",
+            "source_ids": ["s001"],
+            "source_quotes": [
+                {"source_id": "s001", "quote": "Each entry calls the factory."}
+            ],
+            "support_explanation": "Entry owns the call.",
+        }
+    ]
+    selected = [{"requirement_id": "r001", "template_ids": ["T99"]}]
+    assert validate_bindings(response, selected=selected, catalog=catalog, task=task())
+    response["decisions"][0].update(applicability="unknown", instances=[])
+    assert validate_bindings(response, selected=selected, catalog=catalog, task=task())
+
+
+def test_catalog_prerequisites_are_reproducible_and_explicit() -> None:
+    from science.deepswe.acceptance_templates.build_catalog import (
+        DEFAULT_PROPOSAL,
+        build_catalog,
+    )
+
+    catalog = load_catalog(HERE / "catalog.json")
+    assert catalog == build_catalog(DEFAULT_PROPOSAL)
+    guarded = {card["id"] for card in catalog["templates"] if card["prerequisites"]}
+    assert guarded == {"T17", "T18", "T31"}
+
+
+def test_calibration_fixture_labels_do_not_enter_generation_or_review_inputs() -> None:
+    from science.deepswe.acceptance_templates.calibration import (
+        fixture_criteria,
+        inputs,
+    )
+
+    fixture = load_json(HERE / "data/contrasts.json")["cases"][0]
+    task_input, inv = inputs(fixture)
+    criteria = fixture_criteria(fixture, task_input)
+    payload = {**task_input, "inventory": inv, "criteria": criteria}
+    assert "expected" not in json.dumps(payload)
+    assert "bindings" not in json.dumps(payload)
+    assert "label_status" not in payload
+    assert fixture["id"] not in json.dumps(payload)
+    assert task_input["task_id"].startswith("contrast-")
+
+
+@pytest.mark.parametrize("mutation", ["input", "inventory", "status", "arm"])
+def test_controlled_rerun_rejects_unrelated_or_modified_baselines(
+    mutation: str,
+) -> None:
+    from science.deepswe.acceptance_templates.rerun import reused_inventory
+
+    inv = {"items": [{"id": "r001", "text": "original requirement"}]}
+    baseline = {
+        "status": "completed",
+        "arm": "templates",
+        "task_id": task()["task_id"],
+        "input_sha256": digest(task()),
+        "inventory": inv,
+        "inventory_sha256": digest(inv),
+    }
+    assert reused_inventory(baseline, task()) == inv
+    if mutation == "input":
+        baseline["input_sha256"] = "other"
+    elif mutation == "inventory":
+        baseline["inventory"]["items"][0]["text"] = "modified requirement"
+    elif mutation == "status":
+        baseline["status"] = "failed"
+    else:
+        baseline["arm"] = "direct"
+    with pytest.raises(ValueError, match="matching"):
+        reused_inventory(baseline, task())
+
+
+def test_pilot_review_replay_preserves_original_payload_and_hides_labels(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from science.deepswe.acceptance_templates.calibration import replay_check
+    from science.deepswe.acceptance_templates.evaluation import (
+        COVERAGE_PROMPT,
+        SUPPORT_PROMPT,
+    )
+
+    case = load_json(HERE / "data/pilot-review-replays.json")["cases"][0]
+    recorder = Recorder(None, tmp_path / "calls", provider="fake", model="fake")
+    captured = []
+
+    def fake_call(
+        stage: str,
+        prompt: str,
+        payload: dict[str, Any],
+        schema: dict[str, Any],
+        validator: Any,
+    ) -> Any:
+        captured.append({"payload": payload, "schema": schema})
+        response = copy.deepcopy(case["original_response"])
+        for row in response["support"]:
+            if row["criterion_id"] == case["target_id"]:
+                row["status"] = "partial"
+        return validator(response)
+
+    monkeypatch.setattr(recorder, "call", fake_call)
+    checks = replay_check(case, recorder, COVERAGE_PROMPT, SUPPORT_PROMPT)
+    assert captured[0]["payload"] == case["payload"]
+    assert captured[0]["schema"] == case["schema"]
+    assert "expected" not in json.dumps(captured)
+    assert "original_response" not in json.dumps(captured)
+    assert checks[0]["passed"]
+    assert checks[0]["original_observed"] == "supported"
+
+
+@pytest.mark.parametrize(
+    "statuses, expected",
+    [
+        (["supported", "supported"], "supported"),
+        (["supported", "unsupported"], "partial"),
+        (["unsupported"], "unsupported"),
+        (["supported", "uncertain"], "uncertain"),
+    ],
+)
+def test_atomic_support_verdict_is_derived_from_every_assertion(
+    statuses: list[str], expected: str
+) -> None:
+    from science.deepswe.acceptance_templates.atomic_review import combined_status
+
+    assert combined_status(statuses) == expected
+    with pytest.raises(ValueError):
+        combined_status([])
+
+
+def test_evidence_can_quote_multiple_source_clauses_without_combining_them() -> None:
+    from science.deepswe.acceptance_templates.generation import validate_evidence
+
+    evidence = {
+        "source_ids": ["s001", "s002"],
+        "source_quotes": [
+            {"source_id": "s001", "quote": "Each entry calls the factory."},
+            {"source_id": "s002", "quote": "History restores direct children."},
+        ],
+        "support_explanation": "Entry and history behaviors are specified.",
+    }
+    validate_evidence(evidence, task())
+    evidence["source_quotes"] = [
+        {
+            "source_id": "s001",
+            "quote": "Each entry calls the factory. History restores direct children.",
+        }
+    ]
+    with pytest.raises(ValueError):
+        validate_evidence(evidence, task())
+
+
+def test_review_payload_grades_text_without_unrendered_generator_explanations() -> None:
+    from science.deepswe.acceptance_templates.evaluation import rendered_criteria
+
+    assert rendered_criteria(
+        [
+            {
+                "id": "c001",
+                "text": "An observable criterion.",
+                "bindings": [{"invented_policy": "trusted explanation"}],
+                "source_ids": ["s999"],
+                "template_ids": ["T31"],
+            }
+        ]
+    ) == [{"id": "c001", "text": "An observable criterion."}]
+
+
+def test_atomic_review_preserves_assertions_and_grades_one_at_a_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from science.deepswe.acceptance_templates.atomic_review import review_assertions
+
+    captured = []
+
+    def fake_complete(
+        client: Any, messages: list[dict[str, str]], *, response_schema: dict[str, Any]
+    ) -> dict[str, Any]:
+        payload = json.loads(messages[1]["content"])
+        captured.append(payload)
+        if "assertions" in response_schema["properties"]:
+            return {
+                "assertions": [
+                    {"text": "Each entry calls the factory."},
+                    {"text": "The factory must return a new object."},
+                ]
+            }
+        criteria = payload["criteria"]
+        assert len(criteria) == 1
+        row = criteria[0]
+        return {
+            "support": [
+                {
+                    "criterion_id": row["id"],
+                    "status": "supported" if "a001" in row["id"] else "unsupported",
+                    "source_ids": ["s001"],
+                    "rationale": "Invocation is required; result identity is not.",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(common, "complete_json", fake_complete)
+    recorder = Recorder(None, tmp_path / "calls", provider="fake", model="fake")
+    result = review_assertions(
+        task(),
+        {
+            "id": "c001",
+            "text": "Each entry calls the factory, which returns a new object.",
+            "bindings": [{"invented": "explanation"}],
+        },
+        recorder,
+    )
+    assert result["derived_status"] == "partial"
+    assert len(result["assertions"]) == 2
+    assert "instruction" not in captured[0]
+    assert all(
+        set(row) == {"id", "text"}
+        for payload in captured[1:]
+        for row in payload["criteria"]
+    )
+    assert len(list((tmp_path / "calls").glob("*.json"))) == 3
+
+
+def test_coverage_schema_constrains_namespaces_verdict_count_and_empty_lists() -> None:
+    from science.deepswe.acceptance_templates.evaluation import coverage_response_schema
+
+    schema = coverage_response_schema(
+        [{"id": "v001"}],
+        {
+            "inventory": {"items": [{"id": "r001", "kind": "requirement"}]},
+            "criteria": [{"id": "c001"}],
+        },
+    )
+    array = schema["properties"]["coverage"]
+    props = array["items"]["properties"]
+    assert array["minItems"] == array["maxItems"] == 1
+    assert props["reference_id"]["enum"] == ["v001"]
+    assert props["inventory_requirement_ids"]["items"]["enum"] == ["r001"]
+    assert props["criterion_ids"]["items"]["enum"] == ["c001"]
+    empty = coverage_response_schema(
+        [{"id": "v001"}], {"inventory": {"items": []}, "criteria": []}
+    )
+    assert (
+        empty["properties"]["coverage"]["items"]["properties"]["criterion_ids"][
+            "maxItems"
+        ]
+        == 0
+    )
+
+
+@pytest.mark.parametrize("decision", ["yes", "no", "unknown", "failed"])
+def test_semantic_guard_confirms_or_retains_rejected_instances_without_blocking(
+    decision: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from science.deepswe.acceptance_templates.generation import render_bindings
+    from science.deepswe.acceptance_templates.guarding import confirm_guards
+
+    catalog, response = _binding()
+    catalog["templates"][0].update(
+        prerequisites=[
+            {
+                "id": "ownership",
+                "claim": "The entry owns the action",
+                "reject_inference": "No global owner",
+            }
+        ],
+        required_sentence="{owner} calls the factory.",
+        optional_sentences=[],
+    )
+    inv = {
+        "items": [
+            {
+                "id": "r001",
+                "kind": "requirement",
+                "text": "Each entry calls the factory.",
+                "source_ids": ["s001"],
+            }
+        ]
+    }
+    before = copy.deepcopy(response["decisions"])
+
+    def fake_complete(
+        client: Any, messages: list[dict[str, str]], *, response_schema: Any
+    ) -> dict[str, Any]:
+        payload = json.loads(messages[1]["content"])
+        assert "support_explanation" not in json.dumps(payload)
+        if decision == "failed":
+            raise RuntimeError("Provider unavailable")
+        return {
+            "decision": decision,
+            "source_ids": ["s001"] if decision == "yes" else [],
+            "source_quotes": [
+                {"source_id": "s001", "quote": "Each entry calls the factory."}
+            ]
+            if decision == "yes"
+            else [],
+            "support_explanation": "Entry ownership is specified.",
+        }
+
+    monkeypatch.setattr(common, "complete_json", fake_complete)
+    recorder = Recorder(None, tmp_path / "calls", provider="fake", model="fake")
+    result = confirm_guards(task(), inv, catalog, response["decisions"], recorder)
+    assert response["decisions"] == before
+    assert result[0]["applicability"] == (
+        "unknown" if decision == "failed" else decision
+    )
+    assert bool(render_bindings(result, catalog)) == (decision == "yes")
+    if decision != "yes":
+        assert result[0]["rejected_instances"]
+
+
+@pytest.mark.parametrize(
+    ("relation", "expected"),
+    [
+        ("select_one_source_value", "yes"),
+        ("retain_both_in_order", "no"),
+        ("combine_values", "no"),
+        ("unspecified", "unknown"),
+        ("uncertain", "unknown"),
+    ],
+)
+def test_source_relation_controls_eligibility_without_showing_proposed_rule(
+    relation: str, expected: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from science.deepswe.acceptance_templates.build_catalog import RELATIONS
+    from science.deepswe.acceptance_templates.guarding import confirm_guards
+
+    catalog, response = _binding()
+    catalog["templates"][0]["prerequisites"] = [
+        {"id": "collision_winner", **RELATIONS["T18"]}
+    ]
+    instance = response["decisions"][0]["instances"][0]
+    instance["slots"].append(
+        {"name": "winner_rule", "kind": "Outcome", "value": "LEAKED WINNER"}
+    )
+    inv = {"items": [{"id": "r001", "text": "Each entry calls the factory."}]}
+
+    def complete(client: Any, messages: Any, **kwargs: Any) -> dict[str, Any]:
+        payload = json.loads(messages[1]["content"])
+        assert set(payload["operation_context"]) == {"owner"}
+        assert "LEAKED WINNER" not in json.dumps(payload)
+        assert "proposed_criterion" not in payload
+        assert "required_relation" not in payload
+        schema = kwargs["response_schema"]
+        assert "decision" not in schema["properties"]
+        assert relation in schema["properties"]["relation"]["enum"]
+        return {
+            "relation": relation,
+            "support_explanation": "Source analysis.",
+            "source_ids": ["s001"],
+            "source_quotes": [
+                {"source_id": "s001", "quote": "Each entry calls the factory."}
+            ],
+        }
+
+    monkeypatch.setattr(common, "complete_json", complete)
+    recorder = Recorder(None, tmp_path, provider="fake", model="fake")
+    result = confirm_guards(task(), inv, catalog, response["decisions"], recorder)
+    assert result[0]["applicability"] == expected
+    raw = load_json(next(tmp_path.glob("*.json")))["response"]
+    assert "decision" not in raw
+
+
+def test_binding_reuse_allows_only_prerequisite_metadata_changes() -> None:
+    from science.deepswe.acceptance_templates.apply_guards import compatible_catalog
+
+    old = load_catalog(HERE / "data/catalog-evidence-v2.json")
+    current = load_catalog(HERE / "catalog.json")
+    compatible_catalog(current, old, digest(old))
+    with pytest.raises(ValueError, match="fingerprint"):
+        compatible_catalog(current, old, "wrong")
+    changed = copy.deepcopy(current)
+    changed["templates"][0]["required_sentence"] += " New obligation."
+    with pytest.raises(ValueError, match="renderers"):
+        compatible_catalog(changed, old, digest(old))
+
+
+def test_quote_alignment_restores_source_markup_and_offsets() -> None:
+    from science.deepswe.acceptance_templates.generation import validate_evidence
+
+    instruction = "`ReuseValues`  appends old before new."
+    example = {"source_spans": source_spans(instruction)}
+    row: dict[str, Any] = {
+        "source_ids": ["s001"],
+        "source_quotes": [
+            {"source_id": "s001", "quote": "ReuseValues appends old before new."}
+        ],
+        "support_explanation": "Ordering is stated.",
+    }
+    validate_evidence(row, example)
+    quote = row["source_quotes"][0]
+    assert quote["quote"] == instruction
+    assert instruction[quote["start"] : quote["end"]] == quote["quote"]
+    row["source_quotes"][0]["quote"] = "ReuseValues old config wins."
+    with pytest.raises(ValueError):
+        validate_evidence(row, example)
+
+
+def test_recorder_keeps_model_response_separate_from_validator_annotations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    model_response = {"rows": [{"text": "Model text"}]}
+    monkeypatch.setattr(
+        common, "complete_json", lambda *args, **kwargs: copy.deepcopy(model_response)
+    )
+
+    def annotate(raw: dict[str, Any]) -> dict[str, Any]:
+        raw["rows"][0]["id"] = "assigned-by-code"
+        return raw
+
+    recorder = Recorder(None, tmp_path, provider="fake", model="fake")
+    result = recorder.call("stage", "prompt", {}, {}, annotate)
+    assert result["rows"][0]["id"] == "assigned-by-code"
+    assert load_json(tmp_path / "stage-0.json")["response"] == model_response
+
+
+def test_recovered_cached_response_preserves_superseded_call_cost(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    responses = iter([{"value": "initial"}, {"value": "repaired"}])
+    monkeypatch.setattr(
+        common, "complete_json", lambda *args, **kwargs: next(responses)
+    )
+
+    def old_validator(raw: dict[str, Any]) -> dict[str, Any]:
+        if raw["value"] == "initial":
+            raise ValueError("Old formatting validator rejected it")
+        return raw
+
+    recorder = Recorder(None, tmp_path, provider="fake", model="fake")
+    recorder.call("stage", "prompt", {}, {}, old_validator)
+    resumed = Recorder(None, tmp_path, provider="fake", model="fake", resume=True)
+    assert (
+        resumed.call("stage", "prompt", {}, {}, lambda raw: raw)["value"] == "initial"
+    )
+    assert len(resumed.calls) == 2
+    assert resumed.calls[1]["superseded"]
+    assert all(call["cached"] for call in resumed.calls)
+
+
+def test_guard_schema_places_analysis_before_decision() -> None:
+    from science.deepswe.acceptance_templates.guarding import GUARD_SCHEMA
+
+    assert list(GUARD_SCHEMA["properties"])[0] == "support_explanation"
+    assert list(GUARD_SCHEMA["properties"])[-1] == "decision"
+
+
+def test_generation_updates_preserve_the_exact_prior_reviewed_snapshot(
+    tmp_path: Path,
+) -> None:
+    original = {
+        "task_id": "x",
+        "arm": "templates",
+        "criteria": [{"text": "Original criterion."}],
+        "residual_requirements": [],
+    }
+    save_generation(tmp_path, original)
+    old_review = {"generation_sha256": digest(original)}
+    write_json(tmp_path / "review.json", old_review)
+    updated = {**original, "criteria": [{"text": "Updated criterion."}]}
+    save_generation(tmp_path, updated)
+    history = tmp_path / "history" / digest(original)
+    assert load_json(history / "generation.json") == original
+    assert load_json(history / "review.json") == old_review
+    assert "Original criterion." in (history / "prompt.md").read_text()
+    assert load_json(tmp_path / "generation.json") == updated
+
+
+def test_checkpoint_bundle_includes_namespaced_review_calls(tmp_path: Path) -> None:
+    from science.deepswe.acceptance_templates.bundle import bundle
+
+    run = tmp_path / "run"
+    path = run / "task/templates/review-calls/fingerprint/coverage-000-0.json"
+    write_json(
+        path, {"status": "completed", "stage": "coverage-000", "request_sha256": "test"}
+    )
+    manifest = bundle(run, tmp_path)
+    assert manifest["file_count"] == 1
+    assert manifest["files"][0]["path"].endswith("fingerprint/coverage-000-0.json")
 
 
 def test_no_match_completes_prompt_and_retains_requirement(

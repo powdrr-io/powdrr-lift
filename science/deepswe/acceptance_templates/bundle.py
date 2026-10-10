@@ -17,7 +17,7 @@ def bundle(run_dir: Path, repo_root: Path) -> dict[str, Any]:
             path
             for dirname in ("calls", "review-calls", "inventory-calls")
             for directory in run_dir.rglob(dirname)
-            for path in directory.glob("*.json")
+            for path in directory.rglob("*.json")
         }
     )
     if not paths:

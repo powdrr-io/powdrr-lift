@@ -1,0 +1,43 @@
+{
+  "archive": "artifacts.tar.gz",
+  "archive_sha256": "a8e0fa5d9bca823b7a1e314db8786f4cd373033cfe435d495cfb023003c413e7",
+  "file_count": 9,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/append-order-not-precedence/bindings.json",
+      "sha256": "192e09ca50d69e7f959fcbbe8468882d4560a35b6ce0b6bc8e8b594693e882e1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/equality-not-identity/bindings.json",
+      "sha256": "1f58c9eda735b0487a69cdd90bb08ab9b89c4505be5aff1c733e79cc593c9fa6"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/explicit-collision-winner/bindings.json",
+      "sha256": "845c635c63cb1dde0071646c0c35693da576a047a9ccbb6ceef859040caba9ca"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/explicit-nearest-override/bindings.json",
+      "sha256": "c66cd8c53c966a66deca285e009da5245d6e9d85d6b9855a90081b18aa1b4205"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/explicit-reference-identity/bindings.json",
+      "sha256": "695b32185cb749f3e85b7adb7ca87a7a2354f22c97bf2119914f739b0c147c8b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/identity-without-keyword/bindings.json",
+      "sha256": "d6c70b77ccba11ecdad3bc82efb621e8472c9330728e72edf70443c075a2bd88"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/readonly-not-identity/bindings.json",
+      "sha256": "6ca63d8c21d5ad7835eb1b01581aacdfb6b4c67f3f6b5d2ab39bc7feffaecb8d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/report.json",
+      "sha256": "6c6292270df9e2f8aae785b6102270bae341c97484035cccd7d49bec83b87962"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/traversal-not-override/bindings.json",
+      "sha256": "0267b5d1683369a829452a3af87dcd7c7c6bc3b7a7a43a4aec8d95c2b9eed610"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "decisions": [
+    {
+      "requirement_id": "r001",
+      "template_id": "T31",
+      "applicability": "no",
+      "reason": "The source requires equal contents in the same order, not the same object reference. 'Same elements' and 'same order' describe equality of contents, not identity. The card's prerequisite requires the same object reference, which is not supported by the source.",
+      "instances": []
+    }
+  ],
+  "criteria": []
+}

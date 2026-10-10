@@ -13,6 +13,86 @@ ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_PROPOSAL = ROOT / "docs/plans/acceptance-criteria-template-catalog-proposal.md"
 DEFAULT_CATALOG = Path(__file__).with_name("catalog.json")
 
+PREREQUISITES = {
+    "T17": [
+        {
+            "id": "value_selection",
+            "claim": "The source specifies which configuration value takes effect "
+            "when multiple applicable sources supply it.",
+            "reject_inference": "Traversal order or presentation order alone does "
+            "not establish overriding or value selection.",
+        }
+    ],
+    "T18": [
+        {
+            "id": "collision_winner",
+            "claim": "The source specifies a winner for conflicting values "
+            "at the same key in the named operation and scope.",
+            "reject_inference": "Old-before-new concatenation, insertion order, "
+            "or generic merging alone does not specify a collision winner.",
+        }
+    ],
+    "T31": [
+        {
+            "id": "object_identity",
+            "claim": "The source requires the same object reference to be "
+            "returned, shared, or preserved by the named operation.",
+            "reject_inference": "Read-only access, tuple representation, equal "
+            "contents, insertion order, or immutability alone does not require "
+            "object identity. Identity can be specified without the word identity.",
+        }
+    ],
+}
+
+RELATIONS = {
+    "T17": {
+        "question": "What does this operation do with applicable "
+        "configuration sources?",
+        "relation_classes": {
+            "select_effective_value": "Select an effective setting using "
+            "specified source priority.",
+            "list_in_order": "Traverse or list entries without selecting "
+            "an effective value.",
+            "combine_values": "Combine values without specifying source priority.",
+            "unspecified": "No relation is defined.",
+            "uncertain": "The relation is ambiguous.",
+        },
+        "required_relation": "select_effective_value",
+    },
+    "T18": {
+        "question": "In this operation and scope, what happens to competing "
+        "values from the two inputs?",
+        "relation_classes": {
+            "select_one_source_value": "For a keyed conflict, one specified "
+            "source's value is selected for the same key/field lookup; the "
+            "competing value is not selected.",
+            "retain_both_in_order": "Both input values/elements survive in a "
+            "specified relative order, as in concatenation. Neither is "
+            "discarded as a losing value.",
+            "combine_values": "A result is composed from both values without "
+            "selecting a source's conflicting value.",
+            "unspecified": "No conflict outcome is defined for this operation/scope.",
+            "uncertain": "The relation is ambiguous.",
+        },
+        "required_relation": "select_one_source_value",
+    },
+    "T31": {
+        "question": "What object-reference relationship does this operation require?",
+        "relation_classes": {
+            "same_object": "The original reference is returned, shared, or "
+            "preserved rather than copied or replaced.",
+            "equal_contents": "Contents are equal without requiring the "
+            "same reference.",
+            "read_only": "The value is immutable/read-only without requiring "
+            "a particular reference.",
+            "fresh_object": "A different object is created or copied.",
+            "unspecified": "No reference relationship is specified.",
+            "uncertain": "The relation is ambiguous.",
+        },
+        "required_relation": "same_object",
+    },
+}
+
 # Optional clauses are omitted when their slots lack source support. These
 # adaptations remove editorial directions and slash alternatives from prose.
 RENDERERS: dict[str, tuple[str, list[str]]] = {
@@ -126,9 +206,13 @@ def build_catalog(proposal: Path) -> dict[str, Any]:
         cards.append(
             {
                 "id": template_id,
-                "version": 1,
+                "version": 2 if template_id in PREREQUISITES else 1,
                 "name": name,
                 "applies_when": text["Select when"],
+                "prerequisites": [
+                    {**item, **RELATIONS.get(template_id, {})}
+                    for item in PREREQUISITES.get(template_id, [])
+                ],
                 "required_sentence": required,
                 "optional_sentences": optional,
                 "slots": [
@@ -147,7 +231,7 @@ def build_catalog(proposal: Path) -> dict[str, Any]:
     if [card["id"] for card in cards] != [f"T{i:02}" for i in range(1, 53)]:
         raise ValueError("expected exactly the proposal's 52 sequential cards")
     return {
-        "version": 1,
+        "version": 2,
         "proposal_sha256": hashlib.sha256(source.encode()).hexdigest(),
         "slot_representation": "Typed semantic slots use nonempty prose strings; "
         "type/evidence validation is structural, not proof of entailment.",

@@ -1,0 +1,164 @@
+{
+  "kind": "coverage",
+  "judgments": [
+    {
+      "reference_id": "v013",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r013"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c031",
+        "c032"
+      ],
+      "rationale": "Criterion c031 explicitly states that MergeStrategies and MergeKeys expose string slices in path=value format, and c032 confirms the CLI override parser accepts this format and rejects others, fully capturing the requirement."
+    },
+    {
+      "reference_id": "v014",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r014"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c033"
+      ],
+      "rationale": "Criterion c033 directly states that for a given path, CLI overrides take precedence over chart annotations, matching the instruction exactly."
+    },
+    {
+      "reference_id": "v015",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r015"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c034"
+      ],
+      "rationale": "Criterion c034 explicitly states that when ResetValues is used, merge strategies are ignored and the resulting values are unchanged, fully capturing the behavior."
+    },
+    {
+      "reference_id": "v016",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r016"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c035",
+        "c036",
+        "c038",
+        "c039"
+      ],
+      "rationale": "Criterion c035 captures strategy-aware coalescing of old config with new values with append placing old before new; c036 confirms ordering; c038 confirms precedence of old config; c039 confirms winner rule in upgrade result — together fully cover the requirement."
+    },
+    {
+      "reference_id": "v017",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r017"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c040",
+        "c041",
+        "c042",
+        "c043"
+      ],
+      "rationale": "Criterion c040 states new defaults as base with old config merged on top; c041 confirms sequence; c042 confirms old config wins; c043 confirms winner rule — collectively fully satisfy the requirement."
+    },
+    {
+      "reference_id": "v018",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r018"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c044",
+        "c045"
+      ],
+      "rationale": "Criterion c044 confirms warnings are emitted by the same lint rule for both formats; c045 explicitly links the lint rule to the existing Chart.yaml field validator — together fully satisfy the requirement."
+    },
+    {
+      "reference_id": "v019",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r019"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c046"
+      ],
+      "rationale": "Criterion c046 explicitly states the lint rule applies to both stable and internal chart formats, matching the requirement exactly."
+    },
+    {
+      "reference_id": "v020",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r020"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c047",
+        "c048"
+      ],
+      "rationale": "Criterion c047 states the warning message contains \"unsupported\" and the path; c048 confirms the parser accepts only supported values (append/merge) and rejects others — together fully capture the behavior."
+    },
+    {
+      "reference_id": "v021",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r021"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c049",
+        "c050"
+      ],
+      "rationale": "Criterion c049 and c050 both state that a merge annotation without a merge-key produces a warning referencing the path — redundant but sufficient and fully aligned."
+    },
+    {
+      "reference_id": "v022",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r022"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c051",
+        "c052"
+      ],
+      "rationale": "Criterion c051 and c052 both state that an orphan merge-key without a strategy produces a warning referencing the path — fully satisfy the requirement."
+    },
+    {
+      "reference_id": "v023",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r023"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c053",
+        "c054"
+      ],
+      "rationale": "Criterion c053 explicitly states the warning message contains \"not found\" when the path is not found; c054 confirms the validation operation and outcome — fully covered."
+    },
+    {
+      "reference_id": "v024",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r024"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c055",
+        "c056"
+      ],
+      "rationale": "Criterion c055 explicitly states the warning message contains \"non-array\" when the path resolves to a non-array; c056 confirms the validation of resolved value type — together fully satisfy the requirement."
+    }
+  ],
+  "original_request_payload_sha256": "7aa714bbebbd99d7a8c49ef0afb2d37621614be09c756b3f8d9d146a8167dfdf",
+  "source_checkpoint_sha256": "ffb49584834d0e5fdbe7d9c7b7679c8e4e7eacd1c5b32bd193bb628ca42fe0fd"
+}

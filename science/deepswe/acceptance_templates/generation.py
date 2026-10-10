@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 from functools import partial
 from pathlib import Path
 from typing import Any
@@ -73,6 +74,16 @@ BIND_SCHEMA = object_schema(
             reason=TEXT,
             instances=array_schema(
                 object_schema(
+                    prerequisites=array_schema(
+                        object_schema(
+                            id=TEXT,
+                            source_ids=IDS,
+                            source_quotes=array_schema(
+                                object_schema(source_id=TEXT, quote=TEXT)
+                            ),
+                            support_explanation=TEXT,
+                        )
+                    ),
                     slots=array_schema(
                         object_schema(
                             name=TEXT,
@@ -80,8 +91,12 @@ BIND_SCHEMA = object_schema(
                             value=TEXT,
                             basis=choice_schema("instruction", "illustrative"),
                             source_ids=IDS,
+                            source_quotes=array_schema(
+                                object_schema(source_id=TEXT, quote=TEXT)
+                            ),
+                            support_explanation=TEXT,
                         )
-                    )
+                    ),
                 )
             ),
         )
@@ -170,18 +185,87 @@ Nominate all potentially applicable templates for each requirement. Favor recall
 retain plausible candidates for binding to confirm, but do not match only on a
 keyword. Several templates can apply; an empty list is a legitimate catalog miss.
 Deep hierarchy history is not recursive object copying. Same value is not same
-object. Return exactly one selection row for every requirement.""",
+object. Sequence order does not establish conflicting-value precedence. Check
+each card's prerequisites before nominating it; keep alternative templates for
+the supported behavior. Return exactly one selection row for every requirement.""",
         {
             **task,
             "requirements": requirements(inv),
             "catalog": [
-                {key: card[key] for key in ("id", "name", "applies_when")}
+                {
+                    **{key: card[key] for key in ("id", "name", "applies_when")},
+                    "prerequisites": card.get("prerequisites", []),
+                }
                 for card in catalog["templates"]
             ],
         },
         SELECT_SCHEMA,
         validate,
     )
+
+
+def validate_evidence(row: dict[str, Any], task: dict[str, Any]) -> None:
+    """Check quotation provenance; semantic entailment still needs evaluation."""
+    spans = {span["id"]: span for span in task["source_spans"]}
+    ids = checked_ids(row.get("source_ids"), set(spans), "evidence sources")
+    require_text(row, "support_explanation")
+    quoted_ids = set()
+    for item in checked_rows(row, "source_quotes"):
+        sid = item.get("source_id")
+        quote = require_text(item, "quote")
+        if sid not in ids:
+            raise ValueError(
+                f"evidence quote must occur verbatim in cited span {sid}: {quote!r}"
+            )
+        located = locate_quote(spans[sid]["text"], quote)
+        if located is None:
+            raise ValueError(
+                f"evidence words must occur in cited span {sid}: {quote!r}"
+            )
+        start, end = located
+        item.update(
+            quote=spans[sid]["text"][start:end],
+            start=spans[sid]["start"] + start,
+            end=spans[sid]["start"] + end,
+        )
+        quoted_ids.add(sid)
+    if not ids or quoted_ids != set(ids):
+        raise ValueError("every cited source span needs a separate exact quote")
+
+
+def locate_quote(source: str, quote: str) -> tuple[int, int] | None:
+    """Align formatting differences, preserving exact source text and offsets."""
+
+    def normalize(text: str) -> tuple[str, list[int]]:
+        chars: list[str] = []
+        offsets = []
+        for i, char in enumerate(text):
+            if char == "`":
+                continue
+            char = " " if char.isspace() else char
+            if char == " " and chars and chars[-1] == " ":
+                continue
+            chars.append(char)
+            offsets.append(i)
+        return "".join(chars), offsets
+
+    direct = source.find(quote)
+    if direct >= 0:
+        return direct, direct + len(quote)
+    normalized_source, offsets = normalize(source)
+    normalized_quote, _ = normalize(quote)
+    normalized_quote = normalized_quote.strip()
+    if not normalized_quote:
+        return None
+    match = normalized_source.find(normalized_quote)
+    if match < 0:
+        return None
+    start, end = offsets[match], offsets[match + len(normalized_quote) - 1] + 1
+    while start > 0 and source[start - 1] == "`":
+        start -= 1
+    while end < len(source) and source[end] == "`":
+        end += 1
+    return start, end
 
 
 def validate_bindings(
@@ -211,6 +295,19 @@ def validate_bindings(
             raise ValueError("only yes decisions require nonempty instances")
         slot_specs = {slot["name"]: slot for slot in cards[pair[1]]["slots"]}
         for instance in instances:
+            expected_proofs = {
+                item["id"] for item in cards[pair[1]].get("prerequisites", [])
+            }
+            proofs = checked_rows(instance, "prerequisites")
+            supplied_proofs = set()
+            for proof in proofs:
+                pid = proof.get("id")
+                if pid not in expected_proofs or pid in supplied_proofs:
+                    raise ValueError("unknown or duplicate prerequisite evidence")
+                supplied_proofs.add(pid)
+                validate_evidence(proof, task)
+            if supplied_proofs != expected_proofs:
+                raise ValueError("yes binding lacks required prerequisite evidence")
             supplied = set()
             for slot in checked_rows(instance, "slots"):
                 name = slot.get("name")
@@ -230,6 +327,7 @@ def validate_bindings(
                     raise ValueError(
                         "slot needs a valid basis and instruction evidence"
                     )
+                validate_evidence(slot, task)
             required = {name for name, spec in slot_specs.items() if spec["required"]}
             if not required.issubset(supplied):
                 raise ValueError(
@@ -263,7 +361,19 @@ def bind(
 Decide applicability independently for every nominated requirement/template pair.
 For yes, fill one or more instances (distinct cases can need the same template).
 Fill each required slot; omit optional slots lacking support. Slot kinds must
-match the card. Cite supplied source IDs for every slot. Illustrative fixtures
+match the card. For every filled slot, cite supplied source IDs, supply
+source_quotes with one or more {source_id, quote} objects, and explain why those
+clauses support the value in support_explanation. Each quote must be copied
+verbatim from its named source span. Every cited span needs a quote. Use separate
+entries for evidence from separate clauses/spans; never concatenate excerpts or
+paraphrase a quote. Related subject matter is not sufficient.
+For each yes instance, prove every card prerequisite in prerequisites with its
+exact id, source IDs, source_quotes, and explanation. Cards without prerequisites
+use an empty list. If a prerequisite lacks support, return no or unknown with
+no instances; do not manufacture evidence. Read-only/equal contents do not mean
+same reference. Array order does not mean a collision winner. Preserve operation
+scope: a winner for one operation does not establish it for a different mode.
+Illustrative fixtures
 must illustrate a supported general rule, not add an obligation. Never put
 'unspecified' into a required slot to force a match: choose unknown instead.
 Use no for a false candidate match, unknown for insufficient evidence. Negative
@@ -279,7 +389,9 @@ Write slot values as grammatical replacements in the supplied sentences.""",
             partial(validate_bindings, selected=batch, catalog=catalog, task=task),
         )
         all_decisions.extend(decisions)
-    return all_decisions
+    from .guarding import confirm_guards
+
+    return confirm_guards(task, inv, catalog, all_decisions, recorder)
 
 
 def render_instance(card: dict[str, Any], instance: dict[str, Any]) -> str:
@@ -420,6 +532,20 @@ def generate(
 
 
 def save_generation(directory: Path, result: dict[str, Any]) -> None:
+    previous = directory / "generation.json"
+    if previous.exists():
+        prior = load_json(previous)
+        if digest(prior) != digest(result):
+            history = directory / "history" / digest(prior)
+            history.mkdir(parents=True, exist_ok=True)
+            for name in ("generation.json", "prompt.md"):
+                if (directory / name).exists():
+                    shutil.copy2(directory / name, history / name)
+            review_path = directory / "review.json"
+            if review_path.exists() and load_json(review_path).get(
+                "generation_sha256"
+            ) == digest(prior):
+                shutil.copy2(review_path, history / "review.json")
     write_json(directory / "generation.json", result)
     lines = [
         f"# {result['task_id']}: {result['arm']}",
@@ -440,6 +566,25 @@ def load_catalog(path: Path) -> dict[str, Any]:
     if not isinstance(cards, list) or len({card["id"] for card in cards}) != len(cards):
         raise ValueError("catalog requires unique template IDs")
     for card in cards:
+        prerequisites = card.get("prerequisites", [])
+        if len({item["id"] for item in prerequisites}) != len(prerequisites):
+            raise ValueError("duplicate catalog prerequisites")
+        for item in prerequisites:
+            for field in ("id", "claim", "reject_inference"):
+                require_text(item, field)
+            if "relation_classes" in item:
+                require_text(item, "question")
+                classes = item["relation_classes"]
+                if (
+                    not isinstance(classes, dict)
+                    or not {"unspecified", "uncertain"} <= classes.keys()
+                    or item.get("required_relation") not in classes
+                    or any(
+                        not isinstance(v, str) or not v.strip()
+                        for v in classes.values()
+                    )
+                ):
+                    raise ValueError("invalid semantic relation classes")
         names = {slot["name"] for slot in card["slots"]}
         used = set(
             placeholders(

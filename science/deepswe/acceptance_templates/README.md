@@ -1,8 +1,10 @@
 # Acceptance criteria template experiment
 
-A standalone science runner for the [template catalog proposal](../../../docs/plans/acceptance-criteria-template-catalog-proposal.md). It compares direct acceptance-criteria generation with whole-catalog selection, source-based slot binding, and deterministic rendering. It does not change production routing, splitting, prompt generation, or Structrr diff generation.
+A standalone science runner for the [template catalog proposal](../../../docs/plans/acceptance-criteria-template-catalog-proposal.md). Its original pilot compares direct acceptance-criteria generation with whole-catalog selection, source-based slot binding, and deterministic rendering. A separate production-routed experiment feeds the production ledger, atomicity judge, splitter, and JEV router into template matching; it does not change the production prompt or Structrr diff paths.
 
 The initial dataset has four tasks from repository families outside the twelve used to design the catalog: cattrs partial structuring, Helm merge strategies, Koota entity snapshots, and dateutil timezone interoperability. There are 91 agent-authored source-based reference validations, prepared before inspecting generated criteria. These are development evaluation labels, not human gold and not an untouched final holdout after this experiment.
+
+The [production-routed run](runs/production-routed-v1/README.md) reruns those tasks after production sentence capture, JEV atomicity classification, planning-model splitting, and JEV routing. Its results are not directly comparable as a causal estimate because the matcher/catalog version and batch size changed; the report preserves the complete classifier and generation traces.
 
 Start with [FOLLOWUP.md](FOLLOWUP.md) for the latest applicability fixes, failed approaches, reviewer calibration, and the mixed full-task results. [PILOT.md](PILOT.md) preserves the original experiment.
 
@@ -44,7 +46,7 @@ Do not repurpose HOME or CODEX_HOME for experiments. The only exports above sele
 ## Generation and comparison
 
 1. `collect` excludes the catalog development tasks **and their repository families**. `inputs/` holds only task ID and original instruction. A separate manifest records artifact hashes, repository identities, and exclusions. Patch contents never enter generation.
-2. A shared model pass creates an atomic requirement inventory from stable instruction-line spans. It also records context and process statements. This is an experimental input-analysis pass, not the production routing/splitting classifiers; references independently assess whether it missed product meaning.
+2. In the original pilot, a shared model pass creates an atomic requirement inventory from stable instruction-line spans. It also records context and process statements. The separate production-routed run replaces this step with the production instruction ledger, atomicity/splitting, and route classification before matching.
 3. The **direct arm** writes criteria in its own prose from that inventory and the complete instruction.
 4. The **template arm** nominates multiple templates per requirement from the 52 short applicability descriptions. A separate binding pass confirms yes/no/unknown and fills typed slots with instruction evidence. One requirement/template pair can have multiple instances. Code renders the sentences and omits unsupported optional clauses. Exact duplicates are merged, with all bindings preserved.
 5. Requirements with no generated criterion remain in `prompt.md`. They count as incomplete validation generation, not successful coverage. A generation failure writes a failed artifact with the requirement text retained; it does not prevent other tasks/arms from running. An inventory failure remains visible as an incomplete task.

@@ -279,6 +279,25 @@ def score(
         judgments, references=reference["validations"], generation=generation
     )
     support = validate_support(judgments, criteria=generation["criteria"], task=task)
+    support_by_id = {row["criterion_id"]: row for row in support}
+    route_metrics: dict[str, dict[str, int | float]] = {}
+    for criterion in generation["criteria"]:
+        route = criterion.get("route") or "unrouted"
+        metrics = route_metrics.setdefault(
+            route,
+            {
+                "criteria": 0,
+                "supported": 0,
+                "unsupported": 0,
+                "partial": 0,
+                "uncertain": 0,
+            },
+        )
+        metrics["criteria"] += 1
+        status = support_by_id[criterion["id"]]["status"]
+        status_key = {"partly_supported": "partial"}.get(status, status)
+        if status_key in metrics:
+            metrics[status_key] += 1
     status = judgments.get("review_status")
     if status not in {"automated", "human_reviewed"}:
         raise ValueError("review status must remain explicit")
@@ -336,6 +355,7 @@ def score(
         "unsupported": sum(row["status"] == "unsupported" for row in support),
         "partly_supported": sum(row["status"] == "partial" for row in support),
         "uncertain": sum(row["status"] == "uncertain" for row in support),
+        "criteria_by_route": route_metrics,
         "candidate_template_label_recall": ratio(candidate_hits, eligible),
         "accepted_template_label_recall": ratio(accepted_hits, eligible),
         "template_label_reference_count": eligible,
@@ -435,7 +455,8 @@ def report_markdown(report: dict[str, Any], output: Path) -> None:
     if report["failures"]:
         lines += ["", "## Incomplete runs", ""]
         lines.extend(
-            f"- {row['task_id']} / {row['arm']}: {row['error']}"
+            f"- {row['task_id']} / "
+            f"{row.get('arm', row.get('stage', 'unknown'))}: {row['error']}"
             for row in report["failures"]
         )
     output.write_text("\n".join(lines) + "\n")

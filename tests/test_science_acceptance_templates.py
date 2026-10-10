@@ -208,7 +208,7 @@ def test_binding_rejects_unsupported_structure_and_missing_evidence(
 
 
 @pytest.mark.parametrize("mutation", ["invented_quote", "wrong_span", "empty_reason"])
-def test_binding_requires_exact_slot_evidence_and_explanation(mutation: str) -> None:
+def test_binding_rejects_or_withholds_invalid_slot_evidence(mutation: str) -> None:
     catalog, response = _binding()
     slot = response["decisions"][0]["instances"][0]["slots"][0]
     if mutation == "invented_quote":
@@ -216,14 +216,35 @@ def test_binding_requires_exact_slot_evidence_and_explanation(mutation: str) -> 
     elif mutation == "wrong_span":
         slot["source_ids"] = ["s002"]
     else:
-        slot["support_explanation"] = ""
-    with pytest.raises(ValueError):
-        validate_bindings(
-            response,
-            selected=[{"requirement_id": "r001", "template_ids": ["T99"]}],
-            catalog=catalog,
-            task=task(),
+        response["decisions"][0]["reason"] = ""
+    selected = [{"requirement_id": "r001", "template_ids": ["T99"]}]
+    if mutation == "empty_reason":
+        with pytest.raises(ValueError):
+            validate_bindings(response, selected=selected, catalog=catalog, task=task())
+    else:
+        decisions = validate_bindings(
+            response, selected=selected, catalog=catalog, task=task()
         )
+        assert decisions[0]["applicability"] == "unknown"
+        assert decisions[0]["instances"] == []
+
+
+def test_invalid_quote_withholds_candidate_without_failing_task() -> None:
+    catalog, response = _binding()
+    response["decisions"][0]["instances"][0]["slots"][0]["source_quotes"][0][
+        "quote"
+    ] = "Each entry the factory."
+
+    decisions = validate_bindings(
+        response,
+        selected=[{"requirement_id": "r001", "template_ids": ["T99"]}],
+        catalog=catalog,
+        task=task(),
+    )
+
+    assert decisions[0]["applicability"] == "unknown"
+    assert decisions[0]["instances"] == []
+    assert "contiguous substring" in decisions[0]["provenance_validation_error"]
 
 
 @pytest.mark.parametrize(
@@ -256,13 +277,16 @@ def test_yes_binding_requires_all_catalog_prerequisites(mutation: str) -> None:
     else:
         proof["source_quotes"][0]["quote"] = "The child overrides the parent."
     response["decisions"][0]["instances"][0]["prerequisites"] = proofs
-    with pytest.raises(ValueError):
-        validate_bindings(
-            response,
-            selected=[{"requirement_id": "r001", "template_ids": ["T99"]}],
-            catalog=catalog,
-            task=task(),
+    selected = [{"requirement_id": "r001", "template_ids": ["T99"]}]
+    if mutation == "invented_quote":
+        decisions = validate_bindings(
+            response, selected=selected, catalog=catalog, task=task()
         )
+        assert decisions[0]["applicability"] == "unknown"
+        assert decisions[0]["instances"] == []
+    else:
+        with pytest.raises(ValueError):
+            validate_bindings(response, selected=selected, catalog=catalog, task=task())
 
 
 def test_valid_yes_proof_and_declined_guard_both_validate() -> None:
@@ -735,17 +759,31 @@ def test_generation_updates_preserve_the_exact_prior_reviewed_snapshot(
     assert load_json(tmp_path / "generation.json") == updated
 
 
-def test_checkpoint_bundle_includes_namespaced_review_calls(tmp_path: Path) -> None:
+def test_checkpoint_bundle_includes_review_router_and_split_calls(
+    tmp_path: Path,
+) -> None:
     from science.deepswe.acceptance_templates.bundle import bundle
 
     run = tmp_path / "run"
-    path = run / "task/templates/review-calls/fingerprint/coverage-000-0.json"
-    write_json(
-        path, {"status": "completed", "stage": "coverage-000", "request_sha256": "test"}
-    )
+    paths = [
+        run / "task/templates/review-calls/fingerprint/coverage-000-0.json",
+        run / "task/instruction-analysis/jev-calls/routing-clause-0.json",
+        run / "task/instruction-analysis/split-calls/split-clause-0.json",
+    ]
+    for path in paths:
+        write_json(
+            path,
+            {
+                "status": "completed",
+                "stage": path.stem,
+                "request_sha256": "test",
+            },
+        )
     manifest = bundle(run, tmp_path)
-    assert manifest["file_count"] == 1
-    assert manifest["files"][0]["path"].endswith("fingerprint/coverage-000-0.json")
+    assert manifest["file_count"] == 3
+    assert {row["path"] for row in manifest["files"]} == {
+        str(path.resolve().relative_to(tmp_path)) for path in paths
+    }
 
 
 def test_no_match_completes_prompt_and_retains_requirement(

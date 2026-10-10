@@ -15,7 +15,13 @@ def bundle(run_dir: Path, repo_root: Path) -> dict[str, Any]:
     paths = sorted(
         {
             path
-            for dirname in ("calls", "review-calls", "inventory-calls")
+            for dirname in (
+                "calls",
+                "review-calls",
+                "inventory-calls",
+                "jev-calls",
+                "split-calls",
+            )
             for directory in run_dir.rglob(dirname)
             for path in directory.rglob("*.json")
         }

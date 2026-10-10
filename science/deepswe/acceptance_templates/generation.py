@@ -184,6 +184,12 @@ def select(
 Nominate all potentially applicable templates for each requirement. Favor recall:
 retain plausible candidates for binding to confirm, but do not match only on a
 keyword. Several templates can apply; an empty list is a legitimate catalog miss.
+Use the routed category supplied with each requirement. Match an include_prohibition
+only to criteria that preserve the exact prohibited product behavior; do not turn
+it into a positive requirement or prohibit additional behavior. Required rejection
+of invalid input is an include requirement, not an include_prohibition. Context,
+exclude, and unclear clauses are not product requirements and are never template
+candidates.
 Deep hierarchy history is not recursive object copying. Same value is not same
 object. Sequence order does not establish conflicting-value precedence. Check
 each card's prerequisites before nominating it; keep alternative templates for
@@ -220,7 +226,9 @@ def validate_evidence(row: dict[str, Any], task: dict[str, Any]) -> None:
         located = locate_quote(spans[sid]["text"], quote)
         if located is None:
             raise ValueError(
-                f"evidence words must occur in cited span {sid}: {quote!r}"
+                "evidence quote must be a contiguous substring of its cited "
+                "source span (whitespace and backtick formatting differences "
+                f"are allowed) {sid}: {quote!r}"
             )
         start, end = located
         item.update(
@@ -294,6 +302,7 @@ def validate_bindings(
         if bool(instances) != (row["applicability"] == "yes"):
             raise ValueError("only yes decisions require nonempty instances")
         slot_specs = {slot["name"]: slot for slot in cards[pair[1]]["slots"]}
+        provenance_error = None
         for instance in instances:
             expected_proofs = {
                 item["id"] for item in cards[pair[1]].get("prerequisites", [])
@@ -305,7 +314,13 @@ def validate_bindings(
                 if pid not in expected_proofs or pid in supplied_proofs:
                     raise ValueError("unknown or duplicate prerequisite evidence")
                 supplied_proofs.add(pid)
-                validate_evidence(proof, task)
+                try:
+                    validate_evidence(proof, task)
+                except ValueError as exc:
+                    provenance_error = str(exc)
+                    break
+            if provenance_error:
+                break
             if supplied_proofs != expected_proofs:
                 raise ValueError("yes binding lacks required prerequisite evidence")
             supplied = set()
@@ -327,12 +342,26 @@ def validate_bindings(
                     raise ValueError(
                         "slot needs a valid basis and instruction evidence"
                     )
-                validate_evidence(slot, task)
+                try:
+                    validate_evidence(slot, task)
+                except ValueError as exc:
+                    provenance_error = str(exc)
+                    break
+            if provenance_error:
+                break
             required = {name for name, spec in slot_specs.items() if spec["required"]}
             if not required.issubset(supplied):
                 raise ValueError(
                     f"missing required slots: {sorted(required - supplied)}"
                 )
+        if provenance_error:
+            # A broken citation cannot support a rendered criterion. Keep this
+            # nominated pair as an explicit unknown and let requirement fallback
+            # preserve the source behavior without failing the whole task.
+            row["applicability"] = "unknown"
+            row["reason"] = "Withheld because source evidence failed validation."
+            row["instances"] = []
+            row["provenance_validation_error"] = provenance_error
     if seen != expected:
         raise ValueError("binding must decide every nominated pair")
     return rows
@@ -359,6 +388,10 @@ def bind(
             QUALITY
             + """
 Decide applicability independently for every nominated requirement/template pair.
+Respect the source route: include_prohibition criteria must state the precise
+forbidden behavior, while include criteria state required product behavior.
+Do not reverse or broaden either polarity. A required error/rejection for invalid
+input is still include. Context and excluded clauses do not create criteria.
 For yes, fill one or more instances (distinct cases can need the same template).
 Fill each required slot; omit optional slots lacking support. Slot kinds must
 match the card. For every filled slot, cite supplied source IDs, supply
@@ -391,7 +424,11 @@ Write slot values as grammatical replacements in the supplied sentences.""",
         all_decisions.extend(decisions)
     from .guarding import confirm_guards
 
-    return confirm_guards(task, inv, catalog, all_decisions, recorder)
+    all_decisions = confirm_guards(task, inv, catalog, all_decisions, recorder)
+    for decision in all_decisions:
+        decision["route"] = reqs[decision["requirement_id"]].get("route")
+        decision["polarity"] = reqs[decision["requirement_id"]].get("polarity")
+    return all_decisions
 
 
 def render_instance(card: dict[str, Any], instance: dict[str, Any]) -> str:
@@ -416,6 +453,8 @@ def render_bindings(
                 {
                     "text": render_instance(cards[row["template_id"]], instance),
                     "requirement_ids": [row["requirement_id"]],
+                    "route": row.get("route"),
+                    "polarity": row.get("polarity"),
                     "source_ids": sorted(
                         {
                             source
@@ -431,9 +470,9 @@ def render_bindings(
 
 
 def deduplicate(criteria: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    result: dict[str, dict[str, Any]] = {}
+    result: dict[tuple[str | None, str], dict[str, Any]] = {}
     for row in criteria:
-        key = normalized(row["text"])
+        key = (row.get("route"), normalized(row["text"]))
         if key in result:
             for field in ("requirement_ids", "source_ids", "template_ids"):
                 result[key][field] = sorted(set(result[key][field]) | set(row[field]))
@@ -557,6 +596,9 @@ def save_generation(directory: Path, result: dict[str, Any]) -> None:
     if result["residual_requirements"]:
         lines += ["", "## Requirements retained without generated criteria", ""]
         lines.extend(f"- {row['text']}" for row in result["residual_requirements"])
+    if result.get("unresolved_route_items"):
+        lines += ["", "## Requirements with unresolved routing", ""]
+        lines.extend(f"- {row['text']}" for row in result["unresolved_route_items"])
     (directory / "prompt.md").write_text("\n".join(lines) + "\n")
 
 

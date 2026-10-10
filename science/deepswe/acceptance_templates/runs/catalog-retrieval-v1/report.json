@@ -1,0 +1,3823 @@
+{
+  "schema_version": "catalog-retrieval-experiment-v1",
+  "prompt_version": "acceptance-template-evidence-v3",
+  "baseline_run": "/Users/gregory/.codex/worktrees/f86b/powdrr-lift/science/deepswe/acceptance_templates/runs/production-routed-v1",
+  "catalog_sha256": "7eadc44c00257f3d5130b96a743cb08e12a1419953408a010e3fb37ce855472a",
+  "audit_model": {
+    "provider": "deepinfra",
+    "model": "Qwen/Qwen3-Next-80B-A3B-Instruct"
+  },
+  "embedding_model": "BAAI/bge-m3",
+  "jev_model": "jev-latest",
+  "thresholds": [
+    0.35,
+    0.45,
+    0.55,
+    0.65
+  ],
+  "catalog_audit_status_counts": {
+    "expressible": 35,
+    "no_fit": 56,
+    "unclear": 0
+  },
+  "pipeline_diagnosis_counts": {
+    "retrieval_miss": 53,
+    "covered": 35,
+    "binding_or_rendering_miss": 2,
+    "upstream_route_miss": 1
+  },
+  "retrieval_metrics": {
+    "embedding>=0.35": {
+      "catalog_audit_oracle": {
+        "eligible_references": 35,
+        "hits": 34,
+        "complete_group_recall": 0.9714285714285714,
+        "mean_candidates": 51.22857142857143
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 91,
+        "hits": 90,
+        "complete_group_recall": 0.989010989010989,
+        "mean_candidates": 51.37362637362637
+      }
+    },
+    "embedding>=0.45": {
+      "catalog_audit_oracle": {
+        "eligible_references": 35,
+        "hits": 21,
+        "complete_group_recall": 0.6,
+        "mean_candidates": 35.68571428571428
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 91,
+        "hits": 54,
+        "complete_group_recall": 0.5934065934065934,
+        "mean_candidates": 35.24175824175824
+      }
+    },
+    "embedding>=0.55": {
+      "catalog_audit_oracle": {
+        "eligible_references": 35,
+        "hits": 4,
+        "complete_group_recall": 0.11428571428571428,
+        "mean_candidates": 2.5428571428571427
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 91,
+        "hits": 5,
+        "complete_group_recall": 0.054945054945054944,
+        "mean_candidates": 2.230769230769231
+      }
+    },
+    "embedding>=0.65": {
+      "catalog_audit_oracle": {
+        "eligible_references": 35,
+        "hits": 0,
+        "complete_group_recall": 0.0,
+        "mean_candidates": 0.0
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 91,
+        "hits": 2,
+        "complete_group_recall": 0.02197802197802198,
+        "mean_candidates": 0.03296703296703297
+      }
+    },
+    "jev_top1": {
+      "catalog_audit_oracle": {
+        "eligible_references": 35,
+        "hits": 9,
+        "complete_group_recall": 0.2571428571428571,
+        "mean_candidates": 1.0
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 91,
+        "hits": 15,
+        "complete_group_recall": 0.16483516483516483,
+        "mean_candidates": 1.0
+      }
+    },
+    "llm+jev+embedding>=0.35": {
+      "catalog_audit_oracle": {
+        "eligible_references": 35,
+        "hits": 35,
+        "complete_group_recall": 1.0,
+        "mean_candidates": 51.285714285714285
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 91,
+        "hits": 91,
+        "complete_group_recall": 1.0,
+        "mean_candidates": 51.395604395604394
+      }
+    },
+    "llm+jev+embedding>=0.45": {
+      "catalog_audit_oracle": {
+        "eligible_references": 35,
+        "hits": 30,
+        "complete_group_recall": 0.8571428571428571,
+        "mean_candidates": 36.74285714285714
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 91,
+        "hits": 72,
+        "complete_group_recall": 0.7912087912087912,
+        "mean_candidates": 36.010989010989015
+      }
+    },
+    "llm+jev+embedding>=0.55": {
+      "catalog_audit_oracle": {
+        "eligible_references": 35,
+        "hits": 19,
+        "complete_group_recall": 0.5428571428571428,
+        "mean_candidates": 6.228571428571429
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 91,
+        "hits": 47,
+        "complete_group_recall": 0.5164835164835165,
+        "mean_candidates": 5.450549450549451
+      }
+    },
+    "llm+jev+embedding>=0.65": {
+      "catalog_audit_oracle": {
+        "eligible_references": 35,
+        "hits": 16,
+        "complete_group_recall": 0.45714285714285713,
+        "mean_candidates": 4.3428571428571425
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 91,
+        "hits": 42,
+        "complete_group_recall": 0.46153846153846156,
+        "mean_candidates": 3.89010989010989
+      }
+    },
+    "llm_full_catalog": {
+      "catalog_audit_oracle": {
+        "eligible_references": 35,
+        "hits": 15,
+        "complete_group_recall": 0.42857142857142855,
+        "mean_candidates": 4.142857142857143
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 91,
+        "hits": 37,
+        "complete_group_recall": 0.4065934065934066,
+        "mean_candidates": 3.6923076923076925
+      }
+    }
+  },
+  "tasks": [
+    {
+      "task_id": "cattrs-partial-structuring-recovery",
+      "audit_call_count": 6,
+      "jev_call_count": 17,
+      "catalog_status_counts": {
+        "expressible": 3,
+        "no_fit": 14,
+        "unclear": 0
+      },
+      "retrieval_metrics": {
+        "llm_full_catalog": {
+          "catalog_audit_oracle": {
+            "eligible_references": 3,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 4.0,
+            "candidate_precision_proxy": 0.16666666666666666,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 17,
+            "candidate_recall": 0.29411764705882354,
+            "complete_group_recall": 0.29411764705882354,
+            "mean_candidates": 3.8823529411764706,
+            "candidate_precision_proxy": 0.2727272727272727,
+            "hits": 5
+          }
+        },
+        "embedding>=0.35": {
+          "catalog_audit_oracle": {
+            "eligible_references": 3,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 52.0,
+            "candidate_precision_proxy": 0.038461538461538464,
+            "hits": 3
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 17,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 52.0,
+            "candidate_precision_proxy": 0.038461538461538464,
+            "hits": 17
+          }
+        },
+        "llm+jev+embedding>=0.35": {
+          "catalog_audit_oracle": {
+            "eligible_references": 3,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 52.0,
+            "candidate_precision_proxy": 0.038461538461538464,
+            "hits": 3
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 17,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 52.0,
+            "candidate_precision_proxy": 0.038461538461538464,
+            "hits": 17
+          }
+        },
+        "embedding>=0.45": {
+          "catalog_audit_oracle": {
+            "eligible_references": 3,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 39.666666666666664,
+            "candidate_precision_proxy": 0.025210084033613446,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 17,
+            "candidate_recall": 0.6470588235294118,
+            "complete_group_recall": 0.6470588235294118,
+            "mean_candidates": 41.588235294117645,
+            "candidate_precision_proxy": 0.039603960396039604,
+            "hits": 11
+          }
+        },
+        "llm+jev+embedding>=0.45": {
+          "catalog_audit_oracle": {
+            "eligible_references": 3,
+            "candidate_recall": 0.3333333333333333,
+            "complete_group_recall": 0.3333333333333333,
+            "mean_candidates": 41.333333333333336,
+            "candidate_precision_proxy": 0.03225806451612903,
+            "hits": 1
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 17,
+            "candidate_recall": 0.7647058823529411,
+            "complete_group_recall": 0.7647058823529411,
+            "mean_candidates": 42.294117647058826,
+            "candidate_precision_proxy": 0.04172461752433936,
+            "hits": 13
+          }
+        },
+        "embedding>=0.55": {
+          "catalog_audit_oracle": {
+            "eligible_references": 3,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 0.6666666666666666,
+            "candidate_precision_proxy": 0.5,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 17,
+            "candidate_recall": 0.17647058823529413,
+            "complete_group_recall": 0.17647058823529413,
+            "mean_candidates": 2.235294117647059,
+            "candidate_precision_proxy": 0.2894736842105263,
+            "hits": 3
+          }
+        },
+        "llm+jev+embedding>=0.55": {
+          "catalog_audit_oracle": {
+            "eligible_references": 3,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 5.0,
+            "candidate_precision_proxy": 0.13333333333333333,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 17,
+            "candidate_recall": 0.35294117647058826,
+            "complete_group_recall": 0.35294117647058826,
+            "mean_candidates": 5.235294117647059,
+            "candidate_precision_proxy": 0.23595505617977527,
+            "hits": 6
+          }
+        },
+        "embedding>=0.65": {
+          "catalog_audit_oracle": {
+            "eligible_references": 3,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 0.0,
+            "candidate_precision_proxy": null,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 17,
+            "candidate_recall": 0.11764705882352941,
+            "complete_group_recall": 0.11764705882352941,
+            "mean_candidates": 0.17647058823529413,
+            "candidate_precision_proxy": 0.6666666666666666,
+            "hits": 2
+          }
+        },
+        "llm+jev+embedding>=0.65": {
+          "catalog_audit_oracle": {
+            "eligible_references": 3,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 4.666666666666667,
+            "candidate_precision_proxy": 0.14285714285714285,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 17,
+            "candidate_recall": 0.29411764705882354,
+            "complete_group_recall": 0.29411764705882354,
+            "mean_candidates": 4.117647058823529,
+            "candidate_precision_proxy": 0.2571428571428571,
+            "hits": 5
+          }
+        },
+        "jev_top1": {
+          "catalog_audit_oracle": {
+            "eligible_references": 3,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 1.0,
+            "candidate_precision_proxy": 0.3333333333333333,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 17,
+            "candidate_recall": 0.17647058823529413,
+            "complete_group_recall": 0.17647058823529413,
+            "mean_candidates": 1.0,
+            "candidate_precision_proxy": 0.4117647058823529,
+            "hits": 3
+          }
+        }
+      },
+      "diagnosis": [
+        {
+          "reference_id": "v001",
+          "behavior": "BaseConverter exposes partial_structure, and a top-level partial_structure function is available.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T52"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T02",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction requires that `partial_structure` be exposed both as a method on `BaseConverter` and as a top-level function. Template T01 requires a single symbol exposing a single interface, and cannot express two distinct public entry points (method and top-level function) in one instantiation. No combination of T01 instances can express both without violating the template's single-symbol constraint. T52 could express export of the top-level function, but T01 cannot capture the dual exposure (method + top-level). No template supports expressing multiple distinct public interfaces from one instruction clause.",
+          "missing_construct": "No template exists to express that a single entity (e.g., `partial_structure`) is exposed both as a method on a class and as a top-level function in the same module. T01 only allows one symbol → one interface mapping per card. T52 can assert export but not the dual-access pattern."
+        },
+        {
+          "reference_id": "v002",
+          "behavior": "PartialResult is exported publicly.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T52"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T04",
+            "T06",
+            "T21",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "Template T01 requires a symbol exposing an interface, but `PartialResult` is a type/class to be exported, not an interface to be invoked. T52 is the only template that can express export of an artifact (`PartialResult`), but T52 requires a location and inspectable properties — the instruction only requires that `PartialResult` be exported, with no specification of location or properties. T52 cannot be filled without inventing a location (e.g., 'module root') or inspectable properties (e.g., 'is a class'), which violates the rule against adding assertions. Thus, no valid instantiation of T52 is possible under the given constraints.",
+          "missing_construct": "T52 requires specifying a location and inspectable properties for the exported artifact, but the instruction only states 'Export PartialResult' without any location or property constraints. No template allows expressing simple export of a symbol without additional metadata."
+        },
+        {
+          "reference_id": "v003",
+          "behavior": "partial_structure returns a PartialResult whose value is the produced partial object or None when no object can be produced.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T02"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T02",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "Template T02 requires specifying field specifications and their meanings for a result. The instruction defines multiple fields (`value`, `is_complete`, `structured_fields`, `failed_fields`, `errors`, `error_map`) with precise semantics. However, T02 requires a single `field_specifications` (a single observation) and a single `meaning` — it cannot express a table of multiple fields with individual meanings. Even repeated use of T02 would require multiple instantiations, but the template does not support multiple field entries per card. No template exists to express a structured result with multiple named fields and their individual semantic definitions.",
+          "missing_construct": "No template supports expressing a multi-field result structure with individual field-to-meaning mappings. T02 is designed for one field at a time, and the instruction requires a full schema of six fields with distinct semantics — this requires a template for 'result schema definition' which does not exist."
+        },
+        {
+          "reference_id": "v004",
+          "behavior": "PartialResult exposes is_complete, structured_fields and failed_fields as frozensets, errors as an exception or None, and error_map mapping field names to exceptions.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T02"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T02",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The instruction requires PartialResult to expose specific fields (is_complete, structured_fields, failed_fields, errors, error_map) with precise types and semantics, but template T02 (Result structure and field meaning) requires a single 'field_specifications' slot to list all fields and a single 'meaning' slot to describe their collective semantics. This template cannot express multiple distinct fields with individual meanings (e.g., 'errors' as exception or None, 'error_map' as mapping) without violating its structure. No other template in the catalog supports expressing a structured result with multiple typed fields and their individual semantic roles. The catalog lacks a template for 'multiple field definitions with individual types and meanings' — a necessary construct missing from the template set.",
+          "missing_construct": "A template that allows a list of field definitions, each with its own name, type, and semantic description (e.g., a table-like structure), is required but absent from the catalog."
+        },
+        {
+          "reference_id": "v005",
+          "behavior": "A field absent from input is in failed_fields and not in structured_fields.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T11",
+              "T02"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T03",
+            "T09",
+            "T11",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "Template T11 (Missing, null, and empty distinction) can express that absent fields are in failed_fields and not structured_fields, but it requires a single 'presence_or_value_case' and 'case_outcome' mapping. The behavior requires two distinct, simultaneous outcomes: absence → failed_fields AND absence → not in structured_fields. T11 cannot express this bidirectional exclusion. T02 could express the field existence but not the exclusion constraint. No template in the catalog supports expressing mutual exclusion between two sets based on input presence. The catalog lacks a template for 'set membership exclusion based on input absence'.",
+          "missing_construct": "A template that expresses mutual exclusion between two sets (e.g., 'if absent from input, then in set A and not in set B') is required but absent."
+        },
+        {
+          "reference_id": "v006",
+          "behavior": "A failed field with a default uses that default as fallback, without being counted as successfully structured from input.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T09",
+              "T11"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T03",
+            "T09",
+            "T11",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "missing",
+          "cause": "binding_or_rendering_miss",
+          "catalog_rationale": "Template T09 (Deterministic transformation) could express that a failed field with a default yields the default value, but it cannot express that this fallback does not count as 'structured from input' — a critical semantic distinction. T11 can express that absence leads to fallback, but not that the fallback is not structured. T09 and T11 together still cannot express the dual requirement: (1) fallback value is used, and (2) field is not added to structured_fields. The catalog lacks a template that links a transformation outcome to a set membership exclusion. The required construct is a template that ties a value transformation to a classification of 'structured' vs 'not structured' — which does not exist.",
+          "missing_construct": "A template that links a value fallback to a classification of field structure status (structured/failed) is required but absent."
+        },
+        {
+          "reference_id": "v007",
+          "behavior": "A failed required field without a default prevents object production and makes value None.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T05",
+              "T10",
+              "T11"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T03",
+            "T09",
+            "T11",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that a failed required field without a default makes the entire value None. This involves a conditional outcome based on field presence and default existence, which maps to T11 (Missing, null, and empty distinction) for the 'missing required field without default' case producing 'value = None'. However, T11 alone cannot express the causal link between field failure and the top-level value becoming None — that requires a transformation rule (T09) or boundary case (T10) that ties field-level failure to object-level result state. No template in the catalog expresses a hierarchical or aggregate outcome where the failure of a child field directly determines the root value's state (None vs. partial). T05 (Invalid input rejection) is insufficient because it describes error emission, not value assignment. T10 could describe a boundary (e.g., 'no valid fields') but not the specific condition of 'required field missing without default'. No combination of templates can express this causal, hierarchical value assignment without a missing construct: a template that maps field-level validation failure to root object result state (e.g., 'If any required field is missing and has no default, then result.value = None').",
+          "missing_construct": "A template that expresses hierarchical result state derivation: 'When a required field is absent and has no default, the result.value is set to None.'"
+        },
+        {
+          "reference_id": "v008",
+          "behavior": "Nested attrs and dataclass fields are partially structured recursively.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T09",
+              "T50"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T03",
+            "T09",
+            "T11",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires recursive partial structuring of nested attrs/dataclass fields. T09 (Deterministic transformation) could express that a nested field's input produces a partial value, but it cannot express recursion or the propagation of partial state upward. T23 (State transition and guard) implies state propagation but is designed for event-driven state machines, not data transformation hierarchies. T50 (Equivalent behavior across surfaces) applies to multiple entry points, not recursive data flow. No template supports expressing that a field's value is computed by recursively applying the same partial structuring logic to its nested structure. The catalog lacks a template for recursive or nested application of an operation — a construct like 'For a nested field of type T, apply the same partial_structure operation recursively to produce its value.' Without this, recursion cannot be expressed.",
+          "missing_construct": "A template for recursive application of an operation: 'For a field of type T, apply {operation} recursively to its nested structure.'"
+        },
+        {
+          "reference_id": "v009",
+          "behavior": "When nested partial structuring yields a partial value, use it but mark the enclosing parent field failed.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T23",
+              "T11",
+              "T09"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T03",
+            "T09",
+            "T11",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "This behavior requires that when a nested field is partially structured (i.e., yields a partial value), that partial value is used in the parent, but the parent field is marked as failed. This is a two-part observation: (1) the parent field's value is the child's partial value, and (2) the parent field is in failed_fields despite having a value. T09 could express the value propagation, and T11 could express the failed status, but no template expresses the combination of value inheritance with status override. T23 implies state transition with effect, but not value inheritance from a child. T20 (Unchanged portions) is about preservation, not inheritance. The catalog lacks a template that allows a field to have a non-null value while still being classified as 'failed' — a contradiction in terms under standard templates. This requires a template like: 'When a nested field produces a partial value, the parent field’s value is set to that partial value, and the parent field is added to failed_fields.' No such template exists.",
+          "missing_construct": "A template that allows a field to have a non-null value and simultaneously be marked as failed: 'A field may have a value derived from a nested partial structure while still being listed in failed_fields.'"
+        },
+        {
+          "reference_id": "v010",
+          "behavior": "A nested object with no producible value is treated as a normal field failure.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T05",
+              "T11"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T03",
+            "T09",
+            "T11",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires distinguishing between a nested object having 'no producible value' (i.e., all its required fields are missing or failed) versus a field failure. This implies a recursive partial structuring outcome where the nested object's failure state propagates upward. However, no template in the catalog can express recursive structural failure propagation or the conditional production of a partial object value based on nested field completeness. T05 (invalid input rejection) and T11 (missing/null/empty distinction) are insufficient because they address input rejection or value semantics, not recursive structural composition and propagation of partial state. The catalog lacks a template for 'recursive structural outcome' or 'failure propagation in nested hierarchies'.",
+          "missing_construct": "A template for recursive structural outcome or failure propagation in nested objects, which would express: 'When a nested object has no producible value due to failed required fields, the parent field's value is set to None and marked as failed, while preserving the nested object's partial state in error_map.'"
+        },
+        {
+          "reference_id": "v011",
+          "behavior": "List and Dict fields are atomic: any element failure fails the entire field.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T05",
+              "T50",
+              "T23"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T03",
+            "T09",
+            "T11",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that collection fields (List, Dict) fail atomically: any element failure causes the entire field to fail. This is a structural constraint on collection handling, not merely input rejection (T05) or atomicity of operation (T23). T50 (equivalent behavior across surfaces) and T23 (state transition guard) are irrelevant. T05 could express 'element failure causes field failure', but it cannot express the atomicity constraint — that the entire collection field fails as a unit, not per-element. The catalog lacks a template for 'atomic failure propagation in compound structures' or 'collection-level failure semantics'.",
+          "missing_construct": "A template for atomic failure semantics in compound structures: 'For a collection field, if any element fails structuring, the entire field is marked as failed and no partial collection is produced.'"
+        },
+        {
+          "reference_id": "v012",
+          "behavior": "PartialResult.refine(data) returns a new PartialResult and can fix failed fields using the new data.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T09",
+              "T01"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T20"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that `PartialResult.refine(data)` returns a new `PartialResult` with failed fields updated using new data, while preserving structured fields. This is a deterministic transformation of a composite object with selective field replacement. T09 (deterministic transformation) could express the output formula, but it cannot express the selective preservation of structured fields and replacement of only failed fields. T20 (unchanged portions) expresses preservation of unaffected parts, but not the targeted update of failed fields. No template in the catalog supports a transformation that selectively replaces only a subset of fields in a result object while preserving others — the catalog lacks a template for 'selective field update in composite result objects'.",
+          "missing_construct": "A template for selective field update in composite result objects: 'Given a PartialResult and new data, refine() produces a new PartialResult where failed_fields are updated using the new data, structured_fields remain unchanged, and errors are recomputed only for the updated fields.'"
+        },
+        {
+          "reference_id": "v013",
+          "behavior": "Refinement preserves fields already successfully structured even if new data attempts to replace them.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T20",
+              "T07"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T20",
+              "T07"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T01",
+            "T20"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior 'Refinement preserves fields already successfully structured even if new data attempts to replace them' is directly expressible by T20 ('Unchanged portions of a result') which captures that specific fields remain unchanged after an update (refine), and T07 ('Irrelevant or overridden option') which confirms that the new data does not override previously structured fields — together they establish that structured_fields are preserved despite new input.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v014",
+          "behavior": "init=False fields appear in neither structured_fields nor failed_fields.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T21",
+              "T02"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T21",
+              "T02"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T01",
+            "T04",
+            "T06",
+            "T21",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The requirement that 'init=False fields appear in neither structured_fields nor failed_fields' is expressible by T21 ('Contextual exclusion') which captures that the construct (init=False fields) has no effect (exclusion from sets) in the excluded context (when included in result fields), and T02 ('Result structure and field meaning') which defines the meaning of structured_fields and failed_fields as excluding these fields — together they fully specify the exclusion behavior.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v015",
+          "behavior": "With forbid_extra_keys, extra keys make is_complete False while a value is still produced.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T11",
+              "T23"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T11",
+              "T23"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T01",
+            "T04",
+            "T06",
+            "T21",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior 'With forbid_extra_keys, extra keys make is_complete False while a value is still produced' is expressible by T11 ('Missing, null, and empty distinction') which distinguishes the case of extra keys (presence condition) from absence or invalidity, mapping it to is_complete=False, and T23 ('State transition and guard') which captures that the event (extra keys present) under guard (forbid_extra_keys=True) leads to the effect (is_complete=False) while the value is still produced — the latter is implied by 'still produce a value' in the instruction and is covered by the outcome of T23 being non-null value production.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v016",
+          "behavior": "partial_structure honors the converter detailed_validation setting; this instruction does not specify new exception-class or aggregation semantics.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T49",
+              "T07"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T04",
+            "T06",
+            "T21",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "partial",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction requires that `partial_structure` respects the `detailed_validation` setting, but none of the templates can express this because there is no template that captures the notion of 'an option being respected or honored by an operation without changing its behavior'. T07 ('Irrelevant or overridden option') requires that varying the option leaves an observation unchanged — but here, `detailed_validation` is not being ignored; it is actively influencing error reporting and field failure semantics. T06 ('Disabled feature behavior') requires a disabled path with a baseline — but `detailed_validation` is not a disabled feature; it's a mode that changes behavior. No template exists to express that an option modifies internal behavior (e.g., error aggregation, field failure reporting) in a way that is preserved from prior behavior. This is a missing construct: a template for 'option influences internal behavior consistently with prior implementation' — which is not in the catalog.",
+          "missing_construct": "A template that expresses: 'When option X is enabled, operation Y behaves in manner Z, consistent with prior behavior' — i.e., honoring an existing behavior flag without altering its semantics. This is distinct from T06 (disabled path) and T07 (ignored option), and is required to validate that `detailed_validation` is respected as a behavioral toggle."
+        },
+        {
+          "reference_id": "v017",
+          "behavior": "Partial structuring works for attrs classes, dataclasses, and TypedDicts.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T50"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T04",
+            "T06",
+            "T21",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The instruction requires that partial structuring works for attrs classes, dataclasses, and TypedDicts. T50 ('Equivalent behavior across required surfaces') is the only template that could apply, but it requires that the same contract holds for each listed surface. However, T50 requires that the behavior is identical across surfaces — but the instruction does not require identical behavior; it requires that partial structuring works recursively and atomically in each case, which may involve different internal mechanisms (e.g., attrs uses `__attrs_attrs__`, dataclasses use `__dataclass_fields__`, TypedDict uses `__annotations__`). T50 would require that the same field discovery, error mapping, and recursive logic is implemented identically — which is not required. The instruction only requires that each type is supported, not that the behavior is the same contract. No template exists to express 'the operation supports multiple distinct types with type-appropriate behavior'. This is a missing construct: a template for 'operation supports multiple specified types with type-specific but correct behavior'.",
+          "missing_construct": "A template that expresses: 'Operation X supports each of {list of types}, applying type-appropriate introspection and logic to each' — which is not covered by T50 (which demands identical contract) or T01 (which only covers public symbol exposure)."
+        }
+      ]
+    },
+    {
+      "task_id": "helm-array-merge-strategies",
+      "audit_call_count": 10,
+      "jev_call_count": 29,
+      "catalog_status_counts": {
+        "expressible": 14,
+        "no_fit": 15,
+        "unclear": 0
+      },
+      "retrieval_metrics": {
+        "llm_full_catalog": {
+          "catalog_audit_oracle": {
+            "eligible_references": 14,
+            "candidate_recall": 0.35714285714285715,
+            "complete_group_recall": 0.35714285714285715,
+            "mean_candidates": 4.571428571428571,
+            "candidate_precision_proxy": 0.328125,
+            "hits": 5
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 29,
+            "candidate_recall": 0.5172413793103449,
+            "complete_group_recall": 0.5172413793103449,
+            "mean_candidates": 4.862068965517241,
+            "candidate_precision_proxy": 0.3191489361702128,
+            "hits": 15
+          }
+        },
+        "embedding>=0.35": {
+          "catalog_audit_oracle": {
+            "eligible_references": 14,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 51.785714285714285,
+            "candidate_precision_proxy": 0.04275862068965517,
+            "hits": 14
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 29,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 51.89655172413793,
+            "candidate_precision_proxy": 0.04053156146179402,
+            "hits": 29
+          }
+        },
+        "llm+jev+embedding>=0.35": {
+          "catalog_audit_oracle": {
+            "eligible_references": 14,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 51.785714285714285,
+            "candidate_precision_proxy": 0.04275862068965517,
+            "hits": 14
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 29,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 51.89655172413793,
+            "candidate_precision_proxy": 0.04053156146179402,
+            "hits": 29
+          }
+        },
+        "embedding>=0.45": {
+          "catalog_audit_oracle": {
+            "eligible_references": 14,
+            "candidate_recall": 0.7142857142857143,
+            "complete_group_recall": 0.7142857142857143,
+            "mean_candidates": 36.42857142857143,
+            "candidate_precision_proxy": 0.052941176470588235,
+            "hits": 10
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 29,
+            "candidate_recall": 0.7931034482758621,
+            "complete_group_recall": 0.7931034482758621,
+            "mean_candidates": 40.206896551724135,
+            "candidate_precision_proxy": 0.04631217838765009,
+            "hits": 23
+          }
+        },
+        "llm+jev+embedding>=0.45": {
+          "catalog_audit_oracle": {
+            "eligible_references": 14,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 37.42857142857143,
+            "candidate_precision_proxy": 0.05916030534351145,
+            "hits": 14
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 29,
+            "candidate_recall": 0.9310344827586207,
+            "complete_group_recall": 0.9310344827586207,
+            "mean_candidates": 40.758620689655174,
+            "candidate_precision_proxy": 0.04991539763113367,
+            "hits": 27
+          }
+        },
+        "embedding>=0.55": {
+          "catalog_audit_oracle": {
+            "eligible_references": 14,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 2.5714285714285716,
+            "candidate_precision_proxy": 0.16666666666666666,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 29,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 2.5172413793103448,
+            "candidate_precision_proxy": 0.1232876712328767,
+            "hits": 0
+          }
+        },
+        "llm+jev+embedding>=0.55": {
+          "catalog_audit_oracle": {
+            "eligible_references": 14,
+            "candidate_recall": 0.42857142857142855,
+            "complete_group_recall": 0.42857142857142855,
+            "mean_candidates": 6.428571428571429,
+            "candidate_precision_proxy": 0.25555555555555554,
+            "hits": 6
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 29,
+            "candidate_recall": 0.5862068965517241,
+            "complete_group_recall": 0.5862068965517241,
+            "mean_candidates": 6.655172413793103,
+            "candidate_precision_proxy": 0.24870466321243523,
+            "hits": 17
+          }
+        },
+        "embedding>=0.65": {
+          "catalog_audit_oracle": {
+            "eligible_references": 14,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 0.0,
+            "candidate_precision_proxy": null,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 29,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 0.0,
+            "candidate_precision_proxy": null,
+            "hits": 0
+          }
+        },
+        "llm+jev+embedding>=0.65": {
+          "catalog_audit_oracle": {
+            "eligible_references": 14,
+            "candidate_recall": 0.35714285714285715,
+            "complete_group_recall": 0.35714285714285715,
+            "mean_candidates": 4.714285714285714,
+            "candidate_precision_proxy": 0.3181818181818182,
+            "hits": 5
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 29,
+            "candidate_recall": 0.5517241379310345,
+            "complete_group_recall": 0.5517241379310345,
+            "mean_candidates": 4.9655172413793105,
+            "candidate_precision_proxy": 0.3194444444444444,
+            "hits": 16
+          }
+        },
+        "jev_top1": {
+          "catalog_audit_oracle": {
+            "eligible_references": 14,
+            "candidate_recall": 0.21428571428571427,
+            "complete_group_recall": 0.21428571428571427,
+            "mean_candidates": 1.0,
+            "candidate_precision_proxy": 0.6428571428571429,
+            "hits": 3
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 29,
+            "candidate_recall": 0.10344827586206896,
+            "complete_group_recall": 0.10344827586206896,
+            "mean_candidates": 1.0,
+            "candidate_precision_proxy": 0.6896551724137931,
+            "hits": 3
+          }
+        }
+      },
+      "diagnosis": [
+        {
+          "reference_id": "v001",
+          "behavior": "append concatenates chart defaults before user elements.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T14",
+              "T09"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T11",
+            "T14",
+            "T18",
+            "T20",
+            "T39"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior 'append concatenates chart defaults before user elements' requires a deterministic transformation of array ordering (defaults then user), which is expressible by T14 (Stable ordering). However, T14 requires a sequence to be ordered by a rule, and the reference behavior specifies concatenation order — not just ordering — but also the source of each element (defaults vs user). T14 alone cannot express that the first part of the sequence comes from defaults and the second from user values. T09 (Deterministic transformation) could express the output as 'defaults + user', but T09 requires an expression that computes the result, and the instruction does not specify a formula — it specifies a concatenation of two distinct sources. No template in the catalog can express the concatenation of two distinct input sources into a single ordered sequence with source provenance. T14 is close but lacks the ability to specify which input contributes which segment. Thus, no template group can express this behavior without adding an assertion or modifying template text.",
+          "missing_construct": "A template that expresses concatenation of two distinct input sequences into a single output sequence, preserving source provenance and order, is missing. The catalog has ordering (T14) and transformation (T09), but not source-aware concatenation."
+        },
+        {
+          "reference_id": "v002",
+          "behavior": "merge matches array objects by the configured merge-key field and recursively merges matching objects with user fields winning.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T20",
+              "T09",
+              "T18"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T11",
+            "T14",
+            "T18",
+            "T20",
+            "T39"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires key-based merging of array-of-objects: matching objects by a key field, recursively merging matched pairs (user wins), preserving unmatched defaults, and appending unmatched user elements. This involves: (1) matching by key (T18's collision winner applies to key conflicts, but T18 assumes scalar or flat key collisions, not recursive object merging); (2) recursive merging of nested objects (no template supports recursive structure merging); (3) preserving unmatched elements from both sides (T20 covers unchanged portions, but only for unaffected parts — not for elements that are not matched); (4) appending unmatched user elements (T14 could express order, but not source-based selection). T18 can express that user wins in a collision, but not that the collision is defined by a key field within nested objects, nor that unmatched elements are preserved. T20 can express that unmatched defaults are preserved, but not that they are preserved as part of a merge process. No template supports recursive merging of nested objects by key, nor the combination of matching, preserving unmatched, and appending. The catalog lacks a template for 'key-based recursive merge of array-of-objects with source-aware preservation and append'.",
+          "missing_construct": "A template for key-based recursive merge of array-of-objects, preserving unmatched elements from both sources and appending unmatched user elements, is missing. The catalog has collision winner (T18) and unchanged portions (T20), but not their composition in a recursive, key-matching, array-merge context."
+        },
+        {
+          "reference_id": "v003",
+          "behavior": "Key merging preserves unmatched default elements.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T20",
+              "T09"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T11",
+            "T14",
+            "T18",
+            "T20",
+            "T39"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior 'Key merging preserves unmatched default elements' requires that elements in the default array that do not match any user element by key remain in the result. This is a preservation of unchanged portions (T20) — but T20 requires an update to be applied and specifies what does not change. Here, the 'update' is a merge operation, and the unchanged portions are the unmatched defaults. However, T20 does not specify that the unchanged portions are selected by key matching — it only says 'retains prior values'. T20 also assumes the target part is modified and other parts are unchanged, but here the entire array is being restructured: matched elements are merged, unmatched defaults are preserved, unmatched users are appended. T20 cannot express that preservation is conditional on key absence. T18 (scoped merge) expresses winner rules for collisions, but not preservation of non-colliding elements. No template in the catalog can express preservation of elements from a source that do not participate in a key-based matching process. The catalog lacks a template for 'conditional preservation of elements based on absence of match in another set'.",
+          "missing_construct": "A template that expresses preservation of elements from a source based on their absence of a matching key in another source is missing. T20 preserves unchanged parts, but not conditionally by key absence; T18 resolves collisions, but does not handle non-colliding elements."
+        },
+        {
+          "reference_id": "v004",
+          "behavior": "Key merging appends unmatched user elements.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T14",
+              "T09"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T11",
+            "T14",
+            "T18",
+            "T20",
+            "T39"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior 'Key merging appends unmatched user elements' requires a template that expresses ordered concatenation of elements from two sources (defaults and user) where unmatched user elements are appended at the end. While T14 (Stable ordering) can express ordering of the final sequence, and T09 (Deterministic transformation) can express the transformation rule, there is no template that captures the conditional appending of unmatched user elements based on key matching in a merge operation. T20 (Unchanged portions) captures preservation but not conditional appending. No template supports expressing 'append unmatched user elements' as a result of a key-based merge with a distinction between matched/unmatched. The instruction requires a merge algorithm with conditional element retention and appending — a complex, multi-stage transformation not expressible by any single template or combination without inventing semantics.",
+          "missing_construct": "A template for conditional element retention and appending based on key matching in a merge operation — specifically, one that expresses: 'For array elements, if a user element has a key not present in defaults, append it to the result; if a default element has a key not present in user, preserve it; if keys match, merge recursively.' No such template exists in the catalog."
+        },
+        {
+          "reference_id": "v005",
+          "behavior": "Non-map array elements are preserved in the result.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T20",
+              "T11"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T11",
+            "T14",
+            "T18",
+            "T20",
+            "T39"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior 'Non-map array elements are preserved in the result' requires distinguishing between map and non-map elements in an array and preserving the latter. T11 (Missing, null, and empty distinction) handles value states (missing/null/empty) but not type-based classification (map vs non-map). T20 (Unchanged portions) can express preservation but not the conditionality based on element type. No template supports expressing 'preserve non-map elements' as a type-based filter during merging. The catalog lacks a template for type-aware preservation or conditional behavior based on value structure (e.g., is_object(), is_scalar()).",
+          "missing_construct": "A template for type-aware preservation or conditional behavior based on the structure of array elements (e.g., 'if element is not a map, preserve it'). The catalog has no template that operates on value type (map/non-map) as a condition for transformation or retention."
+        },
+        {
+          "reference_id": "v006",
+          "behavior": "Array objects missing the merge key are preserved in the result.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T20",
+              "T11"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T11",
+            "T14",
+            "T18",
+            "T20",
+            "T39"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior 'Array objects missing the merge key are preserved in the result' requires preserving elements that lack a specific key field. This is structurally similar to v005 but focused on the absence of a named key rather than type. T11 could be misapplied if 'missing key' were treated as a value state, but T11 is for missing/null/empty values, not missing keys in objects. T20 can express preservation but not the condition 'missing merge key'. No template supports 'preserve elements that lack a specified key field' — a structural predicate on object keys. The catalog lacks a template for key existence checks as a condition for transformation.",
+          "missing_construct": "A template that expresses preservation based on the absence of a specified key in an object (e.g., 'if object does not contain key X, preserve it'). The catalog has no template for key existence/absence as a condition for retention or transformation."
+        },
+        {
+          "reference_id": "v007",
+          "behavior": "A null user value deletes its key in coalescing.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T11"
+            ],
+            [
+              "T11",
+              "T39"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T11",
+              "T23"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T09",
+            "T11",
+            "T14",
+            "T18",
+            "T20",
+            "T39"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior 'A null user value deletes its key in coalescing' is directly expressible by T11 (Missing, null, and empty distinction) with presence_or_value_case = 'null user value', operation = 'coalescing', case_outcome = 'deletes its key'. T39 (Addressed patch semantics) can be combined to specify the patch operation at a path with null_rule = 'null values delete the key', reinforcing the behavior in a path-aware context. Both are sufficient independently or together.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v008",
+          "behavior": "A nil user value is preserved during merging, unlike coalescing.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T11"
+            ],
+            [
+              "T11",
+              "T39"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T11",
+              "T50"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T09",
+            "T11",
+            "T14",
+            "T18",
+            "T20",
+            "T39"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior 'A nil user value is preserved during merging, unlike coalescing' is expressible by T11: presence_or_value_case = 'nil user value', operation = 'merging', case_outcome = 'preserved'. T39 can be added to specify that during merge operations (as a distinct operation from coalescing), null values are preserved (null_rule = 'nil values are preserved'), contrasting with coalescing behavior. The distinction between coalescing and merging is captured by contextually applying T11 to each operation.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v009",
+          "behavior": "Chart annotations use helm.sh/merge-strategy/<path> and helm.sh/merge-key/<path>, with dot-notation paths.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T01",
+              "T13"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T13"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T01",
+            "T13",
+            "T39"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior 'Chart annotations use helm.sh/merge-strategy/<path> and helm.sh/merge-key/<path>, with dot-notation paths' is expressible by T01 (Public symbol and invocation): symbol = 'helm.sh/merge-strategy/<path>' and 'helm.sh/merge-key/<path>', specified_interface = 'annotation keys for merge strategies and merge keys'. T13 (Accepted and rejected grammar) supports this by stating the parser accepts these exact annotation keys (grammar_class) and rejects malformed or non-dot-notation paths (excluded_class = 'non-dot-notation paths' or 'invalid path formats'). Together, they fully capture the required syntax and usage.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v010",
+          "behavior": "A dotted merge-key path resolves nested object fields.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T39",
+              "T13",
+              "T09"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T39",
+              "T13",
+              "T09"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T01",
+            "T13",
+            "T39"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that a dotted merge-key path (e.g., 'a.b.c') resolves to nested object fields. T39 ('Addressed patch semantics') captures path resolution and operation (merge), T13 ('Accepted and rejected grammar') validates that dotted paths are accepted grammar for merge-key, and T09 ('Deterministic transformation') ensures the path resolves deterministically to the nested field value. The provided template group T39+T13+T09 is sufficient and matches the reference exactly.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v011",
+          "behavior": "A parent chart strategy does not affect a subchart.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T19"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T19"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T19",
+            "T21"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The instruction states that a parent's strategy does not affect subcharts — a clear isolation requirement. T19 ('Isolation across owners or regions') directly expresses this: distinct scopes (parent and subchart) must not affect each other's state (strategy application). The template requires no additional cards; one instance suffices.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v012",
+          "behavior": "A subchart global.-prefixed strategy applies while globals are merged into that subchart scope, after stripping global. for the globals-map path.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T18",
+              "T39",
+              "T16"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T18",
+              "T39",
+              "T16"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T12",
+            "T13",
+            "T17",
+            "T18"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "missing",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires: (1) a subchart's 'global.'-prefixed strategy applies during global merge (T18: scoped merge/shadowing — global scope is consumer, subchart scope is visible, winner rule is 'apply after stripping global.'), (2) the 'global.' prefix is stripped before applying the strategy to the globals map (T39: resolved_path must strip 'global.' to target the actual path in globals map), and (3) the order of stripping then applying matters (T16: ordered transformation stages — strip then merge). The group T18+T39+T16 fully captures the multi-stage, scoped, path-transformed behavior.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v013",
+          "behavior": "CLI MergeStrategies and MergeKeys accept string slices in path=value format.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T13"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T02",
+            "T17"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction specifies that CLI overrides use `MergeStrategies` and `MergeKeys` fields as string slices in `path=value` format, but no template in the catalog can express the parsing or structure of a string slice with key-value pairs in `path=value` format. Template T13 (Accepted and rejected grammar) could potentially apply if the format were a grammar, but it requires explicit grammar classes and rejection rules, and the instruction does not define a grammar — only a serialization format. No template supports expressing 'string slice in path=value format' as a syntactic or parsing requirement. The required construct is a 'structured string parsing rule' for key-value pairs, which is not covered by any template's slot semantics.",
+          "missing_construct": "A template for parsing or validating structured string formats (e.g., key-value pairs in 'key=value' syntax) with support for list-of-strings input and path resolution is missing. T13 is too abstract (grammar classes), T39 addresses path operations but not input format, and no template accepts 'string slice in path=value format' as a first-class input constraint."
+        },
+        {
+          "reference_id": "v014",
+          "behavior": "CLI overrides take precedence over chart annotations for the same path.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T17"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T02",
+            "T17"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The instruction requires that CLI overrides take precedence over chart annotations for the same path. Template T17 (Nearest applicable override) is designed for hierarchical configuration precedence, but it requires a 'precedence_rule' among 'applicable_sources' and a 'target' setting. While the CLI and chart annotations are distinct sources, T17 requires the sources to be ordered and the target to be a configuration setting selected from them. However, the instruction does not describe a hierarchy of configuration sources with traversal or scope — it describes a flat override: CLI wins over chart. T17's prerequisites demand a 'select_effective_value' relation with source priority, which is present, but the template's slots do not support expressing 'CLI overrides chart' as a binary, flat precedence. The template expects multiple sources in a scope hierarchy (e.g., global, user, system), not a simple CLI-vs-chart override. No other template captures this flat override semantics.",
+          "missing_construct": "A template for flat, binary precedence between two distinct configuration sources (e.g., CLI vs file) without hierarchical nesting is missing. T17 assumes a scope tree; T18 assumes shadowing within a scope; no template supports 'source A overrides source B for same key' as a simple, non-hierarchical rule."
+        },
+        {
+          "reference_id": "v015",
+          "behavior": "ResetValues ignores merge strategies.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T07",
+              "T06"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T07",
+            "T09",
+            "T14",
+            "T16",
+            "T18"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction states that `ResetValues` ignores merge strategies. Template T06 (Disabled feature behavior) requires a 'disabled_condition' and 'baseline_behavior'. While 'ResetValues is true' could be the disabled_condition, and 'no merge strategy applied' could be the baseline, T06 requires that the specified effects 'do not occur' — but the instruction does not specify what effects are being disabled. It only says strategies are ignored. T06 expects a list of observable effects that are suppressed, but the instruction gives no such effects — only a negation. T07 (Irrelevant or overridden option) requires that varying the option leaves an observation unchanged, but here the option is not varied — it is entirely disabled. No template supports expressing 'a mode disables a feature entirely without specifying what effects are suppressed'. The required construct is a 'feature disablement with no observable side effects' — which is not covered by any template's required_sentence structure.",
+          "missing_construct": "A template for complete feature disablement under a mode, where no observable behavior change is described beyond 'feature is ignored', is missing. T06 requires specifying what effects are suppressed; T07 requires an invariant observation under variation. Neither fits a mode that nullifies a feature with no side effects to observe."
+        },
+        {
+          "reference_id": "v016",
+          "behavior": "ReuseValues coalesces old config with new values using strategies; append orders old elements before new.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T14",
+              "T35",
+              "T09"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T14",
+              "T35",
+              "T09"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T07",
+            "T09",
+            "T14",
+            "T16",
+            "T18"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior specifies that ReuseValues merges old config before new values using strategies, with 'append' ordering old elements before new. T14 (Stable ordering) captures the required sequence (old before new). T35 (Saved schema governs later operations) ensures the merge strategies (from chart or CLI) are loaded and applied consistently during coalescing. T09 (Deterministic transformation) formalizes the output as a deterministic result of applying the strategy to the input arrays. The provided template group is sufficient and matches the instruction exactly.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v017",
+          "behavior": "ResetThenReuseValues uses new chart defaults as the base and merges old config on top using strategies.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T16",
+              "T09",
+              "T17"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T16",
+              "T09",
+              "T17"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T07",
+            "T09",
+            "T14",
+            "T16",
+            "T18"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "ResetThenReuseValues uses new chart defaults as base and merges old config on top with strategies. T16 (Ordered transformation stages) requires applying strategy-aware merging after establishing the base (new defaults). T09 ensures the result is a deterministic transformation of the inputs. T17 (Nearest applicable override) captures the precedence: old config overrides new defaults at the same path, with strategies applied during merge. The group is sufficient and matches the instruction's explicit hierarchy and strategy application.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v018",
+          "behavior": "Merge-strategy annotation warnings come from the existing Chart.yaml field-validation lint rule rather than a separate pass.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T52",
+              "T50"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T52",
+              "T50"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T04",
+            "T05",
+            "T13",
+            "T39",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction requires that merge-strategy warnings be emitted by the existing Chart.yaml lint rule, not a separate pass. T52 (Required artifact or structural property) confirms the lint rule exists and emits warnings for specific conditions (unsupported values, missing merge-key, etc.). T50 (Equivalent behavior across required surfaces) ensures this same lint rule applies uniformly to all Chart.yaml fields — including merge-strategy annotations — as explicitly required. The group fully expresses the constraint that the warning mechanism is integrated into the existing validation pipeline.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v019",
+          "behavior": "The warning behavior applies to both stable and internal chart formats.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T50"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T04",
+            "T05",
+            "T13",
+            "T39",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The instruction requires that warning behavior applies to both stable and internal chart formats, but no template in the catalog expresses 'equivalent behavior across required surfaces' with a list of specific formats. T50 is the only template that could express this, but it requires a 'listed_surface' of exact surfaces (e.g., 'stable' and 'internal chart formats') and a shared contract. The instruction does not treat these as surfaces in the sense of entry points or adapters — it treats them as internal representation variants. T50's slot guidance requires 'exact surface set' and 'permitted differences', which are not applicable here. No other template can express that a behavior is uniformly enforced across two internal format variants without a surface-level equivalence claim.",
+          "missing_construct": "A template that expresses 'uniform application of behavior across internal representation variants or serialization formats' is missing. T50 requires externally visible surfaces (like CLI, HTTP, API), not internal format compatibility."
+        },
+        {
+          "reference_id": "v020",
+          "behavior": "Unsupported strategy annotations produce warnings containing unsupported and the path.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T05",
+              "T02"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T04",
+            "T05",
+            "T13",
+            "T39",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that unsupported strategy values trigger a warning containing the literal string 'unsupported' and the path. T05 (Invalid input rejection) is the closest, but it requires an 'invalid_input_condition' and an 'error_contract' that specifies the error type/status and detail constraints. The instruction does not specify an error type (e.g., 'InvalidStrategy'), only that the warning message must contain 'unsupported' and the path. T05 requires a named error class, but the instruction only constrains the message content. No template allows specifying message content as a required string literal without an error type. T02 (Result structure) could describe the warning message structure, but it applies to result fields, not diagnostic messages. No template supports 'message must contain literal substring X' as a required condition.",
+          "missing_construct": "A template that constrains diagnostic message content by literal substring matching (e.g., 'message contains X') is missing. Current templates assume error types or result fields, not free-text message content."
+        },
+        {
+          "reference_id": "v021",
+          "behavior": "A merge annotation without a merge-key produces a warning referencing its path.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T04",
+              "T05"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T04",
+            "T05",
+            "T13",
+            "T39",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires that a 'merge' annotation without a companion 'merge-key' produces a warning referencing its path. T04 (Presence and argument-combination rule) could express the absence of a required companion, but it requires an 'operation' that produces a 'specified_outcome' — here, the outcome is a warning message, not a system behavior like raising an error or returning a value. T05 requires an error contract with a named error type, but the instruction only requires a warning message referencing the path. No template allows expressing that a missing companion causes a diagnostic message with path reference. T02 could describe the warning structure, but again, warnings are not result fields. The catalog lacks a template for 'diagnostic message generation triggered by missing companion annotation'.",
+          "missing_construct": "A template that expresses 'a missing required companion annotation triggers a diagnostic message containing the path' is missing. The catalog has no template for diagnostic message generation based on annotation pair absence."
+        },
+        {
+          "reference_id": "v022",
+          "behavior": "A merge-key without a strategy produces a warning referencing its path.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T04",
+              "T05"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T04",
+            "T05",
+            "T13",
+            "T39",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires emitting a warning when a merge-key annotation exists without a corresponding merge-strategy annotation. This is a conditional dependency between two distinct annotations (merge-key and merge-strategy) that must be checked together. Template T04 (Presence and argument-combination rule) could theoretically model this, but it requires an operation that produces a specified outcome when a presence condition is met — however, the instruction does not describe an operation that 'produces' a warning as a result of a condition; instead, the warning is a diagnostic emitted by a lint rule during validation. No template in the catalog captures diagnostic emission based on the absence of a paired annotation. T05 (Invalid input rejection) is insufficient because the merge-key alone is not 'invalid input' — it's only invalid in context. No template supports cross-annotation dependency diagnostics with path referencing. Thus, no template group can express this behavior.",
+          "missing_construct": "No template supports emitting a diagnostic warning based on the absence of a paired annotation (i.e., a conditional dependency between two distinct configuration keys). The catalog lacks a template for 'cross-field validation with diagnostic emission' or 'annotation pair dependency enforcement'."
+        },
+        {
+          "reference_id": "v023",
+          "behavior": "An annotation path not found in chart defaults produces a warning containing not found.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T05",
+              "T39"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T04",
+            "T05",
+            "T13",
+            "T39",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires warning when a strategy path does not exist in chart defaults. This is a path resolution check against a data structure (chart defaults), and the warning must reference the path. Template T05 (Invalid input rejection) could apply if the path were treated as invalid input, but the path is not an input to an operation — it's a reference to a location in a configuration tree. Template T39 (Addressed patch semantics) involves path resolution but assumes the path is being patched or written to, not validated for existence. The catalog lacks a template for 'path existence validation against a data structure with diagnostic emission'. T39's 'missing path rule' clause is for patch operations, not lint-time validation of annotation targets. Thus, no template can express this behavior.",
+          "missing_construct": "No template supports validating that a dotted-path reference exists within a nested configuration structure and emitting a warning if it does not. The catalog lacks a template for 'path existence validation in configuration tree with diagnostic output'."
+        },
+        {
+          "reference_id": "v024",
+          "behavior": "An annotation path resolving to a non-array produces a warning containing non-array.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T05",
+              "T39"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T04",
+            "T05",
+            "T13",
+            "T39",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "partial",
+          "cause": "binding_or_rendering_miss",
+          "catalog_rationale": "The behavior requires warning when a strategy path resolves to a non-array value. This is a type validation of a resolved path's value. Template T05 could be stretched to say 'given a path resolving to non-array, emit warning', but T05 requires an operation that rejects invalid input — here, the operation is a lint rule validating annotation correctness, not an operation consuming the value. Template T39 involves path resolution but only for patching, not type-checking. The catalog lacks a template for 'type validation of resolved path value with diagnostic emission'. T05 requires an 'operation' that produces an error — but the lint rule is not the operation being validated; it's the validator. Thus, no template group can express this behavior.",
+          "missing_construct": "No template supports validating the type of a value at a resolved path and emitting a diagnostic warning. The catalog lacks a template for 'type-checking resolved configuration path with diagnostic output'."
+        },
+        {
+          "reference_id": "v025",
+          "behavior": "Apply strategies to user and chart default arrays at per-chart coalescing, before individual keys are processed by existing coalescing logic.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T16",
+              "T28"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T16",
+              "T28"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T01",
+            "T02",
+            "T09",
+            "T16",
+            "T32"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction requires strategies to be applied to user and chart default arrays at the per-chart coalescing level before existing coalescing logic processes individual keys. This is an ordered transformation stage: first apply merge strategies, then proceed with standard coalescing. T16 ('Ordered transformation stages') captures the required sequence. T28 ('Callback phase, context, and cardinality') captures that the strategy application occurs at a specific phase ('per-chart coalescing level') and is invoked with the relevant context (user and default arrays). Together, these two cards fully express the behavior without requiring additional constructs.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v026",
+          "behavior": "Deep-copy chart arrays before strategy application so nested mutations during merging do not mutate chart defaults.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T32",
+              "T16"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T32",
+              "T16"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T01",
+            "T02",
+            "T09",
+            "T16",
+            "T32"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The instruction mandates that chart arrays be deep-copied before strategy application to prevent mutation of defaults. T32 ('Copy or snapshot isolation at a stated depth') directly expresses that after a copy operation, mutations during merging do not alter the original (protected_observation = chart defaults). T16 ensures the copy happens before strategy application (the 'copy_operation' is the deep-copy step, and 'stage_sequence' includes copy then strategy). The combination is sufficient: T32 defines the isolation property, T16 defines the order. No deeper construct is needed.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v027",
+          "behavior": "The chart accessor interface exposes metadata annotations.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T01",
+              "T52"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T52"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T01",
+            "T02",
+            "T09",
+            "T16",
+            "T32"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction requires the chart accessor interface to expose annotations from chart metadata. T01 ('Public symbol and invocation') expresses that a symbol (chart accessor interface) exposes a specified interface (metadata annotations). T52 ('Required artifact or structural property') reinforces that the annotations must exist and be inspectable at a defined location (chart metadata). Together, they cover both the public API exposure (T01) and the structural requirement that the data is present and accessible (T52). No other construct is needed to express this requirement.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v028",
+          "behavior": "Strategy extraction converts merge entries lacking a companion merge-key into actionable append entries.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T04",
+              "T09"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T09",
+              "T04"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T09",
+            "T10",
+            "T12",
+            "T13",
+            "T15"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that a 'merge' entry lacking a merge-key is transformed into an 'append' entry. This is a deterministic transformation (T09) conditioned on the presence/absence of a companion key (T04: presence_condition = 'merge present and merge-key absent'). The operation 'strategy extraction' produces 'append' as the outcome. The template group T04 + T09 fully captures the conditional transformation without requiring additional constructs.",
+          "missing_construct": "none"
+        },
+        {
+          "reference_id": "v029",
+          "behavior": "Strategy extraction excludes annotations with empty or invalid paths.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T11",
+              "T13"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T21",
+              "T13",
+              "T11"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T09",
+            "T10",
+            "T12",
+            "T13",
+            "T15"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "Excluding annotations with empty or invalid paths requires distinguishing between 'missing/invalid path' (T11: presence_or_value_case = 'empty or invalid path') and 'valid path' (which is processed). T13 validates that the parser accepts valid paths and rejects invalid/empty ones (grammar_class = 'valid path', excluded_class = 'empty or invalid path'). Together, T11 and T13 express the exclusion rule: invalid paths are rejected (not processed), while valid ones are acted upon. No additional template is needed.",
+          "missing_construct": "none"
+        }
+      ]
+    },
+    {
+      "task_id": "koota-entity-snapshot-rollback",
+      "audit_call_count": 7,
+      "jev_call_count": 20,
+      "catalog_status_counts": {
+        "expressible": 12,
+        "no_fit": 8,
+        "unclear": 0
+      },
+      "retrieval_metrics": {
+        "llm_full_catalog": {
+          "catalog_audit_oracle": {
+            "eligible_references": 12,
+            "candidate_recall": 0.6666666666666666,
+            "complete_group_recall": 0.6666666666666666,
+            "mean_candidates": 4.583333333333333,
+            "candidate_precision_proxy": 0.23636363636363636,
+            "hits": 8
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 20,
+            "candidate_recall": 0.6,
+            "complete_group_recall": 0.6,
+            "mean_candidates": 4.15,
+            "candidate_precision_proxy": 0.3253012048192771,
+            "hits": 12
+          }
+        },
+        "embedding>=0.35": {
+          "catalog_audit_oracle": {
+            "eligible_references": 12,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 51.916666666666664,
+            "candidate_precision_proxy": 0.027287319422150885,
+            "hits": 12
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 20,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 51.9,
+            "candidate_precision_proxy": 0.03371868978805395,
+            "hits": 20
+          }
+        },
+        "llm+jev+embedding>=0.35": {
+          "catalog_audit_oracle": {
+            "eligible_references": 12,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 51.916666666666664,
+            "candidate_precision_proxy": 0.027287319422150885,
+            "hits": 12
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 20,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 51.9,
+            "candidate_precision_proxy": 0.03371868978805395,
+            "hits": 20
+          }
+        },
+        "embedding>=0.45": {
+          "catalog_audit_oracle": {
+            "eligible_references": 12,
+            "candidate_recall": 0.9166666666666666,
+            "complete_group_recall": 0.9166666666666666,
+            "mean_candidates": 43.916666666666664,
+            "candidate_precision_proxy": 0.028462998102466792,
+            "hits": 11
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 20,
+            "candidate_recall": 0.65,
+            "complete_group_recall": 0.65,
+            "mean_candidates": 38.6,
+            "candidate_precision_proxy": 0.03367875647668394,
+            "hits": 13
+          }
+        },
+        "llm+jev+embedding>=0.45": {
+          "catalog_audit_oracle": {
+            "eligible_references": 12,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 44.666666666666664,
+            "candidate_precision_proxy": 0.03171641791044776,
+            "hits": 12
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 20,
+            "candidate_recall": 0.95,
+            "complete_group_recall": 0.95,
+            "mean_candidates": 39.55,
+            "candidate_precision_proxy": 0.04298356510745891,
+            "hits": 19
+          }
+        },
+        "embedding>=0.55": {
+          "catalog_audit_oracle": {
+            "eligible_references": 12,
+            "candidate_recall": 0.3333333333333333,
+            "complete_group_recall": 0.3333333333333333,
+            "mean_candidates": 4.083333333333333,
+            "candidate_precision_proxy": 0.10204081632653061,
+            "hits": 4
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 20,
+            "candidate_recall": 0.1,
+            "complete_group_recall": 0.1,
+            "mean_candidates": 3.3,
+            "candidate_precision_proxy": 0.10606060606060606,
+            "hits": 2
+          }
+        },
+        "llm+jev+embedding>=0.55": {
+          "catalog_audit_oracle": {
+            "eligible_references": 12,
+            "candidate_recall": 0.8333333333333334,
+            "complete_group_recall": 0.8333333333333334,
+            "mean_candidates": 7.916666666666667,
+            "candidate_precision_proxy": 0.15789473684210525,
+            "hits": 10
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 20,
+            "candidate_recall": 0.75,
+            "complete_group_recall": 0.75,
+            "mean_candidates": 6.85,
+            "candidate_precision_proxy": 0.21897810218978103,
+            "hits": 15
+          }
+        },
+        "embedding>=0.65": {
+          "catalog_audit_oracle": {
+            "eligible_references": 12,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 0.0,
+            "candidate_precision_proxy": null,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 20,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 0.0,
+            "candidate_precision_proxy": null,
+            "hits": 0
+          }
+        },
+        "llm+jev+embedding>=0.65": {
+          "catalog_audit_oracle": {
+            "eligible_references": 12,
+            "candidate_recall": 0.6666666666666666,
+            "complete_group_recall": 0.6666666666666666,
+            "mean_candidates": 4.666666666666667,
+            "candidate_precision_proxy": 0.23214285714285715,
+            "hits": 8
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 20,
+            "candidate_recall": 0.6,
+            "complete_group_recall": 0.6,
+            "mean_candidates": 4.25,
+            "candidate_precision_proxy": 0.3176470588235294,
+            "hits": 12
+          }
+        },
+        "jev_top1": {
+          "catalog_audit_oracle": {
+            "eligible_references": 12,
+            "candidate_recall": 0.4166666666666667,
+            "complete_group_recall": 0.4166666666666667,
+            "mean_candidates": 1.0,
+            "candidate_precision_proxy": 0.6666666666666666,
+            "hits": 5
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 20,
+            "candidate_recall": 0.35,
+            "complete_group_recall": 0.35,
+            "mean_candidates": 1.0,
+            "candidate_precision_proxy": 0.8,
+            "hits": 7
+          }
+        }
+      },
+      "diagnosis": [
+        {
+          "reference_id": "v001",
+          "behavior": "Export createTraitRegistry, snapshotEntity, snapshotWorld, rollbackEntity, rollbackWorld, diffEntitySnapshots, and diffWorldSnapshots from the public package API.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T52"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T09"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction requires exporting seven specific symbols from the public API, but no template in the catalog can express a multi-symbol export requirement. T01 expresses a single symbol's public exposure, but cannot be combined or repeated to express a set of seven distinct exports without violating the template's single-symbol constraint. There is no template for 'multiple public exports' or 'API surface declaration'. This is a missing construct: the catalog lacks a template for collective symbol export declarations.",
+          "missing_construct": "A template for collective public symbol export declaration (e.g., 'The public API exports {symbol_list}')."
+        },
+        {
+          "reference_id": "v002",
+          "behavior": "createTraitRegistry accepts string-key/Trait-or-Relation entry tuples and throws Error for duplicate keys, duplicate traits, and duplicate relations.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T05",
+              "T15"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T05",
+            "T13",
+            "T15"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "T05 can express throwing Error on invalid input, but the instruction requires three distinct duplicate conditions (duplicate keys, duplicate traits, duplicate relations) to each trigger an Error. T05 accepts one invalid input condition, and there is no template that can express multiple distinct duplicate relations as separate triggers. T15 addresses duplicate retention but only for canonicalization, not for rejection. No template supports expressing multiple distinct duplicate rejection conditions in one assertion. The catalog lacks a template for 'multiple distinct duplicate rejection rules'.",
+          "missing_construct": "A template for multiple distinct duplicate rejection conditions (e.g., 'Given duplicate {item_type}, {operation} throws Error')."
+        },
+        {
+          "reference_id": "v003",
+          "behavior": "snapshotEntity produces the specified id/traits/optional-relations snapshot shape; tag traits are true, data traits are objects, and relation entries include targetId and optional store data.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T02"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T11",
+            "T32"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "T02 can express the result structure (id, traits, optional relations), but cannot express the semantic mapping of tag traits → true, data traits → deep copy, and relations → targetId + optional data. T02 requires a single 'meaning' slot for all fields, but the instruction requires three distinct semantic mappings for different field types. There is no template that allows field-specific meaning annotations or conditional semantics based on value type. The catalog lacks a template for field-type-dependent semantic mapping.",
+          "missing_construct": "A template for field-specific semantic mapping based on value type or structure (e.g., 'Field {field} denotes {meaning} when {value_condition}')."
+        },
+        {
+          "reference_id": "v004",
+          "behavior": "Entity snapshots deep-copy trait data and relation store data, so nested mutation does not change the snapshot.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T32"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T32"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T11",
+            "T32"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires deep copying of trait and relation data to prevent mutation of snapshots. Template T32 ('Copy or snapshot isolation at a stated depth') directly expresses this: after the copy operation (snapshotEntity or snapshotWorld), mutations at the nested data level (trait or relation data objects) must not alter the snapshot. The instruction explicitly states 'deep copies' and 'data as deep copies', satisfying T32's required_sentence with 'copy_operation' = 'snapshotEntity'/'snapshotWorld', 'supported_depth_and_location' = 'nested trait and relation data', and 'protected_observation' = 'the snapshot object'.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v005",
+          "behavior": "A snapshot omits the relations property entirely when the entity has no relations.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T11",
+              "T02"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T11",
+              "T02"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T11",
+            "T32"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires omitting the 'relations' property entirely when no relations exist. Template T11 ('Missing, null, and empty distinction') captures the distinction between 'no relations key' and 'relations: {}': the former is the specified outcome, the latter is not permitted. Template T02 ('Result structure and field meaning') confirms the shape of the result: the 'relations' field is optional and omitted when empty. Together, they express that the absence of relations leads to the field being omitted (T11), and that the result structure includes this optional field (T02).",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v006",
+          "behavior": "snapshotEntity throws Error for destroyed entities and unregistered traits or relations.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T05"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T05"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T11",
+            "T16",
+            "T32"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires throwing Error for destroyed entities and unregistered traits/relations. Template T05 ('Invalid input rejection') directly matches: 'invalid_input_condition' = 'destroyed entity or unregistered trait/relation', 'operation' = 'snapshotEntity', 'error_contract' = 'throws Error'. The instruction explicitly names these conditions as error cases, satisfying T05 without needing additional templates.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v007",
+          "behavior": "snapshotWorld returns an entities array excluding the internal world entity.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T21",
+              "T02"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T21",
+              "T02"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T02",
+            "T09",
+            "T21"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires that `snapshotWorld` excludes the internal world entity from its returned `entities` array. Template T21 ('Contextual exclusion') captures the exclusion of a specific context (the internal world entity), and T02 ('Result structure and field meaning') captures the structure of the result as `{ entities: EntitySnapshot[] }`. Together, they fully express the validation: the result must have an entities array (T02), and the internal world entity must be contextually excluded (T21).",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v008",
+          "behavior": "rollbackEntity removes currently present traits/relations absent from the snapshot, then adds or updates traits/relations to exactly match it.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T16",
+              "T20"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T16",
+              "T09",
+              "T20"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T05",
+            "T09",
+            "T16"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior specifies a two-stage deterministic transformation: first remove traits/relations not in the snapshot, then add/update to match it exactly. T16 ('Ordered transformation stages') captures the required sequence of removal then addition. T20 ('Unchanged portions of a result') ensures that only the specified traits/relations are modified — others are preserved — which is implied by 'exactly match the snapshot'. Together, they fully express the rollback semantics without requiring additional templates.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v009",
+          "behavior": "rollbackEntity throws Error for missing relation targets, destroyed entities, or unknown registry keys.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T05"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T05"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T05",
+            "T09",
+            "T16"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior specifies three distinct invalid input conditions (missing relation targets, destroyed entities, unknown registry keys) that must each cause an `Error` to be thrown. Template T05 ('Invalid input rejection') is designed precisely for this: it maps any specified invalid input condition to a prescribed failure (`Error`). Since all three conditions are explicitly named in the instruction and all trigger the same error type, a single T05 card with a compound condition suffices. No additional templates are needed.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v010",
+          "behavior": "rollbackWorld fully replaces existing state and recreates checkpoint entities with the same IDs.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T34",
+              "T09"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T05",
+            "T09",
+            "T16"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior 'rollbackWorld fully replaces existing state and recreates checkpoint entities with the same IDs' requires a persistence round trip (T34) to express the equivalence of state before and after serialization/restoration, and a deterministic transformation (T09) to express that entity IDs are preserved exactly. However, T34 requires a serialization/restore sequence, which is not mentioned in the instruction — rollbackWorld operates on an in-memory checkpoint object, not a serialized form. T09 could express ID preservation if the output were a formula, but the instruction only states 'recreates entities using the same IDs', which is a state assertion, not a transformation rule. No template in the catalog can express 'recreate entities with the same IDs' as a required identity-preserving reconstruction without serialization or identity tracking. The closest, T32 (copy isolation), applies to mutation protection, not ID preservation during reconstruction. T09 is insufficient because it requires an expression mapping input to output, but the instruction gives no formula — only a result condition. Thus, no template group can express this behavior without adding constructs not in the catalog.",
+          "missing_construct": "A template for 'identity-preserving reconstruction' or 'entity ID retention during state restoration' is required but absent. The catalog lacks a mechanism to express that object identity (entity IDs) must be preserved across a state-replacement operation when the input is a snapshot, not a serialized stream."
+        },
+        {
+          "reference_id": "v011",
+          "behavior": "rollbackWorld throws Error for unknown registry keys or dangling relation targets.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T05"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T05",
+            "T09",
+            "T16"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires throwing Error for two distinct invalid input classes: unknown registry keys and dangling relation targets. T05 (Invalid input rejection) can express each individually: 'Given unknown registry keys, rollbackWorld throws Error' and 'Given dangling relation targets, rollbackWorld throws Error'. However, the instruction combines both into a single error clause: 'Throws Error for unknown registry keys or dangling relation targets.' The catalog has no template that allows a single card to express a disjunction of invalid input conditions with a shared error contract. T05 requires one condition per card. To express the disjunction, two T05 cards would be needed — but the reference validation lists only one template group ['T05'], implying a single card. Since the catalog does not support a single T05 card with a disjunctive condition, and no other template can express multiple invalid input classes under one error, this behavior cannot be expressed with the current templates without violating the constraint that each card must be fillable without changing text or adding assertions.",
+          "missing_construct": "A template that allows a single invalid input rejection card to express a disjunction of multiple invalid input conditions (e.g., 'unknown keys OR dangling targets') with a shared error contract is required but absent."
+        },
+        {
+          "reference_id": "v012",
+          "behavior": "diffEntitySnapshots returns addedTraits, removedTraits, and changedTraits arrays sorted ascending.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T02",
+              "T14"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T12",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires that three arrays — addedTraits, removedTraits, changedTraits — are sorted ascending. T14 (Stable ordering) can express ordering of a sequence. However, T14 requires the sequence to be explicitly named and ordered by a rule. The instruction does not name the arrays as sequences to be ordered; it states they are arrays sorted ascending. T14’s required_sentence format is '{sequence} is ordered by {ordering_rule}', but the arrays are not named as sequences in the instruction — they are fields of a result object. T02 (Result structure and field meaning) can describe the fields and their types, but cannot express ordering. T14 cannot be applied because the sequence (the array) is not named as a top-level observable sequence; it is a field within a result object. No template in the catalog allows expressing ordering of fields within a result object. Thus, while T14 is the only template for ordering, it cannot be instantiated because the instruction does not treat the arrays as sequences to be ordered — it treats them as sorted result fields. No template group can express this.",
+          "missing_construct": "A template that allows expressing ordering constraints on fields within a result object (e.g., 'the field X is an array sorted in ascending order') is required but absent. T14 only applies to named sequences, not to array-valued fields of a result."
+        },
+        {
+          "reference_id": "v013",
+          "behavior": "Entity snapshot data comparison uses shallow equality, not recursive value equality.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T51",
+              "T12"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T51",
+              "T12"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T12",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior 'Entity snapshot data comparison uses shallow equality, not recursive value equality' is expressible by T51 (Relational property or invariant) to assert that shallow equality is the required relation between snapshot data fields, and T12 (Normalization and equivalence) to confirm that different representations of the same shallowly equal data are treated as equivalent. The instruction explicitly defines shallow equality as the comparison rule, and these templates capture the relational invariant and equivalence semantics without requiring deeper recursion.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v014",
+          "behavior": "diffEntitySnapshots throws Error on null or undefined input.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T05"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T05"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T12",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The requirement that 'diffEntitySnapshots throws Error on null or undefined input' is directly expressible by T05 (Invalid input rejection). The condition 'either argument is null/undefined' is a valid invalid_input_condition, and 'throws Error' matches the error_contract. No other template is needed as this is a straightforward input validation rule.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v015",
+          "behavior": "diffWorldSnapshots returns added, removed, and changed entity-ID arrays sorted ascending.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T02",
+              "T14"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T02",
+              "T14"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T12",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior 'diffWorldSnapshots returns added, removed, and changed entity-ID arrays sorted ascending' is expressible by T02 (Result structure and field meaning) to establish that the result object has fields 'added', 'removed', and 'changed', each being an array of numbers, and T14 (Stable ordering) to mandate that these arrays are ordered in ascending numerical order. The instruction specifies both the structure and the required sort order, and these templates together fully capture the validation.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v016",
+          "behavior": "World snapshot equality ignores trait-key order, relation-key order, and relation-target order.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T12"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T12",
+              "T51"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T12",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior 'World snapshot equality ignores trait-key order, relation-key order, and relation-target order' is a case of normalization and equivalence (T12). Multiple input representations (different orderings of keys or targets) must produce the same observation (snapshot equality). T12 directly captures this by requiring that inputs related by a normalization rule (reordering) produce the same observation (snapshot comparison result).",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v017",
+          "behavior": "World snapshot comparison uses shallow equality for trait and relation data.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T51"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T51",
+              "T12"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T12",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior 'World snapshot comparison uses shallow equality for trait and relation data' is a relational invariant (T51). It specifies that for two snapshots, the observation (equality result) holds between their trait and relation data under the relation of shallow equality. T51 is designed for such value-based invariants across data structures, and shallow equality is the precise relation to be enforced.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v018",
+          "behavior": "An entity with relations={} compares equivalent to one without a relations key.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T11"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T11",
+              "T12"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T12",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior 'An entity with relations={} compares equivalent to one with no relations key' is a missing/null/empty distinction (T11). T11 requires mapping specific presence/value cases (presence of empty object vs. absence of key) to the same outcome (equivalence in comparison). The instruction explicitly states these two cases are equivalent, and T11 is the only template that formalizes such case-based equivalence under distinct structural representations.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v019",
+          "behavior": "diffWorldSnapshots throws Error for null/undefined inputs or inputs lacking an entities array.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T05"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T02",
+            "T05",
+            "T09",
+            "T12",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The instruction requires diffWorldSnapshots to throw an Error for null/undefined inputs or inputs lacking an 'entities' array. Template T05 (Invalid input rejection) is the only applicable template, but it requires a condition describing the invalid input (e.g., 'when input.entities is undefined') and an error contract. The current T05 template does not support expressing a condition on the absence of a nested field (like 'entities') in a way that can be filled without modifying the template text. The template expects a simple condition like 'invalid_input_condition', but the reference behavior requires a structural check on a nested property ('entities' array), which cannot be expressed using the existing slot grammar without adding a new clause or modifying the template. No other template in the catalog supports expressing this kind of nested structural validation as a rejection condition.",
+          "missing_construct": "A template variant that allows expressing 'input lacks a required nested field' as an invalid_input_condition, such as 'when {input}.{nested_field} is missing or not an array'."
+        },
+        {
+          "reference_id": "v020",
+          "behavior": "Add world.snapshot(registry), world.rollback(registry, checkpoint), entity.snapshot(registry), and entity.rollback(registry, snapshot) convenience methods.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T50"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction requires adding four convenience methods: world.snapshot, world.rollback, entity.snapshot, entity.rollback. Template T01 (Public symbol and invocation) can express the existence of these symbols, but it requires each to be listed individually with its specified interface. The template does not support expressing a pattern or family of methods across multiple object types (world and entity) with a single card. To express all four, four separate T01 cards would be needed — but the template group must be a set of distinct cards, and repeated use of the same template with different symbols is allowed. However, T01 requires the 'symbol' slot to be a single symbol (e.g., 'world.snapshot'), and the 'specified_interface' to be the signature. The instruction does not specify the interface signature for these convenience methods, only their names and that they delegate to the exported functions. Without a defined interface (e.g., 'world.snapshot(registry) calls snapshotEntity(world, entity, registry)'), T01 cannot be filled accurately. The template cannot infer the interface from context. Therefore, no valid T01 instance can be constructed without assuming interface details not provided in the instruction. T50 (Equivalent behavior across surfaces) could potentially group them, but it requires that the same contract holds across surfaces — and the instruction does not state that the convenience methods have identical behavior to the exported functions, only that they exist. Without explicit equivalence language, T50 cannot be applied. Thus, no template group can express this requirement with the current catalog.",
+          "missing_construct": "A template that supports expressing 'convenience methods on object X delegate to exported function Y with the same signature and semantics' — specifically, a template for method delegation or wrapper behavior."
+        }
+      ]
+    },
+    {
+      "task_id": "dateutil-rfc5545-timezone-interop",
+      "audit_call_count": 9,
+      "jev_call_count": 25,
+      "catalog_status_counts": {
+        "expressible": 6,
+        "no_fit": 19,
+        "unclear": 0
+      },
+      "retrieval_metrics": {
+        "llm_full_catalog": {
+          "catalog_audit_oracle": {
+            "eligible_references": 6,
+            "candidate_recall": 0.3333333333333333,
+            "complete_group_recall": 0.3333333333333333,
+            "mean_candidates": 2.3333333333333335,
+            "candidate_precision_proxy": 0.5,
+            "hits": 2
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 25,
+            "candidate_recall": 0.2,
+            "complete_group_recall": 0.2,
+            "mean_candidates": 1.84,
+            "candidate_precision_proxy": 0.5652173913043478,
+            "hits": 5
+          }
+        },
+        "embedding>=0.35": {
+          "catalog_audit_oracle": {
+            "eligible_references": 6,
+            "candidate_recall": 0.8333333333333334,
+            "complete_group_recall": 0.8333333333333334,
+            "mean_candidates": 48.166666666666664,
+            "candidate_precision_proxy": 0.03460207612456748,
+            "hits": 5
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 25,
+            "candidate_recall": 0.96,
+            "complete_group_recall": 0.96,
+            "mean_candidates": 49.92,
+            "candidate_precision_proxy": 0.038461538461538464,
+            "hits": 24
+          }
+        },
+        "llm+jev+embedding>=0.35": {
+          "catalog_audit_oracle": {
+            "eligible_references": 6,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 48.5,
+            "candidate_precision_proxy": 0.037800687285223365,
+            "hits": 6
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 25,
+            "candidate_recall": 1.0,
+            "complete_group_recall": 1.0,
+            "mean_candidates": 50.0,
+            "candidate_precision_proxy": 0.0392,
+            "hits": 25
+          }
+        },
+        "embedding>=0.45": {
+          "catalog_audit_oracle": {
+            "eligible_references": 6,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 15.5,
+            "candidate_precision_proxy": 0.03225806451612903,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 25,
+            "candidate_recall": 0.28,
+            "complete_group_recall": 0.28,
+            "mean_candidates": 22.48,
+            "candidate_precision_proxy": 0.04092526690391459,
+            "hits": 7
+          }
+        },
+        "llm+jev+embedding>=0.45": {
+          "catalog_audit_oracle": {
+            "eligible_references": 6,
+            "candidate_recall": 0.5,
+            "complete_group_recall": 0.5,
+            "mean_candidates": 17.0,
+            "candidate_precision_proxy": 0.0784313725490196,
+            "hits": 3
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 25,
+            "candidate_recall": 0.52,
+            "complete_group_recall": 0.52,
+            "mean_candidates": 23.4,
+            "candidate_precision_proxy": 0.06153846153846154,
+            "hits": 13
+          }
+        },
+        "embedding>=0.55": {
+          "catalog_audit_oracle": {
+            "eligible_references": 6,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 0.3333333333333333,
+            "candidate_precision_proxy": 0.0,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 25,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 1.04,
+            "candidate_precision_proxy": 0.07692307692307693,
+            "hits": 0
+          }
+        },
+        "llm+jev+embedding>=0.55": {
+          "catalog_audit_oracle": {
+            "eligible_references": 6,
+            "candidate_recall": 0.5,
+            "complete_group_recall": 0.5,
+            "mean_candidates": 3.0,
+            "candidate_precision_proxy": 0.4444444444444444,
+            "hits": 3
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 25,
+            "candidate_recall": 0.36,
+            "complete_group_recall": 0.36,
+            "mean_candidates": 3.08,
+            "candidate_precision_proxy": 0.4025974025974026,
+            "hits": 9
+          }
+        },
+        "embedding>=0.65": {
+          "catalog_audit_oracle": {
+            "eligible_references": 6,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 0.0,
+            "candidate_precision_proxy": null,
+            "hits": 0
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 25,
+            "candidate_recall": 0.0,
+            "complete_group_recall": 0.0,
+            "mean_candidates": 0.0,
+            "candidate_precision_proxy": null,
+            "hits": 0
+          }
+        },
+        "llm+jev+embedding>=0.65": {
+          "catalog_audit_oracle": {
+            "eligible_references": 6,
+            "candidate_recall": 0.5,
+            "complete_group_recall": 0.5,
+            "mean_candidates": 2.6666666666666665,
+            "candidate_precision_proxy": 0.5,
+            "hits": 3
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 25,
+            "candidate_recall": 0.36,
+            "complete_group_recall": 0.36,
+            "mean_candidates": 2.2,
+            "candidate_precision_proxy": 0.5636363636363636,
+            "hits": 9
+          }
+        },
+        "jev_top1": {
+          "catalog_audit_oracle": {
+            "eligible_references": 6,
+            "candidate_recall": 0.16666666666666666,
+            "complete_group_recall": 0.16666666666666666,
+            "mean_candidates": 1.0,
+            "candidate_precision_proxy": 0.8333333333333334,
+            "hits": 1
+          },
+          "reference_mapping_oracle": {
+            "eligible_references": 25,
+            "candidate_recall": 0.08,
+            "complete_group_recall": 0.08,
+            "mean_candidates": 1.0,
+            "candidate_precision_proxy": 0.72,
+            "hits": 2
+          }
+        }
+      },
+      "diagnosis": [
+        {
+          "reference_id": "v001",
+          "behavior": "RDATE accepts TZID, VALUE=DATE, and VALUE=DATE-TIME parameters like EXDATE and DTSTART.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T13",
+              "T50"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T13",
+            "T50"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires RDATE to accept TZID and VALUE parameters, which is a grammar/parsing requirement. Template T13 ('Accepted and rejected grammar') is the only one that can express grammar acceptance/rejection, but it requires a parser symbol and grammar/excluded classes. The instruction does not name a parser or define grammar classes explicitly; it only states parameter support. No other template can express parameter acceptance in a grammar context without a parser symbol or syntax definition. T50 ('Equivalent behavior across required surfaces') could apply if EXDATE/DTSTART were named surfaces, but it requires the same contract across surfaces — not the introduction of new parameter support. Thus, no template can express this without inventing a parser symbol or grammar class not present in the instruction.",
+          "missing_construct": "A template for 'parameter support in a data format' or 'extension of a serialization grammar' is missing. The current catalog lacks a template to express that a field or parameter now accepts new named attributes, especially when the field is part of a structured format like iCalendar."
+        },
+        {
+          "reference_id": "v002",
+          "behavior": "rrulestr tzids resolution accepts a mapping or callable; omission or None uses dateutil.tz.gettz.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T03",
+              "T50"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T01",
+            "T03",
+            "T08"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior specifies that tzids can be a mapping, callable, or None (with default). Template T03 ('Omitted argument default') covers the None/default case. Template T01 ('Public symbol and invocation') could cover the callable/mapping interface if we treat 'tzids' as a symbol exposing a callable interface — but T01 requires the symbol to expose a specified interface, and the instruction does not define an interface contract for the mapping or callable (e.g., signature, return type). T04 ('Presence and argument-combination rule') could handle combinations, but the instruction does not specify invalid combinations — only valid types. No template allows expressing 'accepts type A, B, or C' with polymorphic input types unless T08 ('Allowed alternative outcomes') is used — but T08 requires observations to be equivalent under alternatives, which is not the case here (the input types are not alternative outputs, they are alternative inputs). Thus, no template can express the polymorphic input contract without a template for 'input type polymorphism' or 'type union acceptance'.",
+          "missing_construct": "A template for 'input accepts multiple types (union type)' or 'parameter accepts mapping, callable, or None' is missing. The catalog lacks a way to express that a parameter accepts one of several distinct types with different semantics."
+        },
+        {
+          "reference_id": "v003",
+          "behavior": "rrule string serialization uses TZID for non-UTC DTSTART/UNTIL and Z for UTC.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T09",
+              "T13"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T34"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires deterministic transformation of timezone-aware datetime strings: non-UTC → TZID, UTC → Z. Template T09 ('Deterministic transformation') is the only candidate, but it requires an input domain, operation, expression, and observation. The instruction does not specify the exact output expression (e.g., 'DTSTART;TZID=America/New_York:20230101T120000'), nor does it define the input domain as a structured object with timezone. T09 expects a formulaic transformation (e.g., 'duration → seconds'), not a conditional formatting rule based on timezone type. T13 ('Accepted and rejected grammar') could be used if we treated the output as a grammar, but the instruction does not describe a grammar to accept or reject — it describes output formatting. No template can express conditional string formatting based on timezone type without a template for 'conditional serialization rule'.",
+          "missing_construct": "A template for 'conditional serialization based on value property' (e.g., if timezone is UTC, output Z; else output TZID) is missing. The catalog lacks a way to express formatting rules that vary based on the semantic property of the input (e.g., timezone type)."
+        },
+        {
+          "reference_id": "v004",
+          "behavior": "Parsing str(rule) round-trips the rule, including an auto-generated timezone-aware dtstart.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T34",
+              "T51"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T34"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires a round-trip serialization where rrule.__str__() emits DTSTART with TZID or Z suffix, and rrulestr() must parse that output back to an equivalent rule with auto-generated timezone-aware dtstart. This requires two distinct capabilities: (1) deterministic transformation of a timezone-aware rrule into an iCalendar string with TZID/Z (T09), and (2) parsing of that string back into an equivalent rrule object, including reconstructing timezone-aware dtstart from TZID or Z (T13 + T34). However, T34 (persistence round trip) requires a serialize-restore sequence and equivalence, but the catalog lacks any template that captures parsing of iCalendar-formatted strings with TZID resolution or VTIMEZONE handling. T13 (accepted/rejected grammar) can capture parsing of the format, but cannot express that the parsed result must reconstruct the original timezone-aware dtstart — which is a stateful reconstruction, not just syntactic acceptance. No template in the catalog supports expressing that the output of __str__() is a valid iCalendar string that, when parsed by rrulestr(), yields an object equal to the original — especially one that restores timezone context from TZID/Z. The missing construct is a template for 'semantic round-trip equivalence through a structured text format with timezone context preservation'.",
+          "missing_construct": "A template for 'semantic round-trip equivalence through a structured text format with timezone context preservation' — one that can express that output of a serialization method, when fed into a corresponding parser, reconstructs an equivalent object including timezone state, with TZID resolution and auto-generated dtstart behavior preserved."
+        },
+        {
+          "reference_id": "v005",
+          "behavior": "rruleset string output emits DTSTART from its first rule, then RRULE, RDATE, EXRULE, EXDATE in order; EXRULE uses the EXRULE: prefix.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T14",
+              "T09"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires rruleset.__str__() to emit a specific sequence: DTSTART (from first rrule), then RRULE, RDATE, EXRULE, EXDATE — in that exact order, with EXRULE using the EXRULE: prefix. This is a deterministic, ordered transformation of internal components into a string. T09 (deterministic transformation) can express the output format per component, but cannot enforce the fixed sequence of components. T14 (stable ordering) can express the required order of output lines, but cannot express the content of each line (e.g., that EXRULE lines must use the EXRULE: prefix). No template in the catalog combines both content transformation and strict ordering in a single expression. T09 + T14 together could express it, but the catalog does not allow combining multiple templates into a single group for a single validation unless they are independently sufficient and non-overlapping. Since the behavior requires both the correct content AND the correct order, and no single template expresses both, and the catalog does not support expressing compound behavior across multiple templates for one validation, this cannot be expressed. The missing construct is a template that combines 'deterministic transformation' with 'stable ordering' in a single assertion for a multi-line structured output.",
+          "missing_construct": "A template that combines deterministic transformation of individual components with stable ordering of those components in a multi-line output — e.g., 'For {input}, {operation} produces {sequence_of_expressions} in {ordering_rule}' — which does not exist in the catalog."
+        },
+        {
+          "reference_id": "v006",
+          "behavior": "rruleset RDATE/EXDATE serialization uses TZID for non-UTC dates and Z for UTC dates.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T09",
+              "T50"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that RDATE/EXDATE serialization uses TZID for non-UTC and Z for UTC. This is a conditional deterministic transformation based on timezone type. T09 can express the transformation per case, but only if the condition (UTC vs non-UTC) can be expressed as an input domain. However, T09 requires a single input domain and single expression — it cannot express a conditional branching rule (if UTC then Z, else TZID). T50 (equivalent behavior across surfaces) could apply if multiple surfaces had the same rule, but here it's one surface (RDATE/EXDATE) with a conditional output. No template supports conditional output based on a property of the input (like timezone type). The catalog lacks a template for 'conditional deterministic transformation based on input property'. T09 is insufficient because it cannot express branching logic. The missing construct is a template that allows: 'For {input_domain}, if {condition} then {expression1} else {expression2} at {observation}'.",
+          "missing_construct": "A template for 'conditional deterministic transformation based on input property' — e.g., 'For {input}, if {condition} then {expression1} else {expression2} at {observation}' — which is not present in the catalog."
+        },
+        {
+          "reference_id": "v007",
+          "behavior": "rrule equality compares all recurrence parameters, and equal rules have equal hashes.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T51",
+              "T12"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T51"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that rrule.__eq__ compares all recurrence parameters and that __hash__ is consistent with equality. However, the template catalog lacks any template that can express a requirement for hash consistency with equality. T51 (Relational property or invariant) can express that equality compares all parameters, but no template exists to require that __hash__ must be consistent with __eq__. This is a missing construct: the catalog has no template for 'hash-equality consistency' or 'hash must match equality semantics'. Without this, no template group can fully express the validation.",
+          "missing_construct": "A template for hash-equality consistency, such as 'For objects in {domain}, __hash__ returns the same value if and only if __eq__ returns True.'"
+        },
+        {
+          "reference_id": "v008",
+          "behavior": "rrule repr uses symbolic frequency names and eval(repr(rule)) produces an equivalent rule.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T34",
+              "T52"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09",
+            "T34"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that rrule.__repr__ produces a reconstructable expression using symbolic names and that eval(repr(r)) yields an equivalent rrule. T34 (Persistence round trip) can express the round-trip requirement, and T34's 'serialize_restore_sequence' could be filled with 'repr then eval'. However, T34 does not require the output to use symbolic frequency names (YEARLY, WEEKLY, etc.) — it only requires equivalence after serialization and restoration. There is no template that enforces the specific textual format of the repr output. Thus, while T34 captures the round-trip, the symbolic naming requirement has no supporting template. No combination of templates can express both the format constraint and the round-trip requirement together.",
+          "missing_construct": "A template for 'output format specification', such as 'For {operation}, the output string must use {specific_symbols} and {syntactic_structure}.'"
+        },
+        {
+          "reference_id": "v009",
+          "behavior": "rrule exposes read-only dtstart, freq, interval, and until properties.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T52"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T02"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that rrule exposes read-only properties dtstart, freq, interval, and until. T01 (Public symbol and invocation) can express that these properties are exposed, but it cannot express that they are read-only. The template T01 only requires that the symbol exposes the interface — it does not constrain mutability. There is no template in the catalog that can express 'read-only' as a required property constraint. Without this, we cannot verify that assignments to these properties are disallowed. Thus, T01 alone is insufficient, and no other template can fill the read-only requirement.",
+          "missing_construct": "A template for 'read-only access', such as 'For {symbol}, {property} is accessible for reading but raises {error} when assigned to.'"
+        },
+        {
+          "reference_id": "v010",
+          "behavior": "rrule.count() returns a set count parameter directly, otherwise uses inherited iterative counting.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T07",
+              "T23"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T03",
+            "T10"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction states that rrule.count() returns the count parameter directly when set, otherwise iterates (inherited from rrulebase). Template T07 ('Irrelevant or overridden option') and T23 ('State transition and guard') do not capture this behavior. T07 requires an option that is ignored under a condition, but count() is not an option—it is a method with conditional logic based on internal state. T23 requires a state transition triggered by an event and guard, which does not apply. No template in the catalog expresses a method that conditionally returns a stored value or delegates to a parent implementation based on presence/absence of a parameter. The behavior is a simple conditional return based on internal state, which requires a template like 'Conditional value retrieval based on state'—a construct absent from the catalog.",
+          "missing_construct": "A template for conditional value retrieval based on internal state (e.g., 'When a stored value exists, return it; otherwise, delegate to inherited behavior') is required but missing from the catalog."
+        },
+        {
+          "reference_id": "v011",
+          "behavior": "rrule.to_ical serializes VCALENDAR/VEVENT and emits a STANDARD VTIMEZONE component for non-UTC aware dtstart, deriving TZOFFSETTO and TZOFFSETFROM from the offset at dtstart.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T02",
+              "T09"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction requires that rrule.to_ical() serializes as VCALENDAR/VEVENT and emits a STANDARD VTIMEZONE component for non-UTC dtstart, with TZOFFSETTO/TZOFFSETFROM derived from the UTC offset at dtstart. Template T02 ('Result structure and field meaning') can describe the output structure of the serialized string, but cannot express the deterministic transformation of a timezone-aware dtstart into specific VTIMEZONE fields. Template T09 ('Deterministic transformation') could express the derivation of TZOFFSETTO/TZOFFSETFROM from the dtstart offset, but it cannot express the structural requirement of embedding a VTIMEZONE block with STANDARD component within a VCALENDAR/VEVENT. No template in the catalog supports expressing both structural output format (VCALENDAR/VEVENT/VTIMEZONE hierarchy) and deterministic field derivation from a datetime value. The catalog lacks a template for 'Structured output generation with hierarchical components derived from input values'.",
+          "missing_construct": "A template for structured output generation with hierarchical components derived from input values (e.g., 'For input X, output Y must contain nested structure Z with fields W derived from X') is required but missing from the catalog."
+        },
+        {
+          "reference_id": "v012",
+          "behavior": "rruleset exposes rrules, rdates, exrules, and exdates as read-only tuples in insertion order.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T02",
+              "T14"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T02",
+            "T14"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction requires that rruleset exposes rrules, rdates, exrules, exdates as read-only tuples in insertion order. Template T01 ('Public symbol and invocation') can express that the properties are exposed. Template T14 ('Stable ordering') can express that they are in insertion order. However, T01 requires the symbol to expose a specified_interface, but the instruction does not name an interface (like a class or method) being exposed—it names properties of an object. T14 requires a sequence to be ordered by a rule, but the properties themselves are not sequences being ordered—they are tuples that are ordered. The catalog lacks a template that combines 'exposure of a read-only property holding an ordered sequence' in a single card. T01 and T14 together are insufficient because T01 does not specify that the exposed object is a tuple or that it is read-only, and T14 does not specify that the sequence is a property of an object. The required construct is 'Exposure of a read-only property containing an ordered collection with specified mutability and ordering'.",
+          "missing_construct": "A template for exposure of a read-only property containing an ordered collection with specified mutability and ordering (e.g., '{property} is a read-only tuple ordered by insertion') is required but missing from the catalog."
+        },
+        {
+          "reference_id": "v013",
+          "behavior": "rruleset equality compares all four component groups and is independent of insertion order for dates.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T51",
+              "T12"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T51"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The reference behavior requires rruleset equality to compare all four component groups (rrules, rdates, exrules, exdates) with order-independence for dates. Template T12 (Normalization and equivalence) can express that sorted dates are treated as equivalent, but there is no template that can express the requirement to compare four distinct component groups as a whole, or to assert that equality is defined over the union of these four collections. T51 (Relational property or invariant) could potentially express a relation across observations, but it lacks the ability to specify that four distinct, named collections must be compared collectively. No template supports expressing a multi-component structural equality over named, heterogeneous collections with order-independence for subsets. This is a missing construct: a template for 'structural equality over multiple named collections with per-collection normalization'.",
+          "missing_construct": "A template for 'structural equality over multiple named collections with per-collection normalization' is missing. The current templates can express equivalence of individual elements (T12) or relations between observations (T51), but none can express that an object's equality is defined by comparing four distinct, named, ordered collections where two of them (rdates/exdates) require sorting for equivalence."
+        },
+        {
+          "reference_id": "v014",
+          "behavior": "rruleset repr has rruleset() followed by multiline rrule/rdate/exrule/exdate calls.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T02",
+              "T52"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T09"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires rruleset.__repr__ to produce a multi-line expression starting with 'rruleset()' followed by .rrule(), .rdate(), .exrule(), .exdate() calls in order. Template T02 (Result structure and field meaning) describes field semantics, not output format. T52 (Required artifact or structural property) can assert that a string representation exists with inspectable properties, but it cannot enforce the exact multi-line, method-call syntax structure. T01 (Public symbol and invocation) describes interface exposure, not string formatting. No template can express a prescribed textual format with line breaks and specific method invocation order. This is a missing construct: a template for 'exact string representation format with structural syntax constraints'.",
+          "missing_construct": "A template for 'exact string representation format with structural syntax constraints' is missing. The current templates cannot express that a __repr__ output must be a multi-line string with specific method calls in a fixed order, including indentation and line breaks. This requires a template that binds output format to literal syntax, which is not supported."
+        },
+        {
+          "reference_id": "v015",
+          "behavior": "rruleset.copy() creates a shallow copy with identical components.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T32",
+              "T02"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T32"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "missing",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires rruleset.copy() to create a shallow copy with identical components. Template T32 (Copy or snapshot isolation at a stated depth) can express that mutations at a certain depth do not alter the original, but it requires specifying 'supported_depth_and_location' and 'protected_observation'. The instruction does not specify depth — only 'shallow copy with identical components'. T31 (Object identity preservation) requires the same object, but a shallow copy must be a different object with identical content. T02 could describe field contents, but not the copy operation's semantics. No template can express that a copy operation produces a new object with identical component references (shallow copy) without requiring deep isolation or identity. This is a missing construct: a template for 'shallow copy semantics with component reference equivalence'.",
+          "missing_construct": "A template for 'shallow copy semantics with component reference equivalence' is missing. The current templates either require deep isolation (T32), object identity (T31), or field meaning (T02), but none can express that a copy produces a new container with the same references to its internal components — the definition of a shallow copy."
+        },
+        {
+          "reference_id": "v016",
+          "behavior": "rruleset.union combines all component groups from both sets and raises TypeError for a non-rruleset argument.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T09",
+              "T05"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T09",
+              "T05"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T05",
+            "T51"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that rruleset.union combines all components from both sets (deterministic transformation: T09) and raises TypeError for non-rruleset arguments (invalid input rejection: T05). The instruction explicitly defines the transformation (combine all components) and the error condition (non-rruleset argument), both directly expressible by these templates.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v017",
+          "behavior": "rruleset.subtract adds the other set's rrules as exrules and rdates as exdates, and raises TypeError for a non-rruleset argument.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T09",
+              "T05"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T09",
+              "T05"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T05",
+            "T51"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "partial",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that rruleset.subtract adds other's rrules as exrules and rdates as exdates (deterministic transformation: T09) and raises TypeError for non-rruleset arguments (invalid input rejection: T05). The instruction precisely defines the transformation logic and the error condition, both fully captured by T09 and T05.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v018",
+          "behavior": "rruleset.to_ical emits VCALENDAR with one VTIMEZONE block per unique non-UTC timezone.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T02",
+              "T15"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T02",
+              "T15"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T09",
+            "T15"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires that rruleset.to_ical emits VCALENDAR with one VTIMEZONE block per unique non-UTC timezone. This is a result structure with field semantics (T02: 'emits VCALENDAR with one VTIMEZONE block per unique non-UTC timezone') and a duplicate-item policy (T15: retain one VTIMEZONE per unique timezone, discarding duplicates). The instruction specifies both the output structure and the deduplication rule, both expressible by these templates.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v019",
+          "behavior": "rruleset.from_str is a classmethod wrapping rrulestr with forceset=True.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T01",
+              "T52"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T01",
+              "T52"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T01",
+            "T03"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction specifies that 'rruleset.from_str' is a classmethod wrapping 'rrulestr' with 'forceset=True'. T01 ('Public symbol and invocation') captures the public symbol (rruleset.from_str) and its specified interface (classmethod wrapping rrulestr with forceset=True). T52 ('Required artifact or structural property') confirms the existence and structural property of this classmethod as a required public artifact, ensuring it is not merely an internal implementation detail.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v020",
+          "behavior": "rrulestr auto-detects VCALENDAR and extracts VTIMEZONE and VEVENT.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T13"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T13"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T13",
+            "T17",
+            "T21"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The instruction requires rrulestr to auto-detect BEGIN:VCALENDAR and extract VTIMEZONE and VEVENT structures. T13 ('Accepted and rejected grammar') directly expresses this by stating that the parser (rrulestr) accepts the grammar class (VCALENDAR with VTIMEZONE and VEVENT) and rejects other forms. The behavior is grammatical parsing, and T13 is designed for exactly this kind of language form acceptance/rejection.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v021",
+          "behavior": "rrulestr uses only DTSTART/RRULE/RDATE/EXRULE/EXDATE recurrence properties from the first VEVENT.",
+          "catalog_status": "expressible",
+          "oracle_template_groups": [
+            [
+              "T21",
+              "T13"
+            ]
+          ],
+          "reference_template_groups": [
+            [
+              "T21",
+              "T13"
+            ]
+          ],
+          "audit_reference_group_agreement": true,
+          "catalog_audit_conflict": false,
+          "retrieved_template_ids": [
+            "T13",
+            "T17",
+            "T21"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The instruction requires rrulestr to use only recurrence properties (DTSTART, RRULE, RDATE, EXRULE, EXDATE) from the first VEVENT and ignore others. T13 ensures the parser accepts only these recurrence properties as valid within the VEVENT context. T21 ('Contextual exclusion') adds that these properties have effect only in the eligible context (first VEVENT) and have no effect in excluded contexts (other VEVENTs or non-recurrence properties). Together, they fully express the contextual exclusion and grammatical acceptance required.",
+          "missing_construct": ""
+        },
+        {
+          "reference_id": "v022",
+          "behavior": "rrulestr handles RFC 5545 line unfolding.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T13",
+              "T12"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T13",
+            "T17",
+            "T21"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The behavior requires parsing RFC 5545 line unfolding, which involves recognizing and concatenating folded lines (lines starting with whitespace). None of the templates in the catalog can express this grammar-level parsing behavior. T13 (Accepted and rejected grammar) could potentially apply if the grammar of line folding were explicitly defined as an accepted form, but the instruction does not specify a grammar class or rejection condition — it only states that unfolding is 'handled'. Without a defined grammar class (e.g., 'folded lines') and a rejection class (e.g., 'ununfolded lines'), T13 cannot be instantiated. No other template captures syntactic normalization of input text during parsing.",
+          "missing_construct": "A template for syntactic normalization or input preprocessing of structured text (e.g., 'line folding' or 'unfolding') is required but absent from the catalog."
+        },
+        {
+          "reference_id": "v023",
+          "behavior": "Inline VTIMEZONE definitions take priority over tzids lookups.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T17"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T13",
+            "T17",
+            "T21"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "covered",
+          "catalog_rationale": "The behavior requires a priority-based selection between inline VTIMEZONE definitions and tzids lookups. T17 (Nearest applicable override) is designed for configuration hierarchies, but the instruction does not describe a hierarchy of configuration sources — it describes two distinct mechanisms: inline definitions (part of the input data) and external tzids mappings (a parameter). T17 requires a 'precedence rule among applicable sources', but here the inline VTIMEZONE is not a 'source' in the configuration sense; it is embedded content. The instruction defines a merge/override rule between two different kinds of inputs, not a configuration resolution hierarchy. No template supports this kind of data-source precedence over content embedding.",
+          "missing_construct": "A template for resolving conflicts between embedded content and external parameters (e.g., 'inline definition vs. external mapping') is required but absent from the catalog."
+        },
+        {
+          "reference_id": "v024",
+          "behavior": "Correct the comment referring to RFC 5445 so it references RFC 5545.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T52"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [],
+          "source_item_kinds": [
+            "context"
+          ],
+          "source_routes": [
+            "context"
+          ],
+          "criterion_status": "full",
+          "cause": "upstream_route_miss",
+          "catalog_rationale": "The behavior requires correcting a comment in the source code from 'RFC 5445' to 'RFC 5545'. This is a documentation or source code artifact fix, not a runtime behavior. T52 (Required artifact or structural property) is the only template that addresses artifacts, but it requires an 'inspectable property' — e.g., a public symbol, exported type, or runtime-accessible metadata. A comment in source code is not inspectable at runtime and is not a deliverable that can be validated by the system's behavior. No template in the catalog supports validating or requiring textual correctness in source comments.",
+          "missing_construct": "A template for validating source code comments, documentation strings, or non-runtime artifacts is required but absent from the catalog."
+        },
+        {
+          "reference_id": "v025",
+          "behavior": "TZID and a Z suffix on the same value produce the error message date property specifies multiple timezones.",
+          "catalog_status": "no_fit",
+          "oracle_template_groups": [],
+          "reference_template_groups": [
+            [
+              "T05",
+              "T04"
+            ]
+          ],
+          "audit_reference_group_agreement": false,
+          "catalog_audit_conflict": true,
+          "retrieved_template_ids": [
+            "T05"
+          ],
+          "source_item_kinds": [
+            "requirement"
+          ],
+          "source_routes": [
+            "include"
+          ],
+          "criterion_status": "full",
+          "cause": "retrieval_miss",
+          "catalog_rationale": "The instruction specifies that a conflicting timezone (TZID + Z suffix on the same value) must produce the error message 'date property specifies multiple timezones'. This is a clear invalid-input rejection scenario. However, the available templates do not support expressing an error message with exact string content as a required constraint. Template T05 ('Invalid input rejection') requires only an error contract (e.g., type or status), not the precise textual content of the error message. No other template in the catalog allows specifying the exact string of an error message as a required outcome. Therefore, while the behavior is clearly defined, the template catalog lacks the expressive power to capture the exact error string requirement. This is a missing construct: exact error message literal matching.",
+          "missing_construct": "A template that allows specifying the exact textual content of an error message as a required outcome, not just its type or category."
+        }
+      ]
+    }
+  ]
+}

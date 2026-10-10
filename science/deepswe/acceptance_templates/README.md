@@ -6,6 +6,8 @@ The initial dataset has four tasks from repository families outside the twelve u
 
 The [production-routed run](runs/production-routed-v1/README.md) reruns those tasks after production sentence capture, JEV atomicity classification, planning-model splitting, and JEV routing. Its results are not directly comparable as a causal estimate because the matcher/catalog version and batch size changed; the report preserves the complete classifier and generation traces.
 
+The [catalog retrieval experiment](runs/catalog-retrieval-v1/README.md) compares embedding thresholds, the captured LLM shortlist, JEV top-one suggestions, and their union against both the existing reference template mappings and an independent catalog-coverage audit. It flags disagreements instead of treating model `no_fit` responses as confirmed catalog gaps.
+
 Start with [FOLLOWUP.md](FOLLOWUP.md) for the latest applicability fixes, failed approaches, reviewer calibration, and the mixed full-task results. [PILOT.md](PILOT.md) preserves the original experiment.
 
 ## Run an experiment

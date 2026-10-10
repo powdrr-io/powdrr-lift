@@ -1,0 +1,43 @@
+{
+  "archive": "artifacts.tar.gz",
+  "archive_sha256": "79b971f4906e34e45e63626c2c1f6c64edf7027554ae22cfd7be42b860a8f715",
+  "file_count": 9,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/append-order-not-precedence/bindings.json",
+      "sha256": "159afa93d744565ad2fba72cb9c4e462c0c5c4bf655b70f1e17b182bc60b4108"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/equality-not-identity/bindings.json",
+      "sha256": "64daaf541b3adba86267f1a37a0f19a721501cf3205009f7f7c57b3e50ec93c2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/explicit-collision-winner/bindings.json",
+      "sha256": "d090f4271dcad0e4677b3e2098d3f704027e87fd8164adf55ed0a6f0b10fc2c3"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/explicit-nearest-override/bindings.json",
+      "sha256": "8b11e20298136db540911a3dfa488672a9fe23e92c7844e926ef8d3b74e590c3"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/explicit-reference-identity/bindings.json",
+      "sha256": "afd0b580b0b7d229ac9ddd231000dfe9ca7eb242b88e3ccebc6f08cfa525a44f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/identity-without-keyword/bindings.json",
+      "sha256": "63919983b231a97fc88916b9d40cc05e7431a315ea87d9947a8ac283796893be"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/readonly-not-identity/bindings.json",
+      "sha256": "c8340a367809141ad0a3a49d44de6383648b8ca877e1e52aedccc01c07091064"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/report.json",
+      "sha256": "597704b45006e40a1a6c1e0b1cb27f5a3417a6e005e6a3928b3a8587df7dec27"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/traversal-not-override/bindings.json",
+      "sha256": "4df5e65f21453dc8aff4521b19b7c40d2ca917fabf61b98cae90a23617339779"
+    }
+  ]
+}

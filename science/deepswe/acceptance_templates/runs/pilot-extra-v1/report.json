@@ -1,0 +1,346 @@
+{
+  "run": {
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "catalog_sha256": "694ae31846a317f49d5c6b6fe1c4540323ccbc41a7a9d2a72170ce407b309ff9",
+    "tasks": [
+      "dateutil-rfc5545-timezone-interop",
+      "koota-entity-snapshot-rollback"
+    ],
+    "arms": [
+      "direct",
+      "templates"
+    ],
+    "batch_size": 6,
+    "output_tokens": 12288,
+    "repairs": 1,
+    "failures": []
+  },
+  "eligible_task_count": 2,
+  "paired_task_ids": [
+    "dateutil-rfc5545-timezone-interop",
+    "koota-entity-snapshot-rollback"
+  ],
+  "aggregate": {
+    "direct": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 45,
+      "criterion_count": 74,
+      "strict_recall": 0.9777777777777777,
+      "strict_precision": 0.9864864864864865,
+      "missed_or_partial": 1,
+      "unsupported": 1,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 0.5
+    },
+    "templates": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 45,
+      "criterion_count": 129,
+      "strict_recall": 1.0,
+      "strict_precision": 0.9922480620155039,
+      "missed_or_partial": 0,
+      "unsupported": 1,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 1.0
+    }
+  },
+  "paired_aggregate": {
+    "direct": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 45,
+      "criterion_count": 74,
+      "strict_recall": 0.9777777777777777,
+      "strict_precision": 0.9864864864864865,
+      "missed_or_partial": 1,
+      "unsupported": 1,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 0.5
+    },
+    "templates": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 45,
+      "criterion_count": 129,
+      "strict_recall": 1.0,
+      "strict_precision": 0.9922480620155039,
+      "missed_or_partial": 0,
+      "unsupported": 1,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 1.0
+    }
+  },
+  "scores": [
+    {
+      "task_id": "dateutil-rfc5545-timezone-interop",
+      "arm": "direct",
+      "input_sha256": "29ed87a69cab68f21e44202c6268fc8df9c16de7f66f9f585a06d732d5892493",
+      "generation_sha256": "22d22f04752d7aca2cea4e088675e096b985724eec66e9b1659e893279eaab97",
+      "reference_sha256": "9233d539edda24a645a3d8ed49769105d81dd8d438bf77de61937b04e9d3f847",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 25,
+      "full": 24,
+      "partial": 0,
+      "missed_or_partial": 1,
+      "missing": 1,
+      "strict_recall": 0.96,
+      "including_partial_recall": 0.96,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": false,
+      "criterion_count": 32,
+      "supported": 31,
+      "strict_precision": 0.96875,
+      "unsupported": 1,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": null,
+      "accepted_template_label_recall": null,
+      "template_label_reference_count": 0,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 6,
+      "criterion_characters": 12794,
+      "generation_elapsed_seconds": 55.123,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [
+        {
+          "stage": "inventory",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 17.782,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": true
+        }
+      ],
+      "misses": [
+        {
+          "reference_id": "v024",
+          "inventory_status": "full",
+          "inventory_requirement_ids": [
+            "r031"
+          ],
+          "criterion_status": "missing",
+          "criterion_ids": [],
+          "rationale": "The requirement r031 states a comment references 'RFC 5445' instead of 'RFC 5545', but the criteria do not include any validation or correction of source code comments. The criteria focus on behavior, not comment text correction. Thus, v024 is not covered by any criterion."
+        }
+      ],
+      "precision_flags": [
+        {
+          "criterion_id": "c031",
+          "status": "unsupported",
+          "source_ids": [
+            "s020"
+          ],
+          "rationale": "s020 states 'A comment references \"RFC 5445\" instead of \"RFC 5545\"' — this describes a typo, but does not assert the absence of 'RFC 5545' in any comment, nor does it confirm the presence of 'RFC 5445' in the source code. The criterion demands exact string matches and absence of 'RFC 5545', which goes beyond the source's observation of a single error. Source is ambiguous about code content."
+        }
+      ]
+    },
+    {
+      "task_id": "dateutil-rfc5545-timezone-interop",
+      "arm": "templates",
+      "input_sha256": "29ed87a69cab68f21e44202c6268fc8df9c16de7f66f9f585a06d732d5892493",
+      "generation_sha256": "a43d2b2b547fd72d2686f05f972c10e25efb56225f5e8c34f379cdf1564c930e",
+      "reference_sha256": "9233d539edda24a645a3d8ed49769105d81dd8d438bf77de61937b04e9d3f847",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 25,
+      "full": 25,
+      "partial": 0,
+      "missed_or_partial": 0,
+      "missing": 0,
+      "strict_recall": 1.0,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": true,
+      "criterion_count": 62,
+      "supported": 61,
+      "strict_precision": 0.9838709677419355,
+      "unsupported": 1,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": 0.88,
+      "accepted_template_label_recall": 0.88,
+      "template_label_reference_count": 25,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 7,
+      "criterion_characters": 9351,
+      "generation_elapsed_seconds": 177.556,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [
+        {
+          "stage": "inventory",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 17.782,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": true
+        }
+      ],
+      "misses": [],
+      "precision_flags": [
+        {
+          "criterion_id": "c035",
+          "status": "unsupported",
+          "source_ids": [
+            "s011"
+          ],
+          "rationale": "The instruction says the attributes are 'read-only tuples' but does not specify whether they are the same object as the internal tuple (identity) or a copy. The criterion demands identity ('identical object'), which is an unmandated implementation detail not supported by the source."
+        }
+      ]
+    },
+    {
+      "task_id": "koota-entity-snapshot-rollback",
+      "arm": "direct",
+      "input_sha256": "45c32083152adefb386cfeb96e7750eaf9373772c95abc99fdcbea7cc66f798f",
+      "generation_sha256": "04f63f78104c7140265723376c58dc3cf1e34fd5986d0885b732ae1d98158979",
+      "reference_sha256": "5bb212dea4f68c766a3937960f9e3a68379b276af4fae08e057f990d5803cd84",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 20,
+      "full": 20,
+      "partial": 0,
+      "missed_or_partial": 0,
+      "missing": 0,
+      "strict_recall": 1.0,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": true,
+      "criterion_count": 42,
+      "supported": 42,
+      "strict_precision": 1.0,
+      "unsupported": 0,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": null,
+      "accepted_template_label_recall": null,
+      "template_label_reference_count": 0,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 7,
+      "criterion_characters": 11550,
+      "generation_elapsed_seconds": 42.359,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [
+        {
+          "stage": "inventory",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 20.333,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": true
+        }
+      ],
+      "misses": [],
+      "precision_flags": []
+    },
+    {
+      "task_id": "koota-entity-snapshot-rollback",
+      "arm": "templates",
+      "input_sha256": "45c32083152adefb386cfeb96e7750eaf9373772c95abc99fdcbea7cc66f798f",
+      "generation_sha256": "a35f19323108077f32d3c5e5876714f08906672199f6bd27b9f30b3abe8d28ec",
+      "reference_sha256": "5bb212dea4f68c766a3937960f9e3a68379b276af4fae08e057f990d5803cd84",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 20,
+      "full": 20,
+      "partial": 0,
+      "missed_or_partial": 0,
+      "missing": 0,
+      "strict_recall": 1.0,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": true,
+      "criterion_count": 67,
+      "supported": 67,
+      "strict_precision": 1.0,
+      "unsupported": 0,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": 1.0,
+      "accepted_template_label_recall": 1.0,
+      "template_label_reference_count": 20,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 9,
+      "criterion_characters": 10134,
+      "generation_elapsed_seconds": 234.945,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [
+        {
+          "stage": "inventory",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 20.333,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": true
+        }
+      ],
+      "misses": [],
+      "precision_flags": []
+    }
+  ],
+  "failures": [],
+  "limitations": [
+    "Agent-authored source-based references and automated judgments are not human gold labels.",
+    "Template-group agreement is diagnostic, not proof.",
+    "No coding agent, task validation suite, or Structrr diff was executed.",
+    "Only declared reference validations contribute to recall; references may omit behavior. Inspect source coverage before interpreting scores."
+  ]
+}

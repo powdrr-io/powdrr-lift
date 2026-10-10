@@ -1,0 +1,147 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "32b1132f31426b9f8f8ecc0f555f2ab0d52b2699d7d593c16cbf928921f77bde",
+  "file_count": 20,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/dateutil-rfc5545-timezone-interop/templates/review-calls/coverage-000-0.json",
+      "sha256": "8061df122eb1322faff2550c94e9a4b2784dc60b9093812c3cd61512c4296838",
+      "status": "completed",
+      "stage": "coverage-000",
+      "request_sha256": "9c7724d4f4cc425676d773cbe4e37b4c092dc72b894b16333bda7891eec37563"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/dateutil-rfc5545-timezone-interop/templates/review-calls/coverage-001-0.json",
+      "sha256": "9083e492894d3202717521a1edc0ac5b521ba00ee572603df56471f89749063b",
+      "status": "completed",
+      "stage": "coverage-001",
+      "request_sha256": "88f8785658a68b771be8c9aab4e8dbe9ea5790c893f39bd262200ce33f96e4ca"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/dateutil-rfc5545-timezone-interop/templates/review-calls/coverage-002-0.json",
+      "sha256": "665a8a4560c9457718549fbd8972c789e285a049d1a55133e35893dc51c4b12c",
+      "status": "completed",
+      "stage": "coverage-002",
+      "request_sha256": "0c5db0c229a3630c8954af66d56b7b2e6978afd1f08e2a6c1ee2cfcc9573ab12"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/dateutil-rfc5545-timezone-interop/templates/review-calls/support-000-0.json",
+      "sha256": "0f14ea5e0e752f89c8a315e0ad37f369d80f87d4855d9aa5f203d446b134d566",
+      "status": "completed",
+      "stage": "support-000",
+      "request_sha256": "0d0bf8f074767c4495f93a53437cfe392f808f263b623ad41eb457f1a1ecdb9a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/dateutil-rfc5545-timezone-interop/templates/review-calls/support-001-0.json",
+      "sha256": "caa5d56e0fb6dfbfdb6c5d8de516412e773f8f4feb2912c4d247f455217334e1",
+      "status": "completed",
+      "stage": "support-001",
+      "request_sha256": "0d1881a8209bd1a951726b0116c4ae0be60ad19b6b20eefa37daf82de9663ccd"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/dateutil-rfc5545-timezone-interop/templates/review-calls/support-002-0.json",
+      "sha256": "670e1d621ff005f4ef42dbf3502e59c4d4faecafa366483e44300b37c4650358",
+      "status": "completed",
+      "stage": "support-002",
+      "request_sha256": "34986b1076f7f14e283dfe90aaf7a0b281f04dc11b50cffd1b4bda5fee5bbb9a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/dateutil-rfc5545-timezone-interop/templates/review-calls/support-003-0.json",
+      "sha256": "31dd57db125afb36718000ac94d36788b2c2f771d5c794c93ebfd9ac3cb6d64b",
+      "status": "completed",
+      "stage": "support-003",
+      "request_sha256": "ee2cdabdfdb70a5779aaee569cb9d450c11f67a4b7a62e9e69acee2455f4f53f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/dateutil-rfc5545-timezone-interop/templates/review-calls/support-004-0.json",
+      "sha256": "0cebc15bd66abfd1cef0a5ef74961b5a9f98b72a1bcf261f3bd73cf0a74e11ec",
+      "status": "completed",
+      "stage": "support-004",
+      "request_sha256": "99058a9bcc43cca053f28552ca76b689eba5861ce9ffe26dfa728c6d5c4e9af1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/dateutil-rfc5545-timezone-interop/templates/review-calls/support-005-0.json",
+      "sha256": "3d9d9e81bca5a0b77e78b85006559d9c3964bfd90da9de7477c5bf1d16df270c",
+      "status": "completed",
+      "stage": "support-005",
+      "request_sha256": "b53a4fdf36c87a2ccc71a0c3dc3852022a274cea6be11b408d7ad88348ef8985"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/coverage-000-0.json",
+      "sha256": "cd0d328ac186348f44a2ea306e0def8a0e9bb04c089d9d389ef42e700ad225db",
+      "status": "failed",
+      "stage": "coverage-000",
+      "request_sha256": "7c5a8e2993277ed34a5922a4f23b49119334ea4916841f9d363e71d13da4d8d2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/coverage-000-1.json",
+      "sha256": "c6dfcc76276e1cf1d6579950baeb818eec7f2836ce625d4f2d175fc4551de90e",
+      "status": "completed",
+      "stage": "coverage-000",
+      "request_sha256": "3842ce83ef272b022c66cb296195641f8f85206b5d932deff33ab31ed6401ee8"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/coverage-001-0.json",
+      "sha256": "8021f4641b5b95119146f4997e2f5335bc69701a34c9b3cf04f4f737f2a89cb3",
+      "status": "failed",
+      "stage": "coverage-001",
+      "request_sha256": "a518006013b3a1c477f4e425402fb759e498db37cc744462091562be98596028"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/coverage-001-1.json",
+      "sha256": "341d387e5058cf3a169dc3a812e070cbb98e4e88b800a1da31726aca38bb694e",
+      "status": "completed",
+      "stage": "coverage-001",
+      "request_sha256": "bd7f36174fcfd6f8bb359174d6939a0a41b5e9c84212f39b05e77bcf677366d5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/coverage-002-0.json",
+      "sha256": "432ffb56b4fd3a565da638539649687a91cd8aca2fa17ca6241e535794e5c00f",
+      "status": "completed",
+      "stage": "coverage-002",
+      "request_sha256": "e5086be3c22845ee159858fd03add325b178bac274e628b5dcb735a6dce8289b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/support-000-0.json",
+      "sha256": "0d572f038ac0a419731a14866afa90b9e7b3cd5465d3d86625085b1747bfb1a7",
+      "status": "completed",
+      "stage": "support-000",
+      "request_sha256": "bcfaf889bf33ad5bacf1b8bcb2c29826335f6d740d64d82a96062020927a5316"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/support-001-0.json",
+      "sha256": "da29b9cfccb0cfcc0f591d66bc68c797eacaba7fcb4bb8f310531c0ba594eb70",
+      "status": "completed",
+      "stage": "support-001",
+      "request_sha256": "2205ed48ed6a7bcfe61b20f3f81cb40cdc35ce477c1ce6565d9a5dc3df08d152"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/support-002-0.json",
+      "sha256": "13bab5c250ef30a53ab7434f1bea926826678da4c4fdd821e130572f6a0c0e1e",
+      "status": "completed",
+      "stage": "support-002",
+      "request_sha256": "dc9b3e7bbe95adf3592cd7436fca3ebe39ee31896a6ba92722a2fbcaa1dabe1f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/support-003-0.json",
+      "sha256": "1d7f3c740cd933c1c739a7aad1e2c85f2fbb4295732b70d8e3a669ff73f40b93",
+      "status": "completed",
+      "stage": "support-003",
+      "request_sha256": "9bfaaa1ac183d4112d7cb6838eef704df83fc73fa79f6793816d0177be22ad8b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/support-004-0.json",
+      "sha256": "f53a249cfd2a734dbf0e801e99346d51ea18dba7593e159d5c9ea287e3c4bf56",
+      "status": "completed",
+      "stage": "support-004",
+      "request_sha256": "e2040f93360f71495bf5d6720d727d5302d9a26df84d8d49aadd2a68076d93f5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-control-v3/helm-array-merge-strategies/templates/review-calls/support-005-0.json",
+      "sha256": "8a29eb771daf4d6bd1b51da8851a2b4dabcde682b415b41e0ca2503a25078efb",
+      "status": "completed",
+      "stage": "support-005",
+      "request_sha256": "108fb6480146c00a4062661176a0722d793ed386774124972a0617504c8754c1"
+    }
+  ]
+}

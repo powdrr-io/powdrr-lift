@@ -1,0 +1,17 @@
+{
+  "provider": "deepinfra",
+  "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "catalog_sha256": "694ae31846a317f49d5c6b6fe1c4540323ccbc41a7a9d2a72170ce407b309ff9",
+  "tasks": [
+    "cattrs-partial-structuring-recovery",
+    "helm-array-merge-strategies"
+  ],
+  "arms": [
+    "direct",
+    "templates"
+  ],
+  "batch_size": 6,
+  "output_tokens": 12288,
+  "repairs": 1,
+  "failures": []
+}

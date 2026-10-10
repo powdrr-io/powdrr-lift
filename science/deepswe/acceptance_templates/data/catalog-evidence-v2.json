@@ -1,0 +1,1750 @@
+{
+  "version": 2,
+  "proposal_sha256": "80d4b32e2d29a0a74bd7634500b3736c9efd3780a0f45edfbdfcfe9b765aa9bc",
+  "slot_representation": "Typed semantic slots use nonempty prose strings; type/evidence validation is structural, not proof of entailment.",
+  "templates": [
+    {
+      "id": "T01",
+      "version": 1,
+      "name": "Public symbol and invocation",
+      "applies_when": "the instruction names an import, entry point, parameter, or invocation form.",
+      "prerequisites": [],
+      "required_sentence": "{symbol} exposes {specified_interface}.",
+      "optional_sentences": [
+        "It is available at {public_path}.",
+        "{valid_invocation} is accepted."
+      ],
+      "slots": [
+        {
+          "name": "symbol",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "specified_interface",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "public_path",
+          "kind": "Symbol",
+          "required": false
+        },
+        {
+          "name": "valid_invocation",
+          "kind": "Symbol",
+          "required": false
+        }
+      ],
+      "slot_guidance": "symbols, invocation, required interface.",
+      "example": "SM: `DataVar` and `DataChangeInfo` import from `statemachine`; separately, `State(data={\"count\": 0})` accepts the `data` keyword.",
+      "near_miss": "implementing an internal helper while omitting the public API. Do not infer behavior merely from accepting the call."
+    },
+    {
+      "id": "T02",
+      "version": 1,
+      "name": "Result structure and field meaning",
+      "applies_when": "a result has specified fields, types, or field semantics.",
+      "prerequisites": [],
+      "required_sentence": "For `{operation}`, the result exposes `{field_specifications}`; each field denotes `{meaning}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "field_specifications",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "meaning",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "operation, field/type/meaning table.",
+      "example": "SM: a `DataChangeInfo` record exposes `state_id`, `key`, `old_value`, and `new_value`, identifying the changed state, key, and values before and after the change.",
+      "near_miss": "a success boolean or dictionary with incompatible names. Do not close an extensible result shape unless exclusivity is required."
+    },
+    {
+      "id": "T03",
+      "version": 1,
+      "name": "Omitted argument default",
+      "applies_when": "omission has a specified meaning or value.",
+      "prerequisites": [],
+      "required_sentence": "When `{argument}` is omitted from `{operation}`, behavior is equivalent to `{specified_default_case}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "argument",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "specified_default_case",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "operation, argument, default case.",
+      "example": "TX: an ordinary key event constructed without a phase uses `phase=\"press\"`.",
+      "near_miss": "treating omission as unknown or as a different phase. Omission, explicit `None`, false, zero, and empty containers are not interchangeable unless the source says so."
+    },
+    {
+      "id": "T04",
+      "version": 1,
+      "name": "Presence and argument-combination rule",
+      "applies_when": "validity depends on which arguments are supplied together.",
+      "prerequisites": [],
+      "required_sentence": "For `{presence_condition}` on `{arguments}`, `{operation}` produces `{specified_outcome}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "presence_condition",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "arguments",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "specified_outcome",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "argument-presence predicate, operation, outcome.",
+      "example": "SM: a `DataVar` declaration that supplies both a default and a factory raises `InvalidDefinition`.",
+      "near_miss": "accepting the forbidden pair. Do not infer \u201cexactly one\u201d from \u201cnot both\u201d; absent cases need their own evidence."
+    },
+    {
+      "id": "T05",
+      "version": 1,
+      "name": "Invalid input rejection",
+      "applies_when": "a specified invalid input class has a prescribed failure.",
+      "prerequisites": [],
+      "required_sentence": "Given {invalid_input_condition}, {operation} {error_contract}.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "invalid_input_condition",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "error_contract",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "invalid condition, operation, error type/status and supported detail constraints.",
+      "example": "SM: declaring data with a nonstring dictionary key raises `InvalidDefinition`.",
+      "near_miss": "silently stringifying keys. \u201cNo side effects on rejection\u201d requires separate evidence; it is not an automatic property of this template."
+    },
+    {
+      "id": "T06",
+      "version": 1,
+      "name": "Disabled feature behavior",
+      "applies_when": "an opt-in feature has a defined disabled path.",
+      "prerequisites": [],
+      "required_sentence": "While `{disabled_condition}`, `{specified_effects}` do not occur; `{baseline_behavior}` applies.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "disabled_condition",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "specified_effects",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "baseline_behavior",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "enable/disable condition, excluded effects, baseline.",
+      "example": "CB: with the circuit breaker omitted or falsey, requests are neither tracked nor blocked by a circuit.",
+      "near_miss": "maintaining a hidden failure streak while nominally disabled. Preserve the instruction's exact definition of falsey versus omitted."
+    },
+    {
+      "id": "T07",
+      "version": 1,
+      "name": "Irrelevant or overridden option",
+      "applies_when": "an option is explicitly ignored under another condition.",
+      "prerequisites": [],
+      "required_sentence": "When `{condition}`, varying `{ignored_option}` leaves `{specified_observation}` unchanged.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "condition",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "ignored_option",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "specified_observation",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "condition, option, observation.",
+      "example": "SK: for an explicit component list, changing `resolution` does not change which requested components are produced.",
+      "near_miss": "validating or applying resolution in a way that changes the specified result. Do not extend the invariance to unrelated outputs."
+    },
+    {
+      "id": "T08",
+      "version": 1,
+      "name": "Allowed alternative outcomes",
+      "applies_when": "the instruction intentionally permits several representations or implementations.",
+      "prerequisites": [],
+      "required_sentence": "Under `{condition}`, `{observation}` is one of `{allowed_alternatives}` and satisfies `{shared_constraints}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "condition",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "allowed_alternatives",
+          "kind": "Expression",
+          "required": true
+        },
+        {
+          "name": "shared_constraints",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "condition, alternatives, common predicates.",
+      "example": "TX: shifted printable `A` may use public key `A` or `shift+a`; character remains `A`, modifiers contain shift, and the base key is `a`.",
+      "near_miss": "choosing one allowed spelling as universally mandatory or allowing alternatives to weaken shared constraints."
+    },
+    {
+      "id": "T09",
+      "version": 1,
+      "name": "Deterministic transformation",
+      "applies_when": "output is specified by a formula or transformation.",
+      "prerequisites": [],
+      "required_sentence": "For `{input_domain}`, `{operation}` produces `{expression}` at `{observation}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "required": true
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "domain, expression, observation; numerical tolerance only if justified.",
+      "example": "SK: a duration's total-seconds component represents its duration in seconds; two minutes produces `120`.",
+      "near_miss": "returning minutes under a seconds label. An illustrative numeric case accompanies the general rule rather than replacing it."
+    },
+    {
+      "id": "T10",
+      "version": 1,
+      "name": "Boundary and degenerate case",
+      "applies_when": "a threshold, endpoint, empty domain, or degenerate arithmetic case has specified behavior.",
+      "prerequisites": [],
+      "required_sentence": "When `{boundary_predicate}`, `{operation}` yields `{boundary_outcome}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "boundary_predicate",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "boundary_outcome",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "boundary with inclusive/exclusive relation, operation, outcome.",
+      "example": "SK: if a scaling denominator is zero, non-null scaled feature values are zero; the separately required null-propagation rule still applies.",
+      "near_miss": "division by zero or NaN. Apply only to supported boundaries; a numeric parameter alone does not specify every edge case."
+    },
+    {
+      "id": "T11",
+      "version": 1,
+      "name": "Missing, null, and empty distinction",
+      "applies_when": "missing, null, empty, or false values have different meanings.",
+      "prerequisites": [],
+      "required_sentence": "For `{presence_or_value_case}`, `{operation}` produces `{case_outcome}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "presence_or_value_case",
+          "kind": "Expression",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "case_outcome",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "exact cases and outcome mapping.",
+      "example": "OB: omitting a rule list disables all rules; a present list that normalizes to no valid rules has no effect.",
+      "near_miss": "collapsing both cases to an empty list before interpretation."
+    },
+    {
+      "id": "T12",
+      "version": 1,
+      "name": "Normalization and equivalence",
+      "applies_when": "multiple input representations intentionally denote the same thing.",
+      "prerequisites": [],
+      "required_sentence": "Inputs related by `{normalization_rule}` produce the same `{specified_observation}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "normalization_rule",
+          "kind": "Expression",
+          "required": true
+        },
+        {
+          "name": "specified_observation",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "normalization relation, scope, observation.",
+      "example": "OB: rule names match case-insensitively; empty and duplicate entries are handled according to the specified normalization rules.",
+      "near_miss": "treating different letter case as different rules. Do not normalize quoted payload values or other unrelated fields."
+    },
+    {
+      "id": "T13",
+      "version": 1,
+      "name": "Accepted and rejected grammar",
+      "applies_when": "parsing distinguishes explicitly defined language forms.",
+      "prerequisites": [],
+      "required_sentence": "{parser} accepts {grammar_class} and rejects {excluded_class}.",
+      "optional_sentences": [
+        "Rejection produces {specified_failure}."
+      ],
+      "slots": [
+        {
+          "name": "parser",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "grammar_class",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "excluded_class",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "specified_failure",
+          "kind": "Symbol",
+          "required": false
+        }
+      ],
+      "slot_guidance": "grammar classes, retaining parameters and context; failure type/detail optional unless prescribed.",
+      "example": "HX: accept `application/*+json`, case-insensitively and with media-type parameters; reject a `+json` subtype under a different media tree.",
+      "near_miss": "a substring search for `json`. If the failure type is unspecified, do not supply one."
+    },
+    {
+      "id": "T14",
+      "version": 1,
+      "name": "Stable ordering",
+      "applies_when": "order is explicitly prescribed.",
+      "prerequisites": [],
+      "required_sentence": "{sequence} is ordered by {ordering_rule}.",
+      "optional_sentences": [
+        "For ties or groups, {tie_or_group_rule}."
+      ],
+      "slots": [
+        {
+          "name": "sequence",
+          "kind": "Sequence",
+          "required": true
+        },
+        {
+          "name": "ordering_rule",
+          "kind": "Sequence",
+          "required": true
+        },
+        {
+          "name": "tie_or_group_rule",
+          "kind": "Expression",
+          "required": false
+        }
+      ],
+      "slot_guidance": "sequence, ordering, optional tie/group rule.",
+      "example": "RV: applying two invalid values concatenates the receiver's errors before the argument's errors.",
+      "near_miss": "set union, sorted errors, or reversed concatenation. Value membership alone does not verify order."
+    },
+    {
+      "id": "T15",
+      "version": 1,
+      "name": "Duplicate and canonical-item policy",
+      "applies_when": "duplicate items are removed, preserved, grouped, or canonicalized.",
+      "prerequisites": [],
+      "required_sentence": "For items equivalent under {duplicate_relation}, retain {retention_rule}.",
+      "optional_sentences": [
+        "Expose {specified_alias_or_count_behavior}."
+      ],
+      "slots": [
+        {
+          "name": "duplicate_relation",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "retention_rule",
+          "kind": "Expression",
+          "required": true
+        },
+        {
+          "name": "specified_alias_or_count_behavior",
+          "kind": "Quantifier",
+          "required": false
+        }
+      ],
+      "slot_guidance": "equivalence, retention, optional alias/count contract.",
+      "example": "IG: among duplicate feature columns, the first surviving column is canonical and duplicates are recorded as aliases.",
+      "near_miss": "retaining the last column or dropping aliases needed at prediction time."
+    },
+    {
+      "id": "T16",
+      "version": 1,
+      "name": "Ordered transformation stages",
+      "applies_when": "applying operations in a different order changes the required result.",
+      "prerequisites": [],
+      "required_sentence": "Apply `{stage_sequence}` in that order before observing `{result}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "stage_sequence",
+          "kind": "Sequence",
+          "required": true
+        },
+        {
+          "name": "result",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "ordered stages, observation.",
+      "example": "SK: negative-value handling occurs before component extraction; with `handle_negative=\"clip\"`, a negative duration is clipped before its components are calculated.",
+      "near_miss": "extracting signed components first and then independently clipping them, which can produce different values."
+    },
+    {
+      "id": "T17",
+      "version": 2,
+      "name": "Nearest applicable override",
+      "applies_when": "values are selected from an ordered hierarchy of configuration sources.",
+      "prerequisites": [
+        {
+          "id": "value_selection",
+          "claim": "The source specifies which configuration value takes effect when multiple applicable sources supply it.",
+          "reject_inference": "Traversal order or presentation order alone does not establish overriding or value selection."
+        }
+      ],
+      "required_sentence": "For `{target}`, the effective `{setting}` is selected by `{precedence_rule}` among `{applicable_sources}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "target",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "setting",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "precedence_rule",
+          "kind": "Expression",
+          "required": true
+        },
+        {
+          "name": "applicable_sources",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "target, setting, source order, applicability conditions.",
+      "example": "FA: route/include/router choices determine implicit-method settings using the stated nearest-override rules. Use conflicting values in nested scopes to verify the result.",
+      "near_miss": "a single global default overriding a nearer explicit choice."
+    },
+    {
+      "id": "T18",
+      "version": 2,
+      "name": "Scoped merge and shadowing",
+      "applies_when": "scopes combine data and one scope wins collisions.",
+      "prerequisites": [
+        {
+          "id": "collision_winner",
+          "claim": "The source specifies a winner for conflicting values at the same key in the named operation and scope.",
+          "reject_inference": "Old-before-new concatenation, insertion order, or generic merging alone does not specify a collision winner."
+        }
+      ],
+      "required_sentence": "Within `{consumer_scope}`, expose values from `{visible_scopes}`; collisions resolve to `{winner_rule}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "consumer_scope",
+          "kind": "Scope",
+          "required": true
+        },
+        {
+          "name": "visible_scopes",
+          "kind": "Scope",
+          "required": true
+        },
+        {
+          "name": "winner_rule",
+          "kind": "Expression",
+          "required": true
+        }
+      ],
+      "slot_guidance": "consumer, visible scopes, precedence.",
+      "example": "SM: child callbacks see ancestor data, with the child's value winning a same-key collision.",
+      "near_miss": "exposing only local data or mutating the parent's value to simulate shadowing."
+    },
+    {
+      "id": "T19",
+      "version": 1,
+      "name": "Isolation across owners or regions",
+      "applies_when": "activity in one owner must not affect or expose another's state.",
+      "prerequisites": [],
+      "required_sentence": "For distinct {owners}, {action_on_first} leaves {observation_on_second} unchanged or inaccessible according to {isolation_rule}.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "owners",
+          "kind": "Scope",
+          "required": true
+        },
+        {
+          "name": "action_on_first",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "observation_on_second",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "isolation_rule",
+          "kind": "Expression",
+          "required": true
+        }
+      ],
+      "slot_guidance": "owner relation, action, protected observation.",
+      "example": "SM: a callback in one parallel region does not receive the other region's scoped data.",
+      "near_miss": "merging every active state's data into every callback. Do not infer nested object isolation from scope isolation."
+    },
+    {
+      "id": "T20",
+      "version": 1,
+      "name": "Unchanged portions of a result",
+      "applies_when": "an update is limited to specified fields, keys, paths, or regions.",
+      "prerequisites": [],
+      "required_sentence": "After `{update}`, `{target_part}` changes to `{expected_value}` and `{unaffected_parts}` retain their prior values.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "update",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "target_part",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "expected_value",
+          "kind": "Expression",
+          "required": true
+        },
+        {
+          "name": "unaffected_parts",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "update, changed part, unchanged parts.",
+      "example": "GQL: a deferred update to `a.x` overwrites that value while unrelated fields under `a` and elsewhere remain present.",
+      "near_miss": "replacing the entire accumulated result with a partial patch."
+    },
+    {
+      "id": "T21",
+      "version": 1,
+      "name": "Contextual exclusion",
+      "applies_when": "a recognizer or behavior applies only outside named contexts.",
+      "prerequisites": [],
+      "required_sentence": "`{construct}` has `{effect}` in `{eligible_context}` and has no such effect in `{excluded_contexts}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "construct",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "effect",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "eligible_context",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "excluded_contexts",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "construct, lexical/runtime context, effect.",
+      "example": "OB: standalone ignore markers act as directives; marker-like text inside fenced code, frontmatter, or inline code does not.",
+      "near_miss": "scanning all text with an unrestricted regex. Preserve the complete source-listed exclusion set."
+    },
+    {
+      "id": "T22",
+      "version": 1,
+      "name": "Alias substitution and conflict",
+      "applies_when": "aliases may substitute for canonical inputs, with an agreement rule.",
+      "prerequisites": [],
+      "required_sentence": "`{alias}` may satisfy `{canonical_requirement}`; if `{multiple_sources_condition}`, require `{agreement_predicate}`, otherwise `{error_contract}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "alias",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "canonical_requirement",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "multiple_sources_condition",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "agreement_predicate",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "error_contract",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "alias relation, agreement, error.",
+      "example": "IG: a saved feature alias can supply the canonical feature; multiple available sources must agree on every row, otherwise report the conflicting names.",
+      "near_miss": "silently choosing the first of conflicting columns."
+    },
+    {
+      "id": "T23",
+      "version": 1,
+      "name": "State transition and guard",
+      "applies_when": "an event changes state only under a condition.",
+      "prerequisites": [],
+      "required_sentence": "In `{initial_state}`, when `{event}` occurs and `{guard}` holds, transition to `{next_state}` and expose `{effect}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "initial_state",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "event",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "guard",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "next_state",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "effect",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "initial/next state, event, guard, observable effect.",
+      "example": "CB: after the required consecutive failures, the circuit is open and subsequent requests fast-fail.",
+      "near_miss": "opening on nonconsecutive failures. A false guard does not imply a particular alternative transition without evidence."
+    },
+    {
+      "id": "T24",
+      "version": 1,
+      "name": "Initialization at entry",
+      "applies_when": "an event creates or initializes owned state.",
+      "prerequisites": [],
+      "required_sentence": "On `{entry_event}`, `{owned_state}` becomes `{initial_value}` before `{first_required_observation}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "entry_event",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "owned_state",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "initial_value",
+          "kind": "Expression",
+          "required": true
+        },
+        {
+          "name": "first_required_observation",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "entry, owner, initializer, observation point.",
+      "example": "SM: state data is initialized from defaults before `on_enter` observes it.",
+      "near_miss": "lazy initialization after the callback has run."
+    },
+    {
+      "id": "T25",
+      "version": 1,
+      "name": "Availability through a boundary, then cleanup",
+      "applies_when": "state remains available through an operation but is removed afterward.",
+      "prerequisites": [],
+      "required_sentence": "`{resource}` remains observable during `{last_required_phase}`; after `{completion_boundary}`, `{post_cleanup_observation}` holds.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "resource",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "last_required_phase",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "completion_boundary",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "post_cleanup_observation",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "resource, phase, boundary, cleanup result.",
+      "example": "SM: `on_exit` can read the exiting state's data; after exit, `get_state_data(state)` is `None`.",
+      "near_miss": "deleting data before exit callbacks or leaving exited data active."
+    },
+    {
+      "id": "T26",
+      "version": 1,
+      "name": "Reset on reentry",
+      "applies_when": "a repeated lifecycle starts from original defaults rather than previous mutations.",
+      "prerequisites": [],
+      "required_sentence": "After `{enter_mutate_exit_sequence}`, a new `{entry}` restores `{default_observation}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "enter_mutate_exit_sequence",
+          "kind": "Sequence",
+          "required": true
+        },
+        {
+          "name": "entry",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "default_observation",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "lifecycle sequence, mutation, expected fresh state.",
+      "example": "SM: enter with count `0`, change it to `9`, exit, and reenter normally; count is `0`.",
+      "near_miss": "retaining the previous active value. History recall is a different entry condition and needs separate criteria."
+    },
+    {
+      "id": "T27",
+      "version": 1,
+      "name": "History restoration by hierarchy depth",
+      "applies_when": "historical restoration has an explicit hierarchical scope.",
+      "prerequisites": [],
+      "required_sentence": "After saving and recalling {history_kind}, restore data for {included_states}.",
+      "optional_sentences": [
+        "{excluded_descendants} follow {specified_nonrestored_behavior}."
+      ],
+      "slots": [
+        {
+          "name": "history_kind",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "included_states",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "excluded_descendants",
+          "kind": "Symbol",
+          "required": false
+        },
+        {
+          "name": "specified_nonrestored_behavior",
+          "kind": "Symbol",
+          "required": false
+        }
+      ],
+      "slot_guidance": "history kind, ancestor relation, scope; the excluded-descendant behavior clause is optional and used only if supported.",
+      "example": "SM: deep history restores full descendant snapshots; shallow history restores direct children. Verify with a nested hierarchy where descendant restoration changes an observable value.",
+      "near_miss": "treating both modes as full restoration. This template says nothing about recursive copying of objects inside a state's dictionary."
+    },
+    {
+      "id": "T28",
+      "version": 1,
+      "name": "Callback phase, context, and cardinality",
+      "applies_when": "a callback has specified timing, injected parameters, or invocation count.",
+      "prerequisites": [],
+      "required_sentence": "At {phase}, invoke {callback} with {context}.",
+      "optional_sentences": [
+        "Invocation count: {cardinality_if_specified}.",
+        "Event ordering: {other_events_if_specified}."
+      ],
+      "slots": [
+        {
+          "name": "phase",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "callback",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "context",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "cardinality_if_specified",
+          "kind": "Quantifier",
+          "required": false
+        },
+        {
+          "name": "other_events_if_specified",
+          "kind": "Symbol",
+          "required": false
+        }
+      ],
+      "slot_guidance": "callback, phase, context; optional count/order.",
+      "example": "SM: callbacks receive `state_data` alongside existing parameters such as `source`, `target`, and `event_data`.",
+      "near_miss": "providing new context while dropping existing parameters. Do not invent exactly-once behavior from \u201ccallback\u201d alone."
+    },
+    {
+      "id": "T29",
+      "version": 1,
+      "name": "Accumulate and reset within a window",
+      "applies_when": "records accumulate during a named lifetime and clear at its boundary.",
+      "prerequisites": [],
+      "required_sentence": "During {window}, {query} returns {included_records}; at {reset_boundary}, prior records no longer appear.",
+      "optional_sentences": [
+        "Records follow {order_if_specified}."
+      ],
+      "slots": [
+        {
+          "name": "window",
+          "kind": "Scope",
+          "required": true
+        },
+        {
+          "name": "query",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "included_records",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "reset_boundary",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "order_if_specified",
+          "kind": "Sequence",
+          "required": false
+        }
+      ],
+      "slot_guidance": "window, record content, query, reset; optional order.",
+      "example": "SM: `get_data_changes()` reports changes from the current macrostep and clears them at each macrostep boundary.",
+      "near_miss": "a permanent audit log or clearing after each individual change."
+    },
+    {
+      "id": "T30",
+      "version": 1,
+      "name": "Per-instance storage",
+      "applies_when": "a declaration or class is shared but mutable runtime data belongs to instances.",
+      "prerequisites": [],
+      "required_sentence": "For two instances sharing `{declaration}`, changing `{instance_one_state}` does not change `{instance_two_observation}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "declaration",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "instance_one_state",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "instance_two_observation",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "shared declaration, owned state, mutation, observation.",
+      "example": "SM: two machines using the same `State` declaration have independent active data mappings.",
+      "near_miss": "storing active values on the shared `State` definition. This does not establish the depth of nested copy isolation."
+    },
+    {
+      "id": "T31",
+      "version": 2,
+      "name": "Object identity preservation",
+      "applies_when": "the result must be the same object, rather than merely equal.",
+      "prerequisites": [
+        {
+          "id": "object_identity",
+          "claim": "The source requires the same object reference to be returned, shared, or preserved by the named operation.",
+          "reject_inference": "Read-only access, tuple representation, equal contents, insertion order, or immutability alone does not require object identity. Identity can be specified without the word identity."
+        }
+      ],
+      "required_sentence": "For `{operation}` on `{input}`, `{result}` is the identical object `{reference}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "input",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "result",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "reference",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "operation, reference, identity observation.",
+      "example": "RV: `from_validated` returns the input validated instance itself.",
+      "near_miss": "reconstructing an equal instance. Do not select this for \u201csame value\u201d or \u201cequivalent result.\u201d"
+    },
+    {
+      "id": "T32",
+      "version": 1,
+      "name": "Copy or snapshot isolation at a stated depth",
+      "applies_when": "a copy/snapshot must prevent specified later mutations from propagating.",
+      "prerequisites": [],
+      "required_sentence": "After `{copy_operation}`, mutations at `{supported_depth_and_location}` do not alter `{protected_observation}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "copy_operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "supported_depth_and_location",
+          "kind": "Scope",
+          "required": true
+        },
+        {
+          "name": "protected_observation",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "copied object, mutation direction, depth, observation.",
+      "example": "FA: modifying the nested counts in a `get_stats()` result does not change middleware statistics, because the instruction explicitly requests a deep copy.",
+      "near_miss": "copying only the outer dictionary. If depth is unspecified, do not fill it with `deep`."
+    },
+    {
+      "id": "T33",
+      "version": 1,
+      "name": "Factory invocation at a lifecycle boundary",
+      "applies_when": "a callable produces values at a specified event.",
+      "prerequisites": [],
+      "required_sentence": "At `{event}` for `{owner}`, invoke `{factory}` `{cardinality}`; `{observation}` receives that invocation's return value.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "event",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "owner",
+          "kind": "Scope",
+          "required": true
+        },
+        {
+          "name": "factory",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "cardinality",
+          "kind": "Quantifier",
+          "required": true
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "callable, event, owner, count, result location.",
+      "example": "SM: each entry invokes a callable default to produce that entry's value. A counter factory returns distinguishable values across entries.",
+      "near_miss": "calling the factory once at class definition and reusing its result. Fresh invocation does not prove distinct result identity if the factory returns a shared object."
+    },
+    {
+      "id": "T34",
+      "version": 1,
+      "name": "Persistence round trip",
+      "applies_when": "state or behavior must survive serialization and restoration.",
+      "prerequisites": [],
+      "required_sentence": "After `{serialize_restore_sequence}`, `{specified_observations}` are equivalent to their pre-save values under `{equivalence}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "serialize_restore_sequence",
+          "kind": "Sequence",
+          "required": true
+        },
+        {
+          "name": "specified_observations",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "equivalence",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "serialization format/API, observations, equivalence.",
+      "example": "SM: active state data survives a pickle round trip.",
+      "near_miss": "restoring the active state while dropping its data. Do not require identity preservation across serialization unless expressly supported."
+    },
+    {
+      "id": "T35",
+      "version": 1,
+      "name": "Saved schema governs later operations",
+      "applies_when": "later operations must use choices learned or recorded earlier.",
+      "prerequisites": [],
+      "required_sentence": "At `{later_operation}`, load `{saved_contract}` before `{consumer}` and apply `{recorded_order_and_mapping}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "later_operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "saved_contract",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "consumer",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "recorded_order_and_mapping",
+          "kind": "Sequence",
+          "required": true
+        }
+      ],
+      "slot_guidance": "saved artifact, stages, ordering/mapping, consumers.",
+      "example": "IG: predict and evaluate apply the saved feature schema in its recorded column order before passing input to the model; extra input columns are ignored.",
+      "near_miss": "recomputing feature selection independently on prediction data."
+    },
+    {
+      "id": "T36",
+      "version": 1,
+      "name": "Accumulated output",
+      "applies_when": "each output incorporates previous updates.",
+      "prerequisites": [],
+      "required_sentence": "After input prefix `{prefix}`, emitted `{field}` equals `{fold_rule}` over that prefix.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "prefix",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "field",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "fold_rule",
+          "kind": "Expression",
+          "required": true
+        }
+      ],
+      "slot_guidance": "ordered input prefix, accumulator rule, field.",
+      "example": "GQL: each result's `data` includes earlier payload data plus the current incremental updates.",
+      "near_miss": "yielding the latest patch as though it were the complete data result. Use at least two distinguishable updates."
+    },
+    {
+      "id": "T37",
+      "version": 1,
+      "name": "Per-item metadata without accumulation",
+      "applies_when": "accompanying metadata belongs only to the current item.",
+      "prerequisites": [],
+      "required_sentence": "For emitted item `{i}`, `{metadata_field}` reflects `{current_input_source}` and does not retain metadata solely from prior inputs.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "i",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "metadata_field",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "current_input_source",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "field, current source, replacement semantics.",
+      "example": "GQL: result extensions reflect the current payload rather than merging all prior extensions.",
+      "near_miss": "using the data accumulator for extensions as well. The representation of absent metadata needs separate evidence."
+    },
+    {
+      "id": "T38",
+      "version": 1,
+      "name": "Emission for control-only or empty updates",
+      "applies_when": "an input must produce an output even without new data.",
+      "prerequisites": [],
+      "required_sentence": "For each `{qualifying_input}`, emit `{specified_output}` even when `{empty_data_condition}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "qualifying_input",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "specified_output",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "empty_data_condition",
+          "kind": "Condition",
+          "required": true
+        }
+      ],
+      "slot_guidance": "qualifying inputs, output, empty/control condition, count.",
+      "example": "GQL: a payload containing only `hasNext`, or an empty incremental list, still yields a result.",
+      "near_miss": "filtering outputs by whether their data changed."
+    },
+    {
+      "id": "T39",
+      "version": 1,
+      "name": "Addressed patch semantics",
+      "applies_when": "updates address a nested path and merge, replace, or explicitly write null.",
+      "prerequisites": [],
+      "required_sentence": "Apply {patch} at {resolved_path} using {operation}.",
+      "optional_sentences": [
+        "Missing paths: {missing_path_rule}.",
+        "Null values: {null_rule}."
+      ],
+      "slots": [
+        {
+          "name": "patch",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "resolved_path",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "missing_path_rule",
+          "kind": "Expression",
+          "required": false
+        },
+        {
+          "name": "null_rule",
+          "kind": "Expression",
+          "required": false
+        }
+      ],
+      "slot_guidance": "path grammar and operation; missing-path and null clauses are optional, included when supported.",
+      "example": "GQL: an omitted path targets the root; paths traverse nested lists; a present null data value remains a null update rather than becoming \u2018no update.\u2019",
+      "near_miss": "treating a missing key and a present null identically. Select T20 for preservation of unaffected portions."
+    },
+    {
+      "id": "T40",
+      "version": 1,
+      "name": "Indexed sequence updates",
+      "applies_when": "incoming items are placed using a specified index rather than always appended.",
+      "prerequisites": [],
+      "required_sentence": "Place `{items}` starting at `{index_rule}` in `{target_sequence}`, preserving `{required_order}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "items",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "index_rule",
+          "kind": "Expression",
+          "required": true
+        },
+        {
+          "name": "target_sequence",
+          "kind": "Sequence",
+          "required": true
+        },
+        {
+          "name": "required_order",
+          "kind": "Sequence",
+          "required": true
+        }
+      ],
+      "slot_guidance": "target path, start index, item order.",
+      "example": "GQL: streamed items start at the integer specified by the final path element.",
+      "near_miss": "appending every batch regardless of its path index. Do not infer sparse-gap filling behavior merely because a solution implements it."
+    },
+    {
+      "id": "T41",
+      "version": 1,
+      "name": "Continue after an item error",
+      "applies_when": "a recoverable item failure must not terminate the whole operation.",
+      "prerequisites": [],
+      "required_sentence": "When `{item_error}` occurs, expose `{error_observation}` and continue processing `{later_items}` according to `{normal_rule}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "item_error",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "error_observation",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "later_items",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "normal_rule",
+          "kind": "Expression",
+          "required": true
+        }
+      ],
+      "slot_guidance": "error class, observable error, continuation scope.",
+      "example": "GQL: an incremental payload with errors does not prevent a later payload from producing its result.",
+      "near_miss": "raising on the first payload error and closing the generator. This does not make transport failures recoverable without evidence."
+    },
+    {
+      "id": "T42",
+      "version": 1,
+      "name": "Shared work for equivalent overlapping calls",
+      "applies_when": "concurrent equivalent requests share one execution.",
+      "prerequisites": [],
+      "required_sentence": "While `{execution}` is in progress, calls equivalent under `{key_relation}` share `{execution_count}` execution and each receives `{specified_result}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "execution",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "key_relation",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "execution_count",
+          "kind": "Quantifier",
+          "required": true
+        },
+        {
+          "name": "specified_result",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "overlap window, equivalence relation, count, result delivery.",
+      "example": "LC: concurrent calls with the same input join one execution even if config, kwargs, or dictionary insertion order differ.",
+      "near_miss": "including config in the coalescing key or relying on two calls happening to finish close together."
+    },
+    {
+      "id": "T43",
+      "version": 1,
+      "name": "End of sharing lifetime",
+      "applies_when": "sharing or reuse ends at a specified boundary.",
+      "prerequisites": [],
+      "required_sentence": "After `{completion_boundary}`, a subsequent equivalent `{call}` starts `{new_work}` rather than using `{completed_work}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "completion_boundary",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "call",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "new_work",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "completed_work",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "boundary, equivalence, new execution observation.",
+      "example": "LC: a call after the earlier execution completes runs the underlying operation again.",
+      "near_miss": "implementing permanent memoization instead of request coalescing."
+    },
+    {
+      "id": "T44",
+      "version": 1,
+      "name": "Replay to a late subscriber",
+      "applies_when": "a subscriber joining in progress receives earlier output as well as future output.",
+      "prerequisites": [],
+      "required_sentence": "A subscriber joining after `{prefix}` receives `{required_prefix}` followed by `{future_items}` in `{order}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "prefix",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "required_prefix",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "future_items",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "order",
+          "kind": "Sequence",
+          "required": true
+        }
+      ],
+      "slot_guidance": "join point, replay scope, future sequence, ordering.",
+      "example": "LC: a late stream joiner receives all prior chunks and then subsequent chunks.",
+      "near_miss": "forwarding only future chunks or duplicating the prefix. Use a join point after at least one emitted chunk."
+    },
+    {
+      "id": "T45",
+      "version": 1,
+      "name": "Concurrency capacity and release",
+      "applies_when": "simultaneous work is limited within a named scope.",
+      "prerequisites": [],
+      "required_sentence": "During `{scope}`, at most `{limit}` `{work_units}` are active; `{release_event}` makes capacity available; excess attempts follow `{overflow_policy}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "scope",
+          "kind": "Scope",
+          "required": true
+        },
+        {
+          "name": "limit",
+          "kind": "Quantifier",
+          "required": true
+        },
+        {
+          "name": "work_units",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "release_event",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "overflow_policy",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "scope, capacity, work unit, release, overflow.",
+      "example": "CB: half-open circuits admit no more than the configured concurrent probe limit, and a probe occupies its slot for its complete logical request.",
+      "near_miss": "limiting individual retry attempts while allowing too many logical probes."
+    },
+    {
+      "id": "T46",
+      "version": 1,
+      "name": "Count logical operations, not internal attempts",
+      "applies_when": "accounting applies at a specified abstraction boundary.",
+      "prerequisites": [],
+      "required_sentence": "For each `{logical_operation}`, update `{counter_or_state}` `{cardinality}` based on `{terminal_outcome}`, regardless of `{internal_attempts}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "logical_operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "counter_or_state",
+          "kind": "Quantifier",
+          "required": true
+        },
+        {
+          "name": "cardinality",
+          "kind": "Quantifier",
+          "required": true
+        },
+        {
+          "name": "terminal_outcome",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "internal_attempts",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "operation, terminal outcome classification, count.",
+      "example": "CB: failure accounting occurs once for a logical request including its retries.",
+      "near_miss": "reaching the threshold from retries belonging to a single request. Outcome classification must preserve neutral cases."
+    },
+    {
+      "id": "T47",
+      "version": 1,
+      "name": "Cancellation of pending work",
+      "applies_when": "shutdown or cancellation affects outstanding operations.",
+      "prerequisites": [],
+      "required_sentence": "When {cancellation_trigger} occurs, pending {operations} finish with {cancellation_outcome}.",
+      "optional_sentences": [
+        "{excluded_completed_operations} retain {specified_behavior}."
+      ],
+      "slots": [
+        {
+          "name": "cancellation_trigger",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "operations",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "cancellation_outcome",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "excluded_completed_operations",
+          "kind": "Symbol",
+          "required": false
+        },
+        {
+          "name": "specified_behavior",
+          "kind": "Symbol",
+          "required": false
+        }
+      ],
+      "slot_guidance": "trigger, affected work, error/result; completed-work exclusion clause optional unless specified.",
+      "example": "HD: shutdown rejects pending body reads with a DOMException named `AbortError`, while already buffered bodies remain readable.",
+      "near_miss": "hanging reads or indiscriminately invalidating buffered bodies."
+    },
+    {
+      "id": "T48",
+      "version": 1,
+      "name": "Timing window and cooldown restart",
+      "applies_when": "elapsed time changes eligibility or state.",
+      "prerequisites": [],
+      "required_sentence": "Before {time_boundary}, {restricted_behavior} holds; {specified_relation_to_boundary}, {eligible_behavior} applies.",
+      "optional_sentences": [
+        "{restart_event} resets the window."
+      ],
+      "slots": [
+        {
+          "name": "time_boundary",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "restricted_behavior",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "specified_relation_to_boundary",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "eligible_behavior",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "restart_event",
+          "kind": "Symbol",
+          "required": false
+        }
+      ],
+      "slot_guidance": "clock basis, interval, boundary relation, trigger, optional restart.",
+      "example": "CB: cooldown permits half-open probing; a failed probe reopens the circuit and restarts cooldown.",
+      "near_miss": "measuring the next cooldown from the original failure instead of the failed probe. Do not invent millisecond tolerances."
+    },
+    {
+      "id": "T49",
+      "version": 1,
+      "name": "Existing behavior compatibility",
+      "applies_when": "a named existing path must retain behavior.",
+      "prerequisites": [],
+      "required_sentence": "For {existing_input_class}, {operation} preserves {named_existing_observations}.",
+      "optional_sentences": [
+        "It adds {permitted_new_information}."
+      ],
+      "slots": [
+        {
+          "name": "existing_input_class",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "named_existing_observations",
+          "kind": "Observation",
+          "required": true
+        },
+        {
+          "name": "permitted_new_information",
+          "kind": "Symbol",
+          "required": false
+        }
+      ],
+      "slot_guidance": "path, observable baseline, permitted changes.",
+      "example": "TX: legacy ESC key names remain compatible, while the new modifier metadata agrees with those names.",
+      "near_miss": "changing old key spellings while adding phase metadata. \u2018Preserve everything\u2019 without identifying the relevant surface is not a filled criterion."
+    },
+    {
+      "id": "T50",
+      "version": 1,
+      "name": "Equivalent behavior across required surfaces",
+      "applies_when": "a requirement explicitly applies to several adapters, modes, or entry points.",
+      "prerequisites": [],
+      "required_sentence": "For each {listed_surface}, {same_contract} holds.",
+      "optional_sentences": [
+        "The permitted differences are {specified_surface_differences}."
+      ],
+      "slots": [
+        {
+          "name": "listed_surface",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "same_contract",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "specified_surface_differences",
+          "kind": "Symbol",
+          "required": false
+        }
+      ],
+      "slot_guidance": "exact surface set, shared contract, exceptions.",
+      "example": "IG: evaluate, predict, and `/predict` all apply the persisted feature schema; the endpoint reports its specified failures as HTTP 400 JSON responses.",
+      "near_miss": "fixing the CLI while leaving the HTTP endpoint unchanged. Do not expand the matrix to unrequested adapters."
+    },
+    {
+      "id": "T51",
+      "version": 1,
+      "name": "Relational property or invariant",
+      "applies_when": "correctness is a relation across values, repeated operations, or action sequences.",
+      "prerequisites": [],
+      "required_sentence": "For `{domain_or_sequences}`, `{relation}` holds between `{observations}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "domain_or_sequences",
+          "kind": "Sequence",
+          "required": true
+        },
+        {
+          "name": "relation",
+          "kind": "Condition",
+          "required": true
+        },
+        {
+          "name": "observations",
+          "kind": "Observation",
+          "required": true
+        }
+      ],
+      "slot_guidance": "domain, relation, observation points.",
+      "example": "HX: changing raw chunk boundaries without changing the encoded valid document does not change the sequence of decoded JSON values.",
+      "near_miss": "treating transport chunks as complete JSON records. Never assume a familiar algebraic law: RV explicitly distinguishes validated behavior from an interface whose double-swap law would not hold."
+    },
+    {
+      "id": "T52",
+      "version": 1,
+      "name": "Required artifact or structural property",
+      "applies_when": "a specified deliverable cannot be fully verified by runtime behavior.",
+      "prerequisites": [],
+      "required_sentence": "`{artifact_or_symbol}` exists at `{location}` and has `{inspectable_properties}`.",
+      "optional_sentences": [],
+      "slots": [
+        {
+          "name": "artifact_or_symbol",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "location",
+          "kind": "Symbol",
+          "required": true
+        },
+        {
+          "name": "inspectable_properties",
+          "kind": "Symbol",
+          "required": true
+        }
+      ],
+      "slot_guidance": "artifact/symbol, source-defined location and properties.",
+      "example": "FA: the specified public parameters have `Annotated`/`Doc` documentation; RV: the requested public types are exported through the named interfaces.",
+      "near_miss": "implementing runtime behavior while omitting requested public documentation or exports. This is not permission to prescribe the solution patch's internal file organization."
+    }
+  ]
+}

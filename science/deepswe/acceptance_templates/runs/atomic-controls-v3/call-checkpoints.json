@@ -1,0 +1,42 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "03cd3d91cd3cd0bd3b06d331bfe5638f423d821f9875d84ff991709349ab98d0",
+  "file_count": 5,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-v3/identity-without-keyword/calls/extract-c001-0.json",
+      "sha256": "ff9f9e5a01eef1d203e3ee0f7186d23d3ffece76840a75df7a236d699f268496",
+      "status": "completed",
+      "stage": "extract-c001",
+      "request_sha256": "667d9f20bfad8c36f4e3bb065d2750ecae560db87eb2db1389e807cc135ca6ed"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-v3/identity-without-keyword/calls/support-c001-a001-0.json",
+      "sha256": "1bbc4d51fe4955c108960618e483ac45f609e69e2232b58fe27c4555c476f4e9",
+      "status": "completed",
+      "stage": "support-c001-a001",
+      "request_sha256": "2ae355c62321ffaeb2db6c1227a1c7453e96d59360af4491d5b63436ba7f5434"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-v3/readonly-not-identity/calls/extract-c001-0.json",
+      "sha256": "87037673cbc3b7a5c2411b856c4bf925ab0d20be82cd103cda6000c027ee7560",
+      "status": "completed",
+      "stage": "extract-c001",
+      "request_sha256": "7492a19375e5366a3fe9a79b2f2af4252018f1db9c4dc855981e1647f2c06aab"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-v3/readonly-not-identity/calls/support-c001-a001-0.json",
+      "sha256": "541ff2bfe85d50d7ed26f1915637d323112714f85cca0099937f5ca09d49a957",
+      "status": "completed",
+      "stage": "support-c001-a001",
+      "request_sha256": "10321d6a210a56461a62d28200c95aa4d03b3fbe4ec65a4f07c7e846bef76bf9"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-v3/readonly-not-identity/calls/support-c001-a002-0.json",
+      "sha256": "9acf6a6ee41580dc0e5e43b0eb0e3a42f9b25d08a883e6bc898296bac57d7300",
+      "status": "completed",
+      "stage": "support-c001-a002",
+      "request_sha256": "9971f3ebb24650f8a11d3b812d42576e304d03e45abb2d19918c7156b4948308"
+    }
+  ]
+}

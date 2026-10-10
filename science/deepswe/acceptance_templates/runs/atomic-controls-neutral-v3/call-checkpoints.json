@@ -1,0 +1,42 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "6aa3ca51fa8e0098a99058e91c228a60f98021e405fec2eee3ece71a5b33cc16",
+  "file_count": 5,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-neutral-v3/identity-without-keyword/calls/extract-c001-0.json",
+      "sha256": "86e093c35d038a2667504946dc486a2ad1282d2e7619e52f1288b89abf2e996d",
+      "status": "completed",
+      "stage": "extract-c001",
+      "request_sha256": "667d9f20bfad8c36f4e3bb065d2750ecae560db87eb2db1389e807cc135ca6ed"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-neutral-v3/identity-without-keyword/calls/support-c001-a001-0.json",
+      "sha256": "9f3b48707c0d258f7ba8d1857369ce1772508503b60376ed293dc606b6d086ef",
+      "status": "completed",
+      "stage": "support-c001-a001",
+      "request_sha256": "c94c08b2f65df7c3cc6e24e946fabf2556190bcf9a00a27a1dc9def842a7c817"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-neutral-v3/readonly-not-identity/calls/extract-c001-0.json",
+      "sha256": "85ad5a16eb91c41725ad62470d53b24469eebdc436a6b16cfc3a6ad28ef1654b",
+      "status": "completed",
+      "stage": "extract-c001",
+      "request_sha256": "7492a19375e5366a3fe9a79b2f2af4252018f1db9c4dc855981e1647f2c06aab"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-neutral-v3/readonly-not-identity/calls/support-c001-a001-0.json",
+      "sha256": "85521460e1acd124467b004d807019e2441ba02df63de419b6baf19ea22848ee",
+      "status": "completed",
+      "stage": "support-c001-a001",
+      "request_sha256": "5735a6eb8ddfdb27ce21f1bbb9810a2119e240d0165ff6159edef526b3ade70b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-controls-neutral-v3/readonly-not-identity/calls/support-c001-a002-0.json",
+      "sha256": "2cb6028de6acf828a7c737630533a4f53aac9c383df0642d5c3d5cdadbbb84ae",
+      "status": "completed",
+      "stage": "support-c001-a002",
+      "request_sha256": "16bd3b9eb6a16b542a28440c6f5df79108ab753b992f93ad01d2f0da56c80627"
+    }
+  ]
+}

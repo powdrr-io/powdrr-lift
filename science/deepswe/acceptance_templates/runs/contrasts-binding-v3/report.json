@@ -1,0 +1,196 @@
+{
+  "label_status": "agent_authored",
+  "limitations": "Small synthetic contrasts based on observed error classes. Development checks, not human gold or held-out accuracy estimates. Expected labels are withheld from model calls.",
+  "fixtures_sha256": "fb0e81597f3aee24c96fac4b19b525fb54b1c65e7dceaf1e2ad9de476eafba38",
+  "catalog_sha256": "0c35dc83a0e558f09b308df6c68fdf39516a06f43ba18c5f3a633345afcaeb47",
+  "phase": "binding",
+  "repairs": 1,
+  "provider": "deepinfra",
+  "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "review_version": null,
+  "review_prompts_sha256": null,
+  "passed": 11,
+  "check_count": 11,
+  "eligible_case_count": 8,
+  "checks": [
+    {
+      "case_id": "readonly-not-identity",
+      "phase": "binding",
+      "template_id": "T31",
+      "expected": "no",
+      "observed": "no",
+      "passed": true
+    },
+    {
+      "case_id": "readonly-not-identity",
+      "phase": "binding",
+      "template_id": "T14",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "equality-not-identity",
+      "phase": "binding",
+      "template_id": "T31",
+      "expected": "no",
+      "observed": "no",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-reference-identity",
+      "phase": "binding",
+      "template_id": "T31",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "identity-without-keyword",
+      "phase": "binding",
+      "template_id": "T31",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "append-order-not-precedence",
+      "phase": "binding",
+      "template_id": "T18",
+      "expected": "no",
+      "observed": "no",
+      "passed": true
+    },
+    {
+      "case_id": "append-order-not-precedence",
+      "phase": "binding",
+      "template_id": "T14",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "traversal-not-override",
+      "phase": "binding",
+      "template_id": "T17",
+      "expected": "no",
+      "observed": "no",
+      "passed": true
+    },
+    {
+      "case_id": "traversal-not-override",
+      "phase": "binding",
+      "template_id": "T14",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-collision-winner",
+      "phase": "binding",
+      "template_id": "T18",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-nearest-override",
+      "phase": "binding",
+      "template_id": "T17",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    }
+  ],
+  "failures": [],
+  "calls": [
+    {
+      "stage": "bind-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 8.151,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "readonly-not-identity"
+    },
+    {
+      "stage": "bind-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 3.931,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "equality-not-identity"
+    },
+    {
+      "stage": "bind-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 15.827,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "explicit-reference-identity"
+    },
+    {
+      "stage": "bind-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 8.041,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "identity-without-keyword"
+    },
+    {
+      "stage": "bind-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 16.268,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "append-order-not-precedence"
+    },
+    {
+      "stage": "bind-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 9.091,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "traversal-not-override"
+    },
+    {
+      "stage": "bind-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 13.798,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "explicit-collision-winner"
+    },
+    {
+      "stage": "bind-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 12.125,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "explicit-nearest-override"
+    }
+  ]
+}

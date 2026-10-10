@@ -1,0 +1,28 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "85b0d25e7935134d24aa0ab61d78876bd9c19745df7b349eefd15a50f84cfffb",
+  "file_count": 3,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/review-replay-v2/cattrs-invented-policy/calls/support-0.json",
+      "sha256": "7b179e9517cb40cceaa31e890c209dd1cc5478f6ee3bc1e7fe680cbc499e713f",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "650ad4db1ea8ec2f9e2ef5b76079244e78151a8c88edb6d2832c73e8c15fb3ed"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/review-replay-v2/helm-complete-warning/calls/coverage-0.json",
+      "sha256": "5e11118f9fbb0b788e3649861fec588b99a71a75b52c444482dbbced08bf14c6",
+      "status": "failed",
+      "stage": "coverage",
+      "request_sha256": "e6d6f91e7ebb258815c1584f48e1e431c0e8950703877a54829b505259a0f349"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/review-replay-v2/helm-complete-warning/calls/coverage-1.json",
+      "sha256": "0d0adcae2e6b7b4756c47b57422171b09490a2f9277e035f6e1cef7ad0286f06",
+      "status": "completed",
+      "stage": "coverage",
+      "request_sha256": "d94effb49b1b8fdb5f776c33eb3a59a6fa60a0417c500639c735f33a2cbd8584"
+    }
+  ]
+}

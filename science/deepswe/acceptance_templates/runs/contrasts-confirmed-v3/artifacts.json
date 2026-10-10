@@ -1,0 +1,43 @@
+{
+  "archive": "artifacts.tar.gz",
+  "archive_sha256": "4211b7cf3b1b2729c0798b063f4c7e5e1339bc723eed521cebd23a14254e8067",
+  "file_count": 9,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/append-order-not-precedence/bindings.json",
+      "sha256": "1d909444f3d4aec7138f700896da08e3a7d05544618ebe94dcc9875674dde759"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/equality-not-identity/bindings.json",
+      "sha256": "631494e38b2af24cc3edfb85cbd452ce6630a5535aa34227e4c7efbba6a26a0a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/explicit-collision-winner/bindings.json",
+      "sha256": "80102379e952104848dc7793d92b96089bc6ac4646ff4b60b9db2e0210c79da2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/explicit-nearest-override/bindings.json",
+      "sha256": "22eac4d028e6eec83437e817451ee112dacd6f64d3190dc347646d79b24bce13"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/explicit-reference-identity/bindings.json",
+      "sha256": "7f8920b9d3d26bae633ff877aa86efcf5e26f820153a26e495e61cd3c4e1d7fa"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/identity-without-keyword/bindings.json",
+      "sha256": "270b8d9141825c9a2ed436a2761a430d6f6bb733dd558d8edb73a7562859da3b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/readonly-not-identity/bindings.json",
+      "sha256": "19236fa5bc322a7dd0a3bfdb682dc34c54dbc3642c088382d4a4a2adf502863b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/report.json",
+      "sha256": "2186dec06b93b45f06e97bdc3845d501b85eb91e95802acb531ae2be28d78998"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/traversal-not-override/bindings.json",
+      "sha256": "632c571c4359165d6ed2d342a0eed415c9f2f1d611e403e2f5a8590047d812f2"
+    }
+  ]
+}

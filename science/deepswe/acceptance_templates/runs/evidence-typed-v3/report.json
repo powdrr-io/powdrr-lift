@@ -1,0 +1,242 @@
+{
+  "run": {
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "catalog_sha256": "7eadc44c00257f3d5130b96a743cb08e12a1419953408a010e3fb37ce855472a",
+    "batch_size": 3,
+    "output_tokens": 12288,
+    "repairs": 1,
+    "tasks": [
+      "helm-array-merge-strategies",
+      "dateutil-rfc5545-timezone-interop"
+    ],
+    "arms": [
+      "templates"
+    ],
+    "failures": [],
+    "inventory_sources": {
+      "helm-array-merge-strategies": {
+        "generation_sha256": "5c8387873bf9004fec55b5f39330df0c2f3da89d5192298dbb1c3567007e2f97",
+        "inventory_sha256": "ed0088ba5a81e983aeffa6d24a7cbe92ca52d86245ad348d8a28f0390ee3d7cb",
+        "input_sha256": "9234c56d4ba7f2160fb8989e0a2e51a457e5603e23a03a5650e27a94cf65ce3c"
+      },
+      "dateutil-rfc5545-timezone-interop": {
+        "generation_sha256": "a43d2b2b547fd72d2686f05f972c10e25efb56225f5e8c34f379cdf1564c930e",
+        "inventory_sha256": "590fef0ec885c5f7c2f1d4f1f8264248742660b5ab030c9a9e2f6cf38a631ac9",
+        "input_sha256": "29ed87a69cab68f21e44202c6268fc8df9c16de7f66f9f585a06d732d5892493"
+      }
+    },
+    "prompt_version": "acceptance-template-evidence-v3",
+    "comparison_scope": "Development rerun of template selection and binding. Original inventories and references unchanged; no new inventory or direct-generation calls.",
+    "generation_strategy": "binding_with_guard_confirmation",
+    "guard_provider": "deepinfra",
+    "guard_model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+    "guard_baseline_sha256": {
+      "helm-array-merge-strategies": "abbe2783b943ac46a4ec1cb822cdabf3cce2a25d3289c729d62f82876f96b893",
+      "dateutil-rfc5545-timezone-interop": "15807c926c09f6c9ea811819781ba496dd8a6256e97a0ec7a2b4628a5875cfe5"
+    }
+  },
+  "eligible_task_count": 2,
+  "paired_task_ids": [
+    "helm-array-merge-strategies",
+    "dateutil-rfc5545-timezone-interop"
+  ],
+  "aggregate": {
+    "templates": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 54,
+      "criterion_count": 105,
+      "strict_recall": 1.0,
+      "strict_precision": 0.9142857142857143,
+      "missed_or_partial": 0,
+      "unsupported": 9,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 1.0
+    }
+  },
+  "paired_aggregate": {
+    "templates": {
+      "task_count": 2,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 54,
+      "criterion_count": 105,
+      "strict_recall": 1.0,
+      "strict_precision": 0.9142857142857143,
+      "missed_or_partial": 0,
+      "unsupported": 9,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "complete_task_fraction": 1.0
+    }
+  },
+  "scores": [
+    {
+      "task_id": "helm-array-merge-strategies",
+      "arm": "templates",
+      "input_sha256": "9234c56d4ba7f2160fb8989e0a2e51a457e5603e23a03a5650e27a94cf65ce3c",
+      "generation_sha256": "dc5e69f34095978319e2553757b6cb4c897076107ec4d2ef1c5b4d5ea0872303",
+      "reference_sha256": "5c7215db6e4c8f306aa2022a58976660088f5273e573f9a1333d7a5815028fb5",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 29,
+      "full": 29,
+      "partial": 0,
+      "missed_or_partial": 0,
+      "missing": 0,
+      "strict_recall": 1.0,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": true,
+      "criterion_count": 40,
+      "supported": 40,
+      "strict_precision": 1.0,
+      "unsupported": 0,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": 0.896551724137931,
+      "accepted_template_label_recall": 0.8620689655172413,
+      "template_label_reference_count": 29,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 18,
+      "criterion_characters": 7507,
+      "generation_elapsed_seconds": 533.578,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [],
+      "misses": [],
+      "precision_flags": []
+    },
+    {
+      "task_id": "dateutil-rfc5545-timezone-interop",
+      "arm": "templates",
+      "input_sha256": "29ed87a69cab68f21e44202c6268fc8df9c16de7f66f9f585a06d732d5892493",
+      "generation_sha256": "fc05f1e10279ac6ad1ec87001eb4fffcbc160d8e8a1346f449200d69326bc1d6",
+      "reference_sha256": "9233d539edda24a645a3d8ed49769105d81dd8d438bf77de61937b04e9d3f847",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 25,
+      "full": 25,
+      "partial": 0,
+      "missed_or_partial": 0,
+      "missing": 0,
+      "strict_recall": 1.0,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": true,
+      "criterion_count": 65,
+      "supported": 56,
+      "strict_precision": 0.8615384615384616,
+      "unsupported": 9,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "candidate_template_label_recall": 0.92,
+      "accepted_template_label_recall": 0.92,
+      "template_label_reference_count": 25,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 0,
+      "generation_call_count": 15,
+      "criterion_characters": 9905,
+      "generation_elapsed_seconds": 766.821,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [],
+      "misses": [],
+      "precision_flags": [
+        {
+          "criterion_id": "c002",
+          "status": "unsupported",
+          "source_ids": [
+            "s002"
+          ],
+          "rationale": "The instruction specifies that RDATE 'gains support' for these parameters but does not mandate rejection of RDATE without them. Rejection is an added constraint not present in the source."
+        },
+        {
+          "criterion_id": "c009",
+          "status": "unsupported",
+          "source_ids": [
+            "s004"
+          ],
+          "rationale": "The instruction describes output behavior but does not mandate input validation or rejection of malformed DTSTART. Rejection is an added constraint not in the source."
+        },
+        {
+          "criterion_id": "c010",
+          "status": "unsupported",
+          "source_ids": [
+            "s004"
+          ],
+          "rationale": "The instruction describes output format for UTC, but does not require input validation or rejection of missing Z suffix. This is an added enforcement not in the source."
+        },
+        {
+          "criterion_id": "c017",
+          "status": "unsupported",
+          "source_ids": [
+            "s005"
+          ],
+          "rationale": "s005 describes what is emitted (TZID for non-UTC, Z for UTC) but does not mandate rejection of malformed inputs (e.g., missing timezone indicators). The criterion adds a validation obligation not present in the source."
+        },
+        {
+          "criterion_id": "c019",
+          "status": "unsupported",
+          "source_ids": [
+            "s005"
+          ],
+          "rationale": "s005 describes output format but does not specify input validation or rejection of malformed EXRULE lines. The criterion adds a parsing enforcement obligation not found in the source."
+        },
+        {
+          "criterion_id": "c033",
+          "status": "unsupported",
+          "source_ids": [],
+          "rationale": "s010 specifies the output format (VCALENDAR/VEVENT) but does not state that other formats are rejected. The criterion imposes a new restriction (rejection of other formats) not present in the source. No source supports this exclusivity claim."
+        },
+        {
+          "criterion_id": "c035",
+          "status": "unsupported",
+          "source_ids": [],
+          "rationale": "s010 describes what is produced for non-UTC dtstart but does not state that a VTIMEZONE without STANDARD is rejected. The criterion adds a new validation rule (rejection) not mandated by the source. Unsupported."
+        },
+        {
+          "criterion_id": "c043",
+          "status": "unsupported",
+          "source_ids": [
+            "s013"
+          ],
+          "rationale": "Source s013 describes the expected format but does not prohibit or reject other formats. The criterion imposes a hard restriction ('rejects any other representation format') not mandated by the source, which only specifies the required format without exclusivity."
+        },
+        {
+          "criterion_id": "c049",
+          "status": "unsupported",
+          "source_ids": [],
+          "rationale": "The instruction specifies that rruleset.subtract(other) adds other's rrules as exrules and rdates as exdates, but does not state that the resulting rruleset's exrules contain 'exactly' other's rrules or that exdates contain 'exactly' other's rdates. The word 'exactly' introduces a cardinality and exclusivity constraint not present in the source. Also, no mention is made of the resulting rruleset retaining its own original exrules/exdates — the criterion implies a replacement, while the source implies an addition. This is an over-specification not supported by the source."
+        }
+      ]
+    }
+  ],
+  "failures": [],
+  "limitations": [
+    "Agent-authored source-based references and automated judgments are not human gold labels.",
+    "Template-group agreement is diagnostic, not proof.",
+    "No coding agent, task validation suite, or Structrr diff was executed.",
+    "Only declared reference validations contribute to recall; references may omit behavior. Inspect source coverage before interpreting scores."
+  ]
+}

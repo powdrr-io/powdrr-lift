@@ -1,0 +1,62 @@
+{
+  "provider": "deepinfra",
+  "planning_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "matching_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "prompt_version": "acceptance-template-evidence-v3",
+  "router_provider": "typesafe.ai",
+  "router_model": "jev-latest",
+  "splitter_provider": "deepinfra",
+  "splitter_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "catalog_sha256": "7eadc44c00257f3d5130b96a743cb08e12a1419953408a010e3fb37ce855472a",
+  "production_flow_sha256": "e4813258ff0365509dfdb4a6e76862ffa9d25e50097085702ae357c6a7f26674",
+  "batch_size": 1,
+  "repairs": 3,
+  "tasks": [
+    "cattrs-partial-structuring-recovery",
+    "helm-array-merge-strategies",
+    "koota-entity-snapshot-rollback",
+    "dateutil-rfc5545-timezone-interop"
+  ],
+  "arms": [
+    "templates"
+  ],
+  "analysis_pipeline": [
+    "production instruction ledger sentence capture",
+    "production Jev atomicity classifier",
+    "production planning model atomicity splitter",
+    "production Jev instruction router",
+    "acceptance template selection and binding"
+  ],
+  "failures": [],
+  "task_routing_counts": {
+    "cattrs-partial-structuring-recovery": {
+      "include": 26,
+      "include_prohibition": 0,
+      "context": 0,
+      "exclude": 2,
+      "unclear": 0
+    },
+    "helm-array-merge-strategies": {
+      "include": 36,
+      "include_prohibition": 0,
+      "context": 1,
+      "exclude": 2,
+      "unclear": 0
+    },
+    "koota-entity-snapshot-rollback": {
+      "include": 46,
+      "include_prohibition": 0,
+      "context": 0,
+      "exclude": 2,
+      "unclear": 0
+    },
+    "dateutil-rfc5545-timezone-interop": {
+      "include": 53,
+      "include_prohibition": 0,
+      "context": 1,
+      "exclude": 2,
+      "unclear": 0
+    }
+  },
+  "status": "completed"
+}

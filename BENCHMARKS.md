@@ -1,161 +1,218 @@
 # Benchmarking Powdrr with DeepSWE
 
-Powdrr can run the shared Procedrr `implement-feature` flow as an installed
-Harbor/Pier agent. The Harbor adapter runs the design, implementation,
-validation, completeness review, scope review, and repair stages in the task's
-existing checkout. It commits the result locally; Harbor/Pier and the DeepSWE
-verifier collect and grade that commit.
+Powdrr runs the shared Procedrr `implement-feature` flow through its Harbor/Pier
+adapter. Powdrr plans and reviews the change, uses mini-SWE-agent for coding, and
+uses Typesafe AI's JEV for semantic classification. The adapter works in the task's
+existing checkout and commits the result locally. Pier and the DeepSWE verifier
+collect and grade that commit.
 
 ## Prerequisites
 
-Install Pier outside the task container:
+Install Pier with Powdrr available to its host Python environment:
 
 ```bash
-uv tool install datacurve-pier
+uv tool install --force --upgrade --with \
+  'git+https://github.com/powdrr-io/powdrr-lift.git@main' \
+  datacurve-pier
 ```
 
-Obtain a local Harbor-format DeepSWE task dataset. A task directory contains an
-`instruction.md`, `task.toml`, and its environment and verifier files. The
-first run should use one small task rather than the complete dataset.
+Docker must be installed and running. Obtain a local Harbor-format DeepSWE task
+dataset. A task directory contains `instruction.md`, `task.toml`, and its
+environment and verifier files. Start with one task.
 
-The Powdrr adapter is included in the Powdrr wheel. It reports and installs
-these pinned runtime versions when they are not already present in the image:
+The adapter's default runtime versions are:
 
 | Component | Version |
 | --- | --- |
 | Powdrr | `0.1.0` |
-| OpenCode | `1.18.31` |
+| mini-SWE-agent | `2.4.6` |
 
-For a repeatable benchmark image, preinstall those versions. The adapter's
-fallback installation is useful for a first smoke test but requires package
-registry access.
+The `mini` executable comes from mini-SWE-agent. The adapter selects
+`minisweagent` by default; the commands below select it explicitly as well.
+Preinstall the runtimes for a repeatable image, or allow the adapter to install
+them from PyPI. Set `POWDRR_INSTALL_SPEC` to a current GitHub revision to select
+the container's Powdrr code rather than relying on its default package spec.
 
-## Credentials and model
+## Credentials and models
 
-Pass the DeepInfra key through the agent environment, never in the task image
-or repository:
+Set both credentials on the host and pass them explicitly through the agent
+environment. Keep their values out of task images and committed files:
 
 ```bash
-export DEEPINFRA_API_KEY="..."
+export DEEPINFRA_API_TOKEN="..."
+export TYPESAFEAI_API_KEY="..."
 ```
 
-The Harbor adapter configures both Powdrr planning and OpenCode implementation
-and review to use:
+DeepInfra serves the planning and coding models. The default mini-SWE-agent
+coding model is:
 
 ```text
 deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731
 ```
 
-Powdrr also accepts `DEEPINFRA_API_TOKEN`; it normalizes that spelling for
-OpenCode when necessary. No OpenAI credential is required for this benchmark
-configuration.
+Typesafe AI serves JEV classification at `https://api.typesafe.ai/v1/systemone`.
+The intended benchmark configuration requires a Typesafe AI key in addition to
+the DeepInfra key. Supported aliases are `DEEPINFRA_API_KEY` for DeepInfra, and
+`TYPESAFE_API_KEY` or `SYSTEM_ONE_API_KEY` for Typesafe AI. The examples use
+`DEEPINFRA_API_TOKEN` and `TYPESAFEAI_API_KEY` consistently.
+
+`POWDRR_PLANNING_MODEL` and `POWDRR_MINISWEAGENT_MODEL` override the planning and
+coding models, respectively. Inspect the effective models in `run-metadata.json`
+when comparing runs.
 
 ## First smoke test
 
-Run one task with Pier and the packaged adapter:
+After setting both credentials, run one task with a fresh Docker build, one
+attempt, and explicit artifact collection:
 
 ```bash
-export DEEPINFRA_API_KEY="..."
+: "${DEEPINFRA_API_TOKEN:?Set the DeepInfra API token}"
+: "${TYPESAFEAI_API_KEY:?Set the Typesafe AI API key}"
+export POWDRR_TASK_DIR="/path/to/deep-swe/tasks/your-task-id"
+export POWDRR_INSTALL_SPEC="git+https://github.com/powdrr-io/powdrr-lift.git@main"
+export POWDRR_JOB_DIR="$(mktemp -d /tmp/powdrr-pier-smoke.XXXXXX)"
 
 pier run \
-  -p deep-swe/tasks/<task-id> \
-  --agent powdrr_lift.integrations.harbor.powdrr_agent:PowdrrAgent \
-  --env docker
+  --debug \
+  --force-build \
+  --no-delete \
+  -n 1 -k 1 -r 0 \
+  -p "$POWDRR_TASK_DIR" \
+  --agent-import-path \
+    powdrr_lift.integrations.harbor.powdrr_agent:PowdrrAgent \
+  --env docker \
+  --ae POWDRR_CODE_AGENT=minisweagent \
+  --ae DEEPINFRA_API_TOKEN="$DEEPINFRA_API_TOKEN" \
+  --ae TYPESAFEAI_API_KEY="$TYPESAFEAI_API_KEY" \
+  --ae POWDRR_INSTALL_SPEC="$POWDRR_INSTALL_SPEC" \
+  --ae POWDRR_OUTPUT_ROOT=/tmp/powdrr-feature-run \
+  --ae POWDRR_COMMAND_LOG=/tmp/powdrr-agent-command.log \
+  --artifact /tmp/powdrr-feature-run \
+  --artifact /tmp/powdrr-agent-command.log \
+  -o "$POWDRR_JOB_DIR"
 ```
 
-If the task dataset is at another location, replace the `-p` value with that
-task directory. Pier/Harbor must allow network access to DeepInfra during the
-agent run, and to PyPI/npm if the image does not already contain Powdrr and
-OpenCode. The task's own verifier remains the final correctness check.
+Replace `POWDRR_TASK_DIR` with the actual task directory. Pier must allow network
+access to DeepInfra, Typesafe AI, and GitHub/PyPI for runtime installation. The
+adapter includes `api.typesafe.ai` in its network allowlist, along with the host
+of any configured `SYSTEM_ONE_BASE_URL`.
 
-The adapter expects the task checkout to start clean and configures git
-identity in the task image or environment. It does not create a pull request,
-push, or create a nested worktree.
+Use `--agent-import-path` for this custom adapter. Pier's `--agent` option selects
+a built-in agent by name. For repeatable comparisons, replace `@main` in the
+install spec with a pushed commit SHA and record it with
+`--ae POWDRR_REVISION=COMMIT_SHA`.
+
+The adapter expects the task checkout to start clean and configures Git identity
+in the task environment. It commits locally without publishing a PR or creating
+a nested worktree. The task's verifier remains the final correctness check.
 
 ## Validation discovery
 
 No validation command is required on the command line. Structrr bootstrap
 examines the task repository and discovers declared validation from project and
 CI configuration, including Python, npm, Go, Rust, Maven, and Gradle projects.
-All discovered profiles run before review and repair. An explicit
-`POWDRR_VALIDATION_COMMAND` remains available as an override when a task has a
-special command, but normal DeepSWE runs should omit it.
+An explicit `POWDRR_VALIDATION_COMMAND` remains available for tasks with a special
+command, but normal DeepSWE runs should omit it.
 
-## Telemetry
+## Telemetry and credential delivery
 
-The agent writes its run bundle under:
+The default run bundle is stored under:
 
 ```text
 .powdrr/feature-runs/<task-name>/
 ```
 
+The examples override the output root to `/tmp/powdrr-feature-run` and collect
+that directory with `--artifact`, along with `/tmp/powdrr-agent-command.log`.
 Important artifacts include:
 
-- `run-metadata.json`: task ID and detected Powdrr/OpenCode runtime data;
-- `run-result.json`: stable summary of the final status, commit/worktree,
-  validation, review, and pull-request fields;
-- `failure.json`: typed failure stage and references to preserved telemetry
-  when a run cannot complete;
-- `validation-bootstrap.yaml`: Structrr's repository inspection result;
-- `implementation-request.json` and `requests/`: bounded worker requests;
-- `artifacts/attempts/`: OpenCode attempt receipts and lifecycle events;
+- `run-metadata.json`: task ID, runtime data, and effective planning/coding profile;
+- `run-result.json`: final status, commit/worktree, validation, review, and PR fields;
+- `failure.json`: failure stage and preserved telemetry references, when applicable;
+- `validation-bootstrap.yaml`: Structrr's validation discovery result;
+- `implementation-request.json` and `requests/`: bounded coding requests;
+- `artifacts/attempts/`: coding attempt receipts and lifecycle events;
 - `artifacts/validations/`: validation reports;
-- `artifacts/checkpoints/`: per-operation diff checkpoints;
-- `opencode/`: OpenCode JSONL lifecycle diagnostics.
+- `artifacts/checkpoints/`: diff checkpoints;
+- `minisweagent/`: mini-SWE-agent diagnostics and trajectories;
+- `procedrr-events.jsonl`: operation execution events;
+- `console.log`: full diagnostics, including JEV delivery markers.
 
-Pier/Harbor synchronizes `.powdrr/feature-runs` as the agent's remote session
-log directory. Completed trials are stored by Pier under its `jobs/` directory.
+Pier synchronizes `.powdrr/feature-runs` as the adapter's default session log
+directory. Explicit artifacts preserve the overridden output root. Completed
+trials are stored under the chosen `-o` directory.
 
-## Scaling up
+Confirm a `JEV_RESPONSE_RECEIVED` marker in `console.log` to establish that the
+Typesafe AI request reached the classifier. `JEV_RESULT_ACCEPTED` records
+successful response mapping. Investigate `JEV_CALL_SKIPPED`, `JEV_FALLBACK`, or
+`JEV_FAIL_CLOSED` before treating the run as a successful test of the intended
+JEV configuration. A key present on the host alone does not prove delivery into
+the task container.
 
-After the single-task smoke test succeeds:
+`--no-delete` retains the container for debugging. The wrapper command log
+contains concise progress; `console.log` contains the detailed run diagnostics.
+Use a fresh job directory for each run.
 
-1. inspect the commit and `run-result.json`;
-2. inspect the OpenCode and validation telemetry;
-3. confirm the DeepSWE verifier result;
-4. run a small deterministic sample;
-5. only then run the larger benchmark set.
+## Running a local Powdrr revision with Pier
 
-The first live run is expected to validate the container image, provider
-network allowlist, git identity, adapter discovery, and telemetry collection
-at the same time.
-
-## Running a local Powdrr branch with Pier
-
-Use the installed `datacurve-pier` runner for branch smoke tests. The custom
-agent must be importable by the host Pier process, and the task container
-installs the pushed Powdrr branch from GitHub. The direct `harbor` CLI has a
-different setup path and should not be substituted for this command.
-
-From the Powdrr worktree, run:
+Use the installed `pier` runner from the Powdrr worktree. The host imports the
+adapter from the worktree, while the task container installs the pushed revision
+from GitHub. After setting the two credentials above:
 
 ```bash
-export DEEPINFRA_API_TOKEN="..."
+: "${DEEPINFRA_API_TOKEN:?Set the DeepInfra API token}"
+: "${TYPESAFEAI_API_KEY:?Set the Typesafe AI API key}"
 export POWDRR_WORKTREE="$(pwd)"
 export PYTHONPATH="$POWDRR_WORKTREE/src"
-export POWDRR_BRANCH="codex/your-powdrr-branch"
+export POWDRR_REVISION="$(git rev-parse HEAD)"
+export POWDRR_INSTALL_SPEC="git+https://github.com/powdrr-io/powdrr-lift.git@$POWDRR_REVISION"
+export POWDRR_TASK_DIR="/path/to/deep-swe/tasks/your-task-id"
+export POWDRR_JOB_DIR="$(mktemp -d /tmp/powdrr-pier-branch.XXXXXX)"
 
-/Users/gregory/.local/share/uv/tools/datacurve-pier/bin/pier run \
+pier run \
   --debug \
   --force-build \
   --no-delete \
-  -p /path/to/deep-swe/tasks/python-statemachine-state-data-scoping \
+  -n 1 -k 1 -r 0 \
+  -p "$POWDRR_TASK_DIR" \
   --agent-import-path \
     powdrr_lift.integrations.harbor.powdrr_agent:PowdrrAgent \
   --env docker \
+  --ae POWDRR_CODE_AGENT=minisweagent \
   --ae DEEPINFRA_API_TOKEN="$DEEPINFRA_API_TOKEN" \
-  --ae POWDRR_INSTALL_SPEC="git+https://github.com/powdrr-io/powdrr-lift.git@$POWDRR_BRANCH" \
+  --ae TYPESAFEAI_API_KEY="$TYPESAFEAI_API_KEY" \
+  --ae POWDRR_INSTALL_SPEC="$POWDRR_INSTALL_SPEC" \
+  --ae POWDRR_REVISION="$POWDRR_REVISION" \
   --ae POWDRR_OUTPUT_ROOT=/tmp/powdrr-feature-run \
   --ae POWDRR_COMMAND_LOG=/tmp/powdrr-agent-command.log \
   --artifact /tmp/powdrr-feature-run \
   --artifact /tmp/powdrr-agent-command.log \
-  -o /tmp/powdrr-pier-jobs
+  -o "$POWDRR_JOB_DIR"
 ```
 
-`--no-delete` keeps the Docker container available for debugging after a
-failure. The Powdrr run bundle contains detailed diagnostics in
-`console.log`; the wrapper command log mirrors only the concise progress shown
-in the terminal. The two artifact paths preserve both in the Pier job
-directory. Use a fresh `-o` directory for each run. The branch must be pushed
-before starting the run, and `PYTHONPATH` must point at the host worktree so
-Pier can import the custom agent.
+Push the selected revision before starting the run so the container can install
+that exact commit. `PYTHONPATH` selects the host adapter source; it does not
+install or update code in the task container. The install spec selects the
+container code, and `POWDRR_REVISION` records the revision in telemetry.
+
+## Scaling up
+
+After a single-task smoke test succeeds:
+
+1. Inspect the commit and `run-result.json`.
+2. Inspect mini-SWE-agent and validation telemetry, including JEV delivery.
+3. Confirm the DeepSWE verifier result.
+4. Run a small deterministic sample.
+5. Run the larger benchmark set.
+
+The first live run checks the container image, both provider connections, Git
+identity, adapter import, and telemetry collection together.
+
+## Implementation references
+
+The current defaults, environment forwarding, and telemetry are defined here:
+
+- [Powdrr Harbor/Pier adapter](src/powdrr_lift/integrations/harbor/powdrr_agent.py)
+- [Forwarded credentials and network allowlist](src/powdrr_lift/integrations/harbor/_env.py)
+- [JEV classification and delivery markers](src/powdrr_lift/workrr/jev_classifier.py)
+- [Feature execution and run metadata](src/powdrr_lift/workrr/feature_endpoint.py)

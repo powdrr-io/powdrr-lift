@@ -6,7 +6,7 @@ changes isolated, and makes its work ready for review. It also has an elephant-l
 memory. Powdrr carries intent, decisions, constraints, and prior context forward so it
 always has the right context at the right time.
 
-## Your Agent Does Not Know What Is Safe
+### Your Agent Does Not Know What Is Safe
 
 Approval fatigue happens because your agent literally has no idea which commands are safe
 and which ones are not. You end up approving every shell command, second-guessing every
@@ -21,7 +21,7 @@ roundtrips, and stops when the agent cannot make validated progress. When Powdrr
 for permission on those rare occasions, it provides the context and reasoning you need
 to make an informed decision.
 
-## Your Agent Has The Memory of a Goldfish
+### Your Agent Has The Memory of a Goldfish
 
 You constantly have to remind agents what they need to do: restate the goal, repeat the
 constraints, explain an earlier decision, and point them back to the file or change that
@@ -34,14 +34,18 @@ guidance as structured artifacts alongside the code. Each next step receives the
 useful slice of that context, while execution events and review findings remain available
 for later work. The agent can forget the conversation without forgetting the work.
 
-## Your Agent is an Irresponsible Sycophant
+### Your Agent is an Irresponsible Sycophant
 
 Tired of an agent that tells you everything is great, but admits it isn't when you ask
 again? Tired of needing a manager agent just to monitor your coding agent and make sure
 it performs its basic duties? Powdrr does what you ask, doesn't report false success, and
 doesn't need a chaperone to keep it from running amok.
 
-## Your Agent Follows Through
+<br>
+
+# Powdrr Agent Is Steadfast and Accountable
+
+<br>
 
 Most agents treat a request as a prompt and completion as a story they tell about what
 they did. Powdrr treats required follow-up work as an obligation. When a plan, action,

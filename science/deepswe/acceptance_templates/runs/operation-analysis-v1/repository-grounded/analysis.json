@@ -1,0 +1,567 @@
+{
+  "objective": "Analyze the supplied routed product requirements into implementation decisions that remove ambiguity for a coding agent.",
+  "decisions": [
+    {
+      "operation": "createAspect",
+      "basis": "instruction",
+      "source_ids": [
+        "s002",
+        "s006"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "const id = traitId++;"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires two or more traits, throws on overlapping fields and relations, flattens nested aspects, exposes id/traits/schema, and distinct instances per call. The id can be generated similarly to trait ids.",
+      "raw_source_ids": [
+        "s002",
+        "s006"
+      ],
+      "rejected_evidence": [],
+      "rule": "createAspect accepts two or more traits (or nested aspects) and returns a new aspect object with a unique id, a flattened list of constituent traits, and a merged schema, throwing an error if any constituent is a relation or if any field names overlap across constituents.",
+      "id": "a001",
+      "group": "construction"
+    },
+    {
+      "operation": "public exports",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/index.ts",
+          "quote": "export { getStore, trait } from './trait/trait';"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction says 'The core exports a new createAspect', so it must be added to the public API surface in index.ts.",
+      "raw_source_ids": [
+        "s002"
+      ],
+      "rejected_evidence": [],
+      "rule": "The core package exports `createAspect` and its associated types from the main index, making it available to consumers.",
+      "id": "a002",
+      "group": "construction"
+    },
+    {
+      "operation": "id/traits/schema",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly lists these three properties. The id should be unique per aspect instance, and traits/schema should be derived from constituents.",
+      "raw_source_ids": [
+        "s002"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "Object.defineProperty(Trait, 'id', { value: id, writable: false, enumerable: true, configurable: false });",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "Each aspect exposes a read-only `id` (unique number), a `traits` array containing the flattened constituent traits, and a `schema` object that merges the schemas of all constituents.",
+      "id": "a003",
+      "group": "construction"
+    },
+    {
+      "operation": "nested aspects",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction states 'Nested aspects flatten to their individual traits', so the flattening must occur during creation.",
+      "raw_source_ids": [
+        "s002"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is passed as a constituent to createAspect, it is flattened into its individual traits, so the resulting aspect's traits array contains only the underlying traits, not the nested aspect object.",
+      "id": "a004",
+      "group": "construction"
+    },
+    {
+      "operation": "has",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly states `has` returns true when the entity has every constituent trait, so the operation must check all constituents and return true only if all are present.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "export function hasTrait(world: World, entity: Entity, trait: Trait): boolean { ... return (mask & bitflag) === bitflag; }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "`has` returns true only when the entity has every constituent trait of the aspect, and false otherwise.",
+      "id": "a005",
+      "group": "entity"
+    },
+    {
+      "operation": "get",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction specifies a merged object of all constituent fields, and the existing get function returns a fresh object per call, so the merged result must be a new object to avoid aliasing.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/storage/accessors.ts",
+          "quote": "const get = new Function('index', 'store', ` return ${objectLiteral}; `);",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "`get` returns a new merged object containing all fields from all constituent traits when the entity has every constituent, and returns undefined if any constituent is missing.",
+      "id": "a006",
+      "group": "entity"
+    },
+    {
+      "operation": "set",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "ctx.set(index, store, value); triggerChanged && setChanged(world, entity, trait);"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction requires distributing each field to its owning constituent and triggering per-trait change detection, so each constituent's set must be called with its own fields and change detection must be triggered for each constituent that receives a write.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "`set` accepts a merged object of fields, writes each field to its owning constituent's store, and triggers per-trait change detection for each constituent that had a field written.",
+      "id": "a007",
+      "group": "entity"
+    },
+    {
+      "operation": "add",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "const data = addTraitToEntity(world, entity, trait); if (!data) continue; // Already had the trait"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction says add only the constituents the entity does not already have, and the existing addTrait skips already-present traits, so the aspect add must follow the same skip behavior and only initialize newly added constituents.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "`add` adds only the constituent traits the entity does not already have, initializing each newly added constituent with the values from the provided merged object for its fields, and leaves already-present constituents unchanged.",
+      "id": "a008",
+      "group": "entity"
+    },
+    {
+      "operation": "remove",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "if (!hasTrait(world, entity, trait)) continue;"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction says remove removes all constituent traits, and the existing removeTrait skips traits the entity does not have, so the aspect remove must iterate all constituents and remove each one that is present.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "`remove` removes all constituent traits from the entity, regardless of whether the entity currently has them, and does nothing for constituents that are already absent.",
+      "id": "a009",
+      "group": "entity"
+    },
+    {
+      "operation": "direct query",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/query/query-result.ts",
+          "quote": "getQueryStores(params, traits, stores, world);"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires all constituents for query matching and merged data for readEach/updateEach, so the aspect must be expanded into its constituent traits in the query pipeline.",
+      "raw_source_ids": [
+        "r015",
+        "r016",
+        "r017"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is passed as a query parameter, the query matches only entities that have all constituent traits, and the query result's readEach and updateEach operate on the merged aspect data.",
+      "id": "a010",
+      "group": "query-data"
+    },
+    {
+      "operation": "readEach",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/query/query-result.ts",
+          "quote": "const state = Array.from({ length: traits.length }) as InstancesFromParameters<T>;"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction requires a merged data object, so the state array must be flattened into a single object before invoking the callback.",
+      "raw_source_ids": [
+        "r016"
+      ],
+      "rejected_evidence": [],
+      "rule": "readEach invokes the callback with a merged object containing all constituent fields for each entity that has all constituents, and returns the query result for chaining.",
+      "id": "a011",
+      "group": "query-data"
+    },
+    {
+      "operation": "updateEach",
+      "basis": "instruction",
+      "source_ids": [
+        "s004",
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/query/query-result.ts",
+          "quote": "ctx.fastSetWithChangeDetection(eid, store, newValue);"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction requires distributing writes back to constituent stores and per-trait change detection, so the merged object must be split by field ownership and each constituent's set function used.",
+      "raw_source_ids": [
+        "r017",
+        "r011"
+      ],
+      "rejected_evidence": [],
+      "rule": "updateEach invokes the callback with a merged object, then distributes each field back to its owning constituent store, triggering per-trait change detection for changed fields.",
+      "id": "a012",
+      "group": "query-data"
+    },
+    {
+      "operation": "query lifecycle and callback data",
+      "basis": "assumption",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/world/types.ts",
+          "quote": "onAdd<T extends Trait>(trait: T, callback: (entity: Entity) => void): QueryUnsubscriber;"
+        }
+      ],
+      "alternatives": [
+        "Fire callbacks once per aspect with merged data",
+        "Fire callbacks per constituent with merged data"
+      ],
+      "rationale": "The instruction specifies aspect-level transitions but does not define callback signature; existing world callbacks are per-trait and entity-only, so inheriting that contract is the least surprising default.",
+      "raw_source_ids": [
+        "r023",
+        "r024",
+        "r025"
+      ],
+      "rejected_evidence": [],
+      "rule": "Query lifecycle callbacks (onAdd, onRemove, onChange) fire per constituent trait, not per aspect, and receive only the entity as the callback argument.",
+      "id": "a013",
+      "group": "query-data"
+    },
+    {
+      "operation": "Not",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/not.ts",
+          "quote": "export const Not = <T extends Trait[] = Trait[]>(...traits: T): Modifier<T, 'not'> => { return createModifier('not', 1, traits); };"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly states 'Not with an aspect matches entities missing at least one constituent', and the existing `Not` modifier accepts a list of traits, so passing an aspect's traits to `Not` yields the required behavior.",
+      "raw_source_ids": [
+        "r019"
+      ],
+      "rejected_evidence": [],
+      "rule": "The `Not` modifier, when given an aspect, matches an entity if and only if the entity lacks at least one of the aspect's constituent traits.",
+      "id": "a014",
+      "group": "modifiers"
+    },
+    {
+      "operation": "Or",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction says 'Aspects compose with all query modifiers', and the existing `Or` modifier accepts traits, so passing an aspect's traits to `Or` yields the standard OR semantics.",
+      "raw_source_ids": [
+        "r018"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/or.ts",
+          "quote": "export const Or = <T extends OrParameter[]>(...params: T): OrModifier<T> => { ... }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "The `Or` modifier, when given an aspect, matches an entity if and only if the entity has at least one of the aspect's constituent traits.",
+      "id": "a015",
+      "group": "modifiers"
+    },
+    {
+      "operation": "Changed",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction states 'Changed matches when any constituent data changed', and the existing `Changed` modifier tracks changes per trait, so passing an aspect's traits to `Changed` yields the required behavior.",
+      "raw_source_ids": [
+        "r020"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/changed.ts",
+          "quote": "return <T extends TraitOrRelation[]>(\n        ...inputs: T\n    ): Modifier<ExtractTraits<T>, `changed-${number}`> => { ... }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "The `Changed` modifier, when given an aspect, matches an entity if and only if at least one of the aspect's constituent traits has changed while the entity still has all constituents.",
+      "id": "a016",
+      "group": "modifiers"
+    },
+    {
+      "operation": "Added",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction states 'Added matches the transition to all-present', and the existing `Added` modifier tracks additions per trait, so passing an aspect's traits to `Added` yields the required behavior.",
+      "raw_source_ids": [
+        "r021"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/added.ts",
+          "quote": "return <T extends TraitOrRelation[]>(\n        ...inputs: T\n    ): Modifier<ExtractTraits<T>, `added-${number}`> => { ... }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "The `Added` modifier, when given an aspect, matches an entity if and only if the entity transitions from having at least one missing constituent to having all constituents.",
+      "id": "a017",
+      "group": "modifiers"
+    },
+    {
+      "operation": "Removed",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction states 'Removed matches the transition from all-present', and the existing `Removed` modifier tracks removals per trait, so passing an aspect's traits to `Removed` yields the required behavior.",
+      "raw_source_ids": [
+        "r022"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/removed.ts",
+          "quote": "return <T extends TraitOrRelation[]>(\n        ...inputs: T\n    ): Modifier<ExtractTraits<T>, `removed-${number}`> => { ... }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "The `Removed` modifier, when given an aspect, matches an entity if and only if the entity transitions from having all constituents to having at least one missing constituent.",
+      "id": "a018",
+      "group": "modifiers"
+    },
+    {
+      "operation": "modifier composition and tracking",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction requires aspects to compose with all query modifiers, and the existing query engine already handles modifiers by expanding their traits into required/forbidden/or lists and tracking groups, so passing an aspect's traits to these modifiers integrates with the existing composition logic.",
+      "raw_source_ids": [
+        "r015",
+        "r018",
+        "r019",
+        "r020",
+        "r021",
+        "r022"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/query/query.ts",
+          "quote": "if (parameter.type === 'not') {\n                query.traitInstances.forbidden.push(\n                    ...traits.map((t) => getTraitInstance(ctx.traitInstances, t)!)\n                );\n            } else if (parameter.type === 'or') { ... } else if (isTrackingModifier(parameter)) {\n                // Top-level tracking modifiers use AND logic\n                processTrackingModifier(world, query, parameter, 'and', ctx, trackingGroupsMap);\n            }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "When an aspect is used as a query parameter, the query requires all constituent traits, and when an aspect is used inside `Not`, `Or`, `Changed`, `Added`, or `Removed`, the modifier's trait list is the aspect's constituent traits, and tracking groups are created per modifier with AND logic for top-level tracking modifiers and OR logic for nested tracking modifiers inside `Or`.",
+      "id": "a019",
+      "group": "modifiers"
+    },
+    {
+      "operation": "onAdd",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "for (const sub of data.addSubscriptions) sub(entity);"
+        }
+      ],
+      "alternatives": [
+        "Could fire on every constituent add while incomplete, but instruction specifies transition to complete.",
+        "Could pass constituent trait or merged data, but existing trait onAdd passes only entity."
+      ],
+      "rationale": "The instruction explicitly defines onAdd as firing on the transition to all-present, and the existing trait add subscription pattern passes only the entity, which is inherited for consistency.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The aspect's onAdd subscription fires exactly once when an entity transitions from having at least one but not all constituent traits to having all constituent traits, and the callback receives the entity as its sole argument.",
+      "id": "a020",
+      "group": "subscriptions"
+    },
+    {
+      "operation": "onRemove",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "for (const sub of instance.removeSubscriptions) sub(entity);"
+        }
+      ],
+      "alternatives": [
+        "Could fire on every constituent removal while complete, but instruction specifies transition from all-present.",
+        "Could pass removed trait or merged data, but existing trait remove subscription passes only entity."
+      ],
+      "rationale": "The instruction explicitly defines onRemove as firing on the reverse transition, and the existing trait remove subscription pattern passes only the entity, which is inherited for consistency.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The aspect's onRemove subscription fires exactly once when an entity transitions from having all constituent traits to having at least one but not all, and the callback receives the entity as its sole argument.",
+      "id": "a021",
+      "group": "subscriptions"
+    },
+    {
+      "operation": "onChange",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/changed.ts",
+          "quote": "for (const sub of data.changeSubscriptions) sub(entity);"
+        }
+      ],
+      "alternatives": [
+        "Could fire even when incomplete, but instruction requires all present.",
+        "Could pass changed trait or merged data, but existing trait change subscription passes only entity."
+      ],
+      "rationale": "The instruction explicitly requires all constituents present for onChange, and the existing trait change subscription pattern passes only the entity, which is inherited for consistency.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The aspect's onChange subscription fires whenever any constituent trait's data changes while the entity has all constituent traits, and the callback receives the entity as its sole argument.",
+      "id": "a022",
+      "group": "subscriptions"
+    },
+    {
+      "operation": "unsubscribe",
+      "basis": "repository",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/world/world.ts",
+          "quote": "return () => data.addSubscriptions.delete(resolvedCallback);"
+        }
+      ],
+      "alternatives": [
+        "Could return a shared unsubscribe that removes all callbacks, but existing pattern returns per-callback unsubscriber.",
+        "Could require an identifier, but existing pattern uses closure over callback."
+      ],
+      "rationale": "The existing world.onAdd/onRemove/onChange all return a closure that deletes the specific callback from the subscription set, and the aspect should inherit this pattern for consistency.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "Each of onAdd, onRemove, and onChange returns an unsubscribe function that, when called, removes the specific callback from the aspect's subscription set, and subsequent calls are no-ops.",
+      "id": "a023",
+      "group": "subscriptions"
+    },
+    {
+      "operation": "world reset",
+      "basis": "repository",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/world/world.ts",
+          "quote": "clearTraitInstance(ctx.traitInstances);\n            world.traits.clear();"
+        }
+      ],
+      "alternatives": [
+        "Could preserve subscriptions across reset, but existing reset clears all trait instances and subscriptions.",
+        "Could require re-subscription, but existing pattern clears all state."
+      ],
+      "rationale": "The existing world.reset clears all trait instances and subscriptions, so aspect subscriptions must be cleared as well to avoid stale callbacks.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "When the world is reset, all aspect subscriptions are cleared and no further callbacks fire for entities created after the reset, and the aspect's constituent traits are re-registered as needed.",
+      "id": "a024",
+      "group": "subscriptions"
+    }
+  ]
+}

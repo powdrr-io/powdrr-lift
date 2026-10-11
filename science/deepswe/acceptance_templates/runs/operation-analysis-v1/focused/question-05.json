@@ -1,0 +1,27 @@
+{
+  "id": "f005",
+  "operation": "callback slots",
+  "rule": "In readEach/updateEach callbacks, directly supplied aspects, ordinary data traits, and tag-only aspects each occupy one slot in the state array, with tag-only aspects yielding an empty object; Not modifiers contribute no slot, and nested aspects flatten to their constituent traits, each occupying its own slot.",
+  "question": "How should directly supplied aspects, ordinary data traits, ordinary tags and Not modifiers map to readEach/updateEach callback data slots? Include a tag-only aspect.",
+  "group": "query-data",
+  "source_ids": [],
+  "basis": "instruction",
+  "evidence": [
+    {
+      "file": "packages/core/src/query/types.ts",
+      "quote": "First extends Trait ? IsTag<First> extends false ? ExtractSchema<First> extends AoSFactory ? [ReturnType<ExtractSchema<First>>] : [TraitRecord<First>] : [] : First extends Modifier ? IsNotModifier<First> extends true ? [] : InstancesFromParameters<UnwrapModifierData<First>> : []"
+    }
+  ],
+  "alternatives": [],
+  "rationale": "The instruction states that aspects expose traits and that nested aspects flatten to individual traits, implying each constituent trait is a separate slot. The existing code skips tags and Not modifiers in the traits array, so tag-only aspects (which are traits) would be skipped, leaving no slot. However, the instruction explicitly includes tag traits as valid constituents and requires readEach to deliver merged data, so a tag-only aspect must still occupy a slot with an empty object to represent its presence. Not modifiers are explicitly skipped in the existing code, so they contribute no slot.",
+  "rejected_evidence": [
+    {
+      "file": "packages/core/src/query/query-result.ts",
+      "quote": "getQueryStores(params, traits, stores, world); ... const state = Array.from({ length: traits.length }) as InstancesFromParameters<T>;"
+    },
+    {
+      "file": "packages/core/src/query/query-result.ts",
+      "quote": "if (isModifier(param)) { if (param.type === 'not') continue; ... } else { const trait = param as Trait; if (trait[$internal].type === 'tag') continue; traits.push(trait); stores.push(getStore(world, trait)); }"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "router_provider": "typesafe.ai",
+  "router_model": "jev-latest",
+  "base_commit": "9c434858b2b522002f8c5eb4a554fa8836a7cf3c",
+  "oracle_sha256_before_analysis": "a615600ce419824a1de43c1c1b7703a3de63ee4d44df87a30c25883be53fceb0",
+  "input_sha256": "362a116de724f064c4e6ecf8e6d0b4d58fc9cb3950450069f18f47dccf78ea03",
+  "repository_evidence_sha256": "6735d12f848b594a02199da5b525e9310a125dfb3e68c413993da005ffd58046",
+  "solution_sha256": "6626b19e70409bd2df3f5a3b48015243bce577c4aa2fb8b87f3647d3304b6cf3",
+  "validation_sha256": "5d8c926bf93a041f4010fda23da2942583384a15f67e97f770b5d76f227a6912",
+  "runner_sha256": "a688d9a05ba4940018a54e5a605152de2558695d8e6717e35458b46515f62322",
+  "boundary": "Model payloads contain instruction, production routed inventory and base code only. Oracle, solution, validation patch, prior prompts and review results are withheld."
+}

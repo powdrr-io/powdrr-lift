@@ -1,0 +1,98 @@
+{
+  "objective": "Analyze the supplied routed product requirements into implementation decisions that remove ambiguity for a coding agent.",
+  "decisions": [
+    {
+      "operation": "direct query",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/query/query-result.ts",
+          "quote": "getQueryStores(params, traits, stores, world);"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires all constituents for query matching and merged data for readEach/updateEach, so the aspect must be expanded into its constituent traits in the query pipeline.",
+      "raw_source_ids": [
+        "r015",
+        "r016",
+        "r017"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is passed as a query parameter, the query matches only entities that have all constituent traits, and the query result's readEach and updateEach operate on the merged aspect data.",
+      "id": "a001"
+    },
+    {
+      "operation": "readEach",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/query/query-result.ts",
+          "quote": "const state = Array.from({ length: traits.length }) as InstancesFromParameters<T>;"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction requires a merged data object, so the state array must be flattened into a single object before invoking the callback.",
+      "raw_source_ids": [
+        "r016"
+      ],
+      "rejected_evidence": [],
+      "rule": "readEach invokes the callback with a merged object containing all constituent fields for each entity that has all constituents, and returns the query result for chaining.",
+      "id": "a002"
+    },
+    {
+      "operation": "updateEach",
+      "basis": "instruction",
+      "source_ids": [
+        "s004",
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/query/query-result.ts",
+          "quote": "ctx.fastSetWithChangeDetection(eid, store, newValue);"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction requires distributing writes back to constituent stores and per-trait change detection, so the merged object must be split by field ownership and each constituent's set function used.",
+      "raw_source_ids": [
+        "r017",
+        "r011"
+      ],
+      "rejected_evidence": [],
+      "rule": "updateEach invokes the callback with a merged object, then distributes each field back to its owning constituent store, triggering per-trait change detection for changed fields.",
+      "id": "a003"
+    },
+    {
+      "operation": "query lifecycle and callback data",
+      "basis": "assumption",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/world/types.ts",
+          "quote": "onAdd<T extends Trait>(trait: T, callback: (entity: Entity) => void): QueryUnsubscriber;"
+        }
+      ],
+      "alternatives": [
+        "Fire callbacks once per aspect with merged data",
+        "Fire callbacks per constituent with merged data"
+      ],
+      "rationale": "The instruction specifies aspect-level transitions but does not define callback signature; existing world callbacks are per-trait and entity-only, so inheriting that contract is the least surprising default.",
+      "raw_source_ids": [
+        "r023",
+        "r024",
+        "r025"
+      ],
+      "rejected_evidence": [],
+      "rule": "Query lifecycle callbacks (onAdd, onRemove, onChange) fire per constituent trait, not per aspect, and receive only the entity as the callback argument.",
+      "id": "a004"
+    }
+  ]
+}

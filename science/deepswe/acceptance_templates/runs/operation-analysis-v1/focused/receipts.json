@@ -1,0 +1,162 @@
+[
+  {
+    "stage": "question-01",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 2.892,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-02",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 3.228,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-03",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 3.22,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-04",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 5.218,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-05",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 7.767,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-06",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 4.103,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-07",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 4.98,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-08",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 5.073,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-09",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 6.111,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-10",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 4.678,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-11",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 7.145,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-12",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 4.115,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-13",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 3.219,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-14",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 10.099,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-15",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 6.321,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  },
+  {
+    "stage": "question-16",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 3.57,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  }
+]

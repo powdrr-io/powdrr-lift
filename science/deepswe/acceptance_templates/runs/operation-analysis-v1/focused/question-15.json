@@ -1,0 +1,13 @@
+{
+  "id": "f015",
+  "operation": "unsubscribe",
+  "rule": "Aspect subscription methods should return an unsubscribe function that, when invoked, detaches the callback from the aspect's constituent trait subscription sets, and repeated calls to that unsubscribe function have no further effect (they are idempotent).",
+  "question": "What should aspect subscription methods return, and what must invoking that return value detach? Establish whether repeated unsubscribe calls have an effect.",
+  "group": "subscriptions",
+  "source_ids": [],
+  "basis": "instruction",
+  "evidence": [],
+  "alternatives": [],
+  "rationale": "The instruction specifies subscription methods but not their return values; however, the repository's existing subscription methods (e.g., world.onAdd, world.onRemove, world.onChange) all return an unsubscribe function that removes the callback from the relevant subscription set. Repeated calls to that function are safe because Set.delete on an already-removed callback is a no-op. This inherited pattern should be applied to aspect subscriptions for consistency.",
+  "rejected_evidence": []
+}

@@ -1,0 +1,18 @@
+{
+  "id": "f011",
+  "operation": "flattening identity",
+  "rule": "Repeated occurrences of the same trait through direct or nested aspect inputs should be deduplicated, preserving the first occurrence's position in the flattened traits list, and the minimum constituent count is the number of unique traits after deduplication.",
+  "question": "How should repeated occurrences of the same trait through direct/nested aspect inputs affect the flattened traits list, its order and the minimum constituent count? Separate overlap of distinct trait fields from duplicate trait identity.",
+  "group": "construction",
+  "source_ids": [],
+  "basis": "instruction",
+  "evidence": [
+    {
+      "file": "packages/core/src/trait/trait.ts",
+      "quote": "// Exit early if the entity already has the trait\n    if (hasTrait(world, entity, trait)) return undefined;"
+    }
+  ],
+  "alternatives": [],
+  "rationale": "The instruction says 'Nested aspects flatten to their individual traits' and 'has returns true when the entity has every constituent trait'. If duplicates were kept, the minimum constituent count would be inflated and has would require the same trait multiple times, which is impossible since an entity either has a trait or not. Deduplication aligns with the existing trait-add behavior that ignores duplicates. Preserving first occurrence order is natural for a flatten operation.",
+  "rejected_evidence": []
+}

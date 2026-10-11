@@ -1,0 +1,85 @@
+[
+  {
+    "stage": "decisions-v2-construction",
+    "attempt": 0,
+    "status": "failed",
+    "elapsed_seconds": 11.408,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": true
+  },
+  {
+    "stage": "decisions-v2-construction",
+    "attempt": 1,
+    "status": "completed",
+    "elapsed_seconds": 4.375,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": true,
+    "superseded": true
+  },
+  {
+    "stage": "decisions-v2-entity",
+    "attempt": 0,
+    "status": "failed",
+    "elapsed_seconds": 13.023,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": true
+  },
+  {
+    "stage": "decisions-v2-entity",
+    "attempt": 1,
+    "status": "failed",
+    "elapsed_seconds": 9.179,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": true,
+    "superseded": true
+  },
+  {
+    "stage": "decisions-v2-query-data",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 10.568,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": true
+  },
+  {
+    "stage": "decisions-v2-modifiers",
+    "attempt": 0,
+    "status": "failed",
+    "elapsed_seconds": 16.71,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": true
+  },
+  {
+    "stage": "decisions-v2-modifiers",
+    "attempt": 1,
+    "status": "completed",
+    "elapsed_seconds": 6.842,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": true,
+    "superseded": true
+  },
+  {
+    "stage": "decisions-v2-subscriptions",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 12.812,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": true
+  }
+]

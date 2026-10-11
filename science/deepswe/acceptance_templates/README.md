@@ -1,5 +1,12 @@
 # Acceptance criteria template experiment
 
+The newer [operation-analysis experiment](runs/operation-analysis-v1/README.md)
+evaluates decision extraction before acceptance-criteria generation using Koota
+composite aspects. It treats the solution as the authoritative target, compares
+instruction-only and repository-grounded analysis, and records where focused
+questions help and final prompt rewriting loses detail. It does not use catalog
+matching.
+
 A standalone science runner for the [template catalog proposal](../../../docs/plans/acceptance-criteria-template-catalog-proposal.md). Its original pilot compares direct acceptance-criteria generation with whole-catalog selection, source-based slot binding, and deterministic rendering. A separate production-routed experiment feeds the production ledger, atomicity judge, splitter, and JEV router into template matching; it does not change the production prompt or Structrr diff paths.
 
 The initial dataset has four tasks from repository families outside the twelve used to design the catalog: cattrs partial structuring, Helm merge strategies, Koota entity snapshots, and dateutil timezone interoperability. There are 91 agent-authored source-based reference validations, prepared before inspecting generated criteria. These are development evaluation labels, not human gold and not an untouched final holdout after this experiment.

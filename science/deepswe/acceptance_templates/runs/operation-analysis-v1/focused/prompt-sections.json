@@ -1,0 +1,286 @@
+{
+  "objective": "Add composite trait aspects with unified entity, query and subscription operations.",
+  "requirements": [
+    {
+      "decision_ids": [
+        "g001",
+        "g002",
+        "g003",
+        "g004",
+        "f011",
+        "f012"
+      ],
+      "text": "The core package exports a new `createAspect` function and its associated types from the main index. `createAspect` accepts two or more traits or nested aspects and returns a distinct aspect object with a unique read-only `id`, a frozen `traits` array containing the flattened constituent traits (deduplicated, preserving first occurrence order), and a deeply frozen `schema` object that merges the schemas of all constituents. It throws an error if any constituent is a relation or if any field names overlap across constituents. Nested aspects are flattened into their individual traits. Repeated occurrences of the same trait are deduplicated, and the minimum constituent count is the number of unique traits after deduplication."
+    },
+    {
+      "decision_ids": [
+        "g005",
+        "g006",
+        "g007",
+        "g008",
+        "g009",
+        "f001",
+        "f002",
+        "f003"
+      ],
+      "text": "Entity operations on an aspect behave as follows: `has` returns true only when the entity has every constituent trait. `get` returns a new merged object containing all fields from all constituents when the entity has every constituent, and returns undefined if any constituent is missing. `set` accepts a merged object, writes each field to its owning constituent's store, and triggers per-trait change detection for each constituent that had a field written; it is a no-op if any constituent is missing, and it always triggers change detection for written fields regardless of whether the value changed. `add` adds only the constituent traits the entity does not already have, initializing each newly added constituent with the values from the provided merged object for its fields, and leaves already-present constituents unchanged; unknown fields are ignored and omitted fields are left unchanged. `remove` removes all constituent traits from the entity, regardless of whether the entity currently has them, and does nothing for constituents that are already absent."
+    },
+    {
+      "decision_ids": [
+        "g010",
+        "g011",
+        "g012",
+        "g013",
+        "f005",
+        "f006",
+        "f007",
+        "f008",
+        "f009"
+      ],
+      "text": "When an aspect is used as a query parameter, the query matches only entities that have all constituent traits. The query result's `readEach` invokes the callback with a merged object containing all constituent fields for each entity that has all constituents, and returns the query result for chaining. `updateEach` invokes the callback with a merged object, then distributes each field back to its owning constituent store, triggering per-trait change detection for changed fields. In `readEach`/`updateEach` callbacks, directly supplied aspects, ordinary data traits, and tag-only aspects each occupy one slot in the state array, with tag-only aspects yielding an empty object; `Not` modifiers contribute no slot, and nested aspects flatten to their constituent traits, each occupying its own slot. In aspect `updateEach`, a constituent is considered changed if its new value is not shallow-equal to the previously stored value. `updateEach` accepts a changeDetection option: 'never' commits writes without triggering change detection or notifications; 'always' and 'auto' commit writes and trigger change detection/notifications. If an `updateEach` callback destroys its entity, aspect writes and notifications for that entity are skipped entirely. Aspect `updateEach` dispatches constituent change notifications after the callback iteration completes. Query lifecycle callbacks (`onAdd`, `onRemove`, `onChange`) fire per constituent trait, not per aspect, and receive only the entity as the callback argument."
+    },
+    {
+      "decision_ids": [
+        "g014",
+        "g015",
+        "g016",
+        "g017",
+        "g018",
+        "g019",
+        "f013",
+        "f014"
+      ],
+      "text": "Aspects compose with all query modifiers. The `Not` modifier, when given an aspect, matches an entity if and only if the entity lacks at least one of the aspect's constituent traits. The `Or` modifier, when given an aspect, matches an entity if and only if the entity has at least one of the aspect's constituent traits; when an aspect is passed to `Or` alongside a regular trait, the aspect's constituent traits are expanded into separate alternatives within the `Or`, so the predicate is a disjunction over each individual constituent trait and the regular trait. The `Changed` modifier, when given an aspect, matches an entity if and only if all constituent traits are present and at least one constituent has changed. The `Added` modifier, when given an aspect, matches an entity if and only if the entity transitions from having at least one missing constituent to having all constituents. The `Removed` modifier, when given an aspect, matches an entity if and only if the entity transitions from having all constituents to having at least one missing constituent. When an aspect is used as a query parameter, the query requires all constituent traits, and when an aspect is used inside `Not`, `Or`, `Changed`, `Added`, or `Removed`, the modifier's trait list is the aspect's constituent traits, and tracking groups are created per modifier with AND logic for top-level tracking modifiers and OR logic for nested tracking modifiers inside `Or`."
+    },
+    {
+      "decision_ids": [
+        "g020",
+        "g021",
+        "g022",
+        "g023",
+        "g024",
+        "f010",
+        "f015",
+        "f016"
+      ],
+      "text": "Aspect subscriptions behave as follows: `onAdd` fires exactly once when an entity transitions from having at least one but not all constituent traits to having all constituent traits, and the callback receives the entity as its sole argument. `onRemove` fires exactly once when an entity transitions from having all constituent traits to having at least one but not all, and the callback receives the entity as its sole argument. `onChange` fires whenever any constituent trait's data changes while the entity has all constituent traits, and the callback receives the entity as its sole argument; it fires one notification per constituent trait that changed, not a single notification for the whole aspect operation. Each subscription method returns an unsubscribe function that, when invoked, detaches the callback from the aspect's constituent trait subscription sets, and repeated calls to that unsubscribe function have no further effect (they are idempotent). When the world is reset, all aspect subscriptions are cleared and no further callbacks fire for entities created after the reset, and the aspect's constituent traits are re-registered as needed; world.reset clears all aspect query results, unregisters all constituent traits (clearing their instances and subscriptions), and resets all subscription lifetimes."
+    }
+  ],
+  "constraints": [
+    {
+      "decision_ids": [
+        "g001",
+        "g002",
+        "g003",
+        "g004",
+        "f011",
+        "f012"
+      ],
+      "text": "The existing trait system's conventions for id generation, property definition, and schema freezing must be preserved. Aspects must not introduce new public APIs beyond `createAspect` and its associated types. The `traits` array must be frozen and the `schema` deeply frozen to prevent mutation. Repeated traits are deduplicated, and the minimum constituent count is the number of unique traits after deduplication."
+    },
+    {
+      "decision_ids": [
+        "g005",
+        "g006",
+        "g007",
+        "g008",
+        "g009",
+        "f001",
+        "f002",
+        "f003"
+      ],
+      "text": "Entity operations must preserve existing per-trait behavior: `set` always triggers change detection for written fields, `add` skips already-present traits, `remove` skips absent traits, and the SoA field-accessor contract ignores unknown fields and leaves omitted fields unchanged. Aspect `set` is a no-op if any constituent is missing."
+    },
+    {
+      "decision_ids": [
+        "g010",
+        "g011",
+        "g012",
+        "g013",
+        "f005",
+        "f006",
+        "f007",
+        "f008",
+        "f009"
+      ],
+      "text": "Query behavior must preserve existing query-result semantics: `readEach` returns the query result for chaining, `updateEach` uses shallow equality for change detection, supports changeDetection options, skips destroyed entities, and dispatches notifications after callback iteration. Callback slots follow existing rules: tags and Not modifiers contribute no slot, but tag-only aspects must occupy a slot with an empty object."
+    },
+    {
+      "decision_ids": [
+        "g014",
+        "g015",
+        "g016",
+        "g017",
+        "g018",
+        "g019",
+        "f013",
+        "f014"
+      ],
+      "text": "Modifier behavior must preserve existing modifier semantics: `Not` matches missing at least one, `Or` matches at least one, `Changed` requires all constituents present, `Added` and `Removed` track transitions. When an aspect is passed to `Or`, its constituent traits are expanded into separate alternatives."
+    },
+    {
+      "decision_ids": [
+        "g020",
+        "g021",
+        "g022",
+        "g023",
+        "g024",
+        "f010",
+        "f015",
+        "f016"
+      ],
+      "text": "Subscription behavior must preserve existing per-trait subscription patterns: callbacks receive only the entity, unsubscribe functions are idempotent, and world.reset clears all subscriptions and query results. Aspect `onChange` fires per constituent trait, not per aspect operation."
+    }
+  ],
+  "relevant_context": [
+    {
+      "decision_ids": [
+        "g001",
+        "g002",
+        "g003",
+        "g004",
+        "f011",
+        "f012"
+      ],
+      "text": "The existing trait system generates unique ids via a module-level counter and defines `id` and `schema` as non-writable, non-configurable properties. Tag schemas are frozen. Aspects should follow the same pattern for consistency. The instruction requires distinct instances per `createAspect` call, so a similar counter is used. The `traits` array is frozen to prevent mutation, and the schema is deeply frozen to prevent nested changes."
+    },
+    {
+      "decision_ids": [
+        "g005",
+        "g006",
+        "g007",
+        "g008",
+        "g009",
+        "f001",
+        "f002",
+        "f003"
+      ],
+      "text": "Existing trait operations (`hasTrait`, `getTrait`, `setTrait`, `addTrait`, `removeTrait`) are per-trait and assume the trait is present for `get` and `set`. The SoA set accessor only writes keys present in the value object, so unknown fields are ignored and omitted fields are not overwritten. The instruction specifies aspect-level operations that distribute to constituents, so these per-trait behaviors are inherited."
+    },
+    {
+      "decision_ids": [
+        "g010",
+        "g011",
+        "g012",
+        "g013",
+        "f005",
+        "f006",
+        "f007",
+        "f008",
+        "f009"
+      ],
+      "text": "The existing query engine expands query parameters into trait lists and stores, and `readEach`/`updateEach` operate on per-trait state arrays. The instruction requires merged data for aspects, so the state array must be flattened into a single object for callbacks. The existing `updateEach` uses shallow equality for change detection and supports changeDetection options. The existing code skips tags and Not modifiers in the traits array, but the instruction requires tag-only aspects to occupy a slot with an empty object."
+    },
+    {
+      "decision_ids": [
+        "g014",
+        "g015",
+        "g016",
+        "g017",
+        "g018",
+        "g019",
+        "f013",
+        "f014"
+      ],
+      "text": "The existing modifiers (`Not`, `Or`, `Changed`, `Added`, `Removed`) accept trait lists and are processed by the query engine. The instruction requires aspects to compose with all modifiers, so the aspect's constituent traits are passed to these modifiers. The existing tracking logic enforces required traits before evaluating change, so `Changed(aspect)` requires all constituents present. The `Or` modifier currently separates traits and modifiers, but aspects are not traits, so the aspect's traits must be expanded into the Or's trait list to satisfy the instruction."
+    },
+    {
+      "decision_ids": [
+        "g020",
+        "g021",
+        "g022",
+        "g023",
+        "g024",
+        "f010",
+        "f015",
+        "f016"
+      ],
+      "text": "The existing world subscription methods (`onAdd`, `onRemove`, `onChange`) return unsubscribe functions that delete the callback from a Set, and repeated calls are no-ops. World reset clears all trait instances and subscriptions. The instruction specifies aspect-level transitions, so subscriptions must be implemented by tracking constituent presence and firing on transitions. The callback signature inherits the existing pattern of passing only the entity."
+    },
+    {
+      "decision_ids": [
+        "f004"
+      ],
+      "text": "Unresolved choice: Merged aspect get/readEach data should be a shallow copy of each constituent's data, so top-level assignments do not write through to the underlying store, while nested object/array references are shared and thus write through to the underlying store. Alternatives: deep copy of nested objects/arrays to prevent any write-through; full write-through for all levels to allow direct mutation."
+    }
+  ],
+  "acceptance_criteria": [
+    {
+      "decision_ids": [
+        "g001",
+        "g002",
+        "g003",
+        "g004",
+        "f011",
+        "f012"
+      ],
+      "text": "Given a world and two traits with non-overlapping fields, calling `createAspect(traitA, traitB)` returns an object with a unique numeric `id`, a `traits` array containing exactly `[traitA, traitB]`, and a `schema` that merges both schemas. The `traits` array is frozen, and the `schema` is deeply frozen. Passing a nested aspect as a constituent flattens it into its individual traits, and repeated traits are deduplicated. Passing a relation or overlapping fields throws an error. Each call to `createAspect` returns a distinct instance."
+    },
+    {
+      "decision_ids": [
+        "g005",
+        "g006",
+        "g007",
+        "g008",
+        "g009",
+        "f001",
+        "f002",
+        "f003"
+      ],
+      "text": "Given an entity with only traitA, `has(aspect)` returns false, `get(aspect)` returns undefined, and `set(aspect, data)` is a no-op. After adding traitB via `add(aspect, data)`, `has(aspect)` returns true, `get(aspect)` returns a merged object with fields from both traits, and `set(aspect, data)` writes fields to the correct constituents and triggers change detection for each written constituent. `add(aspect, data)` on an entity that already has both traits does nothing. `remove(aspect)` removes both traits, and `has(aspect)` returns false. Unknown fields in `set` or `add` are ignored, and omitted fields are left unchanged."
+    },
+    {
+      "decision_ids": [
+        "g010",
+        "g011",
+        "g012",
+        "g013",
+        "f005",
+        "f006",
+        "f007",
+        "f008",
+        "f009"
+      ],
+      "text": "Given a query with an aspect parameter, the query matches only entities that have all constituent traits. `readEach` invokes the callback with a merged object containing all fields. `updateEach` invokes the callback with a merged object, and after the callback, writes fields back to the correct constituents, triggering change detection for changed fields. If the callback destroys the entity, no writes or notifications occur. With changeDetection 'never', writes are committed without notifications. Notifications are dispatched after all callbacks have run. In callback slots, a tag-only aspect yields an empty object, and a Not modifier contributes no slot."
+    },
+    {
+      "decision_ids": [
+        "g014",
+        "g015",
+        "g016",
+        "g017",
+        "g018",
+        "g019",
+        "f013",
+        "f014"
+      ],
+      "text": "Given an aspect with two traits, `Not(aspect)` matches an entity missing at least one constituent. `Or(aspect)` matches an entity having at least one constituent. `Changed(aspect)` matches an entity only if all constituents are present and at least one has changed. `Added(aspect)` matches the transition from incomplete to complete, and `Removed(aspect)` matches the transition from complete to incomplete. When `Or(aspect, traitC)` is used, the predicate is a disjunction over each constituent trait and traitC."
+    },
+    {
+      "decision_ids": [
+        "g020",
+        "g021",
+        "g022",
+        "g023",
+        "g024",
+        "f010",
+        "f015",
+        "f016"
+      ],
+      "text": "Given an aspect with two traits, `onAdd` fires exactly once when the entity transitions from incomplete to complete, `onRemove` fires exactly once on the reverse transition, and `onChange` fires whenever any constituent changes while all are present, with one notification per changed constituent. Each subscription method returns an unsubscribe function that, when called, detaches the callback, and repeated calls have no effect. After `world.reset`, no further callbacks fire for entities created after the reset, and all subscriptions are cleared."
+    }
+  ],
+  "verification": [
+    "Run the core package test suite: `pnpm --filter @powdrr/core test`.",
+    "Run type checking: `pnpm --filter @powdrr/core typecheck`.",
+    "Run linting: `pnpm --filter @powdrr/core lint`.",
+    "Run the full repository test suite if feasible: `pnpm test`."
+  ],
+  "assembly_fallbacks": [
+    {
+      "decision_id": "f004",
+      "section": "relevant_context",
+      "reason": "model omitted decision; materialized from existing analysis without another model call"
+    }
+  ]
+}

@@ -1,0 +1,1109 @@
+{
+  "reviewer": "Codex agent-authored static review; not human gold or code-execution results",
+  "rubric": "full=entire target bundle resolved; partial=some facets absent; wrong=explicit conflict with authoritative target; missing=no policy; unresolved=matching proposal explicitly withheld. Evidence support is a separate concern. Focused policy statements override broad statements on the same topic.",
+  "target_entry_count": 34,
+  "artifacts_sha256": {
+    "oracle": "a615600ce419824a1de43c1c1b7703a3de63ee4d44df87a30c25883be53fceb0",
+    "instruction-only": "6dbfe5c2a2a9e6da8b08b0d5157d0b3c684378921ab455754e49cc4394c05e2c",
+    "repository-grounded": "43ecc3d64ef3e8ff9f01274e1d63738a7d1114465952d10bb9b1e62c65d13184",
+    "focused": "2e60137cdee6d84e954bd483fc02e8d51222e705082f2e35af6b5d65ccb5dcc1"
+  },
+  "summary": {
+    "prior-candidate": {
+      "all_target_entries": {
+        "full": 11,
+        "partial": 8,
+        "missing": 14,
+        "wrong": 1
+      },
+      "excluding_edge_entries": {
+        "full": 11,
+        "partial": 8,
+        "missing": 10,
+        "wrong": 1
+      }
+    },
+    "instruction-only": {
+      "all_target_entries": {
+        "partial": 12,
+        "full": 6,
+        "missing": 12,
+        "wrong": 4
+      },
+      "excluding_edge_entries": {
+        "partial": 12,
+        "full": 6,
+        "missing": 8,
+        "wrong": 4
+      }
+    },
+    "repository-grounded": {
+      "all_target_entries": {
+        "full": 11,
+        "partial": 12,
+        "missing": 11
+      },
+      "excluding_edge_entries": {
+        "full": 11,
+        "partial": 12,
+        "missing": 7
+      }
+    },
+    "focused": {
+      "all_target_entries": {
+        "full": 16,
+        "partial": 7,
+        "wrong": 2,
+        "unresolved": 5,
+        "missing": 4
+      },
+      "excluding_edge_entries": {
+        "full": 16,
+        "partial": 6,
+        "wrong": 2,
+        "unresolved": 5,
+        "missing": 1
+      }
+    }
+  },
+  "rows": [
+    {
+      "id": "D01",
+      "target": "Export createAspect and the public Aspect type.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D01",
+        "status": "full",
+        "evidence": "R1 exports createAspect and AC1 also requests Aspect, although they are inconsistent in placement."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a003"
+        ],
+        "explanation": "Aspect type export missing"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a002"
+        ],
+        "explanation": "Exports function and associated types"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "g002"
+        ],
+        "explanation": "Exports public associated type"
+      }
+    },
+    {
+      "id": "D02",
+      "target": "Flatten nested aspects, deduplicate underlying traits by identity, retain first occurrence order, and require at least two unique traits after flattening.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D02",
+        "status": "partial",
+        "evidence": "R1 specifies flattening and two unique underlying traits; first-occurrence order is unstated."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a001",
+          "a002",
+          "a005"
+        ],
+        "explanation": "No deduplication/order rule"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a001",
+          "a004"
+        ],
+        "explanation": "Flattening but no deduplication/order rule"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "f011",
+          "g001"
+        ],
+        "explanation": "Deduplication, first order and unique-count minimum explicit"
+      }
+    },
+    {
+      "id": "D03",
+      "target": "Reject relation constituents and overlapping data schema field names at creation time.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D03",
+        "status": "full",
+        "evidence": "R1 rejects relations and overlapping schema fields."
+      },
+      "instruction-only": {
+        "status": "full",
+        "decision_ids": [
+          "a001"
+        ],
+        "explanation": "Creation errors explicit"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a001"
+        ],
+        "explanation": "Creation errors explicit"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "g001"
+        ],
+        "explanation": "Creation errors retained"
+      }
+    },
+    {
+      "id": "D04",
+      "target": "Accept tags and merge schema fields from data constituents; tags contribute no fields.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D04",
+        "status": "full",
+        "evidence": "R1 accepts tags with no schema fields and combines data schema."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a002",
+          "a004"
+        ],
+        "explanation": "Tag acceptance but no tag schema-field rule"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a001",
+          "a003"
+        ],
+        "explanation": "No explicit tag schema behavior"
+      },
+      "focused": {
+        "status": "partial",
+        "decision_ids": [
+          "g001",
+          "f005"
+        ],
+        "explanation": "Tag-only aspect accepted but schema contribution not explicit"
+      }
+    },
+    {
+      "id": "D05",
+      "target": "Every call returns a fresh instance with a distinct numeric ID.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D05",
+        "status": "partial",
+        "evidence": "R1 requires distinct IDs but does not specify numeric type."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a001",
+          "a004"
+        ],
+        "explanation": "Fresh instance/unique id but no numeric type"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a001",
+          "a003"
+        ],
+        "explanation": "Fresh aspect with unique numeric id"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "g001",
+          "g003"
+        ],
+        "explanation": "Fresh unique numeric id retained"
+      }
+    },
+    {
+      "id": "D06",
+      "target": "Expose non-reassignable id/traits/schema; freeze traits and schema at the top level, retaining nested schema references.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D06",
+        "status": "missing",
+        "evidence": "No metadata immutability policy."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No mutability policy"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a003"
+        ],
+        "explanation": "Readonly id only; no container freezing"
+      },
+      "focused": {
+        "status": "wrong",
+        "decision_ids": [
+          "f012"
+        ],
+        "explanation": "Deep freezing is stronger than the target's shallow freeze"
+      }
+    },
+    {
+      "id": "D07",
+      "target": "An aspect is callable with optional initial field values and the configured result is accepted by entity.add; bare aspect addition uses defaults.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D07",
+        "status": "full",
+        "evidence": "R2 includes add(aspect(data)) and bare default addition."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a009"
+        ],
+        "explanation": "Initialization but callable configuration/defaults unstated"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a008"
+        ],
+        "explanation": "No callable/default configuration form"
+      },
+      "focused": {
+        "status": "partial",
+        "decision_ids": [
+          "g008",
+          "f003"
+        ],
+        "explanation": "No explicit callable configuration/default form"
+      }
+    },
+    {
+      "id": "D08",
+      "target": "has requires every constituent; get returns undefined if any is missing; otherwise merge data fields, omit tag data, and return an empty object for a complete tag-only aspect.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D08",
+        "status": "full",
+        "evidence": "R2 has/get requires all, merges fields and omits tag data; zero merged fields imply an empty object."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a006",
+          "a007"
+        ],
+        "explanation": "Membership and merged get; tag-only data unstated"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a005",
+          "a006"
+        ],
+        "explanation": "has/get core behavior but no tag-only output"
+      },
+      "focused": {
+        "status": "partial",
+        "decision_ids": [
+          "g005",
+          "g006"
+        ],
+        "explanation": "No explicit tag-only get output"
+      }
+    },
+    {
+      "id": "D09",
+      "target": "Return a new shallow merged object: top-level assignments do not write back; nested object/array references are shared, not deeply cloned.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D09",
+        "status": "missing",
+        "evidence": "Merged object/view does not establish shallow copying or aliasing."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a007",
+          "a017"
+        ],
+        "explanation": "New merged object but copy depth and nested aliasing unstated"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a006",
+          "a011"
+        ],
+        "explanation": "New object but no depth/aliasing contract"
+      },
+      "focused": {
+        "status": "unresolved",
+        "decision_ids": [
+          "f004"
+        ],
+        "explanation": "Correct shallow/shared-reference proposal but evidence failed verification"
+      }
+    },
+    {
+      "id": "D10",
+      "target": "If any constituent is missing, perform no writes and no notifications.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D10",
+        "status": "missing",
+        "evidence": "No set behavior for incomplete entities."
+      },
+      "instruction-only": {
+        "status": "full",
+        "decision_ids": [
+          "a008"
+        ],
+        "explanation": "No-op matches target, incorrectly attributed to instruction"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No incomplete set rule"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "f001"
+        ],
+        "explanation": "No-op policy matches, but attribution to instruction is unsupported"
+      }
+    },
+    {
+      "id": "D11",
+      "target": "Route supplied schema fields to their owners, ignore unknown fields, and preserve unspecified fields.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D11",
+        "status": "partial",
+        "evidence": "R2 routes fields and preserves omitted values, but unknown-field treatment is absent."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a008",
+          "a009",
+          "a022"
+        ],
+        "explanation": "Unknown-field policy only given for updateEach"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a007",
+          "a008"
+        ],
+        "explanation": "Field ownership but unknown/omitted fields unspecified"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "f003"
+        ],
+        "explanation": "Ignored unknown fields and preserved omitted values"
+      }
+    },
+    {
+      "id": "D12",
+      "target": "Forward triggerChanged: false suppresses notifications while applying writes.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D12",
+        "status": "missing",
+        "evidence": "No triggerChanged control."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No explicit notification control"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No triggerChanged false"
+      },
+      "focused": {
+        "status": "unresolved",
+        "decision_ids": [
+          "f002"
+        ],
+        "explanation": "Correct pass-through proposal; no verified citation and downgraded confidence"
+      }
+    },
+    {
+      "id": "D13",
+      "target": "Add only missing constituents, use trait defaults for omitted fields, and never overwrite data of existing constituents.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D13",
+        "status": "full",
+        "evidence": "R2 adds missing/default constituents and preserves existing data."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a009"
+        ],
+        "explanation": "Missing-only and preserve existing; omitted-value defaults unstated"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a008"
+        ],
+        "explanation": "Missing-only and preserve existing; defaults missing"
+      },
+      "focused": {
+        "status": "partial",
+        "decision_ids": [
+          "g008",
+          "f003"
+        ],
+        "explanation": "Missing-only/preserved existing, omitted-value initialization defaults unstated"
+      }
+    },
+    {
+      "id": "D14",
+      "target": "Remove present constituent traits, tolerate absent constituents, and leave unrelated traits alone.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D14",
+        "status": "partial",
+        "evidence": "R2 removes constituents and leaves unrelated traits; missing-constituent removal policy is unstated."
+      },
+      "instruction-only": {
+        "status": "full",
+        "decision_ids": [
+          "a010"
+        ],
+        "explanation": "Removes constituents including when some absent"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a009"
+        ],
+        "explanation": "Absent constituents explicitly tolerated"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "g009"
+        ],
+        "explanation": "Absent removal tolerated"
+      }
+    },
+    {
+      "id": "D15",
+      "target": "Require all constituents, compose with ordinary traits and other aspects, and update matching as constituent membership changes.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D15",
+        "status": "full",
+        "evidence": "R3 and AC3 cover all-present matching, trait/aspect composition and live membership."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a011",
+          "a035"
+        ],
+        "explanation": "Matching and composition but live updates unstated"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a010"
+        ],
+        "explanation": "All-present but no live matching/composition examples"
+      },
+      "focused": {
+        "status": "partial",
+        "decision_ids": [
+          "g010"
+        ],
+        "explanation": "Live membership and explicit composition details unstated"
+      }
+    },
+    {
+      "id": "D16",
+      "target": "Use one merged data slot per directly supplied aspect, including an empty object for a tag-only aspect; ordinary tag parameters and Not modifiers contribute no data slots; retain surrounding data parameter order.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D16",
+        "status": "partial",
+        "evidence": "R3 says merged aspect slot at parameter position; no skipped tag/Not slots or tag-only aspect slot."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No data-slot rules"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No callback-slot policy"
+      },
+      "focused": {
+        "status": "wrong",
+        "decision_ids": [
+          "f005"
+        ],
+        "explanation": "Nested aspects incorrectly split into constituent callback slots; ordinary tag omission unclear"
+      }
+    },
+    {
+      "id": "D17",
+      "target": "Write back changed existing fields to their constituent stores and detect changes per constituent using top-level strict inequality, not recursive value comparison.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D17",
+        "status": "partial",
+        "evidence": "R3 covers writeback and per-constituent changes but not top-level strict-inequality comparison."
+      },
+      "instruction-only": {
+        "status": "wrong",
+        "decision_ids": [
+          "a021"
+        ],
+        "explanation": "Every field write notifies; unchanged constituents should not notify in updateEach"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a012"
+        ],
+        "explanation": "Changed fields but no strict shallow comparison"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "f006",
+          "g012"
+        ],
+        "explanation": "Shallow comparison and per-constituent writeback"
+      }
+    },
+    {
+      "id": "D18",
+      "target": "changeDetection never still commits writes but suppresses change notifications.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D18",
+        "status": "missing",
+        "evidence": "No changeDetection never mode."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No never mode"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No never mode"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "f007"
+        ],
+        "explanation": "Never commits without notification"
+      }
+    },
+    {
+      "id": "D19",
+      "target": "For aspect queries, all non-never modes share the same branch and emit notifications for constituents detected as changed.",
+      "category": "edge",
+      "prior-candidate": {
+        "id": "D19",
+        "status": "missing",
+        "evidence": "No non-never mode behavior."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No non-never mode behavior"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No non-never behavior"
+      },
+      "focused": {
+        "status": "partial",
+        "decision_ids": [
+          "f007"
+        ],
+        "explanation": "Named modes inherit current behavior; shared non-never aspect branch not explicit"
+      }
+    },
+    {
+      "id": "D20",
+      "target": "After the callback, skip writeback if the entity has been destroyed.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D20",
+        "status": "missing",
+        "evidence": "No callback-destruction policy."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No callback-destruction guard"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No destruction guard"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "f008"
+        ],
+        "explanation": "Destroyed entities skipped"
+      }
+    },
+    {
+      "id": "D21",
+      "target": "Dispatch detected constituent change notifications after processing the entity iteration, rather than during each callback.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D21",
+        "status": "missing",
+        "evidence": "No notification-dispatch timing."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No notification timing"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No dispatch timing"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "f009"
+        ],
+        "explanation": "Notifications after iteration"
+      }
+    },
+    {
+      "id": "D22",
+      "target": "For a single aspect within a mask generation, match entities missing at least one constituent, including none; update membership in both directions.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D22",
+        "status": "full",
+        "evidence": "R4 and AC4 cover missing-at-least-one and membership updates."
+      },
+      "instruction-only": {
+        "status": "full",
+        "decision_ids": [
+          "a012",
+          "a030"
+        ],
+        "explanation": "Not predicate explicit"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a014"
+        ],
+        "explanation": "Not predicate explicit"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "g014"
+        ],
+        "explanation": "Single Not predicate retained"
+      }
+    },
+    {
+      "id": "D23",
+      "target": "Require all constituents currently present and accept any recorded constituent data change; unchanged entities do not match.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D23",
+        "status": "partial",
+        "evidence": "R4 covers any changed constituent but does not explicitly require current completeness for Changed."
+      },
+      "instruction-only": {
+        "status": "wrong",
+        "decision_ids": [
+          "a013",
+          "a032"
+        ],
+        "explanation": "Inconsistent sufficiency: a013 omits completeness whereas a032 includes it"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a016"
+        ],
+        "explanation": "Completeness and any changed constituent explicit"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "f013"
+        ],
+        "explanation": "Changed requires complete aspect"
+      }
+    },
+    {
+      "id": "D24",
+      "target": "Track incomplete-to-complete and complete-to-incomplete membership against existing modifier tracking history, including complete spawn and excluding removals from previously incomplete sets.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D24",
+        "status": "partial",
+        "evidence": "R4/AC4 specify transitions and spawn/incomplete cases but not tracking observation history."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a014",
+          "a015",
+          "a033",
+          "a034"
+        ],
+        "explanation": "Transition rules but tracking baseline unspecified"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a017",
+          "a018",
+          "a019"
+        ],
+        "explanation": "Transition rules but tracking history unstated"
+      },
+      "focused": {
+        "status": "partial",
+        "decision_ids": [
+          "g017",
+          "g018",
+          "g019"
+        ],
+        "explanation": "Tracking baseline/history still unstated"
+      }
+    },
+    {
+      "id": "D25",
+      "target": "Expand an aspect into independently matching constituent alternatives: Or(aspect(A,B), C) is A OR B OR C.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D25",
+        "status": "missing",
+        "evidence": "Compose with Or does not specify constituent alternatives."
+      },
+      "instruction-only": {
+        "status": "full",
+        "decision_ids": [
+          "a031"
+        ],
+        "explanation": "Constituent-level Or matches target, though its rationale is inconsistent"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a015"
+        ],
+        "explanation": "Constituent alternatives match solution"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "f014"
+        ],
+        "explanation": "Exact constituent-level Or matches; evidence attribution is overstated"
+      }
+    },
+    {
+      "id": "D26",
+      "target": "onAdd gates constituent add callbacks on completeness; onRemove gates removals on the other constituents being present; onChange gates constituent change callbacks on completeness; callbacks receive the affected entity.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D26",
+        "status": "full",
+        "evidence": "R5/AC5 cover completeness-gated subscriptions and callback entity."
+      },
+      "instruction-only": {
+        "status": "wrong",
+        "decision_ids": [
+          "a023",
+          "a024",
+          "a025",
+          "a026"
+        ],
+        "explanation": "Invents merged data callback arguments"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a020",
+          "a021",
+          "a022"
+        ],
+        "explanation": "Membership-gated callbacks with entity argument"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "g020",
+          "g021",
+          "g022"
+        ],
+        "explanation": "Membership-gated callbacks with entity argument"
+      }
+    },
+    {
+      "id": "D27",
+      "target": "Return an unsubscribe function which removes all constituent subscriptions.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D27",
+        "status": "full",
+        "evidence": "R5/AC5 require unsubscribe to stop future callbacks."
+      },
+      "instruction-only": {
+        "status": "full",
+        "decision_ids": [
+          "a039"
+        ],
+        "explanation": "Unsubscribe stops all future callbacks"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a023"
+        ],
+        "explanation": "Unsubscribe contract explicit"
+      },
+      "focused": {
+        "status": "full",
+        "decision_ids": [
+          "f015"
+        ],
+        "explanation": "Detach constituent subscriptions, idempotent unsubscribe"
+      }
+    },
+    {
+      "id": "D28",
+      "target": "Notifications remain per constituent, so one aspect operation updating two constituents may invoke the aspect subscriber twice; do not coalesce to once per aspect operation.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D28",
+        "status": "missing",
+        "evidence": "No per-constituent versus per-operation callback count."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No unit of onChange notification"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a013"
+        ],
+        "explanation": "Per-constituent callback unit, explicitly a chosen assumption"
+      },
+      "focused": {
+        "status": "unresolved",
+        "decision_ids": [
+          "f010"
+        ],
+        "explanation": "Correct per-constituent proposal but no verified repository citation"
+      }
+    },
+    {
+      "id": "D29",
+      "target": "Aspect instances participate distinctly in query hashing rather than being represented as ordinary constituent query parameters.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D29",
+        "status": "missing",
+        "evidence": "Distinct creation IDs do not explicitly require aspect-specific query-cache identity."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No query cache identity"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No query cache identity"
+      },
+      "focused": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No aspect-instance query hash policy"
+      }
+    },
+    {
+      "id": "D30",
+      "target": "Combine constituents from multiple aspect Not parameters into a single notAll set; do not retain a separate negative predicate for each aspect.",
+      "category": "edge",
+      "prior-candidate": {
+        "id": "D30",
+        "status": "missing",
+        "evidence": "No multiple Not-group rule."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No multiple Not set policy"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No multiple negative set policy"
+      },
+      "focused": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No aggregation of multiple Not sets"
+      }
+    },
+    {
+      "id": "D31",
+      "target": "checkAspectTrackingGroup returns the result for the first relevant generation; negative masks are evaluated separately per generation.",
+      "category": "edge",
+      "prior-candidate": {
+        "id": "D31",
+        "status": "missing",
+        "evidence": "No mask-generation policy."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No generation-boundary policy"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No generation policy"
+      },
+      "focused": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No first-generation tracking/per-generation negative policy"
+      }
+    },
+    {
+      "id": "D32",
+      "target": "Function-valued schemas contribute no merged schema entries or field owners; their fields are not routed by aspect set/add through the field map.",
+      "category": "edge",
+      "prior-candidate": {
+        "id": "D32",
+        "status": "missing",
+        "evidence": "No function-schema behavior."
+      },
+      "instruction-only": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No function-schema field-map policy"
+      },
+      "repository-grounded": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No function-schema field map behavior"
+      },
+      "focused": {
+        "status": "missing",
+        "decision_ids": [],
+        "explanation": "No function-schema field-map policy"
+      }
+    },
+    {
+      "id": "D33",
+      "target": "Aspect queries continue working across world.reset through existing reset behavior.",
+      "category": "core",
+      "prior-candidate": {
+        "id": "D33",
+        "status": "full",
+        "evidence": "R6 requires correct behavior after reset."
+      },
+      "instruction-only": {
+        "status": "partial",
+        "decision_ids": [
+          "a040"
+        ],
+        "explanation": "Reset state and callbacks but query matching after reset unstated"
+      },
+      "repository-grounded": {
+        "status": "partial",
+        "decision_ids": [
+          "a024"
+        ],
+        "explanation": "Reset/registration stated but query result behavior unstated"
+      },
+      "focused": {
+        "status": "unresolved",
+        "decision_ids": [
+          "f016"
+        ],
+        "explanation": "Correct reset proposal but no verified repository citation"
+      }
+    },
+    {
+      "id": "D34",
+      "target": "For each constituent with supplied recognized fields, use the existing setTraitForTrait path, which emits change when triggerChanged is true even if supplied values equal existing values.",
+      "category": "clarification",
+      "prior-candidate": {
+        "id": "D34",
+        "status": "wrong",
+        "evidence": "R2 says notifications run for constituents whose data changes; solution uses ordinary setTraitForTrait notifications even when supplied recognized values compare equal."
+      },
+      "instruction-only": {
+        "status": "wrong",
+        "decision_ids": [
+          "a008"
+        ],
+        "explanation": "Requires actual data change to notify ordinary set"
+      },
+      "repository-grounded": {
+        "status": "full",
+        "decision_ids": [
+          "a007"
+        ],
+        "explanation": "Writes notify each recipient constituent without requiring a value difference"
+      },
+      "focused": {
+        "status": "unresolved",
+        "decision_ids": [
+          "f002"
+        ],
+        "explanation": "Same-value notification proposed correctly, not a resolved mandate"
+      }
+    }
+  ]
+}

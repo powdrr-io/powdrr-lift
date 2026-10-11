@@ -1,0 +1,153 @@
+{
+  "objective": "Resolve behavioral decisions for aspect query modifiers and composition.",
+  "decisions": [
+    {
+      "operation": "Not",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Not` with an aspect matches entities missing at least one constituent."
+        }
+      ],
+      "alternatives": [
+        "Negate each constituent individually, which would match entities missing any one trait but also those missing all; this is equivalent to the chosen behavior.",
+        "Negate the entire aspect as a single trait, which would match entities missing the aspect as a whole, but since the aspect is a conjunction, this is the same as missing at least one constituent."
+      ],
+      "rationale": "The instruction explicitly defines the behavior, so no ambiguity remains.",
+      "raw_source_ids": [
+        "r019"
+      ],
+      "rejected_evidence": [],
+      "rule": "`Not` with an aspect matches entities that lack at least one constituent trait, meaning the negation is applied to the conjunction of all constituents.",
+      "id": "a001"
+    },
+    {
+      "operation": "Or",
+      "basis": "assumption",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "Aspects compose with all query modifiers."
+        }
+      ],
+      "alternatives": [
+        "`Or` could treat the aspect as a single unit, matching entities that have the entire aspect or the other condition; this would be less useful and not implied by the instruction.",
+        "`Or` could expand the aspect into its constituents and match any of them, which is the chosen behavior."
+      ],
+      "rationale": "The instruction says aspects compose with all modifiers, but does not specify the semantics for `Or`. Since an aspect is a conjunction, the natural extension is to treat it as a group and apply `Or` at the group level, meaning the group is satisfied if any of its constituents are present.",
+      "raw_source_ids": [
+        "r018"
+      ],
+      "rejected_evidence": [],
+      "rule": "`Or` with an aspect matches entities that have at least one constituent trait, because the aspect is treated as a conjunction and `Or` combines it with other conditions using logical OR.",
+      "id": "a002"
+    },
+    {
+      "operation": "Changed",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Changed` matches when any constituent data changed."
+        }
+      ],
+      "alternatives": [
+        "`Changed` could require all constituents to change simultaneously, which is not stated.",
+        "`Changed` could match when the merged aspect data changes, but since fields are disjoint, this is equivalent to any constituent changing."
+      ],
+      "rationale": "The instruction explicitly states 'any constituent data changed', so the behavior is clear.",
+      "raw_source_ids": [
+        "r020"
+      ],
+      "rejected_evidence": [],
+      "rule": "`Changed` with an aspect matches an entity when any constituent trait's data changes while the entity has all constituents, and the change is detected per constituent.",
+      "id": "a003"
+    },
+    {
+      "operation": "Added",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Added` matches the transition to all-present",
+          "model_quote": "`Added` matches the transition to all-present.",
+          "alignment": "recovered source clause by removing model-added terminal period"
+        }
+      ],
+      "alternatives": [
+        "`Added` could match when any constituent is added, but the instruction specifies 'transition to all-present'."
+      ],
+      "rationale": "The instruction defines the transition condition explicitly.",
+      "raw_source_ids": [
+        "r021"
+      ],
+      "rejected_evidence": [],
+      "rule": "`Added` with an aspect matches an entity when it transitions from having at least one missing constituent to having all constituents present, and this transition is detected by the query system.",
+      "id": "a004"
+    },
+    {
+      "operation": "Removed",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Removed` matches the transition from all-present."
+        }
+      ],
+      "alternatives": [
+        "`Removed` could match when any constituent is removed, but the instruction specifies 'transition from all-present'."
+      ],
+      "rationale": "The instruction defines the transition condition explicitly.",
+      "raw_source_ids": [
+        "r022"
+      ],
+      "rejected_evidence": [],
+      "rule": "`Removed` with an aspect matches an entity when it transitions from having all constituents present to having at least one missing constituent.",
+      "id": "a005"
+    },
+    {
+      "operation": "modifier composition and tracking",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "An aspect used as a query parameter requires all its constituents."
+        },
+        {
+          "file": "instruction",
+          "quote": "Aspects compose with all query modifiers."
+        }
+      ],
+      "alternatives": [
+        "Aspects might not be composable with certain modifiers, but the instruction says 'all'."
+      ],
+      "rationale": "The instruction explicitly states that aspects compose with all query modifiers, so the system must support them in any combination.",
+      "raw_source_ids": [
+        "r015",
+        "r018"
+      ],
+      "rejected_evidence": [],
+      "rule": "Aspects can be used as query parameters and compose with all query modifiers, including `Not`, `Or`, `Changed`, `Added`, and `Removed`, and the query system tracks constituent presence and data changes to evaluate these modifiers.",
+      "id": "a006"
+    }
+  ]
+}

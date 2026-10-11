@@ -386,27 +386,17 @@ invocation starts from the primary checkout.
 - The skill loader can validate a directory of skills and ensure every
   referenced skill exists.
 
-### Available Skills
+Browse the current [workflow-chat definitions](skill-definitions/) for planning,
+implementation, validation, and review flows. The shared Procedrr processes used
+by feature implementation live in
+[docs/procedrr/skill-definitions/](docs/procedrr/skill-definitions/) and are included
+in the installed package.
 
-This repository includes 10 reusable skills for planning, implementation, validation,
-review, and repository-state management:
+From a repository checkout, validate the workflow-chat definitions and templates
+with:
 
-1. **bootstrap** - Analyze repository structure and source code to identify taxonomy-compliant entities, relationships, and features. Generate a validated system specification document from the analysis and commit it.
+```bash
+powdrr-lift validate-workflow-definitions skill-definitions templates
+```
 
-2. **code-edit-context** - Use when you are about to edit code and need index-backed context for a file and line ranges.
-
-3. **implement-pr** - Find a proposed PR by fuzzy search, inspect the full proposal, validate it against the current indexed specs and changelogs, implement the requested changes, review the proposal again, and then optionally generate the matching PR changelog.
-
-4. **prepare-pr-changelog** - Use when preparing a pull request or getting a PR ready. Guides the agent through the PR changelog workflow with powdrr-lift.
-
-5. **review-pr-changelog** - Use during code review when the change includes a changelog. This skill complements general code-review skills; do not replace normal review. Check for the changelog first, validate it, then review each change against the PR intent and report the feedback.
-
-6. **specify-architecture** - Create, fill, and validate architecture specification templates with the repository's architecture-specification CLI or MCP endpoints.
-
-7. **specify-implementation** - Create, fill, and validate implementation specification templates with the repository's implementation-specification CLI or MCP endpoints.
-
-8. **specify-prs** - Create, fill, and validate proposed PR specification templates with the repository's pr-specification CLI or MCP endpoints.
-
-9. **specify-system** - Create, fill, and validate system specification templates with the repository's system-specification CLI or MCP endpoints.
-
-10. **synchronize-code-and-state** - Generate the current codebase-state snapshot, compare it to the source tree and changelog index, and reconcile mismatches by changing code and/or the changelog while preserving the repo's intent.
+For local DeepSWE runs, follow [the benchmark instructions](BENCHMARKS.md).

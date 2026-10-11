@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from powdrr_lift.cli import main
+from powdrr_lift.cli import build_parser, main
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.credential_check import (
     check_model_access,
@@ -139,6 +139,19 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
             }
         ),
     )
+    github_calls: list[list[str]] = []
+
+    def run_github(command: list[str], **_kwargs: object) -> SimpleNamespace:
+        github_calls.append(command)
+        if command == ["gh", "auth", "status"]:
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(
+            returncode=0,
+            stdout='{"nameWithOwner":"example/project","viewerPermission":"WRITE"}',
+            stderr="",
+        )
+
+    monkeypatch.setattr("powdrr_lift.cli.subprocess.run", run_github)
 
     import json
     from contextlib import redirect_stdout
@@ -161,4 +174,24 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
 
     assert exit_code == 0
     assert checks == [("planning", "zai"), ("coding", "deepinfra")]
-    assert json.loads(stdout.getvalue())["passed"] is True
+    report = json.loads(stdout.getvalue())
+    assert report["passed"] is True
+    assert report["checks"][-1] == {
+        "role": "github-access",
+        "provider": "gh",
+        "model": "GitHub CLI and repository permissions",
+        "status": "passed",
+        "repository": "example/project",
+        "permission": "WRITE",
+    }
+    assert github_calls == [
+        ["gh", "auth", "status"],
+        ["gh", "repo", "view", "--json", "nameWithOwner,viewerPermission"],
+    ]
+
+
+def test_bootstrap_opens_pull_request_by_default_with_local_opt_out() -> None:
+    parser = build_parser()
+
+    assert parser.parse_args(["bootstrap"]).open_pr is True
+    assert parser.parse_args(["bootstrap", "--no-open-pr"]).open_pr is False

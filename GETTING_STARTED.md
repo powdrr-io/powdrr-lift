@@ -4,11 +4,18 @@ This guide installs Powdrr Lift from a local checkout, configures and checks its
 provider credentials, bootstraps a repository, and runs one headless feature task.
 Commands below assume macOS, a shell, Git, and Python 3.12 or newer.
 
-## 1. Install Powdrr from this checkout
+## 1. Clone and install Powdrr
+
+Clone this repository, then install Powdrr from the local checkout:
+
+```bash
+git clone https://github.com/powdrr-io/powdrr-lift.git
+cd powdrr-lift
+```
 
 Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) if needed.
-From the root of this repository, install Powdrr in `uv`'s isolated tool
-environment. Editable mode means changes in this checkout are used directly.
+From the repository root, install Powdrr in `uv`'s isolated tool environment.
+Editable mode means changes in this checkout are used directly.
 
 ```bash
 uv tool install --editable --python 3.12 \
@@ -35,29 +42,23 @@ export DEEPINFRA_API_TOKEN="your-deepinfra-token"
 export TYPESAFEAI_API_KEY="your-typesafe-ai-key"
 ```
 
-Powdrr also recognizes `DEEPINFRA_API_KEY` for DeepInfra and
-`TYPESAFE_API_KEY` or `SYSTEM_ONE_API_KEY` for Typesafe AI. Put the exports in
-your shell profile if you want them available in future terminals. Avoid putting
-real secrets in shell history; use your shell's secure secret storage workflow
-when available.
+Put the exports in your shell profile if you want them available in future
+terminals. Avoid putting real secrets in shell history; use your shell's secure
+secret storage workflow when available.
 
 ## 3. Validate credentials
 
-Run the credential check from a Git repository. It makes authenticated requests
-to the configured planning and coding model routes and checks that the default
-mini-SWE-agent executable is available. It reports credential source and
-failures without printing key values.
+Change to the root of your project repository, then run the credential check.
+The `--repo-root` option defaults to the current directory, so it can be omitted
+when you are already in the repository. The check makes authenticated requests
+to the configured planning and coding model routes, checks that the default
+mini-SWE-agent executable is available, and checks GitHub authentication and
+write access to the repository. It reports credential source and failures
+without printing key values.
 
 ```bash
-powdrr-lift check-credentials --repo-root /path/to/your/repo
-```
-
-With the defaults, this checks DeepInfra for planning and coding. To validate
-GitHub access and repository write permission before asking Powdrr to publish a
-pull request, include `--open-pr`:
-
-```bash
-powdrr-lift check-credentials --repo-root /path/to/your/repo --open-pr
+cd /path/to/your/repo
+powdrr-lift check-credentials
 ```
 
 The command does not directly check the Typesafe AI key. The JEV classifier uses
@@ -68,21 +69,14 @@ credential checks as live provider requests; provider usage may be billed.
 
 ## 4. Bootstrap your repository
 
-Change to your own project's clean Git checkout. Bootstrap analyzes its source
-and creates the initial Structrr specification artifacts on a dedicated branch
-and worktree.
+From your own project's clean Git checkout, bootstrap analyzes its source and
+creates the initial Structrr specification artifacts on a dedicated branch and
+worktree. `--repo-root` defaults to the current directory and can be omitted.
+Bootstrap opens a pull request by default; `--no-open-pr` keeps the generated
+branch local.
 
 ```bash
-cd /path/to/your/repo
-powdrr-lift bootstrap --repo-root .
-```
-
-Review the printed report, branch, and retained worktree. To have Powdrr publish
-the onboarding branch as a GitHub pull request, first authenticate `gh` for an
-account with write access, then run:
-
-```bash
-powdrr-lift bootstrap --repo-root . --open-pr
+powdrr-lift bootstrap
 ```
 
 Review and merge the bootstrap pull request, then update your local checkout
@@ -95,16 +89,16 @@ Write the requested outcome in a Markdown or text file in your repository, for
 example `feature.md`. Be specific about behavior and constraints. Then run:
 
 ```bash
-powdrr-lift implement --repo-root . --headless \
+powdrr-lift implement --headless \
   --request-file feature.md \
   --work-item-name add-project-feature
 ```
 
 Powdrr plans, implements, validates, and reviews the change locally. Headless
 mode resolves unspecified details using documented defaults and records those
-decisions in the report. The command does not publish by default. Add `--open-pr`
-to push the verified branch and open a pull request; `gh` must be authenticated
-with write access.
+decisions in the report. The command does not publish a pull request by default.
+Add `--open-pr` to push the verified branch and open a pull request; `gh` must be
+authenticated with write access.
 
 The command prints paths for the report and retained worktree. Run artifacts and
 worktrees are kept under the repository's common Git directory in

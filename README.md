@@ -1,5 +1,7 @@
 # Stop Babysitting Agents. Start Writing Software
 
+<sub>[Skip the marketing and get to work](GETTING_STARTED.md)</sub>
+
 Powdrr gives you an agent you can trust with real engineering work. It is high-integrity
 by design: it follows an explicit plan, acts only through declared capabilities, keeps
 changes isolated, and makes its work ready for review. It also has an elephant-like

@@ -1,0 +1,238 @@
+{
+  "case": "immutability",
+  "direct": {
+    "answer": "Aspect metadata is immutable: `id`, `traits`, and `schema` are read-only properties that cannot be reassigned, and the `traits` array and `schema` object are frozen, preventing container mutation and nested-value mutation.",
+    "basis": "explicit",
+    "evidence_ids": [
+      "instruction",
+      "code1",
+      "code2",
+      "code3",
+      "code4"
+    ],
+    "transfer_reason": "The instruction explicitly states that each aspect exposes `id`, `traits`, and `schema`, and the code patterns for traits and queries show that such metadata properties are defined as read-only (writable: false) and the schema object is frozen. The same pattern is applied to aspects, making the mutability contract explicit.",
+    "unresolved": "The instruction does not specify whether the `traits` array itself is frozen, but the code for traits and queries suggests that metadata objects are frozen, and the `traits` array is part of the aspect's metadata, so it is likely frozen as well. However, this is not explicitly stated for aspects."
+  },
+  "direct_verdict": "unsupported",
+  "plan": {
+    "facts": [
+      {
+        "fact": "Each aspect exposes `id`, `traits`, and `schema`.",
+        "evidence_ids": [
+          "instruction"
+        ],
+        "scope": "aspect metadata exposure"
+      },
+      {
+        "fact": "The instruction does not specify any mutability contract for aspect metadata properties.",
+        "evidence_ids": [
+          "instruction"
+        ],
+        "scope": "aspect metadata mutability"
+      },
+      {
+        "fact": "Trait objects have `id` and `schema` properties defined as non-writable, non-configurable, and enumerable.",
+        "evidence_ids": [
+          "code2"
+        ],
+        "scope": "trait metadata mutability"
+      },
+      {
+        "fact": "Query objects are frozen, making all properties read-only.",
+        "evidence_ids": [
+          "code4"
+        ],
+        "scope": "query metadata mutability"
+      },
+      {
+        "fact": "Trait type definition declares `id` and `schema` as readonly.",
+        "evidence_ids": [
+          "code1"
+        ],
+        "scope": "trait metadata type"
+      },
+      {
+        "fact": "Query type definition declares `id`, `hash`, and `parameters` as readonly.",
+        "evidence_ids": [
+          "code3"
+        ],
+        "scope": "query metadata type"
+      }
+    ],
+    "question_ids": [
+      "scope",
+      "counterpart",
+      "transfer"
+    ],
+    "missing_information": "The instruction does not specify whether aspect metadata properties are mutable, immutable, or frozen. It also does not specify whether the `traits` array is mutable or if nested trait objects are mutable. The existing code for traits and queries shows read-only patterns, but the instruction does not explicitly require the same for aspects."
+  },
+  "plan_verdict": "supported",
+  "observations": {
+    "answers": [
+      {
+        "question_id": "scope",
+        "answer": "The instruction specifies that each aspect exposes `id`, `traits`, and `schema` but does not specify any mutability contract for these properties. It does not state whether property reassignment, container mutation, or nested-value mutation is allowed or prohibited.",
+        "basis": "explicit",
+        "evidence_ids": [
+          "instruction"
+        ],
+        "transfer_reason": "No explicit mutability requirements are provided in the instruction.",
+        "unresolved": "The instruction is silent on all three mutation levels."
+      },
+      {
+        "question_id": "counterpart",
+        "answer": "Analogous existing APIs protect property reassignment and container mutation. Trait objects define `id` and `schema` as non-writable and non-configurable, preventing property reassignment. Query objects are frozen, preventing both property reassignment and container mutation. However, nested-value mutation is not protected in either case: trait schemas are not frozen (except tag schemas), and query parameters are not frozen.",
+        "basis": "inherited",
+        "evidence_ids": [
+          "code2",
+          "code4",
+          "code1",
+          "code3"
+        ],
+        "transfer_reason": "Trait and query metadata are read-only at the property level, and query objects are frozen, indicating a pattern of protecting metadata from reassignment and container mutation.",
+        "unresolved": "Nested-value mutation is not protected in existing APIs."
+      },
+      {
+        "question_id": "transfer",
+        "answer": "Property reassignment protection can legitimately transfer to an aspect's `id` and `schema` properties, as they are analogous to trait and query metadata. Container mutation protection for the `traits` array can also transfer, as it is analogous to query parameters being frozen. However, nested-value mutation protection does not transfer because existing APIs do not protect nested values, and the instruction does not require it.",
+        "basis": "inherited",
+        "evidence_ids": [
+          "code2",
+          "code4"
+        ],
+        "transfer_reason": "The existing pattern of making metadata properties read-only and freezing container objects justifies transferring these protections to aspect metadata. No evidence supports protecting nested values.",
+        "unresolved": "None."
+      }
+    ]
+  },
+  "resolved": {
+    "answer": "The instruction does not specify a mutability contract for aspect metadata. However, based on analogous existing APIs, the following contract is plausible:\n\n- **Property reassignment**: The `id` and `schema` properties should be non-writable and non-configurable, preventing reassignment. This is inherited from trait objects, which define `id` and `schema` as read-only.\n- **Container mutation**: The `traits` array should be frozen, preventing addition, removal, or reordering of elements. This is inherited from query objects, which are frozen to protect their parameters array.\n- **Nested-value mutation**: No protection is established. Existing APIs do not freeze nested values (e.g., trait schemas are not frozen except for tag schemas), and the instruction does not require it. Therefore, nested values within the `traits` array or `schema` may be mutable unless explicitly frozen by the implementation.",
+    "basis": "inherited",
+    "evidence_ids": [
+      "code2",
+      "code4",
+      "code1",
+      "code3"
+    ],
+    "transfer_reason": "The existing pattern of making metadata properties read-only and freezing container objects justifies transferring these protections to aspect metadata. No evidence supports protecting nested values.",
+    "unresolved": "None."
+  },
+  "resolved_verdict": "supported",
+  "negative_claim": "The instruction requires recursively freezing nested schema values.",
+  "negative_verdict": "unsupported",
+  "criteria": [
+    {
+      "given": "an aspect is created via createAspect",
+      "when": "the aspect's id or schema property is accessed",
+      "then": "the id and schema properties are non-writable and non-configurable, preventing reassignment"
+    },
+    {
+      "given": "an aspect is created via createAspect",
+      "when": "the aspect's traits array is accessed",
+      "then": "the traits array is frozen, preventing addition, removal, or reordering of elements"
+    }
+  ],
+  "criteria_verdict": "unsupported",
+  "calls": [
+    {
+      "stage": "direct",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 5.229,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "decompose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 7.624,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "answer-subquestions",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 7.157,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "resolve",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 4.812,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "criteria",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 2.482,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "plan-check",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.243,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-check",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.241,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "resolved-check",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.192,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "negative-control",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.187,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "criteria-check",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.205,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

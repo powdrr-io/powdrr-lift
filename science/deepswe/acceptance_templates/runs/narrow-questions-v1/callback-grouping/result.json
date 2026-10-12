@@ -1,0 +1,212 @@
+{
+  "case": "callback-grouping",
+  "direct": {
+    "answer": "The callback state should contain one merged object per entity, not separate constituent objects.",
+    "basis": "explicit",
+    "evidence_ids": [
+      "instruction",
+      "code1"
+    ],
+    "transfer_reason": "The instruction explicitly states that `readEach` delivers a merged data object, and the code shows `readEach` creates a single `state` array of snapshots for all traits, which is passed to the callback as one object per entity.",
+    "unresolved": "The instruction does not specify the exact shape of the merged object (e.g., whether it is a flat object with all fields or a nested structure), but it is clear that it is a single merged object rather than separate constituent objects."
+  },
+  "direct_verdict": "supported",
+  "plan": {
+    "facts": [
+      {
+        "fact": "Nested aspects flatten to their individual traits.",
+        "evidence_ids": [
+          "instruction"
+        ],
+        "scope": "createAspect"
+      },
+      {
+        "fact": "readEach delivers a merged data object.",
+        "evidence_ids": [
+          "instruction"
+        ],
+        "scope": "readEach"
+      },
+      {
+        "fact": "updateEach distributes writes back to constituent stores.",
+        "evidence_ids": [
+          "instruction"
+        ],
+        "scope": "updateEach"
+      },
+      {
+        "fact": "getQueryStores iterates over query parameters and pushes each trait and its store into arrays.",
+        "evidence_ids": [
+          "code2"
+        ],
+        "scope": "query store resolution"
+      },
+      {
+        "fact": "readEach creates a state array with length equal to the number of traits.",
+        "evidence_ids": [
+          "code1"
+        ],
+        "scope": "readEach"
+      },
+      {
+        "fact": "readEach creates snapshots for each trait and store into the state array.",
+        "evidence_ids": [
+          "code1"
+        ],
+        "scope": "readEach"
+      },
+      {
+        "fact": "InstancesFromParameters maps each query parameter to a tuple element, with tags and not-modifiers contributing no element.",
+        "evidence_ids": [
+          "code3"
+        ],
+        "scope": "type-level query parameter mapping"
+      }
+    ],
+    "question_ids": [
+      "scope",
+      "counterpart",
+      "transfer"
+    ],
+    "missing_information": "The instruction does not specify whether the merged data object from readEach is a single object or an array of objects, nor does it specify how callback slots correspond to flattened traits versus original query parameters. The code evidence shows readEach uses an array of snapshots, but the instruction's 'merged data object' is ambiguous. No evidence explicitly states that flattening changes the number of callback slots or that the callback receives separate constituent objects."
+  },
+  "plan_verdict": "supported",
+  "observations": {
+    "answers": [
+      {
+        "question_id": "scope",
+        "answer": "The instruction specifies that nested aspects flatten to their individual traits, and that readEach delivers a merged data object. The code evidence shows that getQueryStores iterates over query parameters and pushes each trait and its store into arrays, and readEach creates a state array with length equal to the number of traits, creating snapshots for each trait and store. The instruction does not specify whether the merged data object is a single object or an array of objects, nor does it specify how callback slots correspond to flattened traits versus original query parameters.",
+        "basis": "explicit",
+        "evidence_ids": [
+          "instruction",
+          "code1",
+          "code2"
+        ],
+        "transfer_reason": "The instruction explicitly states that nested aspects flatten to their individual traits and that readEach delivers a merged data object. The code evidence shows that readEach uses an array of snapshots, but the instruction's 'merged data object' is ambiguous. No evidence explicitly states that flattening changes the number of callback slots or that the callback receives separate constituent objects.",
+        "unresolved": "The instruction does not specify whether the merged data object from readEach is a single object or an array of objects, nor does it specify how callback slots correspond to flattened traits versus original query parameters. The code evidence shows readEach uses an array of snapshots, but the instruction's 'merged data object' is ambiguous. No evidence explicitly states that flattening changes the number of callback slots or that the callback receives separate constituent objects."
+      },
+      {
+        "question_id": "counterpart",
+        "answer": "The instruction does not specify how original query parameters map to callback slots. The code evidence shows that getQueryStores iterates over query parameters and pushes each trait and its store into arrays, and readEach creates a state array with length equal to the number of traits, creating snapshots for each trait and store. The type-level mapping in InstancesFromParameters maps each query parameter to a tuple element, with tags and not-modifiers contributing no element. However, the instruction does not clarify whether the callback state contains one merged object or separate constituent objects.",
+        "basis": "inherited",
+        "evidence_ids": [
+          "code1",
+          "code2",
+          "code3"
+        ],
+        "transfer_reason": "The code evidence shows that readEach uses an array of snapshots, and the type-level mapping maps each query parameter to a tuple element. However, the instruction does not specify how original query parameters map to callback slots, and the code does not explicitly address flattening of nested aspects. The relationship between the code's behavior and the instruction's 'merged data object' is not established.",
+        "unresolved": "The instruction does not specify how original query parameters map to callback slots. The code evidence shows readEach uses an array of snapshots, but the instruction's 'merged data object' is ambiguous. No evidence explicitly states that flattening changes the number of callback slots or that the callback receives separate constituent objects."
+      },
+      {
+        "question_id": "transfer",
+        "answer": "The instruction does not specify whether constituent flattening entails callback-slot expansion. The code evidence shows that getQueryStores iterates over query parameters and pushes each trait and its store into arrays, and readEach creates a state array with length equal to the number of traits, creating snapshots for each trait and store. The type-level mapping in InstancesFromParameters maps each query parameter to a tuple element, with tags and not-modifiers contributing no element. However, the instruction does not clarify whether the callback state contains one merged object or separate constituent objects.",
+        "basis": "inherited",
+        "evidence_ids": [
+          "code1",
+          "code2",
+          "code3"
+        ],
+        "transfer_reason": "The code evidence shows that readEach uses an array of snapshots, and the type-level mapping maps each query parameter to a tuple element. However, the instruction does not specify whether constituent flattening entails callback-slot expansion, and the code does not explicitly address flattening of nested aspects. The relationship between the code's behavior and the instruction's 'merged data object' is not established.",
+        "unresolved": "The instruction does not specify whether constituent flattening entails callback-slot expansion. The code evidence shows readEach uses an array of snapshots, but the instruction's 'merged data object' is ambiguous. No evidence explicitly states that flattening changes the number of callback slots or that the callback receives separate constituent objects."
+      }
+    ]
+  },
+  "resolved": {
+    "answer": "insufficient_information",
+    "basis": "explicit",
+    "evidence_ids": [
+      "instruction",
+      "code1",
+      "code2"
+    ],
+    "transfer_reason": "The instruction explicitly states that nested aspects flatten to their individual traits and that readEach delivers a merged data object. However, the instruction does not specify whether the callback state contains one merged object or separate constituent objects. The code evidence shows readEach uses an array of snapshots, but the instruction's 'merged data object' is ambiguous. No evidence explicitly states that flattening changes the number of callback slots or that the callback receives separate constituent objects.",
+    "unresolved": "The instruction does not specify whether the merged data object from readEach is a single object or an array of objects, nor does it specify how callback slots correspond to flattened traits versus original query parameters. The code evidence shows readEach uses an array of snapshots, but the instruction's 'merged data object' is ambiguous. No evidence explicitly states that flattening changes the number of callback slots or that the callback receives separate constituent objects."
+  },
+  "resolved_verdict": "unsupported",
+  "negative_claim": "Nested aspect flattening requires one separate callback data slot per constituent trait instead of a merged aspect object.",
+  "negative_verdict": "unsupported",
+  "criteria": [],
+  "criteria_verdict": "skipped-unresolved",
+  "calls": [
+    {
+      "stage": "direct",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 3.91,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "decompose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 7.226,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "answer-subquestions",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 21.443,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "resolve",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 2.73,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "plan-check",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.247,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-check",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.179,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "resolved-check",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.208,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "negative-control",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.196,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

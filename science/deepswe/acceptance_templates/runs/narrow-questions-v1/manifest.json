@@ -1,0 +1,97 @@
+{
+  "experiment": "narrow-questions-v1",
+  "cases": [
+    {
+      "id": "immutability",
+      "requirement": "Each aspect exposes `id`, `traits`, and `schema`.",
+      "question": "What mutability contract should aspect metadata have? Distinguish property reassignment, container mutation, and nested-value mutation.",
+      "questions": {
+        "scope": "Which of these mutation levels does the instruction specify?",
+        "counterpart": "Which levels are protected by analogous existing APIs?",
+        "transfer": "Which protections can legitimately transfer to an aspect?"
+      },
+      "sources": [
+        [
+          "trait/types.ts",
+          13,
+          18
+        ],
+        [
+          "trait/trait.ts",
+          47,
+          99
+        ],
+        [
+          "query/types.ts",
+          78,
+          88
+        ],
+        [
+          "query/query.ts",
+          444,
+          469
+        ]
+      ],
+      "negative": "The instruction requires recursively freezing nested schema values."
+    },
+    {
+      "id": "callback-grouping",
+      "requirement": "Nested aspects flatten to their individual traits. `readEach` delivers a merged data object and `updateEach` distributes writes back to constituent stores.",
+      "question": "For query(createAspect(createAspect(A, B), C)), should the callback state contain one merged object or separate constituent objects?",
+      "questions": {
+        "scope": "What operation does each flattening or merging statement govern?",
+        "counterpart": "How do original query parameters map to callback slots?",
+        "transfer": "Does constituent flattening entail callback-slot expansion?"
+      },
+      "sources": [
+        [
+          "query/query-result.ts",
+          22,
+          51
+        ],
+        [
+          "query/query-result.ts",
+          245,
+          282
+        ],
+        [
+          "query/types.ts",
+          53,
+          75
+        ]
+      ],
+      "negative": "Nested aspect flattening requires one separate callback data slot per constituent trait instead of a merged aspect object."
+    },
+    {
+      "id": "set-notifications",
+      "requirement": "`set` distributes each field to its owning constituent and triggers per-trait change detection.",
+      "question": "When an aspect setter supplies an equal value to a constituent, should that constituent notify with triggerChanged=true?",
+      "questions": {
+        "scope": "Does the instruction explicitly require value inequality?",
+        "counterpart": "What exactly triggers existing regular-trait set notifications?",
+        "transfer": "Should set inherit setter semantics or updateEach semantics?"
+      },
+      "sources": [
+        [
+          "trait/trait.ts",
+          319,
+          350
+        ],
+        [
+          "trait/trait.ts",
+          403,
+          423
+        ],
+        [
+          "query/query-result.ts",
+          52,
+          113
+        ]
+      ],
+      "negative": "Existing regular-trait setters suppress change notifications when the supplied value equals the stored value."
+    }
+  ],
+  "script_sha256": "d7d389ff57096a399b7d0756c3b1e7e4c2603ba33653100ba91a9fdd02b4b2c1",
+  "boundary": "Original instruction/base excerpts only; no oracle or patches.",
+  "limitation": "Three manually selected known failures; one task, one sample per arm."
+}

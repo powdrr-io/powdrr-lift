@@ -1,5 +1,10 @@
 # Acceptance criteria template experiment
 
+The [narrow-question experiment](runs/narrow-questions-v1/README.md) compares
+direct analysis, fact/scope decomposition, and concrete observations with
+independent Flash/Jev choices on three known Koota failures. Two target choices
+recover; shallow freezing and evidence accuracy remain incomplete.
+
 The newer [operation-analysis experiment](runs/operation-analysis-v1/README.md)
 evaluates decision extraction before acceptance-criteria generation using Koota
 composite aspects. It treats the solution as the authoritative target, compares

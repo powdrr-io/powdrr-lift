@@ -1,0 +1,76 @@
+{
+  "label_status": "agent_authored_spotcheck",
+  "limitations": "Replays of two known pilot reviewer mistakes with exact original model input and schema. Target labels stay outside model requests. Development checks, not a quality estimate.",
+  "fixtures_sha256": "437115afa0dc9e9bf37ecd52fd7bb4eff2b3683a9dc829c9697d612735cba8e3",
+  "catalog_sha256": "0c35dc83a0e558f09b308df6c68fdf39516a06f43ba18c5f3a633345afcaeb47",
+  "phase": "replay",
+  "repairs": 1,
+  "provider": "deepinfra",
+  "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+  "review_version": "v2",
+  "review_prompts_sha256": "b041699aa7ac35feaecdb92021b897d8441384be7d28d3905df1bc020acc649f",
+  "passed": 1,
+  "check_count": 2,
+  "eligible_case_count": 2,
+  "checks": [
+    {
+      "case_id": "cattrs-invented-policy",
+      "phase": "support",
+      "target_id": "c022",
+      "expected": [
+        "partial",
+        "unsupported"
+      ],
+      "observed": "supported",
+      "original_observed": "supported",
+      "passed": false
+    },
+    {
+      "case_id": "helm-complete-warning",
+      "phase": "coverage",
+      "target_id": "v024",
+      "expected": [
+        "full"
+      ],
+      "observed": "full",
+      "original_observed": "partial",
+      "passed": true
+    }
+  ],
+  "failures": [],
+  "calls": [
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 6.946,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "cattrs-invented-policy"
+    },
+    {
+      "stage": "coverage",
+      "attempt": 0,
+      "status": "failed",
+      "elapsed_seconds": 12.218,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "helm-complete-warning"
+    },
+    {
+      "stage": "coverage",
+      "attempt": 1,
+      "status": "completed",
+      "elapsed_seconds": 7.645,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "helm-complete-warning"
+    }
+  ]
+}

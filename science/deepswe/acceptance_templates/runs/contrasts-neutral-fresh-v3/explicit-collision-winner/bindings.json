@@ -1,0 +1,236 @@
+{
+  "decisions": [
+    {
+      "requirement_id": "r001",
+      "template_id": "T18",
+      "applicability": "yes",
+      "reason": "The requirement explicitly states that callback data combines ancestor and child fields, and that if both define the same key, the child's value wins. This specifies a collision winner in a scoped merge operation.",
+      "instances": [
+        {
+          "prerequisites": [
+            {
+              "id": "collision_winner",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "If both define the same key, the child's value wins.",
+                  "start": 50,
+                  "end": 102
+                }
+              ],
+              "support_explanation": "The clause explicitly states that when both ancestor and child define the same key, the child's value is selected, which satisfies the prerequisite of a specified winner for conflicting values."
+            }
+          ],
+          "slots": [
+            {
+              "name": "consumer_scope",
+              "kind": "Scope",
+              "value": "callback data",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "Callback data combines ancestor and child fields.",
+                  "start": 0,
+                  "end": 49
+                }
+              ],
+              "support_explanation": "The phrase 'Callback data' identifies the scope in which the merge and collision resolution occur."
+            },
+            {
+              "name": "visible_scopes",
+              "kind": "Scope",
+              "value": "ancestor and child fields",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "Callback data combines ancestor and child fields.",
+                  "start": 0,
+                  "end": 49
+                }
+              ],
+              "support_explanation": "The clause specifies that the data combined comes from both ancestor and child fields, making these the visible scopes."
+            },
+            {
+              "name": "winner_rule",
+              "kind": "Expression",
+              "value": "the child's value wins",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "If both define the same key, the child's value wins.",
+                  "start": 50,
+                  "end": 102
+                }
+              ],
+              "support_explanation": "The clause explicitly states the collision resolution rule: the child's value is selected over the ancestor's value."
+            }
+          ],
+          "guard_checks": [
+            {
+              "prerequisite_id": "collision_winner",
+              "support_explanation": "The instruction explicitly states that when both ancestor and child define the same key, the child's value wins, meaning the child's value is selected for that key and the ancestor's value is discarded.",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "If both define the same key, the child's value wins.",
+                  "start": 50,
+                  "end": 102
+                }
+              ],
+              "relation": "select_one_source_value",
+              "decision": "yes"
+            }
+          ]
+        }
+      ],
+      "rejected_instances": []
+    }
+  ],
+  "criteria": [
+    {
+      "text": "Within `callback data`, expose values from `ancestor and child fields`; collisions resolve to `the child's value wins`.",
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T18"
+      ],
+      "slots": [
+        {
+          "name": "consumer_scope",
+          "kind": "Scope",
+          "value": "callback data",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "Callback data combines ancestor and child fields.",
+              "start": 0,
+              "end": 49
+            }
+          ],
+          "support_explanation": "The phrase 'Callback data' identifies the scope in which the merge and collision resolution occur."
+        },
+        {
+          "name": "visible_scopes",
+          "kind": "Scope",
+          "value": "ancestor and child fields",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "Callback data combines ancestor and child fields.",
+              "start": 0,
+              "end": 49
+            }
+          ],
+          "support_explanation": "The clause specifies that the data combined comes from both ancestor and child fields, making these the visible scopes."
+        },
+        {
+          "name": "winner_rule",
+          "kind": "Expression",
+          "value": "the child's value wins",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "If both define the same key, the child's value wins.",
+              "start": 50,
+              "end": 102
+            }
+          ],
+          "support_explanation": "The clause explicitly states the collision resolution rule: the child's value is selected over the ancestor's value."
+        }
+      ],
+      "id": "c001",
+      "bindings": [
+        [
+          {
+            "name": "consumer_scope",
+            "kind": "Scope",
+            "value": "callback data",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "Callback data combines ancestor and child fields.",
+                "start": 0,
+                "end": 49
+              }
+            ],
+            "support_explanation": "The phrase 'Callback data' identifies the scope in which the merge and collision resolution occur."
+          },
+          {
+            "name": "visible_scopes",
+            "kind": "Scope",
+            "value": "ancestor and child fields",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "Callback data combines ancestor and child fields.",
+                "start": 0,
+                "end": 49
+              }
+            ],
+            "support_explanation": "The clause specifies that the data combined comes from both ancestor and child fields, making these the visible scopes."
+          },
+          {
+            "name": "winner_rule",
+            "kind": "Expression",
+            "value": "the child's value wins",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "If both define the same key, the child's value wins.",
+                "start": 50,
+                "end": 102
+              }
+            ],
+            "support_explanation": "The clause explicitly states the collision resolution rule: the child's value is selected over the ancestor's value."
+          }
+        ]
+      ]
+    }
+  ]
+}

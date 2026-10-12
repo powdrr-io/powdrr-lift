@@ -1,0 +1,427 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "f9b49f50e95561f47c18b59d38acd42e9c5eb310ec4e4956d82fa504b0a62261",
+  "file_count": 60,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/calls/direct-000-0.json",
+      "sha256": "55f755ea314b1ce14940ec19262c72d5925f8c38f2c7a5347457363158744289",
+      "status": "completed",
+      "stage": "direct-000",
+      "request_sha256": "0dee96379f4b770ce9b314c6a8985d34d4b663d95a2b7d2d0ff7499bfc2e22c1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/calls/direct-001-0.json",
+      "sha256": "d3632652c8769fa01e8c07e4adec647b92c428c9fa444d8beaed23d8519065f9",
+      "status": "completed",
+      "stage": "direct-001",
+      "request_sha256": "d8f9c0014cf57ca666b2cd48f70a33cf7c7ac77b362f04bfa1afe11c038caaa8"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/calls/direct-002-0.json",
+      "sha256": "699a39d9df2ffe28cacfea10455d8ca114c7eef1f2a51e0e5fcb8a5eb7431454",
+      "status": "completed",
+      "stage": "direct-002",
+      "request_sha256": "8f221a81fde897cb90cd8750f8b8608fc35594703f119fbbd35692d1a32d7070"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/calls/direct-003-0.json",
+      "sha256": "98c67c14c44d2c6461e7e4a346a7968df6b46d9e0a8b0e8cd44ed6b38bc16bab",
+      "status": "completed",
+      "stage": "direct-003",
+      "request_sha256": "3e791237ac18014062b5009edcb7059922e9be8ea6a673abd477f1102618f2a1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/calls/direct-004-0.json",
+      "sha256": "30b1823f05f494e0e3e5cb873eeb4a9735f44e7211ac1835ec34ed58b69739f5",
+      "status": "completed",
+      "stage": "direct-004",
+      "request_sha256": "22146d80f166a67a78a65e121d1a6c7cb4592f000b762a8c385023af34226b27"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/calls/direct-005-0.json",
+      "sha256": "668f48d0e963925cdd02ed6ca39c6944e9f7a980695410f490c8622826cb3739",
+      "status": "completed",
+      "stage": "direct-005",
+      "request_sha256": "e6d423d4a82e52be482dfd210ed285e9a33e30bbfe73918acc9accae535401ca"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/review-calls/coverage-000-0.json",
+      "sha256": "6733a05d215bd45df786a3bd8e2cf36868e55b9b8bda0134fa367ce1be782d3f",
+      "status": "completed",
+      "stage": "coverage-000",
+      "request_sha256": "7ccab8d7a371f20e8d987cebde8024ce197e14c790afb70474fe59ae00b3bd97"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/review-calls/coverage-001-0.json",
+      "sha256": "4e19a3c294073e7b9111b38cdc2fb7e1d34d016aa5614a2aea1442e73e99cddc",
+      "status": "completed",
+      "stage": "coverage-001",
+      "request_sha256": "0ea95af37ab27433e36d0eb70597123e3cae51b2b7bf00a3a7130075efe8935a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/review-calls/coverage-002-0.json",
+      "sha256": "72451fd508ce72062753255213676d6bb4515a3ad186d4feee39f055e7b300bc",
+      "status": "completed",
+      "stage": "coverage-002",
+      "request_sha256": "ec4c1ccef3b27c326658de6804b53631ff5071b42028d99cc10fd96bb4d5543e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/review-calls/support-000-0.json",
+      "sha256": "a44760b68b186d711c7352d86f9086ee92ad7e995caf40e9cd0d359fc8c92d07",
+      "status": "completed",
+      "stage": "support-000",
+      "request_sha256": "3a7e15e7925d5b30d2561920bca6112e90fbf289f67577ff00e5da36ce7081da"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/review-calls/support-001-0.json",
+      "sha256": "e8e1101688726cb6094378831d9f2b24d9a63e1f0ca5e7858385345fdd51f61a",
+      "status": "completed",
+      "stage": "support-001",
+      "request_sha256": "ba086ca4f2c6d91b2e5f6be495a4d808eaf2be54a843219f069f523d5e82d12c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/direct/review-calls/support-002-0.json",
+      "sha256": "7d5db5a5b26ae5ad1e508fb1b85a6d0c916900bdc5dd855ad5d3fe768c23451e",
+      "status": "completed",
+      "stage": "support-002",
+      "request_sha256": "27f60ff008af42dc6eccd4b9d07f254602efd6abe455067b13d9d1715cda400e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/inventory-calls/inventory-0.json",
+      "sha256": "6785edc3d98710d4be73f751828d04993b48d6e787c1feda65aa142ccb9e9701",
+      "status": "completed",
+      "stage": "inventory",
+      "request_sha256": "88f625d2d819af2f16cabbf00a9155115ecc873e95ee0d137ef9e6b848096b8e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/calls/bind-000-0.json",
+      "sha256": "3c4a754c56571f78fe88d9d2bb2fe92f3491f0904aeedc645ae187a375989192",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "5c7e1e81a22d75bd498be89670a60e44e957a96aad2940c24f0281ca65f38dc1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/calls/bind-001-0.json",
+      "sha256": "91c63bba5bbd061632fedffc90db391a6b5fc3b35378c1228b363125df3d2148",
+      "status": "completed",
+      "stage": "bind-001",
+      "request_sha256": "4a729bace659bee0a5d8dc48f82e4fe74758c3d7dd42a1de6dccf90e4d2149bf"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/calls/bind-002-0.json",
+      "sha256": "40d9f854af9b117c05a1125c511a0ba7cf24b6fea49f643389aba34faa625237",
+      "status": "completed",
+      "stage": "bind-002",
+      "request_sha256": "b1ac453ee2e664ed54aaf36b4a77edd90b6114788be119d50841963b897e0c5f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/calls/bind-003-0.json",
+      "sha256": "086914714c4fa9411ea94b9b57cf0560476ca1b317a893c7e321d214ce189155",
+      "status": "completed",
+      "stage": "bind-003",
+      "request_sha256": "5debf51c1a933d29ff95aefb34e46c12fa484d87b3b26556e300b35b84a3242b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/calls/bind-004-0.json",
+      "sha256": "46874713f98f8b092cdbdf6816a3fb76f36deb1683e9dc98dbf23cadb8d805d0",
+      "status": "completed",
+      "stage": "bind-004",
+      "request_sha256": "b630a2d432409a7941f0c75061e1549541a25df72af9171d6c32c777fdb82cc7"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/calls/bind-005-0.json",
+      "sha256": "e9a9d4bc4389a103f86a9550431980f3c03808943249a65add4479a5d99cdd55",
+      "status": "completed",
+      "stage": "bind-005",
+      "request_sha256": "9ccbda1653effd0bf8a44836cf1f402d946d2a2f56bd6d729142fb2022d3a200"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/calls/select-0.json",
+      "sha256": "9120fbabccce1729f12c619ef74203c237a2967717f892af2ef0ba803fb57930",
+      "status": "completed",
+      "stage": "select",
+      "request_sha256": "6863af99faa9312113ebb662d8ebadd3a49ddf67b934689bdd1aa658725f6a26"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/review-calls/coverage-000-0.json",
+      "sha256": "26ea9ad3fbc1c470c420a25ced5abefb0d088d8bd40523abca3aca264138bdc9",
+      "status": "completed",
+      "stage": "coverage-000",
+      "request_sha256": "d39b07ac5e4d4036ab4f1cfc7b7489a359f6265ef4a25bf4dd7c76f648a81f76"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/review-calls/coverage-001-0.json",
+      "sha256": "5dad01670c16dfba7a7c1dab7c801f961eaa7dcbcac61c47011a3a371e148aa6",
+      "status": "completed",
+      "stage": "coverage-001",
+      "request_sha256": "9dbcdc2a45e7b823e9d3c590d9ab037a72b0597240b6573085d0784efec7479f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/review-calls/coverage-002-0.json",
+      "sha256": "2a6594a76d1d61dd1057fcd301f6324e04553a49a36a1474330aeeb5cdafcb2f",
+      "status": "completed",
+      "stage": "coverage-002",
+      "request_sha256": "4648cd70e19e0b4b0547509b44d889b140fdb809ece68025099f05cf7c1e4924"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/review-calls/support-000-0.json",
+      "sha256": "f5499166cfbbd8a87a355fa1ca410c581d73b4000a7da92a748b45bcb5fa9256",
+      "status": "completed",
+      "stage": "support-000",
+      "request_sha256": "15fb5964909ba4b0c28199c4ecc8dc99854ff055668b9d2e4fb2230d45126ad5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/review-calls/support-001-0.json",
+      "sha256": "2a3e99fc68293029e57d1d6fd06cb72f90ace7de5fe17b6e24608a23b984d740",
+      "status": "completed",
+      "stage": "support-001",
+      "request_sha256": "ac6c2415b11f13b6ec01d87c2243f5df8a7aa155a14b2abc37a1a53f80af49dc"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/review-calls/support-002-0.json",
+      "sha256": "708b97112c6e30a51f0ca72471b8626bdd1ca89074b8101f1f420af740f9099b",
+      "status": "completed",
+      "stage": "support-002",
+      "request_sha256": "7d5b62051a7dcc74e547fa674ca36b47e6c5ea46e83d23ccf66ce2ea466bc8c1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/review-calls/support-003-0.json",
+      "sha256": "082f92693a68e4a65cbe9aa233d88e9da76fc543a41c7cbea615cf03fe07c65c",
+      "status": "completed",
+      "stage": "support-003",
+      "request_sha256": "ce821e8ff445b4197e652d450de081eaee08ad4af3b0510d7a3450ecf31a32ea"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/review-calls/support-004-0.json",
+      "sha256": "b2b7ef637260bba87cee5545f6c4e996c0fc1b4aa018878ccab1900e34f56d2d",
+      "status": "completed",
+      "stage": "support-004",
+      "request_sha256": "43299a5ccb3d4fa77bf72d168c46776767bdd138b1378ed0b718a0de2fedb0e2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/dateutil-rfc5545-timezone-interop/templates/review-calls/support-005-0.json",
+      "sha256": "69ee8bc1db7ab4cfd123e13f7d7d861890c9edda103e6e435b70cf6cba6afa9b",
+      "status": "completed",
+      "stage": "support-005",
+      "request_sha256": "8fd5674277cde31100296b098d6e2b761fa67e019d15274a75503945e323780f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/calls/direct-000-0.json",
+      "sha256": "2f352a5ff28640806ed7cbb1dd2609642e4e68d49bccc9bc84612a0f97246e82",
+      "status": "completed",
+      "stage": "direct-000",
+      "request_sha256": "2335459d29fa104a20e219c32f23165f01265be267212e58ca92f521b38e37a1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/calls/direct-001-0.json",
+      "sha256": "ce0d12fe1366a028a7f457f8c31f27510556c9dd59384f5fe29a945fe61de570",
+      "status": "completed",
+      "stage": "direct-001",
+      "request_sha256": "1d14f584b6e8101780999a54685d687738374640a93121e54d4043322b0ff614"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/calls/direct-002-0.json",
+      "sha256": "9407fa6687735dc1131ff0c2b7a5d428ce8ea647cfeb349ec3db38f790ad23f3",
+      "status": "completed",
+      "stage": "direct-002",
+      "request_sha256": "5eafdfe40568c12671fd8db39754b8943f485bb38ce2d89ecd86a42cbd35da11"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/calls/direct-003-0.json",
+      "sha256": "a0c2f497af833dfe4cd950168a15deee0832956a4d1e9e3d9da9c4371595ee37",
+      "status": "completed",
+      "stage": "direct-003",
+      "request_sha256": "bb2e043cb3e87c72f16bd19d6acd11130fedfcecede6d2f6186c0c81d1ff6ace"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/calls/direct-004-0.json",
+      "sha256": "faa9f9d6a93923c24edd3f24797b9fa529e8785a0b6b39b17326a2655e080a94",
+      "status": "completed",
+      "stage": "direct-004",
+      "request_sha256": "b579ba5584f1796192772f3cce8137f3ca5e3c48821e0ac624cf3063f9871d30"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/calls/direct-005-0.json",
+      "sha256": "bc60d98ad95b20689e26e2608bd172608590d3b0bc6da8e84e2f0a894b035020",
+      "status": "completed",
+      "stage": "direct-005",
+      "request_sha256": "e93fbc2cb36ca05c39418a030551117d3dce8ead5787651ce50587dabbc6e501"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/calls/direct-006-0.json",
+      "sha256": "3f6b8b6ce0672987d6bbfaf49aea233eb619a35374640488711d2ab587702a29",
+      "status": "completed",
+      "stage": "direct-006",
+      "request_sha256": "ed8dd1de1a55cbca7d1a68730e2f935c321c83b5fd3eb4196d3a7092cb92158d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/review-calls/coverage-000-0.json",
+      "sha256": "754155ef507de8c9ee5afcc1de7077bada178152ad307c53599c90957d6ce889",
+      "status": "completed",
+      "stage": "coverage-000",
+      "request_sha256": "67a979cc2c077e4d2ebdbc8207d85d9cb99ba0200ade2b3278d7ec224cc65845"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/review-calls/coverage-001-0.json",
+      "sha256": "1ba470dde192ee0db4f61abd645238ba50106efeca654cf61be0f133fc2e6f21",
+      "status": "completed",
+      "stage": "coverage-001",
+      "request_sha256": "6d411832481e53533d7cbceaac7ae11d96d5a32db50c4a9c2638ae1819acddeb"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/review-calls/support-000-0.json",
+      "sha256": "6e14f1dcfcc55887fddbd8a113084be3757cb291cb443a2d20b1e036518003d4",
+      "status": "completed",
+      "stage": "support-000",
+      "request_sha256": "3f113e64952935fd9ce0d0b0ec4dd024b2685bedd8dd8961d8aa8fc5a1d6ba78"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/review-calls/support-001-0.json",
+      "sha256": "7e0fd8df45ee87582e1f66472288bf4f08429c2e07d5001d95a6cc65240d8683",
+      "status": "completed",
+      "stage": "support-001",
+      "request_sha256": "8bd0583181cc98286206556cb7da0fdba703cb6b392f176d15d07bb551b8adee"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/review-calls/support-002-0.json",
+      "sha256": "f6912f278e9b5a4e4ac1904be17637dbc00c0551449f90e23108d8806de560c4",
+      "status": "completed",
+      "stage": "support-002",
+      "request_sha256": "09d73ba4acbcd09db7f1b063b0a5f9e4a601f17b4e3b294cfc3838bda65aaf3d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/direct/review-calls/support-003-0.json",
+      "sha256": "d6ac5efe62349fb56a832404b25f2f24e6070c4ba75430adb199a22bc6c8156b",
+      "status": "completed",
+      "stage": "support-003",
+      "request_sha256": "cad5faf481ef6aef41a5a780147a03189bc6b9e959fa56a44b930699fa93dc11"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/inventory-calls/inventory-0.json",
+      "sha256": "7622bde58cc9174b62bc74bcce8a026d4eab9bc759352bf6484f6b9c1480d3fe",
+      "status": "completed",
+      "stage": "inventory",
+      "request_sha256": "39efdc37e9fe837ac79013ee17d15cec16a65f0bb876b25031774f34ccd01485"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/calls/bind-000-0.json",
+      "sha256": "dde67e3097cc3371c982d0adb0780205c30389ecf2c89214cc3d8c40d57a082f",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "9bb86985e50e22e5033a15982fa79006a183f10054bb7e81df188ecb1edf0934"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/calls/bind-001-0.json",
+      "sha256": "a82278c9a83177ea96fc55600d26bc81752876c82443cb9a244f69e920ee1889",
+      "status": "failed",
+      "stage": "bind-001",
+      "request_sha256": "47f2a1ea8a6a5d5465746e6b5adbaa21b46f57630c6cf4aee7ae94b0246dd288"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/calls/bind-001-1.json",
+      "sha256": "c20367582f7b2a31db7f53832afc089f71264300ec06856bdf36576abb5cd09a",
+      "status": "completed",
+      "stage": "bind-001",
+      "request_sha256": "47f2a1ea8a6a5d5465746e6b5adbaa21b46f57630c6cf4aee7ae94b0246dd288"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/calls/bind-002-0.json",
+      "sha256": "0e59a0b703e3230857916225cf255876990ddafa788f3eef940017f144ac848b",
+      "status": "completed",
+      "stage": "bind-002",
+      "request_sha256": "f1ff05ec26479cce7da85683a570bde7adc378bbe79f7707fc90368610ced447"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/calls/bind-003-0.json",
+      "sha256": "e45e635eb418b71fe14c8e0856bb2118fd665bd1e8b00604a6e22a3fb328a7b9",
+      "status": "completed",
+      "stage": "bind-003",
+      "request_sha256": "54e4933ec9da69d0667f394cec194c0955c51983ed705f3d19ad270c2860fd65"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/calls/bind-004-0.json",
+      "sha256": "7ed3101fbf270f7ee694fa5800f0dade879c6d82c47a06e2e9e5c15f62bed288",
+      "status": "completed",
+      "stage": "bind-004",
+      "request_sha256": "b90b9a8f8a40b4678e8124d50a6cbdd6e3e6568d341572bdcd96892be7e2985d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/calls/bind-005-0.json",
+      "sha256": "a6202b029638c61a9a58dcfc2013a9effd08fd57ec568523cb7258f00a1fa8aa",
+      "status": "completed",
+      "stage": "bind-005",
+      "request_sha256": "dbe918faa9c78257b1547957d39335d86bd8ef32bfb6ef48b61a902686d9841d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/calls/bind-006-0.json",
+      "sha256": "cf9cb179bf97029e669a7c179694a0ab8d2c3829cd18ffd7913c26748f61b92d",
+      "status": "completed",
+      "stage": "bind-006",
+      "request_sha256": "5ebd3d7ce669ad352c3bd1a38ce142f6f11f4ad3cf7db97fec629b9ec9068f84"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/calls/select-0.json",
+      "sha256": "6661ffe32bd49b1303cad0c3a8fb5892260d858436d9dde9311103eb6c4b5967",
+      "status": "completed",
+      "stage": "select",
+      "request_sha256": "8cf79cb5b3d29940aa3389db4acece6a9e00e8e4aef5dfb98bd9987c308b1402"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/review-calls/coverage-000-0.json",
+      "sha256": "c219773b81c65e5c82c8cb580013d1cfa60bfd6295e9971ffefb2d4b04450e2f",
+      "status": "completed",
+      "stage": "coverage-000",
+      "request_sha256": "53d63c794d9b3c32db3b7e6ac569a3ffebd70ee30d7d72b72720cbfca138bd36"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/review-calls/coverage-001-0.json",
+      "sha256": "3dd2cc0d92eb2dc01e34d57f9d71ebd138b5afb06027fa73981ff0f0394e0e61",
+      "status": "completed",
+      "stage": "coverage-001",
+      "request_sha256": "dce781abe95e78429dff38e951d1beafc74c62a120a1a6abae03df8457b63776"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/review-calls/support-000-0.json",
+      "sha256": "1e398a490bc242122bdf4176e47531179ec4ce5c10fca5a0657f2257810a78d5",
+      "status": "completed",
+      "stage": "support-000",
+      "request_sha256": "1561f1e3f14c74df65b5fbbe637578233b03319c4fdb409ab9e0b2be32f800a5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/review-calls/support-001-0.json",
+      "sha256": "8bd065b125c3b415e32b5165d0e5f3a3d848ef09e04a417354e3dbffd4268e44",
+      "status": "completed",
+      "stage": "support-001",
+      "request_sha256": "1f1ceed3ace13941d50cad2fa4c772e83ed491a36bf500a4293a0fef9d4e8210"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/review-calls/support-002-0.json",
+      "sha256": "fc6af1132832cd96a2557f7dedf7a2262bfe0b919b159d40feb42def8201430a",
+      "status": "completed",
+      "stage": "support-002",
+      "request_sha256": "a3e2c03eb3a5952428e1a9f7740bc10af13540ac30318c7318247a9b073e6dfe"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/review-calls/support-003-0.json",
+      "sha256": "193f8c00143234f9fc0dda0e7ec762169b458101bb19e384d44429583f1c1bc8",
+      "status": "completed",
+      "stage": "support-003",
+      "request_sha256": "4afedcb892908ce871f671a413f3369b58c9b3d74bae86502b4dabcd105d1016"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/review-calls/support-004-0.json",
+      "sha256": "6810b88ee6bff2b3a0fd9a482923eaaa3e2db40bfc1477a6c4fcfa5af516bcb7",
+      "status": "completed",
+      "stage": "support-004",
+      "request_sha256": "768fde244dcfc2af11c01e9c4a3f96186f070e89151ad286a5ec6d741500dc09"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/pilot-extra-v1/koota-entity-snapshot-rollback/templates/review-calls/support-005-0.json",
+      "sha256": "96b002ddf60c3c916336e2227f0b10ba74ffea78b14a43e8736971d821e8f217",
+      "status": "completed",
+      "stage": "support-005",
+      "request_sha256": "9722848c0afe35d188dec441dd867546538fd754ca87d384cfbdd53f7fc3b642"
+    }
+  ]
+}

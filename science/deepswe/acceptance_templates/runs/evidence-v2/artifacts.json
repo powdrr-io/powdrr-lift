@@ -1,0 +1,27 @@
+{
+  "archive": "artifacts.tar.gz",
+  "archive_sha256": "81720053c96a38c9e0be42db42e0107f391b4ed7e7da5b7c28274636268ec412",
+  "file_count": 5,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/dateutil-rfc5545-timezone-interop/templates/generation.json",
+      "sha256": "8d9bb235668a0cef028e91e0884c14a0a18b9cbc5055773cd20e3e83dd1554d4"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/dateutil-rfc5545-timezone-interop/templates/prompt.md",
+      "sha256": "9d8df01c55b9d89af77b99e3220f5976a1737373e87166b83af0640e2dd9a401"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/helm-array-merge-strategies/templates/generation.json",
+      "sha256": "158f6aeb26c71c7cc706defcfdcf8ccf060fd8bfcd1eb12f1ea929965f97395b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/helm-array-merge-strategies/templates/prompt.md",
+      "sha256": "a8b1c6cfee29816c0e6dab55be743c6bbcb0126a771c0565b202f24653144332"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/evidence-v2/run.json",
+      "sha256": "6a8f899d72410c562d184c915b83f8e845316725187645f306cf770bb7b2948d"
+    }
+  ]
+}

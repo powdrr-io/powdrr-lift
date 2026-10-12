@@ -1,0 +1,325 @@
+{
+  "version": 1,
+  "label_status": "agent_authored",
+  "scope": "Small synthetic contrasts based on observed error classes. Development checks, not human gold or held-out accuracy estimates. Expected labels are withheld from model calls.",
+  "cases": [
+    {
+      "id": "readonly-not-identity",
+      "instruction": "rruleset.rrules is a read-only tuple in insertion order.",
+      "requirement": "rruleset.rrules is a read-only tuple in insertion order.",
+      "bindings": [
+        {
+          "template_id": "T31",
+          "expected": "no"
+        },
+        {
+          "template_id": "T14",
+          "expected": "yes"
+        }
+      ],
+      "criteria": [
+        {
+          "text": "rruleset.rrules is a read-only tuple whose entries retain insertion order.",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "rruleset.rrules returns the identical object used for internal storage.",
+          "expected_support": [
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "equality-not-identity",
+      "instruction": "decode(input_list) returns a list with the same elements as input_list, in the same order.",
+      "requirement": "decode(input_list) returns a list with the same elements as input_list, in the same order.",
+      "bindings": [
+        {
+          "template_id": "T31",
+          "expected": "no"
+        }
+      ],
+      "criteria": [
+        {
+          "text": "decode(input_list) returns a list equal in contents and order to input_list.",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "decode(input_list) must return input_list itself, as the identical object.",
+          "expected_support": [
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "explicit-reference-identity",
+      "instruction": "current() returns the original session object supplied at construction; callers can compare references using is.",
+      "requirement": "current() returns the original session object supplied at construction; callers can compare references using is.",
+      "bindings": [
+        {
+          "template_id": "T31",
+          "expected": "yes"
+        }
+      ],
+      "criteria": [
+        {
+          "text": "current() is the identical session object supplied at construction.",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "current() returns a newly allocated copy of the session object.",
+          "expected_support": [
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "identity-without-keyword",
+      "instruction": "The callback receives the object passed to register(), without copying or replacing it.",
+      "requirement": "The callback receives the object passed to register(), without copying or replacing it.",
+      "bindings": [
+        {
+          "template_id": "T31",
+          "expected": "yes"
+        }
+      ],
+      "criteria": [
+        {
+          "text": "The object passed to the callback is the same object passed to register().",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "The callback receives a deep copy of the object passed to register().",
+          "expected_support": [
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "append-order-not-precedence",
+      "instruction": "ReuseValues appends old config array elements before new values, preserving each array's element order.",
+      "requirement": "ReuseValues appends old config array elements before new values, preserving each array's element order.",
+      "bindings": [
+        {
+          "template_id": "T18",
+          "expected": "no"
+        },
+        {
+          "template_id": "T14",
+          "expected": "yes"
+        }
+      ],
+      "criteria": [
+        {
+          "text": "Under ReuseValues, old config array elements precede new array elements, with each input array's order retained.",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "Under ReuseValues, old config wins conflicting values at the same key.",
+          "expected_support": [
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "traversal-not-override",
+      "instruction": "List configuration entries from the root then the child in that order, retaining both values when keys repeat.",
+      "requirement": "List configuration entries from the root then the child in that order, retaining both values when keys repeat.",
+      "bindings": [
+        {
+          "template_id": "T17",
+          "expected": "no"
+        },
+        {
+          "template_id": "T14",
+          "expected": "yes"
+        }
+      ],
+      "criteria": [
+        {
+          "text": "Configuration entries list the root before the child, retaining both values for repeated keys.",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "A child's configuration value overrides the root's value for the same key.",
+          "expected_support": [
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "explicit-collision-winner",
+      "instruction": "Callback data combines ancestor and child fields. If both define the same key, the child's value wins.",
+      "requirement": "Callback data combines ancestor and child fields. If both define the same key, the child's value wins.",
+      "bindings": [
+        {
+          "template_id": "T18",
+          "expected": "yes"
+        }
+      ],
+      "criteria": [
+        {
+          "text": "Callback data includes ancestor and child fields; the child's value wins same-key collisions.",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "The ancestor's value wins same-key collisions in callback data.",
+          "expected_support": [
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "explicit-nearest-override",
+      "instruction": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+      "requirement": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+      "bindings": [
+        {
+          "template_id": "T17",
+          "expected": "yes"
+        }
+      ],
+      "criteria": [
+        {
+          "text": "A local setting takes precedence; otherwise the nearest ancestor defining it supplies the effective value.",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "The root's setting always overrides local and nearer ancestor settings.",
+          "expected_support": [
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "flag-does-not-invent-field-policy",
+      "instruction": "error_map maps failed fields to their exceptions. Respect detailed_validation.",
+      "requirement": "error_map maps failed fields to their exceptions. Respect detailed_validation.",
+      "bindings": [],
+      "criteria": [
+        {
+          "text": "error_map contains a mapping from each failed field to its exception.",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "When detailed_validation=False, error_map must be empty.",
+          "expected_support": [
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "operation-scoped-null-behavior",
+      "instruction": "Null user values delete the key during coalescing; nil is preserved during merging.",
+      "requirement": "Null user values delete the key during coalescing; nil is preserved during merging.",
+      "bindings": [],
+      "criteria": [
+        {
+          "text": "During merging, a nil user value remains present rather than deleting its key.",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "Both coalescing and merging must preserve null-valued keys.",
+          "expected_support": [
+            "partial",
+            "unsupported"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "compound-extra-obligation",
+      "instruction": "rruleset.rrules is a read-only tuple in insertion order.",
+      "requirement": "rruleset.rrules is a read-only tuple in insertion order.",
+      "bindings": [],
+      "criteria": [
+        {
+          "text": "rruleset.rrules is a read-only tuple in insertion order.",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "rruleset.rrules is a read-only tuple in insertion order and must be the identical internal tuple object.",
+          "expected_support": [
+            "partial"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coverage-with-weak-extra",
+      "instruction": "When a strategy path resolves to a non-array value, lint emits a warning containing \"non-array\".",
+      "requirement": "When a strategy path resolves to a non-array value, lint emits a warning containing \"non-array\".",
+      "bindings": [],
+      "criteria": [
+        {
+          "text": "Given a strategy path resolves to a non-array value, lint emits a warning containing \"non-array\".",
+          "expected_support": [
+            "supported"
+          ]
+        },
+        {
+          "text": "The resolved value type is validated.",
+          "expected_support": [
+            "partial",
+            "unsupported"
+          ]
+        }
+      ],
+      "coverage_checks": [
+        {
+          "id": "complete",
+          "criterion_indices": [
+            0
+          ],
+          "expected": "full"
+        },
+        {
+          "id": "complete-plus-weak",
+          "criterion_indices": [
+            0,
+            1
+          ],
+          "expected": "full"
+        },
+        {
+          "id": "weak-only",
+          "criterion_indices": [
+            1
+          ],
+          "expected": "partial"
+        }
+      ]
+    }
+  ]
+}

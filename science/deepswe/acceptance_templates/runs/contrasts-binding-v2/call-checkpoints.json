@@ -1,0 +1,70 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "f87041710007dac4bd9e5f0cef8a8c74a6713270ee74a342f9741d2a36ec1428",
+  "file_count": 9,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/append-order-not-precedence/calls/bind-000-0.json",
+      "sha256": "606bd39aebd7531d80b0e8463e8f4a7a3e90476ade97af6b3bf4aedbc1a77f2b",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "c1ff023daa17904ce3267eeff84d17ff664c0ad0321f3928702d006791177883"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/equality-not-identity/calls/bind-000-0.json",
+      "sha256": "50b6ab2f7cfdda60c85f5cbdb845fcda45b14a1796b1a1eb7e94321ce4a60142",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "6706721b1b0c577093841b933cbd0dfd680c51cdcd1a8705b46172f9ebdaa74e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/explicit-collision-winner/calls/bind-000-0.json",
+      "sha256": "b411a361e9c34dbe12d4e483761f55a445ae98d25a54c68c12f6b237034c1075",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "933ef81bb7083d0e194ba50c2342769f06b20e0c55c48373aa22ae2c3a006f9d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/explicit-nearest-override/calls/bind-000-0.json",
+      "sha256": "1a071bb48979b71046185fe6fa78fe0885833a8419ac1a04bdcbb251ba5b2185",
+      "status": "failed",
+      "stage": "bind-000",
+      "request_sha256": "19a7ca0c19fc7d831aaa9e2048490f8220adeb24e40f47510e1efb5cef0d29e0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/explicit-nearest-override/calls/bind-000-1.json",
+      "sha256": "9a505fe4dc2dfb1e0ba5ab112669e925c4ef528bcba7e5a9ecf4f256e51fc1d1",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "19a7ca0c19fc7d831aaa9e2048490f8220adeb24e40f47510e1efb5cef0d29e0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/explicit-reference-identity/calls/bind-000-0.json",
+      "sha256": "5ade3ed8640bd152fbba300fbf0f2e03deebe115501309f6749025d0712a4e34",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "99572eb724bb726461e34a48300c0c783986a2e3dae2d4eae3a23db6e8027e09"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/identity-without-keyword/calls/bind-000-0.json",
+      "sha256": "788d7a1ddfd2396b36538157fbd8466d1eb3dd244cc64790dc9cacc23d500443",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "fcb040ef5285165eeb65a45879cf9adc3b0c388566f32688061619ec5cd6a6a2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/readonly-not-identity/calls/bind-000-0.json",
+      "sha256": "57393aa3c22f3e811df8a04d91c54f1e413630851e8afd93aab11d226ae743e8",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "a08a4a68b2b6ca82ac9aa8d5f7f2de8928dfdc7fb3dce30aa38e6e7b88750660"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/traversal-not-override/calls/bind-000-0.json",
+      "sha256": "457bc732a797d5a23f275f8dfb3e05e4dbb2229cfed8274f379d97ad368dd762",
+      "status": "completed",
+      "stage": "bind-000",
+      "request_sha256": "bf3cb97dd1f84fecfff75fbefdd274ace73e1ec4a3a0f5f17294990d78966077"
+    }
+  ]
+}

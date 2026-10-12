@@ -1,0 +1,72 @@
+{
+  "label_status": "agent_authored",
+  "scope": "Synthetic positive controls for the assertion reviewer; exact source and criteria preserved. Not human gold or a quality estimate.",
+  "cases": [
+    {
+      "id": "readonly-not-identity",
+      "kind": "support",
+      "payload": {
+        "task_id": "contrast-baf59db8e34f",
+        "instruction": "rruleset.rrules is a read-only tuple in insertion order.",
+        "source_spans": [
+          {
+            "id": "s001",
+            "text": "rruleset.rrules is a read-only tuple in insertion order.",
+            "start": 0,
+            "end": 56
+          }
+        ],
+        "criteria": [
+          {
+            "id": "c001",
+            "text": "rruleset.rrules is a read-only tuple whose entries retain insertion order.",
+            "source_ids": [
+              "s001"
+            ],
+            "requirement_ids": [
+              "r001"
+            ],
+            "template_ids": []
+          }
+        ]
+      },
+      "target_id": "c001",
+      "expected": [
+        "supported"
+      ]
+    },
+    {
+      "id": "identity-without-keyword",
+      "kind": "support",
+      "payload": {
+        "task_id": "contrast-11357ee2af12",
+        "instruction": "The callback receives the object passed to register(), without copying or replacing it.",
+        "source_spans": [
+          {
+            "id": "s001",
+            "text": "The callback receives the object passed to register(), without copying or replacing it.",
+            "start": 0,
+            "end": 87
+          }
+        ],
+        "criteria": [
+          {
+            "id": "c001",
+            "text": "The object passed to the callback is the same object passed to register().",
+            "source_ids": [
+              "s001"
+            ],
+            "requirement_ids": [
+              "r001"
+            ],
+            "template_ids": []
+          }
+        ]
+      },
+      "target_id": "c001",
+      "expected": [
+        "supported"
+      ]
+    }
+  ]
+}

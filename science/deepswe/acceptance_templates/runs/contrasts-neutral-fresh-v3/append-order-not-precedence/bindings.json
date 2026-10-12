@@ -1,0 +1,153 @@
+{
+  "decisions": [
+    {
+      "requirement_id": "r001",
+      "template_id": "T14",
+      "applicability": "yes",
+      "reason": "The requirement explicitly prescribes an ordering rule: old config array elements are appended before new values, preserving each array's element order. This matches the 'Stable ordering' card's applies_when condition.",
+      "instances": [
+        {
+          "prerequisites": [],
+          "slots": [
+            {
+              "name": "sequence",
+              "kind": "Sequence",
+              "value": "the resulting array",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "ReuseValues appends old config array elements before new values, preserving each array's element order.",
+                  "start": 0,
+                  "end": 103
+                }
+              ],
+              "support_explanation": "The instruction describes an operation that produces a resulting array by appending old config array elements before new values, so the sequence is the resulting array."
+            },
+            {
+              "name": "ordering_rule",
+              "kind": "Sequence",
+              "value": "old config array elements first, then new values, with each array's element order preserved",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "ReuseValues appends old config array elements before new values, preserving each array's element order.",
+                  "start": 0,
+                  "end": 103
+                }
+              ],
+              "support_explanation": "The instruction explicitly states the ordering rule: old config array elements are placed before new values, and the element order within each array is preserved."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r001",
+      "template_id": "T18",
+      "applicability": "no",
+      "reason": "The requirement describes concatenation of arrays, not a keyed collision where one source's value wins. The prerequisite 'collision_winner' requires a specified winner for conflicting values at the same key, but the instruction only specifies an append order, not a collision winner. The relation is 'retain_both_in_order', not 'select_one_source_value'.",
+      "instances": []
+    }
+  ],
+  "criteria": [
+    {
+      "text": "the resulting array is ordered by old config array elements first, then new values, with each array's element order preserved.",
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T14"
+      ],
+      "slots": [
+        {
+          "name": "sequence",
+          "kind": "Sequence",
+          "value": "the resulting array",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "ReuseValues appends old config array elements before new values, preserving each array's element order.",
+              "start": 0,
+              "end": 103
+            }
+          ],
+          "support_explanation": "The instruction describes an operation that produces a resulting array by appending old config array elements before new values, so the sequence is the resulting array."
+        },
+        {
+          "name": "ordering_rule",
+          "kind": "Sequence",
+          "value": "old config array elements first, then new values, with each array's element order preserved",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "ReuseValues appends old config array elements before new values, preserving each array's element order.",
+              "start": 0,
+              "end": 103
+            }
+          ],
+          "support_explanation": "The instruction explicitly states the ordering rule: old config array elements are placed before new values, and the element order within each array is preserved."
+        }
+      ],
+      "id": "c001",
+      "bindings": [
+        [
+          {
+            "name": "sequence",
+            "kind": "Sequence",
+            "value": "the resulting array",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "ReuseValues appends old config array elements before new values, preserving each array's element order.",
+                "start": 0,
+                "end": 103
+              }
+            ],
+            "support_explanation": "The instruction describes an operation that produces a resulting array by appending old config array elements before new values, so the sequence is the resulting array."
+          },
+          {
+            "name": "ordering_rule",
+            "kind": "Sequence",
+            "value": "old config array elements first, then new values, with each array's element order preserved",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "ReuseValues appends old config array elements before new values, preserving each array's element order.",
+                "start": 0,
+                "end": 103
+              }
+            ],
+            "support_explanation": "The instruction explicitly states the ordering rule: old config array elements are placed before new values, and the element order within each array is preserved."
+          }
+        ]
+      ]
+    }
+  ]
+}

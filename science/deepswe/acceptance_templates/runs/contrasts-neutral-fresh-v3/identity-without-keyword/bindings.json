@@ -1,0 +1,290 @@
+{
+  "decisions": [
+    {
+      "requirement_id": "r001",
+      "template_id": "T31",
+      "applicability": "yes",
+      "reason": "The requirement explicitly states that the callback receives the object passed to register() without copying or replacing it, which directly requires the same object reference to be preserved.",
+      "instances": [
+        {
+          "prerequisites": [
+            {
+              "id": "object_identity",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "support_explanation": "The phrase 'without copying or replacing it' explicitly requires that the object passed to register() is the same reference delivered to the callback, not merely an equal copy or a replacement. This satisfies the 'same_object' relation class."
+            }
+          ],
+          "slots": [
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "register",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "support_explanation": "The operation is explicitly named as 'register()' in the source."
+            },
+            {
+              "name": "input",
+              "kind": "Symbol",
+              "value": "object passed to register()",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "support_explanation": "The input is the object that is passed to register(), as stated in the source."
+            },
+            {
+              "name": "result",
+              "kind": "Observation",
+              "value": "the callback receives the same object",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "support_explanation": "The result is that the callback receives the object, and the 'without copying or replacing' clause confirms it is the same object reference."
+            },
+            {
+              "name": "reference",
+              "kind": "Symbol",
+              "value": "object passed to register()",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "support_explanation": "The reference is the object passed to register(), which is the original object that must be preserved."
+            }
+          ],
+          "guard_checks": [
+            {
+              "prerequisite_id": "object_identity",
+              "support_explanation": "The instruction explicitly states that the callback receives the object passed to register() without copying or replacing it, meaning the same object reference is preserved and delivered to the callback.",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "relation": "same_object",
+              "decision": "yes"
+            }
+          ]
+        }
+      ],
+      "rejected_instances": []
+    }
+  ],
+  "criteria": [
+    {
+      "text": "For `register` on `object passed to register()`, `the callback receives the same object` is the identical object `object passed to register()`.",
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T31"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "register",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+              "start": 0,
+              "end": 87
+            }
+          ],
+          "support_explanation": "The operation is explicitly named as 'register()' in the source."
+        },
+        {
+          "name": "input",
+          "kind": "Symbol",
+          "value": "object passed to register()",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+              "start": 0,
+              "end": 87
+            }
+          ],
+          "support_explanation": "The input is the object that is passed to register(), as stated in the source."
+        },
+        {
+          "name": "result",
+          "kind": "Observation",
+          "value": "the callback receives the same object",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+              "start": 0,
+              "end": 87
+            }
+          ],
+          "support_explanation": "The result is that the callback receives the object, and the 'without copying or replacing' clause confirms it is the same object reference."
+        },
+        {
+          "name": "reference",
+          "kind": "Symbol",
+          "value": "object passed to register()",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+              "start": 0,
+              "end": 87
+            }
+          ],
+          "support_explanation": "The reference is the object passed to register(), which is the original object that must be preserved."
+        }
+      ],
+      "id": "c001",
+      "bindings": [
+        [
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "register",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+                "start": 0,
+                "end": 87
+              }
+            ],
+            "support_explanation": "The operation is explicitly named as 'register()' in the source."
+          },
+          {
+            "name": "input",
+            "kind": "Symbol",
+            "value": "object passed to register()",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+                "start": 0,
+                "end": 87
+              }
+            ],
+            "support_explanation": "The input is the object that is passed to register(), as stated in the source."
+          },
+          {
+            "name": "result",
+            "kind": "Observation",
+            "value": "the callback receives the same object",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+                "start": 0,
+                "end": 87
+              }
+            ],
+            "support_explanation": "The result is that the callback receives the object, and the 'without copying or replacing' clause confirms it is the same object reference."
+          },
+          {
+            "name": "reference",
+            "kind": "Symbol",
+            "value": "object passed to register()",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "The callback receives the object passed to register(), without copying or replacing it.",
+                "start": 0,
+                "end": 87
+              }
+            ],
+            "support_explanation": "The reference is the object passed to register(), which is the original object that must be preserved."
+          }
+        ]
+      ]
+    }
+  ]
+}

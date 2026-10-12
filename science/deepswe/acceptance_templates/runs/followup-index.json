@@ -1,0 +1,185 @@
+{
+  "scope": "Standalone applicability/reviewer development follow-up; no production changes.",
+  "evidence_status": "agent_authored references and automated model judgments; not human gold.",
+  "runs": [
+    {
+      "run": "atomic-controls-neutral-v3",
+      "role": "primary_evidence",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/atomic-controls-neutral-v3/call-checkpoints.json",
+      "checkpoint_count": 5,
+      "checkpoint_archive_sha256": "6aa3ca51fa8e0098a99058e91c228a60f98021e405fec2eee3ece71a5b33cc16",
+      "report_sha256": "a36814565fb6dc691cb287f1724309188ff41beecf8854078255750d158fa6c2"
+    },
+    {
+      "run": "atomic-controls-v3",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/atomic-controls-v3/call-checkpoints.json",
+      "checkpoint_count": 5,
+      "checkpoint_archive_sha256": "03cd3d91cd3cd0bd3b06d331bfe5638f423d821f9875d84ff991709349ab98d0",
+      "report_sha256": "2a4536d9c1f8db4ab313d602145c627b6b230be35a0a4a2b5108f721d4d760fa",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/atomic-controls-v3/artifacts.json"
+    },
+    {
+      "run": "atomic-review-v3",
+      "role": "primary_evidence",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/atomic-review-v3/call-checkpoints.json",
+      "checkpoint_count": 4,
+      "checkpoint_archive_sha256": "5794a6e221336bbd457349d4455fc855e4693aca67caf42df7a057d257d96885",
+      "report_sha256": "a8a4b9ddc125eb3365998f232233d6805b343a2d4b255095b8c3b5ac0bfc008a"
+    },
+    {
+      "run": "contrasts-binding-v2",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/call-checkpoints.json",
+      "checkpoint_count": 9,
+      "checkpoint_archive_sha256": "f87041710007dac4bd9e5f0cef8a8c74a6713270ee74a342f9741d2a36ec1428",
+      "report_sha256": "039f1865e25234f20308d8cb75a3255ddb45e8456223f2fab251cf58093fc2e3",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/contrasts-binding-v2/artifacts.json"
+    },
+    {
+      "run": "contrasts-binding-v3",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/call-checkpoints.json",
+      "checkpoint_count": 8,
+      "checkpoint_archive_sha256": "baad1e75bd189debdd0d5711dddd1f5d254401450be28dff84d762f5b2f1d25f",
+      "report_sha256": "03eaf07d87d273ce8b9b5840a663d5e721e15a6ca56dabfd93c20a9164021c66",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/contrasts-binding-v3/artifacts.json"
+    },
+    {
+      "run": "contrasts-confirmed-v3",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/call-checkpoints.json",
+      "checkpoint_count": 12,
+      "checkpoint_archive_sha256": "29599be27486cdbdcf9ffa929ff324caa851feed76cc033d7f65912b18ac3ca9",
+      "report_sha256": "60d9adb0b971029e7df4f18729c025274a50702ae69eed8a982a496b72fe9b69",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/contrasts-confirmed-v3/artifacts.json"
+    },
+    {
+      "run": "contrasts-final-v3",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/call-checkpoints.json",
+      "checkpoint_count": 4,
+      "checkpoint_archive_sha256": "870db494cb75463e92a7214f3251e9b01a5d60d95926a178c88702696085c546",
+      "report_sha256": "1d810313169343ab728ac44e7798e1fccccf5af05b5bf386d9b55b5358a3c33f",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/contrasts-final-v3/artifacts.json"
+    },
+    {
+      "run": "contrasts-neutral-fresh-v3",
+      "role": "primary_evidence",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/contrasts-neutral-fresh-v3/call-checkpoints.json",
+      "checkpoint_count": 12,
+      "checkpoint_archive_sha256": "582c2f30102eb6ba5d97a464e4cf59dabbcec001e8805f049db2e35defd8097d",
+      "report_sha256": "4017a4cfc3bf5e3f03de8ec3b5f6c25d2fa123a9e4464a922c4cc6ae1d59aac3"
+    },
+    {
+      "run": "contrasts-neutral-v3",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/call-checkpoints.json",
+      "checkpoint_count": 4,
+      "checkpoint_archive_sha256": "b52b031872a5aac5819d9f8d7f77329829a216b05bfdc26d1ba0d8869e0fe3c3",
+      "report_sha256": "6b08e663ef478670ee383ae8abdcf52e6fb4cdc62addc2fdacf1cee51530e03c",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/artifacts.json"
+    },
+    {
+      "run": "contrasts-review-baseline-v3",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/call-checkpoints.json",
+      "checkpoint_count": 22,
+      "checkpoint_archive_sha256": "3552c7eccb0a2dbe4dbaa3a312ccc8505232763f8c19ab47b6bc5a745dc59e7a",
+      "report_sha256": "cbf35e6b037ecfb6982b5bdb92fc1efbb3b6f0766170bd536a8444cd8c73dc7f",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/artifacts.json"
+    },
+    {
+      "run": "contrasts-review-current-v3",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/call-checkpoints.json",
+      "checkpoint_count": 19,
+      "checkpoint_archive_sha256": "9a1f512d0b6f469cd7b5ff2d2467cc5cc51091c82a89d109e6155e8d5b79a422",
+      "report_sha256": "6f31edf517d78d6991cebc87c8e2b704d090dc807df11bc3969c7bf926a1ecd3",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/artifacts.json"
+    },
+    {
+      "run": "contrasts-review-v1",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/contrasts-review-v1/call-checkpoints.json",
+      "checkpoint_count": 13,
+      "checkpoint_archive_sha256": "1e0c225c705e15fd708f03354804632229ee05164557cfeb8ab76fd73571e7c0",
+      "report_sha256": "0393f214a1b659afdef98124da28e597d31d0dfa66d6fd2581180f28663d4f1c",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/contrasts-review-v1/artifacts.json"
+    },
+    {
+      "run": "contrasts-review-v2",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/contrasts-review-v2/call-checkpoints.json",
+      "checkpoint_count": 14,
+      "checkpoint_archive_sha256": "63e9a409a7ec866d6580577367ae56620b0d598043a745bfc7bb78af9adbaf51",
+      "report_sha256": "a9c6dc21ade8888c2ac622af0053552e807c7301a504461b2eab69afd2f0eb44",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/contrasts-review-v2/artifacts.json"
+    },
+    {
+      "run": "evidence-confirmed-v3",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/evidence-confirmed-v3/call-checkpoints.json",
+      "checkpoint_count": 43,
+      "checkpoint_archive_sha256": "d7888a54b28893598cf006a33448a4fcf60829562bead24cf07fb60f70edf988",
+      "report_sha256": "825ce48279e36bf955d56d9a05b4c313813c803d3d57bccab34aa11007fac577",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/evidence-confirmed-v3/artifacts.json"
+    },
+    {
+      "run": "evidence-control-v3",
+      "role": "primary_evidence",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/evidence-control-v3/call-checkpoints.json",
+      "checkpoint_count": 20,
+      "checkpoint_archive_sha256": "32b1132f31426b9f8f8ecc0f555f2ab0d52b2699d7d593c16cbf928921f77bde",
+      "report_sha256": "40bd37091e3c70fc725c47aaa94356900d3526252fe37d39f995201bef166b64"
+    },
+    {
+      "run": "evidence-guarded-v3",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/evidence-guarded-v3/call-checkpoints.json",
+      "checkpoint_count": 13,
+      "checkpoint_archive_sha256": "3741a3125b3c1949980738b4f7f0004549867c45812bb65c219ae0864863a1b5",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/evidence-guarded-v3/artifacts.json"
+    },
+    {
+      "run": "evidence-independent-v3",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/evidence-independent-v3/call-checkpoints.json",
+      "checkpoint_count": 8,
+      "checkpoint_archive_sha256": "d269acadf1dffe186079b3759e8519c99c132ae436654e60be7dc514036027cb",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/evidence-independent-v3/artifacts.json"
+    },
+    {
+      "run": "evidence-typed-v3",
+      "role": "primary_evidence",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/evidence-typed-v3/call-checkpoints.json",
+      "checkpoint_count": 24,
+      "checkpoint_archive_sha256": "5bda501265cc0bdef99bb41bfba8ea29b31bf5dbb5931eff8351c38b41abc0ad",
+      "report_sha256": "36236b39131ea894e7cfff3fdcde466d13fb2ef8ace203fd2d118405f1a3860d"
+    },
+    {
+      "run": "evidence-v2",
+      "role": "preliminary_trial",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/evidence-v2/call-checkpoints.json",
+      "checkpoint_count": 9,
+      "checkpoint_archive_sha256": "0278861582de7795287079315ca08047c7c84da9e60e5091b555c0303de78250",
+      "parsed_artifact_manifest": "science/deepswe/acceptance_templates/runs/evidence-v2/artifacts.json"
+    },
+    {
+      "run": "evidence-v3",
+      "role": "primary_evidence",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/evidence-v3/call-checkpoints.json",
+      "checkpoint_count": 32,
+      "checkpoint_archive_sha256": "865b5432d16d37093938c304d93a08e6d28ee071beb5cffe415f95a3eccf44b6"
+    },
+    {
+      "run": "review-replay-v2",
+      "role": "primary_evidence",
+      "checkpoint_manifest": "science/deepswe/acceptance_templates/runs/review-replay-v2/call-checkpoints.json",
+      "checkpoint_count": 3,
+      "checkpoint_archive_sha256": "85b0d25e7935134d24aa0ab61d78876bd9c19745df7b349eefd15a50f84cfffb",
+      "report_sha256": "12b3089e3b5d54312216318624228b54f6ad2db8cc038f548b0750973780a17c"
+    }
+  ],
+  "checkpoint_count": 283
+}

@@ -1,0 +1,1276 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "4e148a6094324f48aa0a546f82eca2d7753a4613f6951061bac11349d8845db2",
+  "file_count": 180,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-000-0.json",
+      "sha256": "2b5499dc09d2219ba1b5927dc5d1e2643fffd660a560bde54bd7f81e1c136ba1",
+      "status": "completed",
+      "stage": "catalog-audit-000",
+      "request_sha256": "da3ece50908296d3325201941429164cb2e7897dd26cae1d083ebcb83581d974"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-001-0.json",
+      "sha256": "ebd7e68c8c5e70c6a0e40b29c1f950748ebc179bdc4b6040250aae5919bd78f8",
+      "status": "completed",
+      "stage": "catalog-audit-001",
+      "request_sha256": "dbf269df08b4f11fec7cdda5f5ec321e6b70300d2e7557d99acf5e50b5790122"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-002-0.json",
+      "sha256": "fe2ae29d205f2c1e57c84513eae0418469c23f8ffc624513fe8afece208c7c92",
+      "status": "completed",
+      "stage": "catalog-audit-002",
+      "request_sha256": "06c643658bf570fd335e5db997d4d5f2d31fb046746d6193e296478e9c7dea84"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-003-0.json",
+      "sha256": "484682a974a027cad3f69fe85bbd5e3b7feb5a0be97a6288f153ba3a77e7c106",
+      "status": "completed",
+      "stage": "catalog-audit-003",
+      "request_sha256": "527b79f06dc0e2057761dbae47c2e5556b91adc5de36611cae7b7714de8264d1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-004-0.json",
+      "sha256": "fa344ea20d8e15722e26f9f0ac053f0bb645043fe82414934eca96d9b0f579fb",
+      "status": "completed",
+      "stage": "catalog-audit-004",
+      "request_sha256": "f4294f607e33d569b83d49db75de06104aa094640199794a7cad9ec063852a51"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-005-0.json",
+      "sha256": "b36f326b55d475e330d24bce974ee7469058fe0232853e5b83068052a75288b0",
+      "status": "completed",
+      "stage": "catalog-audit-005",
+      "request_sha256": "7b6cdb768d3919c5c3bb5d08530764ceef92f9e3076d4af0a273e7e13dd931c6"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v2-000-0.json",
+      "sha256": "ed930d03f8118f535c4acef139da288bb18aee4618d6bf2f8999192d2591d4e9",
+      "status": "completed",
+      "stage": "catalog-audit-v2-000",
+      "request_sha256": "846295851425b228b4642c96bd1da3b5cfc449d9b6aa057107a0b9e4907d8d27"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v2-001-0.json",
+      "sha256": "76d5781c955635b08ce349651ddf070851fc7b62c352868fbda99197c97b39c1",
+      "status": "completed",
+      "stage": "catalog-audit-v2-001",
+      "request_sha256": "f00550be035951c7ee670b2a21ab46380aa1df3bdb2cf3748c7459351b05e22b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v2-002-0.json",
+      "sha256": "01ca9bc7ff550671c5c69709e2c10593a545e9a830feaed08ee0826469e9b117",
+      "status": "completed",
+      "stage": "catalog-audit-v2-002",
+      "request_sha256": "e0a0d941d77d18f09f9209a75fa0aa2ca7bddb5462cb56b67c6d3668d37838d7"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v2-003-0.json",
+      "sha256": "125877244100621fbd050733bddf8810c593aa0d07b9bab4f1d5a7d6eea3f0e6",
+      "status": "completed",
+      "stage": "catalog-audit-v2-003",
+      "request_sha256": "02ff85e3b50d28cda124a81426c7c3c2a0021f46a119af18a3c29d22216baee3"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v2-004-0.json",
+      "sha256": "65a0e9576c4024dc3aeb3f952b4977fb4513f8d1c4888ec8387a133eeba07231",
+      "status": "completed",
+      "stage": "catalog-audit-v2-004",
+      "request_sha256": "8d7610d43348e30f5a4f58812438a071fed5acdd0858756571eae128179cc093"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v2-005-0.json",
+      "sha256": "425d8832be3e7c8f8b8d32c7f89a0d148de01990cbecfab594bf4add12984ed9",
+      "status": "completed",
+      "stage": "catalog-audit-v2-005",
+      "request_sha256": "ae0f09120460ac5504c13524e1577adc238839486bd54ce2df57e64e73a95ef8"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v3-000-0.json",
+      "sha256": "16bcd967c9f2d31a98db05a8cef1752e48346314c763f5b8e24b1f6d2f81644d",
+      "status": "completed",
+      "stage": "catalog-audit-v3-000",
+      "request_sha256": "c780ee3092f2e6d0001a4866593058bfc35f2735118e11a421801b28a86c03a5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v3-001-0.json",
+      "sha256": "87d789bfc0087c74747419389560dbac4117e049fa0060986e908e96999ff0bd",
+      "status": "completed",
+      "stage": "catalog-audit-v3-001",
+      "request_sha256": "30d81af52c9b3326e26c250443cf6acce6e0c0bfea7c9b1d495ee72e4f74ae0d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v3-002-0.json",
+      "sha256": "25ee1ef9216b5641e81a7f2733586ac4b663717e827d7065967039bd2accc1c1",
+      "status": "completed",
+      "stage": "catalog-audit-v3-002",
+      "request_sha256": "dd69b059dfe712ef6db649f0465688e95c5c475beedf165d9efdd2972d778e3c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v3-003-0.json",
+      "sha256": "9dc25fbcc505b65683e1636ca41c37545aa469ffa89bd1cff86ef16cdafef4ca",
+      "status": "completed",
+      "stage": "catalog-audit-v3-003",
+      "request_sha256": "8aa718c26c928e666e012ca320bd3ef454c1faff1a120ee7256b8ee1817807dd"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v3-004-0.json",
+      "sha256": "cab6df834cfbc6bfc70899f5b9b74cddf317b5854502e64cadb7e34b0c204569",
+      "status": "completed",
+      "stage": "catalog-audit-v3-004",
+      "request_sha256": "8f9bc6ad244c9c04557da8a3a2055d2cc06ffd9264c3d1fa940c930c00707b9f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/catalog-audit/calls/catalog-audit-v3-005-0.json",
+      "sha256": "225e32f67f8356c427228e95790355e44b5ad8d13ff7c30c23d9e49c72b7fb13",
+      "status": "completed",
+      "stage": "catalog-audit-v3-005",
+      "request_sha256": "6158f297908fa3d1c0e807e1a3c2ea1b969f1c3166027cf7ec2cd92f97081634"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v001-0.json",
+      "sha256": "2ef1e38b9a8643d5f4b46bfc1976afded31227a5c8fc6ac491bf318441ff93aa",
+      "status": "completed",
+      "stage": "jev-v001",
+      "request_sha256": "ed34daec0f541034ee394da26f8017fa14ceff192a225aba58321c9a717a70a9"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v002-0.json",
+      "sha256": "be866c03cdd22bd7aa72726f79bb7f46399a5c346ca57b7cb0c256caec9e0888",
+      "status": "completed",
+      "stage": "jev-v002",
+      "request_sha256": "16fa5409c965414166d22ba99c0c0bd72a0b5738e800ec52c0fb0e4e1a2d71f6"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v003-0.json",
+      "sha256": "a9623c20ce8774c652f003b52965dfa2b0b05c4468b36f5c41080b13f8707da3",
+      "status": "completed",
+      "stage": "jev-v003",
+      "request_sha256": "5e463d88b74fd45d381eeb2785078019f9ed598e761ea63ffd64a7915a5a78cb"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v004-0.json",
+      "sha256": "5572406667ea1b4e6d0e32b2229afa04e1292ddaf4737bf02d71b89275bf8bc5",
+      "status": "completed",
+      "stage": "jev-v004",
+      "request_sha256": "3795d82ba5cd9f536ea6c51131457f6cf6ef6bcc1b14afd84feb9e495491a219"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v005-0.json",
+      "sha256": "3abb437f50c9409215eff239f9270da67cd47dcbcc9954c1a1f77b680bcd8660",
+      "status": "completed",
+      "stage": "jev-v005",
+      "request_sha256": "9aa1d3485d4d0afaf8dd09015c1ed081222792fecdab8d0a724b77b5beb068ed"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v006-0.json",
+      "sha256": "552c051e5561c9234a1a6de53ddc6e8acde754f3f3eb340fa556702681632296",
+      "status": "completed",
+      "stage": "jev-v006",
+      "request_sha256": "695b768e31e093024e01c7179de3799d6f214cccdf9ac1e6e769838dc26d94af"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v007-0.json",
+      "sha256": "f2babf368614fae4a0dedf2d8174bb0c332a877748b7977b544ecb6f18e11ff8",
+      "status": "completed",
+      "stage": "jev-v007",
+      "request_sha256": "a654aed33e3aa44e0e4c5a83831cff15390c26d41cc680e885dbc89a22002df5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v008-0.json",
+      "sha256": "29b4bb38c170f4efc9f9b631b629c31ffe3b6f094ba2f45bbb2608847e0a82a4",
+      "status": "completed",
+      "stage": "jev-v008",
+      "request_sha256": "6cd63e17566b097bed8c415e9f506032d3b680071e1a452516b1e1c1182ab7e0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v009-0.json",
+      "sha256": "4ff6a33e0bca4478cd25ed8c0f855c86a36baa493de6e9bbeaaecf615b6032d1",
+      "status": "completed",
+      "stage": "jev-v009",
+      "request_sha256": "0d09fb4ab9d824d3f02f169efa377b55003243ef57871971434f0d9c9be95912"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v010-0.json",
+      "sha256": "646a851d25ce589b8e7f4806c411922edca9676c542d8a0ac66265b9305a42fb",
+      "status": "completed",
+      "stage": "jev-v010",
+      "request_sha256": "5a7b754edefff5521217c9c6f9332ac47f36c96d9e80c42fe5cf2fd1ae9454e9"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v011-0.json",
+      "sha256": "46968810078938659ac6436a91b26ade21f71c285c0cc326e3f77dde8de86e25",
+      "status": "completed",
+      "stage": "jev-v011",
+      "request_sha256": "60766b30794cf5bf0e2c42c5e7b91fc5814eb86e70fc2e31035cce2a726497c3"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v012-0.json",
+      "sha256": "619f9ce2456e268aa5c3fdd8d4b12ad21cc212b578b680b6ce0b46210d499b5d",
+      "status": "completed",
+      "stage": "jev-v012",
+      "request_sha256": "0bc24f53a5e7517dfeee6ee2c852caa5af7811a0a387f8fe4f7fc9ab23e2c91a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v013-0.json",
+      "sha256": "964440ac20d410cbe9661789276b7c802d407cb2e31bec98c28191b0a1672967",
+      "status": "completed",
+      "stage": "jev-v013",
+      "request_sha256": "2e910f79cc6de25c339c21d3c81b2b461d718c7f2f9613001dbb7f6427bb20d1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v014-0.json",
+      "sha256": "e0cf798fbc0cc37b71d8151a3fc35400287fa2a30e682b05dbb2b82ad49bf492",
+      "status": "completed",
+      "stage": "jev-v014",
+      "request_sha256": "a3eedba0c453db9ff23b873ac2ef5f39ca1106abbf4c450827810235a8287d1d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v015-0.json",
+      "sha256": "7ecd02d58d73a7f9a6ba78e23ec79cfafde5ff304f11ce76a291faeda092a0d2",
+      "status": "completed",
+      "stage": "jev-v015",
+      "request_sha256": "0484e10fd8baf6ba45ba0f987471f9b4ad68d4a4a0ca878384cbe4234e660697"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v016-0.json",
+      "sha256": "c7007337c22a308460f6bbebc07e0e22e6ef6173d64b363d46b68ebd214436fe",
+      "status": "completed",
+      "stage": "jev-v016",
+      "request_sha256": "35ddcc0c0137c97f69eee8e456bda44c4ca6cd5dc17bbe255fd3094d57a863ac"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/cattrs-partial-structuring-recovery/jev-shortlist/calls/jev-v017-0.json",
+      "sha256": "ca503a9a7980a6f8f9e00dfa8c51e7e06eda60365451ee9635b7a1771af01e64",
+      "status": "completed",
+      "stage": "jev-v017",
+      "request_sha256": "49a666df52ca1bf09358f3804a6dbfd2515e8cafd97bab5388c2ab253d2c41a4"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-000-0.json",
+      "sha256": "0b90e6b8467361a23f38d550d4c292a1b00fef3627c02c6efa6f3197340d8a53",
+      "status": "completed",
+      "stage": "catalog-audit-000",
+      "request_sha256": "daf4d87d8d0c7223592097140f7cb5dc46bb195b56c1f7e4387e516633c6a9a0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-001-0.json",
+      "sha256": "6a56eed5c3d35ecd84571af02616c1676ddc6a804372a4dc706e5da35d42cb4c",
+      "status": "completed",
+      "stage": "catalog-audit-001",
+      "request_sha256": "8940b0e529aedd2f9c7c791be21978cf990220b3ff849dd6362274cf6fb27f95"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-002-0.json",
+      "sha256": "38afacf42c0fb9164cabcd94990e2ae33a106d1fbddc2011c26e0776d30a58e3",
+      "status": "completed",
+      "stage": "catalog-audit-002",
+      "request_sha256": "c2143644e4a86e1af577c24bfbfc9c50aa3f01d828561dbf5456960bc715865b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-003-0.json",
+      "sha256": "b394f78511d5971a9d930cec4c39951fddaae0a38b83e539a13adfb89ac45970",
+      "status": "completed",
+      "stage": "catalog-audit-003",
+      "request_sha256": "96e54df8d3c135cedd5cb2bc399c919c53975288858a9b2aa39a0082c1299f36"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-004-0.json",
+      "sha256": "06d5328d08d6abaa497cc5bf565d85db2af85d9844a09ec5704a95f27a5fafe8",
+      "status": "completed",
+      "stage": "catalog-audit-004",
+      "request_sha256": "6e3edf8a320be1dafa5cdab3e06ac70efdb9acb8c1fc41797bffb4acdcc88ec8"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-005-0.json",
+      "sha256": "fc53b33b182f98dc7ab9da5873cbe42fe4ee7e38c71f55a11889e7507cfec6b9",
+      "status": "completed",
+      "stage": "catalog-audit-005",
+      "request_sha256": "0b8cb858a89b372ae9923b238b72de657a169115ae0c6b63988721dc45b76426"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-006-0.json",
+      "sha256": "3e3866129223d52f5f89241e29ace9423ef190b0acd75160f84101b4ccc071a7",
+      "status": "completed",
+      "stage": "catalog-audit-006",
+      "request_sha256": "a011be9167a77414750fe94d15c122bea6a64fabcb270e2054b3bf07d65d6832"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-007-0.json",
+      "sha256": "67e6e371ddfe916e38a5e795bdb68856b8c211418384340f051705836ec00092",
+      "status": "completed",
+      "stage": "catalog-audit-007",
+      "request_sha256": "516e3c97ef41f2eb525ef675da54147420e50b7ba613a4cb62e57416a86ee820"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-008-0.json",
+      "sha256": "91e8a17c205f3f87f2a60f3adeadddb55d8f1d75dffcaaca278738b191088a0f",
+      "status": "completed",
+      "stage": "catalog-audit-008",
+      "request_sha256": "4df5cfca080317593626a9b91eb7974f2fa6d3e49a569b05a6895fc7e8c51599"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v2-000-0.json",
+      "sha256": "2db5a1b0200000339c77eb66a6956b5c2b18d6d2355edc0f96fe6e27a0dc2acb",
+      "status": "completed",
+      "stage": "catalog-audit-v2-000",
+      "request_sha256": "741f15c8bc774b9738a8f27e899e50bfd26babe9e870a0c2d32e5f393ae61778"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v2-001-0.json",
+      "sha256": "9f3e5bc4b87e05f19f28e9de7597a29e9c414b50a2603131e0127d237264a26c",
+      "status": "completed",
+      "stage": "catalog-audit-v2-001",
+      "request_sha256": "4975f05ad50a9a6af7fccf798cd9808f0c4301fcb55ac05024d92fc2d572762a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v3-000-0.json",
+      "sha256": "43bce9b00ec939c9fa24de65b6965cd9b94540b5827f862aac3015f96da130b4",
+      "status": "completed",
+      "stage": "catalog-audit-v3-000",
+      "request_sha256": "786f1b3338210decd28cd2c3af69ca736994156facf698366f3026c9dd091ba1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v3-001-0.json",
+      "sha256": "5e4c03774e5a22a24e26566927d6a94893c7d42c8cc46ee88c783002dccfbc68",
+      "status": "completed",
+      "stage": "catalog-audit-v3-001",
+      "request_sha256": "accb9e7b05ff0347bd5fb00b5b1e39f028e760160babe41d0c9c26a58fd0be0b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v3-002-0.json",
+      "sha256": "665e3c325bef3f7e05a00b6c5ea9d96a338b80bd209017bfd679bb9734225aaa",
+      "status": "completed",
+      "stage": "catalog-audit-v3-002",
+      "request_sha256": "886da219f448d8d547f82c4b210375fb328635aced032a4f20dda0c54c62f158"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v3-003-0.json",
+      "sha256": "a1875c254c066b6c8227e6aa9f54936624bdc4962631df8bf6b34af14d800534",
+      "status": "completed",
+      "stage": "catalog-audit-v3-003",
+      "request_sha256": "d36499ddbb166283ff61ed93356cebcac59e8df289d11a1132ee729ac2b1b8dc"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v3-004-0.json",
+      "sha256": "07d23b9dfbe948e73d1003dda971422a3d6deeb28aa88796820265fd9b2f124a",
+      "status": "completed",
+      "stage": "catalog-audit-v3-004",
+      "request_sha256": "35cac7dd2b464972163a065e2fe5429219d8036d65af725bb9d97da24b707420"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v3-005-0.json",
+      "sha256": "ae404b29d414fc6f3348bbf4ac8d61cb24b8859086a80c16f4737df67646bd9b",
+      "status": "completed",
+      "stage": "catalog-audit-v3-005",
+      "request_sha256": "0bd78807caa464c25aa4ce9aacaa0c63f83340007a0ad902edad212c1ef08e62"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v3-006-0.json",
+      "sha256": "5e90464dd615da2f2d06980c33eab67eb1c13e6edc30210721b1e7f1aac0e1df",
+      "status": "completed",
+      "stage": "catalog-audit-v3-006",
+      "request_sha256": "bd293c43277e99b8fd389d57fc90ed981a1839df336e52a14fe5f95ee0cbe9ff"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v3-007-0.json",
+      "sha256": "6577f7282ee95f797de35ee72c335cf5303484b5b5262c1e6272563f76ee9dfd",
+      "status": "completed",
+      "stage": "catalog-audit-v3-007",
+      "request_sha256": "a8fa5b0322ddfbbc1e19967105763e42f8fe088126debf27ff04a6db476fc99b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v3-008-0.json",
+      "sha256": "138d8f7dbcc59020465aec533f897736ab459d49553b787c1fe327b037afd308",
+      "status": "completed",
+      "stage": "catalog-audit-v3-008",
+      "request_sha256": "bfe6c9a7984276f4d574d7a904ebe30fac53f923a0061fb906761851e4c4cbe6"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v001-0.json",
+      "sha256": "b612ba76cdc6c9d2234207627c6b1f9b684030dd3dc553f433e81c903b94decc",
+      "status": "completed",
+      "stage": "jev-v001",
+      "request_sha256": "5ad36cadf9f35bc6a8a8b9a20f89dd829cc1df6bf1a0b244c766e2acf22718f6"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v002-0.json",
+      "sha256": "4d67ef39a844b7553f4c0203fe01fe4c64bbf014a042ba79d2565c8c63b381f7",
+      "status": "completed",
+      "stage": "jev-v002",
+      "request_sha256": "2e876dc93a0435451cd38be1fc8ef69f961d8d80f1fe4b6e6e002a1e2e0e3ed9"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v003-0.json",
+      "sha256": "84ffb99faeb3330f81c9b998e6d1e66887a27ba13170bfb2d88b17c542453de6",
+      "status": "completed",
+      "stage": "jev-v003",
+      "request_sha256": "393bdddffcaa4893bfec73a268d4544aa2b7342e7031e626bdf7908c62116dd5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v004-0.json",
+      "sha256": "f8c964ce8003e8f450715119ffe2b9ef7ea8ce2e2b5a66d3e76dea1191a1d340",
+      "status": "completed",
+      "stage": "jev-v004",
+      "request_sha256": "f6d0a361fb9ab4df94db45a92974ed1eee8fe1d1e3065c48fc2625ed24868c88"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v005-0.json",
+      "sha256": "8e5cdfb58c721d7559559d08d023913b46da57ad41836b9178a3972c2346506d",
+      "status": "completed",
+      "stage": "jev-v005",
+      "request_sha256": "748e3b39e79724f5ef502579ef80b22e9c65ddac6f2d6a3eb6f3b631703f0cc0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v006-0.json",
+      "sha256": "f68be11d1f20e3b47a74f2444c22e875cb36c3b2f720204a0336b63010d918d6",
+      "status": "completed",
+      "stage": "jev-v006",
+      "request_sha256": "d4e96cd6dd27373bd150587daa07bb4bea8a3c987d5f29b1fa6f04db81b5b7ee"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v007-0.json",
+      "sha256": "840ca7395e1c039c9fc0e9c3e3c6c827cb3053871db92109d75fbf4b4edd25a3",
+      "status": "completed",
+      "stage": "jev-v007",
+      "request_sha256": "5eaf046a6087637a2a8cde1fbc17c7dff86d8fde9b88ccabe0f1e75996cfb02e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v008-0.json",
+      "sha256": "4e1c6f3e2aa38296b389cc5a7e07a8d6124a135285537ae655ae3fbe154eddd8",
+      "status": "completed",
+      "stage": "jev-v008",
+      "request_sha256": "7c3bb8feddb1daeb84beadafb11ff25bed65d046e8bbae45021ad66cb74812e1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v009-0.json",
+      "sha256": "b1c313c73d1f4b21091f596f09f83dee8189b365308db7d90b8032f48682c2f0",
+      "status": "completed",
+      "stage": "jev-v009",
+      "request_sha256": "4b8f23e7f8ba014b5e36815c03ec9dd4a4d11c06f3b1b1187aae29dad3120d05"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v010-0.json",
+      "sha256": "02d9c1184ab1b9a4384c7fbb7ada3581da9f025938060104ef9b8a2625713607",
+      "status": "completed",
+      "stage": "jev-v010",
+      "request_sha256": "9eb1fb44ff138df2fa3c39ad0220b035bff9bb1ace90d5ea91c841cc3db6c344"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v011-0.json",
+      "sha256": "ca386571c16b89b006073a34f9110e79598454a2d0c7544c69aa722ce6cb13ab",
+      "status": "completed",
+      "stage": "jev-v011",
+      "request_sha256": "bb87db91549242fbf35fa312cd99d6633aa317b62b7688fbde3185e26d2b95ee"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v012-0.json",
+      "sha256": "b3933f2d29c8b1f2a30967ac6cafea9030d8cb727647e23386170709f93afe6c",
+      "status": "completed",
+      "stage": "jev-v012",
+      "request_sha256": "8289e06fe1bf52e5545832db95f88b0cb8024d6e0d47d37090ae476468cbf14c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v013-0.json",
+      "sha256": "d48a21881439d261953198da21e2b06952f802991b8846533cd4f0aeb1ea6d57",
+      "status": "completed",
+      "stage": "jev-v013",
+      "request_sha256": "d7979d9e373f659b95075d97b302d757497012cd0f50668500cd5020578cfd8c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v014-0.json",
+      "sha256": "c82e4b390f2afee2f31151eeda3e98dca630e6ff4603139b8811dd9d0082bd8f",
+      "status": "completed",
+      "stage": "jev-v014",
+      "request_sha256": "7d9dde115f66e04f54601a8a91cf53d8a6b4ad3e72441b15372af6522085df09"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v015-0.json",
+      "sha256": "a2eb9ab7738b54153d22c25496b4f3b91a1426ff89b65564c381560f391b2429",
+      "status": "completed",
+      "stage": "jev-v015",
+      "request_sha256": "7fea6a5181e73c02f37ee96ee84dfbee2f20002bef39854e890eaaf4f8d97ffa"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v016-0.json",
+      "sha256": "0d9a199133a09a9f469de09ce4a1ad3ecabe19801fbcfb30e7f0644a3bcfb80d",
+      "status": "completed",
+      "stage": "jev-v016",
+      "request_sha256": "ba119a70897d1f7fb7c86870c9ba299ba9e47b25d267e7b80c3fd1899a7a148e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v017-0.json",
+      "sha256": "6fb330438ee0253f44aa02fedc2fd263b5583ec72cf6704f44890aae1b502706",
+      "status": "completed",
+      "stage": "jev-v017",
+      "request_sha256": "bc93f3c606f20d47b2c8a4edc889b83b0c979f5e582a4655ccb79153c13e4792"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v018-0.json",
+      "sha256": "9217c2b6fd29da7e7dd9585936eaea3f3f4264ffac7cbc9f0feb9fed9edbcc0d",
+      "status": "completed",
+      "stage": "jev-v018",
+      "request_sha256": "75d181b0e226af90236d5378c27cca2e162b2f1aae790c359b471e223898d6f2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v019-0.json",
+      "sha256": "33b68c7a14a5686ee9a004a97fef8419e759be0dbfe3172cf40b77c8b75f21b1",
+      "status": "completed",
+      "stage": "jev-v019",
+      "request_sha256": "5bd59e2c4133eabee0a11f96d9c6e195d6e34d97ea2d6943d17f77da1caabc77"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v020-0.json",
+      "sha256": "4a1a1ce124d632a6b720137f0d4ce90e71dfa1562ad5088bdedb4f56f758e09a",
+      "status": "completed",
+      "stage": "jev-v020",
+      "request_sha256": "87c213be168137ffd2dd021af5909b3410e6cb9d11c2ddd2e4ddfecb87179380"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v021-0.json",
+      "sha256": "f9f839dc5479caa1099ded89a3baf3db942628c24630c22107de92e527f46dfd",
+      "status": "completed",
+      "stage": "jev-v021",
+      "request_sha256": "c577b26965bd6a875b2fd456d8920342decf30462455a96fd8acb66d9bfd7b6a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v022-0.json",
+      "sha256": "1cd2faea4b087865f8b7ea91cc11b7a58258f1e58b99baa9aeb80b54705314fd",
+      "status": "completed",
+      "stage": "jev-v022",
+      "request_sha256": "453d1c6142a77d86189abfe35e90666cc3616c61da64a3f2169ae7e4f8d22f40"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v023-0.json",
+      "sha256": "c337de709343a168bcc4aa4efa694652f0e5e10b9ed881bced0fcd8bf65bf0e3",
+      "status": "completed",
+      "stage": "jev-v023",
+      "request_sha256": "3e9a5f41833a11e62323da744df012fc2f02df8f72cd1a3e9d1bc25054c2b215"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v024-0.json",
+      "sha256": "c9b8927a3110059f683e72f72ef7b3338d739ee011a04fdf451f6aab8a0687e8",
+      "status": "completed",
+      "stage": "jev-v024",
+      "request_sha256": "640935c301a5a6d0049ff683732c18472f586a84a29e619bf6e9b7a138fdf363"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/jev-shortlist/calls/jev-v025-0.json",
+      "sha256": "56a30a4e992823504c4834ce411386f5e21363b3ff0bf2ce7e70dfd34b873623",
+      "status": "completed",
+      "stage": "jev-v025",
+      "request_sha256": "e2aa52ddbae4bba74b591d891e857f843b326b90628658425f92fbd9520a2b4b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-000-0.json",
+      "sha256": "477520273c82fd6ac467bfdf8d8b3647ec653cef589b65cbbd6361c966df6ce4",
+      "status": "completed",
+      "stage": "catalog-audit-000",
+      "request_sha256": "9aa410dbb4c639d1b84cfe1d41b9579284951e05fb7d7a3f4a7f3713c62f7bfb"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-001-0.json",
+      "sha256": "c5b3cbf6646d6b47ad10856235704f5a7788e7e5313236f96c63b3524ac9dd5d",
+      "status": "completed",
+      "stage": "catalog-audit-001",
+      "request_sha256": "938304e9fb03eb150aa2539fe6e5ef3432907f039d423bc25af40e3523ca8a02"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-002-0.json",
+      "sha256": "006637b33c8b642c11425aaf1683227eec0d372eeb82f5dc545211bf4e57bc94",
+      "status": "completed",
+      "stage": "catalog-audit-002",
+      "request_sha256": "86fc9d728e84755fcbf1a58ac165812356dd07171947f5485b72ef3f703f7d87"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-003-0.json",
+      "sha256": "950b30a5a3605021283e1b5917d24f82a6f203c19b29def54ad2b2bbf34a0b96",
+      "status": "completed",
+      "stage": "catalog-audit-003",
+      "request_sha256": "e4ef2cd75b03cf7b0d8de8b9b75837114488e17271fa161e034e45bb2c3e58a0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-004-0.json",
+      "sha256": "ccba98e8ad7e27ec818d89fbf1db116971b6371b16d993acc46f6a2d06fb978c",
+      "status": "completed",
+      "stage": "catalog-audit-004",
+      "request_sha256": "46bc57e701f87fbdf94be6df722a525f02a93fb95d1c801d95c23ccdf140c13d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-005-0.json",
+      "sha256": "02dadf1f13d72fac307c33222e1e53e64c975b50919dd4d7c33df173e0735f63",
+      "status": "completed",
+      "stage": "catalog-audit-005",
+      "request_sha256": "226616a30d2ab0b9e35fb7a1c62e971e8cb86db0325dfa040ef1e7d78c529b79"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-006-0.json",
+      "sha256": "1fc169f1f9bda1101a0f242097af2346d617dda239fa06282890aa0104f70247",
+      "status": "completed",
+      "stage": "catalog-audit-006",
+      "request_sha256": "2d9af988ab0bf55e3533a05e223866e607eabd2d3e639ae0e05a31c946370d10"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-007-0.json",
+      "sha256": "66043ebd910c7f7a205ed8d3bb78bfb2a40114d1aba5ab341d892bbc630bc977",
+      "status": "completed",
+      "stage": "catalog-audit-007",
+      "request_sha256": "5002fd1dc7b348d9b37447b3fb5c03ab54ab5458fb88263356065f41eb56a10c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-008-0.json",
+      "sha256": "c771936c36b70f13e8f2f569022ccfc553f2d8544104e635a02021c431f65ea6",
+      "status": "completed",
+      "stage": "catalog-audit-008",
+      "request_sha256": "5f971e8e4b06bb8c1929d731f73b60915dd41632b91f3c83bbc1163c8bb6e9df"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-009-0.json",
+      "sha256": "a22cb113c6cc5c0686be2a1b3f2217c5a019c3b6bc5f16591e070d25076b20fa",
+      "status": "completed",
+      "stage": "catalog-audit-009",
+      "request_sha256": "09b3f0c1654cd9c4250f8d8133a80abe7d587bceac554f2945c90439cabb113b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v2-000-0.json",
+      "sha256": "79d774cccde47e0854ec60b46e367fa58a6000113d855f2135288541082fed30",
+      "status": "completed",
+      "stage": "catalog-audit-v2-000",
+      "request_sha256": "62be5ef51a237800b495d988e847860386aaf8ddee6f8df985cdee8f08f09a2e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v2-001-0.json",
+      "sha256": "3fd09483c9ad770d2fd83229b398ee3df51ae9b0ae16825dc54f4bfdc03aa58d",
+      "status": "completed",
+      "stage": "catalog-audit-v2-001",
+      "request_sha256": "fc6ab1cfa4678563639fa77efc43e901acb35bbbbbdfcae00941644e1f7c0554"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v2-002-0.json",
+      "sha256": "9241aa96f6951f01244112b55b0814f227145f284669961810b31192d6520660",
+      "status": "completed",
+      "stage": "catalog-audit-v2-002",
+      "request_sha256": "81e9c12540e42ecc23d5e7d7d961e8f22556c83f4cd69dde8b5cc5b00e92b599"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v2-003-0.json",
+      "sha256": "768b1b24e00ff0cc2d43b501ccb993f1925b7b902fa7e998e4ae3ce442fcc35e",
+      "status": "completed",
+      "stage": "catalog-audit-v2-003",
+      "request_sha256": "f1822da8b4d7031522001a15bef294155c34ba79cf6f2bbf4311550dbca48bdd"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v2-004-0.json",
+      "sha256": "a3ddb6eb182db9b8e6d61478311d1ac3cae1128d574ee9e101a88c01f57bc5c5",
+      "status": "completed",
+      "stage": "catalog-audit-v2-004",
+      "request_sha256": "06f990978fabcbc9123883f80152661d11d4f505d9c88237924d2c98881f4b5f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v2-005-0.json",
+      "sha256": "aa8ad144e0070f662f6e557e5f1c400112151ed8cce68ab0c0396908260bca4f",
+      "status": "completed",
+      "stage": "catalog-audit-v2-005",
+      "request_sha256": "85b99b8dda161df2555368fa27c5980a1636c70bd006ad7f68b3bac72e8a9a25"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v2-006-0.json",
+      "sha256": "d76c37ffc0fc371605996b8861b281263dfca081a04e1049e9069994082f3022",
+      "status": "completed",
+      "stage": "catalog-audit-v2-006",
+      "request_sha256": "9352cd50963ad9ab6b5fb7874c18cab8e2c9a3645ee72a00303116551295c857"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v2-007-0.json",
+      "sha256": "a8cce6dc989c5c24b59637b47ee75f871eb5a7e4f40c73f365d21fe246620771",
+      "status": "completed",
+      "stage": "catalog-audit-v2-007",
+      "request_sha256": "367b787950d0065bfb172b0332dedf30c3aa4feb28ae78d79c0aae92a332b27c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v2-008-0.json",
+      "sha256": "68484b524d3e07f71fe7a594352efffe84fd6a4c797636846944ee684bb4bb00",
+      "status": "completed",
+      "stage": "catalog-audit-v2-008",
+      "request_sha256": "16338ac2090af8a5f3b97f50bdbe6d5dc02bb7874980033ad8ab18194e66c3d0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v2-009-0.json",
+      "sha256": "ad154363a26d46dcc75f2a90f37f772e26dff1c2aaeb45b3536d2ed1a3cdab1a",
+      "status": "completed",
+      "stage": "catalog-audit-v2-009",
+      "request_sha256": "f705d774dbe31ad056b805888ab928daed1f5708edbc9a7063f2f73c5097b34a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v3-000-0.json",
+      "sha256": "f897e65cbd8a9d62546f58b2d47bee7ce48ededdd3c37780628f290671104c5c",
+      "status": "completed",
+      "stage": "catalog-audit-v3-000",
+      "request_sha256": "484b90d066a2eb2b12d94bf1531bd4e9d69c865537c99b49b56fffa79d01456d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v3-001-0.json",
+      "sha256": "d21e37a8b2fcf3d859ec29de2767c94c47301ab244efafd3f713686bd27425c4",
+      "status": "completed",
+      "stage": "catalog-audit-v3-001",
+      "request_sha256": "657bc757b4633632d7a70b60726e8e481c28f8e6e95dc7521c42306f3db54556"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v3-002-0.json",
+      "sha256": "00259063f5bf324cdf6ece90037acd704bd1bdff8203d2c438f08cc0602a6dab",
+      "status": "completed",
+      "stage": "catalog-audit-v3-002",
+      "request_sha256": "9fef26bbaac30877384e53a1c3247364979238a09ae58dba3de8176f6dc040bb"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v3-003-0.json",
+      "sha256": "6363e6905eb867c89d6f8d1c64c8de0df02177b5b80e22a97014d5597c3a09d0",
+      "status": "completed",
+      "stage": "catalog-audit-v3-003",
+      "request_sha256": "85a7cd608e9ac163c92e253031788cf168f750a51160a88d7b54921ba4d72931"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v3-004-0.json",
+      "sha256": "42aad1674883fb5e9fee7764a680b3b1ed84bb02dee9470406070522b0ccc9e8",
+      "status": "completed",
+      "stage": "catalog-audit-v3-004",
+      "request_sha256": "ce6f56e65447f91de50fafa7c1ff99f2ec2c176f8013f8511ba4b04fffcc34ef"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v3-005-0.json",
+      "sha256": "6b0f6ba3c08cfbf729bc24552191eac869976711eed9687b568c1ba05c13080a",
+      "status": "completed",
+      "stage": "catalog-audit-v3-005",
+      "request_sha256": "e2a89d47b2949d65b8adb16f3882103eb67dc7f52548c09483706c0ce9797466"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v3-006-0.json",
+      "sha256": "ed13f2d0acedb999629d5ad0f626bc0a442cca4270eb71255b289c2b7f036383",
+      "status": "completed",
+      "stage": "catalog-audit-v3-006",
+      "request_sha256": "748a7ec09724d8b3ce0ac5af9dc20645906d8c896d95e8b8a19c6592d262893e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v3-007-0.json",
+      "sha256": "e350af852ab2e68e0d94338c10fe09d629d774ba8cf2e810b47cae914aafaf85",
+      "status": "completed",
+      "stage": "catalog-audit-v3-007",
+      "request_sha256": "d514fe06b19bd85e924d1816db2c27b7796d5dc0c72b013cb9adc7b9cd49f829"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v3-008-0.json",
+      "sha256": "af9e0521d082f18f3759ccbd57b8751b52d816375845d993db5c21a02c96d73d",
+      "status": "completed",
+      "stage": "catalog-audit-v3-008",
+      "request_sha256": "a05d67b75c388b6943c20955b506c7e46bb484219665299c5b0c635142e87a31"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/catalog-audit/calls/catalog-audit-v3-009-0.json",
+      "sha256": "d66b81300cef2c1054ee31a53b7a326e7c8d16e248689edcfcd38e9557123460",
+      "status": "completed",
+      "stage": "catalog-audit-v3-009",
+      "request_sha256": "1d8f7ad4a41a2991637819aaeff60517b6471d1359850dc46f4f9c766e36a70b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v001-0.json",
+      "sha256": "c87cdcd90d55f7e15138f63f34f750bc35638e23edb7476869b8f242c028e667",
+      "status": "completed",
+      "stage": "jev-v001",
+      "request_sha256": "dd3da110fad32fbdc86280807e39a54b99250f485f632489f5b5282c3200dc03"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v002-0.json",
+      "sha256": "570beaa7b49b5ad319b7bfad491c114e446938c6655675d1dc3bd383b02d7fe3",
+      "status": "completed",
+      "stage": "jev-v002",
+      "request_sha256": "a1abaaf3657505291b3f5cfb67c975b322c4a39bd0276d6ee15f9eb82be0aca1"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v003-0.json",
+      "sha256": "80524e40c9639c90986054501ad97cffa290ed1be58ae150245a56b2040a138d",
+      "status": "completed",
+      "stage": "jev-v003",
+      "request_sha256": "da1481599e383ccb7f66b108af4429961df9d6c945a9810202e28db1fbadc3c2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v004-0.json",
+      "sha256": "b89ec094b2969cf6f35ad671f42920ded85b0d022eb28a4fa8f759778d4655c1",
+      "status": "completed",
+      "stage": "jev-v004",
+      "request_sha256": "9682064e8ef151d40a92a783e896e14272204d76d7dba42b44f8da96500651d5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v005-0.json",
+      "sha256": "c8fbb404418a0b3dc89e28eb21a847ffcbee68a08af0b450d5355943e188a63f",
+      "status": "completed",
+      "stage": "jev-v005",
+      "request_sha256": "80bffef3187e839e12e2d48946b6f83a92c127f0ba6ee366fefab8bbdc81f4cb"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v006-0.json",
+      "sha256": "47916794fa07ff5525b8345ed1487ee138a36b825947c90a4ff64f06ce33cd65",
+      "status": "completed",
+      "stage": "jev-v006",
+      "request_sha256": "5ee8fd212c1ac7c8897bf08568bb90ddb724e74250223018d75ea61b08283e9b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v007-0.json",
+      "sha256": "f49b97931538080845c904a4968de93e16a485b05f6751d413b2318d3ede8697",
+      "status": "completed",
+      "stage": "jev-v007",
+      "request_sha256": "08e29d88ef878a0ba566dc89bbb47203fd135d029340eb3f3cd4b6478f0fbdeb"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v008-0.json",
+      "sha256": "aaafd544c6548b716a577203b21bd5e9eec6f71ee5530dab897cf2d4f3cab3fd",
+      "status": "completed",
+      "stage": "jev-v008",
+      "request_sha256": "3ec0363133d8f03796b1da3c0383149ac409fc6a0a7b3626d32be13e28443d61"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v009-0.json",
+      "sha256": "b15f304b01830db448a42652b87140a1428b3f9c785b33d6466689e06a6b3969",
+      "status": "completed",
+      "stage": "jev-v009",
+      "request_sha256": "16bf88e00613d2ac2016f3a7f9c4ad2d3160d19cf8a4e9e0a1b1401b8c0e1aa3"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v010-0.json",
+      "sha256": "940d39560b0c4c2840ccf4de5935c9780f35f1805b8e35c2563b036a36a73d04",
+      "status": "completed",
+      "stage": "jev-v010",
+      "request_sha256": "498def41b9802b6fd062246a14643d4fb3912ce2da0787ae0513da61f4c2775a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v011-0.json",
+      "sha256": "b4385d5774c412eb3736350378d6ed7f7db9949fb4684ca6dcfd4c52baecbc82",
+      "status": "completed",
+      "stage": "jev-v011",
+      "request_sha256": "5127243810154c5df1eb2ced6dca51851a01d17431c769ba6fa4a1eb4c89010a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v012-0.json",
+      "sha256": "e96754301950b7630956c18446bc63b1086820ebac9ac6d4fabca1897d89aab4",
+      "status": "completed",
+      "stage": "jev-v012",
+      "request_sha256": "fc775ff351cd453cd1c168159866f93338290a8b22fc6117208a30ba4330935f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v013-0.json",
+      "sha256": "dc4c724c22441da2115dde550ed19e2b71f3a3c5217bb1438483272d79ca9088",
+      "status": "completed",
+      "stage": "jev-v013",
+      "request_sha256": "58e2d7636fab05985560ca36f7dacf16a63ea77b970ae52f2566c327a99f5786"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v014-0.json",
+      "sha256": "3242d6ff85945b93c8ca8916919505efd60b7bc188533f2ba9f3dd4daedb5958",
+      "status": "completed",
+      "stage": "jev-v014",
+      "request_sha256": "c47bfed1bd7c5c9a978ff1cd298675622653e8c99a74d785240c9e7fd9dc38ba"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v015-0.json",
+      "sha256": "54d49763ffbc3805b12bc02d9d6706520da669b971d0048cad55e857fa8d684c",
+      "status": "completed",
+      "stage": "jev-v015",
+      "request_sha256": "85f49c5625beb33de2694a8d255c4f93536975ef551b2a643ce0b30b611474d3"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v016-0.json",
+      "sha256": "8a9f422f57fa35af54b52788283a90a237929bd756c03ec1ed43c293a29c48e7",
+      "status": "completed",
+      "stage": "jev-v016",
+      "request_sha256": "b18a86534e311119068d471cf29c083993a7e1feb36bf36990c8ce7a8f4c6a2e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v017-0.json",
+      "sha256": "dd2fe2b6880acfd2c644d6df2aea6d80cb9ade02de72d4b9382e1643d3af0dfa",
+      "status": "completed",
+      "stage": "jev-v017",
+      "request_sha256": "6e76010da769d49a27be8f23771a75f5d24b4080fcb9382cbd11c736dfed4a8c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v018-0.json",
+      "sha256": "62195a7c30f772a851e8ee5ea34f1162c6beabc4fc42eab6c941e8fb9c894118",
+      "status": "completed",
+      "stage": "jev-v018",
+      "request_sha256": "ac5cbb8041ae28020e6a08486665d1ed5e8bcbe7410c40c1356c205f0c5d66b7"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v019-0.json",
+      "sha256": "e9e7b6aaa57a1d7221a793489a066b5e541f5074c53979f9e328650f4c24b44b",
+      "status": "completed",
+      "stage": "jev-v019",
+      "request_sha256": "18903c12dbe6cab46f64fc87ee5fc2583c1122b889acb836551c7d46d8f0e0f5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v020-0.json",
+      "sha256": "d18ebb735c32092765982c3270fa8b6a7ef0ec5c5d5aacdaac9cff5958269f7c",
+      "status": "completed",
+      "stage": "jev-v020",
+      "request_sha256": "b61c44f25d9d59b9f905d9b3c862074d536a58f154c1c0c3297b47d3a9ca340d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v021-0.json",
+      "sha256": "bb8f2ec3c8ae960d41a89730090840e37beeb8bdd1679a17e02212ef8aa2ce63",
+      "status": "completed",
+      "stage": "jev-v021",
+      "request_sha256": "f7d853522032193d0450d539489d19eb8e2d287e498feecd5602499fec3a653a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v022-0.json",
+      "sha256": "c539ae264ec7da8aefb8d4ed704f86ddb15c977847242ebb29d58ec8fac479ed",
+      "status": "completed",
+      "stage": "jev-v022",
+      "request_sha256": "8ec55f73784660908d1989c057b0d548460f4d6224876f0e00d990c51e810db5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v023-0.json",
+      "sha256": "9b42a904f4a49bc27498ab0566bfb2663380406e86e65766d2613408ce4c59e6",
+      "status": "completed",
+      "stage": "jev-v023",
+      "request_sha256": "b2ea6c95ccd7327b7fb8fa43f38c01b8eb33c4d1bdb50ede25906316d9532ff6"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v024-0.json",
+      "sha256": "33d3b80c131c95992a25cdea0f14307d2d4fd79d6bd392494c65956f1eb880d2",
+      "status": "completed",
+      "stage": "jev-v024",
+      "request_sha256": "b54e642fe158dd42499aebaa78fe59b4022eae6ba1ecb4425a50b7146afe28ec"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v025-0.json",
+      "sha256": "b48f0bdc9b8b8cd7d75e22ac0160d5b678489398f2ce65539d984aa006249e6f",
+      "status": "completed",
+      "stage": "jev-v025",
+      "request_sha256": "ca601e26c9f22632feea72f223bd3f8737f91c0bf7b449bff35237b364603275"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v026-0.json",
+      "sha256": "08287a3335f227b740b4a52b3da37a62455e225054eed31707fc40cd7061f33f",
+      "status": "completed",
+      "stage": "jev-v026",
+      "request_sha256": "0556116290d4e3c3e5b8c7b2ae42b89d16913fe832a490b72b03935778a003d2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v027-0.json",
+      "sha256": "33ab0de49a1bdc8d98f2a17714de762c09a13995ea4f23e4736a29f1cc710717",
+      "status": "completed",
+      "stage": "jev-v027",
+      "request_sha256": "9587043f166de7448aa159af7338aec107ca0e21f748e01251f2cdf98b912404"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v028-0.json",
+      "sha256": "bf93044708f3c04682d78fb39376434cd07f0b900902270ed8c87e4bee5da5cb",
+      "status": "completed",
+      "stage": "jev-v028",
+      "request_sha256": "8796fc40dbe0da9d3afa813ee6ab17c4990de30c6ceefa22ba86e6eab53398d0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/helm-array-merge-strategies/jev-shortlist/calls/jev-v029-0.json",
+      "sha256": "cd9057435a785b18ef993971bb6f7b92ddfa6245db6957de7ce0352ea32c70f3",
+      "status": "completed",
+      "stage": "jev-v029",
+      "request_sha256": "4b9568b2361778a7a269b8535e1c08178e6e381ce485587bdb8b00b74c7244e2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-000-0.json",
+      "sha256": "d0c4c455c53693c71b99f01084675a0f87f346b03a17713d978ee1add6e2812d",
+      "status": "completed",
+      "stage": "catalog-audit-000",
+      "request_sha256": "ef61967555c2aab59f05670bb0c914cc03f1c79df1e511ebe75f1f1725797e9e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-001-0.json",
+      "sha256": "a74f2ebbd9a11ed57afac8618109adc5194d54569e0ca39ec5d37f72d0c73a69",
+      "status": "completed",
+      "stage": "catalog-audit-001",
+      "request_sha256": "688575f3b3ca662736857a5ac6ea2bbb9c428dee320aa7ccdd14077108e2497a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-002-0.json",
+      "sha256": "87b1939973a4f580fbf72cf6c374f854db6bdaa0f5cce3d6650bb8725b86e4e1",
+      "status": "completed",
+      "stage": "catalog-audit-002",
+      "request_sha256": "55c06421d8c86d8c4fd4fd32e0231e0e22b85a0f0e9ec78fbe67baba948fe7ec"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-003-0.json",
+      "sha256": "bf02798e4d0e104d81adf7ccdc119abec2a1e461031dd3983665264c226cd7d8",
+      "status": "completed",
+      "stage": "catalog-audit-003",
+      "request_sha256": "e652ed2169bf26190565070b987038699454d23ac1a54e317abc53afe00e737f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-004-0.json",
+      "sha256": "d883cee6ac97670a84fa96ed4a75c5039bb0f096ed46d24c768d303fe9dbb879",
+      "status": "completed",
+      "stage": "catalog-audit-004",
+      "request_sha256": "875769b4b14f3932715c2dd0d57ba277a556151d906a2c55527d434fb166d3ad"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-005-0.json",
+      "sha256": "57af3019ee81d11ec72beb7f952640d6f654658ffe063d636e6a2be5e55f1ecd",
+      "status": "completed",
+      "stage": "catalog-audit-005",
+      "request_sha256": "b52f01e71f8299cfe6b55b92c479ba2b472429bbd65dc45680f187a238b8da32"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-006-0.json",
+      "sha256": "d0a9f6ffec59675e7ec64a1275a40e59b74e54e7612ae9ec9826441409241ba2",
+      "status": "completed",
+      "stage": "catalog-audit-006",
+      "request_sha256": "e0baf270c0ad63fb3df2b59a7c0dde5597f8b5df0b844f5d2fceb40e09d0a722"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v2-000-0.json",
+      "sha256": "920e83c47801a736e374701052fb6c21e39ce7dfe874f5113fb0efcf727ec6ef",
+      "status": "completed",
+      "stage": "catalog-audit-v2-000",
+      "request_sha256": "dc2ced9abb03d00e6a26c4aeed36299dfc8917d7f7a1ac4ebde5a1ae1d660820"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v2-001-0.json",
+      "sha256": "cdadeb1b48a642710da3e74f0a4a2c225756c7a1fd74ec31a12b8d71133962e9",
+      "status": "completed",
+      "stage": "catalog-audit-v2-001",
+      "request_sha256": "1f48a8c62aa0fb554ede2abe3f40e643a90451a97fb51202c70709359efbb3a2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v2-002-0.json",
+      "sha256": "a447acdcec14595d56c1eb619b8879de83203d8a40c7e7ab05fdd4d03f84a9e0",
+      "status": "completed",
+      "stage": "catalog-audit-v2-002",
+      "request_sha256": "9e81dad3b4920be7629bb7eb3c08bdaee0d3789a8f4fd581540ac356ec0bbfce"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v2-003-0.json",
+      "sha256": "1e7ae1ccc824feea6826f7f345fa950e4a6410564a2d752309c5a74b34d09e02",
+      "status": "completed",
+      "stage": "catalog-audit-v2-003",
+      "request_sha256": "5977d11ecaff2c69ed807a391a1ef8f6ac7f2d2c65b1e8e7afe9b9de6099d155"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v2-004-0.json",
+      "sha256": "1020d843a80d2f6efcb4d3f4df869b46e96dec4f83017bbaa6d158d693b3eb73",
+      "status": "completed",
+      "stage": "catalog-audit-v2-004",
+      "request_sha256": "e85ecab2108fd6c91482d073ee8160c1b53556d1c108f5f66b790b3a92d5a49e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v2-005-0.json",
+      "sha256": "de3534241f4cd3902875e1ff1dcf76bab07753eda66883b64186e9e3de485e69",
+      "status": "completed",
+      "stage": "catalog-audit-v2-005",
+      "request_sha256": "dac2ead079df831a141aa6581a43a63d6fc3fa2768e570c0ae793004703f3060"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v2-006-0.json",
+      "sha256": "8e5b7c876ba1efc300c61834f26f826a422ca860c5f8349c0b68a2abd5f9839b",
+      "status": "completed",
+      "stage": "catalog-audit-v2-006",
+      "request_sha256": "78b6561ff92e3c179d9c80ac28ab7e7c3f58e8d571903090d4e9c4f13280ca70"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v3-000-0.json",
+      "sha256": "d1beed418e8b84f6f89d50f6225a0d270d64a4c753e08bdc462290d5c44f9eae",
+      "status": "completed",
+      "stage": "catalog-audit-v3-000",
+      "request_sha256": "e70db70e5202391d1bf094199fc2d9a87babdb3781b84a3df6a69f1fbedfcdc5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v3-001-0.json",
+      "sha256": "3d7dda78a92ebb8732de708a6dd6fba1cedca1c155241151799fd79786e418d7",
+      "status": "completed",
+      "stage": "catalog-audit-v3-001",
+      "request_sha256": "94ac6e6af06c0776fb53b8a97474bad3b8bc7868981dac28c7b8ee1ad4fd4b89"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v3-002-0.json",
+      "sha256": "4fed866ea09e0387f80e35d7d67487222cd668f9c4746d464d4ab59c7d8e4355",
+      "status": "completed",
+      "stage": "catalog-audit-v3-002",
+      "request_sha256": "bba5d7468eb6b5548885d9668af4b5d31c5a25d9b554c0820b9a6ed8331b1b09"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v3-003-0.json",
+      "sha256": "c16ef674576a7bda2ffa1357f822f0fac49cb8aba5bf0f777a2e0b8c07d59881",
+      "status": "completed",
+      "stage": "catalog-audit-v3-003",
+      "request_sha256": "9b30acef973bb4e4f656841229f1a1b710f596e5bfca31669196a58affab8384"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v3-004-0.json",
+      "sha256": "7221d01c580f4212588c9ecb360a9e7700cd8b44bf4587dac56761bddd17605f",
+      "status": "completed",
+      "stage": "catalog-audit-v3-004",
+      "request_sha256": "20ffe97890398ad6d14ee3d8b86b54c669d10c7993ca46d6b52c7a1109a80fb7"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v3-005-0.json",
+      "sha256": "3f88bcbb96b54ac8e2ecc37da19b1353c1217969dd5b6e303700b6a0b5559117",
+      "status": "completed",
+      "stage": "catalog-audit-v3-005",
+      "request_sha256": "d330b9f282f1bbed8bb9464202b846e6e950997782d8b14085d238b1b45faba6"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/catalog-audit/calls/catalog-audit-v3-006-0.json",
+      "sha256": "20ad7f97a7774b78dae5c90b50a7a26128b9f973acee56672e9f18feff12e4c5",
+      "status": "completed",
+      "stage": "catalog-audit-v3-006",
+      "request_sha256": "b480f16f9c848e46c2fa778928b7b7d9ba2e253306134a62f36543985f842465"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v001-0.json",
+      "sha256": "048d964afe97b0414b526a3fa411681dd74afbfa55bb0ab0919af2bd8a94a1a5",
+      "status": "completed",
+      "stage": "jev-v001",
+      "request_sha256": "1f1e05b11bb6e9d7831e6ab2b4a045e288138eb2f1b7d2249a7f1a6b4c994b90"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v002-0.json",
+      "sha256": "64ac60419d500798efd3f65d2a7200189cce3c4600d5d4c8fcb7140fd4d7b241",
+      "status": "completed",
+      "stage": "jev-v002",
+      "request_sha256": "8437e48e095e8dc6f8fe5806bbf2914f1fc848dfb4b3f364037e9bb34e09289c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v003-0.json",
+      "sha256": "d30435dd90701652247415724cc6fd8c75991cd1081e8db694d588737414c3dc",
+      "status": "completed",
+      "stage": "jev-v003",
+      "request_sha256": "d49e6bae66325e577fb550b086e365d11f84815925fc7e5a7543fcb3f34af5bc"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v004-0.json",
+      "sha256": "cb639db6ab571a942de348e073ecdd46b8e08e51b61c728254002e28e267379f",
+      "status": "completed",
+      "stage": "jev-v004",
+      "request_sha256": "e42a48f7de8aef263539047ecc859ca20a49eded903579f338acddba0a4c2388"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v005-0.json",
+      "sha256": "5664d9b0627ccf2ca525f840a6f9d2bfe70144b710f989a633349f54dd64549b",
+      "status": "completed",
+      "stage": "jev-v005",
+      "request_sha256": "9d16777eff162524877e1a94ec2695c3d1ca42fd7115b3dc84a8fabe852c5d46"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v006-0.json",
+      "sha256": "42894e81712f7b1d3074c543d0e7fe0d07a53d6a0963726e5c76da88bee3c66c",
+      "status": "completed",
+      "stage": "jev-v006",
+      "request_sha256": "b51f01791e02268415b7881f21b4f8d6bb5a77615071383aa9ccdf4f005c2d95"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v007-0.json",
+      "sha256": "73b0bfb46fe44f7498eece30d131eddd36f4ce33c59bd5b3dae95bdb1c2667e2",
+      "status": "completed",
+      "stage": "jev-v007",
+      "request_sha256": "a2f8523719628ebd9e645310bdc7087e1fec71dda30abaab204ff154f80c023f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v008-0.json",
+      "sha256": "b06cc358a9c1a363c8e7c19ac1a7cb042f8c1e1abedf577d95fa3a611b053aab",
+      "status": "completed",
+      "stage": "jev-v008",
+      "request_sha256": "e65953247d308c926b23cc25637b816d140883eca45f96f17260bd45f6ff5aff"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v009-0.json",
+      "sha256": "2b93d475dfb7d9f55ca0d1853835ba936b3e83758cc0cac603586595c187e076",
+      "status": "completed",
+      "stage": "jev-v009",
+      "request_sha256": "0d9d701027017a6000c4f3dcc25962d6886fbc8418f202ba73421c905c4e7a50"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v010-0.json",
+      "sha256": "f71394425643efd358101be01248a3c3743925f75079cc9a1228cc9d36c54ef6",
+      "status": "completed",
+      "stage": "jev-v010",
+      "request_sha256": "71e4dae96dfc00fe485c81f78a042cf013c0bce40c890cb215f3f20bc41eb16b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v011-0.json",
+      "sha256": "4a33eb7aa4f8d51a2e4fc5224f878f5ff3e971461e61984b0869c5a99e2a1b52",
+      "status": "completed",
+      "stage": "jev-v011",
+      "request_sha256": "d24758dff870508b8b98d00cd757ac0e314435e34f749ba5adc8524dcbd869aa"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v012-0.json",
+      "sha256": "84306c6ae40da092ce7872ba059d24968c6f098ba91b7934e464ab7420cd113a",
+      "status": "completed",
+      "stage": "jev-v012",
+      "request_sha256": "624d4166a57bb4ff30640094189f61e354144699be1be9182820db7436f56ddc"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v013-0.json",
+      "sha256": "cd9af1775274e1f5eaa3927d0af55ab0a9c7bfedc157633eb7f21a291b089fcf",
+      "status": "completed",
+      "stage": "jev-v013",
+      "request_sha256": "d3db1ca5305f054895ad659f2558865addabeb29ab0617971979ac8c97a4b94b"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v014-0.json",
+      "sha256": "9a58c35346c95626bd8e5d51196bafbcca109994415b4602ee0f9d0fbcdef2e6",
+      "status": "completed",
+      "stage": "jev-v014",
+      "request_sha256": "b770e0f518f7bc4597a75a3abda891090092148b1521218dcd936af58a793488"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v015-0.json",
+      "sha256": "54e49de3d9fdcbc41e3b69f54cad085f766d7522a586e259159662d3e34439dc",
+      "status": "completed",
+      "stage": "jev-v015",
+      "request_sha256": "5ca8c901a8a70ceb12fc1baaeb837203850469b7794bdf8fb87724f28ff7b6ee"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v016-0.json",
+      "sha256": "0f474ab3e40baf02dda4f16981203666e9791dd519027a13311c7a56c3226b9e",
+      "status": "completed",
+      "stage": "jev-v016",
+      "request_sha256": "34d250b801b9b2905523b64937cc34aa975afc8da17616c3e82bdf0c7d7fb970"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v017-0.json",
+      "sha256": "c8a9279c374c1a689483654c5e55f7d84d7610d4d6cc939a2a4078e7c4abde9d",
+      "status": "completed",
+      "stage": "jev-v017",
+      "request_sha256": "48e0ae2e8459c99d1f193ab282ab1282e06d653ccaf9a99e06e7a36818a8a95c"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v018-0.json",
+      "sha256": "b5a93875b61902cbc838f97849892ca0d2ead94e209fbbcb6041cb27f0b08a0e",
+      "status": "completed",
+      "stage": "jev-v018",
+      "request_sha256": "10746ec226b45cd0daa2e3cdd8de93ec559b943ef133ca37f13b580ab956057f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v019-0.json",
+      "sha256": "2e781b8af99810072c1383b4fd99b9cf778a9323be254dafb7a97cbf87c5eeb9",
+      "status": "completed",
+      "stage": "jev-v019",
+      "request_sha256": "34773d676b754d736814d8e7bd2852a1425a812363680ce6a765ba01369164f5"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/koota-entity-snapshot-rollback/jev-shortlist/calls/jev-v020-0.json",
+      "sha256": "71d2d126ffb16d1c62e164323e73348ccf1844c764c060aa16ac425c028a8a5f",
+      "status": "completed",
+      "stage": "jev-v020",
+      "request_sha256": "072720db376c8b14d8ff4a73347ac1089720bfa4b2f329908ce35d9eb1302b71"
+    }
+  ],
+  "excluded_incomplete_calls": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/catalog-retrieval-v1/dateutil-rfc5545-timezone-interop/catalog-audit/calls/catalog-audit-v2-002-0.json",
+      "sha256": "20215fd3731d901c295c01636483d0a8192625d08897b172dfe5c812b45100dd",
+      "status": "running",
+      "stage": "catalog-audit-v2-002",
+      "request_sha256": "fa666822088add7806153301e1b32aa8efc0c2f2cde064afd9cebe7b2f768d14"
+    }
+  ]
+}

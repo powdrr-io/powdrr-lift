@@ -1,0 +1,103 @@
+{
+  "kind": "support",
+  "judgments": [
+    {
+      "criterion_id": "c013",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "The source explicitly states that for nested attrs/dataclass fields, if the nested object is only partially complete, its partial value must be used and the parent field marked as failed. This directly supports the requirement that the parent's value is set to the nested partial value and included in failed_fields and error_map with an exception for incomplete structure."
+    },
+    {
+      "criterion_id": "c014",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "The source mandates that if no value can be produced for a nested field, it is treated as a normal field failure: parent field is in failed_fields (not structured_fields), error_map contains the underlying exception, and value is None if required without default. This matches the criterion exactly."
+    },
+    {
+      "criterion_id": "c015",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "The source clearly states collection fields (List, Dict) are structured atomically — any element failure fails the whole field. This implies no partial collection value is produced, and the field is either fully structured or fully failed, matching the criterion."
+    },
+    {
+      "criterion_id": "c016",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "The source explicitly says 'any element failure fails the whole field', which directly supports the requirement that the entire collection field is in failed_fields with an error_map entry for the element failure, and not in structured_fields."
+    },
+    {
+      "criterion_id": "c017",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The source states that refine(data) returns a new PartialResult, which implies immutability of the original. No modification of the original is mentioned or implied, satisfying the requirement for a new instance."
+    },
+    {
+      "criterion_id": "c018",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The source says refine fixes failed fields with new data while preserving structured fields. This directly supports re-attempting failed fields, preserving structured ones, and updating all result attributes (value, is_complete, etc.) accordingly."
+    },
+    {
+      "criterion_id": "c019",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The source mandates that structured fields are preserved during refine. This implies the new PartialResult's structured_fields must equal the original's, which is exactly what the criterion requires."
+    },
+    {
+      "criterion_id": "c020",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The source explicitly says to exclude init=False fields from structured_fields and failed_fields, regardless of input or errors. This matches the criterion verbatim."
+    },
+    {
+      "criterion_id": "c021",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The source states that with forbid_extra_keys=True, extra keys make is_complete False but still produce a value. This directly supports the criterion's requirement that value is non-None and is_complete is False."
+    },
+    {
+      "criterion_id": "c022",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The source mandates respect for detailed_validation: when True, error_map contains per-field exceptions; when False, error_map is empty and errors contains a single summary exception. This matches the criterion exactly."
+    },
+    {
+      "criterion_id": "c023",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The source requires handling attrs classes and producing a value as an instance of that class (or None if required fields missing), with structured/failed fields reflecting field-level success/failure. This fully supports the criterion."
+    },
+    {
+      "criterion_id": "c024",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The source requires handling dataclasses and producing a value as an instance of that dataclass (or None if required fields missing), with structured/failed fields reflecting field-level success/failure. This matches the criterion exactly."
+    }
+  ],
+  "original_request_payload_sha256": "cfd8869b802342dcb0448875729816d7bd59dc6a6450c9571d7733a4d25e507e",
+  "source_checkpoint_sha256": "8c475bd41882878bf06c26412ff759a6b9d6a39723cc762fcb75d6e46ccff4b0"
+}

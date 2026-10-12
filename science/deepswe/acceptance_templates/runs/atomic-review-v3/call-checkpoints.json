@@ -1,0 +1,35 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "5794a6e221336bbd457349d4455fc855e4693aca67caf42df7a057d257d96885",
+  "file_count": 4,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-review-v3/cattrs-invented-policy/calls/extract-0.json",
+      "sha256": "1347c47e07e00813ca2e19e76e833a9bc0904bebff78be2f0abcd17083e49d62",
+      "status": "completed",
+      "stage": "extract",
+      "request_sha256": "7aecb6e2711c51ca87cddd9e41668595e99281fda87cb28c3127cf13cc87c672"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-review-v3/cattrs-invented-policy/calls/support-c022-a001-0.json",
+      "sha256": "421b29052e310973bf796ab68c1dfc0a0c5ba8f0f5d884f6d6f3892ecdd2e756",
+      "status": "completed",
+      "stage": "support-c022-a001",
+      "request_sha256": "309e16c2ac21efb4bccf2835ea8bc1360ecab60802a91a035a8a32fba4933811"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-review-v3/cattrs-invented-policy/calls/support-c022-a002-0.json",
+      "sha256": "3445558cf55fab77e9640d569d0a071af6c78f740e5984bdcbf06e6db2adb6fb",
+      "status": "completed",
+      "stage": "support-c022-a002",
+      "request_sha256": "d6637dfcb3f51ce1c317aa4acd9a994794fff96498e8be1892112fc6eb074b4e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/atomic-review-v3/cattrs-invented-policy/calls/support-c022-a003-0.json",
+      "sha256": "83fd8fef48e4b955357a596a0538c13e45dccc86d4a57f2ef404a1c42a4f32ab",
+      "status": "completed",
+      "stage": "support-c022-a003",
+      "request_sha256": "78a1a2702347554805428122919ee82e4eee2e6d63b95adebc65592a84a79d75"
+    }
+  ]
+}

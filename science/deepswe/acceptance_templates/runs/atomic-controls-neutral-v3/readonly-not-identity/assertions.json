@@ -1,0 +1,28 @@
+{
+  "criterion_id": "c001",
+  "criterion_text": "rruleset.rrules is a read-only tuple whose entries retain insertion order.",
+  "assertions": [
+    {
+      "text": "rruleset.rrules is a read-only tuple.",
+      "id": "c001-a001",
+      "criterion_id": "c001-a001",
+      "status": "supported",
+      "source_ids": [
+        "s001"
+      ],
+      "rationale": "The instruction explicitly states 'rruleset.rrules is a read-only tuple in insertion order.' This contains the exact predicate 'rruleset.rrules is a read-only tuple,' which is directly and unambiguously supported by source s001. No additional obligations are introduced by the criterion; it omits only the 'in insertion order' modifier, which is permissible as a subset of the full statement. An implementation could satisfy the instruction while respecting this criterion without violating any mandated behavior."
+    },
+    {
+      "text": "The entries of rruleset.rrules retain insertion order.",
+      "id": "c001-a002",
+      "criterion_id": "c001-a002",
+      "status": "supported",
+      "source_ids": [
+        "s001"
+      ],
+      "rationale": "The instruction explicitly states that 'rruleset.rrules is a read-only tuple in insertion order,' which directly mandates that the entries retain insertion order. The phrase 'in insertion order' is a concrete, verifiable predicate about the sequence of entries, and no alternative interpretation (e.g., sorted, hashed, or arbitrary order) would satisfy this requirement. The read-only nature reinforces that the order cannot be altered after creation, preserving insertion sequence. No plausible implementation could satisfy the instruction while violating this criterion."
+    }
+  ],
+  "derived_status": "supported",
+  "limitation": "Decomposition and entailment are model judgments. Splitting may omit meaning; the original criterion and all extracted assertions remain available for inspection. Not a human review."
+}

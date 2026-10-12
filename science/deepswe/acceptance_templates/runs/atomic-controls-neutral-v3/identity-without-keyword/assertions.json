@@ -1,0 +1,18 @@
+{
+  "criterion_id": "c001",
+  "criterion_text": "The object passed to the callback is the same object passed to register().",
+  "assertions": [
+    {
+      "text": "The object passed to the callback is the same object passed to register().",
+      "id": "c001-a001",
+      "criterion_id": "c001-a001",
+      "status": "supported",
+      "source_ids": [
+        "s001"
+      ],
+      "rationale": "The instruction explicitly states that 'the callback receives the object passed to register(), without copying or replacing it.' This directly entails that the object received by the callback is the same object (i.e., identical in identity) that was passed to register(), as any copying or replacing would violate this constraint. The criterion 'The object passed to the callback is the same object passed to register()' is a direct restatement of this condition, with no added obligations or ambiguity."
+    }
+  ],
+  "derived_status": "supported",
+  "limitation": "Decomposition and entailment are model judgments. Splitting may omit meaning; the original criterion and all extracted assertions remain available for inspection. Not a human review."
+}

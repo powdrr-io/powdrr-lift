@@ -1,0 +1,123 @@
+{
+  "version": 1,
+  "tasks": [
+    {
+      "task_id": "cattrs-partial-structuring-recovery",
+      "repository": "https://github.com/python-attrs/cattrs",
+      "artifacts": {
+        "instruction.md": {
+          "sha256": "13eab1ccb6c77dafa95e7e815a35fc76033aaf271076012067c3502c0c11272c",
+          "bytes": 1342
+        },
+        "task.toml": {
+          "sha256": "c1346edb8b455763b8f55baa503c7ab0a1c091170f75ced7cddb2b71f9965e81",
+          "bytes": 1223
+        },
+        "solution/solution.patch": {
+          "sha256": "6050a6735eee8de72939d81ead6274658915dc4512d5d2995280a9a9fdafb1b5",
+          "bytes": 24810
+        },
+        "tests/test.patch": {
+          "sha256": "50154d90fca5e57254affc3a5378082a6782cb4d7e27182a7860a5827b8afef9",
+          "bytes": 24305
+        }
+      }
+    },
+    {
+      "task_id": "helm-array-merge-strategies",
+      "repository": "https://github.com/helm/helm",
+      "artifacts": {
+        "instruction.md": {
+          "sha256": "4d39c1963676acb1c1cdab6ac09d91fd5c321a77939b2db0cbbb666c911e47f6",
+          "bytes": 2882
+        },
+        "task.toml": {
+          "sha256": "1b1333acca61af3e795d7707efca62dbcdca253b5e835c08fb8dadd84e126868",
+          "bytes": 1193
+        },
+        "solution/solution.patch": {
+          "sha256": "49538ffcec69ce5b9f9ff3b64e6d8de4533bc804aa404e76eb7f81c3908a1f39",
+          "bytes": 25633
+        },
+        "tests/test.patch": {
+          "sha256": "64f4a75c0095cf563856f48bc90e6c0fd0a0d5144a51150fc605f9ca22aa26db",
+          "bytes": 50054
+        }
+      }
+    },
+    {
+      "task_id": "koota-entity-snapshot-rollback",
+      "repository": "https://github.com/pmndrs/koota",
+      "artifacts": {
+        "instruction.md": {
+          "sha256": "e725648c0a8d0d84d50ad33749127cdca35f16d2921253b10d833ee559cbc671",
+          "bytes": 2486
+        },
+        "task.toml": {
+          "sha256": "63fa6e5bb6955f7389680dbb224d28c344085c376540b2fbe58b7d51b278d7a1",
+          "bytes": 1190
+        },
+        "solution/solution.patch": {
+          "sha256": "a17b91ad3f691077c38648eb892893f6568c706461f562c09087c9014739d40f",
+          "bytes": 21399
+        },
+        "tests/test.patch": {
+          "sha256": "1d5430d25fd8fbb9c4641559dc2e9d1b114108502379e143648f1796c2526f9f",
+          "bytes": 51810
+        }
+      }
+    },
+    {
+      "task_id": "dateutil-rfc5545-timezone-interop",
+      "repository": "https://github.com/dateutil/dateutil",
+      "artifacts": {
+        "instruction.md": {
+          "sha256": "029feb3185f43a1ed77c0fa9e250c50e82758c78b7544f8905782c2dda9eb9b6",
+          "bytes": 2989
+        },
+        "task.toml": {
+          "sha256": "86e782532553742881ade17ea8203e48ba1e75268c867670dc7363d6413c424f",
+          "bytes": 1205
+        },
+        "solution/solution.patch": {
+          "sha256": "dc6c13f7e3e211513af50613e61baf1d24a2115d91b932af89e0781335940a2b",
+          "bytes": 33534
+        },
+        "tests/test.patch": {
+          "sha256": "927af366a90b1e4eee529cf8d64b6c755a9abb0b6342196a8b307a2b5c74fade",
+          "bytes": 36293
+        }
+      }
+    }
+  ],
+  "excluded_development_tasks": [
+    "fastapi-implicit-head-options",
+    "gql-incremental-graphql-delivery",
+    "happy-dom-abort-pending-body-reads",
+    "httpx-streaming-json-iteration",
+    "igel-persist-feature-schema",
+    "langchain-request-coalescing",
+    "obsidian-linter-scoped-ignore-markers",
+    "ofetch-per-origin-circuit-breaker",
+    "python-statemachine-state-data-scoping",
+    "returns-validated-error-accumulation",
+    "skrub-duration-encoding",
+    "textual-kitty-key-phases"
+  ],
+  "excluded_repository_families": [
+    "https://github.com/capricorn86/happy-dom",
+    "https://github.com/dry-python/returns",
+    "https://github.com/encode/httpx",
+    "https://github.com/fastapi/fastapi",
+    "https://github.com/fgmacedo/python-statemachine",
+    "https://github.com/graphql-python/gql",
+    "https://github.com/langchain-ai/langchain",
+    "https://github.com/nidhaloff/igel",
+    "https://github.com/platers/obsidian-linter",
+    "https://github.com/skrub-data/skrub",
+    "https://github.com/textualize/textual",
+    "https://github.com/unjs/ofetch"
+  ],
+  "selection": "Explicit pilot selection across four new repository families; a development evaluation sample, not an untouched final holdout.",
+  "boundary": "inputs/ contains only task_id and original instruction; patch hashes are provenance, never generation input."
+}

@@ -1,0 +1,1970 @@
+{
+  "reviewer": "Codex static agent review; not human adjudication or a coding experiment",
+  "rubric": "Full: all target facets specified or necessary implications; partial: some facets; missing: no deciding policy; wrong: explicit contradiction takes priority.",
+  "units": "34 pre-existing target bundles, not atomic requirements or pass-rate counts.",
+  "comparison_limit": "New candidate uses only three added decisions; previous generated prompt uses a broader analysis. Coverage loss is not a controlled effect of removing synthesis.",
+  "reference_provenance": "No complete saved Koota ideal text found. New offline ideal text renders the existing frozen solution oracle; earlier hand candidate kept separate. Existing state-machine ideal is a different task.",
+  "standard_prompt": "Captured standard Powdrr prompt for this task unavailable; previous_generated is the saved science LLM output.",
+  "summaries": {
+    "earlier_hand_candidate": {
+      "full": 11,
+      "partial": 8,
+      "missing": 14,
+      "wrong": 1
+    },
+    "previous_generated": {
+      "full": 19,
+      "wrong": 3,
+      "partial": 7,
+      "missing": 5
+    },
+    "new_candidate": {
+      "partial": 16,
+      "full": 3,
+      "missing": 15
+    },
+    "same_analysis_control": {
+      "full": 15,
+      "wrong": 2,
+      "partial": 9,
+      "missing": 8
+    },
+    "ideal_reference": {
+      "full": 34
+    }
+  },
+  "non_edge_summaries": {
+    "earlier_hand_candidate": {
+      "full": 11,
+      "partial": 8,
+      "missing": 10,
+      "wrong": 1
+    },
+    "previous_generated": {
+      "full": 18,
+      "wrong": 3,
+      "partial": 7,
+      "missing": 2
+    },
+    "new_candidate": {
+      "partial": 16,
+      "full": 3,
+      "missing": 11
+    },
+    "same_analysis_control": {
+      "full": 15,
+      "wrong": 2,
+      "partial": 8,
+      "missing": 5
+    },
+    "ideal_reference": {
+      "full": 30
+    }
+  },
+  "rows": [
+    {
+      "id": "D01",
+      "operation": "public API",
+      "target": "Export createAspect and the public Aspect type.",
+      "sources": [
+        "s002"
+      ],
+      "patch_lines": [
+        208,
+        209
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D01",
+        "status": "full",
+        "evidence": "R1 exports createAspect and AC1 also requests Aspect, although they are inconsistent in placement."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 7,
+          "quote": "its associated types"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 7,
+          "quote": "The core exports a new `createAspect`"
+        },
+        "reason": "Aspect type export remains unspecified."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "g002",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 33,
+          "quote": "The core package exports `createAspect` and its associated types from the main index, making it available to consumers."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 7,
+          "quote": "Export createAspect and the public Aspect type."
+        }
+      }
+    },
+    {
+      "id": "D02",
+      "operation": "createAspect",
+      "target": "Flatten nested aspects, deduplicate underlying traits by identity, retain first occurrence order, and require at least two unique traits after flattening.",
+      "sources": [
+        "s002"
+      ],
+      "patch_lines": [
+        28,
+        51
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D02",
+        "status": "partial",
+        "evidence": "R1 specifies flattening and two unique underlying traits; first-occurrence order is unstated."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 7,
+          "quote": "deduplicated, preserving first occurrence order"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 11,
+          "quote": "Nested aspects flatten to their individual traits."
+        },
+        "reason": "No identity deduplication, first-occurrence order or minimum unique flattened count."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "f011",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 62,
+          "quote": "Repeated occurrences of the same trait through direct or nested aspect inputs should be deduplicated, preserving the first occurrence's position in the flattened traits list, and the minimum constituent count is the number of unique traits after deduplication."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 8,
+          "quote": "Flatten nested aspects, deduplicate underlying traits by identity, retain first occurrence order, and require at least two unique traits after flattening."
+        }
+      }
+    },
+    {
+      "id": "D03",
+      "operation": "createAspect",
+      "target": "Reject relation constituents and overlapping data schema field names at creation time.",
+      "sources": [
+        "s002"
+      ],
+      "patch_lines": [
+        53,
+        73
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D03",
+        "status": "full",
+        "evidence": "R1 rejects relations and overlapping schema fields."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 7,
+          "quote": "It throws an error if any constituent is a relation"
+        }
+      },
+      "new_candidate": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 9,
+          "quote": "Relation constituents throw at creation time."
+        },
+        "reason": "Both construction errors are explicit, including overlapping fields in R2."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "g001",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 32,
+          "quote": "createAspect accepts two or more traits (or nested aspects) and returns a new aspect object with a unique id, a flattened list of constituent traits, and a merged schema, throwing an error if any constituent is a relation or if any field names overlap across constituents."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 9,
+          "quote": "Reject relation constituents and overlapping data schema field names at creation time."
+        }
+      }
+    },
+    {
+      "id": "D04",
+      "operation": "createAspect",
+      "target": "Accept tags and merge schema fields from data constituents; tags contribute no fields.",
+      "sources": [
+        "s002"
+      ],
+      "patch_lines": [
+        62,
+        73
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D04",
+        "status": "full",
+        "evidence": "R1 accepts tags with no schema fields and combines data schema."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 9,
+          "quote": "tag-only aspects yielding an empty object"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 10,
+          "quote": "Tag traits are valid constituents."
+        },
+        "reason": "Tag validity is retained; merged schema contents and tag schema contribution are not specified."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "f005",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 57,
+          "quote": "In readEach/updateEach callbacks, directly supplied aspects, ordinary data traits, and tag-only aspects each occupy one slot in the state array, with tag-only aspects yielding an empty object; Not modifiers contribute no slot, and nested aspects flatten to their constituent traits, each occupying its own slot."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 10,
+          "quote": "Accept tags and merge schema fields from data constituents; tags contribute no fields."
+        }
+      }
+    },
+    {
+      "id": "D05",
+      "operation": "createAspect",
+      "target": "Every call returns a fresh instance with a distinct numeric ID.",
+      "sources": [
+        "s002",
+        "s006"
+      ],
+      "patch_lines": [
+        76,
+        109
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D05",
+        "status": "partial",
+        "evidence": "R1 requires distinct IDs but does not specify numeric type."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 32,
+          "quote": "unique numeric `id`"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 31,
+          "quote": "Each `createAspect` call returns a distinct instance."
+        },
+        "reason": "Distinct instances are retained, but numeric and distinct IDs are not established."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "g003",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 34,
+          "quote": "Each aspect exposes a read-only `id` (unique number), a `traits` array containing the flattened constituent traits, and a `schema` object that merges the schemas of all constituents."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 11,
+          "quote": "Every call returns a fresh instance with a distinct numeric ID."
+        }
+      }
+    },
+    {
+      "id": "D06",
+      "operation": "metadata",
+      "target": "Expose non-reassignable id/traits/schema; freeze traits and schema at the top level, retaining nested schema references.",
+      "sources": [
+        "s002"
+      ],
+      "patch_lines": [
+        88,
+        107
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D06",
+        "status": "missing",
+        "evidence": "No metadata immutability policy."
+      },
+      "previous_generated": {
+        "status": "wrong",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 7,
+          "quote": "deeply frozen `schema`"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 34,
+          "quote": "The aspect's id, traits and schema properties cannot be reassigned."
+        },
+        "reason": "Assignment protection is correct; shallow traits/schema freezes and nested reference preservation are absent. Deep-freeze contradiction removed."
+      },
+      "same_analysis_control": {
+        "status": "wrong",
+        "record_id": "f012",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 63,
+          "quote": "Aspect's `id`, `traits`, and `schema` properties should be read-only (non-writable, non-configurable) via `Object.defineProperty`, the `traits` array should be frozen with `Object.freeze` to prevent mutation, and the `schema` object should be deeply frozen to prevent any nested value changes."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 12,
+          "quote": "Expose non-reassignable id/traits/schema; freeze traits and schema at the top level, retaining nested schema references."
+        }
+      }
+    },
+    {
+      "id": "D07",
+      "operation": "configuration",
+      "target": "An aspect is callable with optional initial field values and the configured result is accepted by entity.add; bare aspect addition uses defaults.",
+      "sources": [
+        "s002",
+        "s003"
+      ],
+      "patch_lines": [
+        79,
+        85,
+        146,
+        151
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D07",
+        "status": "full",
+        "evidence": "R2 includes add(aspect(data)) and bare default addition."
+      },
+      "previous_generated": {
+        "status": "wrong",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 33,
+          "quote": "adding traitB via `add(aspect, data)`"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 18,
+          "quote": "`add` distributes initial values by field."
+        },
+        "reason": "Initial data behavior is retained, but callable aspect(data), configured add and default behavior are not specified. Wrong two-argument add signature removed."
+      },
+      "same_analysis_control": {
+        "status": "partial",
+        "record_id": "g008",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 39,
+          "quote": "`add` adds only the constituent traits the entity does not already have, initializing each newly added constituent with the values from the provided merged object for its fields, and leaves already-present constituents unchanged."
+        },
+        "reason": "No callable configured add signature; invented two-argument add is gone."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 13,
+          "quote": "An aspect is callable with optional initial field values and the configured result is accepted by entity.add; bare aspect addition uses defaults."
+        }
+      }
+    },
+    {
+      "id": "D08",
+      "operation": "has/get",
+      "target": "has requires every constituent; get returns undefined if any is missing; otherwise merge data fields, omit tag data, and return an empty object for a complete tag-only aspect.",
+      "sources": [
+        "s003"
+      ],
+      "patch_lines": [
+        1061,
+        1080
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D08",
+        "status": "full",
+        "evidence": "R2 has/get requires all, merges fields and omits tag data; zero merged fields imply an empty object."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 8,
+          "quote": "returns undefined if any constituent is missing"
+        }
+      },
+      "new_candidate": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 14,
+          "quote": "`get` returns a merged object of all constituent fields, or undefined if any constituent is missing."
+        },
+        "reason": "Has/get membership and merged field behavior are explicit; fieldless tag-only merge necessarily yields an empty object."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "g006",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 37,
+          "quote": "`get` returns a new merged object containing all fields from all constituent traits when the entity has every constituent, and returns undefined if any constituent is missing."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 14,
+          "quote": "has requires every constituent; get returns undefined if any is missing; otherwise merge data fields, omit tag data, and return an empty object for a complete tag-only aspect."
+        }
+      }
+    },
+    {
+      "id": "D09",
+      "operation": "get/readEach",
+      "target": "Return a new shallow merged object: top-level assignments do not write back; nested object/array references are shared, not deeply cloned.",
+      "sources": [
+        "s003",
+        "s004"
+      ],
+      "patch_lines": [
+        501,
+        522,
+        1069,
+        1080
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D09",
+        "status": "missing",
+        "evidence": "Merged object/view does not establish shallow copying or aliasing."
+      },
+      "previous_generated": {
+        "status": "partial",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 28,
+          "quote": "Unresolved choice: Merged aspect get/readEach data should be a shallow copy"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 21,
+          "quote": "`readEach` delivers a merged data object."
+        },
+        "reason": "Merged does not decide fresh top-level copies, shared nested references or write-through."
+      },
+      "same_analysis_control": {
+        "status": "missing",
+        "record_id": "g006",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 37,
+          "quote": "`get` returns a new merged object containing all fields from all constituent traits when the entity has every constituent, and returns undefined if any constituent is missing."
+        },
+        "reason": "The shallow/shared read rule f004 is unresolved and withheld."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 15,
+          "quote": "Return a new shallow merged object: top-level assignments do not write back; nested object/array references are shared, not deeply cloned."
+        }
+      }
+    },
+    {
+      "id": "D10",
+      "operation": "set",
+      "target": "If any constituent is missing, perform no writes and no notifications.",
+      "sources": [
+        "s003"
+      ],
+      "patch_lines": [
+        1082,
+        1083
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D10",
+        "status": "missing",
+        "evidence": "No set behavior for incomplete entities."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 8,
+          "quote": "it is a no-op if any constituent is missing"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 15,
+          "quote": "`set` distributes each field to its owning constituent."
+        },
+        "reason": "No set behavior for an entity missing a constituent."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "f001",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 55,
+          "quote": "entity.set(aspect, data) should be a no-op if any constituent trait is missing, leaving the entity unchanged and not triggering change detection."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 16,
+          "quote": "If any constituent is missing, perform no writes and no notifications."
+        }
+      }
+    },
+    {
+      "id": "D11",
+      "operation": "set/add",
+      "target": "Route supplied schema fields to their owners, ignore unknown fields, and preserve unspecified fields.",
+      "sources": [
+        "s003"
+      ],
+      "patch_lines": [
+        1084,
+        1097,
+        1100,
+        1130
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D11",
+        "status": "partial",
+        "evidence": "R2 routes fields and preserves omitted values, but unknown-field treatment is absent."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 8,
+          "quote": "unknown fields are ignored and omitted fields are left unchanged"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 15,
+          "quote": "`set` distributes each field to its owning constituent."
+        },
+        "reason": "Ownership routing is explicit; unknown-field ignoring and omitted-value preservation are not."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "f003",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 56,
+          "quote": "Aspect set and configured add should ignore unknown fields and apply only provided fields, leaving omitted fields unchanged, consistent with the existing SoA set accessor contract."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 17,
+          "quote": "Route supplied schema fields to their owners, ignore unknown fields, and preserve unspecified fields."
+        }
+      }
+    },
+    {
+      "id": "D12",
+      "operation": "set",
+      "target": "Forward triggerChanged: false suppresses notifications while applying writes.",
+      "sources": [
+        "s003"
+      ],
+      "patch_lines": [
+        191,
+        196,
+        1082,
+        1097
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D12",
+        "status": "missing",
+        "evidence": "No triggerChanged control."
+      },
+      "previous_generated": {
+        "status": "missing",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 8,
+          "quote": "it always triggers change detection for written fields"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 33,
+          "quote": "when triggerChanged=true"
+        },
+        "reason": "Neither prompt specifies false still writes and suppresses notifications. Positive-only flag wording does not establish false behavior."
+      },
+      "same_analysis_control": {
+        "status": "missing",
+        "record_id": "g007",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 38,
+          "quote": "`set` accepts a merged object of fields, writes each field to its owning constituent's store, and triggers per-trait change detection for each constituent that had a field written."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 18,
+          "quote": "Forward triggerChanged: false suppresses notifications while applying writes."
+        }
+      }
+    },
+    {
+      "id": "D13",
+      "operation": "add",
+      "target": "Add only missing constituents, use trait defaults for omitted fields, and never overwrite data of existing constituents.",
+      "sources": [
+        "s003"
+      ],
+      "patch_lines": [
+        1100,
+        1130
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D13",
+        "status": "full",
+        "evidence": "R2 adds missing/default constituents and preserves existing data."
+      },
+      "previous_generated": {
+        "status": "partial",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 8,
+          "quote": "leaves already-present constituents unchanged"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 17,
+          "quote": "`add` adds only the constituents the entity does not already have."
+        },
+        "reason": "Missing-only addition retained; trait defaults and preservation of existing constituent data are not spelled out. Previous generated prompt states preservation but not defaults."
+      },
+      "same_analysis_control": {
+        "status": "partial",
+        "record_id": "g008",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 39,
+          "quote": "`add` adds only the constituent traits the entity does not already have, initializing each newly added constituent with the values from the provided merged object for its fields, and leaves already-present constituents unchanged."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 19,
+          "quote": "Add only missing constituents, use trait defaults for omitted fields, and never overwrite data of existing constituents."
+        }
+      }
+    },
+    {
+      "id": "D14",
+      "operation": "remove",
+      "target": "Remove present constituent traits, tolerate absent constituents, and leave unrelated traits alone.",
+      "sources": [
+        "s003"
+      ],
+      "patch_lines": [
+        1132,
+        1139
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D14",
+        "status": "partial",
+        "evidence": "R2 removes constituents and leaves unrelated traits; missing-constituent removal policy is unstated."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 8,
+          "quote": "does nothing for constituents that are already absent"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 19,
+          "quote": "`remove` removes all constituent traits."
+        },
+        "reason": "Missing-constituent tolerance and unrelated-trait preservation are not explicit."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "g009",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 40,
+          "quote": "`remove` removes all constituent traits from the entity, regardless of whether the entity currently has them, and does nothing for constituents that are already absent."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 20,
+          "quote": "Remove present constituent traits, tolerate absent constituents, and leave unrelated traits alone."
+        }
+      }
+    },
+    {
+      "id": "D15",
+      "operation": "direct query",
+      "target": "Require all constituents, compose with ordinary traits and other aspects, and update matching as constituent membership changes.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        684,
+        692
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D15",
+        "status": "full",
+        "evidence": "R3 and AC3 cover all-present matching, trait/aspect composition and live membership."
+      },
+      "previous_generated": {
+        "status": "partial",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 9,
+          "quote": "the query matches only entities that have all constituent traits"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 20,
+          "quote": "An aspect used as a query parameter requires all its constituents."
+        },
+        "reason": "Complete matching is explicit; live result updates and ordinary trait/other aspect composition lack concrete conditions in both prompts."
+      },
+      "same_analysis_control": {
+        "status": "partial",
+        "record_id": "g010",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 41,
+          "quote": "When an aspect is passed as a query parameter, the query matches only entities that have all constituent traits, and the query result's readEach and updateEach operate on the merged aspect data."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 21,
+          "quote": "Require all constituents, compose with ordinary traits and other aspects, and update matching as constituent membership changes."
+        }
+      }
+    },
+    {
+      "id": "D16",
+      "operation": "callback slots",
+      "target": "Use one merged data slot per directly supplied aspect, including an empty object for a tag-only aspect; ordinary tag parameters and Not modifiers contribute no data slots; retain surrounding data parameter order.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        463,
+        499,
+        501,
+        522
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D16",
+        "status": "partial",
+        "evidence": "R3 says merged aspect slot at parameter position; no skipped tag/Not slots or tag-only aspect slot."
+      },
+      "previous_generated": {
+        "status": "wrong",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 9,
+          "quote": "nested aspects flatten to their constituent traits, each occupying its own slot"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 32,
+          "quote": "including when constructed from nested aspects"
+        },
+        "reason": "Nested readEach grouping is correct; tag-only slot, omitted ordinary tag/Not slots, surrounding order and updateEach grouping remain unspecified."
+      },
+      "same_analysis_control": {
+        "status": "wrong",
+        "record_id": "f005",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 57,
+          "quote": "In readEach/updateEach callbacks, directly supplied aspects, ordinary data traits, and tag-only aspects each occupy one slot in the state array, with tag-only aspects yielding an empty object; Not modifiers contribute no slot, and nested aspects flatten to their constituent traits, each occupying its own slot."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 22,
+          "quote": "Use one merged data slot per directly supplied aspect, including an empty object for a tag-only aspect; ordinary tag parameters and Not modifiers contribute no data slots; retain surrounding data parameter order."
+        }
+      }
+    },
+    {
+      "id": "D17",
+      "operation": "updateEach",
+      "target": "Write back changed existing fields to their constituent stores and detect changes per constituent using top-level strict inequality, not recursive value comparison.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        524,
+        557
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D17",
+        "status": "partial",
+        "evidence": "R3 covers writeback and per-constituent changes but not top-level strict-inequality comparison."
+      },
+      "previous_generated": {
+        "status": "partial",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 9,
+          "quote": "not shallow-equal to the previously stored value"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 22,
+          "quote": "`updateEach` distributes writes back to constituent stores."
+        },
+        "reason": "No top-level strict-inequality definition, existing-field limit or precise per-constituent detection. Earlier prompt mentions shallow equality without settling all facets."
+      },
+      "same_analysis_control": {
+        "status": "partial",
+        "record_id": "f006",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 58,
+          "quote": "In aspect updateEach, a constituent is considered changed if its new value is not shallow-equal to the previously stored value, where shallow equality treats equal primitive values as unchanged and separately allocated nested references as changed unless they are the same reference."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 23,
+          "quote": "Write back changed existing fields to their constituent stores and detect changes per constituent using top-level strict inequality, not recursive value comparison."
+        }
+      }
+    },
+    {
+      "id": "D18",
+      "operation": "updateEach options",
+      "target": "changeDetection never still commits writes but suppresses change notifications.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        559,
+        591
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D18",
+        "status": "missing",
+        "evidence": "No changeDetection never mode."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 9,
+          "quote": "'never' commits writes without triggering change detection or notifications"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 22,
+          "quote": "`updateEach` distributes writes back to constituent stores."
+        },
+        "reason": "Disabled-detection mode semantics absent."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "f007",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 59,
+          "quote": "updateEach should accept a changeDetection option that, when set to 'never', commits writes to stores without triggering change detection or notifications, while 'always' and 'auto' commit writes and trigger change detection/notifications as currently implemented."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 24,
+          "quote": "changeDetection never still commits writes but suppresses change notifications."
+        }
+      }
+    },
+    {
+      "id": "D19",
+      "operation": "updateEach options",
+      "target": "For aspect queries, all non-never modes share the same branch and emit notifications for constituents detected as changed.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        592,
+        615
+      ],
+      "category": "edge",
+      "earlier_hand_candidate": {
+        "id": "D19",
+        "status": "missing",
+        "evidence": "No non-never mode behavior."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 9,
+          "quote": "'always' and 'auto' commit writes and trigger change detection/notifications"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 22,
+          "quote": "`updateEach` distributes writes back to constituent stores."
+        },
+        "reason": "Non-never modes and their shared detected-change behavior absent."
+      },
+      "same_analysis_control": {
+        "status": "partial",
+        "record_id": "f007",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 59,
+          "quote": "updateEach should accept a changeDetection option that, when set to 'never', commits writes to stores without triggering change detection or notifications, while 'always' and 'auto' commit writes and trigger change detection/notifications as currently implemented."
+        },
+        "reason": "Mode behavior refers to currently implemented behavior; exact non-never equivalence is not established."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 25,
+          "quote": "For aspect queries, all non-never modes share the same branch and emit notifications for constituents detected as changed."
+        }
+      }
+    },
+    {
+      "id": "D20",
+      "operation": "updateEach lifecycle",
+      "target": "After the callback, skip writeback if the entity has been destroyed.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        579,
+        599
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D20",
+        "status": "missing",
+        "evidence": "No callback-destruction policy."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 9,
+          "quote": "aspect writes and notifications for that entity are skipped entirely"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 22,
+          "quote": "`updateEach` distributes writes back to constituent stores."
+        },
+        "reason": "No destroyed-entity guard."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "f008",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 60,
+          "quote": "If an updateEach callback destroys its entity, aspect writes and notifications for that entity should be skipped entirely, as the existing query-result code checks `world.has(entity)` after the callback and continues without committing changes or triggering change events."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 26,
+          "quote": "After the callback, skip writeback if the entity has been destroyed."
+        }
+      }
+    },
+    {
+      "id": "D21",
+      "operation": "updateEach notifications",
+      "target": "Dispatch detected constituent change notifications after processing the entity iteration, rather than during each callback.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        612,
+        615
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D21",
+        "status": "missing",
+        "evidence": "No notification-dispatch timing."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 9,
+          "quote": "dispatches constituent change notifications after the callback iteration completes"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 22,
+          "quote": "`updateEach` distributes writes back to constituent stores."
+        },
+        "reason": "No dispatch timing."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "f009",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 61,
+          "quote": "Aspect updateEach should dispatch constituent change notifications after the callback iteration completes, following the existing query-result pattern where changed pairs are collected during the loop and setChanged is called in a separate loop after all entities have been processed."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 27,
+          "quote": "Dispatch detected constituent change notifications after processing the entity iteration, rather than during each callback."
+        }
+      }
+    },
+    {
+      "id": "D22",
+      "operation": "Not",
+      "target": "For a single aspect within a mask generation, match entities missing at least one constituent, including none; update membership in both directions.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        705,
+        714,
+        1020,
+        1022
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D22",
+        "status": "full",
+        "evidence": "R4 and AC4 cover missing-at-least-one and membership updates."
+      },
+      "previous_generated": {
+        "status": "partial",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 10,
+          "quote": "matches an entity if and only if the entity lacks at least one"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 24,
+          "quote": "`Not` with an aspect matches entities missing at least one constituent."
+        },
+        "reason": "Correct predicate includes none, but live membership updates and composition are not specified."
+      },
+      "same_analysis_control": {
+        "status": "partial",
+        "record_id": "g014",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 44,
+          "quote": "The `Not` modifier, when given an aspect, matches an entity if and only if the entity lacks at least one of the aspect's constituent traits."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 28,
+          "quote": "For a single aspect within a mask generation, match entities missing at least one constituent, including none; update membership in both directions."
+        }
+      }
+    },
+    {
+      "id": "D23",
+      "operation": "Changed",
+      "target": "Require all constituents currently present and accept any recorded constituent data change; unchanged entities do not match.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        659,
+        666,
+        723,
+        738
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D23",
+        "status": "partial",
+        "evidence": "R4 covers any changed constituent but does not explicitly require current completeness for Changed."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 10,
+          "quote": "all constituent traits are present and at least one constituent has changed"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 25,
+          "quote": "`Changed` matches when any constituent data changed."
+        },
+        "reason": "Any-change condition retained; current completeness and recorded-change history remain ambiguous."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "f013",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 64,
+          "quote": "Changed(aspect) should match an entity only if all constituent traits are present and at least one constituent has changed, so an entity with a changed constituent but another constituent missing does not match."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 29,
+          "quote": "Require all constituents currently present and accept any recorded constituent data change; unchanged entities do not match."
+        }
+      }
+    },
+    {
+      "id": "D24",
+      "operation": "Added/Removed",
+      "target": "Track incomplete-to-complete and complete-to-incomplete membership against existing modifier tracking history, including complete spawn and excluding removals from previously incomplete sets.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        635,
+        670,
+        969,
+        999
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D24",
+        "status": "partial",
+        "evidence": "R4/AC4 specify transitions and spawn/incomplete cases but not tracking observation history."
+      },
+      "previous_generated": {
+        "status": "partial",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 10,
+          "quote": "transitions from having at least one missing constituent to having all constituents"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 26,
+          "quote": "`Added` matches the transition to all-present."
+        },
+        "reason": "Transitions retained, but history observation boundary, spawn and previously-incomplete removal cases are not settled."
+      },
+      "same_analysis_control": {
+        "status": "partial",
+        "record_id": "g017",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 47,
+          "quote": "The `Added` modifier, when given an aspect, matches an entity if and only if the entity transitions from having at least one missing constituent to having all constituents."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 30,
+          "quote": "Track incomplete-to-complete and complete-to-incomplete membership against existing modifier tracking history, including complete spawn and excluding removals from previously incomplete sets."
+        }
+      }
+    },
+    {
+      "id": "D25",
+      "operation": "Or",
+      "target": "Expand an aspect into independently matching constituent alternatives: Or(aspect(A,B), C) is A OR B OR C.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        327,
+        328
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D25",
+        "status": "missing",
+        "evidence": "Compose with Or does not specify constituent alternatives."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 10,
+          "quote": "a disjunction over each individual constituent trait and the regular trait"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 23,
+          "quote": "Aspects compose with all query modifiers."
+        },
+        "reason": "Compose does not choose constituent OR versus grouped aspect conjunction."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "f014",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 65,
+          "quote": "When an aspect is passed to Or alongside a regular trait, the aspect's constituent traits are expanded into separate alternatives within the Or, so the predicate is a disjunction over each individual constituent trait and the regular trait, not a grouped conjunction."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 31,
+          "quote": "Expand an aspect into independently matching constituent alternatives: Or(aspect(A,B), C) is A OR B OR C."
+        }
+      }
+    },
+    {
+      "id": "D26",
+      "operation": "subscriptions",
+      "target": "onAdd gates constituent add callbacks on completeness; onRemove gates removals on the other constituents being present; onChange gates constituent change callbacks on completeness; callbacks receive the affected entity.",
+      "sources": [
+        "s005"
+      ],
+      "patch_lines": [
+        1171,
+        1184,
+        1202,
+        1223,
+        1240,
+        1253
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D26",
+        "status": "full",
+        "evidence": "R5/AC5 cover completeness-gated subscriptions and callback entity."
+      },
+      "previous_generated": {
+        "status": "partial",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 11,
+          "quote": "`onAdd` fires exactly once when an entity transitions from having at least one but not all"
+        }
+      },
+      "new_candidate": {
+        "status": "partial",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 30,
+          "quote": "`onChange` fires when any constituent changes while all are present."
+        },
+        "reason": "Core transition/completeness conditions retained; callback signature and exact constituent subscription gates are not specified. Earlier generated prose narrows incomplete states unnecessarily."
+      },
+      "same_analysis_control": {
+        "status": "partial",
+        "record_id": "g020",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 50,
+          "quote": "The aspect's onAdd subscription fires exactly once when an entity transitions from having at least one but not all constituent traits to having all constituent traits, and the callback receives the entity as its sole argument."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 32,
+          "quote": "onAdd gates constituent add callbacks on completeness; onRemove gates removals on the other constituents being present; onChange gates constituent change callbacks on completeness; callbacks receive the affected entity."
+        }
+      }
+    },
+    {
+      "id": "D27",
+      "operation": "subscriptions",
+      "target": "Return an unsubscribe function which removes all constituent subscriptions.",
+      "sources": [
+        "s005"
+      ],
+      "patch_lines": [
+        1183,
+        1222,
+        1252
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D27",
+        "status": "full",
+        "evidence": "R5/AC5 require unsubscribe to stop future callbacks."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 11,
+          "quote": "detaches the callback from the aspect's constituent trait subscription sets"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 29,
+          "quote": "`onRemove` fires when an entity transitions from complete to incomplete."
+        },
+        "reason": "No unsubscribe contract."
+      },
+      "same_analysis_control": {
+        "status": "full",
+        "record_id": "f015",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 66,
+          "quote": "Aspect subscription methods should return an unsubscribe function that, when invoked, detaches the callback from the aspect's constituent trait subscription sets, and repeated calls to that unsubscribe function have no further effect (they are idempotent)."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 33,
+          "quote": "Return an unsubscribe function which removes all constituent subscriptions."
+        }
+      }
+    },
+    {
+      "id": "D28",
+      "operation": "onChange multiplicity",
+      "target": "Notifications remain per constituent, so one aspect operation updating two constituents may invoke the aspect subscriber twice; do not coalesce to once per aspect operation.",
+      "sources": [
+        "s003",
+        "s005"
+      ],
+      "patch_lines": [
+        1095,
+        1096,
+        1244,
+        1251
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D28",
+        "status": "missing",
+        "evidence": "No per-constituent versus per-operation callback count."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 11,
+          "quote": "one notification per constituent trait that changed"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 30,
+          "quote": "`onChange` fires when any constituent changes while all are present."
+        },
+        "reason": "No aspect subscriber multiplicity when two constituents are changed."
+      },
+      "same_analysis_control": {
+        "status": "missing",
+        "record_id": "g022",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 52,
+          "quote": "The aspect's onChange subscription fires whenever any constituent trait's data changes while the entity has all constituent traits, and the callback receives the entity as its sole argument."
+        },
+        "reason": "Per-constituent aspect callback multiplicity f010 is unresolved and withheld."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 34,
+          "quote": "Notifications remain per constituent, so one aspect operation updating two constituents may invoke the aspect subscriber twice; do not coalesce to once per aspect operation."
+        }
+      }
+    },
+    {
+      "id": "D29",
+      "operation": "query cache",
+      "target": "Aspect instances participate distinctly in query hashing rather than being represented as ordinary constituent query parameters.",
+      "sources": [
+        "s004",
+        "s006"
+      ],
+      "patch_lines": [
+        1039,
+        1043
+      ],
+      "category": "clarification",
+      "earlier_hand_candidate": {
+        "id": "D29",
+        "status": "missing",
+        "evidence": "Distinct creation IDs do not explicitly require aspect-specific query-cache identity."
+      },
+      "previous_generated": {
+        "status": "missing",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 7,
+          "quote": "returns a distinct aspect object"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 31,
+          "quote": "Each `createAspect` call returns a distinct instance."
+        },
+        "reason": "Instance identity alone does not establish distinct query-cache representation."
+      },
+      "same_analysis_control": {
+        "status": "missing",
+        "record_id": "g003",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 34,
+          "quote": "Each aspect exposes a read-only `id` (unique number), a `traits` array containing the flattened constituent traits, and a `schema` object that merges the schemas of all constituents."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 35,
+          "quote": "Aspect instances participate distinctly in query hashing rather than being represented as ordinary constituent query parameters."
+        }
+      }
+    },
+    {
+      "id": "D30",
+      "operation": "multiple Not groups",
+      "target": "Combine constituents from multiple aspect Not parameters into a single notAll set; do not retain a separate negative predicate for each aspect.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        705,
+        710,
+        756,
+        764
+      ],
+      "category": "edge",
+      "earlier_hand_candidate": {
+        "id": "D30",
+        "status": "missing",
+        "evidence": "No multiple Not-group rule."
+      },
+      "previous_generated": {
+        "status": "missing",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 10,
+          "quote": "matches an entity if and only if the entity lacks at least one"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 24,
+          "quote": "`Not` with an aspect matches entities missing at least one constituent."
+        },
+        "reason": "No multiple-Not aggregate policy."
+      },
+      "same_analysis_control": {
+        "status": "missing",
+        "record_id": "g014",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 44,
+          "quote": "The `Not` modifier, when given an aspect, matches an entity if and only if the entity lacks at least one of the aspect's constituent traits."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 36,
+          "quote": "Combine constituents from multiple aspect Not parameters into a single notAll set; do not retain a separate negative predicate for each aspect."
+        }
+      }
+    },
+    {
+      "id": "D31",
+      "operation": "tracking generations",
+      "target": "checkAspectTrackingGroup returns the result for the first relevant generation; negative masks are evaluated separately per generation.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        635,
+        670,
+        1020,
+        1022
+      ],
+      "category": "edge",
+      "earlier_hand_candidate": {
+        "id": "D31",
+        "status": "missing",
+        "evidence": "No mask-generation policy."
+      },
+      "previous_generated": {
+        "status": "missing",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 10,
+          "quote": "tracking groups are created per modifier"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 26,
+          "quote": "`Added` matches the transition to all-present."
+        },
+        "reason": "No first relevant tracking generation or per-generation negative-mask policy."
+      },
+      "same_analysis_control": {
+        "status": "missing",
+        "record_id": "g019",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 49,
+          "quote": "When an aspect is used as a query parameter, the query requires all constituent traits, and when an aspect is used inside `Not`, `Or`, `Changed`, `Added`, or `Removed`, the modifier's trait list is the aspect's constituent traits, and tracking groups are created per modifier with AND logic for top-level tracking modifiers and OR logic for nested tracking modifiers inside `Or`."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 37,
+          "quote": "checkAspectTrackingGroup returns the result for the first relevant generation; negative masks are evaluated separately per generation."
+        }
+      }
+    },
+    {
+      "id": "D32",
+      "operation": "factory schemas",
+      "target": "Function-valued schemas contribute no merged schema entries or field owners; their fields are not routed by aspect set/add through the field map.",
+      "sources": [
+        "s002",
+        "s003"
+      ],
+      "patch_lines": [
+        62,
+        73,
+        1084,
+        1097
+      ],
+      "category": "edge",
+      "earlier_hand_candidate": {
+        "id": "D32",
+        "status": "missing",
+        "evidence": "No function-schema behavior."
+      },
+      "previous_generated": {
+        "status": "missing",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 7,
+          "quote": "merges the schemas of all constituents"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 12,
+          "quote": "Each aspect exposes `id`, `traits`, and `schema`."
+        },
+        "reason": "No function-valued schema field ownership policy."
+      },
+      "same_analysis_control": {
+        "status": "missing",
+        "record_id": "g003",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 34,
+          "quote": "Each aspect exposes a read-only `id` (unique number), a `traits` array containing the flattened constituent traits, and a `schema` object that merges the schemas of all constituents."
+        },
+        "reason": "Retains the relevant declared analysis rule."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 38,
+          "quote": "Function-valued schemas contribute no merged schema entries or field owners; their fields are not routed by aspect set/add through the field map."
+        }
+      }
+    },
+    {
+      "id": "D33",
+      "operation": "reset",
+      "target": "Aspect queries continue working across world.reset through existing reset behavior.",
+      "sources": [
+        "s004"
+      ],
+      "patch_lines": [
+        684,
+        692,
+        1039,
+        1043
+      ],
+      "category": "core",
+      "earlier_hand_candidate": {
+        "id": "D33",
+        "status": "full",
+        "evidence": "R6 requires correct behavior after reset."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 11,
+          "quote": "world.reset clears all aspect query results"
+        }
+      },
+      "new_candidate": {
+        "status": "missing",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 23,
+          "quote": "Aspects compose with all query modifiers."
+        },
+        "reason": "No aspect reset lifecycle behavior."
+      },
+      "same_analysis_control": {
+        "status": "missing",
+        "record_id": "g024",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 54,
+          "quote": "When the world is reset, all aspect subscriptions are cleared and no further callbacks fire for entities created after the reset, and the aspect's constituent traits are re-registered as needed."
+        },
+        "reason": "g024 describes reset subscriptions/registration, but the query-result reset rule f016 is unresolved and withheld."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 39,
+          "quote": "Aspect queries continue working across world.reset through existing reset behavior."
+        }
+      }
+    },
+    {
+      "id": "D34",
+      "operation": "set notification equality",
+      "target": "For each constituent with supplied recognized fields, use the existing setTraitForTrait path, which emits change when triggerChanged is true even if supplied values equal existing values.",
+      "sources": [
+        "s003"
+      ],
+      "patch_lines": [
+        1095,
+        1096
+      ],
+      "category": "clarification",
+      "base_file": "packages/core/src/trait/trait.ts:406-421",
+      "earlier_hand_candidate": {
+        "id": "D34",
+        "status": "wrong",
+        "evidence": "R2 says notifications run for constituents whose data changes; solution uses ordinary setTraitForTrait notifications even when supplied recognized values compare equal."
+      },
+      "previous_generated": {
+        "status": "full",
+        "evidence": {
+          "file": "operation-analysis-v1/focused/prompt.md",
+          "line": 8,
+          "quote": "regardless of whether the value changed"
+        }
+      },
+      "new_candidate": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/candidate-prompt.md",
+          "line": 33,
+          "quote": "still triggers that constituent's change notification when triggerChanged=true"
+        },
+        "reason": "Equal-value ordinary setter notifications are correctly specified."
+      },
+      "same_analysis_control": {
+        "status": "partial",
+        "record_id": "g007",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+          "line": 38,
+          "quote": "`set` accepts a merged object of fields, writes each field to its owning constituent's store, and triggers per-trait change detection for each constituent that had a field written."
+        },
+        "reason": "Per-written-constituent detection is stated, but explicit equal-value notification rule f002 is unresolved and withheld."
+      },
+      "ideal_reference": {
+        "status": "full",
+        "evidence": {
+          "file": "full-prompt-comparison-v1/ideal-reference-prompt.md",
+          "line": 40,
+          "quote": "For each constituent with supplied recognized fields, use the existing setTraitForTrait path, which emits change when triggerChanged is true even if supplied values equal existing values."
+        }
+      }
+    }
+  ],
+  "supplementary_solution_finding": {
+    "id": "E01",
+    "target": "Aspect callbacks receive (entity, undefined), not exactly one argument.",
+    "solution_patch_lines": [
+      1177,
+      1218,
+      1246
+    ],
+    "previous_generated": {
+      "status": "wrong",
+      "evidence": {
+        "file": "operation-analysis-v1/focused/prompt.md",
+        "line": 9,
+        "quote": "receive only the entity as the callback argument"
+      }
+    },
+    "new_candidate": {
+      "status": "missing"
+    },
+    "same_analysis_control": {
+      "status": "wrong",
+      "evidence": {
+        "file": "full-prompt-comparison-v1/same-analysis-prompt.md",
+        "line": 50,
+        "quote": "the callback receives the entity as its sole argument"
+      }
+    },
+    "earlier_hand_candidate": {
+      "status": "partial",
+      "reason": "Affected entity specified, second argument omitted."
+    },
+    "ideal_reference": {
+      "status": "full",
+      "requirement": 35
+    },
+    "counting": "Additional observable patch detail, kept outside the unchanged 34-bundle counts."
+  },
+  "artifacts": {
+    "six-section-hard-task-v1/koota-composite-trait-aspects/prompt.md": {
+      "sha256": "8e91bc7dc8e182755e3ca5b607fc50d20593031aa6f6ec84398f40ac33c6d457",
+      "words": 1172
+    },
+    "operation-analysis-v1/focused/prompt.md": {
+      "sha256": "2e06bc671b61ca87e1a4aa48efa73b8da93304d1f1e0ba46582b949840fb40c7",
+      "words": 2060
+    },
+    "full-prompt-comparison-v1/candidate-prompt.md": {
+      "sha256": "c432d0b47a587b9c0304cc8534db323baacce5ee9c34bf813c36962a4506b58a",
+      "words": 547
+    },
+    "full-prompt-comparison-v1/same-analysis-prompt.md": {
+      "sha256": "70cd5a46617e4a9961c542d31ddbff2adbee016cd6fb82eb5742e112a3d3261a",
+      "words": 1569
+    },
+    "full-prompt-comparison-v1/ideal-reference-prompt.md": {
+      "sha256": "56bc67e8fff723d41136c3af9f52e043e48b6fba24d75a663e71e87486cbebdd",
+      "words": 1016
+    },
+    "operation-analysis-v1/oracle.json": {
+      "sha256": "a615600ce419824a1de43c1c1b7703a3de63ee4d44df87a30c25883be53fceb0",
+      "words": 647
+    }
+  },
+  "recommendation": "Do not replace the earlier prompt with this candidate. Keep direct rendering as an assembly principle while restoring lost analysis coverage with explicit scoped decisions."
+}

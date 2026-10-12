@@ -1,0 +1,351 @@
+{
+  "generation": "Deterministic assembly; no model calls or oracle inputs.",
+  "source_product_clauses": 25,
+  "preserved_product_clause_ids": [
+    "r002",
+    "r003",
+    "r004",
+    "r005",
+    "r006",
+    "r007",
+    "r008",
+    "r009",
+    "r010",
+    "r011",
+    "r012",
+    "r013",
+    "r014",
+    "r015",
+    "r016",
+    "r017",
+    "r018",
+    "r019",
+    "r020",
+    "r021",
+    "r022",
+    "r023",
+    "r024",
+    "r025",
+    "r026"
+  ],
+  "excluded_controller_clause_ids": [
+    "r027",
+    "r028"
+  ],
+  "clarification_ids": [
+    "callback-slot",
+    "aspect-set-equality",
+    "metadata-assignment"
+  ],
+  "unresolved": [
+    "traits-container",
+    "schema-container",
+    "nested-freezing"
+  ],
+  "mappings": [
+    {
+      "section": "Requirements",
+      "number": 1,
+      "text": "The core exports a new `createAspect` which accepts two or more traits and returns an aspect.",
+      "source": "instruction-analysis.json",
+      "source_id": "r002",
+      "original_source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 2,
+      "text": "Overlapping field names between constituents throw at creation time.",
+      "source": "instruction-analysis.json",
+      "source_id": "r003",
+      "original_source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 3,
+      "text": "Relation constituents throw at creation time.",
+      "source": "instruction-analysis.json",
+      "source_id": "r004",
+      "original_source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 4,
+      "text": "Tag traits are valid constituents.",
+      "source": "instruction-analysis.json",
+      "source_id": "r005",
+      "original_source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 5,
+      "text": "Nested aspects flatten to their individual traits.",
+      "source": "instruction-analysis.json",
+      "source_id": "r006",
+      "original_source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 6,
+      "text": "Each aspect exposes `id`, `traits`, and `schema`.",
+      "source": "instruction-analysis.json",
+      "source_id": "r007",
+      "original_source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 7,
+      "text": "`has` returns true when the entity has every constituent trait.",
+      "source": "instruction-analysis.json",
+      "source_id": "r008",
+      "original_source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 8,
+      "text": "`get` returns a merged object of all constituent fields, or undefined if any constituent is missing.",
+      "source": "instruction-analysis.json",
+      "source_id": "r009",
+      "original_source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 9,
+      "text": "`set` distributes each field to its owning constituent.",
+      "source": "instruction-analysis.json",
+      "source_id": "r010",
+      "original_source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 10,
+      "text": "`set` triggers per-trait change detection.",
+      "source": "instruction-analysis.json",
+      "source_id": "r011",
+      "original_source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 11,
+      "text": "`add` adds only the constituents the entity does not already have.",
+      "source": "instruction-analysis.json",
+      "source_id": "r012",
+      "original_source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 12,
+      "text": "`add` distributes initial values by field.",
+      "source": "instruction-analysis.json",
+      "source_id": "r013",
+      "original_source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 13,
+      "text": "`remove` removes all constituent traits.",
+      "source": "instruction-analysis.json",
+      "source_id": "r014",
+      "original_source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 14,
+      "text": "An aspect used as a query parameter requires all its constituents.",
+      "source": "instruction-analysis.json",
+      "source_id": "r015",
+      "original_source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 15,
+      "text": "`readEach` delivers a merged data object.",
+      "source": "instruction-analysis.json",
+      "source_id": "r016",
+      "original_source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 16,
+      "text": "`updateEach` distributes writes back to constituent stores.",
+      "source": "instruction-analysis.json",
+      "source_id": "r017",
+      "original_source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 17,
+      "text": "Aspects compose with all query modifiers.",
+      "source": "instruction-analysis.json",
+      "source_id": "r018",
+      "original_source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 18,
+      "text": "`Not` with an aspect matches entities missing at least one constituent.",
+      "source": "instruction-analysis.json",
+      "source_id": "r019",
+      "original_source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 19,
+      "text": "`Changed` matches when any constituent data changed.",
+      "source": "instruction-analysis.json",
+      "source_id": "r020",
+      "original_source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 20,
+      "text": "`Added` matches the transition to all-present.",
+      "source": "instruction-analysis.json",
+      "source_id": "r021",
+      "original_source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 21,
+      "text": "`Removed` matches the transition from all-present.",
+      "source": "instruction-analysis.json",
+      "source_id": "r022",
+      "original_source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 22,
+      "text": "`onAdd` fires when an entity transitions from incomplete to complete.",
+      "source": "instruction-analysis.json",
+      "source_id": "r023",
+      "original_source_ids": [
+        "s005"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 23,
+      "text": "`onRemove` fires when an entity transitions from complete to incomplete.",
+      "source": "instruction-analysis.json",
+      "source_id": "r024",
+      "original_source_ids": [
+        "s005"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 24,
+      "text": "`onChange` fires when any constituent changes while all are present.",
+      "source": "instruction-analysis.json",
+      "source_id": "r025",
+      "original_source_ids": [
+        "s005"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 25,
+      "text": "Each `createAspect` call returns a distinct instance.",
+      "source": "instruction-analysis.json",
+      "source_id": "r026",
+      "original_source_ids": [
+        "s006"
+      ]
+    },
+    {
+      "section": "Requirements",
+      "number": 26,
+      "text": "A directly supplied aspect contributes one merged readEach callback data object, including when constructed from nested aspects.",
+      "source": "deterministic-decisions-v1/results.json",
+      "source_id": "callback-slot"
+    },
+    {
+      "section": "Requirements",
+      "number": 27,
+      "text": "Setting a supplied constituent field to its existing value still triggers that constituent's change notification when triggerChanged=true.",
+      "source": "deterministic-decisions-v1/results.json",
+      "source_id": "aspect-set-equality"
+    },
+    {
+      "section": "Requirements",
+      "number": 28,
+      "text": "The aspect's id, traits and schema properties cannot be reassigned.",
+      "source": "deterministic-decisions-v1/results.json",
+      "source_id": "metadata-assignment"
+    },
+    {
+      "section": "Acceptance criteria",
+      "number": 1,
+      "text": "Given data traits A={x:1}, B={y:2}, C={z:3}, a complete entity and Outer=createAspect(createAspect(A,B),C), readEach on a query with Outer as its only parameter supplies state with one element: {x:1,y:2,z:3}.",
+      "source": "deterministic-decisions-v1/results.json",
+      "source_id": "callback-slot"
+    },
+    {
+      "section": "Acceptance criteria",
+      "number": 2,
+      "text": "Given an entity with every constituent of aspect(A,B), A.x=1, and an A change subscriber registered after setup, setting the aspect with {x:1} and triggerChanged=true invokes that subscriber once and leaves A.x equal to 1.",
+      "source": "deterministic-decisions-v1/results.json",
+      "source_id": "aspect-set-equality"
+    },
+    {
+      "section": "Acceptance criteria",
+      "number": 3,
+      "text": "Given a created aspect and saved values of its id, traits and schema, attempts to assign replacement values do not change those property values; assignment may throw in strict mode.",
+      "source": "deterministic-decisions-v1/results.json",
+      "source_id": "metadata-assignment"
+    }
+  ],
+  "inputs": {
+    "/Users/gregory/.codex/worktrees/f86b/powdrr-lift/science/deepswe/acceptance_templates/runs/operation-analysis-v1/input.json": "362a116de724f064c4e6ecf8e6d0b4d58fc9cb3950450069f18f47dccf78ea03",
+    "/Users/gregory/.codex/worktrees/f86b/powdrr-lift/science/deepswe/acceptance_templates/runs/operation-analysis-v1/instruction-analysis.json": "875ca847491fd17b74a8f96cec721d15096dd74bdd69daa23661804c0b17c142",
+    "/Users/gregory/.codex/worktrees/f86b/powdrr-lift/science/deepswe/acceptance_templates/runs/deterministic-decisions-v1/results.json": "fd716d8dde6af573dfe79806b55a828c6ce9831d34c2370ea18dc1b7a3cdb448",
+    "/private/tmp/koota-aspect-analysis-base-20261011/packages/core/package.json": "a1d8428a80196571736bf7b467294cd5080d166db1f3e8083a27933eca139773"
+  },
+  "other_scaffolding": {
+    "objective": "Original task rationale and named API operations.",
+    "constraints": "User-established Powdrr controller boundary.",
+    "context": "Previously verified original-code observations and paths.",
+    "verification": "User-requested six-section format and original package scripts."
+  }
+}

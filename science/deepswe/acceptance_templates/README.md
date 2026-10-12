@@ -1,5 +1,10 @@
 # Acceptance criteria template experiment
 
+The [complete-prompt comparison](runs/full-prompt-comparison-v1/README.md)
+finds that preserving the original requirements plus three directly rendered
+clarifications removes contradictions but loses substantial semantic coverage.
+It includes full candidate/reference prompts and a per-target comparison.
+
 The [direct-rendering experiment](runs/deterministic-decisions-v1/README.md)
 removes contract synthesis, preserves selected meanings, and explicitly asks
 about inherited behavior. Three focused statements match the solution; metadata

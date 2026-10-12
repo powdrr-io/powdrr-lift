@@ -1,0 +1,39 @@
+{
+  "new_calls": 12,
+  "providers": {
+    "deepinfra": 5,
+    "typesafe.ai": 7
+  },
+  "sum_call_elapsed_seconds": 7.981,
+  "timing_note": "Summed call durations, not elapsed wall-clock time; parallel calls overlap.",
+  "tokens": null,
+  "usage_note": "Provider receipts contain no token totals.",
+  "pure_ablation_new_calls": 0,
+  "new_feature_questions": 5,
+  "reused_callback_choice_pairs": 1,
+  "contract_synthesis_calls": 0,
+  "scenario_generation_calls": 0,
+  "output_words": 187,
+  "final_script_sha256": "0d55f49859890c2e8aed62ab47e15d5d77ecae52cb2e850c4881cd8f0332b754",
+  "manifest_sha256": "49bd57ee83eac212734ad29983efb16f002b842e97283d25f44c9e4b1a196af5",
+  "archive_sha256": "a06e01612cccf42e9b3abfe8b9f8e15a9564b5be0d318b57991359993cc04341",
+  "task_artifact_hashes": {
+    "instruction.md": "300c70ea3b277bf799c272cb7415368bb631856c5a89bee1e7cac474f5810c25",
+    "solution/solution.patch": "6626b19e70409bd2df3f5a3b48015243bce577c4aa2fb8b87f3647d3304b6cf3",
+    "tests/test.patch": "5d8c926bf93a041f4010fda23da2942583384a15f67e97f770b5d76f227a6912"
+  },
+  "verification": {
+    "output_matches_frozen_choices": true,
+    "unresolved_choices_not_rendered_as_requirements": true,
+    "original_source_packets_match": true,
+    "classification_payload_allowlist": true,
+    "checkpoint_hashes_match": true,
+    "credential_scan": "passed",
+    "tests_run": false,
+    "coding_agents_run": false,
+    "ruff_format": "passed",
+    "ruff_lint": "passed",
+    "mypy": "passed"
+  },
+  "result": "Rendering avoids semantic drift and false explanations; it does not resolve missing metadata policy."
+}

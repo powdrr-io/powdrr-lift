@@ -1,0 +1,50 @@
+{
+  "id": "aspect-set-equality",
+  "flash": {
+    "choice": "retain_set"
+  },
+  "jev": {
+    "choice": "retain_set"
+  },
+  "provenance": {
+    "type": "independent_choices"
+  },
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.955,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "independent-choice",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.245,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "scenario-preservation",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.164,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ],
+  "status": "rendered",
+  "statement": "Setting a supplied constituent field to its existing value still triggers that constituent's change notification when triggerChanged=true.",
+  "scenario": "Given an entity with every constituent of aspect(A,B), A.x=1, and an A change subscriber registered after setup, setting the aspect with {x:1} and triggerChanged=true invokes that subscriber once and leaves A.x equal to 1.",
+  "scenario_review": {
+    "verdict": "preserved"
+  }
+}

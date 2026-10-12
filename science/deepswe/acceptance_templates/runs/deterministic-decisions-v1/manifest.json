@@ -1,0 +1,128 @@
+{
+  "specs": [
+    {
+      "id": "callback-slot",
+      "case": "callback-grouping",
+      "reuse": true,
+      "question": "Does nested-aspect flattening replace readEach's merged aspect data with separate constituent callback objects?",
+      "options": {
+        "merged": {
+          "meaning": "Keep one merged callback object for the supplied aspect.",
+          "statement": "A directly supplied aspect contributes one merged readEach callback data object, including when constructed from nested aspects.",
+          "scenario": "Given data traits A={x:1}, B={y:2}, C={z:3}, a complete entity and Outer=createAspect(createAspect(A,B),C), readEach on a query with Outer as its only parameter supplies state with one element: {x:1,y:2,z:3}."
+        },
+        "expanded": {
+          "meaning": "Expand constituents into separate callback data objects.",
+          "statement": "A nested aspect contributes a separate readEach callback data object for each constituent trait.",
+          "scenario": "Given data traits A={x:1}, B={y:2}, C={z:3}, a complete entity and Outer=createAspect(createAspect(A,B),C), readEach on a query with Outer as its only parameter supplies three state elements: {x:1}, {y:2}, and {z:3}."
+        },
+        "unknown": {
+          "meaning": "The sources do not settle callback grouping."
+        }
+      }
+    },
+    {
+      "id": "aspect-set-equality",
+      "case": "set-notifications",
+      "question": "For the new aspect set operation, should a supplied equal-value field with triggerChanged=true retain existing regular-trait set notification behavior, or introduce an inequality guard like updateEach?",
+      "options": {
+        "retain_set": {
+          "meaning": "Retain regular-trait setter notifications for equal writes.",
+          "statement": "Setting a supplied constituent field to its existing value still triggers that constituent's change notification when triggerChanged=true.",
+          "scenario": "Given an entity with every constituent of aspect(A,B), A.x=1, and an A change subscriber registered after setup, setting the aspect with {x:1} and triggerChanged=true invokes that subscriber once and leaves A.x equal to 1."
+        },
+        "inequality_guard": {
+          "meaning": "Introduce an inequality guard for aspect setter notifications.",
+          "statement": "Setting a supplied constituent field to its existing value does not trigger that constituent's change notification.",
+          "scenario": "Given an entity with every constituent of aspect(A,B), A.x=1, and an A change subscriber registered after setup, setting the aspect with {x:1} and triggerChanged=true invokes that subscriber zero times and leaves A.x equal to 1."
+        },
+        "unknown": {
+          "meaning": "The sources do not settle notification inheritance."
+        }
+      }
+    },
+    {
+      "id": "metadata-assignment",
+      "case": "immutability",
+      "question": "Should the new aspect's exposed id, traits and schema properties prevent reassignment, following the existing public metadata pattern?",
+      "options": {
+        "protected": {
+          "meaning": "Expose non-reassignable metadata properties.",
+          "statement": "The aspect's id, traits and schema properties cannot be reassigned.",
+          "scenario": "Given a created aspect and saved values of its id, traits and schema, attempts to assign replacement values do not change those property values; assignment may throw in strict mode."
+        },
+        "writable": {
+          "meaning": "Expose reassignable metadata properties.",
+          "statement": "The aspect's id, traits and schema properties can be reassigned.",
+          "scenario": "Given a created aspect, assigning replacement id, traits and schema values succeeds and property reads return the replacements."
+        },
+        "unknown": {
+          "meaning": "The sources do not settle metadata reassignment."
+        }
+      }
+    },
+    {
+      "id": "traits-container",
+      "case": "immutability",
+      "question": "Does the instruction or an established existing contract require protecting the new aspect's exposed traits array against adding, removing or replacing its entries after construction? Decide array mutation separately from property reassignment and nested freezing.",
+      "options": {
+        "protected": {
+          "meaning": "Protect the exposed traits array against structural mutation.",
+          "statement": "The exposed traits array cannot have entries added, removed or replaced after aspect creation.",
+          "scenario": "Given an aspect created from A and B, attempts to push C, remove an entry or replace traits[0] leave the exposed array's contents and order unchanged; mutation may throw."
+        },
+        "mutable": {
+          "meaning": "The exposed traits array permits structural mutation.",
+          "statement": "The exposed traits array allows entries to be added, removed or replaced.",
+          "scenario": "Given an aspect created from A and B, pushing C into its exposed traits array succeeds and changes its length to three."
+        },
+        "unknown": {
+          "meaning": "The sources do not settle traits-array protection."
+        }
+      }
+    },
+    {
+      "id": "schema-container",
+      "case": "immutability",
+      "question": "Does the instruction or an established existing contract require protecting the new aspect's exposed merged schema against adding, removing or replacing its top-level fields? Decide top-level schema mutation separately from nested-value freezing.",
+      "options": {
+        "protected": {
+          "meaning": "Protect the merged schema's top-level fields from mutation.",
+          "statement": "Top-level fields of the exposed merged schema cannot be added, removed or reassigned after aspect creation.",
+          "scenario": "Given an aspect with schema fields x and y, attempts to add schema.z, delete schema.x or replace schema.x leave the exposed schema's top-level fields and values unchanged; mutation may throw."
+        },
+        "mutable": {
+          "meaning": "The merged schema's top-level fields permit mutation.",
+          "statement": "The exposed merged schema permits adding, removing or reassigning fields.",
+          "scenario": "Given an aspect with schema fields x and y, assigning a new schema.z succeeds and the exposed schema contains z."
+        },
+        "unknown": {
+          "meaning": "The sources do not settle top-level schema protection."
+        }
+      }
+    },
+    {
+      "id": "nested-freezing",
+      "case": "immutability",
+      "question": "Should creating an aspect recursively freeze nested schema values, or preserve the existing nested values without recursively freezing them? Distinguish recursive freezing from shallow container protection.",
+      "options": {
+        "preserve_nested": {
+          "meaning": "Preserve nested schema references without recursive freezing.",
+          "statement": "Aspect creation retains nested schema value references and does not recursively freeze those values.",
+          "scenario": "Given a constituent schema field whose value is a mutable object N, creating an aspect leaves that merged schema field equal to N by identity and does not freeze N."
+        },
+        "recursive": {
+          "meaning": "Recursively freeze nested schema values at aspect creation.",
+          "statement": "Aspect creation recursively freezes nested schema values.",
+          "scenario": "Given a constituent schema field whose value is a mutable object N, creating an aspect makes the corresponding nested schema value frozen."
+        },
+        "unknown": {
+          "meaning": "The sources do not settle recursive schema freezing."
+        }
+      }
+    }
+  ],
+  "specs_sha256": "4fd43e274c37f0f3305955fe6270bbbeaa535c11d47e6bfebae10c9874f1c521",
+  "boundary": "Original instruction/code only. No oracle/patches in classification.",
+  "limitation": "Manual questions, choices and renderings; known development task."
+}

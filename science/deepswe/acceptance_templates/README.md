@@ -1,5 +1,10 @@
 # Acceptance criteria template experiment
 
+The [direct-rendering experiment](runs/deterministic-decisions-v1/README.md)
+removes contract synthesis, preserves selected meanings, and explicitly asks
+about inherited behavior. Three focused statements match the solution; metadata
+container protection and nested freezing remain unresolved.
+
 The [narrow-question experiment](runs/narrow-questions-v1/README.md) compares
 direct analysis, fact/scope decomposition, and concrete observations with
 independent Flash/Jev choices on three known Koota failures. Two target choices

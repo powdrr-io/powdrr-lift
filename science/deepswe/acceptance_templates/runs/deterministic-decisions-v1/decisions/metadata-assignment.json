@@ -1,0 +1,50 @@
+{
+  "id": "metadata-assignment",
+  "flash": {
+    "choice": "protected"
+  },
+  "jev": {
+    "choice": "protected"
+  },
+  "provenance": {
+    "type": "independent_choices"
+  },
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.954,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "independent-choice",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.218,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "scenario-preservation",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.183,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ],
+  "status": "rendered",
+  "statement": "The aspect's id, traits and schema properties cannot be reassigned.",
+  "scenario": "Given a created aspect and saved values of its id, traits and schema, attempts to assign replacement values do not change those property values; assignment may throw in strict mode.",
+  "scenario_review": {
+    "verdict": "preserved"
+  }
+}

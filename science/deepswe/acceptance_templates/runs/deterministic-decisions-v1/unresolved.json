@@ -1,0 +1,116 @@
+{
+  "decisions": [
+    {
+      "id": "traits-container",
+      "flash": {
+        "choice": "unknown"
+      },
+      "jev": {
+        "choice": "unknown"
+      },
+      "provenance": {
+        "type": "independent_choices"
+      },
+      "calls": [
+        {
+          "stage": "choose",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 2.659,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": true
+        },
+        {
+          "stage": "independent-choice",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 0.195,
+          "provider": "typesafe.ai",
+          "model": "jev-latest",
+          "usage": {},
+          "cached": true
+        }
+      ],
+      "status": "unresolved",
+      "statement": null,
+      "scenario": null
+    },
+    {
+      "id": "schema-container",
+      "flash": {
+        "choice": "unknown"
+      },
+      "jev": {
+        "choice": "unknown"
+      },
+      "provenance": {
+        "type": "independent_choices"
+      },
+      "calls": [
+        {
+          "stage": "choose",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 0.968,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": true
+        },
+        {
+          "stage": "independent-choice",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 0.265,
+          "provider": "typesafe.ai",
+          "model": "jev-latest",
+          "usage": {},
+          "cached": true
+        }
+      ],
+      "status": "unresolved",
+      "statement": null,
+      "scenario": null
+    },
+    {
+      "id": "nested-freezing",
+      "flash": {
+        "choice": "unknown"
+      },
+      "jev": {
+        "choice": "unknown"
+      },
+      "provenance": {
+        "type": "independent_choices"
+      },
+      "calls": [
+        {
+          "stage": "choose",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 0.961,
+          "provider": "deepinfra",
+          "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+          "usage": {},
+          "cached": true
+        },
+        {
+          "stage": "independent-choice",
+          "attempt": 0,
+          "status": "completed",
+          "elapsed_seconds": 0.214,
+          "provider": "typesafe.ai",
+          "model": "jev-latest",
+          "usage": {},
+          "cached": true
+        }
+      ],
+      "status": "unresolved",
+      "statement": null,
+      "scenario": null
+    }
+  ],
+  "original_requirement_retained": "Each aspect exposes `id`, `traits`, and `schema`."
+}

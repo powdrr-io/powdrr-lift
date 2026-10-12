@@ -184,6 +184,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 )
 from powdrr_lift.workrr.credential_check import (
     check_coding_executable,
+    check_jev_access,
     check_model_access,
     configured_model_mapping,
 )
@@ -296,9 +297,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     credentials_parser = subparsers.add_parser(
         "check-credentials",
-        help="Check configured planning and coding model access before a run.",
+        help=(
+            "Check configured planning and coding model access, plus GitHub "
+            "repository write access, before a run."
+        ),
     )
-    credentials_parser.add_argument("--repo-root", type=Path)
+    credentials_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Git repository root (defaults to the current Git repository).",
+    )
     credentials_parser.add_argument(
         "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
     )
@@ -316,7 +324,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     credentials_parser.add_argument("--opencode-executable", default="opencode")
     credentials_parser.add_argument("--minisweagent-executable", default="mini")
-    credentials_parser.add_argument("--open-pr", action="store_true")
     credentials_parser.add_argument("--json", action="store_true")
     credentials_parser.set_defaults(func=_run_check_credentials)
 
@@ -434,7 +441,11 @@ def build_parser() -> argparse.ArgumentParser:
         "bootstrap",
         help="Create a validated project context snapshot in an agent worktree.",
     )
-    bootstrap_parser.add_argument("--repo-root", type=Path)
+    bootstrap_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Git repository root (defaults to the current Git repository).",
+    )
     bootstrap_parser.add_argument("--work-item-name", default="repository-bootstrap")
     bootstrap_parser.add_argument("--base-ref", default="HEAD")
     bootstrap_parser.add_argument("--base-branch")
@@ -451,7 +462,19 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         default=Path("software_development_entity_taxonomy.md"),
     )
-    bootstrap_parser.add_argument("--open-pr", action="store_true")
+    bootstrap_parser.add_argument(
+        "--open-pr",
+        dest="open_pr",
+        action="store_true",
+        default=True,
+        help="Open a pull request for the bootstrap branch (default).",
+    )
+    bootstrap_parser.add_argument(
+        "--no-open-pr",
+        dest="open_pr",
+        action="store_false",
+        help="Keep the bootstrap branch local instead of opening a pull request.",
+    )
     bootstrap_parser.add_argument("--json", action="store_true")
     bootstrap_parser.set_defaults(func=_run_bootstrap)
 
@@ -459,7 +482,11 @@ def build_parser() -> argparse.ArgumentParser:
         "implement",
         help="Implement a feature headlessly in an isolated agent worktree.",
     )
-    implement_parser.add_argument("--repo-root", type=Path)
+    implement_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Git repository root (defaults to the current Git repository).",
+    )
     feature_input = implement_parser.add_mutually_exclusive_group(required=True)
     feature_input.add_argument("--request-file", type=Path)
     feature_input.add_argument("--feature-description")
@@ -3387,56 +3414,56 @@ def _run_check_credentials(args: argparse.Namespace) -> int:
         else args.minisweagent_executable
     )
     results.append(check_coding_executable(executable, role="coding-agent").to_data())
+    results.append(check_jev_access().to_data())
 
-    if args.open_pr:
-        github_result: dict[str, str] = {
-            "role": "github-publication",
-            "provider": "gh",
-            "model": "GitHub CLI and repository permissions",
-            "status": "unavailable",
-        }
-        try:
-            auth = subprocess.run(
-                ["gh", "auth", "status"],
+    github_result: dict[str, str] = {
+        "role": "github-access",
+        "provider": "gh",
+        "model": "GitHub CLI and repository permissions",
+        "status": "unavailable",
+    }
+    try:
+        auth = subprocess.run(
+            ["gh", "auth", "status"],
+            cwd=repo_root,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        if auth.returncode == 0:
+            repository = subprocess.run(
+                ["gh", "repo", "view", "--json", "nameWithOwner,viewerPermission"],
                 cwd=repo_root,
                 text=True,
                 capture_output=True,
                 check=False,
                 timeout=10,
             )
-            if auth.returncode == 0:
-                repository = subprocess.run(
-                    ["gh", "repo", "view", "--json", "nameWithOwner,viewerPermission"],
-                    cwd=repo_root,
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                    timeout=10,
+            if repository.returncode == 0:
+                details = json.loads(repository.stdout)
+                permission = details.get("viewerPermission")
+                github_result.update(
+                    status=(
+                        "passed"
+                        if permission in {"WRITE", "MAINTAIN", "ADMIN"}
+                        else "insufficient_repository_permission"
+                    ),
+                    repository=details.get("nameWithOwner", "unknown"),
+                    permission=str(permission or "unknown"),
                 )
-                if repository.returncode == 0:
-                    details = json.loads(repository.stdout)
-                    permission = details.get("viewerPermission")
-                    github_result.update(
-                        status=(
-                            "passed"
-                            if permission in {"WRITE", "MAINTAIN", "ADMIN"}
-                            else "insufficient_repository_permission"
-                        ),
-                        repository=details.get("nameWithOwner", "unknown"),
-                        permission=str(permission or "unknown"),
-                    )
-                else:
-                    github_result["message"] = (
-                        repository.stderr.strip()[-500:]
-                        or "Could not identify the GitHub repository."
-                    )
             else:
                 github_result["message"] = (
-                    auth.stderr.strip()[-500:] or "GitHub authentication failed."
+                    repository.stderr.strip()[-500:]
+                    or "Could not identify the GitHub repository."
                 )
-        except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
-            github_result["message"] = str(error)[:500]
-        results.append(github_result)
+        else:
+            github_result["message"] = (
+                auth.stderr.strip()[-500:] or "GitHub authentication failed."
+            )
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
+        github_result["message"] = str(error)[:500]
+    results.append(github_result)
 
     success = all(item["status"] == "passed" for item in results)
     report = {"passed": success, "checks": results}

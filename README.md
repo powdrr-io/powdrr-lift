@@ -1,3 +1,5 @@
+<sub>[Skip the marketing and get to work](GETTING_STARTED.md)</sub>
+
 # Stop Babysitting Agents. Start Writing Software
 
 Powdrr gives you an agent you can trust with real engineering work. It is high-integrity

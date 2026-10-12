@@ -1,0 +1,74 @@
+{
+  "case": "immutability",
+  "question": {
+    "question": "In the original createQuery implementation, does Object.freeze on queryRef prevent mutation of the referenced parameters array itself?",
+    "options": {
+      "reference_only": "No: queryRef properties cannot be reassigned, but the referenced array is not frozen by this call.",
+      "recursive": "Yes: freezing queryRef recursively freezes its parameters array.",
+      "unknown": "The supplied code does not allow this question to be answered."
+    }
+  },
+  "observation": {
+    "choice": "reference_only",
+    "reason": "Object.freeze only makes the object's own properties non-writable; it does not deep-freeze nested objects like the parameters array."
+  },
+  "independent_jev": {
+    "choice": "reference_only"
+  },
+  "agreement": true,
+  "resolved": {
+    "answer": "Aspect metadata should be read-only at the property level, but the underlying containers and nested values remain mutable unless explicitly frozen. Specifically:\n\n1. **Property reassignment**: The `id`, `traits`, and `schema` properties should be non-writable and non-configurable (like the existing `Trait` and `Query` implementations use `Object.defineProperty` or `Object.freeze`). Attempting to reassign these properties should fail in strict mode or silently no-op in sloppy mode.\n\n2. **Container mutation**: The `traits` array itself is not frozen by the property-level protection. Callers can still call `push`, `pop`, `splice`, or reassign indices on the array. This is consistent with the existing `Query` implementation where `Object.freeze` on the query object does not freeze the referenced `parameters` array.\n\n3. **Nested-value mutation**: Individual trait objects within the `traits` array remain fully mutable. Their `id` and `schema` properties are protected by their own definitions, but any other properties or nested structures within those traits are mutable.\n\n**Proposed default**: If the intent is to prevent accidental modification of the aspect's constituent list, consider freezing the `traits` array itself (e.g., `Object.freeze(traits)`) at creation time. However, this is not required by the existing patterns and should be a deliberate design choice. The `schema` object should also be frozen if it is meant to be immutable, following the `tagSchema` pattern already used in the codebase.\n\n**Key distinction**: The existing code demonstrates that property-level immutability (via `Object.defineProperty` or `Object.freeze`) does not extend to referenced objects. The aspect implementation should follow this same pattern unless there is an explicit requirement for deep immutability.",
+    "basis": "inherited",
+    "evidence_ids": [
+      "code1",
+      "code2",
+      "code3",
+      "code4"
+    ],
+    "transfer_reason": "The existing Trait and Query implementations establish the pattern: public properties are made read-only via Object.defineProperty or Object.freeze, but referenced containers (like the parameters array in Query) are not recursively frozen. The observation confirms this is reference-only freezing, not deep freezing.",
+    "unresolved": "Whether the traits array should be frozen is not specified in the sources. The instruction only says 'exposes id, traits, and schema' without specifying mutability semantics for the array contents."
+  },
+  "resolved_verdict": "supported",
+  "calls": [
+    {
+      "stage": "observation",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.329,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "resolve",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 9.74,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "independent-observation",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.242,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "resolved-check",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.202,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

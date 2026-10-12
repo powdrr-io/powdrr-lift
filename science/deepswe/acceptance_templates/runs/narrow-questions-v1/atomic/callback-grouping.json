@@ -1,0 +1,74 @@
+{
+  "case": "callback-grouping",
+  "question": {
+    "question": "Does the instruction's nested-aspect flattening rule require replacing readEach's merged aspect data object with separate constituent objects?",
+    "options": {
+      "merged": "No: flattening identifies constituents; readEach still delivers merged aspect data.",
+      "expanded": "Yes: each constituent must occupy a separate callback data slot.",
+      "unknown": "The instruction does not distinguish merged from separate constituent data."
+    }
+  },
+  "observation": {
+    "choice": "merged",
+    "reason": "Flattening only affects how aspects are decomposed into traits; readEach's merged data object remains consistent with the instruction's description of delivering a merged data object."
+  },
+  "independent_jev": {
+    "choice": "merged"
+  },
+  "agreement": true,
+  "resolved": {
+    "answer": "merged",
+    "basis": "explicit",
+    "evidence_ids": [
+      "instruction",
+      "code1",
+      "code2",
+      "code3"
+    ],
+    "transfer_reason": "The instruction explicitly states that `readEach` delivers a merged data object, and the nested-aspect flattening rule only affects how aspects are decomposed into constituent traits, not the shape of the callback state. The code confirms that `readEach` creates a single state array with one slot per trait (not per aspect), and `getQueryStores` flattens nested aspects into their individual traits, so the callback receives a merged object of all constituent fields. The observation correctly identifies that flattening does not require separate constituent objects in the callback.",
+    "unresolved": "none"
+  },
+  "resolved_verdict": "supported",
+  "calls": [
+    {
+      "stage": "observation",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.944,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "resolve",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 6.1,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "independent-observation",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.229,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "resolved-check",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.262,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "case": "set-notifications",
+  "question": {
+    "question": "In original setTraitForTrait, if ctx.set returns normally after an equal-value write and triggerChanged is true, is setChanged called?",
+    "options": {
+      "called": "Yes: the call is guarded by triggerChanged, not value inequality.",
+      "suppressed": "No: equal values suppress setChanged.",
+      "unknown": "The supplied function does not establish whether setChanged is called."
+    }
+  },
+  "observation": {
+    "choice": "called",
+    "reason": "The code shows `triggerChanged && setChanged(...)` — the call depends only on the `triggerChanged` flag, not on whether the value changed."
+  },
+  "independent_jev": {
+    "choice": "called"
+  },
+  "agreement": true,
+  "resolved": {
+    "answer": "Yes",
+    "basis": "inherited",
+    "evidence_ids": [
+      "code2"
+    ],
+    "transfer_reason": "The original `setTraitForTrait` calls `setChanged` whenever `triggerChanged` is true, regardless of whether the value is equal. The aspect `set` operation distributes to constituent traits and triggers per-trait change detection, so it inherits this behavior: an equal-value write with `triggerChanged=true` still notifies.",
+    "unresolved": "The sources do not specify whether aspect-level `set` passes `triggerChanged=true` for all writes or only for actual changes; the default is inherited from the underlying trait setter."
+  },
+  "resolved_verdict": "supported",
+  "calls": [
+    {
+      "stage": "observation",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.662,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "resolve",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 4.326,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "independent-observation",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.249,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "resolved-check",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.187,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    }
+  ]
+}

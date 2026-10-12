@@ -1,0 +1,5 @@
+{
+  "case": "set-notifications",
+  "error_type": "RuntimeError",
+  "detail": "decompose-shape-repair exhausted its recorded repair budget; see /Users/gregory/.codex/worktrees/f86b/powdrr-lift/science/deepswe/acceptance_templates/runs/narrow-questions-v1/calls/set-notifications/flash/decompose-shape-repair-0.json"
+}

@@ -1,0 +1,30 @@
+{
+  "questions": {
+    "immutability": {
+      "question": "In the original createQuery implementation, does Object.freeze on queryRef prevent mutation of the referenced parameters array itself?",
+      "options": {
+        "reference_only": "No: queryRef properties cannot be reassigned, but the referenced array is not frozen by this call.",
+        "recursive": "Yes: freezing queryRef recursively freezes its parameters array.",
+        "unknown": "The supplied code does not allow this question to be answered."
+      }
+    },
+    "callback-grouping": {
+      "question": "Does the instruction's nested-aspect flattening rule require replacing readEach's merged aspect data object with separate constituent objects?",
+      "options": {
+        "merged": "No: flattening identifies constituents; readEach still delivers merged aspect data.",
+        "expanded": "Yes: each constituent must occupy a separate callback data slot.",
+        "unknown": "The instruction does not distinguish merged from separate constituent data."
+      }
+    },
+    "set-notifications": {
+      "question": "In original setTraitForTrait, if ctx.set returns normally after an equal-value write and triggerChanged is true, is setChanged called?",
+      "options": {
+        "called": "Yes: the call is guarded by triggerChanged, not value inequality.",
+        "suppressed": "No: equal values suppress setChanged.",
+        "unknown": "The supplied function does not establish whether setChanged is called."
+      }
+    }
+  },
+  "limitation": "Development refinement after reading first-arm failures; not a holdout.",
+  "boundary": "Same original sources; no solution, tests, or target labels in requests."
+}

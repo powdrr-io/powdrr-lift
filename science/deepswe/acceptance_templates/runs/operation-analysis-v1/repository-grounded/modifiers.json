@@ -1,0 +1,141 @@
+{
+  "objective": "Analyze the supplied routed product requirements into implementation decisions that remove ambiguity for a coding agent.",
+  "decisions": [
+    {
+      "operation": "Not",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/not.ts",
+          "quote": "export const Not = <T extends Trait[] = Trait[]>(...traits: T): Modifier<T, 'not'> => { return createModifier('not', 1, traits); };"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly states 'Not with an aspect matches entities missing at least one constituent', and the existing `Not` modifier accepts a list of traits, so passing an aspect's traits to `Not` yields the required behavior.",
+      "raw_source_ids": [
+        "r019"
+      ],
+      "rejected_evidence": [],
+      "rule": "The `Not` modifier, when given an aspect, matches an entity if and only if the entity lacks at least one of the aspect's constituent traits.",
+      "id": "a001"
+    },
+    {
+      "operation": "Or",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction says 'Aspects compose with all query modifiers', and the existing `Or` modifier accepts traits, so passing an aspect's traits to `Or` yields the standard OR semantics.",
+      "raw_source_ids": [
+        "r018"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/or.ts",
+          "quote": "export const Or = <T extends OrParameter[]>(...params: T): OrModifier<T> => { ... }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "The `Or` modifier, when given an aspect, matches an entity if and only if the entity has at least one of the aspect's constituent traits.",
+      "id": "a002"
+    },
+    {
+      "operation": "Changed",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction states 'Changed matches when any constituent data changed', and the existing `Changed` modifier tracks changes per trait, so passing an aspect's traits to `Changed` yields the required behavior.",
+      "raw_source_ids": [
+        "r020"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/changed.ts",
+          "quote": "return <T extends TraitOrRelation[]>(\n        ...inputs: T\n    ): Modifier<ExtractTraits<T>, `changed-${number}`> => { ... }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "The `Changed` modifier, when given an aspect, matches an entity if and only if at least one of the aspect's constituent traits has changed while the entity still has all constituents.",
+      "id": "a003"
+    },
+    {
+      "operation": "Added",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction states 'Added matches the transition to all-present', and the existing `Added` modifier tracks additions per trait, so passing an aspect's traits to `Added` yields the required behavior.",
+      "raw_source_ids": [
+        "r021"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/added.ts",
+          "quote": "return <T extends TraitOrRelation[]>(\n        ...inputs: T\n    ): Modifier<ExtractTraits<T>, `added-${number}`> => { ... }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "The `Added` modifier, when given an aspect, matches an entity if and only if the entity transitions from having at least one missing constituent to having all constituents.",
+      "id": "a004"
+    },
+    {
+      "operation": "Removed",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction states 'Removed matches the transition from all-present', and the existing `Removed` modifier tracks removals per trait, so passing an aspect's traits to `Removed` yields the required behavior.",
+      "raw_source_ids": [
+        "r022"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/removed.ts",
+          "quote": "return <T extends TraitOrRelation[]>(\n        ...inputs: T\n    ): Modifier<ExtractTraits<T>, `removed-${number}`> => { ... }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "The `Removed` modifier, when given an aspect, matches an entity if and only if the entity transitions from having all constituents to having at least one missing constituent.",
+      "id": "a005"
+    },
+    {
+      "operation": "modifier composition and tracking",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction requires aspects to compose with all query modifiers, and the existing query engine already handles modifiers by expanding their traits into required/forbidden/or lists and tracking groups, so passing an aspect's traits to these modifiers integrates with the existing composition logic.",
+      "raw_source_ids": [
+        "r015",
+        "r018",
+        "r019",
+        "r020",
+        "r021",
+        "r022"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/query/query.ts",
+          "quote": "if (parameter.type === 'not') {\n                query.traitInstances.forbidden.push(\n                    ...traits.map((t) => getTraitInstance(ctx.traitInstances, t)!)\n                );\n            } else if (parameter.type === 'or') { ... } else if (isTrackingModifier(parameter)) {\n                // Top-level tracking modifiers use AND logic\n                processTrackingModifier(world, query, parameter, 'and', ctx, trackingGroupsMap);\n            }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "When an aspect is used as a query parameter, the query requires all constituent traits, and when an aspect is used inside `Not`, `Or`, `Changed`, `Added`, or `Removed`, the modifier's trait list is the aspect's constituent traits, and tracking groups are created per modifier with AND logic for top-level tracking modifiers and OR logic for nested tracking modifiers inside `Or`.",
+      "id": "a006"
+    }
+  ]
+}

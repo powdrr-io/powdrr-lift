@@ -1,0 +1,112 @@
+{
+  "objective": "Analyze the supplied routed product requirements into implementation decisions that remove ambiguity for a coding agent.",
+  "decisions": [
+    {
+      "operation": "has",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly states `has` returns true when the entity has every constituent trait, so the operation must check all constituents and return true only if all are present.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "export function hasTrait(world: World, entity: Entity, trait: Trait): boolean { ... return (mask & bitflag) === bitflag; }",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "`has` returns true only when the entity has every constituent trait of the aspect, and false otherwise.",
+      "id": "a001"
+    },
+    {
+      "operation": "get",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction specifies a merged object of all constituent fields, and the existing get function returns a fresh object per call, so the merged result must be a new object to avoid aliasing.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/storage/accessors.ts",
+          "quote": "const get = new Function('index', 'store', ` return ${objectLiteral}; `);",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "`get` returns a new merged object containing all fields from all constituent traits when the entity has every constituent, and returns undefined if any constituent is missing.",
+      "id": "a002"
+    },
+    {
+      "operation": "set",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "ctx.set(index, store, value); triggerChanged && setChanged(world, entity, trait);"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction requires distributing each field to its owning constituent and triggering per-trait change detection, so each constituent's set must be called with its own fields and change detection must be triggered for each constituent that receives a write.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "`set` accepts a merged object of fields, writes each field to its owning constituent's store, and triggers per-trait change detection for each constituent that had a field written.",
+      "id": "a003"
+    },
+    {
+      "operation": "add",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "const data = addTraitToEntity(world, entity, trait); if (!data) continue; // Already had the trait"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction says add only the constituents the entity does not already have, and the existing addTrait skips already-present traits, so the aspect add must follow the same skip behavior and only initialize newly added constituents.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "`add` adds only the constituent traits the entity does not already have, initializing each newly added constituent with the values from the provided merged object for its fields, and leaves already-present constituents unchanged.",
+      "id": "a004"
+    },
+    {
+      "operation": "remove",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "if (!hasTrait(world, entity, trait)) continue;"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction says remove removes all constituent traits, and the existing removeTrait skips traits the entity does not have, so the aspect remove must iterate all constituents and remove each one that is present.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "`remove` removes all constituent traits from the entity, regardless of whether the entity currently has them, and does nothing for constituents that are already absent.",
+      "id": "a005"
+    }
+  ]
+}

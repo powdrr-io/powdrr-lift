@@ -1,0 +1,125 @@
+{
+  "objective": "Analyze the supplied routed product requirements into implementation decisions that remove ambiguity for a coding agent.",
+  "decisions": [
+    {
+      "operation": "onAdd",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "for (const sub of data.addSubscriptions) sub(entity);"
+        }
+      ],
+      "alternatives": [
+        "Could fire on every constituent add while incomplete, but instruction specifies transition to complete.",
+        "Could pass constituent trait or merged data, but existing trait onAdd passes only entity."
+      ],
+      "rationale": "The instruction explicitly defines onAdd as firing on the transition to all-present, and the existing trait add subscription pattern passes only the entity, which is inherited for consistency.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The aspect's onAdd subscription fires exactly once when an entity transitions from having at least one but not all constituent traits to having all constituent traits, and the callback receives the entity as its sole argument.",
+      "id": "a001"
+    },
+    {
+      "operation": "onRemove",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "for (const sub of instance.removeSubscriptions) sub(entity);"
+        }
+      ],
+      "alternatives": [
+        "Could fire on every constituent removal while complete, but instruction specifies transition from all-present.",
+        "Could pass removed trait or merged data, but existing trait remove subscription passes only entity."
+      ],
+      "rationale": "The instruction explicitly defines onRemove as firing on the reverse transition, and the existing trait remove subscription pattern passes only the entity, which is inherited for consistency.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The aspect's onRemove subscription fires exactly once when an entity transitions from having all constituent traits to having at least one but not all, and the callback receives the entity as its sole argument.",
+      "id": "a002"
+    },
+    {
+      "operation": "onChange",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/query/modifiers/changed.ts",
+          "quote": "for (const sub of data.changeSubscriptions) sub(entity);"
+        }
+      ],
+      "alternatives": [
+        "Could fire even when incomplete, but instruction requires all present.",
+        "Could pass changed trait or merged data, but existing trait change subscription passes only entity."
+      ],
+      "rationale": "The instruction explicitly requires all constituents present for onChange, and the existing trait change subscription pattern passes only the entity, which is inherited for consistency.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The aspect's onChange subscription fires whenever any constituent trait's data changes while the entity has all constituent traits, and the callback receives the entity as its sole argument.",
+      "id": "a003"
+    },
+    {
+      "operation": "unsubscribe",
+      "basis": "repository",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/world/world.ts",
+          "quote": "return () => data.addSubscriptions.delete(resolvedCallback);"
+        }
+      ],
+      "alternatives": [
+        "Could return a shared unsubscribe that removes all callbacks, but existing pattern returns per-callback unsubscriber.",
+        "Could require an identifier, but existing pattern uses closure over callback."
+      ],
+      "rationale": "The existing world.onAdd/onRemove/onChange all return a closure that deletes the specific callback from the subscription set, and the aspect should inherit this pattern for consistency.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "Each of onAdd, onRemove, and onChange returns an unsubscribe function that, when called, removes the specific callback from the aspect's subscription set, and subsequent calls are no-ops.",
+      "id": "a004"
+    },
+    {
+      "operation": "world reset",
+      "basis": "repository",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/world/world.ts",
+          "quote": "clearTraitInstance(ctx.traitInstances);\n            world.traits.clear();"
+        }
+      ],
+      "alternatives": [
+        "Could preserve subscriptions across reset, but existing reset clears all trait instances and subscriptions.",
+        "Could require re-subscription, but existing pattern clears all state."
+      ],
+      "rationale": "The existing world.reset clears all trait instances and subscriptions, so aspect subscriptions must be cleared as well to avoid stale callbacks.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "When the world is reset, all aspect subscriptions are cleared and no further callbacks fire for entities created after the reset, and the aspect's constituent traits are re-registered as needed.",
+      "id": "a005"
+    }
+  ]
+}

@@ -1,0 +1,281 @@
+{
+  "objective": "Implement createAspect and aspect operations in koota core.",
+  "decisions": [
+    {
+      "operation": "createAspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires createAspect to accept two or more traits and return an aspect. This is a new API not present in the repository, so the behavior is defined by the instruction alone.",
+      "id": "a001"
+    },
+    {
+      "operation": "createAspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires overlapping field names between constituents to throw at creation time. This is a validation rule for the new API.",
+      "id": "a002"
+    },
+    {
+      "operation": "createAspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires relation constituents to throw at creation time. This is a validation rule for the new API.",
+      "id": "a003"
+    },
+    {
+      "operation": "createAspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly allows tag traits as constituents. Tag traits have no fields, so they do not conflict with other constituents.",
+      "id": "a004"
+    },
+    {
+      "operation": "createAspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires nested aspects to flatten to their individual traits. This means when an aspect is passed as a constituent, its traits are extracted and included individually.",
+      "id": "a005"
+    },
+    {
+      "operation": "createAspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires each aspect to expose id, traits, and schema. The id must be unique per aspect instance, traits is the list of constituent traits, and schema is the merged schema of all constituents.",
+      "id": "a006"
+    },
+    {
+      "operation": "createAspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s006"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires each createAspect call to return a distinct instance. This means no caching or deduplication of aspects; each call creates a new object with a new id.",
+      "id": "a007"
+    },
+    {
+      "operation": "has",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires has to return true when the entity has every constituent trait. This is a logical AND over all constituent traits.",
+      "id": "a008"
+    },
+    {
+      "operation": "get",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires get to return a merged object of all constituent fields, or undefined if any constituent is missing. The merged object is a new object combining the data from each constituent trait.",
+      "id": "a009"
+    },
+    {
+      "operation": "set",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires set to distribute each field to its owning constituent and trigger per-trait change detection. This means for each field in the input object, find the constituent trait that owns that field and call setTrait on that trait with the field value. Change detection is triggered for each constituent that is set.",
+      "id": "a010"
+    },
+    {
+      "operation": "add",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires add to add only the constituents the entity does not already have, distributing initial values by field. This means for each constituent trait, if the entity does not have it, add it with the provided initial values (or defaults if not provided).",
+      "id": "a011"
+    },
+    {
+      "operation": "remove",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires remove to remove all constituent traits. This is a simple loop over all constituent traits calling removeTrait.",
+      "id": "a012"
+    },
+    {
+      "operation": "query parameter",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires an aspect used as a query parameter to require all its constituents. This means the aspect should be expanded into its constituent traits when used in a query, and the query will match entities that have all of them.",
+      "id": "a013"
+    },
+    {
+      "operation": "readEach",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires readEach to deliver a merged data object. This means when an aspect is used in a query, the readEach callback receives a single object that merges the data from all constituent traits, rather than an array of separate trait data.",
+      "id": "a014"
+    },
+    {
+      "operation": "updateEach",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires updateEach to distribute writes back to constituent stores. This means when the callback modifies the merged data object, the changes are written back to the individual constituent traits, triggering change detection per trait.",
+      "id": "a015"
+    },
+    {
+      "operation": "query modifiers",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires aspects to compose with all query modifiers. This means aspects can be used inside Not, Changed, Added, Removed, Or, etc., and the aspect is expanded to its constituent traits for the modifier.",
+      "id": "a016"
+    },
+    {
+      "operation": "Not with aspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires Not with an aspect to match entities missing at least one constituent. This is the logical negation of the aspect's requirement: an entity matches if it does not have all constituents.",
+      "id": "a017"
+    },
+    {
+      "operation": "Changed with aspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires Changed to match when any constituent data changed. This means the Changed modifier should be applied to each constituent trait, and the entity matches if any of them changed.",
+      "id": "a018"
+    },
+    {
+      "operation": "Added with aspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires Added to match the transition to all-present. This means the entity must have all constituents now and not have had all of them before.",
+      "id": "a019"
+    },
+    {
+      "operation": "Removed with aspect",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires Removed to match the transition from all-present. This means the entity had all constituents before and now does not have all of them.",
+      "id": "a020"
+    },
+    {
+      "operation": "onAdd",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires onAdd to fire when an entity transitions from incomplete to complete. This means the callback is invoked when the entity gains the last missing constituent trait, making it have all constituents.",
+      "id": "a021"
+    },
+    {
+      "operation": "onRemove",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires onRemove to fire on the reverse transition, from complete to incomplete. This means the callback is invoked when the entity loses one of its constituent traits, so it no longer has all of them.",
+      "id": "a022"
+    },
+    {
+      "operation": "onChange",
+      "rule": "instruction",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires onChange to fire when any constituent changes while all are present. This means the callback is invoked when any constituent trait's data changes, but only if the entity currently has all constituents.",
+      "id": "a023"
+    }
+  ]
+}

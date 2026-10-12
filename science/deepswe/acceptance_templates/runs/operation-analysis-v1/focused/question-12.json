@@ -1,0 +1,23 @@
+{
+  "id": "f012",
+  "operation": "public metadata",
+  "rule": "Aspect's `id`, `traits`, and `schema` properties should be read-only (non-writable, non-configurable) via `Object.defineProperty`, the `traits` array should be frozen with `Object.freeze` to prevent mutation, and the `schema` object should be deeply frozen to prevent any nested value changes.",
+  "question": "What public type and mutability contract should aspect id, traits and schema have? Distinguish readonly property assignment, top-level container freezing and nested value freezing.",
+  "group": "construction",
+  "source_ids": [],
+  "basis": "repository",
+  "evidence": [
+    {
+      "file": "packages/core/src/trait/trait.ts",
+      "quote": "const tagSchema = Object.freeze({});"
+    }
+  ],
+  "alternatives": [],
+  "rationale": "The existing trait implementation uses non-writable, non-configurable properties for `id` and `schema`, and freezes the tag schema. Aspects should follow the same pattern: read-only properties, frozen top-level containers, and deep freezing of schema to prevent mutation of nested values.",
+  "rejected_evidence": [
+    {
+      "file": "packages/core/src/trait/trait.ts",
+      "quote": "Object.defineProperty(Trait, 'id', { value: id, writable: false, enumerable: true, configurable: false }); Object.defineProperty(Trait, 'schema', { value: schema, writable: false, enumerable: true, configurable: false });"
+    }
+  ]
+}

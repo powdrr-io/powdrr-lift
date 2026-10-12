@@ -1,0 +1,113 @@
+{
+  "objective": "Resolve behavioral decisions for the aspect operations has, get, set, add, and remove.",
+  "decisions": [
+    {
+      "operation": "has",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`has` returns true when the entity has every constituent trait."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly defines the condition for true; the false case is the logical complement.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "Returns true if and only if the entity currently has every constituent trait of the aspect; otherwise returns false.",
+      "id": "a001"
+    },
+    {
+      "operation": "get",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`get` returns a merged object of all constituent fields, or undefined if any constituent is missing."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction specifies the merged object and the undefined case; a new object is implied to avoid exposing internal references.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "Returns a new object merging the current data of all constituent traits when the entity has every constituent; otherwise returns undefined.",
+      "id": "a002"
+    },
+    {
+      "operation": "set",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`set` distributes each field to its owning constituent and triggers per-trait change detection."
+        }
+      ],
+      "alternatives": [
+        "Throw an error when a constituent is missing",
+        "Silently ignore missing constituents and write only to present ones"
+      ],
+      "rationale": "The instruction does not specify behavior for missing constituents; the chosen default aligns with the aspect's all-or-nothing semantics and avoids partial writes.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "For each field in the provided data, writes that field to the constituent trait that owns it, and triggers change detection for each constituent whose data actually changed; if the entity lacks any constituent, the operation has no effect.",
+      "id": "a003"
+    },
+    {
+      "operation": "add",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`add` adds only the constituents the entity does not already have, distributing initial values by field."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly defines the selective addition and field distribution.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "Adds only the constituent traits that the entity does not already have, initializing each added trait's fields from the provided data; traits already present are left unchanged.",
+      "id": "a004"
+    },
+    {
+      "operation": "remove",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`remove` removes all constituent traits."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction states removal of all constituents without qualification.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "Removes all constituent traits from the entity, regardless of which constituents are currently present.",
+      "id": "a005"
+    }
+  ]
+}

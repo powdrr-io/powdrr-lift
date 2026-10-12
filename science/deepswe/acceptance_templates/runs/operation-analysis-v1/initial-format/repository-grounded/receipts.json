@@ -1,0 +1,12 @@
+[
+  {
+    "stage": "decisions",
+    "attempt": 0,
+    "status": "completed",
+    "elapsed_seconds": 39.298,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": false
+  }
+]

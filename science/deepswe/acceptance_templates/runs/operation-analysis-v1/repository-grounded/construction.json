@@ -1,0 +1,87 @@
+{
+  "objective": "Analyze the supplied routed product requirements into implementation decisions that remove ambiguity for a coding agent.",
+  "decisions": [
+    {
+      "operation": "createAspect",
+      "basis": "instruction",
+      "source_ids": [
+        "s002",
+        "s006"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "const id = traitId++;"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires two or more traits, throws on overlapping fields and relations, flattens nested aspects, exposes id/traits/schema, and distinct instances per call. The id can be generated similarly to trait ids.",
+      "raw_source_ids": [
+        "s002",
+        "s006"
+      ],
+      "rejected_evidence": [],
+      "rule": "createAspect accepts two or more traits (or nested aspects) and returns a new aspect object with a unique id, a flattened list of constituent traits, and a merged schema, throwing an error if any constituent is a relation or if any field names overlap across constituents.",
+      "id": "a001"
+    },
+    {
+      "operation": "public exports",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [
+        {
+          "file": "packages/core/src/index.ts",
+          "quote": "export { getStore, trait } from './trait/trait';"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction says 'The core exports a new createAspect', so it must be added to the public API surface in index.ts.",
+      "raw_source_ids": [
+        "s002"
+      ],
+      "rejected_evidence": [],
+      "rule": "The core package exports `createAspect` and its associated types from the main index, making it available to consumers.",
+      "id": "a002"
+    },
+    {
+      "operation": "id/traits/schema",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction explicitly lists these three properties. The id should be unique per aspect instance, and traits/schema should be derived from constituents.",
+      "raw_source_ids": [
+        "s002"
+      ],
+      "rejected_evidence": [
+        {
+          "file": "packages/core/src/trait/trait.ts",
+          "quote": "Object.defineProperty(Trait, 'id', { value: id, writable: false, enumerable: true, configurable: false });",
+          "reason": "quotation not present verbatim in supplied source"
+        }
+      ],
+      "rule": "Each aspect exposes a read-only `id` (unique number), a `traits` array containing the flattened constituent traits, and a `schema` object that merges the schemas of all constituents.",
+      "id": "a003"
+    },
+    {
+      "operation": "nested aspects",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [],
+      "alternatives": [],
+      "rationale": "The instruction states 'Nested aspects flatten to their individual traits', so the flattening must occur during creation.",
+      "raw_source_ids": [
+        "s002"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is passed as a constituent to createAspect, it is flattened into its individual traits, so the resulting aspect's traits array contains only the underlying traits, not the nested aspect object.",
+      "id": "a004"
+    }
+  ]
+}

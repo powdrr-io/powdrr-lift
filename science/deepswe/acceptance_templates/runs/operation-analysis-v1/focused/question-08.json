@@ -1,0 +1,18 @@
+{
+  "id": "f008",
+  "operation": "callback destruction",
+  "rule": "If an updateEach callback destroys its entity, aspect writes and notifications for that entity should be skipped entirely, as the existing query-result code checks `world.has(entity)` after the callback and continues without committing changes or triggering change events.",
+  "question": "If an updateEach callback destroys its entity, should aspect writes or notifications be committed for that entity? What original behavior should be inherited?",
+  "group": "query-data",
+  "source_ids": [],
+  "basis": "repository",
+  "evidence": [
+    {
+      "file": "packages/core/src/query/query-result.ts",
+      "quote": "// Skip if the entity has been destroyed.\nif (!world.has(entity)) continue;"
+    }
+  ],
+  "alternatives": [],
+  "rationale": "The existing `updateEach` implementation explicitly skips committing changes and collecting changed traits for entities that are destroyed during the callback, so aspect writes and notifications should follow the same inherited behavior.",
+  "rejected_evidence": []
+}

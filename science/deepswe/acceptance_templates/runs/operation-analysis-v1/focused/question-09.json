@@ -1,0 +1,18 @@
+{
+  "id": "f009",
+  "operation": "notification timing",
+  "rule": "Aspect updateEach should dispatch constituent change notifications after the callback iteration completes, following the existing query-result pattern where changed pairs are collected during the loop and setChanged is called in a separate loop after all entities have been processed.",
+  "question": "At what point relative to callback iteration should aspect updateEach dispatch constituent change notifications? What original behavior applies?",
+  "group": "query-data",
+  "source_ids": [],
+  "basis": "instruction",
+  "evidence": [],
+  "alternatives": [],
+  "rationale": "The instruction states that aspect updateEach distributes writes back to constituent stores, and the existing query-result implementation for updateEach collects changed traits during the entity loop and dispatches change notifications only after all entities have been processed. This ensures that change events are not fired during callback iteration, preserving the established behavior.",
+  "rejected_evidence": [
+    {
+      "file": "packages/core/src/query/query-result.ts",
+      "quote": "// Trigger change events for each entity that was modified.\nfor (let i = 0; i < changedPairs.length; i++) {\n    const [entity, trait] = changedPairs[i];\n    setChanged(world, entity, trait);\n} // This loop is outside the entity iteration loop, after all callbacks have run."
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "router_provider": "typesafe.ai",
+  "router_model": "jev-latest",
+  "oracle_frozen_hash_preserved": true,
+  "actual_provider_calls_including_abandoned_attempts_and_repairs": {
+    "deepinfra": 45,
+    "typesafe.ai": 49
+  },
+  "original_call_status_counts": {
+    "completed": 77,
+    "failed": 17
+  },
+  "sum_call_seconds_including_abandoned_attempts_and_repairs": 678.653,
+  "provider_token_usage": null,
+  "token_usage_note": "Provider receipts supply no numeric token totals; unknown is not zero.",
+  "source_words": 234,
+  "prior_prompt_words": 1172,
+  "generated_prompt_words": 2060,
+  "prompt_materialized": true,
+  "prompt_approved": false,
+  "prompt_decision_id_presence_complete": true,
+  "assembly_fallbacks": [
+    {
+      "decision_id": "f004",
+      "section": "relevant_context",
+      "reason": "model omitted decision; materialized from existing analysis without another model call"
+    }
+  ],
+  "rendering_audit": "prompt-audit.md",
+  "analysis_failures_remaining": [],
+  "final_script_hashes": {
+    "run_experiment.py": "15e8423dd6be735f5e8a36d4f5a6614148ee8fe76535797f1657dd4065195caa",
+    "focused_analysis.py": "06a36eb46c088f6126137eb97f8778e4ed1d28e6a5a82f1ac30b6fa6f9f7ea5d",
+    "review_targets.py": "36b89ccd02fb77174e610a6981ece5b460fa9c49b114e912d8e39caa9a679d57"
+  },
+  "tests_run": false,
+  "coding_agent_run": false,
+  "production_changed": false,
+  "reviewer_provenance": "agent-authored static review; not human-adjudicated",
+  "question_planning": "manually instantiated generic dimensions, exploratory; model did not receive oracle answers",
+  "checks": [
+    "oracle hash preserved",
+    "all 34 oracle entries have comparison rows",
+    "all analysis IDs occur in a rendered section",
+    "recorded artifact credential scan"
+  ]
+}

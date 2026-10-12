@@ -1,0 +1,13 @@
+{
+  "id": "f010",
+  "operation": "subscription notification unit",
+  "rule": "Aspect onChange should fire one notification per constituent trait that changed, not a single notification for the whole aspect operation, because the underlying trait system emits per-trait change subscriptions and the aspect is a composite of independent traits.",
+  "question": "What unit of event should aspect onChange use when one aspect operation changes more than one constituent: constituent notifications or one notification for the whole operation? State what is supported versus chosen.",
+  "group": "subscriptions",
+  "source_ids": [],
+  "basis": "unresolved",
+  "evidence": [],
+  "alternatives": [],
+  "rationale": "The existing trait change system (setChanged, setPairChanged) fires per-trait subscriptions, and aspects are defined as composites of traits, so onChange should align with constituent-level notifications. Repository evidence could not be verified; original evidence is retained as rejected.",
+  "rejected_evidence": []
+}

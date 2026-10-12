@@ -1,0 +1,910 @@
+{
+  "objective": "Analyze the supplied routed product requirements into implementation decisions that remove ambiguity for a coding agent.",
+  "decisions": [
+    {
+      "operation": "createAspect",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "accepts two or more traits and returns an aspect. Overlapping field names between constituents throw at creation time, as do relation constituents."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires the arity, the return, and the two error conditions at creation time.",
+      "raw_source_ids": [
+        "r002",
+        "r003",
+        "r004"
+      ],
+      "rejected_evidence": [],
+      "rule": "createAspect accepts two or more traits and returns a new aspect instance, throwing an error if any constituent is a relation or if any two constituents share a field name.",
+      "id": "a001",
+      "group": "construction"
+    },
+    {
+      "operation": "createAspect",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "Tag traits are valid constituents. Nested aspects flatten to their individual traits."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly permits tag traits and mandates flattening of nested aspects.",
+      "raw_source_ids": [
+        "r005",
+        "r006"
+      ],
+      "rejected_evidence": [],
+      "rule": "createAspect accepts tag traits as constituents and flattens any nested aspects into their individual traits, so the resulting aspect's constituent list contains only primitive traits.",
+      "id": "a002",
+      "group": "construction"
+    },
+    {
+      "operation": "public exports",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "The core exports a new `createAspect`"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction specifies that `createAspect` is a new export from the core, implying it is added to the existing public API.",
+      "raw_source_ids": [
+        "r002"
+      ],
+      "rejected_evidence": [],
+      "rule": "The core module exports `createAspect` as a new public API, alongside existing exports, without altering existing export names.",
+      "id": "a003",
+      "group": "construction"
+    },
+    {
+      "operation": "id/traits/schema",
+      "basis": "instruction",
+      "source_ids": [
+        "s002",
+        "s006"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "Each aspect exposes `id`, `traits`, and `schema`."
+        },
+        {
+          "file": "instruction",
+          "quote": "Each `createAspect` call returns a distinct instance."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction requires these three properties and distinct instances, implying a unique id per instance.",
+      "raw_source_ids": [
+        "r007",
+        "r026"
+      ],
+      "rejected_evidence": [],
+      "rule": "Each aspect instance exposes an `id` property that is unique per instance, a `traits` array listing its constituent traits, and a `schema` object describing the merged field schema.",
+      "id": "a004",
+      "group": "construction"
+    },
+    {
+      "operation": "nested aspects",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "Nested aspects flatten to their individual traits."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly states that nested aspects are flattened, meaning the new aspect's traits are the individual traits from the nested aspect.",
+      "raw_source_ids": [
+        "r006"
+      ],
+      "rejected_evidence": [],
+      "rule": "When a nested aspect is passed to `createAspect`, its constituent traits are extracted and included in the new aspect's `traits` list, and the nested aspect itself is not retained as a constituent.",
+      "id": "a005",
+      "group": "construction"
+    },
+    {
+      "operation": "has",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`has` returns true when the entity has every constituent trait."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly defines the condition for true; the false case is the logical complement.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "Returns true if and only if the entity currently has every constituent trait of the aspect; otherwise returns false.",
+      "id": "a006",
+      "group": "entity"
+    },
+    {
+      "operation": "get",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`get` returns a merged object of all constituent fields, or undefined if any constituent is missing."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction specifies the merged object and the undefined case; a new object is implied to avoid exposing internal references.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "Returns a new object merging the current data of all constituent traits when the entity has every constituent; otherwise returns undefined.",
+      "id": "a007",
+      "group": "entity"
+    },
+    {
+      "operation": "set",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`set` distributes each field to its owning constituent and triggers per-trait change detection."
+        }
+      ],
+      "alternatives": [
+        "Throw an error when a constituent is missing",
+        "Silently ignore missing constituents and write only to present ones"
+      ],
+      "rationale": "The instruction does not specify behavior for missing constituents; the chosen default aligns with the aspect's all-or-nothing semantics and avoids partial writes.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "For each field in the provided data, writes that field to the constituent trait that owns it, and triggers change detection for each constituent whose data actually changed; if the entity lacks any constituent, the operation has no effect.",
+      "id": "a008",
+      "group": "entity"
+    },
+    {
+      "operation": "add",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`add` adds only the constituents the entity does not already have, distributing initial values by field."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly defines the selective addition and field distribution.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "Adds only the constituent traits that the entity does not already have, initializing each added trait's fields from the provided data; traits already present are left unchanged.",
+      "id": "a009",
+      "group": "entity"
+    },
+    {
+      "operation": "remove",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`remove` removes all constituent traits."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction states removal of all constituents without qualification.",
+      "raw_source_ids": [
+        "s003"
+      ],
+      "rejected_evidence": [],
+      "rule": "Removes all constituent traits from the entity, regardless of which constituents are currently present.",
+      "id": "a010",
+      "group": "entity"
+    },
+    {
+      "operation": "direct query",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "An aspect used as a query parameter requires all its constituents."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly states that using an aspect as a query parameter requires all constituents, so the query must match only entities that have every constituent trait.",
+      "raw_source_ids": [
+        "s004"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is used as a query parameter, the query matches an entity if and only if the entity has all constituent traits of the aspect.",
+      "id": "a011",
+      "group": "query-data"
+    },
+    {
+      "operation": "direct query",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Not` with an aspect matches entities missing at least one constituent."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly defines the behavior of `Not` with an aspect, so the query must match entities that lack at least one constituent trait.",
+      "raw_source_ids": [
+        "s004"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is used with the `Not` modifier, the query matches an entity if and only if the entity is missing at least one constituent trait of the aspect.",
+      "id": "a012",
+      "group": "query-data"
+    },
+    {
+      "operation": "direct query",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Changed` matches when any constituent data changed."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly states that `Changed` matches when any constituent data changed, so the query must match if any constituent trait's data has changed.",
+      "raw_source_ids": [
+        "s004"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is used with the `Changed` modifier, the query matches an entity if and only if any constituent trait's data has changed since the last query evaluation.",
+      "id": "a013",
+      "group": "query-data"
+    },
+    {
+      "operation": "direct query",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Added` matches the transition to all-present",
+          "model_quote": "`Added` matches the transition to all-present.",
+          "alignment": "recovered source clause by removing model-added terminal period"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly defines `Added` as matching the transition to all-present, so the query must match only entities that newly have all constituent traits.",
+      "raw_source_ids": [
+        "s004"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is used with the `Added` modifier, the query matches an entity if and only if the entity transitioned from not having all constituent traits to having all constituent traits since the last query evaluation.",
+      "id": "a014",
+      "group": "query-data"
+    },
+    {
+      "operation": "direct query",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Removed` matches the transition from all-present."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly defines `Removed` as matching the transition from all-present, so the query must match only entities that no longer have all constituent traits.",
+      "raw_source_ids": [
+        "s004"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is used with the `Removed` modifier, the query matches an entity if and only if the entity transitioned from having all constituent traits to not having all constituent traits since the last query evaluation.",
+      "id": "a015",
+      "group": "query-data"
+    },
+    {
+      "operation": "readEach",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`readEach` delivers a merged data object",
+          "model_quote": "`readEach` delivers a merged data object.",
+          "alignment": "recovered source clause by removing model-added terminal period"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly states that `readEach` delivers a merged data object, so the callback must receive an object that merges all constituent fields.",
+      "raw_source_ids": [
+        "s004"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is used with `readEach`, the callback receives a merged data object containing all fields from all constituent traits of the aspect for each matched entity.",
+      "id": "a016",
+      "group": "query-data"
+    },
+    {
+      "operation": "readEach",
+      "basis": "assumption",
+      "source_ids": [],
+      "evidence": [],
+      "alternatives": [
+        "The merged object could be a live reference to internal state, but that would risk mutation and is not typical for read operations.",
+        "The merged object could be cached and reused, but that would risk stale data."
+      ],
+      "rationale": "Since the instruction does not specify identity or mutability, a new object per callback is the safest default to avoid unintended mutation and ensure fresh data.",
+      "raw_source_ids": [],
+      "rejected_evidence": [],
+      "rule": "The merged data object delivered by `readEach` is a new object created for each callback invocation, containing copies of the current field values from each constituent trait.",
+      "id": "a017",
+      "group": "query-data"
+    },
+    {
+      "operation": "readEach",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "An aspect used as a query parameter requires all its constituents."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "Since the aspect query requires all constituents, `readEach` only operates on entities that have all constituents, so the merged object always includes all constituent fields.",
+      "raw_source_ids": [
+        "s004"
+      ],
+      "rejected_evidence": [],
+      "rule": "The merged data object delivered by `readEach` includes only fields from constituent traits that are present on the entity; if a constituent trait is missing, the entity is not matched and the callback is not invoked.",
+      "id": "a018",
+      "group": "query-data"
+    },
+    {
+      "operation": "updateEach",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`updateEach` distributes writes back to constituent stores."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly states that `updateEach` distributes writes back to constituent stores, so the callback must be able to modify the merged object and have those changes applied to the underlying traits.",
+      "raw_source_ids": [
+        "s004"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is used with `updateEach`, the callback receives a merged data object containing all fields from all constituent traits of the aspect for each matched entity, and any modifications made to that object are written back to the respective constituent stores.",
+      "id": "a019",
+      "group": "query-data"
+    },
+    {
+      "operation": "updateEach",
+      "basis": "assumption",
+      "source_ids": [],
+      "evidence": [],
+      "alternatives": [
+        "The merged object could be a live reference to internal state, but that would allow direct mutation without change detection.",
+        "The merged object could be a proxy that writes through immediately, but that would complicate change detection."
+      ],
+      "rationale": "A new object per callback is the standard pattern for update callbacks, allowing the callback to modify freely and then apply changes atomically after the callback returns.",
+      "raw_source_ids": [],
+      "rejected_evidence": [],
+      "rule": "The merged data object passed to the `updateEach` callback is a new object created for each callback invocation, containing copies of the current field values from each constituent trait, and modifications to it do not affect the original constituent data until the callback returns.",
+      "id": "a020",
+      "group": "query-data"
+    },
+    {
+      "operation": "updateEach",
+      "basis": "instruction",
+      "source_ids": [
+        "s003",
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`set` distributes each field to its owning constituent and triggers per-trait change detection."
+        },
+        {
+          "file": "instruction",
+          "quote": "`updateEach` distributes writes back to constituent stores."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction for `set` establishes the pattern of distributing fields to owning constituents and triggering per-trait change detection, and `updateEach` is described as distributing writes, so the same behavior applies.",
+      "raw_source_ids": [
+        "s003",
+        "s004"
+      ],
+      "rejected_evidence": [],
+      "rule": "After the `updateEach` callback returns, each field in the modified merged object is written to the constituent trait that owns that field, and each such write triggers the per-trait change detection for that constituent.",
+      "id": "a021",
+      "group": "query-data"
+    },
+    {
+      "operation": "updateEach",
+      "basis": "assumption",
+      "source_ids": [],
+      "evidence": [],
+      "alternatives": [
+        "The field could be written to a default store, but there is no such store defined.",
+        "The field could cause an error, but that would be overly strict for a callback that might add extra properties."
+      ],
+      "rationale": "Since the aspect defines a fixed set of fields, any extra fields added by the callback have no owning constituent and should be silently ignored to avoid unexpected errors.",
+      "raw_source_ids": [],
+      "rejected_evidence": [],
+      "rule": "If the `updateEach` callback modifies a field that does not belong to any constituent trait of the aspect, that field is ignored and not written to any store.",
+      "id": "a022",
+      "group": "query-data"
+    },
+    {
+      "operation": "query lifecycle and callback data",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onAdd` fires when an entity transitions from incomplete to complete",
+          "model_quote": "`onAdd` fires when an entity transitions from incomplete to complete.",
+          "alignment": "recovered source clause by removing model-added terminal period"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction defines `onAdd` as firing on the transition to complete, and consistent with `readEach`, the callback should receive the entity and its merged data.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is used with `onAdd`, the callback fires when an entity transitions from not having all constituent traits to having all constituent traits, and the callback receives the entity ID and a merged data object of all constituent fields.",
+      "id": "a023",
+      "group": "query-data"
+    },
+    {
+      "operation": "query lifecycle and callback data",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onRemove` fires on the reverse transition."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction defines `onRemove` as firing on the reverse transition, and the callback should receive the entity and the data that was present before the transition.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is used with `onRemove`, the callback fires when an entity transitions from having all constituent traits to not having all constituent traits, and the callback receives the entity ID and a merged data object of the constituent fields that were present before removal.",
+      "id": "a024",
+      "group": "query-data"
+    },
+    {
+      "operation": "query lifecycle and callback data",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onChange` fires when any constituent changes while all are present."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction defines `onChange` as firing when any constituent changes while all are present, and the callback should receive the entity and the updated merged data.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "When an aspect is used with `onChange`, the callback fires when any constituent trait's data changes while the entity has all constituent traits, and the callback receives the entity ID and a merged data object of all constituent fields after the change.",
+      "id": "a025",
+      "group": "query-data"
+    },
+    {
+      "operation": "query lifecycle and callback data",
+      "basis": "assumption",
+      "source_ids": [],
+      "evidence": [],
+      "alternatives": [
+        "The merged object could be a live reference, but that would risk mutation and inconsistency.",
+        "The merged object could be cached, but that would risk stale data."
+      ],
+      "rationale": "Consistent with `readEach`, a new object per callback is the safest default to avoid unintended mutation and ensure fresh data.",
+      "raw_source_ids": [],
+      "rejected_evidence": [],
+      "rule": "The merged data object passed to `onAdd`, `onRemove`, and `onChange` callbacks is a new object created for each callback invocation, containing copies of the relevant field values.",
+      "id": "a026",
+      "group": "query-data"
+    },
+    {
+      "operation": "query lifecycle and callback data",
+      "basis": "assumption",
+      "source_ids": [],
+      "evidence": [],
+      "alternatives": [
+        "The callback could fire for all complete entities on initial evaluation, but that would not be a transition.",
+        "The callback could fire only for entities that become complete after the query is created, which is the standard interpretation."
+      ],
+      "rationale": "The instruction specifies a transition, so the callback should only fire on actual transitions, not on initial state.",
+      "raw_source_ids": [],
+      "rejected_evidence": [],
+      "rule": "The `onAdd` callback fires only when the entity transitions from incomplete to complete, and does not fire for entities that are already complete when the query is first evaluated.",
+      "id": "a027",
+      "group": "query-data"
+    },
+    {
+      "operation": "query lifecycle and callback data",
+      "basis": "assumption",
+      "source_ids": [],
+      "evidence": [],
+      "alternatives": [
+        "The callback could fire for all incomplete entities on initial evaluation, but that would not be a transition.",
+        "The callback could fire only for entities that become incomplete after the query is created, which is the standard interpretation."
+      ],
+      "rationale": "The instruction specifies a transition, so the callback should only fire on actual transitions, not on initial state.",
+      "raw_source_ids": [],
+      "rejected_evidence": [],
+      "rule": "The `onRemove` callback fires only when the entity transitions from complete to incomplete, and does not fire for entities that are already incomplete when the query is first evaluated.",
+      "id": "a028",
+      "group": "query-data"
+    },
+    {
+      "operation": "query lifecycle and callback data",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onChange` fires when any constituent changes while all are present."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly limits `onChange` to changes while all are present, so transitions are handled by `onAdd` and `onRemove` instead.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The `onChange` callback fires only when a constituent trait's data changes while the entity has all constituent traits, and does not fire when the entity transitions in or out of completeness.",
+      "id": "a029",
+      "group": "query-data"
+    },
+    {
+      "operation": "Not",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Not` with an aspect matches entities missing at least one constituent."
+        }
+      ],
+      "alternatives": [
+        "Negate each constituent individually, which would match entities missing any one trait but also those missing all; this is equivalent to the chosen behavior.",
+        "Negate the entire aspect as a single trait, which would match entities missing the aspect as a whole, but since the aspect is a conjunction, this is the same as missing at least one constituent."
+      ],
+      "rationale": "The instruction explicitly defines the behavior, so no ambiguity remains.",
+      "raw_source_ids": [
+        "r019"
+      ],
+      "rejected_evidence": [],
+      "rule": "`Not` with an aspect matches entities that lack at least one constituent trait, meaning the negation is applied to the conjunction of all constituents.",
+      "id": "a030",
+      "group": "modifiers"
+    },
+    {
+      "operation": "Or",
+      "basis": "assumption",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "Aspects compose with all query modifiers."
+        }
+      ],
+      "alternatives": [
+        "`Or` could treat the aspect as a single unit, matching entities that have the entire aspect or the other condition; this would be less useful and not implied by the instruction.",
+        "`Or` could expand the aspect into its constituents and match any of them, which is the chosen behavior."
+      ],
+      "rationale": "The instruction says aspects compose with all modifiers, but does not specify the semantics for `Or`. Since an aspect is a conjunction, the natural extension is to treat it as a group and apply `Or` at the group level, meaning the group is satisfied if any of its constituents are present.",
+      "raw_source_ids": [
+        "r018"
+      ],
+      "rejected_evidence": [],
+      "rule": "`Or` with an aspect matches entities that have at least one constituent trait, because the aspect is treated as a conjunction and `Or` combines it with other conditions using logical OR.",
+      "id": "a031",
+      "group": "modifiers"
+    },
+    {
+      "operation": "Changed",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Changed` matches when any constituent data changed."
+        }
+      ],
+      "alternatives": [
+        "`Changed` could require all constituents to change simultaneously, which is not stated.",
+        "`Changed` could match when the merged aspect data changes, but since fields are disjoint, this is equivalent to any constituent changing."
+      ],
+      "rationale": "The instruction explicitly states 'any constituent data changed', so the behavior is clear.",
+      "raw_source_ids": [
+        "r020"
+      ],
+      "rejected_evidence": [],
+      "rule": "`Changed` with an aspect matches an entity when any constituent trait's data changes while the entity has all constituents, and the change is detected per constituent.",
+      "id": "a032",
+      "group": "modifiers"
+    },
+    {
+      "operation": "Added",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Added` matches the transition to all-present",
+          "model_quote": "`Added` matches the transition to all-present.",
+          "alignment": "recovered source clause by removing model-added terminal period"
+        }
+      ],
+      "alternatives": [
+        "`Added` could match when any constituent is added, but the instruction specifies 'transition to all-present'."
+      ],
+      "rationale": "The instruction defines the transition condition explicitly.",
+      "raw_source_ids": [
+        "r021"
+      ],
+      "rejected_evidence": [],
+      "rule": "`Added` with an aspect matches an entity when it transitions from having at least one missing constituent to having all constituents present, and this transition is detected by the query system.",
+      "id": "a033",
+      "group": "modifiers"
+    },
+    {
+      "operation": "Removed",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`Removed` matches the transition from all-present."
+        }
+      ],
+      "alternatives": [
+        "`Removed` could match when any constituent is removed, but the instruction specifies 'transition from all-present'."
+      ],
+      "rationale": "The instruction defines the transition condition explicitly.",
+      "raw_source_ids": [
+        "r022"
+      ],
+      "rejected_evidence": [],
+      "rule": "`Removed` with an aspect matches an entity when it transitions from having all constituents present to having at least one missing constituent.",
+      "id": "a034",
+      "group": "modifiers"
+    },
+    {
+      "operation": "modifier composition and tracking",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "An aspect used as a query parameter requires all its constituents."
+        },
+        {
+          "file": "instruction",
+          "quote": "Aspects compose with all query modifiers."
+        }
+      ],
+      "alternatives": [
+        "Aspects might not be composable with certain modifiers, but the instruction says 'all'."
+      ],
+      "rationale": "The instruction explicitly states that aspects compose with all query modifiers, so the system must support them in any combination.",
+      "raw_source_ids": [
+        "r015",
+        "r018"
+      ],
+      "rejected_evidence": [],
+      "rule": "Aspects can be used as query parameters and compose with all query modifiers, including `Not`, `Or`, `Changed`, `Added`, and `Removed`, and the query system tracks constituent presence and data changes to evaluate these modifiers.",
+      "id": "a035",
+      "group": "modifiers"
+    },
+    {
+      "operation": "onAdd",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onAdd` fires when an entity transitions from incomplete to complete"
+        }
+      ],
+      "alternatives": [
+        "Fire for all entities that are complete at subscription time",
+        "Fire for every entity that becomes complete, including those already complete at subscription"
+      ],
+      "rationale": "The instruction specifies a transition, so the callback must only fire on the transition, not for pre-existing complete entities.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The `onAdd` callback fires exactly once when an entity transitions from having at least one but not all constituent traits to having all constituent traits, and it does not fire for entities that already have all traits at subscription time.",
+      "id": "a036",
+      "group": "subscriptions"
+    },
+    {
+      "operation": "onRemove",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onRemove` fires on the reverse transition"
+        }
+      ],
+      "alternatives": [
+        "Fire for all entities that are incomplete at subscription time",
+        "Fire for every entity that becomes incomplete, including those already incomplete at subscription"
+      ],
+      "rationale": "The instruction specifies a transition, so the callback must only fire on the transition, not for pre-existing incomplete entities.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The `onRemove` callback fires exactly once when an entity transitions from having all constituent traits to having at least one but not all constituent traits, and it does not fire for entities that are already incomplete at subscription time.",
+      "id": "a037",
+      "group": "subscriptions"
+    },
+    {
+      "operation": "onChange",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onChange` fires when any constituent changes while all are present"
+        }
+      ],
+      "alternatives": [
+        "Fire on trait addition or removal even if all are present",
+        "Fire only when the merged data object changes"
+      ],
+      "rationale": "The instruction distinguishes change from add/remove, so onChange must only fire on data changes, not on trait presence changes.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The `onChange` callback fires whenever any constituent trait's data changes while the entity has all constituent traits, and it does not fire when a trait is added or removed.",
+      "id": "a038",
+      "group": "subscriptions"
+    },
+    {
+      "operation": "unsubscribe",
+      "basis": "assumption",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onAdd` fires when an entity transitions from incomplete to complete and `onRemove` fires on the reverse transition. `onChange` fires when any constituent changes while all are present."
+        }
+      ],
+      "alternatives": [
+        "No unsubscribe function; callbacks are permanent",
+        "Unsubscribe is a separate method on the aspect"
+      ],
+      "rationale": "The instruction does not specify an unsubscribe mechanism, but typical event subscription patterns in the repository (if any) would return an unsubscribe function; assuming this is the most common and user-friendly approach.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "Each of `onAdd`, `onRemove`, and `onChange` returns an unsubscribe function that, when called, stops the callback from firing on any future transitions or changes for that aspect.",
+      "id": "a039",
+      "group": "subscriptions"
+    },
+    {
+      "operation": "world reset",
+      "basis": "assumption",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onAdd` fires when an entity transitions from incomplete to complete and `onRemove` fires on the reverse transition. `onChange` fires when any constituent changes while all are present."
+        }
+      ],
+      "alternatives": [
+        "Callbacks persist across world reset",
+        "World reset does not affect aspect state"
+      ],
+      "rationale": "The instruction does not specify world reset behavior, but a world reset typically clears all entity data and subscriptions; assuming this is the intended behavior to avoid stale callbacks and state.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "When the world is reset, all aspect callbacks (`onAdd`, `onRemove`, `onChange`) are cleared, and the aspect's internal state for tracking entity completeness is reset, so that subsequent operations treat entities as if they were newly added.",
+      "id": "a040",
+      "group": "subscriptions"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "id": "f016",
+  "operation": "reset lifecycle",
+  "rule": "world.reset should clear all aspect query results, unregister all constituent traits (clearing their instances and subscriptions), and reset all subscription lifetimes, matching the existing world.reset behavior for regular traits and queries.",
+  "question": "What should world.reset do to aspect query results, subsequent constituent registration and subscription lifetimes? Preserve the original world's reset conventions.",
+  "group": "subscriptions",
+  "source_ids": [],
+  "basis": "unresolved",
+  "evidence": [],
+  "alternatives": [],
+  "rationale": "The existing world.reset clears all trait instances, query instances, and subscriptions, so aspects composed of traits should follow the same reset semantics. Repository evidence could not be verified; original evidence is retained as rejected.",
+  "rejected_evidence": []
+}

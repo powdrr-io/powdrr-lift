@@ -1,0 +1,18 @@
+{
+  "id": "f013",
+  "operation": "Changed completeness",
+  "rule": "Changed(aspect) should match an entity only if all constituent traits are present and at least one constituent has changed, so an entity with a changed constituent but another constituent missing does not match.",
+  "question": "Should Changed(aspect) match an entity with a changed constituent but another constituent missing? State the matching predicate and evidence.",
+  "group": "modifiers",
+  "source_ids": [],
+  "basis": "instruction",
+  "evidence": [
+    {
+      "file": "packages/core/src/query/utils/check-query-tracking.ts",
+      "quote": "if (required && (entityMask & required) !== required) return false;"
+    }
+  ],
+  "alternatives": [],
+  "rationale": "The instruction states 'Changed matches when any constituent data changed' but also requires all constituents for an aspect query. The tracking check enforces required traits before evaluating change, so missing constituents fail the required check.",
+  "rejected_evidence": []
+}

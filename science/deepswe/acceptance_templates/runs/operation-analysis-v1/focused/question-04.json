@@ -1,0 +1,25 @@
+{
+  "id": "f004",
+  "operation": "read copy semantics",
+  "rule": "Merged aspect get/readEach data should be a shallow copy of each constituent's data, so top-level assignments do not write through to the underlying store, while nested object/array references are shared and thus write through to the underlying store.",
+  "question": "What should merged aspect get/readEach data mean for top-level assignments and nested object/array references? Specify whether each writes through or is copied, and why.",
+  "group": "entity",
+  "source_ids": [],
+  "basis": "unresolved",
+  "evidence": [],
+  "alternatives": [
+    "deep copy of nested objects/arrays to prevent any write-through",
+    "full write-through for all levels to allow direct mutation"
+  ],
+  "rationale": "The existing trait get functions return a new object for SoA (shallow copy) and the stored object for AoS (direct reference). Merging these per constituent preserves the existing behavior: top-level assignments on the merged object do not affect the store (since the merged object is new), but nested references are shared, so mutations to nested objects/arrays write through. This is consistent with the existing trait get semantics and avoids unexpected deep-copy overhead. Repository evidence could not be verified; original evidence is retained as rejected.",
+  "rejected_evidence": [
+    {
+      "file": "packages/core/src/storage/accessors.ts",
+      "quote": "const objectLiteral = `{ ${keys.map((key) => `${key}: store.${key}[index]`).join(', ')} }`; // SoA get returns a new object with references to stored values"
+    },
+    {
+      "file": "packages/core/src/storage/accessors.ts",
+      "quote": "createAoSGetFunction returns store[index]; // AoS get returns the stored object directly"
+    }
+  ]
+}

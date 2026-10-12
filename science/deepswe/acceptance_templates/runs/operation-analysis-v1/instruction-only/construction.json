@@ -1,0 +1,119 @@
+{
+  "objective": "Analyze the supplied routed product requirements into implementation decisions that remove ambiguity for a coding agent.",
+  "decisions": [
+    {
+      "operation": "createAspect",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "accepts two or more traits and returns an aspect. Overlapping field names between constituents throw at creation time, as do relation constituents."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly requires the arity, the return, and the two error conditions at creation time.",
+      "raw_source_ids": [
+        "r002",
+        "r003",
+        "r004"
+      ],
+      "rejected_evidence": [],
+      "rule": "createAspect accepts two or more traits and returns a new aspect instance, throwing an error if any constituent is a relation or if any two constituents share a field name.",
+      "id": "a001"
+    },
+    {
+      "operation": "createAspect",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "Tag traits are valid constituents. Nested aspects flatten to their individual traits."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly permits tag traits and mandates flattening of nested aspects.",
+      "raw_source_ids": [
+        "r005",
+        "r006"
+      ],
+      "rejected_evidence": [],
+      "rule": "createAspect accepts tag traits as constituents and flattens any nested aspects into their individual traits, so the resulting aspect's constituent list contains only primitive traits.",
+      "id": "a002"
+    },
+    {
+      "operation": "public exports",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "The core exports a new `createAspect`"
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction specifies that `createAspect` is a new export from the core, implying it is added to the existing public API.",
+      "raw_source_ids": [
+        "r002"
+      ],
+      "rejected_evidence": [],
+      "rule": "The core module exports `createAspect` as a new public API, alongside existing exports, without altering existing export names.",
+      "id": "a003"
+    },
+    {
+      "operation": "id/traits/schema",
+      "basis": "instruction",
+      "source_ids": [
+        "s002",
+        "s006"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "Each aspect exposes `id`, `traits`, and `schema`."
+        },
+        {
+          "file": "instruction",
+          "quote": "Each `createAspect` call returns a distinct instance."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction requires these three properties and distinct instances, implying a unique id per instance.",
+      "raw_source_ids": [
+        "r007",
+        "r026"
+      ],
+      "rejected_evidence": [],
+      "rule": "Each aspect instance exposes an `id` property that is unique per instance, a `traits` array listing its constituent traits, and a `schema` object describing the merged field schema.",
+      "id": "a004"
+    },
+    {
+      "operation": "nested aspects",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "Nested aspects flatten to their individual traits."
+        }
+      ],
+      "alternatives": [],
+      "rationale": "The instruction explicitly states that nested aspects are flattened, meaning the new aspect's traits are the individual traits from the nested aspect.",
+      "raw_source_ids": [
+        "r006"
+      ],
+      "rejected_evidence": [],
+      "rule": "When a nested aspect is passed to `createAspect`, its constituent traits are extracted and included in the new aspect's `traits` list, and the nested aspect itself is not retained as a constituent.",
+      "id": "a005"
+    }
+  ]
+}

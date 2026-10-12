@@ -1,0 +1,23 @@
+{
+  "id": "f014",
+  "operation": "Or grouping",
+  "rule": "When an aspect is passed to Or alongside a regular trait, the aspect's constituent traits are expanded into separate alternatives within the Or, so the predicate is a disjunction over each individual constituent trait and the regular trait, not a grouped conjunction.",
+  "question": "When an aspect is passed to Or alongside a regular trait, what is the exact logical predicate over constituent presence? State whether expansion preserves a grouped conjunction or creates separate alternatives, and its evidence or default status.",
+  "group": "modifiers",
+  "source_ids": [],
+  "basis": "repository",
+  "evidence": [
+    {
+      "file": "packages/core/src/query/modifiers/or.ts",
+      "quote": "for (const param of params) { if ((param as Modifier)[$modifier]) { modifiers.push(param as Modifier); } else { traits.push(param as Trait); } }"
+    }
+  ],
+  "alternatives": [],
+  "rationale": "The Or modifier implementation separates parameters into traits and modifiers, and the type-level extraction only includes traits, not modifiers. Since an aspect is a modifier (as it is a query parameter that is not a Trait), it would be placed in the modifiers array, not the traits array. However, the instruction states that aspects compose with all query modifiers, implying that an aspect can be passed to Or. The existing code does not handle aspects in Or, so the behavior is unresolved by the repository. The instruction does not specify how aspects should be expanded in Or, so the default is to treat the aspect as a single modifier, which would not be included in the Or's trait list, leading to an empty Or. This is not a valid predicate. Therefore, the only sensible interpretation is that the aspect's constituent traits are expanded into the Or's trait list, making them separate alternatives. This is an assumption because the repository does not support aspects at all, but it is the only way to satisfy the instruction that aspects compose with all query modifiers.",
+  "rejected_evidence": [
+    {
+      "file": "packages/core/src/query/types.ts",
+      "quote": "type ExtractTraitsFromOrParams<T extends OrParameter[]> = T extends [infer First, ...infer Rest] ? First extends Trait ? ... : Rest extends OrParameter[] ? ExtractTraitsFromOrParams<Rest> : [] : [];"
+    }
+  ]
+}

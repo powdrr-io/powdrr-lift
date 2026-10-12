@@ -1,0 +1,23 @@
+[
+  {
+    "stage": "six-sections",
+    "attempt": 0,
+    "status": "failed",
+    "elapsed_seconds": 50.215,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": true
+  },
+  {
+    "stage": "six-sections",
+    "attempt": 1,
+    "status": "failed",
+    "elapsed_seconds": 48.213,
+    "provider": "deepinfra",
+    "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "usage": {},
+    "cached": true,
+    "superseded": true
+  }
+]

@@ -1,0 +1,23 @@
+{
+  "id": "f006",
+  "operation": "update equality",
+  "rule": "In aspect updateEach, a constituent is considered changed if its new value is not shallow-equal to the previously stored value, where shallow equality treats equal primitive values as unchanged and separately allocated nested references as changed unless they are the same reference.",
+  "question": "For aspect updateEach, what comparison should determine a changed constituent? Address equal primitive values versus identical or separately allocated nested references.",
+  "group": "query-data",
+  "source_ids": [],
+  "basis": "instruction",
+  "evidence": [
+    {
+      "file": "packages/core/src/query/query-result.ts",
+      "quote": "changed = ctx.fastSetWithChangeDetection(eid, store, newValue); if (!changed) { changed = !shallowEqual(newValue, atomicSnapshots[index]); }"
+    }
+  ],
+  "alternatives": [],
+  "rationale": "The existing updateEach implementation uses shallowEqual to compare the new value against the atomic snapshot, which is the stored value before the callback. This comparison treats primitives by reference equality (so equal primitives are unchanged) and nested objects by shallow field equality (so separately allocated but structurally identical objects are considered unchanged, while different references with different fields are changed).",
+  "rejected_evidence": [
+    {
+      "file": "packages/core/src/utils/shallow-equal.ts",
+      "quote": "obj1 === obj2 || (typeof obj1 === 'object' && ... keys1.every((key) => Object.hasOwn(obj2, key) && obj1[key] === obj2[key]))"
+    }
+  ]
+}

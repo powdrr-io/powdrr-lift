@@ -1,0 +1,13 @@
+{
+  "id": "f001",
+  "operation": "set precondition",
+  "rule": "entity.set(aspect, data) should be a no-op if any constituent trait is missing, leaving the entity unchanged and not triggering change detection.",
+  "question": "What should entity.set(aspect, data) do if only some constituent traits are present? Distinguish what existing code establishes from a chosen new composite policy.",
+  "group": "entity",
+  "source_ids": [],
+  "basis": "instruction",
+  "evidence": [],
+  "alternatives": [],
+  "rationale": "The instruction states set distributes each field to its owning constituent and triggers per-trait change detection, but does not specify behavior for partial presence. Existing setTrait requires the trait to be present (getStore would fail otherwise), so a safe composite policy is to no-op when incomplete.",
+  "rejected_evidence": []
+}

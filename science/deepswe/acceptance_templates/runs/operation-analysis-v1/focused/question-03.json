@@ -1,0 +1,18 @@
+{
+  "id": "f003",
+  "operation": "unknown and omitted fields",
+  "rule": "Aspect set and configured add should ignore unknown fields and apply only provided fields, leaving omitted fields unchanged, consistent with the existing SoA set accessor contract.",
+  "question": "What should aspect set and configured add do with unknown fields and omitted fields? Establish which existing field-accessor contract applies.",
+  "group": "entity",
+  "source_ids": [],
+  "basis": "repository",
+  "evidence": [
+    {
+      "file": "packages/core/src/storage/accessors.ts",
+      "quote": "if ('${key}' in value) store.${key}[index] = value.${key};"
+    }
+  ],
+  "alternatives": [],
+  "rationale": "The SoA set function only writes keys present in the value object, so unknown fields are ignored and omitted fields are not overwritten. This is the existing field-accessor contract that aspect set and configured add should follow.",
+  "rejected_evidence": []
+}

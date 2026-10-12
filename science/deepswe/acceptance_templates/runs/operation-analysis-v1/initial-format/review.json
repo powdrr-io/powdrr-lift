@@ -1,0 +1,5 @@
+{
+  "repository-grounded": "rejected semantically: behavior field contained category labels",
+  "instruction-only": "failed bounded streaming output limit after speculative enumeration",
+  "remedy": "Explicit behavior schema plus scoped operation groups and 4096 output-token limit; preserve all original calls; reuse routed inventory"
+}

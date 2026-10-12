@@ -1,0 +1,125 @@
+{
+  "objective": "Analyze the focused operations for the aspect feature in the koota repository.",
+  "decisions": [
+    {
+      "operation": "onAdd",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onAdd` fires when an entity transitions from incomplete to complete"
+        }
+      ],
+      "alternatives": [
+        "Fire for all entities that are complete at subscription time",
+        "Fire for every entity that becomes complete, including those already complete at subscription"
+      ],
+      "rationale": "The instruction specifies a transition, so the callback must only fire on the transition, not for pre-existing complete entities.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The `onAdd` callback fires exactly once when an entity transitions from having at least one but not all constituent traits to having all constituent traits, and it does not fire for entities that already have all traits at subscription time.",
+      "id": "a001"
+    },
+    {
+      "operation": "onRemove",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onRemove` fires on the reverse transition"
+        }
+      ],
+      "alternatives": [
+        "Fire for all entities that are incomplete at subscription time",
+        "Fire for every entity that becomes incomplete, including those already incomplete at subscription"
+      ],
+      "rationale": "The instruction specifies a transition, so the callback must only fire on the transition, not for pre-existing incomplete entities.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The `onRemove` callback fires exactly once when an entity transitions from having all constituent traits to having at least one but not all constituent traits, and it does not fire for entities that are already incomplete at subscription time.",
+      "id": "a002"
+    },
+    {
+      "operation": "onChange",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onChange` fires when any constituent changes while all are present"
+        }
+      ],
+      "alternatives": [
+        "Fire on trait addition or removal even if all are present",
+        "Fire only when the merged data object changes"
+      ],
+      "rationale": "The instruction distinguishes change from add/remove, so onChange must only fire on data changes, not on trait presence changes.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "The `onChange` callback fires whenever any constituent trait's data changes while the entity has all constituent traits, and it does not fire when a trait is added or removed.",
+      "id": "a003"
+    },
+    {
+      "operation": "unsubscribe",
+      "basis": "assumption",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onAdd` fires when an entity transitions from incomplete to complete and `onRemove` fires on the reverse transition. `onChange` fires when any constituent changes while all are present."
+        }
+      ],
+      "alternatives": [
+        "No unsubscribe function; callbacks are permanent",
+        "Unsubscribe is a separate method on the aspect"
+      ],
+      "rationale": "The instruction does not specify an unsubscribe mechanism, but typical event subscription patterns in the repository (if any) would return an unsubscribe function; assuming this is the most common and user-friendly approach.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "Each of `onAdd`, `onRemove`, and `onChange` returns an unsubscribe function that, when called, stops the callback from firing on any future transitions or changes for that aspect.",
+      "id": "a004"
+    },
+    {
+      "operation": "world reset",
+      "basis": "assumption",
+      "source_ids": [
+        "s005"
+      ],
+      "evidence": [
+        {
+          "file": "instruction",
+          "quote": "`onAdd` fires when an entity transitions from incomplete to complete and `onRemove` fires on the reverse transition. `onChange` fires when any constituent changes while all are present."
+        }
+      ],
+      "alternatives": [
+        "Callbacks persist across world reset",
+        "World reset does not affect aspect state"
+      ],
+      "rationale": "The instruction does not specify world reset behavior, but a world reset typically clears all entity data and subscriptions; assuming this is the intended behavior to avoid stale callbacks and state.",
+      "raw_source_ids": [
+        "s005"
+      ],
+      "rejected_evidence": [],
+      "rule": "When the world is reset, all aspect callbacks (`onAdd`, `onRemove`, `onChange`) are cleared, and the aspect's internal state for tracking entity completeness is reset, so that subsequent operations treat entities as if they were newly added.",
+      "id": "a005"
+    }
+  ]
+}

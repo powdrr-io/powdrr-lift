@@ -1,0 +1,18 @@
+{
+  "id": "f007",
+  "operation": "notification options",
+  "rule": "updateEach should accept a changeDetection option that, when set to 'never', commits writes to stores without triggering change detection or notifications, while 'always' and 'auto' commit writes and trigger change detection/notifications as currently implemented.",
+  "question": "What should updateEach changeDetection options do for aspect queries? Separate committing writes from suppressing/detecting notifications.",
+  "group": "query-data",
+  "source_ids": [],
+  "basis": "instruction",
+  "evidence": [],
+  "alternatives": [],
+  "rationale": "The instruction explicitly separates committing writes from suppressing/detecting notifications, and the existing code already implements 'never' as committing without change detection, so the behavior is to preserve that separation.",
+  "rejected_evidence": [
+    {
+      "file": "packages/core/src/query/query-result.ts",
+      "quote": "options: QueryResultOptions = { changeDetection: 'auto' } ... if (options.changeDetection === 'never') { ... ctx.fastSet(eid, stores[j], state[j]); }"
+    }
+  ]
+}

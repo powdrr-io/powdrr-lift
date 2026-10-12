@@ -1,0 +1,13 @@
+{
+  "id": "f002",
+  "operation": "set notifications",
+  "rule": "Writing the same value as before through aspect set should still notify, so the existing triggerChanged argument should default to true and be passed through to each constituent's setTrait call, preserving the current behavior where setTrait always triggers change detection regardless of whether the value actually changed.",
+  "question": "For a constituent receiving recognized fields through aspect set, does writing the same value as before still notify? What behavior should the existing triggerChanged argument have?",
+  "group": "entity",
+  "source_ids": [],
+  "basis": "unresolved",
+  "evidence": [],
+  "alternatives": [],
+  "rationale": "The instruction states aspect set triggers per-trait change detection, and the existing setTrait implementation always calls setChanged when triggerChanged is true, regardless of value equality. The fastSetWithChangeDetection function exists but is not used by setTrait, indicating the current contract is unconditional notification. Repository evidence could not be verified; original evidence is retained as rejected.",
+  "rejected_evidence": []
+}

@@ -129,6 +129,37 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
 
     monkeypatch.setattr("powdrr_lift.cli.check_model_access", check)
     monkeypatch.setattr(
+        "powdrr_lift.cli.resolve_provider_credentials",
+        lambda provider, *_args: SimpleNamespace(
+            source="TEST_API_KEY",
+            base_url="https://example.test",
+            api_key=(
+                "deepinfra-token"
+                if provider.startswith("deepinfra")
+                else f"{provider}-token"
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.cli.check_typesafeai_access",
+        lambda: SimpleNamespace(
+            to_data=lambda: {
+                "role": "classifier",
+                "provider": "typesafeai",
+                "model": "jev-latest",
+                "status": "passed",
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.cli.subprocess.run",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout='{"nameWithOwner":"owner/repo","viewerPermission":"WRITE"}',
+            stderr="",
+        ),
+    )
+    monkeypatch.setattr(
         "powdrr_lift.cli.check_coding_executable",
         lambda executable, *, role: SimpleNamespace(
             to_data=lambda: {
@@ -152,7 +183,7 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
                 "--repo-root",
                 str(tmp_path),
                 "--planning-provider",
-                "zai",
+                "deepinfra-cheap",
                 "--coding-provider",
                 "deepinfra",
                 "--json",
@@ -160,5 +191,7 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
         )
 
     assert exit_code == 0
-    assert checks == [("planning", "zai"), ("coding", "deepinfra")]
-    assert json.loads(stdout.getvalue())["passed"] is True
+    assert checks == [("planning", "deepinfra-cheap")]
+    report = json.loads(stdout.getvalue())
+    assert report["passed"] is True
+    assert report["checks"][0]["roles"] == ["planning", "coding"]

@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
@@ -126,6 +129,105 @@ def check_coding_executable(executable: str, *, role: str) -> CredentialCheck:
     )
 
 
+def check_typesafeai_access() -> CredentialCheck:
+    """Make one authenticated Jev request using the configured TypesafeAI key."""
+    api_key = (
+        os.environ.get("TYPESAFEAI_API_KEY")
+        or os.environ.get("TYPESAFE_API_KEY")
+        or os.environ.get("SYSTEM_ONE_API_KEY")
+    )
+    if not api_key:
+        return CredentialCheck(
+            role="classifier",
+            provider="typesafeai",
+            model=os.environ.get("SYSTEM_ONE_MODEL") or "jev-latest",
+            status="credentials_missing",
+            message=(
+                "No TypesafeAI credentials found. Set TYPESAFEAI_API_KEY, "
+                "TYPESAFE_API_KEY, or SYSTEM_ONE_API_KEY."
+            ),
+        )
+
+    model = os.environ.get("SYSTEM_ONE_MODEL") or "jev-latest"
+    endpoint = os.environ.get("SYSTEM_ONE_BASE_URL", "https://api.typesafe.ai/v1")
+    endpoint = endpoint.rstrip("/") + "/systemone"
+    body = {
+        "model": model,
+        "state": {"source_text": "credential preflight"},
+        "questions": {
+            "decision": {
+                "type": "choice",
+                "instructions": "Choose the valid value.",
+                "criteria": {
+                    "ok": "The credential preflight request is valid.",
+                    "unresolved": "The request cannot be classified.",
+                },
+            }
+        },
+    }
+    request = Request(
+        endpoint,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=10) as response:
+            response_data = json.loads(response.read().decode("utf-8"))
+        if not isinstance(response_data, Mapping) or not isinstance(
+            response_data.get("answers", {}).get("decision"), Mapping
+        ):
+            return CredentialCheck(
+                role="classifier",
+                provider="typesafeai",
+                model=model,
+                status="provider_rejected_request",
+                credential_source=_typesafeai_credential_source(),
+                message="Jev returned a response without a decision answer.",
+            )
+    except HTTPError as error:
+        status = {
+            401: "authentication_failed",
+            403: "model_access_denied",
+            429: "rate_or_quota_limited",
+        }.get(error.code, "provider_rejected_request")
+        return CredentialCheck(
+            role="classifier",
+            provider="typesafeai",
+            model=model,
+            status=status,
+            credential_source=_typesafeai_credential_source(),
+            message=f"Provider returned HTTP {error.code}.",
+        )
+    except (OSError, TimeoutError, URLError, ValueError) as error:
+        return CredentialCheck(
+            role="classifier",
+            provider="typesafeai",
+            model=model,
+            status="unavailable",
+            credential_source=_typesafeai_credential_source(),
+            message=f"TypesafeAI request failed ({type(error).__name__}).",
+        )
+
+    return CredentialCheck(
+        role="classifier",
+        provider="typesafeai",
+        model=model,
+        status="passed",
+        credential_source=_typesafeai_credential_source(),
+    )
+
+
+def _typesafeai_credential_source() -> str:
+    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+        if os.environ.get(name):
+            return name
+    return "unknown"
+
+
 def configured_model_mapping(provider: str, model: str | None) -> LLMModelMapping:
     """Resolve an explicit model or the provider's standard reasoning model."""
     mappings: Mapping[str, LLMModelMapping] = default_llm_mappings(provider)
@@ -165,5 +267,6 @@ __all__ = [
     "CredentialCheck",
     "check_coding_executable",
     "check_model_access",
+    "check_typesafeai_access",
     "configured_model_mapping",
 ]

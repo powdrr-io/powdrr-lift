@@ -185,6 +185,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 from powdrr_lift.workrr.credential_check import (
     check_coding_executable,
     check_model_access,
+    check_typesafeai_access,
     configured_model_mapping,
 )
 from powdrr_lift.workrr.deepswe_design_evaluation import (
@@ -242,7 +243,11 @@ from powdrr_lift.workrr.prompt_probe import (
     probe_workflow_step,
     resolve_probe_model,
 )
-from powdrr_lift.workrr.provider_config import ALL_PROVIDERS, default_llm_mappings
+from powdrr_lift.workrr.provider_config import (
+    ALL_PROVIDERS,
+    default_llm_mappings,
+    provider_definition,
+)
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
     resolve_provider_credentials,
@@ -296,7 +301,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     credentials_parser = subparsers.add_parser(
         "check-credentials",
-        help="Check configured planning and coding model access before a run.",
+        help="Check model credentials, Jev access, and GitHub repository access.",
     )
     credentials_parser.add_argument("--repo-root", type=Path)
     credentials_parser.add_argument(
@@ -316,7 +321,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     credentials_parser.add_argument("--opencode-executable", default="opencode")
     credentials_parser.add_argument("--minisweagent-executable", default="mini")
-    credentials_parser.add_argument("--open-pr", action="store_true")
+    credentials_parser.add_argument(
+        "--open-pr",
+        action="store_true",
+        help="Deprecated; GitHub access is always checked.",
+    )
     credentials_parser.add_argument("--json", action="store_true")
     credentials_parser.set_defaults(func=_run_check_credentials)
 
@@ -3341,7 +3350,7 @@ def _run_bootstrap(args: argparse.Namespace) -> int:
 def _run_check_credentials(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     results = []
-    for role, provider, model, api_key, base_url in (
+    route_checks = (
         (
             "planning",
             args.planning_provider,
@@ -3356,30 +3365,55 @@ def _run_check_credentials(args: argparse.Namespace) -> int:
             None,
             None,
         ),
-    ):
+    )
+    checked_credentials: dict[tuple[str, str], dict[str, Any]] = {}
+    checked_missing_credentials: dict[tuple[str, ...], dict[str, Any]] = {}
+    for role, provider, model, api_key, base_url in route_checks:
+        definition = provider_definition(provider)
+        missing_identity = (
+            *definition.api_key_env_names,
+            base_url or "",
+            api_key or "",
+        )
+        if missing_identity in checked_missing_credentials:
+            checked_missing_credentials[missing_identity].setdefault(
+                "roles", [role]
+            ).append(role)
+            continue
         try:
             mapping = configured_model_mapping(provider, model)
+            credentials = resolve_provider_credentials(provider, api_key, base_url)
         except PowdrrExecutionError as error:
-            results.append(
-                {
-                    "role": role,
-                    "provider": provider,
-                    "model": model or "<unspecified>",
-                    "status": "configuration_error",
-                    "message": str(error),
-                }
+            result = {
+                "role": role,
+                "provider": provider,
+                "model": model or "<unspecified>",
+                "status": "configuration_error",
+                "message": str(error),
+                "roles": [role],
+            }
+            checked_missing_credentials[missing_identity] = result
+            results.append(result)
+            continue
+        credential_identity = (credentials.base_url, credentials.api_key)
+        if credential_identity in checked_credentials:
+            checked_credentials[credential_identity].setdefault("roles", [role]).append(
+                role
             )
             continue
-        results.append(
-            check_model_access(
-                role=role,
-                provider=provider,
-                mapping=mapping,
-                repo_root=repo_root,
-                api_key=api_key,
-                base_url=base_url,
-            ).to_data()
-        )
+        check_result: dict[str, Any] = check_model_access(
+            role=role,
+            provider=provider,
+            mapping=mapping,
+            repo_root=repo_root,
+            api_key=api_key,
+            base_url=base_url,
+        ).to_data()
+        check_result["roles"] = [role]
+        checked_credentials[credential_identity] = check_result
+        results.append(check_result)
+
+    results.append(check_typesafeai_access().to_data())
 
     executable = (
         args.opencode_executable
@@ -3388,55 +3422,54 @@ def _run_check_credentials(args: argparse.Namespace) -> int:
     )
     results.append(check_coding_executable(executable, role="coding-agent").to_data())
 
-    if args.open_pr:
-        github_result: dict[str, str] = {
-            "role": "github-publication",
-            "provider": "gh",
-            "model": "GitHub CLI and repository permissions",
-            "status": "unavailable",
-        }
-        try:
-            auth = subprocess.run(
-                ["gh", "auth", "status"],
+    github_result: dict[str, str] = {
+        "role": "github-publication",
+        "provider": "gh",
+        "model": "GitHub CLI and repository permissions",
+        "status": "unavailable",
+    }
+    try:
+        auth = subprocess.run(
+            ["gh", "auth", "status"],
+            cwd=repo_root,
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=10,
+        )
+        if auth.returncode == 0:
+            repository = subprocess.run(
+                ["gh", "repo", "view", "--json", "nameWithOwner,viewerPermission"],
                 cwd=repo_root,
                 text=True,
                 capture_output=True,
                 check=False,
                 timeout=10,
             )
-            if auth.returncode == 0:
-                repository = subprocess.run(
-                    ["gh", "repo", "view", "--json", "nameWithOwner,viewerPermission"],
-                    cwd=repo_root,
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                    timeout=10,
+            if repository.returncode == 0:
+                details = json.loads(repository.stdout)
+                permission = details.get("viewerPermission")
+                github_result.update(
+                    status=(
+                        "passed"
+                        if permission in {"WRITE", "MAINTAIN", "ADMIN"}
+                        else "insufficient_repository_permission"
+                    ),
+                    repository=details.get("nameWithOwner", "unknown"),
+                    permission=str(permission or "unknown"),
                 )
-                if repository.returncode == 0:
-                    details = json.loads(repository.stdout)
-                    permission = details.get("viewerPermission")
-                    github_result.update(
-                        status=(
-                            "passed"
-                            if permission in {"WRITE", "MAINTAIN", "ADMIN"}
-                            else "insufficient_repository_permission"
-                        ),
-                        repository=details.get("nameWithOwner", "unknown"),
-                        permission=str(permission or "unknown"),
-                    )
-                else:
-                    github_result["message"] = (
-                        repository.stderr.strip()[-500:]
-                        or "Could not identify the GitHub repository."
-                    )
             else:
                 github_result["message"] = (
-                    auth.stderr.strip()[-500:] or "GitHub authentication failed."
+                    repository.stderr.strip()[-500:]
+                    or "Could not identify the GitHub repository."
                 )
-        except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
-            github_result["message"] = str(error)[:500]
-        results.append(github_result)
+        else:
+            github_result["message"] = (
+                auth.stderr.strip()[-500:] or "GitHub authentication failed."
+            )
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
+        github_result["message"] = str(error)[:500]
+    results.append(github_result)
 
     success = all(item["status"] == "passed" for item in results)
     report = {"passed": success, "checks": results}
@@ -3444,9 +3477,10 @@ def _run_check_credentials(args: argparse.Namespace) -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
         for item in results:
+            roles = item.get("roles")
+            role_label = "/".join(roles) if roles else item["role"]
             print(
-                f"{item['role']}: {item['status']} "
-                f"({item['provider']} / {item['model']})"
+                f"{role_label}: {item['status']} ({item['provider']} / {item['model']})"
             )
             if item.get("message"):
                 print(f"  {item['message']}")

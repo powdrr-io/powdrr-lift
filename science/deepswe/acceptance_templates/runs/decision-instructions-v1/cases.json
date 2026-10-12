@@ -1,0 +1,290 @@
+{
+  "cases": [
+    {
+      "id": "k-assignment",
+      "task_id": "koota-composite-trait-aspects",
+      "split": "development",
+      "kind": "inferred",
+      "current_question": "Should exposed id, traits and schema properties prevent reassignment, following the existing public metadata pattern?",
+      "revised_question": "Which property-assignment policy best preserves the aspect's constructed identity and public metadata contract, considering corresponding existing APIs?",
+      "options": {
+        "unknown": "The sources do not settle property reassignment.",
+        "protected": "The aspect's id, traits and schema properties cannot be reassigned.",
+        "writable": "The aspect's id, traits and schema properties allow reassignment."
+      }
+    },
+    {
+      "id": "k-traits-container",
+      "task_id": "koota-composite-trait-aspects",
+      "split": "development",
+      "kind": "inferred",
+      "current_question": "Does the instruction or an established existing contract require protecting the exposed traits array against adding, removing or replacing entries?",
+      "revised_question": "Which traits-array mutation policy best preserves the constructed aspect's constituent definition and its relationship with field ownership and query membership? Consider whether a reconfiguration capability is requested.",
+      "options": {
+        "mutable": "The exposed traits array allows entries to be added, removed or replaced after creation.",
+        "protected": "The exposed traits array cannot have entries added, removed or replaced after creation.",
+        "unknown": "The sources do not settle traits-array mutation."
+      }
+    },
+    {
+      "id": "k-schema-container",
+      "task_id": "koota-composite-trait-aspects",
+      "split": "development",
+      "kind": "inferred",
+      "current_question": "Does the instruction or an established existing contract require protecting the merged schema's top-level fields against mutation?",
+      "revised_question": "Which top-level schema mutation policy keeps the aspect's declared fields consistent with field ownership used by set and add? Consider the metadata's role separately from nested values.",
+      "options": {
+        "protected": "The merged schema's top-level fields cannot be added, removed or reassigned after creation.",
+        "unknown": "The sources do not settle top-level schema mutation.",
+        "mutable": "The merged schema permits adding, removing or reassigning top-level fields after creation."
+      }
+    },
+    {
+      "id": "k-nested-freeze",
+      "task_id": "koota-composite-trait-aspects",
+      "split": "development",
+      "kind": "inferred",
+      "current_question": "Should creating an aspect recursively freeze nested schema values, or does the instruction not settle this?",
+      "revised_question": "What recursive-freezing policy preserves existing constituent schema values without introducing a side effect on nested objects supplied by callers? Distinguish container protection from recursive mutation protection.",
+      "options": {
+        "preserve": "Aspect creation does not recursively freeze previously mutable nested schema values.",
+        "recursive": "Aspect creation recursively freezes nested schema values.",
+        "unknown": "The sources do not settle recursive schema freezing."
+      }
+    },
+    {
+      "id": "k-nested-reference",
+      "task_id": "koota-composite-trait-aspects",
+      "split": "development",
+      "kind": "inferred",
+      "current_question": "Does the instruction explicitly require retaining nested schema value identity instead of copying nested objects?",
+      "revised_question": "Are merged schema entries references to existing constituent field definitions, or independently cloned definitions? Choose the policy most consistent with composing existing traits without changing their definitions.",
+      "options": {
+        "unknown": "The sources do not settle nested schema identity.",
+        "shared": "Nested merged schema values retain their constituent schema references.",
+        "cloned": "Nested merged schema values are independent deep copies of constituent schema values."
+      }
+    },
+    {
+      "id": "k-callback-slot",
+      "task_id": "koota-composite-trait-aspects",
+      "split": "development",
+      "kind": "explicit",
+      "current_question": "Does nested-aspect flattening replace readEach's merged data with separate constituent callback slots?",
+      "revised_question": "Which operation does nested-aspect flattening govern, and which callback data shape preserves readEach's separate promise to deliver merged aspect data?",
+      "options": {
+        "expanded": "A directly supplied nested aspect contributes separate readEach callback objects for each constituent.",
+        "unknown": "The sources do not settle nested callback grouping.",
+        "merged": "A directly supplied nested aspect contributes one merged readEach callback object."
+      }
+    },
+    {
+      "id": "k-set-equality",
+      "task_id": "koota-composite-trait-aspects",
+      "split": "development",
+      "kind": "inherited",
+      "current_question": "Should the new aspect setter inherit equal-value notifications from regular-trait set, or introduce an inequality guard like updateEach?",
+      "revised_question": "Which operation corresponds to distributing aspect set fields to their owners? Follow that operation's actual notification guard, keeping setter behavior separate from mutation-callback detection.",
+      "options": {
+        "suppress": "A supplied equal-value aspect set field suppresses its constituent notification even when triggerChanged=true.",
+        "notify": "A supplied equal-value aspect set field still triggers its constituent notification when triggerChanged=true.",
+        "unknown": "The sources do not settle equal-value aspect notifications."
+      }
+    },
+    {
+      "id": "k-callback-subject",
+      "task_id": "koota-composite-trait-aspects",
+      "split": "development",
+      "kind": "inherited",
+      "current_question": "Does the instruction explicitly specify whether an aspect subscription callback receives the affected entity or merged data as its first argument?",
+      "revised_question": "What is the first argument in existing world subscription callbacks, and does the aspect feature request replace that callback subject? Choose the compatible first argument.",
+      "options": {
+        "data": "Aspect subscription callbacks receive merged aspect data as their first argument.",
+        "entity": "Aspect subscription callbacks receive the affected entity as their first argument.",
+        "unknown": "The sources do not settle the callback's first argument."
+      }
+    },
+    {
+      "id": "k-unsupported-cap",
+      "task_id": "koota-composite-trait-aspects",
+      "split": "development",
+      "kind": "unsupported",
+      "current_question": "Does this task require an application-level maximum of 32 or 256 aspect constituents?",
+      "revised_question": "Is a fixed maximum of 32 or 256 constituents part of the requested contract or necessary for its behavior, beyond the stated minimum?",
+      "options": {
+        "cap256": "Aspect creation rejects more than 256 constituents.",
+        "cap32": "Aspect creation rejects more than 32 constituents.",
+        "unknown": "The task establishes no application-level maximum constituent count."
+      }
+    },
+    {
+      "id": "g-result-snapshot",
+      "task_id": "gql-incremental-graphql-delivery",
+      "split": "evaluation",
+      "kind": "inferred",
+      "current_question": "Does the instruction explicitly require previous yielded data objects to remain unchanged when later payloads arrive?",
+      "revised_question": "Which data-lifetime policy preserves each yielded result as a coherent result for the payload that produced it, while accumulating later deliveries? Consider nested deferred and streamed updates.",
+      "options": {
+        "unknown": "The sources do not settle previously yielded data lifetime.",
+        "live": "Previously yielded result data remains a live view that later payload processing mutates.",
+        "snapshot": "Later payload processing leaves previously yielded result data unchanged, including nested objects and lists."
+      }
+    },
+    {
+      "id": "g-stream-position",
+      "task_id": "gql-incremental-graphql-delivery",
+      "split": "evaluation",
+      "kind": "inferred",
+      "current_question": "Does insertion start index mean stream items splice into the list and shift existing elements, or overwrite addressed positions?",
+      "revised_question": "Which interpretation of a stream start index preserves path-based addressing while concurrent deferred and streamed fields are merged: filling addressed positions or shifting existing positions?",
+      "options": {
+        "positions": "For list [A,B,C] and streamed [X] at start index 1, the result is [A,X,C].",
+        "splice": "For list [A,B,C] and streamed [X] at start index 1, the result is [A,X,B,C].",
+        "unknown": "The sources do not settle stream index semantics."
+      }
+    },
+    {
+      "id": "g-extensions-lifetime",
+      "task_id": "gql-incremental-graphql-delivery",
+      "split": "evaluation",
+      "kind": "explicit",
+      "current_question": "When a later payload omits extensions, should earlier payload extensions remain in its yielded result?",
+      "revised_question": "Which fields have an accumulation contract and which are payload-local? Apply the stated extensions scope when a payload has no extensions field.",
+      "options": {
+        "payload_local": "A payload without extensions yields extensions=None rather than retaining earlier extensions.",
+        "unknown": "The sources do not settle omitted extensions.",
+        "retain": "A payload without extensions yields the previous payload's extensions."
+      }
+    },
+    {
+      "id": "g-progress-only",
+      "task_id": "gql-incremental-graphql-delivery",
+      "split": "evaluation",
+      "kind": "explicit",
+      "current_question": "Does the instruction require yielding results for hasNext-only payloads and empty incremental arrays, or may they be skipped?",
+      "revised_question": "Is yielding governed by receiving a payload or by that payload changing data? Apply the explicit progress-payload requirement.",
+      "options": {
+        "skip": "hasNext-only payloads and empty incremental arrays are skipped when they do not change data.",
+        "yield": "hasNext-only payloads and empty incremental arrays still yield results with the accumulated data.",
+        "unknown": "The sources do not settle progress-only yields."
+      }
+    },
+    {
+      "id": "g-error-continuation",
+      "task_id": "gql-incremental-graphql-delivery",
+      "split": "evaluation",
+      "kind": "explicit",
+      "current_question": "Should the incremental generator retain existing session subscribe's TransportQueryError behavior for result errors?",
+      "revised_question": "Does the new operation's explicit error-continuation requirement override the corresponding existing subscription error behavior? Choose the observable incremental behavior.",
+      "options": {
+        "continue": "Result errors are delivered on incremental results without halting subsequent items.",
+        "unknown": "The sources do not settle incremental error continuation.",
+        "raise": "Result errors raise TransportQueryError and terminate incremental delivery."
+      }
+    },
+    {
+      "id": "g-errors-lifetime",
+      "task_id": "gql-incremental-graphql-delivery",
+      "split": "evaluation",
+      "kind": "inferred",
+      "current_question": "Does the instruction explicitly specify whether errors accumulate across result payloads?",
+      "revised_question": "Which result fields are explicitly accumulated, and what is the existing result scope for errors? Choose the errors policy that preserves per-delivery result meaning without introducing extra accumulation.",
+      "options": {
+        "payload_local": "Each result contains only current payload and current incremental-item errors; earlier payload errors are not carried forward.",
+        "unknown": "The sources do not settle error accumulation.",
+        "accumulate": "Each result accumulates errors from all previous payloads."
+      }
+    },
+    {
+      "id": "g-unsupported-cap",
+      "task_id": "gql-incremental-graphql-delivery",
+      "split": "evaluation",
+      "kind": "unsupported",
+      "current_question": "Does the task require a maximum of 1024 or 4096 accumulated result items?",
+      "revised_question": "Is either numeric result-size ceiling requested or necessary for incremental delivery's stated contract?",
+      "options": {
+        "unknown": "The task establishes no fixed accumulated-item ceiling.",
+        "cap4096": "Incremental results reject more than 4096 accumulated items.",
+        "cap1024": "Incremental results reject more than 1024 accumulated items."
+      }
+    },
+    {
+      "id": "b-none-selection",
+      "task_id": "bandit-structured-nosec-directives",
+      "split": "evaluation",
+      "kind": "explicit",
+      "current_question": "Should none resolve to an empty legacy nosec set and therefore blanket suppression?",
+      "revised_question": "Does the new selector token none mean absence of a selector or selection of no tests? Preserve that semantic distinction when adapting legacy sentinel representation.",
+      "options": {
+        "blanket": "A structured directive with selector none suppresses every test.",
+        "no_effect": "A structured directive with selector none applies no suppression.",
+        "unknown": "The sources do not settle selector none."
+      }
+    },
+    {
+      "id": "b-unrecognized-selection",
+      "task_id": "bandit-structured-nosec-directives",
+      "split": "evaluation",
+      "kind": "inferred",
+      "current_question": "When a nonempty new selector resolves no valid test IDs, should legacy empty-set blanket suppression be inherited?",
+      "revised_question": "Is a supplied nonempty selector that selects no enabled tests equivalent to an omitted selector? Choose the policy that preserves selection meaning while adapting the legacy representation.",
+      "options": {
+        "blanket": "A supplied nonempty structured selector resolving no known tests suppresses all tests.",
+        "unknown": "The sources do not settle nonempty selectors resolving no tests.",
+        "no_effect": "A supplied nonempty structured selector resolving no known tests applies no suppression."
+      }
+    },
+    {
+      "id": "b-blanket-combination",
+      "task_id": "bandit-structured-nosec-directives",
+      "split": "evaluation",
+      "kind": "explicit",
+      "current_question": "Should combining blanket and specific suppressions convert the empty blanket sentinel into only the specific test set?",
+      "revised_question": "What must dominate when two applicable suppressions combine? Distinguish the semantic blanket selection from its empty-set representation.",
+      "options": {
+        "specific": "Combining a blanket suppression and a specific suppression suppresses only the specific tests and counts as skipped_tests.",
+        "blanket": "Combining a blanket suppression and a specific suppression remains blanket suppression and counts as nosec.",
+        "unknown": "The sources do not settle blanket-plus-specific combination."
+      }
+    },
+    {
+      "id": "b-compound-header",
+      "task_id": "bandit-structured-nosec-directives",
+      "split": "evaluation",
+      "kind": "inferred",
+      "current_question": "Does statement-wide suppression on a function-definition header extend across its full AST span, including independent statements in its body?",
+      "revised_question": "Which findings belong to the suppressed logical statement and which belong to separate nested statements? Apply statement-wide scope without turning header suppression into a new whole-suite region.",
+      "options": {
+        "whole_suite": "Suppression on a compound statement header automatically suppresses all independent statements in its body.",
+        "unknown": "The sources do not settle compound-header scope.",
+        "header_only": "Suppression on a compound statement header does not automatically suppress independent statements in its body."
+      }
+    },
+    {
+      "id": "b-nested-begin-line",
+      "task_id": "bandit-structured-nosec-directives",
+      "split": "evaluation",
+      "kind": "inferred",
+      "current_question": "Is a nested nosec-begin directive line exempt from every active suppression because begin lines are not suppressed?",
+      "revised_question": "Does excluding a begin directive's own line apply only to that newly opened region or also cancel an already active outer region? Preserve the scope of the exclusion and combination rules.",
+      "options": {
+        "outer_applies": "A nested begin directive's line can still be suppressed by an already active outer region; only the new region starts on the following line.",
+        "unknown": "The sources do not settle nested begin-line coverage.",
+        "all_exempt": "A nested begin directive's line is exempt from all active outer-region suppressions."
+      }
+    },
+    {
+      "id": "b-unsupported-cap",
+      "task_id": "bandit-structured-nosec-directives",
+      "split": "evaluation",
+      "kind": "unsupported",
+      "current_question": "Does this task require a maximum nesting depth of 32 or 256 suppression regions?",
+      "revised_question": "Is either fixed nesting-depth ceiling requested or necessary for the region suppression contract?",
+      "options": {
+        "cap256": "Region suppression rejects nesting deeper than 256 regions.",
+        "unknown": "The task establishes no fixed region-nesting depth ceiling.",
+        "cap32": "Region suppression rejects nesting deeper than 32 regions."
+      }
+    }
+  ]
+}

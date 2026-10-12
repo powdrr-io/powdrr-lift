@@ -1,0 +1,31 @@
+{
+  "id": "k-set-equality",
+  "task_id": "koota-composite-trait-aspects",
+  "arm": "examples",
+  "flash": "notify",
+  "jev": "notify",
+  "consensus": "notify",
+  "rendered": "A supplied equal-value aspect set field still triggers its constituent notification when triggerChanged=true.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.263,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.214,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

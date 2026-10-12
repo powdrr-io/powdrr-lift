@@ -1,0 +1,138 @@
+{
+  "labels": [
+    {
+      "id": "k-assignment",
+      "expected": "protected",
+      "evidence": "solution.patch:88-107 non-writable property descriptors",
+      "kind": "inferred"
+    },
+    {
+      "id": "k-traits-container",
+      "expected": "protected",
+      "evidence": "solution.patch:95-100 Object.freeze([...traits])",
+      "kind": "inferred"
+    },
+    {
+      "id": "k-schema-container",
+      "expected": "protected",
+      "evidence": "solution.patch:102-107 Object.freeze({...schema})",
+      "kind": "inferred"
+    },
+    {
+      "id": "k-nested-freeze",
+      "expected": "preserve",
+      "evidence": "solution.patch:103 shallow copy/freeze, no recursive walk",
+      "kind": "inferred"
+    },
+    {
+      "id": "k-nested-reference",
+      "expected": "shared",
+      "evidence": "solution.patch:72 schema[key]=traitSchema[key], then {...schema}",
+      "kind": "inferred"
+    },
+    {
+      "id": "k-callback-slot",
+      "expected": "merged",
+      "evidence": "solution.patch:468-476 per-aspect slot mapping; 511-519 state[i]=merged",
+      "kind": "explicit"
+    },
+    {
+      "id": "k-set-equality",
+      "expected": "notify",
+      "evidence": "solution.patch:1095-1096 setTraitForTrait forwarding; base trait/trait.ts:406-423 no equality guard",
+      "kind": "inherited"
+    },
+    {
+      "id": "k-callback-subject",
+      "expected": "entity",
+      "evidence": "solution.patch:1177,1218,1246 callback(entity,undefined); exact arity deliberately not tested here",
+      "kind": "inherited"
+    },
+    {
+      "id": "k-unsupported-cap",
+      "expected": "unknown",
+      "evidence": "Instruction specifies minimum only; solution.patch constructor has no upper-limit guard",
+      "kind": "unsupported"
+    },
+    {
+      "id": "g-result-snapshot",
+      "expected": "snapshot",
+      "evidence": "solution.patch:329,360,366 deep-copy accumulated result data",
+      "kind": "inferred"
+    },
+    {
+      "id": "g-stream-position",
+      "expected": "positions",
+      "evidence": "solution.patch:280-284 target_list[start_index+i]=item, padding gaps with None",
+      "kind": "inferred"
+    },
+    {
+      "id": "g-extensions-lifetime",
+      "expected": "payload_local",
+      "evidence": "Instruction payload-specific extensions; solution.patch:355 response.get(extensions)",
+      "kind": "explicit"
+    },
+    {
+      "id": "g-progress-only",
+      "expected": "yield",
+      "evidence": "Instruction explicit; solution.patch:366-383 constructs result for every incremental/progress payload",
+      "kind": "explicit"
+    },
+    {
+      "id": "g-error-continuation",
+      "expected": "continue",
+      "evidence": "Instruction errors must not halt subsequent items; solution.patch:93 unconditional yield and 373-383 result.errors",
+      "kind": "explicit"
+    },
+    {
+      "id": "g-errors-lifetime",
+      "expected": "payload_local",
+      "evidence": "solution.patch:354 and 367-377 collects only current response/item errors",
+      "kind": "inferred"
+    },
+    {
+      "id": "g-unsupported-cap",
+      "expected": "unknown",
+      "evidence": "Instruction and solution contain no such application-level result-size cap",
+      "kind": "unsupported"
+    },
+    {
+      "id": "b-none-selection",
+      "expected": "no_effect",
+      "evidence": "Instruction none has no effect; solution.patch:343-344 returns None",
+      "kind": "explicit"
+    },
+    {
+      "id": "b-unrecognized-selection",
+      "expected": "no_effect",
+      "evidence": "solution.patch:347-348 empty resolved selection->None;366 empty fallback->None",
+      "kind": "inferred"
+    },
+    {
+      "id": "b-blanket-combination",
+      "expected": "blanket",
+      "evidence": "Instruction blanket dominates; solution.patch:719-720 returns set() when either applicable set empty",
+      "kind": "explicit"
+    },
+    {
+      "id": "b-compound-header",
+      "expected": "header_only",
+      "evidence": "solution.patch:739-754 restricts compound statements to header line",
+      "kind": "inferred"
+    },
+    {
+      "id": "b-nested-begin-line",
+      "expected": "outer_applies",
+      "evidence": "solution.patch:normalize_begin event starts next line;212-230 region map applies existing stack on nested begin line",
+      "kind": "inferred"
+    },
+    {
+      "id": "b-unsupported-cap",
+      "expected": "unknown",
+      "evidence": "Instruction and solution region stack establish no fixed nesting cap",
+      "kind": "unsupported"
+    }
+  ],
+  "authority": "Solution patch is the target; unsupported controls have no requested/specified obligation.",
+  "reviewer": "Agent-authored, not human adjudication; known task and manually designed questions."
+}

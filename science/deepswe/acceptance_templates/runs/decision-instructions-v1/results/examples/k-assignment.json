@@ -1,0 +1,31 @@
+{
+  "id": "k-assignment",
+  "task_id": "koota-composite-trait-aspects",
+  "arm": "examples",
+  "flash": "protected",
+  "jev": "protected",
+  "consensus": "protected",
+  "rendered": "The aspect's id, traits and schema properties cannot be reassigned.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.222,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.284,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

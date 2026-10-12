@@ -1,0 +1,31 @@
+{
+  "id": "k-callback-subject",
+  "task_id": "koota-composite-trait-aspects",
+  "arm": "examples",
+  "flash": "entity",
+  "jev": "entity",
+  "consensus": "entity",
+  "rendered": "Aspect subscription callbacks receive the affected entity as their first argument.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.884,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.232,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "g-error-continuation",
+  "task_id": "gql-incremental-graphql-delivery",
+  "arm": "revised",
+  "flash": "continue",
+  "jev": "continue",
+  "consensus": "continue",
+  "rendered": "Result errors are delivered on incremental results without halting subsequent items.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 2.018,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.271,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

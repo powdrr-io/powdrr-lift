@@ -1,0 +1,1097 @@
+{
+  "scores": {
+    "development": {
+      "current": {
+        "flash": {
+          "correct": 0,
+          "missing": 8,
+          "wrong": 0,
+          "correct_withholding": 1,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 2,
+          "missing": 6,
+          "wrong": 0,
+          "correct_withholding": 1,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 0,
+          "missing": 8,
+          "wrong": 0,
+          "correct_withholding": 1,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "revised": {
+        "flash": {
+          "correct": 8,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 1,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 8,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 1,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 8,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 1,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "examples": {
+        "flash": {
+          "correct": 8,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 1,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 8,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 1,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 8,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 1,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      }
+    },
+    "evaluation": {
+      "current": {
+        "flash": {
+          "correct": 6,
+          "missing": 4,
+          "wrong": 1,
+          "correct_withholding": 2,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 8,
+          "missing": 2,
+          "wrong": 1,
+          "correct_withholding": 2,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 6,
+          "missing": 4,
+          "wrong": 1,
+          "correct_withholding": 2,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "revised": {
+        "flash": {
+          "correct": 10,
+          "missing": 0,
+          "wrong": 1,
+          "correct_withholding": 2,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 11,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 2,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 10,
+          "missing": 1,
+          "wrong": 0,
+          "correct_withholding": 2,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "examples": {
+        "flash": {
+          "correct": 10,
+          "missing": 0,
+          "wrong": 1,
+          "correct_withholding": 2,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 11,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 2,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 10,
+          "missing": 1,
+          "wrong": 0,
+          "correct_withholding": 2,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      }
+    },
+    "all": {
+      "current": {
+        "flash": {
+          "correct": 6,
+          "missing": 12,
+          "wrong": 1,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 10,
+          "missing": 8,
+          "wrong": 1,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 6,
+          "missing": 12,
+          "wrong": 1,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "revised": {
+        "flash": {
+          "correct": 18,
+          "missing": 0,
+          "wrong": 1,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 19,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 18,
+          "missing": 1,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "examples": {
+        "flash": {
+          "correct": 18,
+          "missing": 0,
+          "wrong": 1,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 19,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 18,
+          "missing": 1,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      }
+    }
+  },
+  "by_kind": {
+    "explicit": {
+      "current": {
+        "flash": {
+          "correct": 5,
+          "missing": 1,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 6,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 5,
+          "missing": 1,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "revised": {
+        "flash": {
+          "correct": 6,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 6,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 6,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "examples": {
+        "flash": {
+          "correct": 6,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 6,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 6,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      }
+    },
+    "inherited": {
+      "current": {
+        "flash": {
+          "correct": 0,
+          "missing": 2,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 0,
+          "missing": 2,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 0,
+          "missing": 2,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "revised": {
+        "flash": {
+          "correct": 2,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 2,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 2,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "examples": {
+        "flash": {
+          "correct": 2,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 2,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 2,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      }
+    },
+    "inferred": {
+      "current": {
+        "flash": {
+          "correct": 1,
+          "missing": 9,
+          "wrong": 1,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 4,
+          "missing": 6,
+          "wrong": 1,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 1,
+          "missing": 9,
+          "wrong": 1,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "revised": {
+        "flash": {
+          "correct": 10,
+          "missing": 0,
+          "wrong": 1,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 11,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 10,
+          "missing": 1,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "examples": {
+        "flash": {
+          "correct": 10,
+          "missing": 0,
+          "wrong": 1,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 11,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 10,
+          "missing": 1,
+          "wrong": 0,
+          "correct_withholding": 0,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      }
+    },
+    "unsupported": {
+      "current": {
+        "flash": {
+          "correct": 0,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 0,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 0,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "revised": {
+        "flash": {
+          "correct": 0,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 0,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 0,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      },
+      "examples": {
+        "flash": {
+          "correct": 0,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "jev": {
+          "correct": 0,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        },
+        "consensus": {
+          "correct": 0,
+          "missing": 0,
+          "wrong": 0,
+          "correct_withholding": 3,
+          "unsupported_addition": 0,
+          "failed": 0
+        }
+      }
+    }
+  },
+  "rows": [
+    {
+      "id": "k-assignment",
+      "split": "development",
+      "kind": "inferred",
+      "expected": "protected",
+      "evidence": "solution.patch:88-107 non-writable property descriptors",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "protected",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "protected",
+          "jev": "protected",
+          "consensus": "protected"
+        },
+        "examples": {
+          "flash": "protected",
+          "jev": "protected",
+          "consensus": "protected"
+        }
+      }
+    },
+    {
+      "id": "k-traits-container",
+      "split": "development",
+      "kind": "inferred",
+      "expected": "protected",
+      "evidence": "solution.patch:95-100 Object.freeze([...traits])",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "protected",
+          "jev": "protected",
+          "consensus": "protected"
+        },
+        "examples": {
+          "flash": "protected",
+          "jev": "protected",
+          "consensus": "protected"
+        }
+      }
+    },
+    {
+      "id": "k-schema-container",
+      "split": "development",
+      "kind": "inferred",
+      "expected": "protected",
+      "evidence": "solution.patch:102-107 Object.freeze({...schema})",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "protected",
+          "jev": "protected",
+          "consensus": "protected"
+        },
+        "examples": {
+          "flash": "protected",
+          "jev": "protected",
+          "consensus": "protected"
+        }
+      }
+    },
+    {
+      "id": "k-nested-freeze",
+      "split": "development",
+      "kind": "inferred",
+      "expected": "preserve",
+      "evidence": "solution.patch:103 shallow copy/freeze, no recursive walk",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "preserve",
+          "jev": "preserve",
+          "consensus": "preserve"
+        },
+        "examples": {
+          "flash": "preserve",
+          "jev": "preserve",
+          "consensus": "preserve"
+        }
+      }
+    },
+    {
+      "id": "k-nested-reference",
+      "split": "development",
+      "kind": "inferred",
+      "expected": "shared",
+      "evidence": "solution.patch:72 schema[key]=traitSchema[key], then {...schema}",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "shared",
+          "jev": "shared",
+          "consensus": "shared"
+        },
+        "examples": {
+          "flash": "shared",
+          "jev": "shared",
+          "consensus": "shared"
+        }
+      }
+    },
+    {
+      "id": "k-callback-slot",
+      "split": "development",
+      "kind": "explicit",
+      "expected": "merged",
+      "evidence": "solution.patch:468-476 per-aspect slot mapping; 511-519 state[i]=merged",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "merged",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "merged",
+          "jev": "merged",
+          "consensus": "merged"
+        },
+        "examples": {
+          "flash": "merged",
+          "jev": "merged",
+          "consensus": "merged"
+        }
+      }
+    },
+    {
+      "id": "k-set-equality",
+      "split": "development",
+      "kind": "inherited",
+      "expected": "notify",
+      "evidence": "solution.patch:1095-1096 setTraitForTrait forwarding; base trait/trait.ts:406-423 no equality guard",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "notify",
+          "jev": "notify",
+          "consensus": "notify"
+        },
+        "examples": {
+          "flash": "notify",
+          "jev": "notify",
+          "consensus": "notify"
+        }
+      }
+    },
+    {
+      "id": "k-callback-subject",
+      "split": "development",
+      "kind": "inherited",
+      "expected": "entity",
+      "evidence": "solution.patch:1177,1218,1246 callback(entity,undefined); exact arity deliberately not tested here",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "entity",
+          "jev": "entity",
+          "consensus": "entity"
+        },
+        "examples": {
+          "flash": "entity",
+          "jev": "entity",
+          "consensus": "entity"
+        }
+      }
+    },
+    {
+      "id": "k-unsupported-cap",
+      "split": "development",
+      "kind": "unsupported",
+      "expected": "unknown",
+      "evidence": "Instruction specifies minimum only; solution.patch constructor has no upper-limit guard",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "examples": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        }
+      }
+    },
+    {
+      "id": "g-result-snapshot",
+      "split": "evaluation",
+      "kind": "inferred",
+      "expected": "snapshot",
+      "evidence": "solution.patch:329,360,366 deep-copy accumulated result data",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "snapshot",
+          "jev": "snapshot",
+          "consensus": "snapshot"
+        },
+        "examples": {
+          "flash": "snapshot",
+          "jev": "snapshot",
+          "consensus": "snapshot"
+        }
+      }
+    },
+    {
+      "id": "g-stream-position",
+      "split": "evaluation",
+      "kind": "inferred",
+      "expected": "positions",
+      "evidence": "solution.patch:280-284 target_list[start_index+i]=item, padding gaps with None",
+      "arms": {
+        "current": {
+          "flash": "splice",
+          "jev": "splice",
+          "consensus": "splice"
+        },
+        "revised": {
+          "flash": "splice",
+          "jev": "positions",
+          "consensus": "unknown"
+        },
+        "examples": {
+          "flash": "splice",
+          "jev": "positions",
+          "consensus": "unknown"
+        }
+      }
+    },
+    {
+      "id": "g-extensions-lifetime",
+      "split": "evaluation",
+      "kind": "explicit",
+      "expected": "payload_local",
+      "evidence": "Instruction payload-specific extensions; solution.patch:355 response.get(extensions)",
+      "arms": {
+        "current": {
+          "flash": "payload_local",
+          "jev": "payload_local",
+          "consensus": "payload_local"
+        },
+        "revised": {
+          "flash": "payload_local",
+          "jev": "payload_local",
+          "consensus": "payload_local"
+        },
+        "examples": {
+          "flash": "payload_local",
+          "jev": "payload_local",
+          "consensus": "payload_local"
+        }
+      }
+    },
+    {
+      "id": "g-progress-only",
+      "split": "evaluation",
+      "kind": "explicit",
+      "expected": "yield",
+      "evidence": "Instruction explicit; solution.patch:366-383 constructs result for every incremental/progress payload",
+      "arms": {
+        "current": {
+          "flash": "yield",
+          "jev": "yield",
+          "consensus": "yield"
+        },
+        "revised": {
+          "flash": "yield",
+          "jev": "yield",
+          "consensus": "yield"
+        },
+        "examples": {
+          "flash": "yield",
+          "jev": "yield",
+          "consensus": "yield"
+        }
+      }
+    },
+    {
+      "id": "g-error-continuation",
+      "split": "evaluation",
+      "kind": "explicit",
+      "expected": "continue",
+      "evidence": "Instruction errors must not halt subsequent items; solution.patch:93 unconditional yield and 373-383 result.errors",
+      "arms": {
+        "current": {
+          "flash": "continue",
+          "jev": "continue",
+          "consensus": "continue"
+        },
+        "revised": {
+          "flash": "continue",
+          "jev": "continue",
+          "consensus": "continue"
+        },
+        "examples": {
+          "flash": "continue",
+          "jev": "continue",
+          "consensus": "continue"
+        }
+      }
+    },
+    {
+      "id": "g-errors-lifetime",
+      "split": "evaluation",
+      "kind": "inferred",
+      "expected": "payload_local",
+      "evidence": "solution.patch:354 and 367-377 collects only current response/item errors",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "payload_local",
+          "jev": "payload_local",
+          "consensus": "payload_local"
+        },
+        "examples": {
+          "flash": "payload_local",
+          "jev": "payload_local",
+          "consensus": "payload_local"
+        }
+      }
+    },
+    {
+      "id": "g-unsupported-cap",
+      "split": "evaluation",
+      "kind": "unsupported",
+      "expected": "unknown",
+      "evidence": "Instruction and solution contain no such application-level result-size cap",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "examples": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        }
+      }
+    },
+    {
+      "id": "b-none-selection",
+      "split": "evaluation",
+      "kind": "explicit",
+      "expected": "no_effect",
+      "evidence": "Instruction none has no effect; solution.patch:343-344 returns None",
+      "arms": {
+        "current": {
+          "flash": "no_effect",
+          "jev": "no_effect",
+          "consensus": "no_effect"
+        },
+        "revised": {
+          "flash": "no_effect",
+          "jev": "no_effect",
+          "consensus": "no_effect"
+        },
+        "examples": {
+          "flash": "no_effect",
+          "jev": "no_effect",
+          "consensus": "no_effect"
+        }
+      }
+    },
+    {
+      "id": "b-unrecognized-selection",
+      "split": "evaluation",
+      "kind": "inferred",
+      "expected": "no_effect",
+      "evidence": "solution.patch:347-348 empty resolved selection->None;366 empty fallback->None",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "no_effect",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "no_effect",
+          "jev": "no_effect",
+          "consensus": "no_effect"
+        },
+        "examples": {
+          "flash": "no_effect",
+          "jev": "no_effect",
+          "consensus": "no_effect"
+        }
+      }
+    },
+    {
+      "id": "b-blanket-combination",
+      "split": "evaluation",
+      "kind": "explicit",
+      "expected": "blanket",
+      "evidence": "Instruction blanket dominates; solution.patch:719-720 returns set() when either applicable set empty",
+      "arms": {
+        "current": {
+          "flash": "blanket",
+          "jev": "blanket",
+          "consensus": "blanket"
+        },
+        "revised": {
+          "flash": "blanket",
+          "jev": "blanket",
+          "consensus": "blanket"
+        },
+        "examples": {
+          "flash": "blanket",
+          "jev": "blanket",
+          "consensus": "blanket"
+        }
+      }
+    },
+    {
+      "id": "b-compound-header",
+      "split": "evaluation",
+      "kind": "inferred",
+      "expected": "header_only",
+      "evidence": "solution.patch:739-754 restricts compound statements to header line",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "header_only",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "header_only",
+          "jev": "header_only",
+          "consensus": "header_only"
+        },
+        "examples": {
+          "flash": "header_only",
+          "jev": "header_only",
+          "consensus": "header_only"
+        }
+      }
+    },
+    {
+      "id": "b-nested-begin-line",
+      "split": "evaluation",
+      "kind": "inferred",
+      "expected": "outer_applies",
+      "evidence": "solution.patch:normalize_begin event starts next line;212-230 region map applies existing stack on nested begin line",
+      "arms": {
+        "current": {
+          "flash": "outer_applies",
+          "jev": "outer_applies",
+          "consensus": "outer_applies"
+        },
+        "revised": {
+          "flash": "outer_applies",
+          "jev": "outer_applies",
+          "consensus": "outer_applies"
+        },
+        "examples": {
+          "flash": "outer_applies",
+          "jev": "outer_applies",
+          "consensus": "outer_applies"
+        }
+      }
+    },
+    {
+      "id": "b-unsupported-cap",
+      "split": "evaluation",
+      "kind": "unsupported",
+      "expected": "unknown",
+      "evidence": "Instruction and solution region stack establish no fixed nesting cap",
+      "arms": {
+        "current": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "revised": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        },
+        "examples": {
+          "flash": "unknown",
+          "jev": "unknown",
+          "consensus": "unknown"
+        }
+      }
+    }
+  ],
+  "limitation": "One sample per manually designed question per model/arm; no automatic question-discovery or coding success claim."
+}

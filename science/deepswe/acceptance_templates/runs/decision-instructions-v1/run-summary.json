@@ -1,0 +1,27 @@
+{
+  "model_calls": 260,
+  "providers": {
+    "deepinfra": 81,
+    "typesafe.ai": 179
+  },
+  "statuses": {
+    "completed": 256,
+    "failed": 4
+  },
+  "summed_provider_seconds": 221.594,
+  "token_usage": "Unavailable; provider receipts contain empty usage objects.",
+  "paired_decisions": 66,
+  "prompts": 9,
+  "verification": [
+    "frozen hashes",
+    "original source commits/excerpts",
+    "task artifact hashes",
+    "score recomputation",
+    "source/label packet boundary",
+    "literal rendering",
+    "checkpoint archive hashes",
+    "environment credential scan"
+  ],
+  "tests_run": false,
+  "coding_agents_run": false
+}

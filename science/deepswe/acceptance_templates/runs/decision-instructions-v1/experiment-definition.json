@@ -1,0 +1,35 @@
+{
+  "arms": [
+    "current",
+    "revised",
+    "examples"
+  ],
+  "current": "Choose the most faithful behavior for exactly the supplied question using the original instruction and original code. Preserve ordinary instruction meanings and established behavior of the corresponding operation. Do not infer recursive freezing from readonly properties or shallow freezing. An analogous API is not proof of a new policy; choose unknown if the available sources do not settle the choice. Return only the selected choice.",
+  "revised": "Choose the behavior that best satisfies the requested feature's meaning, purpose and relationships with existing operations. First identify the operation, object, condition and scope governed by each relevant statement. Keep construction, membership, callback projection, writing and event delivery separate. Inspect actual corresponding code behavior. Preserve that behavior where compatible; an explicit new behavior overrides it. Compare the alternatives by their observable consequences: do they keep the requested relationships consistent, or introduce an unrequested capability, side effect or cross-operation rule? Infer an ordinary coherent contract when supported by these relationships, even if no sentence states every detail verbatim. Do not require literal repetition of a necessary implication. Choose unknown for unsupported extra guarantees or a choice still genuinely underdetermined after checking scope, existing behavior and consequences. Return only the selected choice.",
+  "examples": [
+    {
+      "source": "A bundle constructor flattens nested bundles into members. Its read callback delivers one merged bundle record.",
+      "question": "Does flattening require separate member callback arguments?",
+      "correct": "No; flattening governs membership, while the callback's promised value remains merged.",
+      "tempting_wrong": "Yes; flattening applies to all later representations."
+    },
+    {
+      "source": "Object.freeze({members: suppliedMembers}) protects an object's own properties.",
+      "question": "Does this freeze make suppliedMembers and its nested values immutable?",
+      "correct": "No; object-property protection and referenced-container/nested-value protection are different decisions.",
+      "tempting_wrong": "Yes; metadata immutability implies recursive immutability."
+    },
+    {
+      "source": "assign writes a supplied field and calls announce when announceEnabled is true. edit callback processing announces only unequal values. New assignBundle routes fields through assign.",
+      "question": "Does an equal-value assignBundle field announce when enabled?",
+      "correct": "Yes; this operation corresponds to assign, not edit callback detection.",
+      "tempting_wrong": "No; adopt equality filtering from the neighboring edit operation."
+    },
+    {
+      "source": "A component defines immutable membership and a lookup derived from it. Task adds a composed component view, with no operation to reconfigure its definition.",
+      "question": "Should exposing its member list introduce independent reconfiguration?",
+      "correct": "No; keep the definition and its derived lookup consistent, while deciding nested-value protection separately.",
+      "tempting_wrong": "Allow arbitrary member-list edits because the word immutable was not repeated for the view."
+    }
+  ]
+}

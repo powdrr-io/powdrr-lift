@@ -1,0 +1,31 @@
+{
+  "id": "b-blanket-combination",
+  "task_id": "bandit-structured-nosec-directives",
+  "arm": "current",
+  "flash": "blanket",
+  "jev": "blanket",
+  "consensus": "blanket",
+  "rendered": "Combining a blanket suppression and a specific suppression remains blanket suppression and counts as nosec.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.101,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.195,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

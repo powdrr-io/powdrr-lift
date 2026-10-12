@@ -1,0 +1,1924 @@
+{
+  "checkpoints": [
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d001/flash/choose-0.json",
+      "sha256": "0844c4a972a9a318fcf4cf242791149d7bab0b718202db6449d20c75145b165f",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.699,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "61d6949a80fb2c23231c1a144327c714f59076e2b288ecfaafe2fe7e46314097"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d001/jev/choose-0.json",
+      "sha256": "21881c814db01d0647bb4797f3440ab6e473f0604702fa13d5c2e166dbb02b47",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.254,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b05059bdbe51b0d76020d96c80a375a031d55fc4c4e99167f45cc31d5ac101c9"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d001/jev/provider.json",
+      "sha256": "2be6188d2dd883d10a4d056cc96f3c55bdafe7743bee1ee1a89457576267612d",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d002/flash/choose-0.json",
+      "sha256": "6665274dac47cdbabd5d08a6d6a9864d6c7dc1c79b4560c1686446498edacecf",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.755,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "97ac14cce501c1665a768e39f6f3da7963504c33b0e3bfa8d0c9f2cd594779e0"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d002/jev/choose-0.json",
+      "sha256": "3c2834cff7d3353bae0937298ea374e85840adb4e716d9245a951305ae6d0430",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.558,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "36c0a9d6ea945bc964b2c54d33953c9222a76d2f000a4e780d4d23d0eaea6df7"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d002/jev/provider.json",
+      "sha256": "e0d924f1cb1370bf65ec336b56c4f8b68edbf243a3c3735cd4e075369bcd177c",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d003/flash/choose-0.json",
+      "sha256": "99581f1a280626a88e247e183c9b3096e648314ee985e09b46f0077f651cea5a",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.447,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "33c67f77811b258ec8b8f594c287259bb967eb8020275e3e03826485585f1312"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d003/jev/choose-0.json",
+      "sha256": "61094239fec1eee16bdc2090907faf19f86e755d1b2cd11d9047e71f6c53a92a",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.417,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "6b7b082c92f0d8b28a8ec08a345880add8a9357acb7139e5ebf864d61c6d7dad"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d003/jev/provider.json",
+      "sha256": "0bc83f7d66e76b962dde486df4a4e6df4a91681b041be698cd45e32d424a3afb",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d004/flash/choose-0.json",
+      "sha256": "ee3b00ac9aaaa8ddfbc30b2bf07f0e62febdc6a235d5df033d3927bdfa72139c",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.637,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "1420409d3b0f87e02c8579820c5b92c4f840666fdfc2e1bed69192868159ec58"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d004/jev/choose-0.json",
+      "sha256": "0ec1ffb73e490e7c91e1bd056650a156df8b439672fe4ac05456d6926d635198",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.341,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "fc952ec88ea8cb9d6d3dc213b44dd3d6bf90b8f61f1877e51a75d66096a75ee6"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d004/jev/provider.json",
+      "sha256": "c51e561d8b1558f26eb5ea0ccfc82ab96a76bc97416fb55064828ebdb2eb5658",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d005/flash/choose-0.json",
+      "sha256": "11bd8408b0fae30e61e0c3ca06ffc82a824019f3f642d52f5c21b0663f299a73",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.571,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ed5c1dbcc493c071bea62786fb10e5386db449de206615923ea468a31e89c976"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d005/jev/choose-0.json",
+      "sha256": "24c02fac59e5fc6c30b1efd78a94f64430f9f3e569c1daa394656dc202c973d3",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.482,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "8758a0fdee033b4f1e2730bd20beb46e8ac009a6187955b254fcf7d2c51a7939"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d005/jev/provider.json",
+      "sha256": "f9b3258164e10bdb57b6f6c4ccb4f527687993df9ea0a565d42edfcbad29e596",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d006/flash/choose-0.json",
+      "sha256": "89253834471f88ef16ba37bea8940085ea745109fe18c00a4723c43c159496c4",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.637,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "bbe0a571210298ad0e57cd062111cfc076ba4e2c3f390ac0cf8d415610597f57"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d006/jev/choose-0.json",
+      "sha256": "8f2fef4ff1e2781429d52216f4509fbc12aaa7009c90162a91709b949208fc4e",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.361,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "905ccaafcbbab2b451ce9e3b4677e3da6424b0ff5082422d670263f65bb96eb4"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d006/jev/provider.json",
+      "sha256": "9d65831a64605012193176729645c34e2a7b4a16e33ffe041e05fc5964bbf729",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d007/flash/choose-0.json",
+      "sha256": "977ded5caae9e56b8d7204dfc3c5d43faf18b909210cda7008fb6338b6bbdc63",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.776,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "82e8d5943757df24312e360f50688a61ea12422d927f17ced6f347d05b75eed5"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d007/jev/choose-0.json",
+      "sha256": "c6078e9a7b482dc763c56d14a802d62fe94ae39af19c4b045f86f497fe5c8d89",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.372,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3c3daf91963b98cde4252d394364de68ea55be6a14d22c4ef002878f2677e121"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d007/jev/provider.json",
+      "sha256": "c791652d9ee8984aa23e0d031898826ecf7f635f072800de8e929067157320cc",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d008/flash/choose-0.json",
+      "sha256": "edf7c4feb0eb5387941cde23898909a17ef6ed797bf2d82c56b810ef6c725ec9",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.171,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a3b205892f1d2fa075cca0474583ee4b09044173fda5f73f1fed72820282dc6b"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d008/jev/choose-0.json",
+      "sha256": "cd62aa1a5fcfef9d3e45b8198796cc71c934b134913aab98fc909849d3294781",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.458,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "4f5590f659a80c7b788c3f1d8d03c1938255f4b6d5d8f3c4ffa245b16d01ef29"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d008/jev/provider.json",
+      "sha256": "763fba7efabe9c91899ea27c164dac0866c2efb5e4b1fab1a369a4b2ab01e67e",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d009/flash/choose-0.json",
+      "sha256": "06793b9459416d7b629d6d233fa7d99ad86369450c9711731ae7ac9cc17197a6",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.359,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "664d88fd295a6fcb666d7483f5c3d2808544cb1fca9df16af6daa96d65621f38"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d009/jev/choose-0.json",
+      "sha256": "cfa33a0e43d42a950ae79282494f78d5c6f0eabc39a8ce90d2d2177d6c9e7d67",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.383,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e2b5893e436a61a2c3436e205fdb080e22e184e2e7cc6fdd0859c4598328cce3"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d009/jev/provider.json",
+      "sha256": "41e7f9dc6b029d44273a06af418885a12f7972e36ac8bf4e69d921b3df08dd00",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d010/flash/choose-0.json",
+      "sha256": "b6f4fbff4975292b05f808e5457c1eb351020937386ceffe12b3345cf2c82f9e",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.884,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "957ac7c2d99bea89bbe825bc7f1b88848f932d4ae5c1a92e65a7d2689be0bb46"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d010/jev/choose-0.json",
+      "sha256": "de8fa9d8da26507579972349008b65ebf1383c402010d6efc3667e83596a19f3",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.056,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "1eded4f869ec29189bfbe504cc11649210a8743167e1c275cc239350f5a61d1a"
+    },
+    {
+      "file": "calls/decisions/bandit-structured-nosec-directives/d010/jev/provider.json",
+      "sha256": "de1cc02b91d87e29bf3d4319b745fdb8d61ae22494ad6fc5b29d610e494fe2c9",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-01-q1/flash/choose-0.json",
+      "sha256": "caa77eec860107a2c35c44ea1ceefb4ee4c3dc4a87d297c9903ae49c96c68e44",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.292,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "fb5d61a6f08910f0493417e961e35437d9f0691eb82ebb0889b56b172a268ed4"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-01-q1/jev/choose-0.json",
+      "sha256": "2fe452faab1b5ec4a4b1781c8572faa68cecda280bfa7527c7b009d09adbc499",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.416,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "7a2f18a57673a406743c8a380c544b4900b043f5590f2c2c4cc92c527a750630"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-01-q1/jev/provider.json",
+      "sha256": "120c55d12bb81e03ea452f0725968e00427130cd0abcc11683db4ddab3626fb1",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-01-q2/flash/choose-0.json",
+      "sha256": "6f4258fbf9c88d0b3536969053f18953beb5845c90a8c9af4ed3c9b1afa76ba9",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.54,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "33ede357543a19fd461bdccc94a4aa2f66ab8da5d2b0d68dbbf9276c56c2f151"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-01-q2/jev/choose-0.json",
+      "sha256": "18f74d4e351e5bfcd55d70d5fe957d3ac9a063b1ddd1895ed4dbeb1a9b86a253",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.303,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "d770f1974bbfe94d09e835a9f6f6c6245b3a00c3ddff8f1a8b75680198740496"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-01-q2/jev/provider.json",
+      "sha256": "63384e19a37445239135b701ee9cebca4b448c6b034c1a99c64c7be93e51deb6",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-01-q3/flash/choose-0.json",
+      "sha256": "d140da0d7fa3e11c2cc40eadddafaa0e234e63328f38e061fdf6a6ec63c2499b",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.609,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "beaee5384d939763662729ca5f4b16c99ade77142c52904897f0a63861ad4db5"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-01-q3/jev/choose-0.json",
+      "sha256": "ee4e3b1c2a58c5a3352ac0a0468b8a755d8048ef9036fe6a75a98b8bcd11683b",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.376,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "8e4138a6ddfb08a7adad94910917b47bd401dbbbfebbed8f3cc55a240639e38e"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-01-q3/jev/provider.json",
+      "sha256": "e94d6c7f8bd69fe7ff98b96865add42fc66572bfb8d00a43967d9df12587e911",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q1/flash/choose-0.json",
+      "sha256": "25995ac6ed9ae856c23ed8619c6b85244fa98f0833435b3e454efa7a77ab8295",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.699,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "47fd6ee67262ff2f72f777d96741116ff6c4591d1b08f27ac0def03190fea419"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q1/jev/choose-0.json",
+      "sha256": "f87a38444dc9b995e53d7ae8efb5d5f5989e6cc6c6e2e965143bef9447a9281d",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.284,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3f9070b5cbc52e0017eb8f07bcefdb1178440a511cc5a36bb5781c327d6f16b3"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q1/jev/provider.json",
+      "sha256": "37245190365c5d17ab83180efff6139617ae82ba5eaca986004a43dc3b50d6b8",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q2/flash/choose-0.json",
+      "sha256": "6f559a22615bc2a0b5fbda43519dfcb7eaf9a9150ffdccf56da742bea19fb81a",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.587,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f3f538fc636e5426026dae8c124477b6b257b06153dd66077eb3d64c523b153e"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q2/jev/choose-0.json",
+      "sha256": "84d813807b2489076b9333a4b3adc8c84a8ea3a4373adfbd1282c9cb19a22caf",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.319,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "75a00637de19d543a7a9a6c649df9a7afef8d193887a6bf62a4d628ef14c67aa"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q2/jev/provider.json",
+      "sha256": "f88eb988531a81d800390e990e79805d7503379c87238d382a1064ad6a3b68c0",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q3/flash/choose-0.json",
+      "sha256": "ff40d133f0f592f12a77de8d5538c72fcd7fe18d2df74c0e7d611a7f770d651e",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.683,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0893fe5c4a72fb4195c39847bb7bb0b19cc8a751e54aac70986a064afa9a1caf"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q3/jev/choose-0.json",
+      "sha256": "b1ddc340f39638205ae0767efd08a8958f2a35b05ec4b40f4b231d96863834c2",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.394,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a401b688ce595d3fb8d5784375dfe0bd1f335f35ab301b594c71953aeec9c1ad"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q3/jev/provider.json",
+      "sha256": "61887ee8e3c2e555dd4cbb6e2b567f7d7d42ba0bd40582790878dbebf5e35d1c",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q4/flash/choose-0.json",
+      "sha256": "b27e0a2314b86c8df7fab44e98515acfec998bb8df9b0aa83fe236f323a39bf3",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.635,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "6b143a915cc1fab7d90cfd50f12cdaf72bd7537317717702ed27e95486d3d254"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q4/jev/choose-0.json",
+      "sha256": "25120ef51c5e1229898408113820837984819c372dfcc8aa83a9dcc4bee82767",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.238,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "db5f52e095ed467cf26f8a509c4bf21b75f676a27beb60fa7a3bef900e25cfce"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q4/jev/provider.json",
+      "sha256": "32315e5c560c7de5e74aadddaf5690fee4808ceda8a5e21a24a124700af2aa82",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q5/flash/choose-0.json",
+      "sha256": "17cb4d78868da492b69cd2728abd086a821afbc71b91bd3dee814fff62ceab12",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.174,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "8b2e5fe1064a8e77fdb8dc1f3b4623fdab76b64922dc8a7fd122014c47058a64"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q5/jev/choose-0.json",
+      "sha256": "97ff1a709a1548f1901e79635475dee08e018ddab8aab5107b1e695642ac12f3",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.31,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "d6e6bc8eb245c20c8452a07607fb1d463de9cf5edfe52304277ac3f6c1b04377"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-02-q5/jev/provider.json",
+      "sha256": "9da9182b4a31319ce0323dcd326027965fea42c6ca0cb823723d244012b2509d",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-03-q1/flash/choose-0.json",
+      "sha256": "b38dfa8e0a5a57d5e5fd0b6e6571b8f16dd5c1f59ee4dfa9db8fec034de3a44b",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.859,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "d79a2f8daea73b809a4292b7db3ab07f91aee2872f1b2dbec6c03e7a88ef2d1c"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-03-q1/jev/choose-0.json",
+      "sha256": "56bcf38e5b9bb72708743847b2001e029a428d44ce9befb38df7caeda2810145",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.213,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "61c578e26f3e7c52ab0b1b148ee8107bb6cfbd7d740d5fb9b9cbeaa45b770638"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-03-q1/jev/provider.json",
+      "sha256": "356c8cd401e804a0f81f78d722f057218cac381df33a2480a9f2a896f3e4e681",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-03-q2/flash/choose-0.json",
+      "sha256": "11255ae0815b5a8ad44f6cae47d347a4dcbc47e65f419ed8c1e28352de69969f",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.665,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0b56510b3c8dee9fa7a6149dda0ca4d74aa91e53f62c061e5cb1408f5dc3d58f"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-03-q2/jev/choose-0.json",
+      "sha256": "6de1cbf0242d5d2eeb3ee84abf2879aac06d0c8a9fde0bd9786f864801a3deb3",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.224,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "82a6cb1319cde7bbda95ae7aac2a2dd1dbc927628270b44d9fd1d963e0bea175"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-03-q2/jev/provider.json",
+      "sha256": "30e82ce1233e97c445bc5153d9248b6c107ee2a0f0af21f8de64c6ef9011fd20",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-03-q3/flash/choose-0.json",
+      "sha256": "67e08341e1d2cf713fac0bdad30fb24f43c94b92ea786a44897678a024553bed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.326,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "acfff2c1cb34e41cf7b2b6cdaa0901286ded4f429d2982ece420c1b88c8aa2c1"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-03-q3/jev/choose-0.json",
+      "sha256": "45375393d317f08a27180afdb35836e3833c94c51705af383fd8a2c52804bc77",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.263,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b3c94179206313b1e834dfbdc09ce85d4c832e48bdf981e7884c9983600ffdc9"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-03-q3/jev/provider.json",
+      "sha256": "7460bbced00644d71fd0b0fe0132196ffab801033cf8eb0ed7b0e41b7b8cc49f",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q1/flash/choose-0.json",
+      "sha256": "2d636b9f235575e3d2dcb593cd1f9a871ba4a7b5389b97275229529be394f0ab",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 7.814,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3649b8b488a14f3f11586689b9725215c449a5d08a8f2d80e96cd209e1fd0052"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q1/jev/choose-0.json",
+      "sha256": "f759339606da76511ee1101ac48b964236a3fec2331f90115b50ae8be8572b07",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.233,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "faaac4802057477a9fda24f99c43d93ca1e0cebb335b136c6ba2fd0ef5e20894"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q1/jev/provider.json",
+      "sha256": "1a768321ada989540a222db7e5b70d846ddf9926b3048938e918df5f00fc4d3b",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q2/flash/choose-0.json",
+      "sha256": "24ba12db5c481abfedb9045464e8967092b99bd1c3e2e94249d1f67763f548ea",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.167,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3bad2475bccaf67e4aca0561d3503db86ca1203f6b754cedd56e86c711aa870f"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q2/jev/choose-0.json",
+      "sha256": "89522fc650581aabefdcfa287aabe66b73c890f70ba94fc16e08483852713f47",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.278,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b06e31cd32a172c49a1dafcd3bdfafa6b175b9c8c601dfa39c950fb61657a1e7"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q2/jev/provider.json",
+      "sha256": "351cbc073503d87cccf65692956182007f0c8427dbbf4946902637cd6b346194",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q3/flash/choose-0.json",
+      "sha256": "7e6e7f58867492a186780748f341f82f06d4c6d2fadaef89e3a0651e18ce08aa",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.963,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3c081b6b8889838640fc5615a1b545f8d44046bc0a440ecd36b2b9595a915737"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q3/jev/choose-0.json",
+      "sha256": "15f1ed336a7e96e630f1b71aa70bac97d5d3bf1da78a16a255085a1befdfe0f0",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.292,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f9e8e0038afb0ce279b367b38738f5992050ed65f2f9ba2bd36cb3102647176b"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q3/jev/provider.json",
+      "sha256": "f51ac41b50453861f199eb6471792740fbeccc57633b94afcba13b30487d43b7",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q4/flash/choose-0.json",
+      "sha256": "7281de78d1416b6e01395e79b3c7d0d3787412f7bacceba6850e5f4754d98c53",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.838,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f427a3e62f09acd9d868ec19c5c838349caeaadc5c64d773085ec1a084674f6d"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q4/jev/choose-0.json",
+      "sha256": "ee2ced138dea12ae41bb0dfe2b5d4b5b32a6ff183d2a216a24f40644f68fc58a",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.307,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b346485ac3a6b1836504e2c73e72444807e96fb5ab5822bf894eb3a2bdcb9d1a"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-04-q4/jev/provider.json",
+      "sha256": "1919fe4a25be45cd34a83d079cf6beb3e4bf457f356abbfffbc2fc26ede048d0",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q1/flash/choose-0.json",
+      "sha256": "c7fd11c65773f9b0830956945646472c99f3a6c0d9f43e515c8f097b9ea89a8a",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.187,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "788327c7175cb724c2bbed75f891ac06f0b562fa85337076c16942c106329f3c"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q1/jev/choose-0.json",
+      "sha256": "8ecb2bf7212440386121fe0249b1c92da10394c22d2b122a30b007091ef7ae81",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.258,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5762748b5366048914e828cd40054c2c0ab08f7a23a4406028ad374ae8b0fe86"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q1/jev/provider.json",
+      "sha256": "740475dbdf564658355d37ca9959c26b2073df4f81b4694248baa6dff64a5e61",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q2/flash/choose-0.json",
+      "sha256": "e451316be8c55b8bdffd05be42a9dba4617367f596f3a5071618efd4c9e98e2f",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.237,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "dbad49b6c57b655f840ab0890230ecd9a6ad75968b32706d2ee2e5842507c08d"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q2/jev/choose-0.json",
+      "sha256": "a594b64c03a5b0cf2f2a89f1891825619a7a274bb68560bd5d1b0345f9d469e7",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.347,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e2e384719c6390f0662b38a8f34c73268e226fc6bb6169a5cf8757f31932ae4b"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q2/jev/provider.json",
+      "sha256": "b4b7695c2dd08cef6776a9e90d05ef7fa3c1428c962f8a969a4cbf17d31bbe4b",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q3/flash/choose-0.json",
+      "sha256": "317295e51142f59f30d50cce969d7c93e73e1d1ae9095015727d698dfca3b9ec",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.584,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "95677551d96f229bc245d35a739c756f9d8644a9973ac2ecb226ac42d46779b7"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q3/jev/choose-0.json",
+      "sha256": "97c80a131a35feed3df7caf020079bf33a969d84b457cb5d1d74a8c11b659149",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.228,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "61602f213c20d5becda8842d31b3246613114fdb74d626d9ba3a102b4d4e7181"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q3/jev/provider.json",
+      "sha256": "e2f8182a612afa9b57bb7c7dc6904d885e770c5ec2091931cb323c993446b102",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q4/flash/choose-0.json",
+      "sha256": "922cdee8fc2ef575c43a303c0c44217ad867ce42825215396e9443fb6e7a8007",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.249,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "76447b2428b7394c6a72cbe4642c1421a477b8e42adb86ca2acde82f9542141a"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q4/jev/choose-0.json",
+      "sha256": "e6081a50cb780f7067ad2c30980a8002e054ec19b2c8fb66da01509812b2973a",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.296,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "6a0ecb16a27033f5cff522db9386b11186fa714d5ae8ed1fd2696a60eba257c9"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q4/jev/provider.json",
+      "sha256": "9434593a43f4afbb568903919a78e1e8b1095f9670f5c4c4f8657d2cd056ef1e",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q5/flash/choose-0.json",
+      "sha256": "0b91872daab061192fcb2dd7665fc088b5815060f99a07f90d28a7c84fab70f0",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.625,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "956af90e2d1471a19e0fbf3947a043324b618719db02dce1ebc72359c99f33ff"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q5/jev/choose-0.json",
+      "sha256": "2700c8943b51495462f83293cb8d5784268103256fe80270fc2848ef16a6cf4a",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.384,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5cb2b713446586565a3822f378486a685ef8ec2f7b31acfa2dc28a887a879086"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-05-q5/jev/provider.json",
+      "sha256": "a193eedffa157e04a453cb7855bc64a54dbf09f1578f33d3df6ce2098bf6b69a",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q1/flash/choose-0.json",
+      "sha256": "a776da1f48adcb9a4e631e7df105b0502ec31a276a48f98d6a392c0f67783e76",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.624,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "590beb9b027d1d9bcd6604bf15661e48a03f6984400371ef000a410a2c33d2cd"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q1/jev/choose-0.json",
+      "sha256": "5d0ae0053566c2abc72d93e642da75d196a49d9577a5360fb977909f225571f3",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.339,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "1d7f0cdd8ae1ec55e0be3d759b0aa5dbe510eafb5cf1b4932cec3bceaa7b3f00"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q1/jev/provider.json",
+      "sha256": "38f94072fad320989b01e3388bd4946b5e9a1218fa3ce658f0d660313b48daa3",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q2/flash/choose-0.json",
+      "sha256": "49f03019beec4f3719f818656b5bf5d9ee3156ec6d7b2260dc136cc6ea6cf8c6",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.82,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f9f182e8ea9723987e64165fe5e4f538e4f05abc7de6372b9f08f107ecaabc45"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q2/jev/choose-0.json",
+      "sha256": "644a39421aeb18719a779a8bc0fa04d82dc6074d120593d75fb4ee99d98778bb",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.206,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "be4b28cdee38bf96f1cdf2e3b7e37982380a31a8375742997d3f8bf463ca6da4"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q2/jev/provider.json",
+      "sha256": "77c25918075736697db16efa0e807d6681e1d03d1d354cca3a975444daaaddfb",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q3/flash/choose-0.json",
+      "sha256": "4d48684c7e722d1b2d2a6bf6e55982ccf8efc4b98b0fa8b17bcc1ead8e1e21c9",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.657,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5878805f4ce7245f5d7580f3a6ac256f07c641f1235b3da3fdc3b7600e2ed2db"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q3/jev/choose-0.json",
+      "sha256": "68bfe9f7a40aec1e1f60dcb739d06115c1658f39711db1a735430e41b3f67571",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.248,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b5d474ff2f17bbf4dc51bca1c22c7711188e5901df801beeb686725f78a6ed8a"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q3/jev/provider.json",
+      "sha256": "02e4fb7ab5f52c654831ff90e4afe44b83d6d234aa68a3d6659633309bfd37a1",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q4/flash/choose-0.json",
+      "sha256": "dbd2816a2306f5cd999dd3c522ff7461eb223ee0aee21e4bd8199dc3537cb821",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 7.162,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "dc953581c73ca3a767b73356e807a63dde4c2832e8cb3cec3eade541b25db1dd"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q4/jev/choose-0.json",
+      "sha256": "bbe09d7ec03778d01702d49d654286f98011c9886596545ab6ff1977b189a9bc",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.223,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "1287529d770d234036a3aaf8ac91b0271b163a821d195420ad9b05eb02cb7835"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q4/jev/provider.json",
+      "sha256": "baed1ba0c3834af6895bbc574e351293bc35c1fc52da1fa028e1ae722e69825f",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q5/flash/choose-0.json",
+      "sha256": "89fc2785e6b10764edb4189caad291f6dd872505a6c0bc387e5007b8dc681749",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.647,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "8a8de668fb2a2f74269af6b7b1f5b7af34d542fb110c789a53b5e66f3aee73f8"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q5/jev/choose-0.json",
+      "sha256": "f019341a925293eacffc692f276cc0cfe30bdf65addbf376b1a7cb63e167caae",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.258,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "156ca51b68eb9b7a96247f03e78e98ef6f85f4050643db446367f150ec6a2c96"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q5/jev/provider.json",
+      "sha256": "1438e4ba0c0cb123e5b19056c3221b893a2f95d77faf2776d9618611cd9d91b9",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q6/flash/choose-0.json",
+      "sha256": "a591a903943b9aeae8cf20c2e1d56c1d58bc8864c942403a0eaaec9a85ba43c1",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.585,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "9c7439d3fc3eaabae6a1c509faf6fa9b451fc6e6ef4b34bd5a3cdeca7e741ff7"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q6/jev/choose-0.json",
+      "sha256": "d5dae1d1f5c5caea42d79c78ed2bc128672c67e7f5da8ca9de0a0960eded4b6f",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.244,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "dbbc21440633ad55f1f3c56cb2fcd61558488a8fbbcb3febfbaf4caa796b1a6e"
+    },
+    {
+      "file": "calls/decisions/gql-incremental-graphql-delivery/batch-06-q6/jev/provider.json",
+      "sha256": "91652b2e5c403d4a299011d625e9f7cdb2684aaafa230918cf71b928b7146f72",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d001/flash/choose-0.json",
+      "sha256": "a3378a345fc3293ddc6d3630f82c2344621b80a413aaa9b3c19787df3c4a8e63",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.914,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "021f2bf2c9b060b827650f7fea5418fe09d3d0e8f0e02112a0a59edbd55995f0"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d001/jev/choose-0.json",
+      "sha256": "3eb3e1888f934d00c9533ab007ff4336e907980568702493a7eb8af82f396e18",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.441,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ced9eaa90e9db41f91dde8efc7b222521932b0952d3a2c0acdd9bb8eb80c148b"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d001/jev/provider.json",
+      "sha256": "7592c82937e31b9de5fbca2e4b00890446f308aaf1e2a5a2e5b4d06639eb98cc",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d002/flash/choose-0.json",
+      "sha256": "358c6c1b90f26bad95c373e184b248714e50a528b67758ee25900a1872eae935",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.748,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "4c0545de307149919bb8c54cc3708f9fcfaf0903dee5c4f6b0069638cbed3ff2"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d002/jev/choose-0.json",
+      "sha256": "c94a39dbb539c678f1799e308305b300a96dd7e603ea181dec01cd2455e8c022",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.297,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "bcb7399c0a387aa36f686188381817f434180184f3643e8cc199c6bea20fd44a"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d002/jev/provider.json",
+      "sha256": "e6039fcf926544d2563a64c1571532c87582e9b3229311b55efa0c2234a617d9",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d003/flash/choose-0.json",
+      "sha256": "3897995c8ca033fc8fecfaf04bedf7b4aecd864d9876bedec84f9948c28ca19f",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.896,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "76a481bc607ff517755caa961100de73e2ce9febfced4d28cd6037b1736d4ca2"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d003/jev/choose-0.json",
+      "sha256": "96d25db5babc852ef7692058e1fa4ed72ec94828698bceb1fb73fac9bf70883a",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.372,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "d97042d09f4f1d4730f3a76738b874dfe04feec812c5e233553a3d57912caa7f"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d003/jev/provider.json",
+      "sha256": "d031b52afc4464cf8554b09767763e12c25bc42760577e3eb96817208192da1f",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d004/flash/choose-0.json",
+      "sha256": "088aaa8539e29e7dc5cc269589e6dedc92196f51cbc8e17d42f08d5836bd2e64",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.888,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "74e0a238700524dd3bc2c147042728bdbcb838e14e1502155f2b40b0532ae852"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d004/jev/choose-0.json",
+      "sha256": "662e7f6c9feca835e9f43991c2ffdf78a3a43c241754d642cf04fffcf12741da",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.421,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "d68282c803294c460154736f8f7c08d247f7c15299e20c9c9ca75133e043a7b0"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d004/jev/provider.json",
+      "sha256": "378ef9920bcd2e281c7c7922146d41e122d21c7fd65691b87306a9fba9b7abb1",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d005/flash/choose-0.json",
+      "sha256": "c0b3f6a46278e1c974ed9e6cf7f5ee39729f01edb4c82f44d76045d8d0f51de3",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 16.955,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "1c6fcfea89a14c30dc73e58fbe3e1df31da5356c8db1ee0768f58492dfbd90d7"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d005/jev/choose-0.json",
+      "sha256": "5e59aa578bb623474f90a57ed0a26bb3aebd00a28354edfef47c1d7dd5ef8c1f",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.325,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "4c7a76d0a7ef9674e76a43fd3261c66621f59a00d595c299835b407d18167b12"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d005/jev/provider.json",
+      "sha256": "986053940ff4fe0488d2905f07c827a7ae58fd4e93990a3c1a62127328f39fce",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d006/flash/choose-0.json",
+      "sha256": "320ab306177eba9aae71593993997c6e9c8e52723f627e5a27589d08c048717a",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 16.744,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a424e226f9a3f57aaa2d081d090303fd7a4fadc17200588406818cb3720b4257"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d006/jev/choose-0.json",
+      "sha256": "d05c100f12896b52d12e2dcf0791035fe4027766ae91c86f8ff47753e7f27496",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.25,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "78cf0c1e17db23da850afd928d689f9f224527cd39138772b8bd05cbea9afcce"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d006/jev/provider.json",
+      "sha256": "8cc1368a8a12e6eba50436a5a98fac23024509b42b7a283d2a327f2583740c52",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d007/flash/choose-0.json",
+      "sha256": "53d84516e6b0b176d44a2c7c7e314ed22dc2b9b5fb5372698451fb4f6d8ba679",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.588,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "473f03d88f8beb5e1ce401635b87c2c7ad43c548125a5a4ec9b25b74d1af67b5"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d007/jev/choose-0.json",
+      "sha256": "8b78fe307ef639d3893cc77cbaa3cda7ceafbfe5d52db9c45575ea94fe97c682",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.271,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "109bac71494c45d48ffbe5dfe3e87d4eede1b3bdf2324cf8f162b5c43a8a069d"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d007/jev/provider.json",
+      "sha256": "6575a52421df82cd427d5d349989233c972ffee27d6bdc8581394cd42008f582",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d008/flash/choose-0.json",
+      "sha256": "07dd799750acd13bd8b53e338fe9907315468ac832683534c879521a227f1bc9",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.265,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a78f99cc5dc2f99a6f2ec42ff20c10845205d43a883c4c2a02d6e852bfa6c170"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d008/jev/choose-0.json",
+      "sha256": "4fe38e0abc0538c844471e6d1969769c89acc342fa7999749fe98d25d4025ac5",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.284,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "944da46124e4b214928e28ba80aa90b11bb6faf24fad1acc149a4ffc17a7d22f"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d008/jev/provider.json",
+      "sha256": "9a6fa5d86a4a015156f7b6be60a80caa9f272bbb8dd5d5ca5a6b6a5edf5e0816",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d009/flash/choose-0.json",
+      "sha256": "391b17cbc7b121887a5ed3ed290b07336796536eea9f3236cfa95d822404a457",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.839,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "7f7a3d9270386a06223420c99833f5b3e93bb57fda2e0089c5f07b23219400e3"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d009/jev/choose-0.json",
+      "sha256": "4c450e67bda274810ab7b05047acf20aea352e1c39c2292d28de4539a7e7c742",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.286,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "22ef009d108ba21cc893f52c3545692e2c3d35eb67e405da325372af06373b5d"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d009/jev/provider.json",
+      "sha256": "cba1391f1fe0d3efec0021295c39186a2fb110aeed43768afe1398ff8d3ebe27",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d010/flash/choose-0.json",
+      "sha256": "4ca6d436f8c0db4ed0a550d6fdf43c44bc681fc8881fa5304fb254496bd97629",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.436,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "53dc3d39bbc3afe352bcb59606497ce11d30538fb1c29a8d17dc8282c3928d57"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d010/jev/choose-0.json",
+      "sha256": "830340d89af47c66b6a81e2809905a06fd23b653d46469dfd2023959cf7bd12b",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.443,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3f157cbd55f6adea20117b66dfbaa7e507be67b92833642cbda36ce6b384d606"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d010/jev/provider.json",
+      "sha256": "5f71e62835a3976f25331b5202df35f90260fe8e833ee28ed0d6a280b2affaf3",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d011/flash/choose-0.json",
+      "sha256": "6debfdca311d9e05f4f8753df1870b09c31429421b18aa4b311536060cd3f056",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.58,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5b3cb214b912b5e13a052602ae470205219dbe50e450ad6fab6f97cecda8951e"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d011/jev/choose-0.json",
+      "sha256": "6a13e26a89c9c302034d61e8f7b989d08f74638f1d95e636b2eebfb3f9a1fd58",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.301,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "1b4af1ddf52d3940bd341508a9c7d8f8365eccba93cf02d3751ddbfc0bdf1fd9"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d011/jev/provider.json",
+      "sha256": "8f4f3815aab1a01c4696d11640976e074c100f823b2caad9e8fd04ab517eab59",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d012/flash/choose-0.json",
+      "sha256": "dd1c17a2068dfe475e5da4ee8f5b6f63b06a096e806d97bd021681ee2f5d6606",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.065,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e504b4f2a47a3a753f7925b879139d06868949d54ae95de06498e8b54ced141c"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d012/jev/choose-0.json",
+      "sha256": "b3e8710dcf12feb60057652e62287fbf2c76dd2db993f60d212f18b7f1581685",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.609,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0fa57b3eed9cdd9012b1813ee9913c3d10acacdbdeeb796537b4b43af3d98554"
+    },
+    {
+      "file": "calls/decisions/koota-composite-trait-aspects/d012/jev/provider.json",
+      "sha256": "b9b9ad992d2c5c57c27e710b5def1b7ee7af45817f500757be7d0ae296224f21",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/discovery/bandit-structured-nosec-directives/discover-0.json",
+      "sha256": "b560665382b18a2cd211d3c1e987e5a8434ba1635f7cbf186060a902582bec48",
+      "receipt": {
+        "stage": "discover",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 61.922,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "failed",
+      "request_sha256": "98a56b5d09344edc40b547ca4c1a9bb820edd2d1b5cc262eeded0cac3c3f61a0"
+    },
+    {
+      "file": "calls/discovery/gql-incremental-graphql-delivery/discover-0.json",
+      "sha256": "a08a83513e2b580245dbd2d34032cfa0a11d065b2ef06d95b6caf02b35eeb898",
+      "receipt": {
+        "stage": "discover",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 238.627,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "failed",
+      "request_sha256": "40501d0dfd84a6a925bba56b6c32f503aaa02f8c32ee1f26a8f313feb1d95c15"
+    },
+    {
+      "file": "calls/discovery/koota-composite-trait-aspects/discover-0.json",
+      "sha256": "c4a6a856acc3bceb42b8f0bf8aaa5e518353031f64d3016d6e9b65566e632766",
+      "receipt": {
+        "stage": "discover",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 55.668,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "failed",
+      "request_sha256": "6f0de4c3f2ce8af745ea7848764c9fa5566a489327aca80ab08a296db0ed3330"
+    },
+    {
+      "file": "calls/scoped-discovery/gql-incremental-graphql-delivery/batch-01/discover-0.json",
+      "sha256": "2aa07df8c5e1a549a44452ab664c039d3afb16e149e3376a7481d6fea6ff7583",
+      "receipt": {
+        "stage": "discover",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 22.761,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "160fbf59bc982c2c92614de0b1c3ba001fbf9428b46baa654b559b87afba7b5b"
+    },
+    {
+      "file": "calls/scoped-discovery/gql-incremental-graphql-delivery/batch-02/discover-0.json",
+      "sha256": "0941b6a15b88cf97b32eb7a0df49c47616109e156f05bd9c532bf086973dd1c2",
+      "receipt": {
+        "stage": "discover",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 26.372,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5ccc331f58a841f9dace3043e967a35116e3ee1a7a3c1c95c4876376f0625a80"
+    },
+    {
+      "file": "calls/scoped-discovery/gql-incremental-graphql-delivery/batch-03/discover-0.json",
+      "sha256": "b107340dd1c8c50cea18bc7b7104034e5477b49be3a7e0441ed6d7d02f4c83c9",
+      "receipt": {
+        "stage": "discover",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 22.702,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0371b8e713d250c3265190517ac9f62d9ecafe41d4b1b690d5ebdaf82a5f68ed"
+    },
+    {
+      "file": "calls/scoped-discovery/gql-incremental-graphql-delivery/batch-04/discover-0.json",
+      "sha256": "ea5edce3f3df6f1334fe2f433b002757683ea70bf27e6a6fd94a261e8a2ddf9b",
+      "receipt": {
+        "stage": "discover",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 18.219,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "bb1f0688910c46f2de4083a5cb6fbc1a92782c34d7c156206aec66074db1fe24"
+    },
+    {
+      "file": "calls/scoped-discovery/gql-incremental-graphql-delivery/batch-05/discover-0.json",
+      "sha256": "9ae364235d3289cd37f3dd5b101d37b868373d54372da533984683c3ce71da82",
+      "receipt": {
+        "stage": "discover",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 27.994,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "4fef5d87f71253d2a251cdd129182e885249e5c99507563487f97855dfeba078"
+    },
+    {
+      "file": "calls/scoped-discovery/gql-incremental-graphql-delivery/batch-06/discover-0.json",
+      "sha256": "b2fa66452e978b83858220996d08579d47688979fefda697fbc966be323096bc",
+      "receipt": {
+        "stage": "discover",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 30.307,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f37a213ef3552ed0db4d29773fce60bc349fba11b99658cb3cc87af6bced3959"
+    }
+  ]
+}

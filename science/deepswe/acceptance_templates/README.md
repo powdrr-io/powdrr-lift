@@ -1,5 +1,11 @@
 # Acceptance criteria template experiment
 
+The [automatic-discovery experiment](runs/automatic-discovery-v1/README.md)
+finds that generating questions and answer choices loses the gains from manually
+supplied decisions: 16/48 pairs lack a safe complete choice, and nine agreed
+clarifications conflict with the solution or add unsupported guarantees. The
+next experiment should separate source-bound facts and conditions from choices.
+
 The [decision-instruction experiment](runs/decision-instructions-v1/README.md)
 compares current wording, consistency-focused questions and contrasting examples.
 On audited GraphQL/Bandit evaluation decisions, Flash improves from five correct

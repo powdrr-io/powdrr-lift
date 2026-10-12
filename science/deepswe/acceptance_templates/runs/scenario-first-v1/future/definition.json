@@ -1,0 +1,7 @@
+{
+  "selection": "All frozen scenarios, not a gold-selected subset.",
+  "change": "Add explicit completed-feature framing to answer and review; no scenario, source, schema or model changes.",
+  "adaptive": true,
+  "scenario_digest": "58a5d5a223086b92d4f4a85a44c89b733116942078f4eaaa84f88d3112bc7414",
+  "oracle_access": false
+}

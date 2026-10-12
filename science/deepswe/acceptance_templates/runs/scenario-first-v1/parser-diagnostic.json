@@ -1,0 +1,6 @@
+{
+  "raw_json_valid": true,
+  "parsed_matches_raw": true,
+  "same_request_as_original": true,
+  "first_given_after_parser": "A session is connected to a server that supports @defer. The query is `{ hero { name ... @defer { friends { name } } } }`. The server sends two payloads: first `{data: {hero: {name: 'R2-D2'}}, hasNext: true, extensions: {traceId: 'a'}}`, then `{incremental: [{data: {friends: [{name: 'C-3PO'}]}, path: ['hero']}], hasNext: false, extensions: {traceId: 'b'}}`."
+}

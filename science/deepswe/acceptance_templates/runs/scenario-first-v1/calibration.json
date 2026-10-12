@@ -1,0 +1,61 @@
+{
+  "cases": [
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "batch-04-scenario-2",
+      "expected": "supported",
+      "actual": "supported",
+      "proposed": "The query result contains only `E1`. `E2`, `E3`, and `E4` are absent because the aspect requires all constituent traits (`Position` and `Velocity`) to be present on an entity, and only `E1` satisfies that condition."
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "batch-04-scenario-2",
+      "expected": "contradicted",
+      "actual": "contradicted",
+      "proposed": "The query includes E2, E3 and E4 and excludes E1; entities with all constituents do not match."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-03-s3",
+      "expected": "supported",
+      "actual": "supported",
+      "proposed": "The second yielded result object has .data equal to {'user': {'name': 'Alice'}, 'age': 30}. The incremental item with no 'path' field is treated as a root-level merge ([]), so the 'age' key is added directly to the root of the accumulated data dict, preserving the existing 'user' key and its value."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-03-s3",
+      "expected": "contradicted",
+      "actual": "contradicted",
+      "proposed": "The resulting data is {'age':30}; the existing user field is discarded rather than preserved by root-level merge."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-05-scenario_1",
+      "expected": "supported",
+      "actual": "supported",
+      "proposed": "The second yielded result object has .data equal to the accumulated {user: {id: 1}}, .has_next equal to False, .errors equal to None, and .extensions equal to None (since the second payload contains no extensions field)."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-05-scenario_1",
+      "expected": "contradicted",
+      "actual": "contradicted",
+      "proposed": "The second hasNext-only payload is skipped entirely and produces no yielded result."
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "batch-08-scenario_1",
+      "expected": "supported",
+      "actual": "supported",
+      "proposed": "Both B307 and B602 findings are reported (not suppressed) despite the presence of the `# nosec-begin` and `# nosec-next-line` directives."
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "batch-08-scenario_1",
+      "expected": "contradicted",
+      "actual": "contradicted",
+      "proposed": "The directives suppress the findings even though ignore-nosec is enabled; no findings are reported."
+    }
+  ],
+  "note": "After observing universal acceptance, four manually selected direct-instruction contradictions and matched positive observations; labels never enter requests."
+}

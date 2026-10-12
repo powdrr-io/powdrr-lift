@@ -1,0 +1,97 @@
+{
+  "discovery": "Create concrete usage scenarios that clarify the requested features. Use the original instruction and corresponding existing code, with routed clauses as an index; do not amplify scope a splitter added. For the active clauses, give a starting state (given), one operation (when), and one observable question (observe). Use small concrete values and name the observation point. Fully specify relevant state: earlier versus later delivery, operation options, object/container versus nested value, and relationships between requested features. Include only dimensions relevant to this operation. Use valid requested usage and informative interactions; avoid arbitrary new error policies, unrequested limits, or guessing how malformed inputs ought to work. Each scenario should distinguish plausible implementations of a requested behavior. Do not invent methods or assume callbacks consume their return value. Do not propose an expected outcome, competing policy choices, fact-analysis records, or an ideal prompt. Produce up to four useful scenarios per batch, not a quota. Related requirements can share a scenario. Avoid repeating scenarios.",
+  "answer": "Resolve the stated observation for exactly this starting state and operation using the original instruction and corresponding existing code. Explain the expected observable result concisely, with concrete values where helpful. Preserve compatible existing behavior; explicit new requirements override it. Infer necessary consequences of the feature's meaning and relationships without requiring every detail verbatim. Keep separate operations and observation boundaries separate. Do not add guarantees outside this scenario or prescribe an implementation. If the sources genuinely do not settle this observation, mark unresolved rather than invent an answer. Write only the observation, not the given/when prefix again. There is no later rewriting or synthesis.",
+  "review": "Does the proposed expected observation correctly implement the original instruction for exactly this given state and operation? Inspect the corresponding existing code, preserving compatible behavior and applying explicit overrides. Reason about necessary feature consequences, not just literal wording. Choose supported when the outcome is correct within this scenario, contradicted when it conflicts with the source behavior or introduces an unsupported guarantee, and unknown when it is genuinely underdetermined. Check all conditions and the observation point; do not trust the proposed answer merely because it sounds plausible.",
+  "scenario_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "type": "string",
+        "pattern": "^[A-Za-z0-9_-]+$",
+        "maxLength": 24
+      },
+      "requirement_ids": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20
+        }
+      },
+      "given": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 420
+      },
+      "when": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      },
+      "observe": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 260
+      }
+    },
+    "required": [
+      "id",
+      "requirement_ids",
+      "given",
+      "when",
+      "observe"
+    ]
+  },
+  "answer_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "status": {
+        "type": "string",
+        "enum": [
+          "resolved",
+          "unresolved"
+        ]
+      },
+      "then": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "required": [
+      "status",
+      "then"
+    ]
+  },
+  "review_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "choice": {
+        "type": "string",
+        "enum": [
+          "supported",
+          "contradicted",
+          "unknown"
+        ]
+      }
+    },
+    "required": [
+      "choice"
+    ]
+  },
+  "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "jev_model": "jev-latest",
+  "input_hashes": {
+    "koota-composite-trait-aspects": "ef9cc8128083d6356ac4501519b93674a4d6166503082c2eb9b677a5e6b766f1",
+    "gql-incremental-graphql-delivery": "5cbcd6f12fdde8a3ce06faa5d33b6b42cce16d06b7b9b6a36abaabcecccd8839",
+    "bandit-structured-nosec-directives": "3cfb9cb3584c0f409ac2b92e81f3782df2f3e6d9c3325ff464a26238a81e4699"
+  },
+  "oracle_access": false,
+  "batch_size": 4,
+  "facts_stage": false,
+  "evaluation": "Audit all generated scenarios/proposed observations against solutions after calls; map to the same 18 target facets."
+}

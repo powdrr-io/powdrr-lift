@@ -1,0 +1,3355 @@
+{
+  "checkpoints": [
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-01-scenario_1/flash/answer-0.json",
+      "sha256": "64ca0d2c59dd1ae13990823a13c6c4b22879ed885b01579df07e07cdac77848c",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.11,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3f0e27eaafcad85353d9d817b6ab06f47aa3f56bb9d84fad41e6c9da7506858b"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-01-scenario_1/jev/provider.json",
+      "sha256": "9b618b3d388c12f4f24a982637134b8956118e73c0e9b05f36cad3d0ac5ca972",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-01-scenario_1/jev/review-0.json",
+      "sha256": "6b4da38d7c1d9b53a81eb44ccfd4ac724d1a08ba26f34b7b067557ad7bf33a90",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.219,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5c9ef23b2171516aca5299ea2993aa58d99cfee4b4a8ea2d23043930e462d24e"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-01-scenario_2/flash/answer-0.json",
+      "sha256": "c0ab917a89e1813bb2b9e1017fbe061c5686a88dbc8d9c101cf92cd8a8e73211",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.5,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a0aa4164ad5848b62e520dbb464c7eb9f097681492044d13696c92cb03807176"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-01-scenario_3/flash/answer-0.json",
+      "sha256": "c713c2f6b0fa22394685b3a92163a525f28fac4d27da6a54033992123a370c3e",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.394,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "cb9d3b9e5ca3b9d17fa17ec214118048b056fd1c89d4d7954a43e99a743caa61"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-01-scenario_3/jev/provider.json",
+      "sha256": "cb1adec2d30df09fb6c757f3f5bb6ae95a13c237229865c9fe803803ba94b4bc",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-01-scenario_3/jev/review-0.json",
+      "sha256": "1a0cd2098881cbcbbb02251e05eaf8b2c6258d0dde1dd49ef451ce626f774e0e",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.221,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "445bdb3cbbf894a0b5156e85ce3be84a7c87cff3a142b72e334a076252b474c4"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-01-scenario_4/flash/answer-0.json",
+      "sha256": "c9989f96ccaa7fabade189f4ec57a5fcbfd9a7596238156b5a8ca85b1997e958",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.717,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0d1dc740d55a21b2e0a22bebc291b6e99c379829e403b0a8e3f911be11ddf253"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-02-scenario_1/flash/answer-0.json",
+      "sha256": "46652ffb5b84c7db06945d28c9b6e98cd78f346aafd80175c380778580c94a58",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.545,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c1a1a8f279c8f564bfd5fac1031e60accb0322f5355f989644b95fa52a1fbf63"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-03-scenario_1/flash/answer-0.json",
+      "sha256": "500f3e2d3696945dbdaa2e39eb5b989001e77dd156edb22ade8f273ce56fa2d1",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.726,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "94763ca9b8e4c55e76b74264513ae979e330ad2c80dd790092d337fbdfbaf727"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-03-scenario_2/flash/answer-0.json",
+      "sha256": "431c5e8e9e38dcbdd4251e80d68bb6d2e600f2c44110ed7482339e0b13caacb2",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.762,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "4021b5519cf9ceea9c6cafcb838153a3e626b110f612ff03b0a7edbf9bf9ab6e"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-03-scenario_2/jev/provider.json",
+      "sha256": "d4ee3b8069181d8133b8780c432ce638d23d839d0753bfef7676d535d72095b9",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-03-scenario_2/jev/review-0.json",
+      "sha256": "90077818ef6f5fa760dd7363efb49fbb94402417177992803a80e3ef33eb9ea0",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.217,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "9f105c4979795154689dd57abdd5d61e6ff2f6fcce80d92b2e8c66a3200af4da"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-03-scenario_3/flash/answer-0.json",
+      "sha256": "8c80e14fea556be6528381fffcf2e9d68e9fd606676f13e476a0cfe5b40d6f35",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 125.379,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "failed",
+      "request_sha256": "6d5c53d0186f1ecd029e5b030e8184b0d40a8e94f15fd5350941f4c14405c370"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-04-scenario_1/flash/answer-0.json",
+      "sha256": "b54477a17459a46015d07b52b9cfdae0fc120cc6c20f35246a721ef86c5660f0",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 5.231,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "failed",
+      "request_sha256": "fea0ad0ea813862c98534a6484905931dad6e6a44df22e09b93b255ee8c2ea3b"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-05-scenario-1/flash/answer-0.json",
+      "sha256": "823afb53a4498a6c0364bf51599bb012889c7aabc5cf5cd57b472d1ce2f5339a",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 120.356,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "failed",
+      "request_sha256": "f1af1faa63351990d696222b3652ef5cdbb4492b72c9f731b14081cf56e6a8fd"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-06-s1/flash/answer-0.json",
+      "sha256": "b278c9ddcdc706e53cc3a958d24edd0e0a55ef701673c3532879b1ce090fba32",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 1.737,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "failed",
+      "request_sha256": "a8f823c94ceb213cf3fe757cba4941927d7e7828e55fae7aa4b82351e50aa649"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-06-s2/flash/answer-0.json",
+      "sha256": "ab74d8a744e2a5d1ae3a1f42853187b5a503f0435bd43ee7da994706ee55451a",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 120.622,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "failed",
+      "request_sha256": "2436d5471f1f119e99c2ccba84fd327a4b4fad289ecd400ff0c478a641840a1c"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-06-s3/flash/answer-0.json",
+      "sha256": "f252d6368a50247ddbd579c520b4245520f42913c9a476f2844a1017ac0c5d39",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 124.255,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "failed",
+      "request_sha256": "52536608c0d236be30483609222f6f3b6f573419a9c23b66f24f15019c26e8c1"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-06-s4/flash/answer-0.json",
+      "sha256": "c91232fc3db1b6e91adb67012f31a3678a90458353cae32da0839117aa373537",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 20.359,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0f88e33a1f8f30a04e48f5e3c2be6d824162d5842b727590053d20e5bf488ecc"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-07-scenario_1/flash/answer-0.json",
+      "sha256": "e7ab7ee039842e568292c185f828c7e6f9540f2fd2a2cb62cc2a40ce6af556cf",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 16.351,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0e379e177c0926f4135bdca228b8f004107de1fbeeaec1d3d6e6aebb2538ff27"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-07-scenario_1/jev/provider.json",
+      "sha256": "888e1be60bfa8df4151a9ad4a407eaf6d9d54378380b69fd0c41d3319e685926",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-07-scenario_1/jev/review-0.json",
+      "sha256": "cade3417ee0ce049b8937839894c599359049c80b7ac0420e03814b0e87f9567",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.278,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "6f3f8bfba6f0f0db3a60043c235e9e71bb671bb823f9c8dc94eea4aac585479b"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-08-scenario_1/flash/answer-0.json",
+      "sha256": "752a0597a519845792cbd4ecf056c781d3e2102bb5b453f31bd6b484fd09d440",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 17.696,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f8b58e04033bc5ae6dda815eb6bd4f8bf2fbeffa4353f4a65906a1f15d56a98f"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-08-scenario_2/flash/answer-0.json",
+      "sha256": "50a81699ebc236862209511c7eccf08bf0b2df2f5f91b1e9aa49cea0eba235cf",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 24.018,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3376586641a9df8a80f898b7b143e3b6f5857f1cac0b3f3ba3ee1953cdae5038"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-09-scenario_1/flash/answer-0.json",
+      "sha256": "8468b1872a167e8798e69aa0f7201a59685d8185d1e389d5d665610f87386a9f",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 13.6,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a3c72d6088e1359bb18813ddc5aadc8f3128e72de3ca468a829034a08e3a207c"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-09-scenario_1/jev/provider.json",
+      "sha256": "1df1bf1a259b08fe7edc5b75e68ddbf3e66496ffa086b9ccc446fb223fe8fddd",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-09-scenario_1/jev/review-0.json",
+      "sha256": "d69d69b1889402aee1e5fdcf5fc2d1f0df2b24d46b57883c5d71e2f83185d406",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.217,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "680eb4b8790c9764ac45fae58b2cc8ce5b09a4fb1d79dadc64fa63bfb431bf27"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-09-scenario_2/flash/answer-0.json",
+      "sha256": "43f1d0310ab02ab76633fc33f256a8f4f7a6836913a0fc794153262b22c97821",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 19.301,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "7e5a5471cbcd8168311bf6b8768fc98971f35a79f3592e7eb898cc147abd3064"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-09-scenario_3/flash/answer-0.json",
+      "sha256": "eaa7c0ba4683320432e63469242b3e6d168a798e1c934c7a0a239cb45e606961",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 18.287,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "14c6c1b605023141686cad9ee60de72f1e696ad79e58433d3515e7b632401c4c"
+    },
+    {
+      "file": "calls/answers/bandit-structured-nosec-directives/batch-09-scenario_4/flash/answer-0.json",
+      "sha256": "19fdd42c0dc4bd0cfd01be3337dd2818210d926e9573231b24c1d966d269edf9",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.432,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "47026cf3d0c629a96a04286f28e0e3595aae099b9990aa4c7bd217b84466bb18"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-01-s1/flash/answer-0.json",
+      "sha256": "1a86cf1698be838b64798e51ef619c9e425f85f593ea073bf814bc1fd4a95030",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 7.556,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "1590949dba2737a55565140b69f944b2d17e11272d01e38dfc165d80f9f17aea"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-01-s2/flash/answer-0.json",
+      "sha256": "820d4369f2d95c637c717362dd29c246e35b2f8c559b154e87820746a57abf13",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 14.085,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "83e93e501a1834aa984655deecbd29e2c6604c506a91a8586c6c731cac3400f3"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-02-scenario_1/flash/answer-0.json",
+      "sha256": "e0e5eb9c85f6a2040f8bf6e6ccdadee8417f0b4ed5d8cc82d74c2b2237ada38d",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 13.699,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "1d383783428753c0617aa26f280b28c66eb78c024d113f3b2930d9a747b8be7c"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-02-scenario_2/flash/answer-0.json",
+      "sha256": "51c3612d60c6040b9eeee490bfa167cf553829a74eb5a8648dd2b5870aab9e8a",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.363,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a01eaab3192a69e467467d8154b65490e8441d447478269abecfc7927bc99986"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-02-scenario_3/flash/answer-0.json",
+      "sha256": "9dc9f286805ade718457d742896575c1284c1e4d213707195db7ec335444fc15",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.375,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "6ddea5a01d4778adf34b2711106cec666eee542c12e06f570f94356f803daafa"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-02-scenario_4/flash/answer-0.json",
+      "sha256": "f94b7ddad54b6479f6f14252f0b3aa4d615e1a6af6387bc61295b571049f4bd3",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 14.544,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a92de77a133adf437c44b9115d35ba178ba9ee34de531372eb8e22185d7f283e"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-03-s1/flash/answer-0.json",
+      "sha256": "21c8ae576807f3de15ea327621fab656f8091a9ec285defcf70354bb8081c17e",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.694,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "329e484c58741bd47903f9d6f686c28def688dafc0e4ecf90b3200a8c9d10458"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-03-s2/flash/answer-0.json",
+      "sha256": "764de832e4ce1ff5fe24cb82259209b5c8ef39a583a3dab9d12eab4c0c1e0737",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.025,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "4ddb2b81eeaeda8896dbc04dc56c20cfc2129e8d4352c2f14984fe24c78e356e"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-03-s3/flash/answer-0.json",
+      "sha256": "68882e71d4be0ba3514c01b4fe3bec1feebc49111323d9778a0c12005b58ea92",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.826,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "10fb2491a0c1f4eff26d29498b4d06403986053d4ae5ccd0b4d35acbd349c041"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-03-s4/flash/answer-0.json",
+      "sha256": "4ebaf029aa7a0cb4e90004d793748e4bddaf69a918446c9af0cc35e478ed7cac",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 13.612,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5c81d9a94aa5e1e0aa4cd165f7c30294cdc3bd96c9bb0a2b445e7b6b6f1a385a"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-04-scenario_1/flash/answer-0.json",
+      "sha256": "089532ad02d76672e374ff6827729861dbcc66af18ce8321083039c13d5fc246",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.631,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ef52f9e28e55e9b771a3f27252743fd7e80d00ba085ef04231e105c4bd696593"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-05-scenario_1/flash/answer-0.json",
+      "sha256": "9c73ccdf74bda200bbab6fd2ecf8037ba2069e1bbb6393d577f83865015e85d1",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 12.016,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e5054799232d0614f982f40620ed8b17c202c6f78b6091c0053aa9505b3eeb7e"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-05-scenario_1/jev/provider.json",
+      "sha256": "7be9b4216edefca27026ed5871ba6e7c8607b7d351d571f1b5476358b76b7c77",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-05-scenario_1/jev/review-0.json",
+      "sha256": "db79089012d8988e8b40202041446c70af994fc1dffba78e879cdb5bd145a38c",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.269,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "adb784f7cc89572d4b3b2ed6b94656098a402280d0ebc4e164dba91f2c81b1e8"
+    },
+    {
+      "file": "calls/answers/gql-incremental-graphql-delivery/batch-06-s_ws_forward/flash/answer-0.json",
+      "sha256": "e8f72b1965c4beab6a097eca891eaa69624eca861c64084e084546c8aeb5d241",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.107,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "6797652be6f9808d7cec26545769b73a69350734da291a1c4005a96da744ca75"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-01-s1/flash/answer-0.json",
+      "sha256": "c1f42dde5dc7f04c0510f31520aaffdd1592f897a20c70a6f637b27145ba48f9",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 7.873,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "fb54827ead133b2b0ceaa81c660f62b03e32ea607dbc7b3c2f2838fb9f429821"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-02-scenario-1/flash/answer-0.json",
+      "sha256": "36e4c0c145552cd2c30e73ab54b4234e06feca3bb0b878fb1d250f60f403240e",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.971,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "34b8a0c9c12a54e618ea7399ea39efb6eceb18f282bda054f8c83e39c7ddaaf9"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-03-s1/flash/answer-0.json",
+      "sha256": "3c083e4ddea1a73c9d5635591b03190a27db7308cdc141c08e07ccfc9ee30aa1",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.692,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "574f9ce65f7339a713a927e790af4e4fe3bee2c6fc3dd4b89ab4a40e2cf44f9f"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-03-s2/flash/answer-0.json",
+      "sha256": "d003ee81c865353809d5a17a42a8c52163ef49f2bf1f7624874f655174fbca3b",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.157,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "381008cee3dfab21cecd32b37d644f62601cbb89968f937616e97b8bdc42bf3f"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-03-s3/flash/answer-0.json",
+      "sha256": "9e462dd04c763956e600789b3067345f9e8c139d516147093c09e4bb8f746201",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.968,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e7eb63ea46d8197e9e76cbe42520f04f84a162a6cc99ff22c1864d965abc5adb"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-04-scenario-1/flash/answer-0.json",
+      "sha256": "74787bec2524f28f85da636d8a8ab19bb23a36791146038a43deecb40b9fd6d2",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.266,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "8d066fac00b2ed98fc7e63fb4ff20192aa4f5aac4b061063e0ed056d68a15bd6"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-04-scenario-2/flash/answer-0.json",
+      "sha256": "ff715fc72a1f06593c23503a48f6e1b7cf2a432aedd3e01afe65875a4555f430",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 7.345,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c5303132fef7e19e05c7643277d4ea2b2e5caca758494c182f5f4502d3495038"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-04-scenario-2/jev/provider.json",
+      "sha256": "4df8c64800015de90eff337e9810b2ce020eaa9e4f278850d244a74509f95f51",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-04-scenario-2/jev/review-0.json",
+      "sha256": "78f44710dc14555ecc549f3bad39d0396c46427cb933c744a9b63235d8c79f63",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.383,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "d3e513dcb7fd84e0118e38eac8b66e9b999b01e1c21ef26cc485547daad2b51d"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-04-scenario-3/flash/answer-0.json",
+      "sha256": "96bd8b8c9c148c7349de28ff3592ef7d4da44e3f36a980d3bac014c7246f4fc3",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.385,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a895acc7d37d9114f750a25512b4c5f4997e942063c489f6aaa9e3a31591af42"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-04-scenario-4/flash/answer-0.json",
+      "sha256": "de10a5a656dc8867955d758dfdd48f380b7494c5f7acaa1acfc2215a65025c0a",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.542,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a63cedee9738a863bd11c1b6961b9a328320cadd621c026016c271ace627b91c"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-05-scenario-1/flash/answer-0.json",
+      "sha256": "bd510473cc3f7b4254a45d8da2080686c8bd2b5b2d7456c518ed636694ec14b9",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.758,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "389105573a1e6fb1adf63c85445fd1814499b96a41e64f256235379ebb65a84e"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-05-scenario-2/flash/answer-0.json",
+      "sha256": "79beb67dbef82dcce09dd82ce1035c7ff2f58c12ed3d9c6ca12fe4d46b7e5ce4",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.339,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3630c1baf2533fd434552f362710794d1677c2702b30485356f66890599be55f"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-05-scenario-3/flash/answer-0.json",
+      "sha256": "0d3aa90681c6b6226c774013d4da8b941242b172546b97742c88a86d49b0dc5f",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.163,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b61bb88dded56d4273ee244713feca73e858ab16d5b48a00895d1409f8020ed7"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-05-scenario-4/flash/answer-0.json",
+      "sha256": "1a730e8a658a049561ec3abb2d65a07792c0939fc07ec5ccc302cb3e3adad35f",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 7.4,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "6e4b2a6e20e599e49c43f0a94299ae8507b2a983feba397e65f5e181133e86c4"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-06-s1/flash/answer-0.json",
+      "sha256": "e4e9ef18549e107dab419ed874d1b8e79dd9c06adc73c05d49d1a9fabe3b11e5",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.334,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "df93af0f8c9bce1d41e296bf10ed3760fc659ffdd9b34e998ab8dfc93154a381"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-06-s2/flash/answer-0.json",
+      "sha256": "6c63213db93eb0787325e0319bc535c3fb55a160274b41cea3f1c4072bca6b6f",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.907,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c5746db0d889d284f104c8d0905b118a1f9951fdf7f3aee737fdb812afb20c6c"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-06-s3/flash/answer-0.json",
+      "sha256": "be2bb5054c8781e5494b0fb561f5dc89a77c4fd0ace3eb6c24a231d5f2f49afd",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.923,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c6b81684e0c75a134725db2f58dd21d2bc77b51b1d602aa530faa507ea154b19"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-06-s4/flash/answer-0.json",
+      "sha256": "850b171b32c9fbf715e143e53778a7bd08ddf22259aa6b101054cf61587b1a10",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.316,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c5d0970bc98ea9345d8607b36d7d288f9378aa05f59cd287c54303c4c44b4bd4"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-07-s1/flash/answer-0.json",
+      "sha256": "5f3b7ca28071dd96a0ed910c098dca7477b627987eea3efd83604973665c71b9",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.088,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "8c1dd574a7e188bd6b3bc14e5076cdb2aafdb0635c47e72f894f325fa0106fab"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-07-s2/flash/answer-0.json",
+      "sha256": "8a5db0445b432d24b11dcc69ef65333b5e5a71e779a30d1adceec4c2116b07b0",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 12.782,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a6714e6d96d71d29a2b17cac8c9b8a65a6642b310638b312e94f5c700a21618e"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-07-s3/flash/answer-0.json",
+      "sha256": "9f9a2fa9f9fcaf72bb58e7eb197481aca966c60dcd7a780832297fc039cc9a72",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.936,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3a17ba82caf29a64b087061f98e0d04449b9ea4bde5963b1728f03fcdbbe3d73"
+    },
+    {
+      "file": "calls/answers/koota-composite-trait-aspects/batch-07-s4/flash/answer-0.json",
+      "sha256": "e4c941c1411548582d2f2d2d8b96c3c84024a5af344d264db7a86a9625603355",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.286,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "8d31f9134fcfa0ca668a7b4e997110f87118b24373ea8b351bb51cb320bd2c0b"
+    },
+    {
+      "file": "calls/calibration/bandit-structured-nosec-directives/batch-08-scenario_1/negative/provider.json",
+      "sha256": "6858693ae63a23fa3bf8623aa2c2cda50b4dbed104f2a8b2911f54204e868d17",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/calibration/bandit-structured-nosec-directives/batch-08-scenario_1/negative/review-0.json",
+      "sha256": "d6a9ae2a1d6e1aef6d3ffbd0c6fc7e04941928372756ad9dfee14c0682ce8d2b",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.256,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0e5cdaefbb16b293a1535edd1f820e2de493298c34680bb6a880fdcc62908a21"
+    },
+    {
+      "file": "calls/calibration/bandit-structured-nosec-directives/batch-08-scenario_1/positive/provider.json",
+      "sha256": "f2995fadb33e7f54f8359b996c17469f980b9705cd42d6bfb3df9eba4a5b415b",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/calibration/bandit-structured-nosec-directives/batch-08-scenario_1/positive/review-0.json",
+      "sha256": "1cbc0ddadf09dd98ad1339ac6e73f456fc739843ac9fc65aca9c009133a119a2",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.229,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ebd148e6a1312b3391e66e5c713b7728c277a02f2a46d8eab9629f383ed0c001"
+    },
+    {
+      "file": "calls/calibration/gql-incremental-graphql-delivery/batch-03-s3/negative/provider.json",
+      "sha256": "f696fb0bfd3e5354fa80e929edce4db332f34b530fbc17efcbbd70bdd35dc69e",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/calibration/gql-incremental-graphql-delivery/batch-03-s3/negative/review-0.json",
+      "sha256": "a8b955b3e4bbc65ade9b389275c51a3786cd02f64888358f3ede87fffbe7cfcf",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.188,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f03bd15df15e2c00ccb1a60ac6669404d4c57a41aadde811a2ef69b78c996016"
+    },
+    {
+      "file": "calls/calibration/gql-incremental-graphql-delivery/batch-03-s3/positive/provider.json",
+      "sha256": "1edae6c784c2bf67df63993c63fd1b3b647864d57d38a09c771c5dac30cf117d",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/calibration/gql-incremental-graphql-delivery/batch-03-s3/positive/review-0.json",
+      "sha256": "5e8de9f520329caa76ce8cb68c327375aee7892713eef79b0b0c42040aab09d2",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.221,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "fe76457cb3728462782b5ec929ce65718a52413d73839308ede5e9c88fb99c04"
+    },
+    {
+      "file": "calls/calibration/gql-incremental-graphql-delivery/batch-05-scenario_1/negative/provider.json",
+      "sha256": "0a4718a04bff7adcbc3ce09c737ab59253311df7b5890151fb7eb4fc7c8fa56a",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/calibration/gql-incremental-graphql-delivery/batch-05-scenario_1/negative/review-0.json",
+      "sha256": "6c10d6e5a803839555f6f0dce282d590f655237d3c72ab811136b67bdd844428",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.241,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ab71c3b60f36beddf69b2fbefb5056b37b60508608d94371bf78d127363a80df"
+    },
+    {
+      "file": "calls/calibration/gql-incremental-graphql-delivery/batch-05-scenario_1/positive/provider.json",
+      "sha256": "0c021952326ee05e2be89d098232ffce9959fc022dd3bd467b99d4db7c2c609e",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/calibration/gql-incremental-graphql-delivery/batch-05-scenario_1/positive/review-0.json",
+      "sha256": "0d73fa96e49c7a9744265cfd9b13d726a8aedb2325c39135ac647b5184e4b13f",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.202,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "317724aaed4e91ea2b69c883df2d9b78d164551d14f754d979185021d0eb1b7d"
+    },
+    {
+      "file": "calls/calibration/koota-composite-trait-aspects/batch-04-scenario-2/negative/provider.json",
+      "sha256": "297a3e2dd95fe985fbcf51888d2e2bcaf43dec131b2983eaa38f8cb94e04c1fa",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/calibration/koota-composite-trait-aspects/batch-04-scenario-2/negative/review-0.json",
+      "sha256": "742f2641655c195c7347ae428ae1089f9c256f5687973dbac5dad83f35adfd12",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.239,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b261ae9be280e88b7fc1e267474d7926a09bf3d812c12fcd26e25f73e71a874c"
+    },
+    {
+      "file": "calls/calibration/koota-composite-trait-aspects/batch-04-scenario-2/positive/provider.json",
+      "sha256": "7cf42580817410953a31da339c15394af8c7d4fee4606ac7a141e46a23493ff4",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/calibration/koota-composite-trait-aspects/batch-04-scenario-2/positive/review-0.json",
+      "sha256": "e35cff333743c34779a5b0853f62a9dcb8aa307432006683d64c215590d38222",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.278,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0e08e7026d8080fa781bac41c521064ea59e9b2bb44cd78562d8d7defd654f62"
+    },
+    {
+      "file": "calls/discovery/bandit-structured-nosec-directives/batch-01/scenarios-0.json",
+      "sha256": "05debe451d7b24305121b6dcdd2bf645b117385fb75bc08f96a01992ab0740c6",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 17.649,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "716d69ea77ffd259af421b9e28e45a2bfa428c98998e524d17591f0fe28ad464"
+    },
+    {
+      "file": "calls/discovery/bandit-structured-nosec-directives/batch-02/scenarios-0.json",
+      "sha256": "1b96563b06259cab71ab8ef396ecf72757216b0caf61261ff36bd78ef44f0fc3",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.386,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "26ac2a422b70038590c0e9f5c4af7c35a8eb94860d9b1de6477a41304c27c9fa"
+    },
+    {
+      "file": "calls/discovery/bandit-structured-nosec-directives/batch-03/scenarios-0.json",
+      "sha256": "2bf05619573f86a75164410fddaad367313fd82b1c4620005e63c1a690188c01",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 15.216,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5a0f5e7363c36fb09bc6cf1005c89146ec63060b5f5e251160efa837de1fa8f5"
+    },
+    {
+      "file": "calls/discovery/bandit-structured-nosec-directives/batch-04/scenarios-0.json",
+      "sha256": "c8ac437003124277d117fc1638c8f0aaec890125446c3e42542f8c307a36cfa3",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 13.138,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f84ce54dd1fa55e310d851e78c8468272884c3aa8f529198dc7d3c4504ba5fa0"
+    },
+    {
+      "file": "calls/discovery/bandit-structured-nosec-directives/batch-05/scenarios-0.json",
+      "sha256": "b5bb2f1acde9139be0c7585fe824cd675a956abcec103c3ad019417eb3b09983",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 12.167,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "aeaa95e284befedff732775d694a9c03c2f2b3c1b7ee69f72b378b59a4769fcf"
+    },
+    {
+      "file": "calls/discovery/bandit-structured-nosec-directives/batch-06/scenarios-0.json",
+      "sha256": "33fc65a62363a937ec664b591e1fcd25a611a47ce5b7860a82622410dbc88863",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 19.104,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e505658a7d46d888f2cf9d542c4cadea64a7bfa687e3418eae318c42968a145c"
+    },
+    {
+      "file": "calls/discovery/bandit-structured-nosec-directives/batch-07/scenarios-0.json",
+      "sha256": "303e131d4ecd12daf66a3248cadb3c3b60b2b3d0617d5262004ad0653b1adf7b",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.915,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5acbb178a35ca12c0b4b08929b9607bd68814a7a94b8a3add508f196b8bcf8a3"
+    },
+    {
+      "file": "calls/discovery/bandit-structured-nosec-directives/batch-08/scenarios-0.json",
+      "sha256": "1871f4b3cf62c0cb6f42c3648419579aca33275acda035273500cbc6eca436f2",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 15.328,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "badd78817aed27f76ab37489352ed2236cfd3dfa5b922b306b2f956d3fb36be8"
+    },
+    {
+      "file": "calls/discovery/bandit-structured-nosec-directives/batch-09/scenarios-0.json",
+      "sha256": "278fb3a97733a93b3a82c4e5f4e0e1b65b93d17cdc1f5f0674006deae7b404d4",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 18.845,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5b2e251aa8510bd30a4b030fed29b197807c465dec0c435b3daf0293efaa991c"
+    },
+    {
+      "file": "calls/discovery/gql-incremental-graphql-delivery/batch-01/scenarios-0.json",
+      "sha256": "8e7a92a0e842651e50509a0317bf9aeef2ba1464013b21f6e319e7756c42c627",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 17.048,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c8e51c5c705ca02008463c402781fd387a05354eb1f51cc53b9f251ae3b5bbb3"
+    },
+    {
+      "file": "calls/discovery/gql-incremental-graphql-delivery/batch-02/scenarios-0.json",
+      "sha256": "256064402f7492938d49be0d1bc59470193fe261687add6feb7d435fdd6864e9",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 24.35,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f9cf184d75fb9c69fa1d1c6ed50fb09b0dfb75b9fcd13158b75646fbde0b6bf6"
+    },
+    {
+      "file": "calls/discovery/gql-incremental-graphql-delivery/batch-03/scenarios-0.json",
+      "sha256": "1eab89712410645ab9c06765721baa130b3179fe854e3c07836f18a22c5f6ebe",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 17.147,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "64d3efc7beb892d630f2719785073625b1e4fde3570b3d4df052bd8df0e5cca8"
+    },
+    {
+      "file": "calls/discovery/gql-incremental-graphql-delivery/batch-04/scenarios-0.json",
+      "sha256": "2b63088c659863340de7117c6acb4296fe222e0a498108428afaa1422bc046ec",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 12.702,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "1037f8f98f132d8658c278ca91bda6ea800606b34fa092e3f1b9450e4ca7eae8"
+    },
+    {
+      "file": "calls/discovery/gql-incremental-graphql-delivery/batch-05/scenarios-0.json",
+      "sha256": "4ba712ee32b94b913b81baa1126e0a46ca11d7134bcb8bc4b242207889aca902",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 20.864,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "68dcacd5f0b8e8832c6d09b8f0d24a6c804e61b3ca4e0b32d1aed2a5d2fb47b4"
+    },
+    {
+      "file": "calls/discovery/gql-incremental-graphql-delivery/batch-06/scenarios-0.json",
+      "sha256": "0571df8378feb32f49fda7899bfab0ae9d5f5af8dbf435aa655ef0600886556d",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.842,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c2e6ba4f2296225ec35e8c044b7c0a98c6d80fa7ef8bcf513c5f10267731012b"
+    },
+    {
+      "file": "calls/discovery/koota-composite-trait-aspects/batch-01/scenarios-0.json",
+      "sha256": "8f233ccd3708bd5bfd51e35672ca78551b051093ad955454818ee1857f8a59e2",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.113,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "57ad68fc80272e2a0bdc17d58fb22c7deec156a338f4998181f2c906b8487783"
+    },
+    {
+      "file": "calls/discovery/koota-composite-trait-aspects/batch-02/scenarios-0.json",
+      "sha256": "49ab986a7f2297ee0d4895e271d5e9c64734f80fe12a3a552ef72924bf1f53c7",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.907,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "42fb3c6813781a543cf3049cbe9e3dff75e1ea8bfdfec473dede50b857a73ca4"
+    },
+    {
+      "file": "calls/discovery/koota-composite-trait-aspects/batch-03/scenarios-0.json",
+      "sha256": "96a774c71994811154d5ff087989d9ebcff60d9624860648ded73e7bf7f3d6b4",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 15.736,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "6b553b757ca60485ab9d9253036bc2c425a8b54f89b0e3a24cf3a25c40bb91a5"
+    },
+    {
+      "file": "calls/discovery/koota-composite-trait-aspects/batch-04/scenarios-0.json",
+      "sha256": "aa016328d8c4595fe6523c3c3a33d66b69347864304d4bd4a699ef90b37cf8e5",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 22.627,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c829307180032b1c49b0ffa971ad44d99968af0206686bba7fa26271674bca45"
+    },
+    {
+      "file": "calls/discovery/koota-composite-trait-aspects/batch-05/scenarios-0.json",
+      "sha256": "0265aab6f127699a32017a88a0dafe2759650344e75a808b8d18e6d28d4413f4",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 24.922,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "90f0c24d4deafa6176822bbd4093b5cb2be547374879e876b82e547dfb8e62b1"
+    },
+    {
+      "file": "calls/discovery/koota-composite-trait-aspects/batch-06/scenarios-0.json",
+      "sha256": "29a1e58319da411a737295954bbc744ddc8d9e61d0744cea858f82955c8bbaf0",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 27.429,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "02202609392fb21ce673c886d5cc866ddee92a213cb37b02ad93cc74f7065ae0"
+    },
+    {
+      "file": "calls/discovery/koota-composite-trait-aspects/batch-07/scenarios-0.json",
+      "sha256": "090224e6b4f3aaf512054d5f39a92a59fcde843012e0773b9e1ab88593f70eb1",
+      "receipt": {
+        "stage": "scenarios",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 27.136,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e94892763db3e6c114d89a64a7ecf6b538e3676883612932c22c6cb339ad8340"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_1/flash/answer-0.json",
+      "sha256": "04b410a9d772efad257c767f432f51be2c9dafc2fe0b1d0f6d0754bc2a4faf2d",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.578,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "693c0bd009854ac96a9aa69eebff1c9fa672323cf1753b5d584f6bcc5abcdf9e"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_1/jev/provider.json",
+      "sha256": "bd6b16879d7d12cc58921751b595725ff8347aac7ac79c0f2a5c22368f73516a",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_1/jev/review-0.json",
+      "sha256": "66e62a499476879df067ed4d769a5d17ad50d078a87006c375aa20837476193b",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.24,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "251a47a964972e9f178955ab56e8d9d3a09d485ab6951aa3c4b782e8269b73c6"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_2/flash/answer-0.json",
+      "sha256": "e2fc30bace36e2023b10233378aa748a93d5c74495fb56209a6a250595059417",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.283,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "76ed9df8d9a7a6fb3dab31ecc9dee38bba27e677324d9406b1c61bb3e587282e"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_2/jev/provider.json",
+      "sha256": "6c9dbb0b563b5904e46963318e90933599df55e0e06c4370d96243e50b5ee3a2",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_2/jev/review-0.json",
+      "sha256": "db0f6900af931c3cace776ba35740b546aec3570e2f4f6bf305d9e54162580a0",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.236,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "375360340132474ad34992095cf135458cb9ecb22b4e69d43171028cd9e55109"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_3/flash/answer-0.json",
+      "sha256": "628980f027f30b2dd3332ed92d69f6d842751a185e7ad8cbe163a57b1a0f683c",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.838,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b70d3001f67935d936fdee0177be658839d2f82d5b62502ec1de8bb5021f2b15"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_3/jev/provider.json",
+      "sha256": "1bf2ea4e4f501ded901c31c5b80fb14f2056c332dd73a5a1f03de35c930958bd",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_3/jev/review-0.json",
+      "sha256": "22e8abd6f66b87f57e4e31680f41cf609048b9ebad5d657ea1455123ed3cdd4f",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.235,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3bcc4198c1bf657ef880ba7fd47a1a9081cc86da52e87f65d84ccb4c872ed03f"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_4/flash/answer-0.json",
+      "sha256": "e5e4446240f47680ba1f94e9d48181dfe164a3a38109344535ee82f32a092393",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.844,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "9572c419294c26205d01ddf4cd408327127eab77fea8b2a34034464f6a00f4b3"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_4/jev/provider.json",
+      "sha256": "553fe23135a04a3705fbd80751650ecc377419fd7ca8c29ace7277a5fa1ac4be",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-01-scenario_4/jev/review-0.json",
+      "sha256": "9cca086f06c3740dacb06effc171a58278db1b8a9e815d29d46029bcc554c438",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.278,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f92a459366a74524612de1546a78f047df822eeaa2d585f2905fc962fbf2560a"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-02-scenario_1/flash/answer-0.json",
+      "sha256": "3e93aecabc68422a36ec4dbec3ab7940b40921a9cdb0f7f7742b37c01c0024c3",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.678,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "03c947134098069b0ad951e93ffe8e2665e114da3e2313b52099f4cdfdc316d4"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-02-scenario_1/jev/provider.json",
+      "sha256": "ed7cb5e92acf5ee0e4d7a4c902624706c71ddf10ccfc3c64442487587431786a",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-02-scenario_1/jev/review-0.json",
+      "sha256": "eddcee55f696a2eb6668d1b8337e5561354ef92ee02d3862ab46aa0315f4619e",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.268,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0497775e9fa18438f35bc19c33f65bf8b91cde12a8a53be633d1951a6aaba31f"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-03-scenario_1/flash/answer-0.json",
+      "sha256": "96cba8c93d6756af601af2f0d133b7a20e76540479865e84d4e9c60c9f088e8b",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.275,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ef81d4c426bec960fc03dfbcfb15cc78ee074468b354bf8eb4ce7ffee970d773"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-03-scenario_1/jev/provider.json",
+      "sha256": "2c800fa7d0646611e53702036d3172524136640719dd3fef2a771b51837b6f57",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-03-scenario_1/jev/review-0.json",
+      "sha256": "ff7b20fcc65bcde638b2a918098f5ec63d334bb29d6a77d7f456d8f0264397c6",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.22,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c845af30d328903790bed43051bfc25d972956514f9c24ccee724ae5c27d08f6"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-03-scenario_2/flash/answer-0.json",
+      "sha256": "cab07d59f6da76621bfbcf7b9e446cec4d698a647159b76fd2daeafeb3074a76",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.566,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "2d1e5290cd6557bea62fe9a07bbb8caad6b5180090bed18eed134d4e9de25957"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-03-scenario_2/jev/provider.json",
+      "sha256": "8eaa8f0e9ec6da065c0cf234b4803a06cc4cac6c197eb514c31aadb42659d06b",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-03-scenario_2/jev/review-0.json",
+      "sha256": "7daee3910f67d7a76629bd7f2bc280b8b617d2b76fae1cdb243e3819cde05785",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.383,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "d7c94e94d5691d446a6b363386aaa1783c30b2224c57ac87c1f9f3365b1b1d26"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-03-scenario_3/flash/answer-0.json",
+      "sha256": "59a2a726321596ce7388655c887e3496b0d63e94022b092eb8eaad2ce6df18ab",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.097,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b6632dc80f817d02853734db77fa3c1421a7145201b0831d2984f97f899dc40e"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-03-scenario_3/jev/provider.json",
+      "sha256": "36a96af667c95838e5e204082b821a866ea7517351fb4f4e6300b6dcff45ca07",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-03-scenario_3/jev/review-0.json",
+      "sha256": "cee39b70df8fae2e778d73e6d1df164f6a3f218ad75fd2b7be240f902233b277",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.222,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "20aa64b164d9742e66d5d61fc558b77edf676c2ad445d2b9f8652bca947bf4fd"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-04-scenario_1/flash/answer-0.json",
+      "sha256": "f419cde98240a1581a9aa0d6351de3627f09406845a7f75e84c6632188ed6b0a",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 12.157,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "9fb0437d087b8a41318bf39bc4800d6cc22865720de35b9e05f3d925db06b69f"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-05-scenario-1/flash/answer-0.json",
+      "sha256": "36f6d5802b64d34227e98a4eb7bbf6d301cd269215a32425a59864c73d9fa711",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.592,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f07554226c0d85a9682bfa4ab6cf150f1b861c2a11866c764fad16acd14f924c"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-05-scenario-1/jev/provider.json",
+      "sha256": "343dab42cc5a04be7493fc06e25a1eb082991d34a11fcb1832e2cca47fdc377f",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-05-scenario-1/jev/review-0.json",
+      "sha256": "7cdd0a4fe0df683a4b2ad45e9f2029033d602db695cbde7b106bb62ef7e4b22b",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.218,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "d880ca5671f4de2439225a7183f97685743c6d39f12b44091aafb1cf8f72b1f2"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s1/flash/answer-0.json",
+      "sha256": "a988abf6f1dc4a9f86ef0871b446ef4b736ab8bdd2a1585fd2b94a59293df12f",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.938,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e6e0e8b1b6343e8505d2ab721e98a4c382e2252ffcbf84381f00103d20b8cf5f"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s1/jev/provider.json",
+      "sha256": "7b53a7d5e4a85ae86a4b75c8b9e8a1cda84de25a4e85cc398e09fb75e4c41774",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s1/jev/review-0.json",
+      "sha256": "07a5080a2065d39e009531ab492f9493a20df7af1677d584b063c2a583605ee0",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.248,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "2d27f34d17b906bd841f30baa79f40143986c83137000cdea0fc7364d8c520bc"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s2/flash/answer-0.json",
+      "sha256": "631fb2cc2aeb7cf63750664232b10381de2c6be5e457730b7419fea71ff31e6e",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.881,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b014136ee6048dd4eb637674b33f07f1c1a3396fedb9815b9b9f8e788f873997"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s2/jev/provider.json",
+      "sha256": "c523176d4dcf54f69a00049f83645c538b7d3ae3bb40ddb74d92ffd4940aa498",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s2/jev/review-0.json",
+      "sha256": "d064e9826038e8619d5d027ee7e1cd3986904572bec02a13eccf6a54285d746e",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.223,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "bc5c82fd14d5569494c36a60585ba5863b246cfa91055544ecdcbed86b63981e"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s3/flash/answer-0.json",
+      "sha256": "cb32a0e757ea47102e28bf9284ae8e86bf75810e24b8ecc968eab10a58abddd4",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.742,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a56c54c633d48973774b178bdf4664ef90285c3da9575f506310acd5746d3904"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s3/jev/provider.json",
+      "sha256": "216d8990276fca644aad604338bd3709a40c2a87dfd581c8de5c7ee5dddb9cc0",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s3/jev/review-0.json",
+      "sha256": "7aadb3f3bbeed9ebf9c5bdefacc02617145cbc06d35c423175a1e71aeb59b53d",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.234,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "171c5784c3bfab73441c06a8b778de6eaa90c40ca01e741abc49270f80c39f30"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s4/flash/answer-0.json",
+      "sha256": "a2f02c8dd194b4943a82d95885e8f4f68a3ee35ebeaa5091286f717a72c554e4",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.498,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "6eb00c6b9f355e05b37da1652fe1e8bca78cda76a99c4c132af96177f00bffbc"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s4/jev/provider.json",
+      "sha256": "ddefd2cd27dad1d3dc49053c72fc9cd382a34f490adc4fe038f5eb308d313e49",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-06-s4/jev/review-0.json",
+      "sha256": "7cf74d27d1dd278f84abbb9d4f97556bb11bddaced518b99249cfe245fd4e13a",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.225,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "bd82cc63f87b7f4aa74a52664d2eb48fb299af57fe7f27869bef954938463e2b"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-07-scenario_1/flash/answer-0.json",
+      "sha256": "acfe6fd7d01093c836931e325682556f65283102adbab00c77daa0e9c9ad6479",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.806,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "517602e869f5a387541d16039e15941dffe5277d499c39882b09bb3289843954"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-07-scenario_1/jev/provider.json",
+      "sha256": "73ddaa3963d613f5998bb51cc0f0e644d778d0a2e27f2057e03853667b0ac459",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-07-scenario_1/jev/review-0.json",
+      "sha256": "bae4b5b4085120055625a113e74573ef95218a6cffed36fda71da69b74f44fca",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.236,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "86fd5dbf6f3d90a00127ec22d93e3c4230c4cb1cd06a46dab4fc9a078feee4c6"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-08-scenario_1/flash/answer-0.json",
+      "sha256": "70f6423ef479c8fd20529bc5d2c41cdc88feff93004d25a504ac718409fd4d4a",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.103,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "aab717c75ed6e72f601b71de114b99da3d8733c77bab398382904d6c3161216c"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-08-scenario_1/jev/provider.json",
+      "sha256": "31ef166797f880ae7257c9fe11b0ac3eb326285c8414b81f4849d14a2e797c55",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-08-scenario_1/jev/review-0.json",
+      "sha256": "dc4263febe3e2496d52d0e0b28a82771d5137d4a45f11a2411f0466bfbb7655f",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.214,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ebd148e6a1312b3391e66e5c713b7728c277a02f2a46d8eab9629f383ed0c001"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-08-scenario_2/flash/answer-0.json",
+      "sha256": "3094971060422692ddbc0aeaacbfb0bee08eac5d173d2c94a238ad5b5c6879c6",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 7.957,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5a22b5a8209625e5b1ae64fc9e7935cc8bc17057f7bdf1fcb6947fa7dab772f5"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-08-scenario_2/jev/provider.json",
+      "sha256": "426aa364230ecf071fd3dc5bf41efa00d9d19043d681abc6e9a00713ec23d6d0",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-08-scenario_2/jev/review-0.json",
+      "sha256": "51eb018a0ace380ab072be635f0a5c3788728c3895de3ff98a9af4e8c5cae89f",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.225,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "8a7a885ad5c7e73f7de1c8e9d7e87263209be11b5d4fa4d9a62ad3652cd61537"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_1/flash/answer-0.json",
+      "sha256": "b74c0331fd60d4838994d411f15ce06a082bf0bc226926fc96f1b4c5baa9c4f6",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.156,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ea6f34cc516c4a434b88a99c7375d02b018c40b2c79894edba51e408367c5443"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_1/jev/provider.json",
+      "sha256": "3a436b3b479508c852c00846b4824ba9069e8267e5d4a777cd12e28ba8632e96",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_1/jev/review-0.json",
+      "sha256": "773bd4981f39be2777218b5439c346e9efb2f43638d469e6a5cdcad7387c0c56",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.208,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "35607608205c605935fa5d1a2c55844aca337f9504ec6ce4bd27216e269f3dff"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_2/flash/answer-0.json",
+      "sha256": "8becb12e5c0b5a2d82f628896571314652b519fab117c30e58df0b021cb1e059",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.639,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e57692369a37d13b4f89e4e4c528e0ad129c0e6d8cf40bce67b20e5eeddea019"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_2/jev/provider.json",
+      "sha256": "3d89c70ea575d09f70258d54a6dbde9943456c1b1f57fa40be3acb0b1437e62a",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_2/jev/review-0.json",
+      "sha256": "0040824694bde95949bb931a4ce2ede7fdc73e19daa8a833b6c16554bcadda76",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.218,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "7c1a6be8fa1352dbdcca790b42d5a5e8f5bdeac5165470d761e4851e1b9d8b40"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_3/flash/answer-0.json",
+      "sha256": "f03c71293512389254ee3f6b2e32e7cb0a1cf7790c877ad6d6467ea054487877",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.862,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0c4f3a4756fd4f4ced2c3d13154ba031bbc3231b30f21e6264bd3cc0f1d4b0c6"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_3/jev/provider.json",
+      "sha256": "451b7684788df3770db2ac9b85dc5be118f517453a3bc8b673ea15353d0f8e0b",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_3/jev/review-0.json",
+      "sha256": "46891acf7dd56198a813af97a5fa2c091eb64cdeef9d55d919c69d198d344d0c",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.231,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "661f4eef8f54c17d142ba0e65c03f2a20e695a2434bd8fa66ca9c3ac99dfc4cf"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_4/flash/answer-0.json",
+      "sha256": "59c804f4f6ca75422769350b2ad6b6e5072daae9afef48281690dfaae1d3cd22",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.405,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b09e3b95350a774ab730e616fdcf559547c99dac8f93435de2e5f804e62155f0"
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_4/jev/provider.json",
+      "sha256": "c296e74b6718745f8412eac550bb8bc77452d21db3c58ad8728925073bd4113c",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/bandit-structured-nosec-directives/batch-09-scenario_4/jev/review-0.json",
+      "sha256": "fb957f9c43bb1a8238e95b7bfcd79315ad6f8565baf2b96cdd88d1e3be53b689",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.252,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "54bd5394a6058a9ccd5b505d53b781cf49cd0bb6b932ea5b8b4e9bb5b6fc5839"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-01-s1/flash/answer-0.json",
+      "sha256": "b079fb9484e8bc2edb9a8356433f6d7031f927afa35c13dfd09671d4c0fc1746",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.531,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b50640d1d9d8bde5830e31ee06f29c9a0c54a84d30bd8904581810d06981153a"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-01-s1/jev/provider.json",
+      "sha256": "93f82d59006b067093fd82ab6be13de0a3192c8fa47ea98c780fe3c0cf77ba7a",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-01-s1/jev/review-0.json",
+      "sha256": "4c6952d8b597a0003975d21288ef6f9db16be220f7943a68e3d9ba4175fc5586",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.242,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "8864272ee6361c50d5a54e3b03a39215f83f7dca373649ee4bb26096d4607b05"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-01-s2/flash/answer-0.json",
+      "sha256": "a26d4b022c3f3b9de3e6dee9c9b6a5d7972ee9bb631114785de67fc3dcee829a",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 22.014,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "316ee870d1835797ac8ae60ab1bc81dc4873782af0073f9535764b2dfea9b281"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-01-s2/jev/provider.json",
+      "sha256": "9efec50edb84c258da7eff0ee5c8fc0cb01e6418c34f4ab3bd955cccce6ad64f",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-01-s2/jev/review-0.json",
+      "sha256": "58e69abfcbc5a17b28aba2a07355f3311f9b26c9eb0e7531b2b3f35d75d4bcb6",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.214,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3fd8ac6f0fb2cdf38bff8086d83cafa3e679b201d55e8d72cce9800b8bfef276"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-02-scenario_1/flash/answer-0.json",
+      "sha256": "7c4283aab5e2f2a794fb5904d991f57c9f9e12bc67eb0e07c3b2f7704e54b059",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.785,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "3e47978e50b583fc1a6609a6e66ca3934cb17523e743968ceea6153717a493e4"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-02-scenario_2/flash/answer-0.json",
+      "sha256": "11ce7959a0b670edbe74431855b4736eed0a7a854ce70b68591886846ade3ea4",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.531,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a4ea02e458e305d07a08e314d20dfd4322e1b4d5840dc16b19631cac546fef6e"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-02-scenario_2/jev/provider.json",
+      "sha256": "ac5129d3b817489ad721c16c9cb96adb588353754e96668891b7018a5a2a5a0e",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-02-scenario_2/jev/review-0.json",
+      "sha256": "aeeedc9144c64fd6de95ad843013a5fb8fc01c0dcab7bc217692db4cb4c8a5e6",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.207,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "59ccd298d9b2d786dcc3e44596610f77dc5e1c6d48b94da25a36031b6929bd4d"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-02-scenario_3/flash/answer-0.json",
+      "sha256": "95476ce369a35bd3cc46c7cb71083765c28cf6163f9e05258136c55171310ae8",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.362,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "273d0fa8687528530ccd86212ea245b0ce1216666cf5e451fd4a71c8e915c8d5"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-02-scenario_3/jev/provider.json",
+      "sha256": "e3be183e01f301fdc266a51fb6abdf339dc0cbccd82c03e583b3deef70290ff9",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-02-scenario_3/jev/review-0.json",
+      "sha256": "7bfe893d52560316709feeb934a8723a0b9c980eafa162bdb306062b450fd55d",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.211,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "7aa4a0388ee0ad133d7e1b71c02430f38d41769e068070464b199cddb09f00e1"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-02-scenario_4/flash/answer-0.json",
+      "sha256": "3272832ae95034a3ca24a4fb2ec502c7ca48e384c401d8dd092b8ad452d6f37f",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 12.649,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5c96d72e3d367fa1b5209d7780517f7558038b51c6808a66205016a9e1d00d1f"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-02-scenario_4/jev/provider.json",
+      "sha256": "4dd424b6d030900568b2c25ea1c4b8e8b50e6c178cb4de4bf036d12934934cb8",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-02-scenario_4/jev/review-0.json",
+      "sha256": "a226f3a2fa2f27618e149503ea2e098f29f35ed496018425d6e4ec82ebb72134",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.225,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ddc8d49fc033320359c6e5ab7522886b0b0e874473d7f9778717a149fde092ba"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-03-s1/flash/answer-0.json",
+      "sha256": "295e664ccb019c2d0a2502b4d52bd1d66d0d6b565b42630802915889ea318210",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.571,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "156dccfe8190408578b1c81c0becade17218aa56460c73bb8a3657717554a61a"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-03-s2/flash/answer-0.json",
+      "sha256": "553276449aaf72b6f6bf7a9b5411ed69952efae57d38400dfb5e759c6a658984",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.396,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a53f785f253e61d6048e1a4a8dc4346151fdd19474529511704ace7b1626a73b"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-03-s2/jev/provider.json",
+      "sha256": "a12d38c72bd5ba609b7d45a7a604600dcc6edc28909bea702a0439371a5d7d5b",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-03-s2/jev/review-0.json",
+      "sha256": "9bef748227882f8db41e2bf3feff71ff6114e7c193c0cae9092321fc4cbbaa59",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.19,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a2b96bc0700440cbb163d00652bd3c5f642f066ff86d6da3cdcd3fd5fae5f4ee"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-03-s3/flash/answer-0.json",
+      "sha256": "f48faddf24975dfa903f1ee826272bc19a105df023ec1035d67cfce3264ed252",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.879,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "20b66140b21f8aa9d1e75fd469eddad475524c50ee6854334400895c40de5303"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-03-s3/jev/provider.json",
+      "sha256": "4d7eb8407c0c030974cab578e59615a889ea825c041e3478a1d6740e86127f62",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-03-s3/jev/review-0.json",
+      "sha256": "9bdfc05f7479011117c238e3f6f3576dc12bafc12e72d520f3480a5fe463a056",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.205,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "fe76457cb3728462782b5ec929ce65718a52413d73839308ede5e9c88fb99c04"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-03-s4/flash/answer-0.json",
+      "sha256": "e8cda9877dffbfc6924f1b84822908467b1e66965fbb655d2bfc977aa82f5a2d",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.686,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c00ee04f5ee9bf468c4732d639cbe7a5ff63cd8f609b017f9d86bf98b1306860"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-03-s4/jev/provider.json",
+      "sha256": "90751ed34d7857195f3af31b5517aad6fb323e0f1636ab06310c5db56c83e730",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-03-s4/jev/review-0.json",
+      "sha256": "870005ac191e696b9dfef39bafb4379cf3af13ef54560baa6978be7903806d97",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.23,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ad93d1c551bf5f26d828c5983c97196a8d0dadd2d6eccdf63ccf20cf696a2827"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-04-scenario_1/flash/answer-0.json",
+      "sha256": "cc23379a9e7f9ae3b32882177dbde6f8d25b7b4bcbea556144f43d5c8f187654",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.18,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "cfd2f654f1823243940cf371dbf2aeadd73806f0c0af8d7747c37b5f6451cbec"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-04-scenario_1/jev/provider.json",
+      "sha256": "d6b6c92b4dc9f8d9cf2c644cf3b47b565e2708245d01e0e9d8409b0f0145e8ec",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-04-scenario_1/jev/review-0.json",
+      "sha256": "820043f8d32429b7f2f2df2004de20399f75216447ad0bce43ae5eb683f490a3",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.185,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f6c7dd1b25fc54b6e2e78cf9ff03c070ed7a70cc0df7c250812601854e27974c"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-05-scenario_1/flash/answer-0.json",
+      "sha256": "9a99d47e019b0434db9796674c4e12b18101664100ce8cf46740bd86972b38ce",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.516,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "513623296c6836e8868267acca6abe67cd776d298a93be91ef925d5fc1a17148"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-05-scenario_1/jev/provider.json",
+      "sha256": "06d3ebe18b2530064519df66c6a37559bceb86b02b4cc09e68497d5aba398b5b",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-05-scenario_1/jev/review-0.json",
+      "sha256": "4653b256000ac8e946d45b912093dc61d55f0fd7dc139e7d1f12d36a130c42ad",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.182,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "317724aaed4e91ea2b69c883df2d9b78d164551d14f754d979185021d0eb1b7d"
+    },
+    {
+      "file": "calls/future-answers/gql-incremental-graphql-delivery/batch-06-s_ws_forward/flash/answer-0.json",
+      "sha256": "ed048b742e4eab0c63430adcffafb31a42b72505e2b167b09b83cb4e5059f4c6",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.511,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "66bcb6f49902ab17404e001bd7d579ac88bee7c1d3376dc45ddd3ffb60e83c65"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-01-s1/flash/answer-0.json",
+      "sha256": "23cf82e477675905baa15e2cd1e2c4f0a0d845603f188583f330b1bf7ac5a839",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.292,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c7477474fd9ef35a7e226222a5f3f550b6f5cf3a990808ee798c0d2c89b29645"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-02-scenario-1/flash/answer-0.json",
+      "sha256": "5876e38f33ba0ae826f3d31493d86c5845707caa53804db2c45b857c3ff54917",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.363,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e9aa25a8cfc726db605e6f74ecc1b3fb87f2cba282a602e8d9d71525d2cfb8e4"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-03-s1/flash/answer-0.json",
+      "sha256": "69b2b3efcac50936812a3adfe52d7467d84b1d3fd7ec6d448df482239a28d157",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.649,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b4993c70c055ad8cf8c4f94bee6bbc4168200c024a6510dfc8558cfdf8a81944"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-03-s1/jev/provider.json",
+      "sha256": "69b1f24b34bbe77fd7055795a022377d0f846e003eda1d5bd75c6e222040d108",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-03-s1/jev/review-0.json",
+      "sha256": "a15930694484e2e9b42af6c184c8b7322d274fcc5a870f1a5962d44777bf36ad",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.234,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "151591b4377bb46c997c54137c70d0238d17be2d55cb22595a03c68342b0fa98"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-03-s2/flash/answer-0.json",
+      "sha256": "fcede9d8caa6f26fbd8f51cda12792624545f1d204db97e39fbbfcf0ea914814",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 7.181,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e955e3fc1ce59f4f7efa87d0637c597ef641bb19e5523b56b23465c160693aee"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-03-s2/jev/provider.json",
+      "sha256": "ce84acadee7ccd1f55abc7283543aa2d4c7bc0819ef09c7f440299afdeebe0c8",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-03-s2/jev/review-0.json",
+      "sha256": "aa7ae13584323193409dc7cf6c0c267966acbd2af2ac96135173af6d0400c67f",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.296,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f7715b20ff1220a8b6a3ee444e6a8071aed7ca9fa382f8676ad285ca0a01d44b"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-03-s3/flash/answer-0.json",
+      "sha256": "6650c434f41bd42715a3db143f3666882390ea91ba60774ba0e5a58e2665fea9",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.654,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "95c407607a3dc5b08b1548811e3d5f7e8fff9171b30ee5ba843447ed357f88c9"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-03-s3/jev/provider.json",
+      "sha256": "43fd962b6256be943e48149b9e8772032ea82fe6ea1ff192242fad944b6fb8f5",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-03-s3/jev/review-0.json",
+      "sha256": "35a3c67728b9e894385bce5f5770ff6dd4cf2a210947996f0dd4a1123cbd819c",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.277,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "00fe6868e4efe7e412701a7bafcd43220314f0cfc3aef28bf0082bcf86560c91"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-04-scenario-1/flash/answer-0.json",
+      "sha256": "eabe282cb5a81e8ae7d2b1219f2da5bace2194c0ac9a08bb62d7afc5716c3551",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 13.503,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "fdedb108898dddd7d77295ec3088bfc457575a7f1486a333a4057cdf02ed9928"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-04-scenario-1/jev/provider.json",
+      "sha256": "1e8fe1b7f3d6898aa76ce014dca7e35dd502b9a2296df14a5674b4c546a749bc",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-04-scenario-1/jev/review-0.json",
+      "sha256": "7f1c3be1f7f5660ec66d6eb0de51d64e979e0d7b4b1ba9d3126b06687127b929",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.226,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b14fa4d0234fa516fd55ef4aa69a01e3b568bd9a0c95f25525c61041ae63bebc"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-04-scenario-2/flash/answer-0.json",
+      "sha256": "b499a30caeb1e4a1f18fcf8467ff0eecdbb522b8db7ad935de6fa2981cbc4d7e",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.559,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "fba5f0fe474ad880b5ff7b92496f89b3a6430b2a95082bded4961b67ea60900e"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-04-scenario-2/jev/provider.json",
+      "sha256": "7cf42580817410953a31da339c15394af8c7d4fee4606ac7a141e46a23493ff4",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-04-scenario-2/jev/review-0.json",
+      "sha256": "847a56593777f8f359b84faafa7f02e84b5bd168ad3249a15ec24092525879ab",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.241,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0e08e7026d8080fa781bac41c521064ea59e9b2bb44cd78562d8d7defd654f62"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-04-scenario-3/flash/answer-0.json",
+      "sha256": "6f3fe49d0a48a27dfdea4b68ddbd82cedb2060dfeaf97a485b494584dada2bb7",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 10.667,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "7ffa66c9b6839ea2b642ec5afaf8e8414d0c440b029ec8b1ab390e4090831f47"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-04-scenario-3/jev/provider.json",
+      "sha256": "a6424fbb94b828c9c9a30182cdb91b25d42128423f6a97e533ce784732666a63",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-04-scenario-3/jev/review-0.json",
+      "sha256": "39265a711f30d1c1eea4aedbecf360f21d9ad131ff38a6541bdc2cbb31fca45f",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.253,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "68f1b5b69459beaffb3142b0ba848c36459f17b6c661087fb899b424e0bfc510"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-04-scenario-4/flash/answer-0.json",
+      "sha256": "7f111e1d558fb927472fcbe8c55aea29454fec38e66d9fe47e656c79f66776b8",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.028,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "8d4604856b0c10b95e5f115ed2872baa8bb3c50f8166ac3709316caf3585b6ef"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-05-scenario-1/flash/answer-0.json",
+      "sha256": "4f09d2b8b276c230ded9b6149b4da32641f813daa372d27f86bf5dd9cc1ba57e",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.24,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "0afc3ca32b97fbe2fd0f045e1bea418dbff117b1b2dff91566e9fc5e3b8e7cf3"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-05-scenario-2/flash/answer-0.json",
+      "sha256": "69dad715730a34d1d55a1a8c2ed3e75d417a367c1889b3bc644403ee7f657468",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 11.907,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "1c9697a4d1764b0a678df8b92d1bae64e512fd5c4b354930d1b802e115bb2efd"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-05-scenario-2/jev/provider.json",
+      "sha256": "4cce3912373fb99a13e3f40375e64b01b1b3064701065461490f08f2fed0fc0e",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-05-scenario-2/jev/review-0.json",
+      "sha256": "845a310731abcfe96dabd17d376a32aafb3194e98e947da3d823450d91d5542c",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.268,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b8634bc68300a9eaf53233b1421d19fd4e5a98ed47ebf81f2c23ae91466094c8"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-05-scenario-3/flash/answer-0.json",
+      "sha256": "2cd99c34a292138808a90ddf8499eb9383a8eac940df5985081a2c3022f4cdb5",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 8.779,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "47486391ba1d9015f32ecec0f993a25f50cf0bf70057d2c819daf4e206c622cc"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-05-scenario-4/flash/answer-0.json",
+      "sha256": "1e8ebe04385b5817f3b72f46ea1945540185489827c105e279785f2b646a9a2d",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 13.988,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "c5cc5f68a85cc3078d1837743bb59a01e6f4100e565de313c22a75dd3862b738"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-05-scenario-4/jev/provider.json",
+      "sha256": "e32da619791d447c97640222a25563fb51e7da38dc5529448a63256e5b45cea1",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-05-scenario-4/jev/review-0.json",
+      "sha256": "80cea795a74a1780cfa5ee6352f7f2ea6fd1e873c4a817024bad7f44a007d09b",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.241,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "166ce66d1a4596aa029b529bb5302b217449e396979636f815dcc239353aabed"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-06-s1/flash/answer-0.json",
+      "sha256": "fcf10ed3c45055c93cdcacff8b061afe5dea025eec69b818d3081d9201fb9755",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 15.197,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "b775de7c8182a0417f189fe72f1aaacf445f7b023ab917dfbebd1611cf272178"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-06-s2/flash/answer-0.json",
+      "sha256": "8d2c72ef5ad94e76d961f35bda1209756f1fbf5475cfae28f8d8e787f0536242",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.289,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "6884423577ae30b420013ee64026b59b418a9aaa06bba4f1f8f4d47d5aa5e773"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-06-s2/jev/provider.json",
+      "sha256": "119e37c111a7b0f13a94cd2f722272d166323eaea2e596ba727f145d6673faec",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-06-s2/jev/review-0.json",
+      "sha256": "844068587675399c705b96e32b20c75300fe912b274f661a966fd98801a409ea",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.227,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "11865966491dfe681ef7032e8ecc325ce2715c4d666a2ef9fd7b6aa2e7aa6e70"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-06-s3/flash/answer-0.json",
+      "sha256": "897b38daf16f75d6687fd915d1dae32d633e1bd58f3a235cc593610f014957f3",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 18.1,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "79a9ccb5da3f39d702f58a4e94311fdbad37177abf775b6402abc7442c1e5439"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-06-s3/jev/provider.json",
+      "sha256": "c5904c22326e510069f867c3868c923c5c731cb01d29f9140fd4f13bec04787d",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-06-s3/jev/review-0.json",
+      "sha256": "f593e2641822f789089250244346de894c6e351eb0bf8d4d3e7ed51f0256238e",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.233,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "79878f6611ceef520880883d2e88a8512959726f75ac910e45a85361b31de57f"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-06-s4/flash/answer-0.json",
+      "sha256": "02b90ea012c7ade63e6da6c2b233d08952aebcd9c232e80073383ba0f8fb8cf1",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 13.829,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "70621a916a13ea415bf42492e2c9f52fd3bf646a01196a2547f30b1216db321c"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-07-s1/flash/answer-0.json",
+      "sha256": "4a779969e1675e08b4a09dc0029b4384227bfed7ba590d711a4b7d9529112ebd",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 12.063,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "cb8506c0ceaa901fe2c4fb333116f62388ca3b35713264b1ae029b6f95664031"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-07-s1/jev/provider.json",
+      "sha256": "96eeaa01268732815633051a5d915f0eff364d38faac12fb4ba03efc6cfcbd11",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-07-s1/jev/review-0.json",
+      "sha256": "2f3f9ccfe6d16e33bf39af1d1b12c162adbcb67def3b2788795fac4117662744",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.229,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "17eabff2b1c6c4d7346a1d8d90ddb4d87c094b4e3ea3bab2fad051e44b4e586c"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-07-s2/flash/answer-0.json",
+      "sha256": "07e2248d67aa1f87dcf75656465fa2e290bfd22fd6c6b4afcfaca2158338808a",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 12.777,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "5f0a05da482a85ab121ba3eda37811e9e3716675f60859e8f7ed5bf1c4ad45cd"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-07-s3/flash/answer-0.json",
+      "sha256": "6bf3a001630ffd7d2aa1a95ba20269b1dfd763c3ccc255608c16f4b36a3ee62d",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 18.495,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "a06607db1aed8bf9d188766641c35f36a1e99a0ba7304467a9b695b423a56ae2"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-07-s3/jev/provider.json",
+      "sha256": "dcd92d5d838970a056519161542458d526b9be195232cbf3e660229eb64d0130",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-07-s3/jev/review-0.json",
+      "sha256": "3d13e031e8da9016be99ea6773ab4194009791f6e87f9432021908e6919d4bec",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.223,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "4ecdd65123ed88a5f8a7b2f52cf87664046808eca5cc9ce8696ee21cd3bad2c3"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-07-s4/flash/answer-0.json",
+      "sha256": "5b30d370ceee4c15e255aa37bad840307207a93c860b9a173095364b969e5347",
+      "receipt": {
+        "stage": "answer",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 16.193,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "e4f0baf71979bc4fe8dcc5d8c861f6b2bf6530f6980ceb9dae328633c3fe2f65"
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-07-s4/jev/provider.json",
+      "sha256": "97b5d3823620437b2c7586d9e3e391a1deb3e73109f0a5a5a550c863c90d46fd",
+      "raw_provider_capture": true
+    },
+    {
+      "file": "calls/future-answers/koota-composite-trait-aspects/batch-07-s4/jev/review-0.json",
+      "sha256": "d06f1eb0869781c01560b7d9d4d063006c67cb0b7770ef0502a5ae376294aa32",
+      "receipt": {
+        "stage": "review",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.297,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "ef783bbfd1848590460bbd7d45b53b87abadae34cc63330d84c56969995bcdde"
+    },
+    {
+      "file": "calls/parser-diagnostic/capture-0.json",
+      "sha256": "55435e982b6835ff86914fb7967f5f967575c9ee6af98964607f64ad997cab96",
+      "receipt": {
+        "stage": "capture",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 26.098,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      },
+      "status": "completed",
+      "request_sha256": "f9cf184d75fb9c69fa1d1c6ed50fb09b0dfb75b9fcd13158b75646fbde0b6bf6"
+    },
+    {
+      "file": "calls/parser-diagnostic/raw.txt",
+      "sha256": "4b84c5a241ec02b7740f4256de33a45e6378754b92fae38a380747d283cf4fc3",
+      "raw_provider_capture": true
+    }
+  ]
+}

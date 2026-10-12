@@ -1,0 +1,169 @@
+{
+  "excluded": [
+    "g-extensions-lifetime",
+    "three unsupported-cap probes (not proposed to discovery)"
+  ],
+  "targets": [
+    {
+      "id": "k-assignment",
+      "task_id": "koota-composite-trait-aspects",
+      "discovery": "missing",
+      "decision_ids": [],
+      "added_criterion": "missing",
+      "note": "No property-reassignment decision."
+    },
+    {
+      "id": "k-traits-container",
+      "task_id": "koota-composite-trait-aspects",
+      "discovery": "missing",
+      "decision_ids": [],
+      "added_criterion": "missing",
+      "note": "No constituent-list mutation decision."
+    },
+    {
+      "id": "k-schema-container",
+      "task_id": "koota-composite-trait-aspects",
+      "discovery": "missing",
+      "decision_ids": [],
+      "added_criterion": "missing",
+      "note": "No schema-container mutation decision."
+    },
+    {
+      "id": "k-nested-freeze",
+      "task_id": "koota-composite-trait-aspects",
+      "discovery": "missing",
+      "decision_ids": [],
+      "added_criterion": "missing",
+      "note": "No shallow-versus-recursive protection decision."
+    },
+    {
+      "id": "k-nested-reference",
+      "task_id": "koota-composite-trait-aspects",
+      "discovery": "missing",
+      "decision_ids": [],
+      "added_criterion": "missing",
+      "note": "No reference-sharing decision; d003's isolation overclaim is not a correct clarification."
+    },
+    {
+      "id": "k-callback-slot",
+      "task_id": "koota-composite-trait-aspects",
+      "discovery": "full",
+      "decision_ids": [
+        "d006"
+      ],
+      "added_criterion": "correct",
+      "note": "Merged callback object rather than individual constituent objects."
+    },
+    {
+      "id": "k-set-equality",
+      "task_id": "koota-composite-trait-aspects",
+      "discovery": "missing",
+      "decision_ids": [],
+      "added_criterion": "missing",
+      "note": "No equal-value set notification decision."
+    },
+    {
+      "id": "k-callback-subject",
+      "task_id": "koota-composite-trait-aspects",
+      "discovery": "partial",
+      "decision_ids": [
+        "d011"
+      ],
+      "added_criterion": "partial",
+      "note": "Both options already use entity first and add wrong exact-arity alternatives; consensus withholds."
+    },
+    {
+      "id": "g-result-snapshot",
+      "task_id": "gql-incremental-graphql-delivery",
+      "discovery": "missing",
+      "decision_ids": [],
+      "added_criterion": "missing",
+      "note": "No prior-result immutability or reference-lifetime question."
+    },
+    {
+      "id": "g-stream-position",
+      "task_id": "gql-incremental-graphql-delivery",
+      "discovery": "full",
+      "decision_ids": [
+        "batch-03-q1"
+      ],
+      "added_criterion": "wrong",
+      "note": "Exact overwrite-versus-shift distinction is found, but both models choose shift."
+    },
+    {
+      "id": "g-progress-only",
+      "task_id": "gql-incremental-graphql-delivery",
+      "discovery": "partial",
+      "decision_ids": [
+        "batch-05-q1"
+      ],
+      "added_criterion": "partial",
+      "note": "hasNext-only yield covered, empty incremental arrays not explicitly clarified."
+    },
+    {
+      "id": "g-error-continuation",
+      "task_id": "gql-incremental-graphql-delivery",
+      "discovery": "full",
+      "decision_ids": [
+        "batch-01-q3"
+      ],
+      "added_criterion": "correct",
+      "note": "Result errors do not terminate delivery. Another generated criterion adds a contradictory early per-item yield."
+    },
+    {
+      "id": "g-errors-lifetime",
+      "task_id": "gql-incremental-graphql-delivery",
+      "discovery": "partial",
+      "decision_ids": [
+        "batch-01-q3",
+        "batch-05-q2"
+      ],
+      "added_criterion": "partial",
+      "note": "Questions concern delivery/continuation but do not exclude retaining earlier payload errors."
+    },
+    {
+      "id": "b-none-selection",
+      "task_id": "bandit-structured-nosec-directives",
+      "discovery": "missing",
+      "decision_ids": [],
+      "added_criterion": "missing",
+      "note": "No None-selector sentinel question."
+    },
+    {
+      "id": "b-unrecognized-selection",
+      "task_id": "bandit-structured-nosec-directives",
+      "discovery": "missing",
+      "decision_ids": [],
+      "added_criterion": "missing",
+      "note": "No supplied nonempty selector resolving no tests question."
+    },
+    {
+      "id": "b-blanket-combination",
+      "task_id": "bandit-structured-nosec-directives",
+      "discovery": "full",
+      "decision_ids": [
+        "d009"
+      ],
+      "added_criterion": "correct",
+      "note": "Blanket dominance correctly settled."
+    },
+    {
+      "id": "b-compound-header",
+      "task_id": "bandit-structured-nosec-directives",
+      "discovery": "missing",
+      "decision_ids": [],
+      "added_criterion": "missing",
+      "note": "Multi-line statement d007 is not the compound-header versus independent-body distinction."
+    },
+    {
+      "id": "b-nested-begin-line",
+      "task_id": "bandit-structured-nosec-directives",
+      "discovery": "partial",
+      "decision_ids": [
+        "d004"
+      ],
+      "added_criterion": "partial",
+      "note": "New begin starts next line, but prior outer-region applicability on begin line is not clarified."
+    }
+  ]
+}

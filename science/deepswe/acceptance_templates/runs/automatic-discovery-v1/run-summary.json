@@ -1,0 +1,20 @@
+{
+  "discovered": {
+    "koota-composite-trait-aspects": 12,
+    "gql-incremental-graphql-delivery": 26,
+    "bandit-structured-nosec-directives": 10
+  },
+  "paired_decisions": 48,
+  "provider_calls": 105,
+  "providers": {
+    "deepinfra": 57,
+    "typesafe.ai": 48
+  },
+  "statuses": {
+    "completed": 102,
+    "failed": 3
+  },
+  "summed_provider_seconds": 761.117,
+  "tests_run": false,
+  "coding_agents_run": false
+}

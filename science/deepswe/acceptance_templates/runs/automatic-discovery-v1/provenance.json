@@ -1,0 +1,35 @@
+{
+  "koota-composite-trait-aspects": {
+    "base_commit": "9c434858b2b522002f8c5eb4a554fa8836a7cf3c",
+    "input_digest": "ef9cc8128083d6356ac4501519b93674a4d6166503082c2eb9b677a5e6b766f1",
+    "task_artifact_hashes": {
+      "instruction.md": "300c70ea3b277bf799c272cb7415368bb631856c5a89bee1e7cac474f5810c25",
+      "solution/solution.patch": "6626b19e70409bd2df3f5a3b48015243bce577c4aa2fb8b87f3647d3304b6cf3",
+      "tests/test.patch": "5d8c926bf93a041f4010fda23da2942583384a15f67e97f770b5d76f227a6912"
+    },
+    "previous_routing_sha256": "875ca847491fd17b74a8f96cec721d15096dd74bdd69daa23661804c0b17c142",
+    "prompt_sha256": "25e6ee64e73021b75b0c57a6cda4b4f19a9c9dcc9786ea605e1a9aecc38c198f"
+  },
+  "bandit-structured-nosec-directives": {
+    "base_commit": "b46fa3a2723635aa29cc012538df4867ac2ac006",
+    "input_digest": "3cfb9cb3584c0f409ac2b92e81f3782df2f3e6d9c3325ff464a26238a81e4699",
+    "task_artifact_hashes": {
+      "instruction.md": "310eeb36b46c3aece39ab187817b87764f0a428affe5e8a1688e0c92f7b92f9d",
+      "solution/solution.patch": "b35e9ce831b69e3443ceda1a955d8d6d934e0915e15f20c754cbb2e7b8ed4514",
+      "tests/test.patch": "433d6b981ac0c768176e1d326daa1848c6cb8f4431d1bd6bdc78485b7d0ac30f"
+    },
+    "previous_routing_sha256": "7b89997330113d0ddc1962b096d54e56b82279dce72cbdd4aa23dd8a10ccad40",
+    "prompt_sha256": "3c4fe08800e6a8ae70c6b99fbd51aafd3ae7b9a11b7cb4eda65eaa89c4c70c0e"
+  },
+  "gql-incremental-graphql-delivery": {
+    "base_commit": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "input_digest": "5cbcd6f12fdde8a3ce06faa5d33b6b42cce16d06b7b9b6a36abaabcecccd8839",
+    "task_artifact_hashes": {
+      "instruction.md": "0d14a5dac7fa2d6fe2e9d9d9a113fb02cfb2495f63f8b7edcaa18ba73dd16edf",
+      "solution/solution.patch": "65d77639c640cde71e5e867089b4bfd55140e9e7d418183c3cb9df570ade30db",
+      "tests/test.patch": "031de3d902d74cdc8ef142886d5aca3342ff63611a3a903797f3e8d6fb413670"
+    },
+    "previous_routing_sha256": "df9e47c41d225b02b21a9cd05cb42f46736733650885d7fb079a2f96a6807096",
+    "prompt_sha256": "114c451f2f61b885df790e7dd2264022dbc949380c8303ee46f641eb398dd4cc"
+  }
+}

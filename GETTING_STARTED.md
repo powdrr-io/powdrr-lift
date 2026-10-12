@@ -53,19 +53,15 @@ The `--repo-root` option defaults to the current directory, so it can be omitted
 when you are already in the repository. The check makes authenticated requests
 to the configured planning and coding model routes, checks that the default
 mini-SWE-agent executable is available, and checks GitHub authentication and
-write access to the repository. It reports credential source and failures
-without printing key values.
+write access to the repository. It also sends an authenticated request to
+Typesafe AI to verify that API key. It reports credential sources and failures
+without printing key values. These provider checks make live requests and may
+incur usage charges.
 
 ```bash
 cd /path/to/your/repo
 powdrr-lift check-credentials
 ```
-
-The command does not directly check the Typesafe AI key. The JEV classifier uses
-it when a feature workflow makes a semantic classification request, and falls
-back to the planning model when it is missing or unavailable. Feature run logs
-record `JEV_RESPONSE_RECEIVED` when Typesafe returns a response. Treat these
-credential checks as live provider requests; provider usage may be billed.
 
 ## 4. Bootstrap your repository
 

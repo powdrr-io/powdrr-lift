@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from email.message import Message
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,6 +9,7 @@ import pytest
 from powdrr_lift.cli import build_parser, main
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.credential_check import (
+    check_jev_access,
     check_model_access,
     configured_model_mapping,
 )
@@ -110,6 +112,63 @@ def test_check_model_access_reports_missing_credentials(tmp_path: Path) -> None:
     assert result.status == "credentials_missing"
 
 
+def test_check_jev_access_makes_authenticated_request_without_exposing_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("TYPESAFEAI_API_KEY", "private-test-key")
+    captured: dict[str, object] = {}
+
+    def call_jev(
+        request: object, api_key: str, endpoint: str, model: str
+    ) -> dict[str, object]:
+        captured.update(
+            request=request, api_key=api_key, endpoint=endpoint, model=model
+        )
+        return {"answer": {"choice": "ok"}}
+
+    monkeypatch.setattr("powdrr_lift.workrr.credential_check._call_jev", call_jev)
+
+    result = check_jev_access()
+
+    assert result.status == "passed"
+    assert result.credential_source == "TYPESAFEAI_API_KEY"
+    assert "private-test-key" not in str(result.to_data())
+    assert captured["api_key"] == "private-test-key"
+    assert captured["endpoint"] == "https://api.typesafe.ai/v1/systemone"
+    assert captured["model"] == "jev-latest"
+
+
+def test_check_jev_access_reports_missing_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+
+    result = check_jev_access()
+
+    assert result.status == "credentials_missing"
+    assert result.message == "Set TYPESAFEAI_API_KEY to check Typesafe AI access."
+
+
+def test_check_jev_access_reports_authentication_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from urllib.error import HTTPError
+
+    monkeypatch.setenv("TYPESAFEAI_API_KEY", "private-test-key")
+
+    def reject(*_args: object) -> object:
+        raise HTTPError("https://api.typesafe.ai", 401, "Unauthorized", Message(), None)
+
+    monkeypatch.setattr("powdrr_lift.workrr.credential_check._call_jev", reject)
+
+    result = check_jev_access()
+
+    assert result.status == "authentication_failed"
+    assert result.message == "Typesafe AI returned HTTP 401."
+    assert "private-test-key" not in str(result.to_data())
+
+
 def test_check_credentials_cli_checks_both_routes_and_executable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -135,6 +194,17 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
                 "role": role,
                 "provider": "local-executable",
                 "model": executable,
+                "status": "passed",
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.cli.check_jev_access",
+        lambda: SimpleNamespace(
+            to_data=lambda: {
+                "role": "jev-classifier",
+                "provider": "typesafe-ai",
+                "model": "jev-latest",
                 "status": "passed",
             }
         ),
@@ -176,6 +246,12 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
     assert checks == [("planning", "zai"), ("coding", "deepinfra")]
     report = json.loads(stdout.getvalue())
     assert report["passed"] is True
+    assert report["checks"][-2] == {
+        "role": "jev-classifier",
+        "provider": "typesafe-ai",
+        "model": "jev-latest",
+        "status": "passed",
+    }
     assert report["checks"][-1] == {
         "role": "github-access",
         "provider": "gh",

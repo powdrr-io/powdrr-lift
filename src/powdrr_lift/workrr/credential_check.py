@@ -8,8 +8,14 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError, URLError
 
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.jev_classifier import (
+    JEV_DEFAULT_BASE_URL,
+    JEV_MODEL,
+    _call_jev,
+)
 from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
 from powdrr_lift.workrr.provider_config import (
     LLMModelMapping,
@@ -126,6 +132,76 @@ def check_coding_executable(executable: str, *, role: str) -> CredentialCheck:
     )
 
 
+def check_jev_access() -> CredentialCheck:
+    """Make one authenticated Typesafe AI classification request."""
+    key_names = (
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
+    )
+    credential_source = next((name for name in key_names if os.environ.get(name)), None)
+    model = os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL
+    endpoint_root = os.environ.get("SYSTEM_ONE_BASE_URL")
+    endpoint = (
+        f"{endpoint_root.rstrip('/')}/systemone"
+        if endpoint_root
+        else JEV_DEFAULT_BASE_URL
+    )
+    if credential_source is None:
+        return CredentialCheck(
+            role="jev-classifier",
+            provider="typesafe-ai",
+            model=model,
+            status="credentials_missing",
+            message="Set TYPESAFEAI_API_KEY to check Typesafe AI access.",
+        )
+
+    request = {
+        "allowed_values": ["ok"],
+        "criteria": {"ok": "This request verifies authenticated API access."},
+        "instructions": ["Return ok for this credential check."],
+        "question": "Select the result for this credential check.",
+        "state": {"credential_check": True},
+    }
+    try:
+        response = _call_jev(request, os.environ[credential_source], endpoint, model)
+        answer = response.get("answer", response)
+        choice = answer.get("choice") if isinstance(answer, Mapping) else None
+        if choice not in {"ok", "unresolved"}:
+            raise ValueError("Typesafe AI returned an invalid credential-check result.")
+    except HTTPError as error:
+        status = {
+            401: "authentication_failed",
+            403: "access_denied",
+            429: "rate_or_quota_limited",
+        }.get(error.code, "provider_rejected_request")
+        return CredentialCheck(
+            role="jev-classifier",
+            provider="typesafe-ai",
+            model=model,
+            status=status,
+            credential_source=credential_source,
+            message=f"Typesafe AI returned HTTP {error.code}.",
+        )
+    except (OSError, TimeoutError, URLError, ValueError) as error:
+        return CredentialCheck(
+            role="jev-classifier",
+            provider="typesafe-ai",
+            model=model,
+            status="unavailable",
+            credential_source=credential_source,
+            message=f"Typesafe AI credential check failed: {error}",
+        )
+
+    return CredentialCheck(
+        role="jev-classifier",
+        provider="typesafe-ai",
+        model=model,
+        status="passed",
+        credential_source=credential_source,
+    )
+
+
 def configured_model_mapping(provider: str, model: str | None) -> LLMModelMapping:
     """Resolve an explicit model or the provider's standard reasoning model."""
     mappings: Mapping[str, LLMModelMapping] = default_llm_mappings(provider)
@@ -164,6 +240,7 @@ def _safe_error_message(error: Exception) -> str:
 __all__ = [
     "CredentialCheck",
     "check_coding_executable",
+    "check_jev_access",
     "check_model_access",
     "configured_model_mapping",
 ]

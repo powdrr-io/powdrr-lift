@@ -184,6 +184,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
 )
 from powdrr_lift.workrr.credential_check import (
     check_coding_executable,
+    check_jev_access,
     check_model_access,
     configured_model_mapping,
 )
@@ -3413,6 +3414,7 @@ def _run_check_credentials(args: argparse.Namespace) -> int:
         else args.minisweagent_executable
     )
     results.append(check_coding_executable(executable, role="coding-agent").to_data())
+    results.append(check_jev_access().to_data())
 
     github_result: dict[str, str] = {
         "role": "github-access",

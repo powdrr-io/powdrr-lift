@@ -1,0 +1,24 @@
+{
+  "scenarios": {
+    "koota-composite-trait-aspects": 21,
+    "gql-incremental-graphql-delivery": 13,
+    "bandit-structured-nosec-directives": 21
+  },
+  "resolved": 7,
+  "reviews": {
+    "not_called": 48,
+    "supported": 7
+  },
+  "provider_calls": 191,
+  "providers": {
+    "deepinfra": 133,
+    "typesafe.ai": 58
+  },
+  "statuses": {
+    "completed": 185,
+    "failed": 6
+  },
+  "summed_provider_seconds": 1935.078,
+  "tests_run": false,
+  "coding_agents_run": false
+}

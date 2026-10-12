@@ -1,0 +1,28 @@
+{
+  "statements": [
+    {
+      "case": "immutability",
+      "question": "In the original createQuery implementation, does Object.freeze on queryRef prevent mutation of the referenced parameters array itself?",
+      "choice": "reference_only",
+      "statement": "No: queryRef properties cannot be reassigned, but the referenced array is not frozen by this call.",
+      "scope": "existing_code",
+      "input_sha256": "2eb9095189df5bf83879c2d3f9bf57e16ca6549fefc5f6f24dab425bcb26fe75"
+    },
+    {
+      "case": "callback-grouping",
+      "question": "Does the instruction's nested-aspect flattening rule require replacing readEach's merged aspect data object with separate constituent objects?",
+      "choice": "merged",
+      "statement": "No: flattening identifies constituents; readEach still delivers merged aspect data.",
+      "scope": "feature",
+      "input_sha256": "8547d8cd4f1a219194a70f859bfa2bc1ef407e43a547a74d193d41bbe04b6261"
+    },
+    {
+      "case": "set-notifications",
+      "question": "In original setTraitForTrait, if ctx.set returns normally after an equal-value write and triggerChanged is true, is setChanged called?",
+      "choice": "called",
+      "statement": "Yes: the call is guarded by triggerChanged, not value inequality.",
+      "scope": "existing_code",
+      "input_sha256": "69b42c28b9094c1e4085e0bd2a43ad111527605a95e7c354b1ed0ab4038c7869"
+    }
+  ]
+}

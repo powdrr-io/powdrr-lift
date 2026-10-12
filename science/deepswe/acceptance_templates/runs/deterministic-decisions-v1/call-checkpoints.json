@@ -1,0 +1,184 @@
+{
+  "checkpoints": [
+    {
+      "file": "calls/aspect-set-equality/flash/choose-0.json",
+      "sha256": "e9a0d2d4d08d01d40ad5ca067029d1dd34b54e22cd83b7fe73910b57f5296494",
+      "request_sha256": "0f283e9ccb12f5210f6a0ec1aee73346f304c215f1e6ae9eb670e86356415df5",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.955,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/aspect-set-equality/jev/independent-choice-0.json",
+      "sha256": "650d8a0c2bcd6153fd9f4659348afdd0e3053d3a7cf91f5b85882e0204cf4b94",
+      "request_sha256": "3ba54f5ba9b89767dad69931823f95fa21e1a21522d7b6b893ef9ecc1b9f7e05",
+      "receipt": {
+        "stage": "independent-choice",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.245,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/aspect-set-equality/jev/scenario-preservation-0.json",
+      "sha256": "42d7e00bd4915271597f543661a86070b991e4061adf8b16ea38bd36a7a8ef5e",
+      "request_sha256": "f423b36d785a52666e2cde2ecde8d16ab04b17e2c7a9a5a34d50c074d66c2653",
+      "receipt": {
+        "stage": "scenario-preservation",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.164,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/metadata-assignment/flash/choose-0.json",
+      "sha256": "df346e54b61f106b7bad4145cf71260c26885fe81f5ea4009a4b377b5bf18222",
+      "request_sha256": "feac996e2513d7e914fbd4c9f44525f2d4098477bb35d9d56b651c2881e6f3dd",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.954,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/metadata-assignment/jev/independent-choice-0.json",
+      "sha256": "83bad71c22e22232cfdab6bae7f51161b4d5d5f94996ba9e83b9a1af37a631f4",
+      "request_sha256": "e23ecf886ad3217f489f7ad23c37917b6a94bc07271686d5469b011f79ff494e",
+      "receipt": {
+        "stage": "independent-choice",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.218,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/metadata-assignment/jev/scenario-preservation-0.json",
+      "sha256": "95a64078defe865679c05e2d31047e6dd9bd96ca29bbb8fdf4d9778d1ede38bc",
+      "request_sha256": "b3a903330bb0b09da00fa4aada7e710c130ae19b2136746d981e8ece3ca9a03a",
+      "receipt": {
+        "stage": "scenario-preservation",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.183,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/nested-freezing/flash/choose-0.json",
+      "sha256": "dcf22fedcce953bfad85fe337520c1c9be9353ed64654a55affd0d26980c826b",
+      "request_sha256": "08981870dd9c5c1548534264f168c6f47598b6c59e0116a2338eaa791273b950",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.961,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/nested-freezing/jev/independent-choice-0.json",
+      "sha256": "b7d7c3c96233a26017b130debe4588157e9965f9134d0bfa162cc38aa19f11eb",
+      "request_sha256": "abccbc5bd878e1b972f764a78f17f36ba903fef985a07748a1af76eb64261daa",
+      "receipt": {
+        "stage": "independent-choice",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.214,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/schema-container/flash/choose-0.json",
+      "sha256": "f421021abf1e47c9a32530cbc4e637e8523b9271ab537825b3f4614f609123f8",
+      "request_sha256": "1d15096649c7f8f05e2cc6c95ec9bc8c42ce9ed4bd18293a501b7122c53667da",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.968,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/schema-container/jev/independent-choice-0.json",
+      "sha256": "bff8698270c5b8a1b14d6cb628d1ec7c35ed473a0eec543981a3558f5d7e25e0",
+      "request_sha256": "978f7f3a167d835c49e205fb9b332b701f15b3c02acf088a02a37f79820c76a0",
+      "receipt": {
+        "stage": "independent-choice",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.265,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/traits-container/flash/choose-0.json",
+      "sha256": "89746cc59b7606b189ffcc0c170abc48ba7d686ef5ae5cd2ca75d7e61eed48b7",
+      "request_sha256": "a590fef40ba008406c0725b1054f1e845df3f1149a70a8cb51006f1d8a7f1618",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.659,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/traits-container/jev/independent-choice-0.json",
+      "sha256": "13e0126e1f08960b4a06e903d33c1e003aadd041cb44955a839c5322aa451166",
+      "request_sha256": "4fd7880bd9132ceefccd51a71f7d1962010421ac8d95951fff9854806f91737b",
+      "receipt": {
+        "stage": "independent-choice",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.195,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    }
+  ]
+}

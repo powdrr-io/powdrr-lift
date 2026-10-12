@@ -1,0 +1,18 @@
+{
+  "id": "callback-slot",
+  "flash": {
+    "choice": "merged"
+  },
+  "jev": {
+    "choice": "merged"
+  },
+  "provenance": {
+    "type": "saved_decisions",
+    "artifact": "narrow-questions-v1/atomic/callback-grouping.json",
+    "sha256": "8547d8cd4f1a219194a70f859bfa2bc1ef407e43a547a74d193d41bbe04b6261"
+  },
+  "calls": [],
+  "status": "rendered",
+  "statement": "A directly supplied aspect contributes one merged readEach callback data object, including when constructed from nested aspects.",
+  "scenario": "Given data traits A={x:1}, B={y:2}, C={z:3}, a complete entity and Outer=createAspect(createAspect(A,B),C), readEach on a query with Outer as its only parameter supplies state with one element: {x:1,y:2,z:3}."
+}

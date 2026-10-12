@@ -1,0 +1,31 @@
+{
+  "id": "b-compound-header",
+  "task_id": "bandit-structured-nosec-directives",
+  "arm": "examples",
+  "flash": "header_only",
+  "jev": "header_only",
+  "consensus": "header_only",
+  "rendered": "Suppression on a compound statement header does not automatically suppress independent statements in its body.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.19,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.245,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

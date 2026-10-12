@@ -1,0 +1,60 @@
+{
+  "task": "koota-composite-trait-aspects",
+  "model_calls": 0,
+  "coding_agents_run": false,
+  "tests_run": false,
+  "builder_inputs_exclude_reference_or_solution": true,
+  "original_product_clauses_preserved": 25,
+  "added_clarifications": 3,
+  "unresolved_new_dimensions": 3,
+  "same_analysis_declared_rules_preserved": 35,
+  "same_analysis_withheld_proposals": 5,
+  "counts": {
+    "earlier_hand_candidate": {
+      "full": 11,
+      "partial": 8,
+      "missing": 14,
+      "wrong": 1
+    },
+    "previous_generated": {
+      "full": 19,
+      "wrong": 3,
+      "partial": 7,
+      "missing": 5
+    },
+    "new_candidate": {
+      "partial": 16,
+      "full": 3,
+      "missing": 15
+    },
+    "same_analysis_control": {
+      "full": 15,
+      "wrong": 2,
+      "partial": 9,
+      "missing": 8
+    },
+    "ideal_reference": {
+      "full": 34
+    }
+  },
+  "review_limit": "Static single-agent review; 34 target bundles plus separately recorded callback finding. No coding pass-rate claim.",
+  "scripts": {
+    "build_candidate.py": "0836e2ee78110d5557a620deb142a998ca975654f9eded34462a00ff56cda776",
+    "compare.py": "185d073eea76894bff737dd476de69ff633263162e0e1b9203b6235c9d20e0ec"
+  },
+  "source_task_hashes": {
+    "instruction.md": "300c70ea3b277bf799c272cb7415368bb631856c5a89bee1e7cac474f5810c25",
+    "solution/solution.patch": "6626b19e70409bd2df3f5a3b48015243bce577c4aa2fb8b87f3647d3304b6cf3",
+    "tests/test.patch": "5d8c926bf93a041f4010fda23da2942583384a15f67e97f770b5d76f227a6912"
+  },
+  "verification": {
+    "six_sections": "passed",
+    "product_clause_preservation": "passed",
+    "exact_selected_wording": "passed",
+    "quoted_evidence_and_hashes": "passed",
+    "credential_scan": "passed",
+    "ruff_format": "passed",
+    "ruff_lint": "passed",
+    "mypy": "passed"
+  }
+}

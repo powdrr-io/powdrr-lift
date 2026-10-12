@@ -1,0 +1,90 @@
+{
+  "excluded_case": "g-extensions-lifetime",
+  "reason": "Literal None guarantee lacks helper-versus-wire observation boundary; WebSocket adds control metadata to extensions.",
+  "evidence": [
+    "solution.patch:575-606",
+    "solution.patch:635-662"
+  ],
+  "frozen_cases_and_labels_unchanged": true,
+  "positive_evaluation_decisions": 10,
+  "scores": {
+    "current": {
+      "flash": {
+        "correct": 5,
+        "missing": 4,
+        "wrong": 1,
+        "correct_withholding": 2,
+        "unsupported_addition": 0,
+        "failed": 0
+      },
+      "jev": {
+        "correct": 7,
+        "missing": 2,
+        "wrong": 1,
+        "correct_withholding": 2,
+        "unsupported_addition": 0,
+        "failed": 0
+      },
+      "consensus": {
+        "correct": 5,
+        "missing": 4,
+        "wrong": 1,
+        "correct_withholding": 2,
+        "unsupported_addition": 0,
+        "failed": 0
+      }
+    },
+    "revised": {
+      "flash": {
+        "correct": 9,
+        "missing": 0,
+        "wrong": 1,
+        "correct_withholding": 2,
+        "unsupported_addition": 0,
+        "failed": 0
+      },
+      "jev": {
+        "correct": 10,
+        "missing": 0,
+        "wrong": 0,
+        "correct_withholding": 2,
+        "unsupported_addition": 0,
+        "failed": 0
+      },
+      "consensus": {
+        "correct": 9,
+        "missing": 1,
+        "wrong": 0,
+        "correct_withholding": 2,
+        "unsupported_addition": 0,
+        "failed": 0
+      }
+    },
+    "examples": {
+      "flash": {
+        "correct": 9,
+        "missing": 0,
+        "wrong": 1,
+        "correct_withholding": 2,
+        "unsupported_addition": 0,
+        "failed": 0
+      },
+      "jev": {
+        "correct": 10,
+        "missing": 0,
+        "wrong": 0,
+        "correct_withholding": 2,
+        "unsupported_addition": 0,
+        "failed": 0
+      },
+      "consensus": {
+        "correct": 9,
+        "missing": 1,
+        "wrong": 0,
+        "correct_withholding": 2,
+        "unsupported_addition": 0,
+        "failed": 0
+      }
+    }
+  }
+}

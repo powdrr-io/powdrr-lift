@@ -1,0 +1,31 @@
+{
+  "id": "k-callback-slot",
+  "task_id": "koota-composite-trait-aspects",
+  "arm": "examples",
+  "flash": "merged",
+  "jev": "merged",
+  "consensus": "merged",
+  "rendered": "A directly supplied nested aspect contributes one merged readEach callback object.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.987,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.226,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

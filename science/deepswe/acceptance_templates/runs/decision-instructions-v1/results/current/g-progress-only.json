@@ -1,0 +1,31 @@
+{
+  "id": "g-progress-only",
+  "task_id": "gql-incremental-graphql-delivery",
+  "arm": "current",
+  "flash": "yield",
+  "jev": "yield",
+  "consensus": "yield",
+  "rendered": "hasNext-only payloads and empty incremental arrays still yield results with the accumulated data.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.186,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.235,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

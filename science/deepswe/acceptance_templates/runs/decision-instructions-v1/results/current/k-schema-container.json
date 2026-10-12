@@ -1,0 +1,31 @@
+{
+  "id": "k-schema-container",
+  "task_id": "koota-composite-trait-aspects",
+  "arm": "current",
+  "flash": "unknown",
+  "jev": "unknown",
+  "consensus": "unknown",
+  "rendered": null,
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.1,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.24,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

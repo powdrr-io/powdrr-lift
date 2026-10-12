@@ -1,0 +1,4164 @@
+{
+  "checkpoints": [
+    {
+      "file": "calls/decisions/current/b-blanket-combination/flash/choose-0.json",
+      "sha256": "78da6c2d423a638408b4d8aa4748ecb5bc23bb16289878962a20430db662b2ae",
+      "request_sha256": "e622596411e7e342aef91d5e449d0cde5f567ce0d6bbf54bca2fcd8b50488f02",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.101,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-blanket-combination/jev/choose-0.json",
+      "sha256": "c7ea430de4f21e9243d6f3e06fda0c3db3bf51301032f3c59e861434b02515d4",
+      "request_sha256": "41a8212875416eaa901c4142961e6cedfedc83cdb4b7e3a604019229181e6dc4",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.195,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-compound-header/flash/choose-0.json",
+      "sha256": "750832c353a5b5f31a7b28cd6d4a703b73fb6ba8c6b5fb4b9e1beb6342fdbff2",
+      "request_sha256": "5f353087905e8900fc1419903be157253cffc6df229803104b67ea4dd5fa9dfc",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.978,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-compound-header/jev/choose-0.json",
+      "sha256": "6c8e9d308e90e1394bbe081e4a7d477357e10074a99c353c3e246635567543f9",
+      "request_sha256": "60ff72bd52edd4b61be797858fb8d80eabacdcfc65c9b769b3afe5d7d520b6a2",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.196,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-nested-begin-line/flash/choose-0.json",
+      "sha256": "23de8f11ecc9768477f7b6fa1841d758a925ee42ab64fcec9da0565fabc7a5ab",
+      "request_sha256": "44be967824bf9bd28881eb6f46c7e6167c867ccba98eea5eef2dd875123cbbc8",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.195,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-nested-begin-line/jev/choose-0.json",
+      "sha256": "75e6ad8a2608c823622da9ed58f5a1cf721d0ec4552aff1dfd8bd2580eb0a413",
+      "request_sha256": "335e16a90e630a95262cc4fb2f3f89e88eea3532f272746f9d9525abad88f362",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.212,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-none-selection/flash/choose-0.json",
+      "sha256": "0277a477f6aeb5186b63a3d4289eaaf74328ee4239dd207667e58a20e90ad43e",
+      "request_sha256": "72094bc1c24b44eaa676b535e23a10ea01d537ef8c4c30248cb7bb597286989b",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.905,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-none-selection/jev/choose-0.json",
+      "sha256": "873e878db4364021091544858df6771a49a9fa3bac938e1e8671c0381f2709a5",
+      "request_sha256": "17668d6c6a5931cb13b6f26dfb69f8a65be2254e46361bb61f0fff1c973f0d9d",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.235,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-unrecognized-selection/flash/choose-0.json",
+      "sha256": "3a49ff9e8045a32e1b1a3e94cd974874d6ab386d7685e17c6284ee304d3af71e",
+      "request_sha256": "a12c32b68048dfe99f4dc469a7b1a532fe0c5d22ac4dca422b27b645eb12d3ae",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.075,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-unrecognized-selection/jev/choose-0.json",
+      "sha256": "9755a95ec055e016c0234d569da96c0da3ed0665bda969dfda71e5528bf51de4",
+      "request_sha256": "ccbb793e5c76bfd1877bd2fb6f52213bb0e7850934c4bace4c507cabc04069fd",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.241,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-unsupported-cap/flash/choose-0.json",
+      "sha256": "67d78308f4054c0189719caf9b016b733980f465d7f20aec9aa78ca887cce3b7",
+      "request_sha256": "1c21ba1c41657e9395d1c057e34a7e9817baaa9d5054b5e713c4da33e9c9b86f",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.966,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/b-unsupported-cap/jev/choose-0.json",
+      "sha256": "a82500b4b5f598e82e54ea789c36e38c01f33fe784e6f4bd0192aed482551eca",
+      "request_sha256": "eb4b9174659fbc4d269a72818067f2b8317d2bd3fd95f5916a90e1612cb30713",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.227,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-error-continuation/flash/choose-0.json",
+      "sha256": "5044601558f0b0170fbc8600bd29d981ed85df3bb35178e89de49ce449825f81",
+      "request_sha256": "54f03e3e17cf3dfdb787942256a5a9628f08ca245a31961e9abddcaf3031abf9",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.932,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-error-continuation/jev/choose-0.json",
+      "sha256": "d83e38850936fd85a03aac3c4616612d1147aead0335e40051f51a09b355ead1",
+      "request_sha256": "8c78bd3b83da491ac19d85e5f2df5e6baccd78e2bceb55f0ed5f9c7437d0cdae",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.225,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-errors-lifetime/flash/choose-0.json",
+      "sha256": "84c5bd625ef951c59ec00f28f748cc05a41f4be1a7d33f731792c0b07ca5ddd6",
+      "request_sha256": "234d9a2eca448957e070014473ca947739c430b433fa7eeda281f7c567bd133c",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.702,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-errors-lifetime/jev/choose-0.json",
+      "sha256": "b262a6d5cb917188a3892c5a3bae7a317afa0c1621adf127f6905331467a23c3",
+      "request_sha256": "864bf0ce5a654c19b0cadd9005c831e40673add4c0878fc6e685c57cb0e0219f",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.24,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-extensions-lifetime/flash/choose-0.json",
+      "sha256": "a04f9d59c138518aa32cf64c24155504e06d499a3a5680dfb7f006bded7d5307",
+      "request_sha256": "e284fdb860dbd50ab52a3341e7e52fed4c0acf5b3ef62465d73d4f92ad39e3ed",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.673,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-extensions-lifetime/jev/choose-0.json",
+      "sha256": "6dab128b39583f6887a484287488a42ecb609123b0c2aa814840aacee2ea6299",
+      "request_sha256": "4b72e34ac7148c9ef54d28a4ecedbd669fa6890b117845ea55ab081d6e33de47",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.208,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-progress-only/flash/choose-0.json",
+      "sha256": "7f82cbaabb01f31c741c4d8c17c3102003c85bf3d59965d9d589e65ef7809514",
+      "request_sha256": "f7ac8034123d0a8a6fe38a9bf3e86a404bdd508192be36d335f03134966e4749",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.186,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-progress-only/jev/choose-0.json",
+      "sha256": "9749358709f6ab987313470674bd6be1e0bdbb99a726c3e6ba73fd8db3841c02",
+      "request_sha256": "a9912edd7110a0ce46dd718747471fd5c5d1b25b50dd268b7692db6aef85e278",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.235,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-result-snapshot/flash/choose-0.json",
+      "sha256": "2d946e4bdcb4ea0b301270c8094e3651da65bfdfb2e99ea8e3c966d08b686ad8",
+      "request_sha256": "5e5356aca01bc2af64a740cd1413b8b4c595fa6861ab3fd722128d556b5c48fe",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.055,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-result-snapshot/jev/choose-0.json",
+      "sha256": "beaabc007c861144965056352dbd3df675096ee2cdf3848806d2dc6d21173047",
+      "request_sha256": "2d69b00dbd13f4e3c6270fac6bebe5dd00b69d63ce6a9ed3487dc3fe2d01d402",
+      "status": "failed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 0.209,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-stream-position/flash/choose-0.json",
+      "sha256": "9caef3dec860fc90c9c0892b3dfa442346e32dc22e7bdf75c519380f6ed40816",
+      "request_sha256": "9e8371a8dac77057e8ca00ff06a41c32d63f453aaf1dcd2737f29a46f5243b82",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.027,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-stream-position/jev/choose-0.json",
+      "sha256": "2a5f3a7f0e3512b080cfb5113c99a21370d4b5fcc8d537a58a07e121afadb1d6",
+      "request_sha256": "2ffa7de915f793fdc8e712e1a25b8ccab6c778f1469e2c3e15f8c407ac481843",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.227,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-unsupported-cap/flash/choose-0.json",
+      "sha256": "21a635890c8d811ef5f2b44abdac3af5fe59b6321cf80696d313647740ccb6f2",
+      "request_sha256": "e980f202d84100eabba2273ec7b797ea19fd3b4d53a0053e9a1dc57f44ddb870",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.335,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/g-unsupported-cap/jev/choose-0.json",
+      "sha256": "794be310cde38970bc9b59e63858fba628beb23ad646adaeb52c74eae95b4bf4",
+      "request_sha256": "cf9657e6bf369d5a6617a0e5a536c6dd5b52771943c8d812d6c656039ec598d0",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.19,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-assignment/flash/choose-0.json",
+      "sha256": "21abc84a918a5941df0ed188aa5a855078557be37b91701f629e5ffc3627ff5b",
+      "request_sha256": "a2537cc45422bb39a083a2ca5132e9d0993911cdb15e2d324cb5f97ce1b17db8",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.202,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-assignment/jev/choose-0.json",
+      "sha256": "2a0c17a35db1bf3988a05f7a287914a34e09d3cc2b073c296c2d3a60d040c1bb",
+      "request_sha256": "18839f5536e088b84e29963a848b59e52975dbca617e5c2426b4804e80937647",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.264,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-callback-slot/flash/choose-0.json",
+      "sha256": "90d2bba415e8a8574c37a4c71968b192ef4eece929c16b6de1d8abbbfc7acb4a",
+      "request_sha256": "ac195ec78b27df4767a6aa81ee2ea0ef40e30740a2bef4a5ead5dade7f051f73",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.023,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-callback-slot/jev/choose-0.json",
+      "sha256": "7a05ed5fda652f860032eb892c30267775e4df3756e0686782f18d7b770c717d",
+      "request_sha256": "652d29d2a9093b0d5e27f484b891f50305449848bf0a9d8ace79b4a68dd2ea34",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.212,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-callback-subject/flash/choose-0.json",
+      "sha256": "eece4ae414ca55f157a88c90229f71afd7b2c979b9a03fd68bd20db03e2c2d4c",
+      "request_sha256": "d3fbeacda00c3069a305fe2ed85c33f52b1ba11c33ccf615290b2670fbf6b294",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.676,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-callback-subject/jev/choose-0.json",
+      "sha256": "7601934b45e0a068e3a87b5fe2b25fed05064442c57ce75268a84963447b6589",
+      "request_sha256": "298c0ba48a5516dafc3123bfcfbca862598f6f1639ee3cb7de0fa2073a2fbb7f",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.217,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-nested-freeze/flash/choose-0.json",
+      "sha256": "85baf84be21d11a2048f24e1779f054af3c26f70b187caae1563fa910faa4c36",
+      "request_sha256": "3e96b2409051f7d2a3ed1c072e0dac2b9486dc075a9486954a7658bcaecbb7bb",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.08,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-nested-freeze/jev/choose-0.json",
+      "sha256": "86f585f3bdcc78a960d3a1631ddf4d5c57b8468b39a0486f28c6ba91de7a2456",
+      "request_sha256": "ac3d96d5b3e7cf73f366ce06c2df73df67531908e8a5ce7e1968fde671e65601",
+      "status": "failed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 0.227,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-nested-reference/flash/choose-0.json",
+      "sha256": "bd1aca17fc7a9a879dd6aaf8b745acc41510e270b45ae92ae1fac413272e4a65",
+      "request_sha256": "361cfcd4ef7c06e733da72724fff4a3489d835b6930274823cbd004d2df6f5c7",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.228,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-nested-reference/jev/choose-0.json",
+      "sha256": "315a22d183460441e79be36ea336b1f38d31f99166ede31d5ed614ac2be37508",
+      "request_sha256": "095342b73715940123ba3e1488f6f0df73115328e23bde38be645c4cfd9203ac",
+      "status": "failed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 0.287,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-schema-container/flash/choose-0.json",
+      "sha256": "6f62746f708c19ae11e4db8f8a52eb9d4f2f14d07a126b161e075979959bdeac",
+      "request_sha256": "3123a1e01c5ed69b869bf6510c663817d3fbe434e049ad93564c9bc09e1597e3",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.1,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-schema-container/jev/choose-0.json",
+      "sha256": "6250415e52a87df686733ac47ca38df3b38ab06b7559cb2c9c59cbfaaacdae4e",
+      "request_sha256": "256f050275b4a6c435b718434dfad08c2b9fa69323aced3b901fc19cdaf332db",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.24,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-set-equality/flash/choose-0.json",
+      "sha256": "17bb160c15d2005407ee95d21af0c5cf37d60618197d70859c0c181ccda9a8bf",
+      "request_sha256": "1e09fc61efbe4566d054e44e28e66e4b13ad972c0a7c28dd7560ad118aebca65",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.412,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-set-equality/jev/choose-0.json",
+      "sha256": "c293638df6d791e6592087f68697a6ff3f2a96c1f432fa27e72ce10679c2edfc",
+      "request_sha256": "b21c18cfaf6f2385f6c5c6ec2c4b53822c4eed3e16de1e7d978e4c5908f722b6",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.223,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-traits-container/flash/choose-0.json",
+      "sha256": "5a38d2af8f6909979f5a540e94ae2667f306a5aa6f456ab3617cabd7a721134d",
+      "request_sha256": "f153ed46833d50ecfd059fcd0e307b43080849421ddc77a0103db3a5f299c929",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.211,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-traits-container/jev/choose-0.json",
+      "sha256": "5c221164cbab06db98eb3031e595d449c0acd3479fb955bdffa4f356bf159feb",
+      "request_sha256": "46f29aca109aeb8f65e1ff10ef0587ab0c7c913c02914da8337c41641b0da46b",
+      "status": "failed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "failed",
+        "elapsed_seconds": 0.256,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-unsupported-cap/flash/choose-0.json",
+      "sha256": "9b49e2aaf14801df23ebf05bf1d11d32e7279b8bc65b1feb0be555886858810a",
+      "request_sha256": "e8c3c906a5050db37d79e97fd66ddafe68b3390f137cf348d59d4288ac3f782f",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.966,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/current/k-unsupported-cap/jev/choose-0.json",
+      "sha256": "7e535aca9d3d899b38069811cebd8e58bc489a2d1dd7584106b190261debc2ba",
+      "request_sha256": "21e508bd6c08070d1984ba9fcae1e756db221f8b00e683e100c66ce0ad703c62",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.25,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-blanket-combination/flash/choose-0.json",
+      "sha256": "e100ebf431536c47035a9498ce902404147a16a8d350458a2a8b9c97b7eec398",
+      "request_sha256": "a735067c2a7c38881319f2192d6d2eb9cf8c9bce6348d84d97703137eb2efea5",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.042,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-blanket-combination/jev/choose-0.json",
+      "sha256": "712ca2b336070ab4b5c4d546b92f52977e61b9ffeefceebc35111e762adc0a38",
+      "request_sha256": "a8fc6c01660230a92fc9c9cbb08e587844cf7bcaa7896dd07e9fcc878bf1b80e",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.208,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-compound-header/flash/choose-0.json",
+      "sha256": "cc2c6f6c1a59d48a48d29de2d1ffb7b8d07cfd742fa75955af6ef9936c7a1d48",
+      "request_sha256": "2ef42e951afae5139946610b2b12f1f0cc54cb8b56a2d064c093ca68064ea1d8",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.19,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-compound-header/jev/choose-0.json",
+      "sha256": "1207f87bd0cf722094f19570bbd95be4547fd9ce2edb02004e54477cce69993f",
+      "request_sha256": "a8bcaeed7a309c09cd87b2dca74f47c3abfdedd69cb836a4c5ac3a2cd01a74a1",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.245,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-nested-begin-line/flash/choose-0.json",
+      "sha256": "754fdaad44bbd177dc355d6d96b2911ad0a7f2c047d7e4cd07fa332ec9c330fe",
+      "request_sha256": "bddb1af49478dea99b2e9f0773082bc9fec87cf57be9b174d210850cf9d4d1b3",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.458,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-nested-begin-line/jev/choose-0.json",
+      "sha256": "d32f5b6bebb816b081e8b63f2a5da039bf60ff1f258b0d7ca69764e56de6088f",
+      "request_sha256": "fae860a08fc030d01496368503293ea5c18d84d95111e451fb45fa30a1698fad",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.221,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-none-selection/flash/choose-0.json",
+      "sha256": "e45ebae6d695ec73466bda3a51f3a3c5d6c8d61bb8b382915b4964d003430617",
+      "request_sha256": "0d404400fe8e389d7d307695adbb9b9181a4cf7f1b919f5b87d394e4f113a8f6",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.55,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-none-selection/jev/choose-0.json",
+      "sha256": "f8136f662d28addf58fed02a7dc6a46892caada3eda8abe8d838b00ca375e4b1",
+      "request_sha256": "395f280c1127895a6518a02f78b521029db3747f27aeb8ce34bba8eb7c9173f2",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.257,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-unrecognized-selection/flash/choose-0.json",
+      "sha256": "ea0f3ee8d1565b6c86d52227cce5aaa06477bb4ee1b9e23edfc3c18af982c63e",
+      "request_sha256": "bfb343fecb94e7503fd481efcad11506cb41e7536719a059cb3ee2118fc0f14b",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.031,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-unrecognized-selection/jev/choose-0.json",
+      "sha256": "1d9b9352a70ad1e94d3a97b41cf8b575a19ed6ac2aadd7bd5ba498186bc353cb",
+      "request_sha256": "28debfa0fe4747eda3ef3ae9071404e15fbd353aa6dc75373ebd5fe1186e8c83",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.252,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-unsupported-cap/flash/choose-0.json",
+      "sha256": "85581b1c501785d1d284c8108bb52d97a768ba6a83e892d134aa9ddc03c7350e",
+      "request_sha256": "82ea7c63bc235fcc3bc12c2f9e69e29864c94bdf9f70c67615d0c484eb0d6d70",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.493,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/b-unsupported-cap/jev/choose-0.json",
+      "sha256": "afee509ec81b3c820853e7f1357c27a18df4db46da541e08d210ffdc1f641a66",
+      "request_sha256": "781583b7e5661345f92b9fd63fa666bcd8284056c6e2f361095c5a152d423523",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.215,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-error-continuation/flash/choose-0.json",
+      "sha256": "3f3e31e2381138b319171b369b81d720424d6d848b527fae2bf4cadf6504ad6a",
+      "request_sha256": "2fa8a8075795b1bfac83764b5b7ee99079ebe5f64f9b583eb3448935ba6fc9a2",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.427,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-error-continuation/jev/choose-0.json",
+      "sha256": "51d209cd32cf45cdfdc884c06d0a3a2fb99e1a0f189316df95641aa67b296065",
+      "request_sha256": "be7a3d96dcc43c68d28bff88a79ecc21ecbfed184a76033abedfa764735c173d",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.223,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-errors-lifetime/flash/choose-0.json",
+      "sha256": "621336a03912be4a0ab166d32bfbe982c8241bf071f4543562097e38a4646899",
+      "request_sha256": "6da9d5bc3723642069a87992ba7edff3edc6b1592b742518070be6e279541b07",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.102,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-errors-lifetime/jev/choose-0.json",
+      "sha256": "53d67073afddf12a3a065e057a65bc9d9f9149974b6fb34b49737b0329825a0e",
+      "request_sha256": "e793bf0cd73fba00b7897a7b9e8cca46bc32ed76e135ba331a95f8dd95f9b594",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.199,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-extensions-lifetime/flash/choose-0.json",
+      "sha256": "b8e7c41b02e45886e42ac7395a16efa5c7e286bdf42f770adfddea07266de03f",
+      "request_sha256": "0214dc762b8f03d98a768c534ff055b2c44411affe3140f6ad33c75858d9a005",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.361,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-extensions-lifetime/jev/choose-0.json",
+      "sha256": "d52e666d0171531e15ebfcf39bab11d812cb57443b0a2f70d51452cf965d7de4",
+      "request_sha256": "f8cfe84001ed19bb1a52b3a33aaedeace61a3f491b4b694e712abb751580a6e4",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.189,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-progress-only/flash/choose-0.json",
+      "sha256": "1452389002af37f21a9d25722f8cef821a84aba1a11440b64b7a8783091a2a74",
+      "request_sha256": "bdd22762af2b1a1d44315513d7474010f9512fcb3508e83a913df3941fef5dd2",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.801,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-progress-only/jev/choose-0.json",
+      "sha256": "b73d7381fbd81cc5eace4eb3129f16334fa7949b37545fa12cf09b877811d6e4",
+      "request_sha256": "3f95a69afec85f48012c4fa48013354dd8c45b763f8e56849c36553744f84bf6",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.206,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-result-snapshot/flash/choose-0.json",
+      "sha256": "ac99a455274a3c0d20ca5628664c90b30082ce12c9ae652a6275b649023f1ee1",
+      "request_sha256": "564ea42535ed797182af7b68b6921da471d2b7705bef42d9efae41f9e7096a71",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.717,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-result-snapshot/jev/choose-0.json",
+      "sha256": "a251a374b69c03d767edac3976eb3b137c4a2d23c81d9aff063b7fb2498047c2",
+      "request_sha256": "1b079cdfd898d3275bb91ff6461844706e7e581fe8c15ce9c3cda8da11da408f",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.253,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-stream-position/flash/choose-0.json",
+      "sha256": "c40a0403a3a5130bbcc620091f10aa792994b0184916c993f7d204603c0b9f78",
+      "request_sha256": "84e2e168d6fd1e30c1a8ba9a52381392f32c3119bf1c702a02a6b29d6a91355a",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.21,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-stream-position/jev/choose-0.json",
+      "sha256": "26afa83c498adda1de4d2d863c6098b0236a4e695916993f7e2d855e80bef19f",
+      "request_sha256": "9859f23554897130e029b295c073bc77983d297c17fe7fa96d0060f5f1ec62df",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.207,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-unsupported-cap/flash/choose-0.json",
+      "sha256": "4ea3834a15ad81491bab2817e440a12a45370ec379ea939102defcc043d29f56",
+      "request_sha256": "febbfa1f8af7f60d8e0088b0a848d3ed66d9ca9e3f54c0a367dd0641b9c26ba8",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.856,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/g-unsupported-cap/jev/choose-0.json",
+      "sha256": "497193c66a08dca6478f24f90375e54348e699e30d47e5743760f107e408a181",
+      "request_sha256": "bfc5e4505dc4f3b26d184a52160e5c5d7d84886aba89b6966947c15a517d6ab0",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.204,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-assignment/flash/choose-0.json",
+      "sha256": "523f30b092ec207cfb7106205ade43655d86a6b2e0e226b2e109a1c6333a2c09",
+      "request_sha256": "f04f9c8c06ee72c706eb62edf28a9abcfa7910af90a00fcc28ecd592c095161c",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.222,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-assignment/jev/choose-0.json",
+      "sha256": "a5b079e5be0cbdccbfb4b5d93c89db342d90b836d6b807d593791980f7db8163",
+      "request_sha256": "26bfe8a03403625453e8205a97e6c2dbd08fac1bff8980b502a6772cbcd08cbe",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.284,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-callback-slot/flash/choose-0.json",
+      "sha256": "e4354ed5801c5037dc379579c0870f762bf9d6b926833c9e1cb136da5eab2e88",
+      "request_sha256": "a23f6c6110d97fe5d040c68c8e8a2cab6454b229808398efcee07fd0dda0f5cc",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.987,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-callback-slot/jev/choose-0.json",
+      "sha256": "559157681b543eb9b6ced50e29034fc9bd6c9d9e36be7fcd9603904c2a4bd456",
+      "request_sha256": "0b2b5233afd0325c0121c34e5016c0ead23c2f3b6a0ca70be3db15bc5005a974",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.226,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-callback-subject/flash/choose-0.json",
+      "sha256": "a9a45d1de4325cf1fcdfb1beebbe63329957a15a120dd892f69aba23efdc1b92",
+      "request_sha256": "13a7c8e95636b76aba33d3359710b2205736d6829c0d3f7315389c5cbfbbd177",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.884,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-callback-subject/jev/choose-0.json",
+      "sha256": "446a8fc74c89fb1566124a0cd10d19fff14e2bb1674e813503150f1d198337fb",
+      "request_sha256": "c7fa2777e90e21bbfa22e4e999b90ee94407b8b6182d7f78ec1ed2d9e67143d4",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.232,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-nested-freeze/flash/choose-0.json",
+      "sha256": "e24a4e2b2029110bd6d6a9437daa67040e6ce944b1c720b6da8604adde911cd9",
+      "request_sha256": "47d77c03972690e1acf0bde9e6cc6419dbe1655281bebd7a8f64c18fea2f8d02",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.02,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-nested-freeze/jev/choose-0.json",
+      "sha256": "74af09666aa67f331a472b7df263de0cbc39bafa112dd6db0f8e97910d9d22a1",
+      "request_sha256": "b9620eebfefbaf04593bcbb29dfa3127c47821705281c6340c412b73f8509678",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.218,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-nested-reference/flash/choose-0.json",
+      "sha256": "d5aa0f3c2e55bd050d69f47f52b8b69f378943dcbaa57ac1d5a971a1d04c5bf2",
+      "request_sha256": "af8ab4122704310e4f13723c46005e3fa5c39cc9ff8a4a34bd40649951939320",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.314,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-nested-reference/jev/choose-0.json",
+      "sha256": "6859270e3e2a723d06d1b9d0fc9446097f98cf5e262032d4be542554ffbaf9f1",
+      "request_sha256": "8a2204a9937b1b122504c5c0de1de0d623a6d124768a629c462cffcefc26a823",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.257,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-schema-container/flash/choose-0.json",
+      "sha256": "7d2b49594716f20f76b353d4c067998858a17779cf494d36f9ff55a727201c47",
+      "request_sha256": "62a4144c4a7b0413d8127a703fb81a3e7d05d45f4241ee7a72b14eade87646dd",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.858,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-schema-container/jev/choose-0.json",
+      "sha256": "2bb6d4322d6fcb9fe7a0e38cd993d7fe0da9078c8af136a95635b7d7dc8ea0e4",
+      "request_sha256": "b0860def624f77eb0939bdb01b562a83c5d19b0eb319b58b017861746693b3b0",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.255,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-set-equality/flash/choose-0.json",
+      "sha256": "a3ea9cacfb73613bba53bb1eed0171cb8a0604a83433b6e9a78a9ba2e7b5c156",
+      "request_sha256": "9ec1c049085e57b822d653a51e7c3b7210ecebf7d3bda5d44a016003aa8c1c0b",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.263,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-set-equality/jev/choose-0.json",
+      "sha256": "ed6393294f3bd1b7b674f34be4febce73b80857e986999e91b2ba2de2edbbaac",
+      "request_sha256": "244ba3c741eb4ea3a971540ca5b7afc696285443beab9c59d398814daf680bf3",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.214,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-traits-container/flash/choose-0.json",
+      "sha256": "b25bd1ce50fcc0ca188c7dd9f7654193be036dd5073e43cbcea95f7f696edfca",
+      "request_sha256": "01947986b5ebf610a455cc988ba376c398f6ebe7bb3a12309f0b82a24dde1d18",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.397,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-traits-container/jev/choose-0.json",
+      "sha256": "3239ea5894216e8a00c1393b971879b4858fba42fd2133e459dd02b58e3d08ae",
+      "request_sha256": "7f3b78c3eff8351d21bc7c0d8584bac6394f9d8f0f38fa5e85addae08d8367d8",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.229,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-unsupported-cap/flash/choose-0.json",
+      "sha256": "c0dcf5d9cc9526e0dd1617e42443786edb9750bc6f385d07d53013fae9e64431",
+      "request_sha256": "b2b7fb6d4c7a1dbae71d2b04bbc0c19c3e14f37d5a1e41bb7c03ad0590ff572f",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.256,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/examples/k-unsupported-cap/jev/choose-0.json",
+      "sha256": "688c4c50687d9843b840368e4f62562c90fdf171e161c507b668f11a13cad5ed",
+      "request_sha256": "b859c89639b516cfca1a9cb5cc85b767732dfffe9f60e8c922a8338bdc90cf44",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.232,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-blanket-combination/flash/choose-0.json",
+      "sha256": "2e90bcd180006f098fbccacd1ad08f202454a2b6d6c7a56e20406f906116b87b",
+      "request_sha256": "f3d9b61ea3a93db7545d5181ef7909033be37bf4235db82ed508eaf32c03a141",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.08,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-blanket-combination/jev/choose-0.json",
+      "sha256": "5357436ae5859f719835d4c43dd6641fe75c95aecf653b234e67512e598509dd",
+      "request_sha256": "ebbd3814b54ebdec55fae5585512a73ac1edbdc9d6c8982cca98b15703603e56",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.21,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-compound-header/flash/choose-0.json",
+      "sha256": "e8f5f41ba2377df0514d2de9f48b8b497d6d1e3b6008bad8ea968ba793aeade2",
+      "request_sha256": "0fcba564e882da1f89b232705b89d6819c8b251269bbc771fd3b88cf110db037",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.225,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-compound-header/jev/choose-0.json",
+      "sha256": "76d2fcbdfb3b71cb8f4ee72740f721b824973f8c56cfa33150f3b924a5fd7bc2",
+      "request_sha256": "a6cc9dc14a4e69ecd244b52b371094d7cd18b7a15e0341b51f39206fde3d1123",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.327,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-nested-begin-line/flash/choose-0.json",
+      "sha256": "7a20d3fe63207d21464e397d7937c6f2c71ee5c5126c03802172ee1c7e02555d",
+      "request_sha256": "ca785e06c48dc4e94c547825ea903c857fbd74be93080fe76eb69da9b0ed0415",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.458,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-nested-begin-line/jev/choose-0.json",
+      "sha256": "77edef0e942877fa401a454a8818df9defe7c927efd548c183e3bc883cac72be",
+      "request_sha256": "9298ce88dfb3ec1978ae080b1e9d8e16ba494dc79a30979344999eb5a30e10bf",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.234,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-none-selection/flash/choose-0.json",
+      "sha256": "abd7869c37a968b5f80445b0670a121e53c229cd09398f41e11231321d9d2ed2",
+      "request_sha256": "6c67010441bd840e9cf0470c2a91e3791244abc6ace371ef9c14ef0f5e63ac5b",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.947,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-none-selection/jev/choose-0.json",
+      "sha256": "df96b7262432329eedc78cb912a0ff7a0740d46797f9f941a78a86a40ee17bd6",
+      "request_sha256": "aecdabd9a591a2d7457437e424cd9de8f92d56ea1e0b71a2ad5405bfe6471439",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.215,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-unrecognized-selection/flash/choose-0.json",
+      "sha256": "48b7c8bab59bc6466e3be283693c24bd7ef6d79806eca6b52a5e0f9d9b081ae7",
+      "request_sha256": "23b8979db28eddb47c5278aac0272c1ac972d9e0328787533bfa3e1ef55d2674",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.96,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-unrecognized-selection/jev/choose-0.json",
+      "sha256": "f3128760d7d5859af77745d570e0f123f426c17118c010a2144e18658e3e8a55",
+      "request_sha256": "b17b51820bbb1445a0583b01b92ca9722365c27c8a37d70b16316bd32541545a",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.238,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-unsupported-cap/flash/choose-0.json",
+      "sha256": "c99b93e6b3cec77d22c9b476ff651e4b058d0c81c3d6b9392c0e4724b859b175",
+      "request_sha256": "0b67fff33f3e339fc070214f669eec6449d3e9be5af5f8e59cbdace8198904d3",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.54,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/b-unsupported-cap/jev/choose-0.json",
+      "sha256": "f66c302cea8edd1260a453a7f36ef7e8e632ad708f8b29e29de293e0545d599b",
+      "request_sha256": "4994319485566ed1f494041dcc2bd038144c13a04de4bb1d4c7ae038920876e4",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.229,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-error-continuation/flash/choose-0.json",
+      "sha256": "c88d7ccbaedb01421ff562ef03f4ce940a1d18770f22db177f7f2c97ef8dbb99",
+      "request_sha256": "5c10f6d3c8152e2b82a2205606dc31f8ec787dcc965e66247dca23ecd9a19ec8",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 2.018,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-error-continuation/jev/choose-0.json",
+      "sha256": "491c47da53d377f6e8a10d2e5cba53be0e2236db34420f587e43c6ad0c92fcf9",
+      "request_sha256": "bf813dc2c77bcb1f5aba015863eefb4e80c4583ac60d0095fca2ce9410d5ebc6",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.271,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-errors-lifetime/flash/choose-0.json",
+      "sha256": "b0681280eb98abdbde9d183b88f141a4f83bc22fd761b1ef713029af4f2903a2",
+      "request_sha256": "443a9da1107c49691ab873157b1195334fb6bc382265087ae83c029986b4449e",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.551,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-errors-lifetime/jev/choose-0.json",
+      "sha256": "632cf13b3b2e9aeb467761c98ddfbe061a00b2919a6014f8ab1a92876bec42f1",
+      "request_sha256": "900861adc298374c3c8ae80d11b14cf5b1ba410381addb333b62c33574b7b041",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.206,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-extensions-lifetime/flash/choose-0.json",
+      "sha256": "83acc5cd8b6db2b671c6601266f284cf6ab763b8ed11678bade15b07cfec4ce3",
+      "request_sha256": "9a151f7ab691bef8ab53b4c80dfe38a13a9ac498b31cf69abc925a6b846ffaf4",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.391,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-extensions-lifetime/jev/choose-0.json",
+      "sha256": "1a22024d72bce272149fb2440b057ca1693118efacb6f04a983222636c995f12",
+      "request_sha256": "8a06a6fae3d45fed30dada3d6cc0fe8dece82e626f2cfff25c6312b5c53f6140",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.213,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-progress-only/flash/choose-0.json",
+      "sha256": "922fcd66e9a97a88cb620e022420e7b46160e2ed95f0a129d3c2b41947da3239",
+      "request_sha256": "dc6ab5ff32bba04ba31db39ac9887da6f6f5d6f8ccecea55e1952ae6c9e8f452",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.95,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-progress-only/jev/choose-0.json",
+      "sha256": "055d1252e4dfc086fe49727e588ff3f37ea398b3f53a8113b1081638b7412486",
+      "request_sha256": "46748b8cd46aeb37666750838c6e4975816db2eda3f2b618e2856adfe5fa7d61",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.238,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-result-snapshot/flash/choose-0.json",
+      "sha256": "9b9d297738f8387f70d1c80ee562ddd34e303a5f99e127ceff1480ac2682d131",
+      "request_sha256": "b207ec647c734ad88d74f11444f4e1b6bba88a924b97a333472d9ac02d87122c",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.798,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-result-snapshot/jev/choose-0.json",
+      "sha256": "456c9f14e40b96ba1015bf22ad836839e8777598c79df0e970e1d61d582b2cb6",
+      "request_sha256": "247d430f11882bd34cedd2497f61c83db09d564d95dd1bc62bc2c448f33a0068",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.274,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-stream-position/flash/choose-0.json",
+      "sha256": "f45e48aa90b4c2f2b255dfdeee3b07463666b0e334f648e5c15a2a3cf45f639d",
+      "request_sha256": "b8ace35d3dbe6a2e35a6d412f841a12b478431158788e6429ec8d5af5d79f363",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.335,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-stream-position/jev/choose-0.json",
+      "sha256": "9f4adfa16eabb1ba61c8176722e2f27ec1b022caf7b79b908b8428fc53b8d87f",
+      "request_sha256": "e206a8f7b6b58649ea0a251055b5e03e0d578bba9aab91ff322c66060ddaca22",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.201,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-unsupported-cap/flash/choose-0.json",
+      "sha256": "b1fc1d2ef72de17c0f637912a7c6331b3c82e7ef887455a471c83cfc22f8af3e",
+      "request_sha256": "d597319ede926582a125717a6f865d47bfdf019c261c0070bf18ddd597980f4f",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.54,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/g-unsupported-cap/jev/choose-0.json",
+      "sha256": "5261b8dff7148bdb4a2af929b3541f0be50301df73db95410dd451d86f7f9e82",
+      "request_sha256": "cee1fa9e40a1c562129ddd01b02578f52d088266f32c87d0531e2c26bfe97c37",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.258,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-assignment/flash/choose-0.json",
+      "sha256": "cd0d9fd9a44c62df90e42fba0e36e971f1ede378f87df268b947f604560e115c",
+      "request_sha256": "393c638a63840fcb5e77649011e06ed26261c5d3e0edbc9cb89a22d79dca3de6",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.221,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-assignment/jev/choose-0.json",
+      "sha256": "9af4fce84faafc92d5fc7fdf2129842dc1816b3720aa19cb8adecae37336dd8d",
+      "request_sha256": "c4ad77de8a7fc4f94ce2850e726dd6de04c9b2b560da9d46a428d4ca39ba7ed5",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.255,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-callback-slot/flash/choose-0.json",
+      "sha256": "ee1c772751fb883ab0c1192c695cf3767e12da4724b49b5440fa1722d7f8d7f1",
+      "request_sha256": "5f75fc33a7f828cda06d883d02b490aad20710c06842481ad392deefc03583a6",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.972,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-callback-slot/jev/choose-0.json",
+      "sha256": "c68d5c1919d966dd0c09d6540aab2d0849ffa906b9516363af2cb4b815e36fd1",
+      "request_sha256": "094912f92eb146be39b873a55b7cd0df398fb6009d9eb30e17f7723dac956fc9",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.209,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-callback-subject/flash/choose-0.json",
+      "sha256": "bb92fca6b7a0c396e05e2dd40f3d6b65c7828a8a4af36b33f26a57e020e004e0",
+      "request_sha256": "0bbf655f47d6a5925835c719ac030c2bd9ae976dcc020f94be6e92b8f4aa64f0",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.99,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-callback-subject/jev/choose-0.json",
+      "sha256": "ebfaa25f854f2a8d879446f71ddb817e24b468d7fecb02e16e5ef66f97f2b4c8",
+      "request_sha256": "71bd4ed01dd6c82b04e6b5eaf69e6d9439e63cb2f6c94669529f4f4c39f72cf0",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.215,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-nested-freeze/flash/choose-0.json",
+      "sha256": "9da2910e913950cc1d7ee7a21d56d301508337d441c87e287712efcba7f70baf",
+      "request_sha256": "023193c393e1cb1dfdb789db98f9fed389d0bf9916674a278c2f288e68b6eec4",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.122,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-nested-freeze/jev/choose-0.json",
+      "sha256": "631973cd775c63f8d732ddf5ce7cff7fa5bd7c220f4b5bb396ad51334e92a9bb",
+      "request_sha256": "a84407465f68fe65d31bfc309c6e515926e19122d616e37ef9204df95cc7f316",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.242,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-nested-reference/flash/choose-0.json",
+      "sha256": "c9ee8371323a0804a0bcc4fbcac62fda81ecfedca45f585b9df94d1712c0b111",
+      "request_sha256": "60a7a921f557c237df4224f15c5be43d83517122bd65be4a106eed4941fb556d",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.213,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-nested-reference/jev/choose-0.json",
+      "sha256": "620b0175d595924f8df452146c61f409cde695d3e53c61baaca94494ec617e54",
+      "request_sha256": "fbc11b28b9746aa367ab2953ab51324f070211808fdeaa761f73c74bf3a8534c",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.248,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-schema-container/flash/choose-0.json",
+      "sha256": "043783ec50496309add251f2f23d8b540d70562a00971ec01f14a14c3c841613",
+      "request_sha256": "07649ed91e3bf54f9234d7669adec2467d46856f00fb55cfbebdd3499935870c",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.123,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-schema-container/jev/choose-0.json",
+      "sha256": "b7e446fd5803e34139f5a97401fd66cd8523897194ec380f659ffef339937321",
+      "request_sha256": "c2b74b7a81897f899a14dc19ee4593046890ce33a166a2cc7d548006c3bd8e3f",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.23,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-set-equality/flash/choose-0.json",
+      "sha256": "cdcb05ab82387e424873849516263ae131ba1e6b7c50117fc0578f36035a0f1a",
+      "request_sha256": "485932aa12bd2bd4b90257876b274d945900a84cc7316a94294ee5bd786141f6",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.169,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-set-equality/jev/choose-0.json",
+      "sha256": "cf6f5fec817403d8f0908a650ec343ff7208a53516ad45efa9ab366e7382e0d9",
+      "request_sha256": "9776fa4651d40f40ab08e66a9720534c432324a0aa9fe50ed63aebf7a59189ce",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.215,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-traits-container/flash/choose-0.json",
+      "sha256": "615aecc16f0bedf5aa22cbc9c74ffb5047b8a6b775648c5f527f09bb89c3f1dd",
+      "request_sha256": "a06182928ce32d0990b533525bd652e9755d1e8f1841d203fe4597f276ad45ff",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 1.192,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-traits-container/jev/choose-0.json",
+      "sha256": "7baa9ced61ec4d831cd45d1a665741211ceb1f7a587323561463d5e2b3b0f6a4",
+      "request_sha256": "46c80792f0d63a3a9af91787b41f9fc67988f5f759a11d0768c138ebf8663a72",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.297,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-unsupported-cap/flash/choose-0.json",
+      "sha256": "f50707103f3014940c4d94a4a33d406dacae5c13434c8a822b23336019a98ca0",
+      "request_sha256": "15743a778e3de0b12499d42d5e5543370b7390fd4c93824f4c3d0bee4d203ae1",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.744,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/decisions/revised/k-unsupported-cap/jev/choose-0.json",
+      "sha256": "a80366b7844d00df370714f5831a826bdcdbef16dcd51fe7a39f31b706083c7e",
+      "request_sha256": "e27af7c1e93db3c9ecc446dbf254198b463447e6f7f34df9c231d5e5aed8b9eb",
+      "status": "completed",
+      "receipt": {
+        "stage": "choose",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.301,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/diagnostics/g-result-snapshot/observe-abstention-0.json",
+      "sha256": "87973d1bfd8081b397b44692c1bb0c249e773cd2cf3036e0b5e13d8cf08d6622",
+      "request_sha256": "2d69b00dbd13f4e3c6270fac6bebe5dd00b69d63ce6a9ed3487dc3fe2d01d402",
+      "status": "completed",
+      "receipt": {
+        "stage": "observe-abstention",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.299,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/diagnostics/k-nested-freeze/observe-abstention-0.json",
+      "sha256": "aa7f99ca7c88341259565c11b9f8711cd9ab07aa126fca35d2002d786a0c3186",
+      "request_sha256": "ac3d96d5b3e7cf73f366ce06c2df73df67531908e8a5ce7e1968fde671e65601",
+      "status": "completed",
+      "receipt": {
+        "stage": "observe-abstention",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.257,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/diagnostics/k-nested-reference/observe-abstention-0.json",
+      "sha256": "f4b2ee0b6009f738c93e908861404e6c9c3c666d2cb8da85a5634dd0579e0b30",
+      "request_sha256": "095342b73715940123ba3e1488f6f0df73115328e23bde38be645c4cfd9203ac",
+      "status": "completed",
+      "receipt": {
+        "stage": "observe-abstention",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.236,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/diagnostics/k-traits-container/observe-abstention-0.json",
+      "sha256": "cd46af08c4120be45b6f685ab45ca92562d50079e1d82b3f1dc652df32565d4b",
+      "request_sha256": "46f29aca109aeb8f65e1ff10ef0587ab0c7c913c02914da8337c41641b0da46b",
+      "status": "completed",
+      "receipt": {
+        "stage": "observe-abstention",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.265,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/flash/split-instruction-001-0.json",
+      "sha256": "aa698eb5b2542f394a73f5a77ef56016813a083d1a28bbb7cc9a4459b62ba8a6",
+      "request_sha256": "7893cc77605121b6afe1d4565b86240fe363472f0a96e2459d66f2048aa118f5",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-001",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.023,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/flash/split-instruction-002-0.json",
+      "sha256": "1ea3087a645073e960bd47f5442a67ab4e24ab3f46d8ab2176ec3063ae6d6095",
+      "request_sha256": "c481b99c057afa6c7a729d4eb8e244e8691a9a4058f3269e5769edac21882764",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-002",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 4.96,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/flash/split-instruction-005-0.json",
+      "sha256": "49209aef4422b475d23b0ced8c2e6dbe5f1bbd9298caf10fbac7d44ce641ccb6",
+      "request_sha256": "d03b7d7e4a03e842003511196fdd2c3b9972c1f18749d1c396a6327f7875845e",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-005",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 7.723,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/flash/split-instruction-007-0.json",
+      "sha256": "fe90a0e511c934967d66413fc062cbf04d3e63ab7c52873a0f9be37ae503c2ee",
+      "request_sha256": "a2e46ae8974e10930909e388e084b9cabd8cb3b42926fc965a2773adc3980dbf",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-007",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.06,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/flash/split-instruction-012-0.json",
+      "sha256": "374b503dc50759481a69240a44a8144cfa0182bedaa7fc1d6528249879edc124",
+      "request_sha256": "9722753d70167b7c2426a20b2d3f2d4769631bc11b8b0b7692cf53997a4c39fe",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-012",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.634,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/flash/split-instruction-015-0.json",
+      "sha256": "bece8d7c2d0113a7e4c3e0b5e49ae6a6167ff75a6be4ed2ba33accd593c2fa4f",
+      "request_sha256": "b9b4af54ed4b94ee6f772e5ccd6df0b45b641e14bb8e01ca9a812b96116cbd86",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-015",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.056,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/flash/split-instruction-028-0.json",
+      "sha256": "f4b42b096d4c9377986386eac5182c23c5bb557c780f091c797e94e818c6bf80",
+      "request_sha256": "b7d7b7995fbc7ca0cb7a9ec17dbe2dea35995097d9bdea449f18ac2445de1daf",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-028",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.978,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/flash/split-instruction-030-0.json",
+      "sha256": "3790e1d0d78a357cd1a85c55f82c7215e5d826b08fa4fa96005f0fba48948baa",
+      "request_sha256": "76434f549f517b8f89af72eb2d64d87f8d9f18e205f931c9741d24d40d8b24a2",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-030",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.148,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-001-0.json",
+      "sha256": "9595f00728e4bdc160dcf715308dde6d4fe5f37d9366171b6160d8cfede765da",
+      "request_sha256": "437f6b7e9b0b578f1f85120040ad536d6392125b0bf1b32faeeba785f377770e",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-001",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.287,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-002-0.json",
+      "sha256": "81de0bd76f32bc31f57765dd044cef70c998df1d78ed2aa8ecd2358d22e3450e",
+      "request_sha256": "7abe2d86d6a5d3fb602e902c7e22ad1f1d11fdedec793ff47d4a6fc7ad98050c",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-002",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.175,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-003-0.json",
+      "sha256": "23a96dc6fa8593ec81956da0573044b2957bf7cf0c3e400c8c00bb8eb8add75e",
+      "request_sha256": "9067d9cddd7084a91e94e092fe4153061005e5e97208e33cd29964a86995e374",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-003",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.195,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-004-0.json",
+      "sha256": "c1e05d592b99a6c122f43305da2d0b9d56010605aa557dd94e4feec95643322e",
+      "request_sha256": "2345a91581b078f212b177194c5ac062ee5567259bd6101a0ad733e6b438e687",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-004",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.183,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-005-0.json",
+      "sha256": "ef7f0fc6e97d69d485ae31c722ae03a89ed1c0bed375652e89270df5b6a62433",
+      "request_sha256": "e2de65c14c4bd6c4b4d0e3f21bcc708241245fc9f6b00d7481d130d3cd952c1d",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-005",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.294,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-006-0.json",
+      "sha256": "6bd13c42af78dd4f7b9efc0b92609f055286ae3f3c4e9207d3a80b20c195a547",
+      "request_sha256": "c99b6c25e16dbeab4e870d760d522a30889750ad5c152d119c8e94edbc701c6c",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-006",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.232,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-007-0.json",
+      "sha256": "bae50028bc6d2b05c66a25a0b9aafdc981edee5b7a33eb8f2fb2844eb5d215e7",
+      "request_sha256": "3cd1132199ec2e3dd167966cb63818b48976080a85e05d4e4a79f38c32dc9967",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-007",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.234,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-008-0.json",
+      "sha256": "f92202043244037a09271c06696398e5bcbcf0bfce26615ee40eb3112e1fa648",
+      "request_sha256": "91b5fae93ec6c82dc3e7c611f613f0938de019ac590b43df91f1963c2bfec12e",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-008",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.213,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-009-0.json",
+      "sha256": "167b87fa147b840493775b8c5f77f3cf50cec6803dc101ec93b809fd1f2dd5cd",
+      "request_sha256": "aa2d91bfb2f1840e24a6f2e1605b578b60bd34eb245078d507fdeefff4c79a6a",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-009",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.22,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-010-0.json",
+      "sha256": "878ebb930becca9dad05589dab5aa5ddfe135e5f36ff7236f4cf3d1eaf709a59",
+      "request_sha256": "8adc2b5f0285d66f02720609d38af77265fb2093e932e73e40ffae79d919478f",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-010",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.191,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-011-0.json",
+      "sha256": "8a127ebbc8960266c3a8cb3b384978de0139690e142c2baf668aa5bbea1f51f4",
+      "request_sha256": "55a598326927e3d17fc011a6f2451e1a0244834faf817dbc88ce615f29a74b3a",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-011",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.187,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-012-0.json",
+      "sha256": "2c339f9d71879292cee3645ce2e92f8ecfd497eddf517e14fee72ddd40e1e7b3",
+      "request_sha256": "6db56d1163e538690cfa908ca939f460f8b16d98e5620b87617b9537817f7fda",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-012",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.206,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-013-0.json",
+      "sha256": "a0981678edf9bfa1727fb8062584ed0d2bcf3b0097e652386551ee237bebed3e",
+      "request_sha256": "285292cbc8a82690491ef176efda946e82c1e6cff0ac79ffbd90247a3404bf6d",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-013",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.201,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-014-0.json",
+      "sha256": "8f3768e60478c51f76c2d09c4299dfea47dda8584abb773749587069a6352998",
+      "request_sha256": "37be874fd502aedd7fb0adef7ff787e1d9e70697c02a6ce52195c0bf11faff02",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-014",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.225,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-015-0.json",
+      "sha256": "edde637c110588c55e0ce02998035a3853f0814edc194fbf5cf5a43acc27bf44",
+      "request_sha256": "dbd4f4e00198f7cc2c6b5e7e8ddd2f7a95c8ed2f4c6935d0290a128cb40dc936",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-015",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.193,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-016-0.json",
+      "sha256": "3d48e75d31a7461f42af54b732e3114721c9da016322c22fd8f91f80aa0e05a1",
+      "request_sha256": "7741ae1720787b0751822f729ac75673eb1509d22a735338657924c8dc9b70bd",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-016",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.207,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-017-0.json",
+      "sha256": "ae78df515537725e2f7ad93c620ef73b23498e81e572506753dd1be6d06253d3",
+      "request_sha256": "ab75d79dc104095e11a3203119fa1ec8020c0c5dcf6dfa32b0063abf5b18ab6c",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-017",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.254,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-018-0.json",
+      "sha256": "1e68d4a816eaf446ede0ad99765a46c87a7a5d461e6fcf1238654ccd16b08dc4",
+      "request_sha256": "2ca73fe413a8b96225008d255cdbda85af1e54b66d1ac97e66e9815a583b1c63",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-018",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.205,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-019-0.json",
+      "sha256": "7068d04fa34f23475f3a35518ac827f97b0a8ffe7da538ee9b533a4cb4cb6888",
+      "request_sha256": "1ffc577e488d0fc785930bc387689340d77e67228de82feac807ef8664a03b3f",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-019",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.188,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-020-0.json",
+      "sha256": "1dccb6a54f3b7a3a416378c11880243d2964d4b99e176c6012c961c5e75ca50d",
+      "request_sha256": "09869f2712b5c0d089c19041601204518ce75143a697ef75242a6097adb7b3ce",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-020",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.21,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-021-0.json",
+      "sha256": "0e807fcefb79547baff89992d631ca919ddc0a20030dc83823509d6005e9be0f",
+      "request_sha256": "c0741240dba45112deb4ba92304473c1b8e4a6ef73956c03328a3aa662b2671d",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-021",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.233,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-022-0.json",
+      "sha256": "c3ab18e609c8167f57eff0982f6e020692c3227a957abb5140097c6be31fe9b3",
+      "request_sha256": "6243dd1ff9df5588242401e52a831c2b86e2104bad6f6e9ea96360363e651ea0",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-022",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.184,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-023-0.json",
+      "sha256": "c4ce038cbb0ad81a5f9b533eade3b357a7e84aafef9c831513fa7bea39b015b4",
+      "request_sha256": "6806a7d0fc49dcdbef56630e44e4224b96b2bd4a2a90821779fc06539d3d7445",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-023",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.207,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-024-0.json",
+      "sha256": "c3305975274c0aebcf0f19522536cc50eda70e5df7028b56d0f227e9386f6ca7",
+      "request_sha256": "a0ea7575c0dc23091f35b36032c2c8b91054076f79bfca5a86c74112fd7068be",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-024",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.178,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-025-0.json",
+      "sha256": "b72e940354fea90dddb292a8c258c9f1418d95c5fe86a53d6b1cad5f433e5ac0",
+      "request_sha256": "da25b409e223348d4ddf3836d32da3f27f7baa9135e09d5e81efc3747261818e",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-025",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.189,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-026-0.json",
+      "sha256": "6f88a73be334ef0533ab197ef27165c170af7859f0ad20554585c607c71422cd",
+      "request_sha256": "accb1879f107299678cf38c0da2b0f217e9a7fb4f44998aa6de5df50757a2394",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-026",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.227,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-027-0.json",
+      "sha256": "ff8d0065879de90fcd1c5823468e070d133fa179c1fbf918403b49d37ee31677",
+      "request_sha256": "b716edf8c4a679eefd570ed63c47dbbabdd09e3a0cbe790fee7d31cdaeff6a75",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-027",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.209,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-028-0.json",
+      "sha256": "f79d1d1b1080bfd2bc0cae5db7033b3e2f1c1d3dcbe1cbe125c0b856208dd007",
+      "request_sha256": "b8dbdea3c042684fc4fedc4d21b682680e4b2cd3fb365e1e8528bfe09584d50d",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-028",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.218,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-029-0.json",
+      "sha256": "e737c88188ba43ace503bbe80d20aa9c320f9638700a53f980acc7d727c6a317",
+      "request_sha256": "9e48ba125208f7dcfa77b7d7d1880255b5c02b23ac72431159e7081d6c1d3474",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-029",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.198,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/atomicity-instruction-030-0.json",
+      "sha256": "42fdc6250dafeb302fc6339c6b05cc65d8135af19817424518c7dc8af8714d60",
+      "request_sha256": "e96decf14aa78b7bee88f9a3651b539379ee2ab59c8a829de749831160baede8",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-030",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.181,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-001-0.json",
+      "sha256": "d54a37ff113429dcfbd6dc1f7cb495c8121bdbf750b48b322a261ed0afdd1ac7",
+      "request_sha256": "a4a4bf2e0e0ec3abd731f39b913d34e2ef6458fa08c4e5a83f32af2b23944d8e",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-001",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.225,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-002-0.json",
+      "sha256": "c1f755f0c11d2bb08516d2e7e69705714e8007f80441c4b09aeb95deacbc6687",
+      "request_sha256": "0dd70a5a324677027ab6722cbddcdae2a31985408c5fcbb4f23e17108092e401",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-002",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.24,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-003-0.json",
+      "sha256": "58b1d7e5bdac3763b73bdd8a5970f5ab03bc6ae145f32b1d32b484b2cdfbcd6c",
+      "request_sha256": "5934f3f4711cee237064f21acf54a2a78a2f720fea87b4f44e26502fceab541a",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-003",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.223,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-004-0.json",
+      "sha256": "a9ca8adfe5a98dff82e4179ba2bc0cfa4cb4a47d695b69aa7f380ad9b11fd291",
+      "request_sha256": "c185b0a6165ad8a66ec395340fa24156ace6b33bdf8f16e9888bd2e01f683f68",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-004",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.216,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-005-0.json",
+      "sha256": "8d980016087e6f311c390f0b300c9e5c86df03be97ab365cfd15dd56f38f9993",
+      "request_sha256": "998b13e58baf22d5d7a49f5281df871fd5a588e28a7c61efdd5906af0e935fdf",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-005",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.236,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-006-0.json",
+      "sha256": "f3272509aaa3af23b729d4b293206ee75f7c059a59165a0a60b1c80de2488419",
+      "request_sha256": "ba7387724d53a053b96dae60734e9599406ddb2650dfb46e5c17267a45793883",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-006",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.263,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-007-0.json",
+      "sha256": "a759d5b6b3bfa20524f6b42b9d67640ee8fc79ca3ab9a6fe10de71c55fd374ee",
+      "request_sha256": "62b7592bb1a12647bfd6ebf6bfa3f6418dfdd7d1080c776a6eb1220ca51b4f30",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-007",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.22,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-008-0.json",
+      "sha256": "589dbb8850f5ee69402c289bb7187d2eb9d5abae8c4e23972b81dd2f8b008b0e",
+      "request_sha256": "25b040b4c13172a2eab3f2ef0f13583b4193b66f66fd7c74d52b0d9093380eff",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-008",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.247,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-009-0.json",
+      "sha256": "25802466f00a89ced049050189ce28dbdeb6096b14dcf16f0ed9c2155f1e0542",
+      "request_sha256": "7063d35521b57442b4d40f7614730fda54227fa99e75b814a33b008422f81575",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-009",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.266,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-010-0.json",
+      "sha256": "e2b22d7bf9284dbe85f0b946c6e3c00f0e21b9ae29bda37d7a190fa97257d1cd",
+      "request_sha256": "9b519aff7fb6a5f32f9b3c4b1b423d413bf6608c73c80d34715ea9966c8c0c70",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-010",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.234,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-011-0.json",
+      "sha256": "91ceb4e663d9c33517958cc50a84452a6f8d895227f387f3ddf8713de7b28582",
+      "request_sha256": "c4579ba4e61a133e5f1e5caf600637f669ab938d62c9ce9fef2e6244db78f452",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-011",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.253,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-012-0.json",
+      "sha256": "c0eca1ae38c4ef55b8ddb653e3b953127b38b94120c076e93a1b3ade35fc6a17",
+      "request_sha256": "24cc9df0455258688ef2ff7ba3a19e7c9caadcda631ace00b39db9423dc187c3",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-012",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.239,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-013-0.json",
+      "sha256": "41e13e9d401fd3d8f2d2db6f1c78854de57950afdd86f4d444a59362faf2b410",
+      "request_sha256": "9eeafe38d66f3d7f5512e1c5efb403be4cf74c66f34473480128961b979515b1",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-013",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.241,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-014-0.json",
+      "sha256": "e3ac6ef1b1687c70cf07961f3fb29683dcb54688e3606d39902098227e8bbd91",
+      "request_sha256": "6f74231721b22d3feb7dc95637c98510a428a11c5deb7d17103d978a588f9055",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-014",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.236,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-015-0.json",
+      "sha256": "9bb2f2b27e9489b46dfe2106a09503928123577df87da73ec8cd677b8ab46273",
+      "request_sha256": "c7abc6553354dd54be47b6a133a6dd7a3c2eaa9d4a954ec40db3552b79f8bc5c",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-015",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.239,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-016-0.json",
+      "sha256": "6acbaf177074107d45c670995e390a6f368caa7aeb571e14684b85c8cc03d1d0",
+      "request_sha256": "502cc18cfcf9b3809475237d3e3f18085c03a9d059d53528cd251599987ac7ae",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-016",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.289,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-017-0.json",
+      "sha256": "e06722a33d68a722c2dd2a498dcee35533d0b58be7fa81306bc18dc8ef6f6d90",
+      "request_sha256": "7a4c0703298eacbe711ef9433e61810aa1c2b30cf92b5abc6a5eb4d01653636e",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-017",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.248,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-018-0.json",
+      "sha256": "96dd57671796374537cd088b3a7153acf5dede7fdf7b712aa6de0ff1d7fd5bff",
+      "request_sha256": "602ebfc235e5acbf31cdb40794498ae538a83a83975a7a276fb34ffcfe814ccc",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-018",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.23,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-019-0.json",
+      "sha256": "1ebb68a17d05e67c26796f5f169128fbe1260ad6a17f07b3a9f918e53d4e8c56",
+      "request_sha256": "2600759232eae522a6da102a36b1abf8c234ed246f7849c01a0a79776f3e6aa9",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-019",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.268,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-020-0.json",
+      "sha256": "886981fb46a638d9ab4d501f3c8b0061349f6c54fb758ffd5db56290595b5a5d",
+      "request_sha256": "6a59b2fd87607f24431043b467fe1c01017d3d4fec78a0c87bcc86a1c4822fd6",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-020",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.25,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-021-0.json",
+      "sha256": "f71d9e7772a9bec8f99280ff8a125c4c86b1caccd0097213e348012f768e3cdb",
+      "request_sha256": "64ee900c78b74f8e5cbb23e74425defc4b2cc804994377e955cb47dc236a0d48",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-021",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.264,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-022-0.json",
+      "sha256": "0ca3f22f4d3a3dabd99480c6fb125eeead73162551423f9b83e97ada457b1265",
+      "request_sha256": "8843190d00dad4c5b7cccc9a534bc2bfcbe94a75a91016b649b89b0f5f715235",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-022",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.246,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-023-0.json",
+      "sha256": "948aa0140b45f4f657a4779b9132283dde3605232e3a03ef3fe3162f1ac40011",
+      "request_sha256": "e2e6d417c171d0e3467a168f3429a014e7a73084ba15bd04a89054d8df6467bd",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-023",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.258,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-024-0.json",
+      "sha256": "2bdb460207dce1cf7f917f027ff2faea6ce5c78f1cf15867193cac7592438949",
+      "request_sha256": "e04c740baeb367cb1e4931a2e0a27e6c1e3044a6d8d4cda18ccc1f27c5dd7629",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-024",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.255,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-025-0.json",
+      "sha256": "d87f1cf5069e91d3218d3baed45ba33b8b6b2356f30fe8178281790a6424db9e",
+      "request_sha256": "814af9c6b631326fe4217e1e74d9f8f2a2033367febb2b89efd08bc2acc0d197",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-025",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.227,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-026-0.json",
+      "sha256": "cb95aefbf390d6042ebb53c03769c150ca65574597d42a68196df1e0c1ff933f",
+      "request_sha256": "1d8f3835d55b004b0c1e66671f4e955d0014fbfd47b6e36c00afafed03990306",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-026",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.23,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-027-0.json",
+      "sha256": "1a9be1e0611d49088b807085fd60fc7b8f1efb05f7202ee4a5f4b631e7d60942",
+      "request_sha256": "549849793659c6d6055cb2bf317239e13398cd3fb9e50a72724d773285e82f22",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-027",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.223,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-028-0.json",
+      "sha256": "cce0d6e13c9babda20f3f5ddf29712004614c2ee7f76afbaaf2bcf5e2325a227",
+      "request_sha256": "b2c8f066732d02eaf754f9bd5c96aedcd5ee36712fc4f762f709c75459e7be9c",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-028",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.249,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-029-0.json",
+      "sha256": "86bd046c2fc9b566290252ac9d0a70e2a4cb46de5612aff4291cb32a0e1ef90a",
+      "request_sha256": "f5c127a5bd116e956294b3e1a8f38edb109b998def269c38144c0e4d2acdaa6f",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-029",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.261,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-030-0.json",
+      "sha256": "fb24556661a828a961efc1e5354488ceb0260eb1c1d58d5e2be4c17e1ecfba39",
+      "request_sha256": "0ebd10be21196e604d4f73a1adbfef754d24be0e405b099af644920f3a8464c3",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-030",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.23,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-031-0.json",
+      "sha256": "e125a7a6c6bdf5c39cd689fa266f955b40f855ccaad41e441735ccd2a74581a3",
+      "request_sha256": "773d823150d79cc17579b7d9486db2237ed420d56dcd8d671ae64d13aa500e62",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-031",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.224,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-032-0.json",
+      "sha256": "ae25c713ac81ecaaf6d029fe3e9ab727ca906e22cc71c53b322f68b8ac116e71",
+      "request_sha256": "66b24e2e434caadd46e7f754722167bbc946ff9a9d2f09948ba3ce092564aa07",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-032",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.257,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-033-0.json",
+      "sha256": "ccbe998fe7b2acf9e0f37e64a0524012785ed2c9c91599084ed3679dd76a939c",
+      "request_sha256": "ad167d2801d66926bf9ee5aba88591538e730fd8afabdde3e1065ee228167eb4",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-033",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.228,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-034-0.json",
+      "sha256": "6dc04796e88f3cff9438399ef991abb63f80509fee1398ecf265d36c9c30e782",
+      "request_sha256": "8a17ca1b9e32d1306257a56c1b3ac9e721a3d3f0c9b065e5ce656f43278e2bf1",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-034",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.276,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-035-0.json",
+      "sha256": "53aa8c16aa5003efa941fb9327fe82b5eeec47684a16d2a29befb90f497c0e24",
+      "request_sha256": "88c755ae2b4109055102146ad79448a5086cd41015cab048f64969f759d99e08",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-035",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.236,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-036-0.json",
+      "sha256": "ee5e565dd0606991ecacf86d26c4c297ef4e41b8e00e98698f62ff0fd09b9ee4",
+      "request_sha256": "104ebcb83f56ff3c639c15858e55cfbb88b40ed1a355a8fe3566826c5b5bf5e7",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-036",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.222,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-037-0.json",
+      "sha256": "117435b68c703ac2e0382fe25594592ae6593456c6a48214561d3634f738598a",
+      "request_sha256": "976051db06ab7bf9db073486afd49b5159243c0333668b5fd5eec4189f69fc87",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-037",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.229,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-038-0.json",
+      "sha256": "637b544084dc80e6e1738dca7c164a5682a6266b19447d3b2339c40c08f82309",
+      "request_sha256": "63247a4ac2c99e9a44b15dc9a6907c82ed316df96e929e956154f49778c1d81b",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-038",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.25,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/bandit-structured-nosec-directives/jev/routing-instruction-039-0.json",
+      "sha256": "bbd4542aed6ed871eac289c29046f41a92f0c0a886701ff7fcee1a19da6e7f4c",
+      "request_sha256": "cfbee9ba26b24e19e8d1ed41bcd235e35482a27d0c29b05cd8392e2256293373",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-039",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.238,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/flash/split-instruction-001-0.json",
+      "sha256": "af2bbd5c8d75e9c80a90b8f153a503be373f8ae316c8caa2addb20a34c4ee0f3",
+      "request_sha256": "4339efb2d5db161c141c90d67d7364bcdbeccac29e597a5f64e7f316cb19b584",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-001",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 3.179,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/flash/split-instruction-002-0.json",
+      "sha256": "c5ed5ae0e57d1c26cd4ed6fc61156ace87c88131c9832079313d6228e72811dd",
+      "request_sha256": "9c7b2bdc181dd117d3358c696476248c7e45c9995f14e042b1a9e22ac63946d2",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-002",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.543,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/flash/split-instruction-006-0.json",
+      "sha256": "031913b9f91e6db95eb0dad6240a5b3458359ec76ce57da9a3ad3eda30d0852f",
+      "request_sha256": "b8cc41aca23a874cdaf5122369d4850ee5e770e7461cd891fd7badf9ab47394e",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-006",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 6.402,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/flash/split-instruction-008-0.json",
+      "sha256": "3a0cfd4bae2ae65c6473e18234b8490316cb7ee6a5ef15e397cb0bd3175015e0",
+      "request_sha256": "263e5d4aee9c67907ded5fcb8aa3cbcb5515f4a4ac05dd1a16d07d1765f6e5d9",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-008",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 5.647,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/flash/split-instruction-012-0.json",
+      "sha256": "1ad4948c19253e031f9925f33841b0256ac06a4149c84f25e96b591a74c5ea52",
+      "request_sha256": "e395c7c253bfd4e2c2ebffd70e7dbdb88c1cdf4d16c53bfe5daf0110075e2125",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-012",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.21,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/flash/split-instruction-014-0.json",
+      "sha256": "d49f42adcd90aba37bad4425d4d459772a38ad7f352be8cd29e02597dfd2306f",
+      "request_sha256": "4466b555683f471c70a7c6e9ae9e3cd74028ddb88a0a7b131d2de83423a65d14",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-014",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 7.408,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/flash/split-instruction-015-0.json",
+      "sha256": "adf2654362c09deef78d19fd07bc1d4daaecd946989f994740f8fc406b556c58",
+      "request_sha256": "a1c579efa85490e0b48e0818671e77e4ddba5b760d32f6a7eb7bc90347a7bbe1",
+      "status": "completed",
+      "receipt": {
+        "stage": "split-instruction-015",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 9.493,
+        "provider": "deepinfra",
+        "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-001-0.json",
+      "sha256": "2c5688adb6a180cc6c09b4132990979464a1c472b98274defe3f990d2199660f",
+      "request_sha256": "90cfd775ac479c5f8d5f4302e30fdcda2c622a3452f5303fbe3f02304a9ff54a",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-001",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.292,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-002-0.json",
+      "sha256": "f21d85e42dc46036758f13c78e24fb972f0b465727d4f60afa1235e09ff5b70e",
+      "request_sha256": "470e53407c85885b135d7a1a766ff0658e38d299022f37530908cef7b594ad53",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-002",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.177,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-003-0.json",
+      "sha256": "a37c62b91659c2c6713065760096e93c8f51df23608717c029fb390b77408ccd",
+      "request_sha256": "c385a76fed3286f42b56960a7ade5f676366095c4af1749065a6a8fea42eef6c",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-003",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.208,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-004-0.json",
+      "sha256": "365c23cdce70d7ba8771903d3057bf4a0747bc5bc4d22a6cf10fb71484aa0fb8",
+      "request_sha256": "987dae001eacc976b9923773bea1dc8d8d906d356f0432aabf6d705d867bb6cb",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-004",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.184,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-005-0.json",
+      "sha256": "46c9d4557764d5be546dc18d5a9264b111caaf882e01a71e5aa8b57d2246ffbf",
+      "request_sha256": "49f1eeaaf5a4fa74aa630d3c2109366d3c06178414be3806433848608af91d3c",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-005",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.202,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-006-0.json",
+      "sha256": "776a707550eab705001baf73bf49e3326358bc2fb3b40b38f5d3b4c2f3438609",
+      "request_sha256": "2ae4b2fcd31ba872cc10f819531d021371a3de76f771603d21f0a42e778152ab",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-006",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.203,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-007-0.json",
+      "sha256": "ec80a330115bd8bd9f557b8bf5acf5ed35a8d0fca853a492992e63cba3b8a2e3",
+      "request_sha256": "0fc05971e99436ab9b62c630716f2dde167a1e4924c56a710933614d5599aaea",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-007",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.184,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-008-0.json",
+      "sha256": "97a999ecfd1b1a4263b0563a07013366540a99ca0039d99aeed90110185de807",
+      "request_sha256": "9fac86d501d053ba6dd386748445f7a6879d1f241283a59ca07fb2dc75069abf",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-008",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.181,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-009-0.json",
+      "sha256": "b05aa6ff9b16edd26effe1ec09be5098a50289fc806e4c1d911534e6246ad8c3",
+      "request_sha256": "5c6835d0141e99ba5eb9677a10065cf25398ebcab6fba16672016726f0e0f19b",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-009",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.171,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-010-0.json",
+      "sha256": "84b7bb7ae95fb1d11b885817eec60778ce0fcbb4b296d4b1201dada3574e6589",
+      "request_sha256": "a521a037ec736a8b6214128d15426a6a1ebb99b502c05694c641e829842c0b2f",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-010",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.203,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-011-0.json",
+      "sha256": "a547d9a8a9f67c3ba2930620e976110e1d4a6aca9800e2577e0f5b0ada157dda",
+      "request_sha256": "8957cf1ba9d52c7efe89597d0ca77a9a331f9219de5fed1850b88edc226b88df",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-011",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.203,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-012-0.json",
+      "sha256": "21f9c3a9fcf4221934080d264e59f7dc1119a607954b86bf3c730f9812edfd03",
+      "request_sha256": "452b92af35ef565fe5c8f141e65bf6e56559a1903d25da8df8e1950fa9b20778",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-012",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.202,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-013-0.json",
+      "sha256": "939d7bdd5e33a5ef6e4442779d95ecec48cc2926e580a9d9468beca5e760b498",
+      "request_sha256": "cd0b731fbff429449090c7fd4d2b48e3617fcfdb0a5da39ff226ba2d561289f7",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-013",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.192,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-014-0.json",
+      "sha256": "b5702b4d38a89994e208fcf545a0d9c52de747fea7642d381c3feed2798fb5bb",
+      "request_sha256": "f60b8ac525e9ee0406f32660e5d7c2df6753fe57af53c83848696a6521d879a6",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-014",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.201,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/atomicity-instruction-015-0.json",
+      "sha256": "f8f2b7cf6f1755228a4c00907e81a9287366ece47538783333820d2f97f3d54b",
+      "request_sha256": "8abf1bb88ea3578483bee00b1d683b67d0b182a99d0a92b5ff96583620114b58",
+      "status": "completed",
+      "receipt": {
+        "stage": "atomicity-instruction-015",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.185,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-001-0.json",
+      "sha256": "75c971c3074ab19867d24d345d34092514982d8b106c636b6b0af748ed87ec9a",
+      "request_sha256": "b63ff367ae8098a7bb32e5dcd9afb79460ade2acf1345c8eb8a5daf051115c49",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-001",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.247,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-002-0.json",
+      "sha256": "f85d00601d95c02e7306b6b0f590932d4b2e402a4c33c61382a3df45564f08ba",
+      "request_sha256": "115a54c48d2eceb9f8517176cc1e28d436185bdec69a53885baa47358b556868",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-002",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.231,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-003-0.json",
+      "sha256": "d856e4ffbd260628f14eaa193e07e899003d5a268bc64923d9dfca7ebf96c3c5",
+      "request_sha256": "02c2a06d5fcb5f4b534eadc211d4b23914f8c2a786c3163ebd6c270a98db0406",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-003",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.239,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-004-0.json",
+      "sha256": "1efd9d81e4653a7df37f2d21348191b660a562a6cfcacbd65c19e8d55af2b206",
+      "request_sha256": "c1e9e6f09e5ef8480bb77c13de81062efa34392492a41c419aea6a5507965e7c",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-004",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.239,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-005-0.json",
+      "sha256": "2a830eafb4448f21abac2a2a8440da4a0733a5469655070f3358041e52a2045f",
+      "request_sha256": "fde50bd835023de2f148f6ceb3e73bc7649e44f3282036d9e97e25431597c01c",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-005",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.229,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-006-0.json",
+      "sha256": "7c84164d4009b1a760f233f972f7809b73578e9b333ce04fdb6ee1ecd04aef4f",
+      "request_sha256": "6ee7edc894506a384847662e9575d7f79b15168b55ed6b33d626adf7efff096d",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-006",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.246,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-007-0.json",
+      "sha256": "62fce3ca53aaab9e074886c51b0e89195366fc6f35d2870eeb222f94ca2221b8",
+      "request_sha256": "6eda55f96b2c2f5a3d465651a776739b9bda689b3c6a6244fe3c2d4f0eda59f3",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-007",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.248,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-008-0.json",
+      "sha256": "25f989c586d7c48f352aa02e2d17b6e5337b166dc13720ec5115082d08f79dc1",
+      "request_sha256": "bc4acefb63328d7b8fe9914ede8ca0505a69578a893e11fc91ebeb60d57ed07a",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-008",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.244,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-009-0.json",
+      "sha256": "f5b5dafad003baee1707e9084177a3d313117151353e84c1ca670f9b87eb2c7a",
+      "request_sha256": "33b3e9b6d6d4f13f5bdf78b8253454a04712b45f01aba656a106c87ef67020a9",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-009",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.211,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-010-0.json",
+      "sha256": "185193769249061df70017bf39254d932ecd07a7bb23bbf17b3450678eded0de",
+      "request_sha256": "0999449772a6dfc1554cdfda0264e13a8c84c2a15a3d77b1a32309434e925c5d",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-010",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.253,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-011-0.json",
+      "sha256": "2d23a990a7a13cfcee25faf2c5d78403182522097cb678d5d7e04efba7eac5fb",
+      "request_sha256": "1fb077b02f67fbf4a37b7d3f82f3b734476e9132d4de1cd3df0bf15d88dd077e",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-011",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.248,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-012-0.json",
+      "sha256": "faea2834969d805ec0cda9fcc33f6a81cf26c9eb7cef894ba93fe69e7842f2ae",
+      "request_sha256": "17464916290c4f9f594557c7de6ab603ff231d780f901b7b1f79c50e7af4ebf1",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-012",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.212,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-013-0.json",
+      "sha256": "fd0c2054d6506fe8176a28b2a3e512fd6c0a21fec5c678a3d35c6e6c2e0d7f61",
+      "request_sha256": "c5231f47b05d764653a1b158e3783d42ba5df1aae37096277ddbd4f2892ad5c3",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-013",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.326,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-014-0.json",
+      "sha256": "f45f2dad36af8c1566785a4dccf9d8eec024a01c2e1066d0bf8730ab9ea52674",
+      "request_sha256": "e36b011036bb2543b50dfe11bb092546155c0553fac88134a015703d383d4ed4",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-014",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.242,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-015-0.json",
+      "sha256": "eb0c2a6a5142e04b6927c3907c1f21d70d3a607a050283b94ccd7f17cdeec2f4",
+      "request_sha256": "e08f77024c89671500a8c9c4ad6b396226e5ec5ea057347955a8dc20140a34ad",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-015",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.201,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-016-0.json",
+      "sha256": "d421d17e196ddfb5540f7f2bb9365d3804b43a8b61850c5cfe895ffa8bb4a68e",
+      "request_sha256": "e9d666b725871ec9bd28245d363e1fc57b4e1eeeec3b9d568fe81abcb73cfe29",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-016",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.24,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-017-0.json",
+      "sha256": "6626e896af46f8e4e659164bd25883f6441d12830e605a51e16caadc904546df",
+      "request_sha256": "4203011e1ba3333f11b3c981859adf8ff8bb707ca4f68d4e59e57944a34f097c",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-017",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.189,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-018-0.json",
+      "sha256": "31dfd41db0687e44ec1655b0c8db5623ff3227d7a1e646bacac8f449ef450a83",
+      "request_sha256": "6332ca93d3b5b54a638039c1f68a713cd3dda3c6f0499460d7808fb67f240d5a",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-018",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.213,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-019-0.json",
+      "sha256": "86294d36879adf5128acb601d1562115bb093e676e6c53d8542b21bc02e65f16",
+      "request_sha256": "d1c713aae5a402cafe17db6d6e024f20a78725b604b384df21649dacc5d5fdc3",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-019",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.231,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-020-0.json",
+      "sha256": "311530eebee3f0ba2cc1de5bc21e122f616f26fe2048a3a81d690fec3acb8e5a",
+      "request_sha256": "01ccb8c6cd4ef0719eb27d4705f5e2acd4598e19c281ced344e5fbe3f70babd0",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-020",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.327,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-021-0.json",
+      "sha256": "94b0374d19b0ad7582f019b5c7f0b8938d37bc1d72cde4bf77177bd94dfc226e",
+      "request_sha256": "db0a6765acc9da2149600632c8fd3a0c33154b252ae2736646c6c36b8a5af98e",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-021",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.234,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-022-0.json",
+      "sha256": "23f6a6b4740d03284ef60c76ef401dec30f8999aed8000fca3872d6c959deb3c",
+      "request_sha256": "ef166240783d164ef1bca72935fdbcdadc17576facdab1f9f37000b1dec53cde",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-022",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.21,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-023-0.json",
+      "sha256": "5050ef3c9be6aa29266f862d751008b737fa4e697f7b75c7b6123cbf58389086",
+      "request_sha256": "45cdb15f7ec0202e7a7bf81fef05f291630370b895e71675176cd25883b279a5",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-023",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.243,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-024-0.json",
+      "sha256": "c891133d76b86f9b851ec814455b996e3fc7f530c88378ddae59fd7583199da9",
+      "request_sha256": "921294e15af399e13ed415afc64da32a28d52059d2d10d2755ec0e5439ccde4c",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-024",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.212,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    },
+    {
+      "file": "calls/routing/gql-incremental-graphql-delivery/jev/routing-instruction-025-0.json",
+      "sha256": "38235b6d0ae9aa17ec98573bba10894159c05368d4cc93bfdd6d63baa3ad42fc",
+      "request_sha256": "f2b69120214dfe6de5c34bc8cf670d07b53cf431f1b88cf6520741b23c64e07c",
+      "status": "completed",
+      "receipt": {
+        "stage": "routing-instruction-025",
+        "attempt": 0,
+        "status": "completed",
+        "elapsed_seconds": 0.206,
+        "provider": "typesafe.ai",
+        "model": "jev-latest",
+        "usage": {},
+        "cached": false
+      }
+    }
+  ]
+}

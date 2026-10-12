@@ -1,0 +1,31 @@
+{
+  "id": "g-extensions-lifetime",
+  "task_id": "gql-incremental-graphql-delivery",
+  "arm": "examples",
+  "flash": "payload_local",
+  "jev": "payload_local",
+  "consensus": "payload_local",
+  "rendered": "A payload without extensions yields extensions=None rather than retaining earlier extensions.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.361,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.189,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

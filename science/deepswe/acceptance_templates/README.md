@@ -1,5 +1,16 @@
 # Acceptance criteria template experiment
 
+The [decision-instruction experiment](runs/decision-instructions-v1/README.md)
+compares current wording, consistency-focused questions and contrasting examples.
+On audited GraphQL/Bandit evaluation decisions, Flash improves from five correct
+out of ten to nine; examples add no further gain. Streaming-index semantics
+remain wrong, and a manually authored option overstates extensions behavior.
+
+The [complete-prompt comparison](runs/full-prompt-comparison-v1/README.md)
+finds that preserving the original requirements plus three directly rendered
+clarifications removes contradictions but loses substantial semantic coverage.
+It includes full candidate/reference prompts and a per-target comparison.
+
 The [direct-rendering experiment](runs/deterministic-decisions-v1/README.md)
 removes contract synthesis, preserves selected meanings, and explicitly asks
 about inherited behavior. Three focused statements match the solution; metadata

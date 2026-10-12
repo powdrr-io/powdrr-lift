@@ -1,0 +1,116 @@
+{
+  "cases_sha256": "4f3c7d143d1c5831f1b9c5ec8038a95da9b63c3d5cabb2f998ce0955ea408893",
+  "oracle_sha256": "b4f445a4e5b3d6c2bc9998b93ccce8c0e71dddb1e22202c74342579742957667",
+  "tasks": {
+    "koota-composite-trait-aspects": {
+      "split": "development",
+      "base": "/private/tmp/koota-aspect-analysis-base-20261011",
+      "sha": "9c434858b2b522002f8c5eb4a554fa8836a7cf3c",
+      "excerpts": [
+        [
+          "packages/core/src/trait/types.ts",
+          13,
+          18
+        ],
+        [
+          "packages/core/src/trait/trait.ts",
+          47,
+          93
+        ],
+        [
+          "packages/core/src/trait/trait.ts",
+          403,
+          423
+        ],
+        [
+          "packages/core/src/query/query.ts",
+          444,
+          469
+        ],
+        [
+          "packages/core/src/query/query-result.ts",
+          22,
+          51
+        ],
+        [
+          "packages/core/src/query/query-result.ts",
+          245,
+          282
+        ],
+        [
+          "packages/core/src/world/world.ts",
+          315,
+          373
+        ]
+      ]
+    },
+    "gql-incremental-graphql-delivery": {
+      "split": "evaluation",
+      "base": "/private/tmp/decision-gql-base-20261011",
+      "sha": "f07c89f8f065010a36b4263eded209b2b1d37063",
+      "excerpts": [
+        [
+          "gql/client.py",
+          1395,
+          1450
+        ],
+        [
+          "gql/transport/websockets_protocol.py",
+          286,
+          314
+        ]
+      ]
+    },
+    "bandit-structured-nosec-directives": {
+      "split": "evaluation",
+      "base": "/private/tmp/decision-bandit-base-20261011",
+      "sha": "b46fa3a2723635aa29cc012538df4867ac2ac006",
+      "excerpts": [
+        [
+          "bandit/core/manager.py",
+          478,
+          504
+        ],
+        [
+          "bandit/core/tester.py",
+          78,
+          97
+        ],
+        [
+          "bandit/core/tester.py",
+          127,
+          154
+        ],
+        [
+          "bandit/core/utils.py",
+          219,
+          227
+        ],
+        [
+          "bandit/core/utils.py",
+          393,
+          401
+        ]
+      ]
+    }
+  },
+  "task_hashes": {
+    "koota-composite-trait-aspects": {
+      "instruction.md": "300c70ea3b277bf799c272cb7415368bb631856c5a89bee1e7cac474f5810c25",
+      "solution/solution.patch": "6626b19e70409bd2df3f5a3b48015243bce577c4aa2fb8b87f3647d3304b6cf3",
+      "tests/test.patch": "5d8c926bf93a041f4010fda23da2942583384a15f67e97f770b5d76f227a6912"
+    },
+    "gql-incremental-graphql-delivery": {
+      "instruction.md": "0d14a5dac7fa2d6fe2e9d9d9a113fb02cfb2495f63f8b7edcaa18ba73dd16edf",
+      "solution/solution.patch": "65d77639c640cde71e5e867089b4bfd55140e9e7d418183c3cb9df570ade30db",
+      "tests/test.patch": "031de3d902d74cdc8ef142886d5aca3342ff63611a3a903797f3e8d6fb413670"
+    },
+    "bandit-structured-nosec-directives": {
+      "instruction.md": "310eeb36b46c3aece39ab187817b87764f0a428affe5e8a1688e0c92f7b92f9d",
+      "solution/solution.patch": "b35e9ce831b69e3443ceda1a955d8d6d934e0915e15f20c754cbb2e7b8ed4514",
+      "tests/test.patch": "433d6b981ac0c768176e1d326daa1848c6cb8f4431d1bd6bdc78485b7d0ac30f"
+    }
+  },
+  "boundary": "Classifier inputs contain original sources/questions/choices only; labels and patch contents excluded.",
+  "limitation": "Manual question discovery, retrieval and choice definitions. Evaluation repositories separated from development examples, but author knows their solutions; not an untouched holdout."
+}

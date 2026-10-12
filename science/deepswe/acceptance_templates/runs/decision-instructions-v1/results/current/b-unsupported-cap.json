@@ -1,0 +1,31 @@
+{
+  "id": "b-unsupported-cap",
+  "task_id": "bandit-structured-nosec-directives",
+  "arm": "current",
+  "flash": "unknown",
+  "jev": "unknown",
+  "consensus": "unknown",
+  "rendered": null,
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.966,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.227,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "g-errors-lifetime",
+  "task_id": "gql-incremental-graphql-delivery",
+  "arm": "revised",
+  "flash": "payload_local",
+  "jev": "payload_local",
+  "consensus": "payload_local",
+  "rendered": "Each result contains only current payload and current incremental-item errors; earlier payload errors are not carried forward.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.551,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.206,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

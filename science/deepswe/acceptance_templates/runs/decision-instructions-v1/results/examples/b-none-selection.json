@@ -1,0 +1,31 @@
+{
+  "id": "b-none-selection",
+  "task_id": "bandit-structured-nosec-directives",
+  "arm": "examples",
+  "flash": "no_effect",
+  "jev": "no_effect",
+  "consensus": "no_effect",
+  "rendered": "A structured directive with selector none applies no suppression.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.55,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.257,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

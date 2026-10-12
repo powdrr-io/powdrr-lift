@@ -1,0 +1,43 @@
+{
+  "id": "k-traits-container",
+  "task_id": "koota-composite-trait-aspects",
+  "arm": "current",
+  "flash": "unknown",
+  "jev": "unknown",
+  "consensus": "unknown",
+  "initial_mapping_error": "choose failed (ValueError); see /Users/gregory/.codex/worktrees/f86b/powdrr-lift/science/deepswe/acceptance_templates/runs/decision-instructions-v1/calls/decisions/current/k-traits-container/jev/choose-0.json",
+  "diagnostic": "diagnostics/k-traits-container-provider.json",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.211,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "failed",
+      "elapsed_seconds": 0.256,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    },
+    {
+      "stage": "observe-abstention",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.265,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": false
+    }
+  ],
+  "rendered": null
+}

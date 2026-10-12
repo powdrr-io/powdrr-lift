@@ -1,0 +1,27 @@
+{
+  "replays": [
+    {
+      "id": "g-result-snapshot",
+      "provider_choice": "unresolved",
+      "experiment_choice": "unknown"
+    },
+    {
+      "id": "k-nested-freeze",
+      "provider_choice": "unknown",
+      "experiment_choice": "unknown"
+    },
+    {
+      "id": "k-nested-reference",
+      "provider_choice": "unknown",
+      "experiment_choice": "unknown"
+    },
+    {
+      "id": "k-traits-container",
+      "provider_choice": "unresolved",
+      "experiment_choice": "unknown"
+    }
+  ],
+  "production_issue": "_call_jev offers unresolved; _format_classifier_result rejects it for single output named choice, causing fail-closed ValueError.",
+  "scope": "Diagnostic normalization only; production client unchanged.",
+  "caveat": "Initial raw provider bodies were not captured. Two replays confirmed unresolved; two returned the declared unknown label. The exact original provider choice cannot be proved for the latter two."
+}

@@ -1,0 +1,31 @@
+{
+  "id": "b-nested-begin-line",
+  "task_id": "bandit-structured-nosec-directives",
+  "arm": "revised",
+  "flash": "outer_applies",
+  "jev": "outer_applies",
+  "consensus": "outer_applies",
+  "rendered": "A nested begin directive's line can still be suppressed by an already active outer region; only the new region starts on the following line.",
+  "calls": [
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.458,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "choose",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 0.234,
+      "provider": "typesafe.ai",
+      "model": "jev-latest",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

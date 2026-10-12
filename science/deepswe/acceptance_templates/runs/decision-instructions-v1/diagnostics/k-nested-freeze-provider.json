@@ -1,0 +1,21 @@
+{
+  "response": {
+    "answer": {
+      "type": "choice",
+      "choice": "unknown",
+      "confidence": 0.29,
+      "probabilities": {
+        "preserve": 0.08,
+        "recursive": 0.01,
+        "unknown": 0.47,
+        "unresolved": 0.44
+      }
+    },
+    "model": "jev-1.13.0",
+    "usage": {
+      "input_tokens": 4614,
+      "output_tokens": 49
+    }
+  },
+  "normalization": "Provider unresolved maps to experiment unknown; no model substitution."
+}

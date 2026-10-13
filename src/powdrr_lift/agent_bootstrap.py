@@ -243,14 +243,7 @@ def run_bootstrap_task(
             "Bootstrap repository structure",
             runner=runner,
         )
-        if validation_status in {
-            "failed",
-            "blocked",
-            "timed_out",
-        }:
-            status = "validation_failed"
-            failure_stage = "validation"
-        elif config.open_pr and has_commit:
+        if config.open_pr and has_commit:
             failure_stage = "publication"
             _emit_bootstrap_progress(progress, "Opening the bootstrap pull request.")
             pull_request_url = publish_pull_request(
@@ -265,6 +258,13 @@ def run_bootstrap_task(
                 progress, f"Pull request opened: {pull_request_url}"
             )
             status = "pr_opened"
+        elif validation_status in {
+            "failed",
+            "blocked",
+            "timed_out",
+        }:
+            status = "validation_failed"
+            failure_stage = "validation"
         elif validation_status == "no_checks":
             status = "completed_unverified"
             failure_stage = "validation"

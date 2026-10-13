@@ -142,22 +142,47 @@ def test_bootstrap_reports_validation_failure_and_keeps_snapshot(
     )
     _git(root, "add", ".")
     _git(root, "commit", "-qm", "declare ruff validation")
+    remote = tmp_path / "origin.git"
+    subprocess.run(
+        ["git", "init", "--bare", "--initial-branch=main", str(remote)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    _git(root, "remote", "add", "origin", str(remote))
+    _git(root, "push", "--set-upstream", "origin", "main")
+    _git(root, "remote", "set-head", "origin", "main")
+    gh_calls: list[list[str]] = []
 
     def runner(
         command: Sequence[str], **kwargs: Any
     ) -> subprocess.CompletedProcess[str]:
         args = list(command)
+        if args and args[0] == "gh":
+            gh_calls.append(args)
+            return subprocess.CompletedProcess(
+                args, 0, "https://github.com/acme/repo/pull/44\n", ""
+            )
         if args and args[0] == "ruff":
             return subprocess.CompletedProcess(args, 2, "", "lint failed\n")
         return subprocess.run(args, **kwargs)
 
     result = run_bootstrap_task(
-        BootstrapTaskConfig(repo_root=root, run_id="bootstrap-validation-fail"),
+        BootstrapTaskConfig(
+            repo_root=root,
+            open_pr=True,
+            run_id="bootstrap-validation-fail",
+        ),
         runner=runner,
     )
 
-    assert result.status == "validation_failed"
+    assert result.status == "pr_opened"
     assert result.validation_status == "failed"
+    assert result.pull_request_url == "https://github.com/acme/repo/pull/44"
+    assert len(gh_calls) == 1
+    pr_body = gh_calls[0][gh_calls[0].index("--body") + 1]
+    assert "ruff-check" in pr_body
+    assert "failed" in pr_body
     assert result.bootstrap is not None
     assert result.bootstrap.output_path.is_file()
     check = next(

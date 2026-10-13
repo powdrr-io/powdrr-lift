@@ -422,16 +422,17 @@ def discover_validation_profiles(
         # Use the exact declared command for a detected check when a workflow
         # provides one, including package selectors and nested working dirs.
         for origin in ci_origins:
-            cwd = str(origin.get("working_directory", ".")).strip() or "."
-            if (
-                cwd.startswith(("/", "~"))
-                or ".." in Path(cwd).parts
-                or not (root_path / cwd).is_dir()
+            base_cwd = str(origin.get("working_directory", ".")).strip() or "."
+            for index, (command, cwd) in enumerate(
+                _commands_with_working_directory(str(origin.get("run", "")), base_cwd),
+                start=1,
             ):
-                continue
-            for index, command in enumerate(
-                _commands_from_script(str(origin.get("run", ""))), start=1
-            ):
+                if (
+                    cwd.startswith(("/", "~"))
+                    or ".." in Path(cwd).parts
+                    or not (root_path / cwd).is_dir()
+                ):
+                    continue
                 if not _is_locally_runnable(command):
                     continue
                 kind = _validation_command_kind(command)
@@ -2130,6 +2131,37 @@ def _commands_from_script(script: str) -> tuple[tuple[str, ...], ...]:
                 "cargo",
             }:
                 commands.append(tokens)
+    return tuple(commands)
+
+
+def _commands_with_working_directory(
+    script: str, working_directory: str
+) -> tuple[tuple[tuple[str, ...], str], ...]:
+    """Extract supported commands while honoring simple preceding ``cd`` lines."""
+    current_directory = working_directory or "."
+    commands: list[tuple[tuple[str, ...], str]] = []
+    for line in script.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "if ", "then", "fi", "set ")):
+            continue
+        for segment in re.split(r"\s*(?:&&|\|\||;)\s*", stripped):
+            try:
+                tokens = tuple(shlex.split(segment, posix=True))
+            except ValueError:
+                continue
+            if tokens and tokens[0] == "cd":
+                if len(tokens) == 2:
+                    destination = tokens[1]
+                    if (
+                        not destination.startswith(("/", "~", "$"))
+                        and "$" not in destination
+                    ):
+                        current_directory = os.path.normpath(
+                            os.path.join(current_directory, destination)
+                        ).replace(os.sep, "/")
+                continue
+            for command in _commands_from_script(segment):
+                commands.append((command, current_directory))
     return tuple(commands)
 
 

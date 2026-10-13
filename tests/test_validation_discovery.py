@@ -201,3 +201,25 @@ def test_discovers_nested_package_and_ci_checks_with_working_directory(
     )
     assert frontend_test.cwd == "mobile-web"
     assert frontend_test.command == ("pnpm", "test")
+
+
+def test_workflow_cd_sets_cwd_for_nested_validation_command(tmp_path: Path) -> None:
+    local_dev = tmp_path / "tools" / "local-dev"
+    local_dev.mkdir(parents=True)
+    (local_dev / "go.mod").write_text(
+        "module example.test/local-dev\n", encoding="utf-8"
+    )
+    workflow = tmp_path / ".github" / "workflows"
+    workflow.mkdir(parents=True)
+    (workflow / "pr.yml").write_text(
+        "jobs:\n  local-dev:\n    steps:\n"
+        "      - run: |\n          cd tools/local-dev\n          go test ./...\n",
+        encoding="utf-8",
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+    go_tests = [profile for profile in profiles if profile.provider == "go"]
+
+    assert len(go_tests) == 1
+    assert go_tests[0].cwd == "tools/local-dev"
+    assert go_tests[0].command == ("go", "test", "./...")

@@ -42,11 +42,22 @@ found that these variants still produce incorrect criteria.
   every proposed criterion against the original instruction and source,
   without treating generated behavior or previous approvals as authority.
   It permits one declared repair, then checks again.
-- `atomic_conditions --setup <setup> --generation <run> --output <fresh-run>`
+- `atomic_conditions --setup <setup> --generation <run> --evidence <evidence>
+  --output <fresh-run>`
   constructs inputs/operation, observation and counterexample in separate
-  decisions. It does not show earlier generated outcomes. Source selection
-  currently reranks the generation's **batch** excerpts, not the full index;
-  this is a measured weakness, especially for the final DSL requirements.
+  decisions. It does not show earlier generated outcomes. The original
+  `atomic-contract-v1` run reranked the generation's **batch** excerpts, not the
+  full index; the follow-up uses requirement-scoped packets via `--evidence`.
+- `requirement_evidence --setup <setup> --generation <run> --output <fresh-run>`
+  indexes the repository once, retrieves against the full symbol set separately
+  for each routed requirement, then captures bounded source excerpts with
+  source hashes and explicit truncation flags. Exact CamelCase receivers pin
+  their public methods in declaration order. Candidate rankings remain in each
+  packet so retrieval errors can be audited. This recovered DSL declarations
+  that batch retrieval missed, but the follow-up prompt run emitted no
+  additional acceptance criteria; see the recorded
+  [retrieval follow-up](../runs/atomic-contract-v3/RESULTS.md). Pass that
+  evidence directory with `atomic_conditions --evidence <evidence>`.
 - `consolidate --setup <setup> --output <run>` runs only the consolidation tail
   on saved contract-generation decisions. It makes additional recorded Jev
   calls, so it is not an offline renderer.

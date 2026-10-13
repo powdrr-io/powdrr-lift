@@ -20,7 +20,6 @@ from science.deepswe.acceptance_templates.repository_planning.refine import (
     RepairClient,
     ReviewOperations,
 )
-from science.deepswe.acceptance_templates.repository_planning.symbols import terms
 
 from .contracts import evaluate_recorded
 from .contracts_workflow import (
@@ -45,36 +44,65 @@ class AtomicClient(RepairClient):
 
 
 class AtomicOperations(ReviewOperations):
+    def __init__(
+        self,
+        setup: Path,
+        output: Path,
+        packet: dict[str, Any],
+        generation: Path,
+        evidence: Path,
+    ) -> None:
+        super().__init__(setup, output, packet, generation)
+        self.evidence = evidence
+
     def __call__(self, tool: str, parameters: Any) -> Any:
         command = parameters["command"][0]
         if command == "focused_sources":
             requirement = parameters["requirement"]
-            number = int(requirement["id"].removeprefix("r"))
-            rows = [
-                load_json(p)["response"]
-                for p in sorted(
-                    (
-                        self.generation / "reads" / f"batch-{(number - 1) // 4 + 1:02}"
-                    ).glob("*.json")
-                )
-            ]
-            query = terms(requirement["text"])
-            rows.sort(
-                key=lambda r: (
-                    -len(query & terms(r["signature"] + " " + r["text"])),
-                    r["reference"],
-                )
-            )
+            packet = load_json(self.evidence / "packets" / f"{requirement['id']}.json")
             dependencies = load_json(self.generation / "dependency-evidence.json")
-            return {
-                "repository": [{**r, "text": r["text"][:3500]} for r in rows[:5]],
-                "result_interface": dependencies["types"]["ExecutionResult"],
-                "wire_interfaces": {
+            text = requirement["text"].casefold()
+            relevant_directives = {
+                name: value
+                for name, value in dependencies["directives"].items()
+                if name in text
+            }
+            result_interface = (
+                dependencies["types"]["ExecutionResult"]
+                if "result" in text
+                and any(
+                    attr in text
+                    for attr in (".data", ".errors", ".extensions", ".has_next")
+                )
+                else None
+            )
+            wire_interfaces = (
+                {
                     k: v
                     for k, v in dependencies["types"].items()
                     if k.startswith("Formatted")
+                }
+                if any(
+                    term in text
+                    for term in ("http", "websocket", "multipart", "protocol")
+                )
+                else {}
+            )
+            return {
+                "repository": packet["evidence"],
+                "retrieval_record": {
+                    k: packet[k]
+                    for k in (
+                        "query_terms",
+                        "matching_symbols",
+                        "truncated_candidates",
+                        "ranked_candidates",
+                        "selected",
+                    )
                 },
-                "directives": dependencies["directives"],
+                "result_interface": result_interface,
+                "wire_interfaces": wire_interfaces,
+                "directives": relevant_directives,
                 "scope": (
                     "Existing APIs and dependency formats are evidence of "
                     "conventions. They do not mandate an implementation class for a "
@@ -113,6 +141,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--setup", type=Path, required=True)
     parser.add_argument("--generation", type=Path, required=True)
+    parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
@@ -122,7 +151,12 @@ def main() -> None:
         for r in packet["routed_clauses"]
         if r["route"] in {"include", "include_prohibition"}
     ]
-    operations = AtomicOperations(args.setup, args.output, packet, args.generation)
+    evidence_summary = load_json(args.evidence / "summary.json")
+    if evidence_summary["requirements"] != len(requirements):
+        raise ValueError("Evidence packets do not cover every routed requirement")
+    operations = AtomicOperations(
+        args.setup, args.output, packet, args.generation, args.evidence
+    )
     operations.facts = [
         load_json(p)
         for p in sorted((args.generation / "facts/reviewed").glob("*.json"))

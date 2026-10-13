@@ -1,0 +1,14 @@
+{
+  "requirements": 23,
+  "emitted": 0,
+  "provider_calls": 115,
+  "run_error": null,
+  "recorded_calls": 115,
+  "failures": 0,
+  "final_status": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "tests_run": false,
+  "coding_agents_run": false
+}

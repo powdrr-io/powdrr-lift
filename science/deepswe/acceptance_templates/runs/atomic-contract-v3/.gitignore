@@ -1,0 +1,13 @@
+*
+!.gitignore
+!prompt.md
+!summary.json
+!pipeline.yaml
+!input.json
+!selection.json
+!coverage.json
+!execution.json
+!RESULTS.md
+!checkpoints.tar.gz
+!checkpoints.json
+!provenance.json

@@ -1,0 +1,146 @@
+{
+  "checkpoints": [
+    {
+      "path": ".gitignore",
+      "bytes": 95,
+      "sha256": "cb4618c0418b7ce2b0da75739cd5daa8ae3b74d40174425d0026a9865c81e1d2"
+    },
+    {
+      "path": "RESULTS.md",
+      "bytes": 1393,
+      "sha256": "f04cd415e6dc35e2185c9734433851a5ca1baf05ae683ae6015fb88136862831"
+    },
+    {
+      "path": "packets/r001.json",
+      "bytes": 19738,
+      "sha256": "bae1066779d6db38ddba9347bc65ba51a72c11783d62a03cddeba03e2e4dc696"
+    },
+    {
+      "path": "packets/r002.json",
+      "bytes": 26631,
+      "sha256": "010ed1b553ecd620cc7805c85e4c49dd46b5838423366fef252ae1d116ea909c"
+    },
+    {
+      "path": "packets/r003.json",
+      "bytes": 28697,
+      "sha256": "092e48fa411e9eb2088d7137befe75cdf14ee37fdd73ec4e392b56553b5ba65c"
+    },
+    {
+      "path": "packets/r004.json",
+      "bytes": 28291,
+      "sha256": "e49d4ad581e6a4260ab29b6694311e17159edd71be87731c00c7990c7cba84e5"
+    },
+    {
+      "path": "packets/r005.json",
+      "bytes": 27344,
+      "sha256": "071df0037af15b114ac74d729ade51f9a4065897580b1b9a7112333326ef7298"
+    },
+    {
+      "path": "packets/r006.json",
+      "bytes": 31431,
+      "sha256": "56328369292d8954178b43641c97490582b1a3c113dc0d40c4142db6cc6a1191"
+    },
+    {
+      "path": "packets/r007.json",
+      "bytes": 37197,
+      "sha256": "f66032892fa0064f77f8d1ccbe1cd4f3f3a6be495708ebfc89258c7b1cdf2d84"
+    },
+    {
+      "path": "packets/r008.json",
+      "bytes": 32510,
+      "sha256": "8616d974c87af096176956c6de93311cece1a78a3909fa95ef201c660d9bf55b"
+    },
+    {
+      "path": "packets/r009.json",
+      "bytes": 31378,
+      "sha256": "1a0a9565e7e23496e930076e0b77913c25acc020d0489fa4b91fb28b79ec654b"
+    },
+    {
+      "path": "packets/r010.json",
+      "bytes": 27415,
+      "sha256": "619d6c10cc7fa4d4e5d39699fc75ee83d15615bb4ee094ad108e27f14d7622f8"
+    },
+    {
+      "path": "packets/r011.json",
+      "bytes": 26206,
+      "sha256": "04c10a3bfbb921d4f1cc8d43dc6251ced441f50c9a9768dcc99de5be02326558"
+    },
+    {
+      "path": "packets/r012.json",
+      "bytes": 24573,
+      "sha256": "8ab8f5432f28485fec023e4adcb762473100131dd11b794a19b461f0cf2d6eb7"
+    },
+    {
+      "path": "packets/r013.json",
+      "bytes": 23499,
+      "sha256": "78151ded6ecc05b73af84d0b9e77bd6708d6f866ad4acc194e4389621557e6b4"
+    },
+    {
+      "path": "packets/r014.json",
+      "bytes": 20927,
+      "sha256": "f69d30e1798905fb14097aa62fc56feac9abdf3c2830973cdc5910728b27bc3c"
+    },
+    {
+      "path": "packets/r015.json",
+      "bytes": 2328,
+      "sha256": "af9527eac6ce61731c7f1a8be2db95d81dcefa33a582b8ff119511dded8ce3d5"
+    },
+    {
+      "path": "packets/r016.json",
+      "bytes": 31584,
+      "sha256": "aea68e6c38b4285a309cd697d6b7e1ad2656ea78bd0a6d7f8acbd0d872f9511a"
+    },
+    {
+      "path": "packets/r017.json",
+      "bytes": 36415,
+      "sha256": "d53967884eb3618bcbfb64cd443bb7cbbc33f66f2e10cdd332804509c78f9a60"
+    },
+    {
+      "path": "packets/r018.json",
+      "bytes": 29849,
+      "sha256": "5773cb0cc2368e0577b7025b7a1dc698629d89d52d4bb35f5c7c94cb454b7acc"
+    },
+    {
+      "path": "packets/r019.json",
+      "bytes": 34307,
+      "sha256": "41c82cb89f45ed7970e7db34dbaeaebe735e922ee59eafefe50b92e967f12f34"
+    },
+    {
+      "path": "packets/r020.json",
+      "bytes": 23384,
+      "sha256": "9e6569b3ab541e1e37adc0116bd0735bc2af4d9602283a9734037f1e72d5a1e3"
+    },
+    {
+      "path": "packets/r021.json",
+      "bytes": 35843,
+      "sha256": "a2f14cf9eb03d75e3a388bb74aefed652f9ab0c4d17265d1cf13498bdadf771a"
+    },
+    {
+      "path": "packets/r022.json",
+      "bytes": 19672,
+      "sha256": "597418bd5242997540eaf3fec4629b94e6a096f336220c043b8718191b3743ca"
+    },
+    {
+      "path": "packets/r023.json",
+      "bytes": 16343,
+      "sha256": "b15d41c707c958d099f336dacd0fd1c3b3e003d7ffa769e95979230f4871f095"
+    },
+    {
+      "path": "provenance.json",
+      "bytes": 1508,
+      "sha256": "8762d0addc7cabb0481789edf3dd357d194f188cf04e9cd8ef6a2408eb2e8b87"
+    },
+    {
+      "path": "summary.json",
+      "bytes": 9503,
+      "sha256": "7f1f47dbaf370c30e15faaea500202dcf6dc0b69c3d251c2046fc57ecd5cba87"
+    },
+    {
+      "path": "symbol-index.json.gz",
+      "bytes": 140822,
+      "sha256": "2381d2f7b1f4803e487a658387a36410d529ab450ad44f3fc92f070389a33a65"
+    }
+  ],
+  "credential_scan": "No environment credential values found",
+  "integrity_verified": true
+}

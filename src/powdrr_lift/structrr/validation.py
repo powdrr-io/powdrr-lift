@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shlex
 import tomllib
@@ -235,6 +236,7 @@ def discover_validation_profiles(
     root: str | Path,
     *,
     explicit_command: tuple[str, ...] = (),
+    _include_nested: bool = True,
 ) -> tuple[DiscoveredValidationProfile, ...]:
     """Discover the checks a repository declares for local/CI validation.
 
@@ -379,10 +381,12 @@ def discover_validation_profiles(
 
     package_json = _load_package_json(root_path)
     if package_json and _has_script(package_json, ("test", "check", "lint")):
+        package_manager = _package_manager(root_path, package_json)
         profiles.append(
             _profile(
-                "npm-test",
-                _find_command(ci_commands, ("npm", "test")) or ("npm", "test"),
+                f"{package_manager}-test",
+                _find_command(ci_commands, (package_manager, "test"))
+                or (package_manager, "test"),
                 "package.json scripts/CI",
             )
         )
@@ -413,6 +417,60 @@ def discover_validation_profiles(
     for profile in profiles:
         unique.setdefault(profile.name, profile)
     profiles = list(unique.values())
+    if _include_nested:
+        profiles.extend(_discover_nested_validation_profiles(root_path))
+        # Use the exact declared command for a detected check when a workflow
+        # provides one, including package selectors and nested working dirs.
+        for origin in ci_origins:
+            cwd = str(origin.get("working_directory", ".")).strip() or "."
+            if (
+                cwd.startswith(("/", "~"))
+                or ".." in Path(cwd).parts
+                or not (root_path / cwd).is_dir()
+            ):
+                continue
+            for index, command in enumerate(
+                _commands_from_script(str(origin.get("run", ""))), start=1
+            ):
+                if not _is_locally_runnable(command):
+                    continue
+                kind = _validation_command_kind(command)
+                if kind is None:
+                    continue
+                match_index = next(
+                    (
+                        index
+                        for index, profile in enumerate(profiles)
+                        if profile.cwd == cwd
+                        and _validation_command_kind(profile.command) == kind
+                    ),
+                    None,
+                )
+                if match_index is not None:
+                    profiles[match_index] = replace(
+                        profiles[match_index],
+                        command=command,
+                        source="GitHub Actions workflow",
+                        declaration="declared",
+                        ci_origins=(origin,),
+                    )
+                else:
+                    profiles.append(
+                        DiscoveredValidationProfile(
+                            name=f"ci-{cwd.replace('/', '-')}-{kind}-{index}",
+                            command=command,
+                            source="GitHub Actions workflow",
+                            provider_name=kind,
+                            cwd=cwd,
+                            declaration="declared",
+                            evidence=(str(origin.get("workflow", "")),),
+                            ci_origins=(origin,),
+                        )
+                    )
+        unique = {}
+        for profile in profiles:
+            unique.setdefault(profile.name, profile)
+        profiles = list(unique.values())
     enriched: list[DiscoveredValidationProfile] = []
     for profile in profiles:
         markers = _profile_markers(profile)
@@ -427,6 +485,69 @@ def discover_validation_profiles(
         )
         enriched.append(replace(profile, ci_origins=matches) if matches else profile)
     return tuple(enriched)
+
+
+def _discover_nested_validation_profiles(
+    root: Path,
+) -> tuple[DiscoveredValidationProfile, ...]:
+    """Discover checks declared by nested packages and workspace members."""
+    manifests = {
+        "pyproject.toml",
+        "setup.cfg",
+        "tox.ini",
+        "noxfile.py",
+        "package.json",
+        "go.mod",
+        "Cargo.toml",
+        "pom.xml",
+        "build.gradle",
+        "gradlew",
+    }
+    ignored = {".git", ".venv", "venv", "node_modules", "vendor", "dist", "build"}
+    project_roots: set[Path] = set()
+    for directory, child_dirs, filenames in os.walk(root):
+        child_dirs[:] = [name for name in child_dirs if name not in ignored]
+        if Path(directory) == root:
+            continue
+        if manifests.intersection(filenames):
+            project_roots.add(Path(directory))
+
+    discovered: list[DiscoveredValidationProfile] = []
+    for project_root in sorted(project_roots):
+        relative = project_root.relative_to(root).as_posix()
+        for profile in discover_validation_profiles(
+            project_root, _include_nested=False
+        ):
+            discovered.append(
+                replace(
+                    profile,
+                    name=f"{relative.replace('/', '-')}-{profile.name}",
+                    provider_name=profile.provider,
+                    cwd=(
+                        relative if profile.cwd == "." else f"{relative}/{profile.cwd}"
+                    ),
+                    evidence=tuple(f"{relative}/{item}" for item in profile.evidence),
+                )
+            )
+    return tuple(discovered)
+
+
+def _validation_command_kind(command: tuple[str, ...]) -> str | None:
+    tokens = tuple(token.lower() for token in command)
+    joined = " ".join(tokens)
+    if "pytest" in tokens or " test" in f" {joined}" or "vitest" in tokens:
+        return "test"
+    if "ruff" in tokens and "format" in tokens:
+        return "format"
+    if any(tool in tokens for tool in ("ruff", "eslint", "flake8")):
+        return "lint"
+    if any(tool in tokens for tool in ("mypy", "pyright", "tsc")):
+        return "typecheck"
+    if any(tool in tokens for tool in ("go", "cargo")) and any(
+        token in tokens for token in ("test", "check")
+    ):
+        return "test"
+    return None
 
 
 def _profile(
@@ -1872,6 +1993,23 @@ def _load_package_json(root: Path) -> dict[str, object]:
     return value if isinstance(value, dict) else {}
 
 
+def _package_manager(root: Path, package_json: dict[str, object]) -> str:
+    declared = package_json.get("packageManager")
+    if isinstance(declared, str):
+        manager = declared.split("@", 1)[0]
+        if manager in {"npm", "pnpm", "yarn", "bun"}:
+            return manager
+    for manager, lockfile in (
+        ("pnpm", "pnpm-lock.yaml"),
+        ("yarn", "yarn.lock"),
+        ("bun", "bun.lockb"),
+        ("npm", "package-lock.json"),
+    ):
+        if (root / lockfile).is_file():
+            return manager
+    return "npm"
+
+
 def _has_script(package_json: dict[str, object], names: tuple[str, ...]) -> bool:
     scripts = package_json.get("scripts")
     return isinstance(scripts, dict) and any(name in scripts for name in names)
@@ -1983,6 +2121,9 @@ def _commands_from_script(script: str) -> tuple[tuple[str, ...], ...]:
                 "poe",
                 "poetry",
                 "npm",
+                "pnpm",
+                "yarn",
+                "bun",
                 "pre-commit",
                 "hatch",
                 "go",
@@ -2010,6 +2151,7 @@ def _profile_markers(profile: DiscoveredValidationProfile) -> tuple[str, ...]:
         ("task",),
         ("poe",),
         ("npm", "test"),
+        ("pnpm", "test"),
         ("go", "test"),
         ("cargo", "test"),
     ):

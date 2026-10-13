@@ -231,9 +231,6 @@ def run_bootstrap_task(
         }:
             status = "validation_failed"
             failure_stage = "validation"
-        elif config.open_pr and validation_status != "passed":
-            status = "validation_incomplete"
-            failure_stage = "validation"
         elif config.open_pr and has_commit:
             failure_stage = "publication"
             pull_request_url = publish_pull_request(

@@ -328,3 +328,45 @@ def test_bootstrap_open_pr_publishes_only_onboarding_changes(tmp_path: Path) -> 
         "origin/main...HEAD",
     ).splitlines()
     assert set(changed_paths) == set(result.changed_paths)
+
+
+def test_bootstrap_opens_pr_when_no_validation_checks_are_discovered(
+    tmp_path: Path,
+) -> None:
+    root = _repository(tmp_path / "repo")
+    remote = tmp_path / "origin.git"
+    subprocess.run(
+        ["git", "init", "--bare", "--initial-branch=main", str(remote)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    _git(root, "remote", "add", "origin", str(remote))
+    _git(root, "push", "--set-upstream", "origin", "main")
+    _git(root, "remote", "set-head", "origin", "main")
+    gh_calls: list[list[str]] = []
+
+    def runner(
+        command: Sequence[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        args = list(command)
+        if args and args[0] == "gh":
+            gh_calls.append(args)
+            return subprocess.CompletedProcess(
+                args, 0, "https://github.com/acme/repo/pull/43\n", ""
+            )
+        return subprocess.run(args, **kwargs)
+
+    result = run_bootstrap_task(
+        BootstrapTaskConfig(
+            repo_root=root,
+            open_pr=True,
+            run_id="bootstrap-no-checks",
+        ),
+        runner=runner,
+    )
+
+    assert result.validation_status == "no_checks"
+    assert result.status == "pr_opened"
+    assert result.pull_request_url == "https://github.com/acme/repo/pull/43"
+    assert len(gh_calls) == 1

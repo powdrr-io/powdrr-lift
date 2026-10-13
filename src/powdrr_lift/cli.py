@@ -243,7 +243,11 @@ from powdrr_lift.workrr.prompt_probe import (
     probe_workflow_step,
     resolve_probe_model,
 )
-from powdrr_lift.workrr.provider_config import ALL_PROVIDERS, default_llm_mappings
+from powdrr_lift.workrr.provider_config import (
+    ALL_PROVIDERS,
+    default_llm_mappings,
+    provider_definition,
+)
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
     resolve_provider_credentials,
@@ -3368,7 +3372,7 @@ def _run_bootstrap(args: argparse.Namespace) -> int:
 def _run_check_credentials(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     results = []
-    for role, provider, model, api_key, base_url in (
+    route_checks = (
         (
             "planning",
             args.planning_provider,
@@ -3383,30 +3387,53 @@ def _run_check_credentials(args: argparse.Namespace) -> int:
             None,
             None,
         ),
-    ):
+    )
+    checked_credentials: dict[tuple[str, str], dict[str, Any]] = {}
+    checked_missing_credentials: dict[tuple[str, ...], dict[str, Any]] = {}
+    for role, provider, model, api_key, base_url in route_checks:
+        definition = provider_definition(provider)
+        missing_identity = (
+            *definition.api_key_env_names,
+            base_url or "",
+            api_key or "",
+        )
+        if missing_identity in checked_missing_credentials:
+            checked_missing_credentials[missing_identity].setdefault(
+                "roles", [role]
+            ).append(role)
+            continue
         try:
             mapping = configured_model_mapping(provider, model)
+            credentials = resolve_provider_credentials(provider, api_key, base_url)
         except PowdrrExecutionError as error:
-            results.append(
-                {
-                    "role": role,
-                    "provider": provider,
-                    "model": model or "<unspecified>",
-                    "status": "configuration_error",
-                    "message": str(error),
-                }
+            result = {
+                "role": role,
+                "provider": provider,
+                "model": model or "<unspecified>",
+                "status": "configuration_error",
+                "message": str(error),
+                "roles": [role],
+            }
+            checked_missing_credentials[missing_identity] = result
+            results.append(result)
+            continue
+        credential_identity = (credentials.base_url, credentials.api_key)
+        if credential_identity in checked_credentials:
+            checked_credentials[credential_identity].setdefault("roles", [role]).append(
+                role
             )
             continue
-        results.append(
-            check_model_access(
-                role=role,
-                provider=provider,
-                mapping=mapping,
-                repo_root=repo_root,
-                api_key=api_key,
-                base_url=base_url,
-            ).to_data()
-        )
+        check_result: dict[str, Any] = check_model_access(
+            role=role,
+            provider=provider,
+            mapping=mapping,
+            repo_root=repo_root,
+            api_key=api_key,
+            base_url=base_url,
+        ).to_data()
+        check_result["roles"] = [role]
+        checked_credentials[credential_identity] = check_result
+        results.append(check_result)
 
     executable = (
         args.opencode_executable
@@ -3471,9 +3498,10 @@ def _run_check_credentials(args: argparse.Namespace) -> int:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
         for item in results:
+            roles = item.get("roles")
+            role_label = "/".join(roles) if roles else item["role"]
             print(
-                f"{item['role']}: {item['status']} "
-                f"({item['provider']} / {item['model']})"
+                f"{role_label}: {item['status']} ({item['provider']} / {item['model']})"
             )
             if item.get("message"):
                 print(f"  {item['message']}")

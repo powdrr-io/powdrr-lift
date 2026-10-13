@@ -188,6 +188,18 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
 
     monkeypatch.setattr("powdrr_lift.cli.check_model_access", check)
     monkeypatch.setattr(
+        "powdrr_lift.cli.resolve_provider_credentials",
+        lambda provider, *_args: SimpleNamespace(
+            source="TEST_API_KEY",
+            base_url="https://example.test",
+            api_key=(
+                "deepinfra-token"
+                if provider.startswith("deepinfra")
+                else f"{provider}-token"
+            ),
+        ),
+    )
+    monkeypatch.setattr(
         "powdrr_lift.cli.check_coding_executable",
         lambda executable, *, role: SimpleNamespace(
             to_data=lambda: {
@@ -235,7 +247,7 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
                 "--repo-root",
                 str(tmp_path),
                 "--planning-provider",
-                "zai",
+                "deepinfra-cheap",
                 "--coding-provider",
                 "deepinfra",
                 "--json",
@@ -243,9 +255,10 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
         )
 
     assert exit_code == 0
-    assert checks == [("planning", "zai"), ("coding", "deepinfra")]
+    assert checks == [("planning", "deepinfra-cheap")]
     report = json.loads(stdout.getvalue())
     assert report["passed"] is True
+    assert report["checks"][0]["roles"] == ["planning", "coding"]
     assert report["checks"][-2] == {
         "role": "jev-classifier",
         "provider": "typesafe-ai",

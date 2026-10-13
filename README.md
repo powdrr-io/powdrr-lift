@@ -235,10 +235,13 @@ limit from one to five.
 
 Powdrr sends the feature request and the repository context needed for planning,
 implementation, and review to the configured planning and coding providers.
-Configure credentials for both routes before running; `check-credentials`
-confirms authenticated model access without printing credential values. With
-the default DeepInfra planning and coding routes, set `DEEPINFRA_API_TOKEN` or
-`DEEPINFRA_API_KEY`; use the provider/model options shown above for other
+`check-credentials` makes one authenticated request per distinct configured
+model credential, checks Jev using `TYPESAFEAI_API_KEY` (or
+`TYPESAFE_API_KEY` / `SYSTEM_ONE_API_KEY`), verifies the selected coding-agent
+executable, and checks GitHub write access for the current repository. It does
+not print credential values. With the default DeepInfra planning and coding
+routes, set `DEEPINFRA_API_TOKEN` or `DEEPINFRA_API_KEY`; that shared credential
+is checked once. Use the provider/model options shown above for other
 configured routes. Local run reports, generated context, and retained worktrees
 remain in the Git common directory. Review and remove retained branches and
 worktrees when they are no longer needed; Powdrr does not automatically discard

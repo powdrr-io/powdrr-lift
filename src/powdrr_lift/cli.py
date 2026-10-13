@@ -3333,6 +3333,11 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
 
 def _run_bootstrap(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
+
+    def report_progress(message: str) -> None:
+        destination = sys.stderr if args.json else sys.stdout
+        print(f"Bootstrap: {message}", file=destination, flush=True)
+
     result = run_bootstrap_task(
         BootstrapTaskConfig(
             repo_root=repo_root,
@@ -3344,7 +3349,8 @@ def _run_bootstrap(args: argparse.Namespace) -> int:
             output_root=args.output_root,
             taxonomy_path=args.taxonomy,
             validation_timeout_seconds=args.validation_timeout_seconds,
-        )
+        ),
+        progress=report_progress,
     )
     data = result.to_data()
     if args.json:

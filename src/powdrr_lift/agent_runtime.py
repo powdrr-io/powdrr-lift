@@ -187,7 +187,6 @@ def publish_pull_request(
         runner,
         task.worktree,
         [
-            "gh",
             "pr",
             "create",
             "--base",

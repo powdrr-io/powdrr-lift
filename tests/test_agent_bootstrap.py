@@ -180,6 +180,7 @@ def test_bootstrap_reports_validation_failure_and_keeps_snapshot(
     assert result.validation_status == "failed"
     assert result.pull_request_url == "https://github.com/acme/repo/pull/44"
     assert len(gh_calls) == 1
+    assert gh_calls[0][:3] == ["gh", "pr", "create"]
     pr_body = gh_calls[0][gh_calls[0].index("--body") + 1]
     assert "ruff-check" in pr_body
     assert "failed" in pr_body
@@ -366,6 +367,7 @@ def test_bootstrap_open_pr_publishes_only_onboarding_changes(tmp_path: Path) -> 
     assert result.task is not None
     assert result.pull_request_url == "https://github.com/acme/repo/pull/42"
     assert len(gh_calls) == 1
+    assert gh_calls[0][:3] == ["gh", "pr", "create"]
     body = gh_calls[0][gh_calls[0].index("--body") + 1]
     assert "Bootstrap summary" in body
     assert "Added the packaged default taxonomy." in body

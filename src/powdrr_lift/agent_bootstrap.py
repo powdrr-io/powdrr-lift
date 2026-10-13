@@ -8,6 +8,7 @@ import os
 import signal
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from importlib.resources import files
 from pathlib import Path
@@ -97,6 +98,7 @@ def run_bootstrap_task(
     config: BootstrapTaskConfig,
     *,
     runner: Any = subprocess.run,
+    progress: Callable[[str], None] | None = None,
 ) -> BootstrapTaskResult:
     """Generate, validate, and optionally publish onboarding artifacts."""
     repo_root = config.repo_root.resolve()
@@ -109,6 +111,7 @@ def run_bootstrap_task(
     taxonomy_provenance: str | None = None
     validation_status: str | None = None
     try:
+        _emit_bootstrap_progress(progress, "Preparing an isolated worktree.")
         task = prepare_agent_worktree(
             repo_root,
             config.task_name,
@@ -118,6 +121,9 @@ def run_bootstrap_task(
             publish=config.open_pr,
             run_id=config.run_id,
             runner=runner,
+        )
+        _emit_bootstrap_progress(
+            progress, f"Worktree ready on branch {task.branch}: {task.worktree}"
         )
         run_id = task.worktree.name
         output_root = output_root or _run_output_root(runner, repo_root, run_id)
@@ -156,6 +162,9 @@ def run_bootstrap_task(
                 previous_manifest_data = json.loads(previous_manifest)
             except json.JSONDecodeError:
                 previous_manifest_data = None
+        _emit_bootstrap_progress(
+            progress, "Scanning repository sources and drafting the baseline snapshot."
+        )
         bootstrap = bootstrap_structrr(
             task.worktree,
             output_path=Path("docs/structrr/current/baseline-bootstrap.yaml"),
@@ -172,13 +181,22 @@ def run_bootstrap_task(
             raise PowdrrExecutionError(
                 "Structrr bootstrap validation failed: " + "; ".join(issues)
             )
+        _emit_bootstrap_progress(
+            progress, "Snapshot drafted; running discovered local validation checks."
+        )
         baseline_result = _run_validation_baseline(
             task.worktree,
             bootstrap.document,
             runner=runner,
             timeout_seconds=config.validation_timeout_seconds,
+            progress=progress,
         )
         validation_status = str(baseline_result["status"])
+        _emit_bootstrap_progress(
+            progress,
+            f"Validation finished: {validation_status} "
+            f"({baseline_result['checks']} checks).",
+        )
         if baseline_result["checks"]:
             report = validate_bootstrap_document(
                 bootstrap.document,
@@ -218,6 +236,7 @@ def run_bootstrap_task(
                 if path is not None
             )
         )
+        _emit_bootstrap_progress(progress, "Committing generated bootstrap files.")
         has_commit = commit_paths(
             task.worktree,
             changed_paths,
@@ -233,6 +252,7 @@ def run_bootstrap_task(
             failure_stage = "validation"
         elif config.open_pr and has_commit:
             failure_stage = "publication"
+            _emit_bootstrap_progress(progress, "Opening the bootstrap pull request.")
             pull_request_url = publish_pull_request(
                 task,
                 title=f"Bootstrap project context for {repo_root.name}",
@@ -240,6 +260,9 @@ def run_bootstrap_task(
                     bootstrap, changed_paths, copied_taxonomy
                 ),
                 runner=runner,
+            )
+            _emit_bootstrap_progress(
+                progress, f"Pull request opened: {pull_request_url}"
             )
             status = "pr_opened"
         elif validation_status == "no_checks":
@@ -274,6 +297,9 @@ def run_bootstrap_task(
             result, output_root, publication_requested=config.open_pr
         )
     except Exception as error:
+        _emit_bootstrap_progress(
+            progress, f"Bootstrap failed during {failure_stage}: {error}"
+        )
         if output_root is None:
             try:
                 output_root = _run_output_root(
@@ -412,6 +438,7 @@ def _run_validation_baseline(
     *,
     runner: Any,
     timeout_seconds: float,
+    progress: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Run discovered local argv checks and store bounded baseline outcomes."""
     inventory = document.get("validation_inventory", [])
@@ -426,14 +453,23 @@ def _run_validation_baseline(
         and check["applicability"].get("local", True) is not False
     ]
     if not applicable:
+        _emit_bootstrap_progress(
+            progress, "No applicable local validation checks found."
+        )
         return {"status": "no_checks", "checks": 0}
 
     deadline = time.monotonic() + _VALIDATION_BUDGET_SECONDS
     statuses: list[str] = []
-    for check in applicable:
+    for index, check in enumerate(applicable, start=1):
         command = check.get("command", [])
         execution = check.get("execution", {})
         cwd_value = execution.get("cwd", ".") if isinstance(execution, dict) else "."
+        label = str(check.get("profile") or check.get("id") or f"check {index}")
+        _emit_bootstrap_progress(
+            progress,
+            f"Validation check {index}/{len(applicable)}: {label} "
+            f"(directory {cwd_value}).",
+        )
         status: str
         returncode: int | None = None
         stdout = ""
@@ -523,6 +559,7 @@ def _run_validation_baseline(
         }
         check["baseline"] = {"status": status, "observation": observation}
         statuses.append(status)
+        _emit_bootstrap_progress(progress, f"Validation check {label}: {status}.")
 
     if "timed_out" in statuses:
         overall = "timed_out"
@@ -533,6 +570,18 @@ def _run_validation_baseline(
     else:
         overall = "passed"
     return {"status": overall, "checks": len(statuses)}
+
+
+def _emit_bootstrap_progress(
+    progress: Callable[[str], None] | None, message: str
+) -> None:
+    if progress is None:
+        return
+    try:
+        progress(message)
+    except Exception:
+        # Progress reporting must not change the result of the bootstrap task.
+        return
 
 
 def _output_digest(value: object) -> str:

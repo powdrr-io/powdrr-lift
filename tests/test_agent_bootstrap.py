@@ -4,7 +4,7 @@ import io
 import json
 import subprocess
 from collections.abc import Sequence
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 from typing import Any
 
@@ -240,8 +240,9 @@ def test_bootstrap_preflight_failure_preserves_input_and_writes_report(
 def test_bootstrap_cli_emits_one_json_result(tmp_path: Path) -> None:
     root = _repository(tmp_path / "repo")
     stdout = io.StringIO()
+    stderr = io.StringIO()
 
-    with redirect_stdout(stdout):
+    with redirect_stdout(stdout), redirect_stderr(stderr):
         exit_code = main(
             [
                 "bootstrap",
@@ -260,6 +261,31 @@ def test_bootstrap_cli_emits_one_json_result(tmp_path: Path) -> None:
     assert result["branch"].startswith("powdrr/sample-onboarding-")
     assert result["worktree"]
     assert result["report_json_path"]
+    assert "Bootstrap: Preparing an isolated worktree." in stderr.getvalue()
+
+
+def test_bootstrap_cli_prints_live_progress_for_text_output(tmp_path: Path) -> None:
+    root = _repository(tmp_path / "repo")
+    stdout = io.StringIO()
+
+    with redirect_stdout(stdout):
+        exit_code = main(
+            [
+                "bootstrap",
+                "--repo-root",
+                str(root),
+                "--work-item-name",
+                "sample onboarding",
+                "--no-open-pr",
+            ]
+        )
+
+    output = stdout.getvalue()
+    assert exit_code == 1
+    assert "Bootstrap: Preparing an isolated worktree." in output
+    assert "Bootstrap: Scanning repository sources" in output
+    assert "Bootstrap: No applicable local validation checks found." in output
+    assert "Bootstrap status: completed_unverified" in output
 
 
 def test_bootstrap_open_pr_publishes_only_onboarding_changes(tmp_path: Path) -> None:

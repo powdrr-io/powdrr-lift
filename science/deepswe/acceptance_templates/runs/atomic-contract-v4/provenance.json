@@ -1,0 +1,50 @@
+{
+  "analysis_container": "powdrr-gql-contracts-20261012-c",
+  "analysis_image": "powdrr-science-gql-contracts:20261012-c",
+  "analysis_image_id": "sha256:c105b9fbd6b4ac3215ca3e90e174a6201202055c73959d8f7a75aab5d2612d9e",
+  "coding_agents_run": false,
+  "comparison": {
+    "baseline_criteria_emitted": 0,
+    "baseline_provider_calls": 115,
+    "baseline_request_hashes_shared": 0,
+    "baseline_run": "atomic-contract-v3",
+    "current_request_hashes": 115,
+    "current_request_hashes_new": 115,
+    "manual_solution_validation_audit": "4 of 5 emitted criteria align; r015 contains an invalid deferred response path",
+    "split_context_change_exercised": false
+  },
+  "criteria_emitted": 5,
+  "evidence_summary_sha256": "7f1f47dbaf370c30e15faaea500202dcf6dc0b69c3d251c2046fc57ecd5cba87",
+  "experiment": "atomic-criteria-full-instruction-directives-v1",
+  "input_sha256": "a6cad74c22efdcbabaa6a6f73979a2b9b20ecbc2e0a30e81883790535179ce0b",
+  "model_providers": [
+    "deepinfra",
+    "typesafe.ai"
+  ],
+  "network": "none",
+  "pipeline_sha256": "9a7c32737b7de8d479dfdeb5cd28a3a19c3216bfea6f73baf3d71886b3a830d5",
+  "postrun_oracle_audit": {
+    "patches_passed_to_models": false,
+    "solution_patch_sha256": "65d77639c640cde71e5e867089b4bfd55140e9e7d418183c3cb9df570ade30db",
+    "validation_patch_sha256": "031de3d902d74cdc8ef142886d5aca3342ff63611a3a903797f3e8d6fb413670"
+  },
+  "prompt_sha256": "a0c734163097d44fe787679ede3e19910428eb6dd7664ec9e9b0c9918bceb8bb",
+  "provider_calls": 115,
+  "provider_failures": 0,
+  "read_only": true,
+  "repository_revision": "a48f9824fc82b539aaec132d1a6451f3c0aa76d4",
+  "solution_and_tests_mounted": false,
+  "source_code_sha256": {
+    "atomic_conditions.py": "474abcbbf4fafbbcf52a489d262360eb0f351fd1fdb53a1414ba8358e2051e22",
+    "command_catalog.py": "e79bbe682c9ad5a4a49ca9bb11d788ac8e954f9f2196967cb7768b1c0eb5239e",
+    "requirement_evidence.py": "b6005184e6427ea913ca62aaa3e9366bd084adacfe3a4ce244623e58bd041165",
+    "symbols.py": "808832108fd47278f6ce76739a04498f1455151bd21415fa32dca47677fdeef5"
+  },
+  "task_base_sha": "f07c89f8f065010a36b4263eded209b2b1d37063",
+  "task_checkout_status": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "task_id": "gql-incremental-graphql-delivery",
+  "tests_run": false
+}

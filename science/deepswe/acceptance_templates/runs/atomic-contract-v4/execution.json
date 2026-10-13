@@ -1,0 +1,13 @@
+{
+  "comparison_baseline_calls": 115,
+  "current_run_request_hashes": 115,
+  "current_run_request_hashes_new": 115,
+  "failures": 0,
+  "final_status": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "provider_calls": 115,
+  "recorded_calls": 230,
+  "run_error": null
+}

@@ -114,7 +114,9 @@ from powdrr_lift.workrr.external_contract_research import (
     redact_external_contract_search_event,
 )
 from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
-from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
+from powdrr_lift.workrr.jev_classifier import (
+    preferred_semantic_classifier_client,
+)
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_lift.workrr.run_artifacts import (
@@ -635,19 +637,23 @@ def _execute_procedrr_flow(
             replay_responses=replay_responses,
             telemetry_sink=record_provider_attempt,
         )
-        jev_classifier_client = WorkrrProcedrrClient(
-            JevSemanticClassifierClient(config.planning_client),
-            skills_dir=flow_directory,
-            replay_responses=replay_responses,
-            telemetry_sink=record_provider_attempt,
-        )
+        classifier_client = preferred_semantic_classifier_client(config.planning_client)
+        if classifier_client is None:
+            classifier_judge_client = planning_client
+        else:
+            classifier_judge_client = WorkrrProcedrrClient(
+                classifier_client,
+                skills_dir=flow_directory,
+                replay_responses=replay_responses,
+                telemetry_sink=record_provider_attempt,
+            )
         evaluator = Evaluator(
             planning_client,
             execute,
             process_directory=flow_directory,
             judge_clients={
                 "planning": planning_client,
-                "jev": jev_classifier_client,
+                "jev": classifier_judge_client,
             },
             command_catalog=command_catalog,
             event_sink=record_procedrr_event,

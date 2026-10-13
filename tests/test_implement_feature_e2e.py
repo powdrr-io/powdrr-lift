@@ -28,7 +28,12 @@ def keep_deterministic_feature_tests_off_live_jev(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Do not send fixture clauses to Jev when a developer has API credentials."""
-    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+    for name in (
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
+        "SUBQ_API_KEY",
+    ):
         monkeypatch.delenv(name, raising=False)
 
 

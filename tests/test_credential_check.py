@@ -141,13 +141,45 @@ def test_check_jev_access_makes_authenticated_request_without_exposing_key(
 def test_check_jev_access_reports_missing_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+    for name in (
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
+        "SUBQ_API_KEY",
+    ):
         monkeypatch.delenv(name, raising=False)
 
     result = check_jev_access()
 
     assert result.status == "credentials_missing"
-    assert result.message == "Set TYPESAFEAI_API_KEY to check Typesafe AI access."
+    assert result.message == "Set a Jev or SUBQ_API_KEY to check classifier access."
+
+
+def test_check_jev_access_uses_subq_when_jev_key_is_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("SUBQ_API_KEY", "private-subq-key")
+    captured: dict[str, object] = {}
+
+    def call_subq(
+        request: object, api_key: str, endpoint: str, model: str
+    ) -> dict[str, object]:
+        captured.update(
+            request=request, api_key=api_key, endpoint=endpoint, model=model
+        )
+        return {"answer": {"choice": "ok"}}
+
+    monkeypatch.setattr("powdrr_lift.workrr.credential_check._call_subq", call_subq)
+
+    result = check_jev_access()
+
+    assert result.status == "passed"
+    assert result.credential_source == "SUBQ_API_KEY"
+    assert result.provider == "subq"
+    assert captured["endpoint"] == "https://api.subq.ai/v1/systemone"
+    assert captured["model"] == "subq-snap-preview"
 
 
 def test_check_jev_access_reports_authentication_failure(
@@ -165,7 +197,7 @@ def test_check_jev_access_reports_authentication_failure(
     result = check_jev_access()
 
     assert result.status == "authentication_failed"
-    assert result.message == "Typesafe AI returned HTTP 401."
+    assert result.message == "Decision API returned HTTP 401."
     assert "private-test-key" not in str(result.to_data())
 
 

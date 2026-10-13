@@ -15,6 +15,7 @@ from powdrr_lift.workrr.jev_classifier import (
     JEV_DEFAULT_BASE_URL,
     JEV_MODEL,
     _call_jev,
+    _call_subq,
 )
 from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
 from powdrr_lift.workrr.provider_config import (
@@ -133,27 +134,42 @@ def check_coding_executable(executable: str, *, role: str) -> CredentialCheck:
 
 
 def check_jev_access() -> CredentialCheck:
-    """Make one authenticated Typesafe AI classification request."""
+    """Check the preferred configured typed decision classifier."""
     key_names = (
         "TYPESAFEAI_API_KEY",
         "TYPESAFE_API_KEY",
         "SYSTEM_ONE_API_KEY",
     )
     credential_source = next((name for name in key_names if os.environ.get(name)), None)
-    model = os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL
-    endpoint_root = os.environ.get("SYSTEM_ONE_BASE_URL")
-    endpoint = (
-        f"{endpoint_root.rstrip('/')}/systemone"
-        if endpoint_root
-        else JEV_DEFAULT_BASE_URL
-    )
+    is_subq = credential_source is None and bool(os.environ.get("SUBQ_API_KEY"))
+    if is_subq:
+        credential_source = "SUBQ_API_KEY"
+        model = os.environ.get("SUBQ_MODEL") or "subq-snap-preview"
+        endpoint_root = os.environ.get("SUBQ_BASE_URL")
+        endpoint = (
+            f"{endpoint_root.rstrip('/')}/systemone"
+            if endpoint_root
+            else "https://api.subq.ai/v1/systemone"
+        )
+        provider_name = "subq"
+        call = _call_subq
+    else:
+        model = os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL
+        endpoint_root = os.environ.get("SYSTEM_ONE_BASE_URL")
+        endpoint = (
+            f"{endpoint_root.rstrip('/')}/systemone"
+            if endpoint_root
+            else JEV_DEFAULT_BASE_URL
+        )
+        provider_name = "typesafe-ai"
+        call = _call_jev
     if credential_source is None:
         return CredentialCheck(
-            role="jev-classifier",
-            provider="typesafe-ai",
+            role="decision-classifier",
+            provider="typed-decision-api",
             model=model,
             status="credentials_missing",
-            message="Set TYPESAFEAI_API_KEY to check Typesafe AI access.",
+            message="Set a Jev or SUBQ_API_KEY to check classifier access.",
         )
 
     request = {
@@ -164,11 +180,13 @@ def check_jev_access() -> CredentialCheck:
         "state": {"credential_check": True},
     }
     try:
-        response = _call_jev(request, os.environ[credential_source], endpoint, model)
+        response = call(request, os.environ[credential_source], endpoint, model)
         answer = response.get("answer", response)
         choice = answer.get("choice") if isinstance(answer, Mapping) else None
         if choice not in {"ok", "unresolved"}:
-            raise ValueError("Typesafe AI returned an invalid credential-check result.")
+            raise ValueError(
+                "Decision API returned an invalid credential-check result."
+            )
     except HTTPError as error:
         status = {
             401: "authentication_failed",
@@ -176,26 +194,26 @@ def check_jev_access() -> CredentialCheck:
             429: "rate_or_quota_limited",
         }.get(error.code, "provider_rejected_request")
         return CredentialCheck(
-            role="jev-classifier",
-            provider="typesafe-ai",
+            role="decision-classifier",
+            provider=provider_name,
             model=model,
             status=status,
             credential_source=credential_source,
-            message=f"Typesafe AI returned HTTP {error.code}.",
+            message=f"Decision API returned HTTP {error.code}.",
         )
     except (OSError, TimeoutError, URLError, ValueError) as error:
         return CredentialCheck(
-            role="jev-classifier",
-            provider="typesafe-ai",
+            role="decision-classifier",
+            provider=provider_name,
             model=model,
             status="unavailable",
             credential_source=credential_source,
-            message=f"Typesafe AI credential check failed: {error}",
+            message=f"Decision API credential check failed: {error}",
         )
 
     return CredentialCheck(
-        role="jev-classifier",
-        provider="typesafe-ai",
+        role="decision-classifier",
+        provider=provider_name,
         model=model,
         status="passed",
         credential_source=credential_source,

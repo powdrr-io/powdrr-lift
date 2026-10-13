@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 947
+change_id: 977
 title: Add SubQ as a fallback classifier provider
 intent:
   problem: The design-interview classifier can use Jev but has no typed-decision provider alternative when Jev credentials are unavailable.

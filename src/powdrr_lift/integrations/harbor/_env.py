@@ -11,6 +11,9 @@ PROVIDER_ENVIRONMENT_KEYS = (
     "DEEPINFRA_BASE_URL",
     "SYSTEM_ONE_API_KEY",
     "SYSTEM_ONE_BASE_URL",
+    "SUBQ_API_KEY",
+    "SUBQ_BASE_URL",
+    "SUBQ_MODEL",
     "TYPESAFEAI_API_KEY",
     "TYPESAFE_API_KEY",
     "TAVILY_API_KEY",
@@ -39,18 +42,22 @@ def env_flag_is_enabled(value: str | None) -> bool:
 
 def network_allowlist_domains(
     system_one_base_url: str | None = None,
+    subq_base_url: str | None = None,
 ) -> tuple[str, ...]:
     """Return hosts required by package installation and configured providers."""
     domains = {
         "api.deepinfra.com",
         "api.typesafe.ai",
+        "api.subq.ai",
         "files.pythonhosted.org",
         "github.com",
         "pypi.org",
         "registry.npmjs.org",
     }
-    if system_one_base_url:
-        host = urlsplit(system_one_base_url).hostname
+    for base_url in (system_one_base_url, subq_base_url):
+        if not base_url:
+            continue
+        host = urlsplit(base_url).hostname
         if host:
             domains.add(host.casefold())
     return tuple(sorted(domains))

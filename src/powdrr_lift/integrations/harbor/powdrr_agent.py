@@ -105,7 +105,10 @@ class PowdrrAgent(BaseInstalledAgent):
 
         return NetworkAllowlist(
             domains=list(
-                network_allowlist_domains(self._get_env("SYSTEM_ONE_BASE_URL"))
+                network_allowlist_domains(
+                    self._get_env("SYSTEM_ONE_BASE_URL"),
+                    self._get_env("SUBQ_BASE_URL"),
+                )
             )
         )
 

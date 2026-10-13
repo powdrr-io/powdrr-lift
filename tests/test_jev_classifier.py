@@ -7,7 +7,11 @@ from typing import Any
 import pytest
 
 from powdrr_lift.workrr import jev_classifier
-from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
+from powdrr_lift.workrr.jev_classifier import (
+    JevSemanticClassifierClient,
+    SubQSemanticClassifierClient,
+    preferred_semantic_classifier_client,
+)
 
 
 class _Fallback:
@@ -113,6 +117,64 @@ def test_jev_uses_valid_choice_regardless_of_confidence(monkeypatch: Any) -> Non
 
     assert result == {"status": "resolved", "value": "present", "reason_code": None}
     assert fallback.calls == 0
+
+
+def test_subq_uses_typed_choice_and_maps_to_workflow_result(monkeypatch: Any) -> None:
+    fallback = _Fallback()
+    calls: list[tuple[str, str, str]] = []
+
+    def call(
+        request: Mapping[str, Any], api_key: str, endpoint: str, model: str
+    ) -> dict[str, Any]:
+        calls.append((api_key, endpoint, model))
+        assert request["allowed_values"] == ["absent", "present"]
+        return {"choice": "present", "confidence": 0.7}
+
+    monkeypatch.setattr(jev_classifier, "_call_subq", call)
+    result = SubQSemanticClassifierClient(fallback, api_key="subq-key").complete_json(
+        _messages("has_exception"), response_schema=_decision_schema()
+    )
+
+    assert result == {"status": "resolved", "value": "present", "reason_code": None}
+    assert calls == [
+        ("subq-key", "https://api.subq.ai/v1/systemone", "subq-snap-preview")
+    ]
+    assert fallback.calls == 0
+
+
+def test_preferred_classifier_uses_jev_key_before_subq(monkeypatch: Any) -> None:
+    monkeypatch.setenv("TYPESAFEAI_API_KEY", "jev-key")
+    monkeypatch.setenv("SUBQ_API_KEY", "subq-key")
+
+    client = preferred_semantic_classifier_client(_Fallback())
+
+    assert isinstance(client, JevSemanticClassifierClient)
+
+
+def test_preferred_classifier_uses_subq_when_jev_key_is_missing(
+    monkeypatch: Any,
+) -> None:
+    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("SUBQ_API_KEY", "subq-key")
+
+    client = preferred_semantic_classifier_client(_Fallback())
+
+    assert isinstance(client, SubQSemanticClassifierClient)
+
+
+def test_preferred_classifier_returns_none_without_provider_keys(
+    monkeypatch: Any,
+) -> None:
+    for name in (
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
+        "SUBQ_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    assert preferred_semantic_classifier_client(_Fallback()) is None
 
 
 def test_jev_logs_correlated_successful_call(

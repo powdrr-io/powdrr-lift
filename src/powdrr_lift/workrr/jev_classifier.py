@@ -1,4 +1,4 @@
-"""Jev-backed typed classification for the design-interview workflow."""
+"""Typed decision API classification for the design-interview workflow."""
 
 from __future__ import annotations
 
@@ -18,10 +18,16 @@ LOGGER = logging.getLogger(__name__)
 JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
 JEV_MODEL = "jev-latest"
 JEV_DEFAULT_BASE_URL = "https://api.typesafe.ai/v1/systemone"
+SUBQ_MODEL = "subq-snap-preview"
+SUBQ_DEFAULT_BASE_URL = "https://api.subq.ai/v1/systemone"
 
 
-class JevSemanticClassifierClient:
-    """Use Jev for classifier judges, retaining planning as an error fallback."""
+class _DecisionApiSemanticClassifierClient:
+    """Common typed-decision API adapter with a planning fallback."""
+
+    provider = "DECISION_API"
+    default_model = ""
+    default_endpoint = ""
 
     def __init__(
         self,
@@ -31,21 +37,23 @@ class JevSemanticClassifierClient:
         endpoint: str | None = None,
         model: str | None = None,
         fail_closed: bool = False,
+        _api_key: str | None = None,
+        _endpoint_env: str = "",
+        _model_env: str = "",
     ) -> None:
         self._fallback = fallback
-        self._api_key = (
-            api_key
-            or os.environ.get("TYPESAFEAI_API_KEY")
-            or os.environ.get("TYPESAFE_API_KEY")
-            or os.environ.get("SYSTEM_ONE_API_KEY")
-        )
-        configured_base_url = os.environ.get("SYSTEM_ONE_BASE_URL")
+        self._api_key = api_key or _api_key
+        configured_base_url = os.environ.get(_endpoint_env) if _endpoint_env else None
         self._endpoint = endpoint or (
             f"{configured_base_url.rstrip('/')}/systemone"
             if configured_base_url
-            else JEV_DEFAULT_BASE_URL
+            else self.default_endpoint
         )
-        self._model = model or os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL
+        self._model = (
+            model
+            or (os.environ.get(_model_env) if _model_env else None)
+            or self.default_model
+        )
         self._fail_closed = fail_closed
 
     def complete_json(
@@ -59,16 +67,17 @@ class JevSemanticClassifierClient:
         request_data = _classifier_request(messages, response_schema)
         if not self._api_key:
             LOGGER.warning(
-                "JEV_CALL_SKIPPED "
-                "request_id=%s reason=missing_api_key endpoint_host=%s",
+                "%s_CALL_SKIPPED request_id=%s reason=missing_api_key endpoint_host=%s",
+                self.provider,
                 request_id,
                 endpoint_host,
             )
             return _fallback(self._fallback, messages, response_schema)
         if request_data is None:
             LOGGER.warning(
-                "JEV_CALL_SKIPPED "
+                "%s_CALL_SKIPPED "
                 "request_id=%s reason=unsupported_request endpoint_host=%s",
+                self.provider,
                 request_id,
                 endpoint_host,
             )
@@ -76,21 +85,21 @@ class JevSemanticClassifierClient:
 
         started_at = time.monotonic()
         LOGGER.warning(
-            "JEV_REQUEST_STARTED request_id=%s endpoint_host=%s model=%s",
+            "%s_REQUEST_STARTED request_id=%s endpoint_host=%s model=%s",
+            self.provider,
             request_id,
             endpoint_host,
             self._model,
         )
         phase = "request"
         try:
-            response = _call_jev(
-                request_data, self._api_key, self._endpoint, self._model
-            )
+            response = self._call(request_data, self._api_key, self._endpoint)
             answer = response.get("answer", response)
             returned_model = response.get("model", self._model)
             LOGGER.warning(
-                "JEV_RESPONSE_RECEIVED request_id=%s endpoint_host=%s "
+                "%s_RESPONSE_RECEIVED request_id=%s endpoint_host=%s "
                 "model=%s duration_ms=%d",
+                self.provider,
                 request_id,
                 endpoint_host,
                 returned_model,
@@ -100,9 +109,13 @@ class JevSemanticClassifierClient:
             choice = answer.get("choice")
             result = _format_classifier_result(choice, request_data, response_schema)
         except Exception as exc:  # noqa: BLE001
-            # Jev is an optional classifier provider.
+            # Decision APIs are optional classifier providers.
             http_status = getattr(exc, "code", "none")
-            log_event = "JEV_FAIL_CLOSED" if self._fail_closed else "JEV_FALLBACK"
+            log_event = (
+                f"{self.provider}_FAIL_CLOSED"
+                if self._fail_closed
+                else f"{self.provider}_FALLBACK"
+            )
             LOGGER.warning(
                 "%s request_id=%s endpoint_host=%s phase=%s "
                 "error_type=%s http_status=%s duration_ms=%d",
@@ -116,8 +129,8 @@ class JevSemanticClassifierClient:
             )
             return self._fallback_or_false(messages, response_schema)
         LOGGER.warning(
-            "JEV_RESULT_ACCEPTED request_id=%s endpoint_host=%s model=%s "
-            "duration_ms=%d",
+            "%s_RESULT_ACCEPTED request_id=%s endpoint_host=%s model=%s duration_ms=%d",
+            self.provider,
             request_id,
             endpoint_host,
             returned_model,
@@ -134,8 +147,100 @@ class JevSemanticClassifierClient:
             output_property = _single_output_property(response_schema)
             if output_property and output_property.get("type") == "boolean":
                 return {output_property["name"]: False}
-            raise ValueError("Jev is unavailable for a fail-closed decision")
+            raise ValueError(
+                f"{self.provider} is unavailable for a fail-closed decision"
+            )
         return _fallback(self._fallback, messages, response_schema)
+
+    def _call(
+        self, request_data: Mapping[str, Any], api_key: str, endpoint: str
+    ) -> Mapping[str, Any]:
+        raise NotImplementedError
+
+
+class JevSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
+    """Use Jev for classifier judges, retaining planning as an error fallback."""
+
+    provider = "JEV"
+    default_model = JEV_MODEL
+    default_endpoint = JEV_DEFAULT_BASE_URL
+
+    def __init__(
+        self,
+        fallback: WorkflowLLMClient,
+        *,
+        api_key: str | None = None,
+        endpoint: str | None = None,
+        model: str | None = None,
+        fail_closed: bool = False,
+    ) -> None:
+        super().__init__(
+            fallback,
+            api_key=api_key,
+            endpoint=endpoint,
+            model=model,
+            fail_closed=fail_closed,
+            _api_key=(
+                os.environ.get("TYPESAFEAI_API_KEY")
+                or os.environ.get("TYPESAFE_API_KEY")
+                or os.environ.get("SYSTEM_ONE_API_KEY")
+            ),
+            _endpoint_env="SYSTEM_ONE_BASE_URL",
+            _model_env="SYSTEM_ONE_MODEL",
+        )
+
+    def _call(
+        self, request_data: Mapping[str, Any], api_key: str, endpoint: str
+    ) -> Mapping[str, Any]:
+        return _call_jev(request_data, api_key, endpoint, self._model)
+
+
+class SubQSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
+    """Use SubQ Decisions for classifier judges with planning as fallback."""
+
+    provider = "SUBQ"
+    default_model = SUBQ_MODEL
+    default_endpoint = SUBQ_DEFAULT_BASE_URL
+
+    def __init__(
+        self,
+        fallback: WorkflowLLMClient,
+        *,
+        api_key: str | None = None,
+        endpoint: str | None = None,
+        model: str | None = None,
+        fail_closed: bool = False,
+    ) -> None:
+        super().__init__(
+            fallback,
+            api_key=api_key,
+            endpoint=endpoint,
+            model=model,
+            fail_closed=fail_closed,
+            _api_key=os.environ.get("SUBQ_API_KEY"),
+            _endpoint_env="SUBQ_BASE_URL",
+            _model_env="SUBQ_MODEL",
+        )
+
+    def _call(
+        self, request_data: Mapping[str, Any], api_key: str, endpoint: str
+    ) -> Mapping[str, Any]:
+        return _call_subq(request_data, api_key, endpoint, self._model)
+
+
+def preferred_semantic_classifier_client(
+    fallback: WorkflowLLMClient, *, fail_closed: bool = False
+) -> _DecisionApiSemanticClassifierClient | None:
+    """Choose Jev when configured, then SubQ, without requiring credentials."""
+    if (
+        os.environ.get("TYPESAFEAI_API_KEY")
+        or os.environ.get("TYPESAFE_API_KEY")
+        or os.environ.get("SYSTEM_ONE_API_KEY")
+    ):
+        return JevSemanticClassifierClient(fallback, fail_closed=fail_closed)
+    if os.environ.get("SUBQ_API_KEY"):
+        return SubQSemanticClassifierClient(fallback, fail_closed=fail_closed)
+    return None
 
 
 def _fallback(
@@ -336,28 +441,41 @@ def _format_classifier_result(
     if output_property and output_property.get("type") == "boolean":
         if choice in {"true", "false"}:
             return {output_property["name"]: choice == "true"}
-        raise ValueError("Jev returned an unsupported boolean classification")
+        raise ValueError("Decision API returned an unsupported boolean classification")
     if choice == "unresolved":
         if output_property and output_property["name"] != "value":
-            raise ValueError("Jev abstained on a single-field classification")
+            raise ValueError("Decision API abstained on a single-field classification")
         return {
             "status": "unresolved",
             "value": None,
             "reason_code": "classifier_abstained",
         }
     if choice not in allowed:
-        raise ValueError("Jev returned an unsupported classifier value")
+        raise ValueError("Decision API returned an unsupported classifier value")
     if response_schema is not None and {"status", "value", "reason_code"} <= set(
         response_schema.get("properties", {})
     ):
         return {"status": "resolved", "value": choice, "reason_code": None}
     if output_property:
         return {output_property["name"]: choice}
-    raise ValueError("Jev classifier output does not match the declared schema")
+    raise ValueError("Decision API output does not match the declared schema")
 
 
 def _call_jev(
     classifier: Mapping[str, Any], api_key: str, endpoint: str, model: str = JEV_MODEL
+) -> Mapping[str, Any]:
+    return _call_decision_api(classifier, api_key, endpoint, model)
+
+
+def _call_subq(
+    classifier: Mapping[str, Any], api_key: str, endpoint: str, model: str
+) -> Mapping[str, Any]:
+    """Call SubQ's Decisions endpoint and normalize its typed answer."""
+    return _call_decision_api(classifier, api_key, endpoint, model)
+
+
+def _call_decision_api(
+    classifier: Mapping[str, Any], api_key: str, endpoint: str, model: str
 ) -> Mapping[str, Any]:
     labels = classifier["allowed_values"]
     instructions = classifier["instructions"]
@@ -393,7 +511,7 @@ def _call_jev(
         result = json.loads(response.read().decode("utf-8"))
     answer = result.get("answers", {}).get("decision")
     if not isinstance(answer, Mapping):
-        raise ValueError("Jev response has no decision answer")
+        raise ValueError("Decision API response has no decision answer")
     return {
         "answer": answer,
         "model": result.get("model", model),

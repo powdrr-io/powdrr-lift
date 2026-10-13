@@ -1,0 +1,283 @@
+{
+  "requirements": [
+    {
+      "requirement": {
+        "id": "r001",
+        "text": "Add @defer directive support so servers can send critical data first while deferring non-essential fields incrementally.",
+        "route": "include",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      "model_approved_criteria": [
+        "r001-criterion-2",
+        "r001-criterion-1"
+      ],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r002",
+        "text": "Add @stream directive support so servers can send critical data first while streaming non-essential fields incrementally.",
+        "route": "include",
+        "source_ids": [
+          "s001"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r003",
+        "text": "Implement session.execute_incremental(query) as an async generator.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r004",
+        "text": "The async generator must yield result objects.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r005",
+        "text": "Each yielded result object must have .data, .has_next, .errors, and .extensions attributes.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r006",
+        "text": "The .data dict is accumulated across payloads, not raw deltas.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r007",
+        "text": "Each yielded result contains the .extensions from that specific payload, not accumulated across payloads.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r008",
+        "text": "Deferred fields merge into parent objects at the path given, using a data key in the incremental item.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r009",
+        "text": "For @stream, incremental items carry an items array.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r010",
+        "text": "For @stream, the path's last integer is the insertion start index into the parent list.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r011",
+        "text": "If an incremental item has no path field, treat it as root-level merge ([]).",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r012",
+        "text": "Support nested paths navigating through lists by index.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r013",
+        "text": "Support nested paths navigating through null values.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r014",
+        "text": "Support nested paths navigating through field overwrites.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r015",
+        "text": "Support concurrent deferred/streamed fields.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r016",
+        "text": "Handle non-incremental responses gracefully.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r017",
+        "text": "Empty incremental arrays and hasNext-only payloads (without data or incremental fields) must still yield a result.",
+        "route": "include",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r018",
+        "text": "Errors must not halt subsequent items.",
+        "route": "include_prohibition",
+        "source_ids": [
+          "s002"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r019",
+        "text": "HTTP multipart transport with boundary=graphql and deferSpec=20220824 must support incremental delivery.",
+        "route": "include",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r020",
+        "text": "WebSocket transport must support incremental delivery.",
+        "route": "include",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r021",
+        "text": "The WebSocket transport must forward incremental payloads through the existing protocol.",
+        "route": "include",
+        "source_ids": [
+          "s003"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r022",
+        "text": "Extend the DSL: .defer() on both DSLFragment and DSLFragmentSpread.",
+        "route": "include",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    },
+    {
+      "requirement": {
+        "id": "r023",
+        "text": "Extend the DSL: .stream() on list fields with optional label and initial_count parameters.",
+        "route": "include",
+        "source_ids": [
+          "s004"
+        ]
+      },
+      "model_approved_criteria": [],
+      "interpretation": "Model votes, not solution coverage"
+    }
+  ]
+}

@@ -1,0 +1,250 @@
+version: 1
+name: atomic-acceptance-observations
+inputs:
+- name: instruction
+  type: string
+  required: true
+- name: requirements
+  type: array
+  required: true
+limits:
+  llm_activations: 200
+  tool_calls: 200
+  context_chars: 70000
+  context_value_chars: 50000
+steps:
+- for_each:
+    snapshot:
+      name: requirements
+      max_items: 40
+    item_binding: requirement
+    collect:
+      binding: records
+      mode: list
+      value: record
+    body:
+    - operation:
+        tool: internal
+        command:
+        - focused_sources
+        parameters:
+          requirement:
+            type: reference
+            value: requirement
+        bind: sources
+    - judge:
+        question: What complete inputs and one operation isolate this requirement?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Construct a valid normal-use scenario for the active requirement. The original
+          instruction governs meaning and grammar; the routed clause is an index.
+          Specify actual initial state and every input payload with concrete values,
+          fields and flags. Name HTTP or WebSocket when relevant. Choose a state that
+          exposes a plausible error through collision, retained data, scope or lifecycle
+          timing when implicated. One operation, precise observation point. query
+          is a complete valid GraphQL document only when needed; otherwise empty.
+          Use captured directive locations and argument names. No expected outcomes.
+          A requested new API need not exist yet. Do not invent guarantees for malformed
+          inputs or absent containers.
+        context:
+        - instruction
+        - requirement
+        - sources
+        provider: flash
+        output:
+          name: setup
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              given: &id001
+                type: string
+              when: *id001
+              query: *id001
+            required:
+            - given
+            - when
+            - query
+        validation:
+          kind: json_schema
+    - judge:
+        question: What required observation follows from exactly these inputs and
+          this operation?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Derive the post-implementation observation from scratch. Do not assess current
+          implementation completeness. Assert only the active requirement and necessary
+          interactions. Use exact values from setup; do not invent example values
+          or defaults. Preserve state outside the addressed update unless relocation
+          is explicitly requested. Distinguish addressed updates from positional insertion.
+          Interpret type/value support separately from constructing absent structure.
+          Existing concrete return types do not prescribe the class for a new structural
+          interface. Optional API arguments do not require a particular AST representation
+          when equivalent encodings express the same behavior. State exact observation
+          timing and conditions without may/or alternatives; omit unrelated assertions.
+          Reference input values symbolically only when the entire relationship is
+          unambiguous and verifiable.
+        context:
+        - instruction
+        - requirement
+        - setup
+        - sources
+        provider: flash
+        output:
+          name: observation
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              then: *id001
+            required:
+            - then
+        validation:
+          kind: json_schema
+    - judge:
+        question: Which plausible incorrect implementation would fail this observed
+          condition?
+        subject: requirement
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Name a specific wrong behavior discriminated by this setup and observation.
+          Do not assume a correct output beyond the supplied observation. Do not add
+          implementation prescriptions or guarantees.
+        context:
+        - requirement
+        - setup
+        - observation
+        provider: flash
+        output:
+          name: counterexample
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              rejects: *id001
+            required:
+            - rejects
+        validation:
+          kind: json_schema
+    - operation:
+        tool: internal
+        command:
+        - assemble_atomic_criterion
+        parameters:
+          requirement:
+            type: reference
+            value: requirement
+          setup:
+            type: reference
+            value: setup
+          observation:
+            type: reference
+            value: observation
+          counterexample:
+            type: reference
+            value: counterexample
+        bind: criterion
+    - operation:
+        tool: internal
+        command:
+        - quality_query
+        parameters:
+          criterion:
+            type: reference
+            value: criterion
+        bind: syntax
+    - judge:
+        question: Are the inputs fully specified and valid for checking the proposed
+          observation?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Check concrete values, payload envelopes, prior state, directive locations,
+          argument names, receivers and observation layer. Source is existing evidence,
+          not a veto on requested new APIs. supported=complete valid setup; contradicted=invalid
+          input or invented value; unknown=insufficient specification.
+        context:
+        - instruction
+        - requirement
+        - criterion
+        - syntax
+        - sources
+        provider: jev
+        output:
+          name: premise
+          schema: &id002
+            type: object
+            additionalProperties: false
+            properties:
+              choice:
+                type: string
+                enum:
+                - supported
+                - contradicted
+                - unknown
+            required:
+            - choice
+        validation:
+          kind: json_schema
+    - judge:
+        question: Does every asserted observation follow from the instruction and
+          correctly scoped source evidence?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Judge independently; the proposal and earlier analyses are hypotheses. Missing
+          implementation never blocks an explicit requirement. Check observation time,
+          update scope, absence defaults and payload-local metadata. Reject additional
+          concrete-class identity requirements for a structural interface and stronger-than-requested
+          representation guarantees. A targeted update should leave other addresses
+          unchanged unless relocation is requested. Dependency formats describe scoped
+          wire/API conventions, not mandatory implementation types. supported=all
+          assertions justified; contradicted=any conflicting or unsupported assertion;
+          unknown=underdetermined.
+        context:
+        - instruction
+        - requirement
+        - criterion
+        - sources
+        provider: jev
+        output:
+          name: review
+          schema: *id002
+        validation:
+          kind: json_schema
+    - operation:
+        tool: internal
+        command:
+        - record_atomic
+        parameters:
+          requirement:
+            type: reference
+            value: requirement
+          criterion:
+            type: reference
+            value: criterion
+          premise:
+            type: reference
+            value: premise
+          review:
+            type: reference
+            value: review
+          syntax:
+            type: reference
+            value: syntax
+        bind: record
+- operation:
+    tool: internal
+    command:
+    - merge_exact_criteria
+    parameters: {}
+    bind: merge_result
+- operation:
+    tool: internal
+    command:
+    - render_prompt
+    parameters: {}
+    bind: prompt
+- terminal: succeeded

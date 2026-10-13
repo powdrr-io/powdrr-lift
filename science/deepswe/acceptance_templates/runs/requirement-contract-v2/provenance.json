@@ -1,0 +1,30 @@
+{
+  "base": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "final_status_observed_after_all_runs": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "setup_artifacts": "../requirement-contract-v3/setup in checkpoints.tar.gz",
+  "models": [
+    "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "jev-latest"
+  ],
+  "recorded_decisions": 186,
+  "cached_decisions": 36,
+  "new_provider_calls": 150,
+  "new_typesafe_completed": 104,
+  "max_request_chars": 59016,
+  "pipeline_sha256": "cf1dc7d9a5b537782727ab02e2fb14160c8ffb6e5dd7171ce390f73abc6060ef",
+  "oracle_input": false,
+  "oracle_hashes_for_post_call_audit_only": {
+    "instruction.md": "0d14a5dac7fa2d6fe2e9d9d9a113fb02cfb2495f63f8b7edcaa18ba73dd16edf",
+    "solution/solution.patch": "65d77639c640cde71e5e867089b4bfd55140e9e7d418183c3cb9df570ade30db",
+    "tests/test.patch": "031de3d902d74cdc8ef142886d5aca3342ff63611a3a903797f3e8d6fb413670"
+  },
+  "tests_run": false,
+  "coding_agents_run": false,
+  "run_error": null
+}

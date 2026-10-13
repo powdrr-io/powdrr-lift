@@ -1,0 +1,64 @@
+{
+  "method": "Manual post-call comparison, not blinded; strict unambiguous/verifiable/solution-consistent standard. No coding-success metric.",
+  "oracle_hashes": {
+    "instruction.md": "0d14a5dac7fa2d6fe2e9d9d9a113fb02cfb2495f63f8b7edcaa18ba73dd16edf",
+    "solution/solution.patch": "65d77639c640cde71e5e867089b4bfd55140e9e7d418183c3cb9df570ade30db",
+    "tests/test.patch": "031de3d902d74cdc8ef142886d5aca3342ff63611a3a903797f3e8d6fb413670"
+  },
+  "model_approved": 5,
+  "ready_emitted_criteria": 0,
+  "emitted_findings": [
+    {
+      "id": "r004-atomic",
+      "assessment": "wrong_outcome",
+      "note": "Requires ExecutionResult and hasNext instead of a structural result with has_next; incomplete payload values and required query variables."
+    },
+    {
+      "id": "r009-atomic",
+      "assessment": "tautology",
+      "note": "Server input is repeated as the observation; ignoring client processing would still satisfy it."
+    },
+    {
+      "id": "r015-atomic",
+      "assessment": "wrong_scope_and_inputs",
+      "note": "Output invents payloads absent from setup; terminal description path with object data nests an object at that terminal in the solution."
+    },
+    {
+      "id": "r016-atomic",
+      "assessment": "wrong_api",
+      "note": "Checks legacy execute, not execute_incremental fallback."
+    },
+    {
+      "id": "r022-atomic",
+      "assessment": "ambiguous_receiver_and_observation",
+      "note": "Repeats availability and combines execution with construction; no precise receiver-to-AST mapping; DSLFragment.defer acts on its spread."
+    }
+  ],
+  "missed_opportunity": {
+    "id": "r023-atomic",
+    "note": "Correct initialCount spelling appears in the proposal, but setup does not explicitly state call parameter values; outcome review is unknown, criterion withheld."
+  },
+  "retrieval_failure": {
+    "id": "r023",
+    "first_five_sources": [
+      "AIOHTTPWebsocketsTransport.__init__",
+      "WebsocketsTransport.__init__",
+      "WebsocketsProtocolTransportBase.__init__",
+      "DSLDirectable.directives",
+      "DSLDirective"
+    ],
+    "note": "Batch-level source pool prevents requirement reranking from recovering omitted DSL receivers."
+  },
+  "remaining_facets": [
+    "Earlier yielded snapshots",
+    "No-shift stream updates and padding",
+    "Correct null terminal scope",
+    "HasNext-only and empty incremental yield with retained state",
+    "Concrete error continuation and metadata lifetime",
+    "GraphQLRequest compatibility",
+    "Serialization and result parsing options",
+    "Generator closure",
+    "Plain response through new incremental API",
+    "Precise DSL receiver-to-AST behavior"
+  ]
+}

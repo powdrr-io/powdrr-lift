@@ -29,6 +29,7 @@ from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_document,
 )
+from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.workrr.run_artifacts import (
     write_json_artifact,
     write_run_report,
@@ -75,9 +76,6 @@ class BootstrapTaskResult:
             "base_branch": self.task.base_branch if self.task else None,
             "bootstrap_path": (
                 str(self.bootstrap.output_path) if self.bootstrap else None
-            ),
-            "manifest_path": (
-                str(self.bootstrap.manifest_path) if self.bootstrap else None
             ),
             "changed_paths": list(self.changed_paths),
             "pull_request_url": self.pull_request_url,
@@ -149,17 +147,26 @@ def run_bootstrap_task(
             "packaged_default" if copied_taxonomy else "project_taxonomy"
         )
         snapshot_path = task.worktree / "docs/structrr/current/baseline-bootstrap.yaml"
-        manifest_path = snapshot_path.with_suffix(".manifest.json")
+        legacy_manifest_path = snapshot_path.with_suffix(".manifest.json")
         previous_snapshot = (
             snapshot_path.read_bytes() if snapshot_path.is_file() else None
         )
-        previous_manifest = (
-            manifest_path.read_bytes() if manifest_path.is_file() else None
+        previous_legacy_manifest = (
+            legacy_manifest_path.read_bytes()
+            if legacy_manifest_path.is_file()
+            else None
         )
         previous_manifest_data: Any = None
-        if previous_manifest is not None:
+        if previous_snapshot is not None:
             try:
-                previous_manifest_data = json.loads(previous_manifest)
+                prior_document = yaml.safe_load(previous_snapshot)
+                if isinstance(prior_document, dict):
+                    previous_manifest_data = prior_document.get("source_manifest")
+            except yaml.YAMLError:
+                previous_manifest_data = None
+        if previous_manifest_data is None and previous_legacy_manifest is not None:
+            try:
+                previous_manifest_data = json.loads(previous_legacy_manifest)
             except json.JSONDecodeError:
                 previous_manifest_data = None
         _emit_bootstrap_progress(
@@ -218,15 +225,56 @@ def run_bootstrap_task(
             )
         if (
             previous_snapshot is not None
-            and previous_snapshot == bootstrap.output_path.read_bytes()
-            and previous_manifest is not None
             and isinstance(previous_manifest_data, dict)
             and bootstrap.source_manifest is not None
             and previous_manifest_data.get("product_digest")
             == bootstrap.source_manifest.product_digest
         ):
-            manifest_path.write_bytes(previous_manifest)
-        candidate_paths = [bootstrap.output_path, bootstrap.manifest_path]
+            try:
+                previous_source_manifest = SourceManifest.from_data(
+                    previous_manifest_data
+                )
+            except ValueError:
+                previous_source_manifest = None
+            if previous_source_manifest is not None:
+                prior_document = yaml.safe_load(previous_snapshot)
+                if isinstance(prior_document, dict):
+                    prior_without_manifest = dict(prior_document)
+                    current_without_manifest = dict(bootstrap.document)
+                    prior_without_manifest.pop("source_manifest", None)
+                    current_without_manifest.pop("source_manifest", None)
+                else:
+                    prior_without_manifest = None
+                    current_without_manifest = {}
+                if prior_without_manifest == current_without_manifest:
+                    bootstrap.document["source_manifest"] = (
+                        previous_source_manifest.to_data()
+                    )
+                    bootstrap = replace(
+                        bootstrap, source_manifest=previous_source_manifest
+                    )
+                    bootstrap.output_path.write_text(
+                        yaml.safe_dump(
+                            bootstrap.document, sort_keys=False, allow_unicode=False
+                        ),
+                        encoding="utf-8",
+                    )
+        candidate_paths = [bootstrap.output_path]
+        if previous_legacy_manifest is not None:
+            tracked_legacy = runner(
+                [
+                    "git",
+                    "ls-files",
+                    "--error-unmatch",
+                    "docs/structrr/current/baseline-bootstrap.manifest.json",
+                ],
+                cwd=task.worktree,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if tracked_legacy.returncode == 0:
+                candidate_paths.append(legacy_manifest_path)
         if copied_taxonomy:
             candidate_paths.append(selected_taxonomy)
         changed_paths = tuple(

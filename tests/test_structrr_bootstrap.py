@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import subprocess
 from pathlib import Path
 
@@ -374,6 +373,8 @@ def test_bootstrap_can_include_new_candidate_files_and_exclude_runtime_plans(
         "features:\n  - id: proposed-only\n    action: added\n",
         encoding="utf-8",
     )
+    legacy_manifest = tmp_path / "candidate.manifest.json"
+    legacy_manifest.write_text("{}\n", encoding="utf-8")
 
     result = bootstrap_structrr(
         repo,
@@ -388,9 +389,10 @@ def test_bootstrap_can_include_new_candidate_files_and_exclude_runtime_plans(
     assert result.source_manifest is not None
     assert result.source_manifest.coverage_complete is True
     assert "src/new_behavior.py" in {item.path for item in result.source_manifest.files}
-    assert result.manifest_path == tmp_path / "candidate.manifest.json"
-    persisted_manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
-    assert persisted_manifest["fingerprint"] == result.source_manifest.fingerprint
+    assert result.document["source_manifest"] == result.source_manifest.to_data()
+    assert not legacy_manifest.exists()
+    persisted_document = yaml.safe_load((tmp_path / "candidate.yaml").read_text())
+    assert persisted_document["source_manifest"] == result.source_manifest.to_data()
 
 
 def test_bootstrap_is_deterministic_and_does_not_stage_output(tmp_path: Path) -> None:

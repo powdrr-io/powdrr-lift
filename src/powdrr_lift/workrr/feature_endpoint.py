@@ -558,9 +558,7 @@ def _execute_procedrr_flow(
             "--validation-command or declare project validation tooling."
         )
     state["validation_profiles"] = validation_profiles
-    state["source_baseline_manifest_path"] = (
-        output_root / "validation-bootstrap.manifest.json"
-    )
+    state["source_baseline_manifest_path"] = output_root / "validation-bootstrap.yaml"
     state["validation_profile_names"] = tuple(
         profile.name for profile in validation_profiles
     )
@@ -6532,10 +6530,12 @@ def _prepare_final_implementation_review(
             "final review requires the immutable source-baseline manifest"
         )
     try:
-        baseline_manifest = SourceManifest.from_data(
-            json.loads(baseline_manifest_path.read_text(encoding="utf-8"))
-        )
-    except (OSError, json.JSONDecodeError, ValueError) as error:
+        baseline_document_with_manifest = _load_yaml_mapping(baseline_manifest_path)
+        manifest_data = baseline_document_with_manifest.get("source_manifest")
+        if not isinstance(manifest_data, Mapping):
+            raise ValueError("source_manifest is missing from bootstrap YAML")
+        baseline_manifest = SourceManifest.from_data(manifest_data)
+    except (OSError, ValueError) as error:
         raise PowdrrExecutionError(
             f"source-baseline manifest is missing or invalid: {error}"
         ) from error

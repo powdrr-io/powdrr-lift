@@ -1,0 +1,29 @@
+{
+  "scenario": {
+    "given": "A query with a deferred field. The server sends an incremental payload with no path field, containing data {\"name\": \"Alice\"}.",
+    "when": "execute_incremental is called and iterated over.",
+    "observe": "What is the .data attribute of the yielded object? Is the data merged at the root level?",
+    "evidence": [
+      "gql/client.py:AsyncClientSession.execute_batch:1688",
+      "gql/client.py:SyncClientSession.execute_batch:1109"
+    ],
+    "id": "batch-02-scenario-3",
+    "requirement_ids": [
+      "r005",
+      "r006",
+      "r007",
+      "r008"
+    ]
+  },
+  "premise": {
+    "choice": "unknown"
+  },
+  "answer": {
+    "status": "unresolved",
+    "then": "Not called: premise unverified."
+  },
+  "review": {
+    "choice": "unknown"
+  },
+  "rendered": null
+}

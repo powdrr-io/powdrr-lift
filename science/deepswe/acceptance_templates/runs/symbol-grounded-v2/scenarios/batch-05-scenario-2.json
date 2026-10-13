@@ -1,0 +1,16 @@
+{
+  "given": "An HTTP multipart transport (AIOHTTPTransport) is configured to connect to a server that supports the multipart/mixed content type with boundary=graphql and deferSpec=20220824. The server sends a multipart response with three parts: the first part contains a payload with data and hasNext: true, the second part contains a payload with an error (e.g., {\"payload\": {\"errors\": [{\"message\": \"boom\"}]}}), and the third part contains a payload with data and hasNext: false.",
+  "when": "The client calls session.execute_incremental(query) and iterates over the yielded results.",
+  "observe": "Does the error in the second part cause the iteration to stop, or does the third part still yield a result? What are the .errors attributes of the yielded results?",
+  "evidence": [
+    "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_part:532",
+    "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_response:489"
+  ],
+  "id": "batch-05-scenario-2",
+  "requirement_ids": [
+    "r017",
+    "r018",
+    "r019",
+    "r020"
+  ]
+}

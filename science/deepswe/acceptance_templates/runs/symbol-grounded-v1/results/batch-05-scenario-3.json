@@ -1,0 +1,29 @@
+{
+  "scenario": {
+    "given": "A WebSocket transport (WebsocketsTransport) is connected to a server that supports the graphql-ws protocol. The server sends a subscription message with a payload containing an incremental item: {\"data\": {\"user\": {\"id\": \"1\"}}, \"incremental\": [{\"data\": {\"name\": \"Alice\"}, \"path\": [\"user\"]}], \"hasNext\": true}.",
+    "when": "The client calls session.execute_incremental(query) and iterates over the yielded results.",
+    "observe": "What is the .data attribute of the first yielded result? Does it contain the accumulated data (e.g., {\"user\": {\"id\": \"1\", \"name\": \"Alice\"}}) or only the raw delta (e.g., {\"user\": {\"id\": \"1\"}})?",
+    "evidence": [
+      "gql/transport/websockets.py:WebsocketsTransport:10",
+      "gql/transport/websockets_protocol.py:WebsocketsProtocolTransportBase.__init__:35"
+    ],
+    "id": "batch-05-scenario-3",
+    "requirement_ids": [
+      "r017",
+      "r018",
+      "r019",
+      "r020"
+    ]
+  },
+  "premise": {
+    "choice": "unknown"
+  },
+  "answer": {
+    "status": "unresolved",
+    "then": "Not called: premise unverified."
+  },
+  "review": {
+    "choice": "unknown"
+  },
+  "rendered": null
+}

@@ -1,0 +1,30 @@
+{
+  "scenario": {
+    "given": "A GraphQL query with a deferred field, e.g., `{ hero { name ... @defer } }`, and a server that sends an initial payload with `data: { hero: { name: \"R2-D2\" } }` and `hasNext: true`, followed by an incremental payload with `incremental: [{ path: [\"hero\"], data: { homePlanet: \"Naboo\" } }]` and `hasNext: false`.",
+    "when": "The client calls `session.execute_incremental(query)` and iterates over the yielded results.",
+    "observe": "What are the `.data` values of the first and second yielded results? Does the second result's `.data` include both `name` and `homePlanet`? What is the `.has_next` value of each result?",
+    "evidence": [
+      "gql/transport/aiohttp.py:AIOHTTPTransport.subscribe:425",
+      "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_part:532",
+      "gql/client.py:AsyncClientSession._subscribe:1290"
+    ],
+    "id": "batch-01-scenario-1",
+    "requirement_ids": [
+      "r001",
+      "r002",
+      "r003",
+      "r004"
+    ]
+  },
+  "premise": {
+    "choice": "supported"
+  },
+  "answer": {
+    "status": "resolved",
+    "then": "The first yielded result has `.data` equal to `{\"hero\": {\"name\": \"R2-D2\"}}` and `.has_next` equal to `True`. The second yielded result has `.data` equal to `{\"hero\": {\"name\": \"R2-D2\", \"homePlanet\": \"Naboo\"}}` and `.has_next` equal to `False`. The second result's `.data` includes both `name` and `homePlanet` because the incremental payload's data is merged into the accumulated data at the path `[\"hero\"]`."
+  },
+  "review": {
+    "choice": "supported"
+  },
+  "rendered": "Given A GraphQL query with a deferred field, e.g., `{ hero { name ... @defer } }`, and a server that sends an initial payload with `data: { hero: { name: \"R2-D2\" } }` and `hasNext: true`, followed by an incremental payload with `incremental: [{ path: [\"hero\"], data: { homePlanet: \"Naboo\" } }]` and `hasNext: false`. When The client calls `session.execute_incremental(query)` and iterates over the yielded results. Then The first yielded result has `.data` equal to `{\"hero\": {\"name\": \"R2-D2\"}}` and `.has_next` equal to `True`. The second yielded result has `.data` equal to `{\"hero\": {\"name\": \"R2-D2\", \"homePlanet\": \"Naboo\"}}` and `.has_next` equal to `False`. The second result's `.data` includes both `name` and `homePlanet` because the incremental payload's data is merged into the accumulated data at the path `[\"hero\"]`."
+}

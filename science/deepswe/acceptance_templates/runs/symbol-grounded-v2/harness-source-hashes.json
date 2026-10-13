@@ -1,0 +1,16 @@
+{
+  "note": "Published harness after bundling identical frozen inputs and adding summary bookkeeping. Exact model request/response bytes and actual container sources are preserved separately.",
+  "files": {
+    "repository_planning/README.md": "cfdc1ef5320ba8b5f051045d4faea7a55f3d2d9c5278c7370328403ee82b2189",
+    "repository_planning/__init__.py": "2989745d64563b17fff22efd26cec0aa1076973686c4e4cca3a20d283c2c597a",
+    "repository_planning/archive.py": "c17c4033aa8202273e5f59478c01a601b9b493280fbb20f78a036d24f336311b",
+    "repository_planning/baseline/input.json": "a6cad74c22efdcbabaa6a6f73979a2b9b20ecbc2e0a30e81883790535179ce0b",
+    "repository_planning/baseline/prompt.md": "b6edf879b6031975f12e42b79d1aa89c470cffaa5cf081a6e6a532249b92d5ae",
+    "repository_planning/pipeline.yaml": "5e07345530c1ea96e517464b8b78357fd28680c2c34bbb00e23c87704143a211",
+    "repository_planning/prepare.py": "9dcc0a0977a6734446156bcaf3056befd54a49962276e2f0f774cea568092749",
+    "repository_planning/run.py": "73e469e2e624c6d1b1f44bdfc70786595178d3ee76dc2fcb1f62f5cde2dd0f7e",
+    "repository_planning/symbols.py": "44497530e2703ee49124816c9cdeab92f6f798136043f30e5c1fe6285d93201a",
+    "repository_planning/worker.py": "7a37998243c674e99640f0f95f3ba75cb745d778fa369acf3404cc1568b7b741",
+    "repository_planning/workflow.py": "86fc26d39bc35c68a82cf148675dcc44027b4bdab6fb2725746da0e151d0c894"
+  }
+}

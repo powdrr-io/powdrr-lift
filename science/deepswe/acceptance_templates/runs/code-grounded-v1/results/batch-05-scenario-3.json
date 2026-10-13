@@ -1,0 +1,8 @@
+{
+  "id": "batch-05-scenario-3",
+  "rendered": "Given An AsyncClientSession is connected to a transport that returns two payloads in sequence: first `{'data': {'hero': {'name': 'R2-D2'}}, 'hasNext': true}` and then `{'incremental': [{'path': ['hero'], 'data': {'friends': ['C-3PO']}, 'errors': [{'message': 'boom'}]}], 'hasNext': false}`. The session has `execute_incremental` implemented as an async generator. When The caller iterates over `session.execute_incremental(gql('{ hero { name friends } }'))` and collects the yielded results. Then The second yielded result has `.data == {'hero': {'name': 'R2-D2', 'friends': ['C-3PO']}}`, `.has_next == False`, `.errors == [{'message': 'boom'}]`, and `.extensions == {}`. The iteration continues and yields that second result despite the error in the incremental item.",
+  "premise": "supported",
+  "status": "resolved",
+  "then": "The second yielded result has `.data == {'hero': {'name': 'R2-D2', 'friends': ['C-3PO']}}`, `.has_next == False`, `.errors == [{'message': 'boom'}]`, and `.extensions == {}`. The iteration continues and yields that second result despite the error in the incremental item.",
+  "review": "supported"
+}

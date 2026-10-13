@@ -1,0 +1,7 @@
+{
+  "id": "batch-06-scenario-1",
+  "rendered": null,
+  "premise": "supported",
+  "status": "unresolved",
+  "then": "The first yielded result object from session.execute_incremental(query) is expected to have .data equal to {'hero': {'name': 'R2-D2'}} and .has_next equal to True, but the provided code does not implement execute_incremental or the incremental payload handling, so this behavior cannot be confirmed from the given sources."
+}

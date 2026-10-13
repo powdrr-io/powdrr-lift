@@ -1,0 +1,17 @@
+{
+  "given": "A GraphQL subscription using WebSocket transport, with a query that includes a @stream field. The server sends an initial payload with data containing a list, then sends an incremental payload with an items array and a path ending in an integer index.",
+  "when": "The client calls session.execute_incremental(query) and iterates over the yielded results.",
+  "observe": "Does the second yielded result's .data contain the accumulated list with the items inserted at the specified index, and does the .extensions attribute reflect only the incremental payload's extensions?",
+  "evidence": [
+    "r009: For @stream, incremental items carry an items array.",
+    "r010: For @stream, the path's last integer is the insertion start index into the parent list.",
+    "WebSocket transport must forward incremental payloads through the existing protocol."
+  ],
+  "id": "batch-03-scenario-1",
+  "requirement_ids": [
+    "r009",
+    "r010",
+    "r011",
+    "r012"
+  ]
+}

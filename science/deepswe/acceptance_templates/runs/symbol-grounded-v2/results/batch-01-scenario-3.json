@@ -1,0 +1,30 @@
+{
+  "scenario": {
+    "given": "A GraphQL query with a deferred field, and a server that sends an initial payload with `data: { hero: { name: \"R2-D2\" } }` and `hasNext: true`, followed by an incremental payload with `incremental: [{ data: { extra: \"value\" } }]` (no `path` field) and `hasNext: false`.",
+    "when": "The client calls `session.execute_incremental(query)` and iterates over the yielded results.",
+    "observe": "What are the `.data` values of the first and second yielded results? Does the second result's `.data` include the `extra` field at the root level? What is the `.has_next` value of each result?",
+    "evidence": [
+      "gql/transport/aiohttp.py:AIOHTTPTransport.subscribe:425",
+      "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_part:532",
+      "gql/client.py:AsyncClientSession._subscribe:1290"
+    ],
+    "id": "batch-01-scenario-3",
+    "requirement_ids": [
+      "r001",
+      "r002",
+      "r003",
+      "r004"
+    ]
+  },
+  "premise": {
+    "choice": "supported"
+  },
+  "answer": {
+    "status": "resolved",
+    "then": "The first yielded result has `.data` equal to `{\"hero\": {\"name\": \"R2-D2\"}}` and `.has_next` equal to `True`. The second yielded result has `.data` equal to `{\"hero\": {\"name\": \"R2-D2\"}, \"extra\": \"value\"}` and `.has_next` equal to `False`. The second result's `.data` includes the `extra` field at the root level because the incremental item has no `path` field, so it is treated as a root-level merge."
+  },
+  "review": {
+    "choice": "supported"
+  },
+  "rendered": "Given A GraphQL query with a deferred field, and a server that sends an initial payload with `data: { hero: { name: \"R2-D2\" } }` and `hasNext: true`, followed by an incremental payload with `incremental: [{ data: { extra: \"value\" } }]` (no `path` field) and `hasNext: false`. When The client calls `session.execute_incremental(query)` and iterates over the yielded results. Then The first yielded result has `.data` equal to `{\"hero\": {\"name\": \"R2-D2\"}}` and `.has_next` equal to `True`. The second yielded result has `.data` equal to `{\"hero\": {\"name\": \"R2-D2\"}, \"extra\": \"value\"}` and `.has_next` equal to `False`. The second result's `.data` includes the `extra` field at the root level because the incremental item has no `path` field, so it is treated as a root-level merge."
+}

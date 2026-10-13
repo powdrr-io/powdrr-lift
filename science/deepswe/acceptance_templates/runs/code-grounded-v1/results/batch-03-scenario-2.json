@@ -1,0 +1,8 @@
+{
+  "id": "batch-03-scenario-2",
+  "rendered": "Given An AsyncClientSession is connected to a transport that returns incremental payloads. The query uses @defer on a root field. The first payload has `data: {'user': {'name': 'Alice'}}` and `has_next: true`. The second payload has `incremental: [{'data': {'age': 30}}]` (no `path` field) and `has_next: false`. When The caller iterates over `session.execute_incremental(query)` and inspects the second yielded result's `.data` attribute. Then The second result's `.data` is `{'user': {'name': 'Alice'}, 'age': 30}`. The incremental item with no `path` field is treated as a root-level merge, so its `data` key's value (`{'age': 30}`) is merged directly into the accumulated root data dict, not nested under a `'data'` key. The first payload's `data` (`{'user': {'name': 'Alice'}}`) is preserved, and the second payload's incremental data is merged at the root, yielding the combined result.",
+  "premise": "supported",
+  "status": "resolved",
+  "then": "The second result's `.data` is `{'user': {'name': 'Alice'}, 'age': 30}`. The incremental item with no `path` field is treated as a root-level merge, so its `data` key's value (`{'age': 30}`) is merged directly into the accumulated root data dict, not nested under a `'data'` key. The first payload's `data` (`{'user': {'name': 'Alice'}}`) is preserved, and the second payload's incremental data is merged at the root, yielding the combined result.",
+  "review": "supported"
+}

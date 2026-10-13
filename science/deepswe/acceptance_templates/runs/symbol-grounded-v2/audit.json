@@ -1,0 +1,139 @@
+{
+  "method": "Manual post-call comparison to solution.patch and base definitions; not blinded. Conditional correctness distinguished from runnable setup. Three usable criteria are not three fully covered features.",
+  "solution_sha256": "65d77639c640cde71e5e867089b4bfd55140e9e7d418183c3cb9df570ade30db",
+  "index": {
+    "symbols": 1589,
+    "parse_errors": []
+  },
+  "counts": {
+    "proposed_scenarios": 24,
+    "invalid_citation_scenarios": 8,
+    "reviewed_premises": 16,
+    "emitted": 6,
+    "usable_emitted": 3,
+    "withheld": 10
+  },
+  "scenarios": [
+    {
+      "id": "batch-01-scenario-1",
+      "emitted": true,
+      "assessment": "invalid_fixture",
+      "note": "Literal query `{ hero { name ... @defer } }` lacks the required fragment selection set. Conditional merge/hasNext answer is correct, but premise was approved and is not runnable."
+    },
+    {
+      "id": "batch-01-scenario-2",
+      "emitted": true,
+      "assessment": "usable",
+      "note": "Empty list plus stream items at index zero yields Luke/Leia and current hasNext flags; coherent for a scalar-list schema."
+    },
+    {
+      "id": "batch-01-scenario-3",
+      "emitted": true,
+      "assessment": "usable",
+      "note": "Deferred data without item path merges at root and preserves hero. Does not test earlier-result snapshot immutability."
+    },
+    {
+      "id": "batch-01-scenario-4",
+      "emitted": false,
+      "assessment": "withheld",
+      "note": "Concrete correct consequence is in then but status is unresolved; no criterion emitted."
+    },
+    {
+      "id": "batch-02-scenario-1",
+      "emitted": false,
+      "assessment": "withheld",
+      "note": "Explicit result-attribute requirements withheld because new implementation is absent; input payload is also underspecified."
+    },
+    {
+      "id": "batch-02-scenario-2",
+      "emitted": false,
+      "assessment": "withheld",
+      "note": "Status unresolved despite a concrete expected data/extensions answer; hasNext and wire item envelope not fully specified."
+    },
+    {
+      "id": "batch-02-scenario-3",
+      "emitted": true,
+      "assessment": "usable",
+      "note": "Root data result agrees with solution. Wording does not completely specify wire incremental-item envelope; weak discriminator for missing-path merge."
+    },
+    {
+      "id": "batch-02-scenario-4",
+      "emitted": false,
+      "assessment": "incomplete_fixture",
+      "note": "No starting parent list. Outcome unresolved, premise nevertheless supported."
+    },
+    {
+      "id": "batch-05-scenario-1",
+      "emitted": false,
+      "assessment": "invalid_fixture",
+      "note": "HTTP parts incorrectly wrap new fields in payload, copied from existing subscription format. Correct solution processes raw part JSON; hypothetical answer also uses {} instead of None for omitted HTTP extensions. Withheld."
+    },
+    {
+      "id": "batch-05-scenario-2",
+      "emitted": true,
+      "assessment": "wrong_outcome",
+      "note": "Concrete HTTP error part wraps errors in payload. Solution reads top-level errors and therefore does not emit the claimed boom errors. Conditional continuation/lifetime intention is useful but literal approved criterion is wrong."
+    },
+    {
+      "id": "batch-05-scenario-3",
+      "emitted": false,
+      "assessment": "withheld",
+      "note": "Withheld because implementation is absent. Initial top-level data plus incremental items would take solution initial-data branch; then cannot presume both get merged."
+    },
+    {
+      "id": "batch-05-scenario-4",
+      "emitted": true,
+      "assessment": "ambiguous_fixture",
+      "note": "HTTP empty-incremental example wraps fields in payload, so does not exercise an actual empty incremental array. Added extensions empty/None assertion is ambiguous. Approved criterion is not ready."
+    },
+    {
+      "id": "batch-06-scenario-1",
+      "emitted": false,
+      "assessment": "invalid_fixture",
+      "note": "Transport observation assumes merged data and True without a hasNext field or initial parent list. Transport forwards data=None for incremental-only messages; session accumulates. Withheld."
+    },
+    {
+      "id": "batch-06-scenario-2",
+      "emitted": false,
+      "assessment": "withheld",
+      "note": "Existing DSLFragment.spread API correctly identified, but explicitly required new defer behavior withheld because method is absent."
+    },
+    {
+      "id": "batch-06-scenario-3",
+      "emitted": false,
+      "assessment": "withheld",
+      "note": "Correct existing DSLField receiver, but explicitly required new stream method withheld because absent."
+    },
+    {
+      "id": "batch-06-scenario-4",
+      "emitted": false,
+      "assessment": "incomplete_fixture",
+      "note": "No concrete data or hasNext flags; proposes final false on stream EOF without final payload. Withheld."
+    }
+  ],
+  "invalid_citation_scenarios": [
+    "batch-03-scenario-1",
+    "batch-03-scenario-2",
+    "batch-03-scenario-3",
+    "batch-03-scenario-4",
+    "batch-04-scenario-1",
+    "batch-04-scenario-2",
+    "batch-04-scenario-3",
+    "batch-04-scenario-4"
+  ],
+  "target_facets": {
+    "g-result-snapshot": "No immutable prior-result criterion.",
+    "g-stream-position": "No fully correct overwrite/no-shift/padding criterion; stream-at-zero case only.",
+    "g-progress-only": "HTTP empty-array example has wrong wire wrapper; hasNext-only case withheld.",
+    "g-error-continuation": "Conditional intention present, literal HTTP errors wrapper incorrect.",
+    "g-errors-lifetime": "Conditional intention present, literal HTTP errors wrapper incorrect."
+  },
+  "retrieval_limitations": [
+    "Lexical ranking selects ParseResultVisitor for list/path/null terms; its existing scalar/result conversion semantics are not the new incremental merge contract.",
+    "Long bodies truncated at 120 lines and class excerpts at 25 lines.",
+    "Imported external-library definitions are not indexed.",
+    "Selection cannot recover a relevant declaration outside the candidate pool.",
+    "Eight proposals dropped due to prose citation formatting, without proving semantic incorrectness."
+  ],
+  "comparison": "Same task/model/frozen routing as prior experiments, but changed retrieval/context and decision prompts; a single adaptive sample, not a controlled causal improvement claim."
+}

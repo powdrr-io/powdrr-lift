@@ -1,0 +1,16 @@
+{
+  "given": "An HTTP multipart transport (AIOHTTPTransport) is configured to connect to a server that supports the multipart/mixed content type with boundary=graphql and deferSpec=20220824. The server sends a multipart response with two parts: the first part is a JSON payload containing only {\"payload\": {\"hasNext\": true}} (no data or incremental fields), and the second part is a JSON payload containing {\"payload\": {\"data\": {\"user\": {\"id\": \"1\"}}, \"hasNext\": false}}.",
+  "when": "The client calls session.execute_incremental(query) and iterates over the yielded results.",
+  "observe": "How many results are yielded, and what are the .data, .has_next, .errors, and .extensions attributes of each yielded result?",
+  "evidence": [
+    "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_part:532",
+    "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_response:489"
+  ],
+  "id": "batch-05-scenario-1",
+  "requirement_ids": [
+    "r017",
+    "r018",
+    "r019",
+    "r020"
+  ]
+}

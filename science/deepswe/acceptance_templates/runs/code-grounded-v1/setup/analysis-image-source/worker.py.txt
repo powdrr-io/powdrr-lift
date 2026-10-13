@@ -1,0 +1,105 @@
+"""Read-only task-repository tools, executed inside the prepared task image."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+from powdrr_lift.basedpyright_tools import execute_basedpyright_tool
+from powdrr_lift.structrr.bootstrap import bootstrap_structrr
+
+ROOT = Path("/app")
+ARTIFACTS = Path("/analysis")
+
+
+def git(*args: str) -> str:
+    return subprocess.check_output(["git", "-C", str(ROOT), *args], text=True).strip()
+
+
+def files() -> list[str]:
+    return git("ls-files").splitlines()
+
+
+def source(path: str) -> Path:
+    candidate = (ROOT / path).resolve()
+    if ROOT not in candidate.parents or path not in files():
+        raise ValueError("Only tracked files inside the task checkout are readable")
+    if not candidate.is_file():
+        raise ValueError("Not a regular file")
+    return candidate
+
+
+def execute(request: dict[str, Any]) -> dict[str, Any]:
+    operation = request["operation"]
+    if operation == "status":
+        return {"head": git("rev-parse", "HEAD"), "status": git("status", "--porcelain")}
+    if operation == "bootstrap":
+        result = bootstrap_structrr(
+            ROOT,
+            output_path=ARTIFACTS / "bootstrap.yaml",
+            taxonomy_path=Path(
+                "/opt/powdrr/src/powdrr_lift/resources/"
+                "software_development_entity_taxonomy.md"
+            ),
+            benchmark_mode=True,
+        )
+        if not result.validation.successful:
+            raise ValueError(str(result.validation.issues))
+        return {
+            "validation_successful": True,
+            "evidence_files": list(result.evidence_files),
+            "sections": list(result.document),
+            "snapshot_sha256": hashlib.sha256(result.output_path.read_bytes()).hexdigest(),
+            "files": files(),
+        }
+    if operation in {"symbol", "structure"}:
+        parameters = (
+            {"query": request["query"], "limit": 20}
+            if operation == "symbol"
+            else {"path": request["path"]}
+        )
+        if operation == "structure":
+            source(request["path"])
+        return execute_basedpyright_tool(
+            "basedpyright-symbol" if operation == "symbol" else "basedpyright-structure",
+            parameters,
+            worktree_root=ROOT,
+        )
+    if operation == "read":
+        path = source(request["path"])
+        lines = path.read_text().splitlines()
+        start, end = request["start"], request["end"]
+        if not 1 <= start <= end <= len(lines) or end - start >= 160:
+            raise ValueError("Read 1-160 lines within file bounds")
+        return {
+            "path": request["path"],
+            "start": start,
+            "end": end,
+            "file_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "text": "\n".join(f"{i}: {lines[i - 1]}" for i in range(start, end + 1)),
+        }
+    if operation == "search":
+        query = request["query"]
+        if not query or "\n" in query:
+            raise ValueError("Search requires a nonempty literal substring")
+        matches = []
+        for name in files():
+            if Path(name).suffix not in {".py", ".md", ".rst", ".toml", ".cfg"}:
+                continue
+            for number, line in enumerate(source(name).read_text().splitlines(), 1):
+                if query.casefold() in line.casefold():
+                    matches.append({"path": name, "line": number, "text": line})
+        return {"matches": matches[:30], "total": len(matches), "truncated": len(matches) > 30}
+    raise ValueError(f"Unsupported operation: {operation}")
+
+
+if __name__ == "__main__":
+    try:
+        response = execute(json.load(sys.stdin))
+    except Exception as exc:
+        response = {"error": type(exc).__name__, "message": str(exc)}
+    print(json.dumps(response))

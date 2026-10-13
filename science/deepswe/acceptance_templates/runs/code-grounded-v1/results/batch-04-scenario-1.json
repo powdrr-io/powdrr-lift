@@ -1,0 +1,8 @@
+{
+  "id": "batch-04-scenario-1",
+  "rendered": "Given A session has executed a query with a deferred field `user.friends` where the initial payload has `data: {user: {name: 'Alice', friends: null}}` and an incremental item `{path: ['user', 'friends'], data: [{id: '1'}]}`. When The session's `execute_incremental` async generator yields the incremental payload. Then In the yielded result's `.data`, `data['user']['friends']` is a list containing `{'id': '1'}`, replacing the initial `null` value. The null does not remain, and the list appears at the same path `['user', 'friends']`.",
+  "premise": "supported",
+  "status": "resolved",
+  "then": "In the yielded result's `.data`, `data['user']['friends']` is a list containing `{'id': '1'}`, replacing the initial `null` value. The null does not remain, and the list appears at the same path `['user', 'friends']`.",
+  "review": "supported"
+}

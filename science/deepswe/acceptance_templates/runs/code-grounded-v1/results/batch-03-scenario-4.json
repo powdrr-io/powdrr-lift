@@ -1,0 +1,8 @@
+{
+  "id": "batch-03-scenario-4",
+  "rendered": "Given An AsyncClientSession is connected to a transport that returns incremental payloads. The query uses @stream on a list field `friends` at path `['user', 'friends']`. The first payload has `data: {'user': {'friends': [{'name': 'A'}, {'name': 'C'}]}}` and `has_next: true`. The second payload has `incremental: [{'path': ['user', 'friends', 1], 'items': [{'name': 'B'}]}]` and `has_next: false`. When The caller iterates over `session.execute_incremental(query)` and inspects the second yielded result's `.data` attribute. Then The second yielded result's `.data` is `{'user': {'friends': [{'name': 'A'}, {'name': 'B'}, {'name': 'C'}]}}`, with 'B' inserted at index 1 and 'C' shifted to index 2.",
+  "premise": "supported",
+  "status": "resolved",
+  "then": "The second yielded result's `.data` is `{'user': {'friends': [{'name': 'A'}, {'name': 'B'}, {'name': 'C'}]}}`, with 'B' inserted at index 1 and 'C' shifted to index 2.",
+  "review": "supported"
+}

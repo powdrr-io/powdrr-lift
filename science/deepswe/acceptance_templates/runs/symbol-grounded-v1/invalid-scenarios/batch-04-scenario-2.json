@@ -1,0 +1,16 @@
+{
+  "given": "A GraphQL schema with a list field `items` of type `[String]`, and a query `{ items }`.",
+  "when": "The server sends an incremental response with a first payload containing `data: {\"items\": [\"a\"]}` and `hasNext: true`, then a second payload with `incremental: [{\"path\": [\"items\", 1], \"items\": [\"b\"]}]` and `hasNext: false`.",
+  "observe": "What are the `.data` values in the two yielded results, and how does the second result's `.data` reflect the insertion of `\"b\"` at index 1?",
+  "evidence": [
+    "Instruction: 'The .data dict is accumulated across payloads, not raw deltas.'",
+    "Instruction: 'For @stream, incremental items carry an items array, and the path's last integer is the insertion start index into the parent list.'"
+  ],
+  "id": "batch-04-scenario-2",
+  "requirement_ids": [
+    "r013",
+    "r014",
+    "r015",
+    "r016"
+  ]
+}

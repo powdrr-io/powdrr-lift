@@ -1,0 +1,15 @@
+{
+  "given": "A DSLField representing a list field 'items' is created.",
+  "when": "The .stream() method is called on the DSLField with arguments label='chunk' and initial_count=2.",
+  "observe": "Does the method exist and return the same instance? Does the resulting AST include a @stream directive with the specified label and initial_count arguments?",
+  "evidence": [
+    "gql/dsl.py:DSLField.directives:1182",
+    "gql/dsl.py:DSLDirectable.directives:476"
+  ],
+  "id": "batch-06-scenario-3",
+  "requirement_ids": [
+    "r021",
+    "r022",
+    "r023"
+  ]
+}

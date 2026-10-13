@@ -1,0 +1,8 @@
+{
+  "id": "batch-04-scenario-4",
+  "rendered": "Given A session has executed a query without any @defer or @stream directives. The transport returns a single non-incremental response with `data: {hello: 'world'}` and no `incremental` field. When The session's `execute_incremental` async generator yields that response. Then The yielded result has `.data` equal to `{'hello': 'world'}` and `.has_next` equal to `False`. The result is not treated as an error and is not skipped; it is yielded normally as the first and only result from the async generator.",
+  "premise": "supported",
+  "status": "resolved",
+  "then": "The yielded result has `.data` equal to `{'hello': 'world'}` and `.has_next` equal to `False`. The result is not treated as an error and is not skipped; it is yielded normally as the first and only result from the async generator.",
+  "review": "supported"
+}

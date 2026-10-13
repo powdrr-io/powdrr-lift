@@ -1,0 +1,29 @@
+{
+  "scenario": {
+    "given": "An HTTP multipart transport (AIOHTTPTransport) is configured to connect to a server that supports the multipart/mixed content type with boundary=graphql and deferSpec=20220824. The server sends a multipart response with two parts: the first part contains a payload with data and hasNext: true, and the second part contains a payload with an empty incremental array and hasNext: false (e.g., {\"payload\": {\"incremental\": [], \"hasNext\": false}}).",
+    "when": "The client calls session.execute_incremental(query) and iterates over the yielded results.",
+    "observe": "How many results are yielded? Does the second part yield a result even though it has no data or incremental fields?",
+    "evidence": [
+      "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_part:532",
+      "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_response:489"
+    ],
+    "id": "batch-05-scenario-4",
+    "requirement_ids": [
+      "r017",
+      "r018",
+      "r019",
+      "r020"
+    ]
+  },
+  "premise": {
+    "choice": "supported"
+  },
+  "answer": {
+    "status": "resolved",
+    "then": "The client observes exactly 2 yielded results. The first result has the data from the first part and has_next=True. The second result is yielded even though it has no data or incremental fields, with has_next=False and the extensions from that specific payload (which may be empty/None)."
+  },
+  "review": {
+    "choice": "supported"
+  },
+  "rendered": "Given An HTTP multipart transport (AIOHTTPTransport) is configured to connect to a server that supports the multipart/mixed content type with boundary=graphql and deferSpec=20220824. The server sends a multipart response with two parts: the first part contains a payload with data and hasNext: true, and the second part contains a payload with an empty incremental array and hasNext: false (e.g., {\"payload\": {\"incremental\": [], \"hasNext\": false}}). When The client calls session.execute_incremental(query) and iterates over the yielded results. Then The client observes exactly 2 yielded results. The first result has the data from the first part and has_next=True. The second result is yielded even though it has no data or incremental fields, with has_next=False and the extensions from that specific payload (which may be empty/None)."
+}

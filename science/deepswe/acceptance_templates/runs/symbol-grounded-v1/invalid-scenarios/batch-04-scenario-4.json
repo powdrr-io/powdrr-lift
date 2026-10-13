@@ -1,0 +1,16 @@
+{
+  "given": "A GraphQL schema with a nullable object field `user` that has a nullable `name` field, and a query `{ user { name } }`.",
+  "when": "The server sends an incremental response with a first payload containing `data: {\"user\": null}` and `hasNext: true`, then a second payload with `incremental: [{\"path\": [\"user\"], \"data\": {\"name\": \"Alice\"}}]` and `hasNext: false`.",
+  "observe": "What are the `.data` values in the two yielded results, and how does the second result's `.data` handle the null value at the path?",
+  "evidence": [
+    "Instruction: 'Support nested paths navigating through null values.'",
+    "parse_result.py:186-188: If `self.current_result` is None, the field is removed, indicating null handling."
+  ],
+  "id": "batch-04-scenario-4",
+  "requirement_ids": [
+    "r013",
+    "r014",
+    "r015",
+    "r016"
+  ]
+}

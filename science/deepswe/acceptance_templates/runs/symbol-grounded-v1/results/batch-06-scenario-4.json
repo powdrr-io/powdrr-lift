@@ -1,0 +1,29 @@
+{
+  "scenario": {
+    "given": "An HTTP transport (e.g., AIOHTTPTransport) is used to execute a query with a @defer directive, and the server responds with a multipart message using boundary=graphql and deferSpec=20220824.",
+    "when": "The server sends a first part with a non-incremental payload containing initial data, followed by a second part with an incremental payload containing a deferred field.",
+    "observe": "Does the transport yield a result object with .data containing the merged data, .has_next set to true, and .extensions from the second payload? Does it yield a final result with .has_next false when the stream ends?",
+    "evidence": [
+      "gql/transport/websockets_protocol.py:WebsocketsProtocolTransportBase.__init__:35",
+      "gql/transport/websockets.py:WebsocketsTransport.__init__:18",
+      "gql/transport/aiohttp_websockets.py:AIOHTTPWebsocketsTransport.__init__:19"
+    ],
+    "id": "batch-06-scenario-4",
+    "requirement_ids": [
+      "r021",
+      "r022",
+      "r023"
+    ]
+  },
+  "premise": {
+    "choice": "unknown"
+  },
+  "answer": {
+    "status": "unresolved",
+    "then": "Not called: premise unverified."
+  },
+  "review": {
+    "choice": "unknown"
+  },
+  "rendered": null
+}

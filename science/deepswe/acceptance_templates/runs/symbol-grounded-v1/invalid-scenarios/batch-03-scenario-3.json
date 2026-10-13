@@ -1,0 +1,16 @@
+{
+  "given": "A GraphQL query using HTTP multipart transport with a @defer field. The server sends an initial payload with data, then an incremental payload that has no path field but includes a data key.",
+  "when": "The client calls session.execute_incremental(query) and iterates over the results.",
+  "observe": "Is the incremental data merged at the root level of the accumulated .data, and does the yielded result's .extensions reflect only the incremental payload's extensions?",
+  "evidence": [
+    "If an incremental item has no path field, treat it as root-level merge ([]).",
+    "Each yielded result contains the .extensions from that specific payload, not accumulated across payloads."
+  ],
+  "id": "batch-03-scenario-3",
+  "requirement_ids": [
+    "r009",
+    "r010",
+    "r011",
+    "r012"
+  ]
+}

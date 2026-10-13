@@ -1,0 +1,16 @@
+{
+  "given": "A GraphQL schema with a nullable object field `user` that has a nullable `name` field, and a query `{ user { name } }`.",
+  "when": "The server returns a non-incremental response with `data: {\"user\": null}`.",
+  "observe": "What does `session.execute_incremental(query)` yield, and what are the `.data`, `.has_next`, `.errors`, and `.extensions` attributes of the yielded result?",
+  "evidence": [
+    "parse_result.py:186-188: If `self.current_result` is None, the field is removed, indicating null handling.",
+    "parse_result.py:190-199: If the result is a Mapping and the key is missing, the field is removed."
+  ],
+  "id": "batch-04-scenario-1",
+  "requirement_ids": [
+    "r013",
+    "r014",
+    "r015",
+    "r016"
+  ]
+}

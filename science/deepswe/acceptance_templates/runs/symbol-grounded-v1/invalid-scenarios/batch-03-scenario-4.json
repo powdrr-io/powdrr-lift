@@ -1,0 +1,17 @@
+{
+  "given": "A GraphQL query using HTTP multipart transport with a @stream field. The server sends an initial payload with data, then an incremental payload with an items array and a path that navigates through a list by index (e.g., [\"friends\", 0, \"nicknames\"]).",
+  "when": "The client calls session.execute_incremental(query) and processes the yielded results.",
+  "observe": "Does the second yielded result's .data have the items inserted into the nested list at the specified index, and does the .extensions attribute contain only the incremental payload's extensions?",
+  "evidence": [
+    "Support nested paths navigating through lists by index.",
+    "For @stream, incremental items carry an items array.",
+    "For @stream, the path's last integer is the insertion start index into the parent list."
+  ],
+  "id": "batch-03-scenario-4",
+  "requirement_ids": [
+    "r009",
+    "r010",
+    "r011",
+    "r012"
+  ]
+}

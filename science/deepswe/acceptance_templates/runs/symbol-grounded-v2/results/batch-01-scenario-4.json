@@ -1,0 +1,30 @@
+{
+  "scenario": {
+    "given": "A GraphQL query with a deferred field, and a server that sends an initial payload with `data: { hero: { name: \"R2-D2\" } }` and `hasNext: true`, followed by an incremental payload with `incremental: [{ path: [\"hero\"], data: { homePlanet: \"Naboo\" } }]` and `hasNext: false`, but the incremental payload also includes an `errors` field with a non-empty array.",
+    "when": "The client calls `session.execute_incremental(query)` and iterates over the yielded results.",
+    "observe": "Does the second yielded result include the `errors` field? Does the iteration continue to yield the second result despite the errors? What is the `.has_next` value of each result?",
+    "evidence": [
+      "gql/transport/aiohttp.py:AIOHTTPTransport.subscribe:425",
+      "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_part:532",
+      "gql/client.py:AsyncClientSession._subscribe:1290"
+    ],
+    "id": "batch-01-scenario-4",
+    "requirement_ids": [
+      "r001",
+      "r002",
+      "r003",
+      "r004"
+    ]
+  },
+  "premise": {
+    "choice": "supported"
+  },
+  "answer": {
+    "status": "unresolved",
+    "then": "The second yielded result includes the `errors` field, and iteration continues to yield the second result despite the errors. The first result has `.has_next` as `True`, and the second result has `.has_next` as `False`."
+  },
+  "review": {
+    "choice": "unknown"
+  },
+  "rendered": null
+}

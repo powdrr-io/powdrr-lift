@@ -1,0 +1,19 @@
+{
+  "llm_activations": 50,
+  "operations": 68,
+  "run_error": null,
+  "scenario_count": 16,
+  "emitted": 6,
+  "provider_calls": 50,
+  "provider_failures": 0,
+  "final_status": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "tests_run": false,
+  "coding_agents_run": false,
+  "recorded_decisions": 50,
+  "cached_decisions": 12,
+  "new_provider_calls": 38,
+  "typesafe_completed_calls": 22
+}

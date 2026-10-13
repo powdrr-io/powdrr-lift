@@ -1,0 +1,29 @@
+{
+  "scenario": {
+    "given": "A WebSocket transport (WebsocketsTransport) is connected to a server that supports the graphql-ws protocol. The server sends a subscription message with a payload containing an incremental item: {\"data\": {\"user\": {\"id\": \"1\"}}, \"incremental\": [{\"data\": {\"name\": \"Alice\"}, \"path\": [\"user\"]}], \"hasNext\": true}.",
+    "when": "The client calls session.execute_incremental(query) and iterates over the yielded results.",
+    "observe": "What is the .data attribute of the first yielded result? Does it contain the accumulated data (e.g., {\"user\": {\"id\": \"1\", \"name\": \"Alice\"}}) or only the raw delta (e.g., {\"user\": {\"id\": \"1\"}})?",
+    "evidence": [
+      "gql/transport/websockets.py:WebsocketsTransport:10",
+      "gql/transport/websockets_protocol.py:WebsocketsProtocolTransportBase.__init__:35"
+    ],
+    "id": "batch-05-scenario-3",
+    "requirement_ids": [
+      "r017",
+      "r018",
+      "r019",
+      "r020"
+    ]
+  },
+  "premise": {
+    "choice": "supported"
+  },
+  "answer": {
+    "status": "unresolved",
+    "then": "The .data attribute of the first yielded result cannot be determined from the provided evidence. The evidence shows the WebSocket transport's initialization and protocol base class, but does not include the implementation of execute_incremental or the incremental payload handling logic. The requirement states that .data should be accumulated across payloads, but the actual behavior depends on the implementation that is not shown in the evidence."
+  },
+  "review": {
+    "choice": "unknown"
+  },
+  "rendered": null
+}

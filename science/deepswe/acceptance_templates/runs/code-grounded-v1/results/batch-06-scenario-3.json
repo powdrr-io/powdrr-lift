@@ -1,0 +1,7 @@
+{
+  "id": "batch-06-scenario-3",
+  "rendered": null,
+  "premise": "supported",
+  "status": "unresolved",
+  "then": "The printed query string includes '@stream(label: 'friends_stream', initialCount: 2)' on the 'friends' field, because the DSLField.stream() method adds a @stream directive with the provided label and initial_count arguments to the field's AST, and the query printer serializes the directive with camelCase argument names."
+}

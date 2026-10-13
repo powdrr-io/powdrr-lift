@@ -1,0 +1,183 @@
+"""Deterministic Python symbol extraction and high-recall lexical retrieval."""
+
+from __future__ import annotations
+
+import ast
+import hashlib
+import math
+import re
+from collections import Counter
+from pathlib import Path
+from typing import Any
+
+STOP = frozenset(
+    "a an the to of in on and or with from for by be as is must should support implements implement optional existing new both using given when then result field fields".split()
+)
+
+
+def terms(text: str) -> set[str]:
+    text = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", text)
+    return {
+        t.rstrip("s") if len(t) > 4 and t.endswith("s") else t
+        for t in re.findall(r"[a-zA-Z][a-zA-Z0-9]*", text.lower())
+        if len(t) > 1 and t not in STOP
+    }
+
+
+def extract(root: Path, paths: list[str]) -> dict[str, Any]:
+    records: list[dict[str, Any]] = []
+    errors = []
+    for relative in paths:
+        if not relative.endswith(".py"):
+            continue
+        path = (root / relative).resolve()
+        if root.resolve() not in path.parents:
+            raise ValueError("Source escapes repository")
+        text = path.read_text()
+        try:
+            tree = ast.parse(text)
+        except SyntaxError as exc:
+            errors.append({"path": relative, "error": str(exc)})
+            continue
+        file_hash = hashlib.sha256(path.read_bytes()).hexdigest()
+
+        def visit(node: ast.AST, parents: list[str]) -> None:
+            if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                qualified = ".".join([*parents, node.name])
+                start = min([node.lineno, *[d.lineno for d in node.decorator_list]])
+                end = node.end_lineno or node.lineno
+                signature = (
+                    "class "
+                    + node.name
+                    + "("
+                    + ", ".join(ast.unparse(b) for b in node.bases)
+                    + ")"
+                    if isinstance(node, ast.ClassDef)
+                    else ("async " if isinstance(node, ast.AsyncFunctionDef) else "")
+                    + "def "
+                    + node.name
+                    + "("
+                    + ast.unparse(node.args)
+                    + ")"
+                    + (" -> " + ast.unparse(node.returns) if node.returns else "")
+                )
+                calls = sorted(
+                    {
+                        ast.unparse(n.func)
+                        for n in ast.walk(node)
+                        if isinstance(n, ast.Call)
+                    }
+                )
+                identifiers = sorted(
+                    {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
+                    | {n.attr for n in ast.walk(node) if isinstance(n, ast.Attribute)}
+                )
+                records.append(
+                    {
+                        "id": f"{relative}:{qualified}:{start}",
+                        "name": node.name,
+                        "qualified_name": qualified,
+                        "container": ".".join(parents),
+                        "kind": "class"
+                        if isinstance(node, ast.ClassDef)
+                        else "function",
+                        "path": relative,
+                        "start": start,
+                        "end": end,
+                        "signature": signature,
+                        "docstring": ast.get_docstring(node) or "",
+                        "calls": calls,
+                        "identifiers": identifiers,
+                        "file_sha256": file_hash,
+                        "test": relative.startswith("tests/")
+                        or Path(relative).name.startswith("test_"),
+                    }
+                )
+                parents = [*parents, node.name]
+            for child in ast.iter_child_nodes(node):
+                visit(child, parents)
+
+        visit(tree, [])
+    return {
+        "symbols": records,
+        "parse_errors": errors,
+        "method": "Python AST; call/name links are syntactic candidates, not resolved type edges",
+    }
+
+
+def retrieve(index: dict[str, Any], requirement: str) -> dict[str, Any]:
+    symbols = index["symbols"]
+    documents = [
+        terms(
+            " ".join(
+                [
+                    r["qualified_name"],
+                    r["signature"],
+                    r["path"],
+                    r["docstring"],
+                    *r["identifiers"],
+                ]
+            )
+        )
+        for r in symbols
+    ]
+    counts = Counter(t for document in documents for t in document)
+    query = terms(requirement)
+    scores = []
+    for row, document in zip(symbols, documents, strict=True):
+        matched = query & document
+        names = terms(row["qualified_name"] + " " + row["signature"])
+        score = sum(
+            math.log(1 + len(symbols) / (1 + counts[t])) * (3 if t in names else 1)
+            for t in matched
+        )
+        if score:
+            scores.append((score, row, sorted(matched)))
+    scores.sort(key=lambda item: (-item[0], item[1]["id"]))
+    production = [item for item in scores if not item[1]["test"]][:10]
+    usages = [item for item in scores if item[1]["test"]][:3]
+    chosen = {
+        row["id"]: {
+            "symbol": row,
+            "score": score,
+            "reason": "lexical",
+            "matched_terms": matched,
+        }
+        for score, row, matched in [*production, *usages]
+    }
+    # One hop: parent classes and syntactically referenced local declarations.
+    for _, row, _ in production:
+        names = {call.rsplit(".", 1)[-1] for call in row["calls"]} | set(
+            row["identifiers"]
+        )
+        neighbors = [
+            r
+            for r in symbols
+            if not r["test"]
+            and (
+                (
+                    r["path"] == row["path"]
+                    and (r["name"] in names or r["qualified_name"] == row["container"])
+                )
+                or (r["kind"] == "class" and r["name"] in names)
+            )
+        ]
+        for related in neighbors[:4]:
+            if len(chosen) >= 22:
+                break
+            chosen.setdefault(
+                related["id"],
+                {
+                    "symbol": related,
+                    "score": 0,
+                    "reason": f"syntactic neighbor of {row['id']}",
+                    "matched_terms": [],
+                },
+            )
+    return {
+        "query_terms": sorted(query),
+        "total_matching_symbols": len(scores),
+        "candidates": list(chosen.values()),
+        "truncated": len(scores) > len(production) + len(usages),
+        "limits": {"production": 10, "usages": 3, "with_neighbors": 22},
+    }

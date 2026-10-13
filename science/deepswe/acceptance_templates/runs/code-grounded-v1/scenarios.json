@@ -1,0 +1,192 @@
+{
+  "scenarios": [
+    {
+      "id": "batch-03-scenario-1",
+      "requirement_ids": [
+        "r009",
+        "r010"
+      ],
+      "given": "An AsyncClientSession is connected to a transport that returns incremental payloads. The query uses @stream on a list field `friends` at path `['user', 'friends']`. The first payload has `data: {'user': {'friends': [{'name': 'A'}]}}` and `has_next: true`. The second payload has `incremental: [{'path': ['user', 'friends', 1], 'items': [{'name': 'B'}]}]` and `has_next: false`.",
+      "when": "The caller iterates over `session.execute_incremental(query)` and inspects the second yielded result's `.data` attribute.",
+      "observe": "Does the second result's `.data` contain `{'user': {'friends': [{'name': 'A'}, {'name': 'B'}]}}` with 'B' inserted at index 1, or does it contain only the raw incremental delta `{'user': {'friends': [{'name': 'B'}]}}`?",
+      "evidence_ids": [
+        "batch-03-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-03-scenario-2",
+      "requirement_ids": [
+        "r011"
+      ],
+      "given": "An AsyncClientSession is connected to a transport that returns incremental payloads. The query uses @defer on a root field. The first payload has `data: {'user': {'name': 'Alice'}}` and `has_next: true`. The second payload has `incremental: [{'data': {'age': 30}}]` (no `path` field) and `has_next: false`.",
+      "when": "The caller iterates over `session.execute_incremental(query)` and inspects the second yielded result's `.data` attribute.",
+      "observe": "Does the second result's `.data` contain `{'user': {'name': 'Alice'}, 'age': 30}` (root-level merge) or `{'user': {'name': 'Alice'}, 'data': {'age': 30}}` (nested under a 'data' key)?",
+      "evidence_ids": [
+        "batch-03-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-03-scenario-3",
+      "requirement_ids": [
+        "r012"
+      ],
+      "given": "An AsyncClientSession is connected to a transport that returns incremental payloads. The query uses @defer on a field inside a list. The first payload has `data: {'users': [{'name': 'A'}, {'name': 'B'}]}` and `has_next: true`. The second payload has `incremental: [{'path': ['users', 1, 'age'], 'data': 30}]` and `has_next: false`.",
+      "when": "The caller iterates over `session.execute_incremental(query)` and inspects the second yielded result's `.data` attribute.",
+      "observe": "Does the second result's `.data` contain `{'users': [{'name': 'A'}, {'name': 'B', 'age': 30}]}` with the deferred field merged into the second list element, or does it fail to navigate the list index and leave the data unchanged?",
+      "evidence_ids": [
+        "batch-03-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-03-scenario-4",
+      "requirement_ids": [
+        "r009",
+        "r010",
+        "r012"
+      ],
+      "given": "An AsyncClientSession is connected to a transport that returns incremental payloads. The query uses @stream on a list field `friends` at path `['user', 'friends']`. The first payload has `data: {'user': {'friends': [{'name': 'A'}, {'name': 'C'}]}}` and `has_next: true`. The second payload has `incremental: [{'path': ['user', 'friends', 1], 'items': [{'name': 'B'}]}]` and `has_next: false`.",
+      "when": "The caller iterates over `session.execute_incremental(query)` and inspects the second yielded result's `.data` attribute.",
+      "observe": "Does the second result's `.data` contain `{'user': {'friends': [{'name': 'A'}, {'name': 'B'}, {'name': 'C'}]}}` with 'B' inserted at index 1 (shifting 'C' to index 2), or does it contain `{'user': {'friends': [{'name': 'A'}, {'name': 'C'}, {'name': 'B'}]}}` with 'B' appended at the end?",
+      "evidence_ids": [
+        "batch-03-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-04-scenario-1",
+      "requirement_ids": [
+        "r013",
+        "r014"
+      ],
+      "given": "A session has executed a query with a deferred field `user.friends` where the initial payload has `data: {user: {name: 'Alice', friends: null}}` and an incremental item `{path: ['user', 'friends'], data: [{id: '1'}]}`.",
+      "when": "The session's `execute_incremental` async generator yields the incremental payload.",
+      "observe": "In the yielded result's `.data`, is `data['user']['friends']` a list containing `{'id': '1'}` (replacing the null), or does the null remain and the list appear elsewhere?",
+      "evidence_ids": [
+        "batch-04-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-04-scenario-2",
+      "requirement_ids": [
+        "r014"
+      ],
+      "given": "A session has executed a query with a deferred field `user.profile` where the initial payload has `data: {user: {name: 'Alice', profile: {age: 30}}}` and an incremental item `{path: ['user', 'profile'], data: {age: 31}}`.",
+      "when": "The session's `execute_incremental` async generator yields the incremental payload.",
+      "observe": "In the yielded result's `.data`, does `data['user']['profile']` become `{'age': 31}` (replacing the entire object), or does it merge with the existing object to become `{'age': 31}` with any other keys preserved?",
+      "evidence_ids": [
+        "batch-04-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-04-scenario-3",
+      "requirement_ids": [
+        "r015"
+      ],
+      "given": "A session has executed a query with two deferred fields: `user.friends` and `user.posts`. The initial payload has `data: {user: {name: 'Alice'}}`. The server sends two incremental items in the same payload: `{path: ['user', 'friends'], data: [{id: '1'}]}` and `{path: ['user', 'posts'], data: [{id: 'p1'}]}`.",
+      "when": "The session's `execute_incremental` async generator yields that payload.",
+      "observe": "In the yielded result's `.data`, does `data['user']` contain both `friends` and `posts` keys with their respective lists, or does one overwrite the other?",
+      "evidence_ids": [
+        "batch-04-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-04-scenario-4",
+      "requirement_ids": [
+        "r016"
+      ],
+      "given": "A session has executed a query without any @defer or @stream directives. The transport returns a single non-incremental response with `data: {hello: 'world'}` and no `incremental` field.",
+      "when": "The session's `execute_incremental` async generator yields that response.",
+      "observe": "In the yielded result, is `.data` equal to `{'hello': 'world'}` and `.has_next` False, or is the result treated as an error or skipped?",
+      "evidence_ids": [
+        "batch-04-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-05-scenario-1",
+      "requirement_ids": [
+        "r017"
+      ],
+      "given": "An AsyncClientSession is connected to a transport that returns a single non-incremental JSON payload: `{'data': {'hero': {'name': 'R2-D2'}}, 'hasNext': false}`. The session has `execute_incremental` implemented as an async generator.",
+      "when": "The caller iterates over `session.execute_incremental(gql('{ hero { name } }'))` and collects the yielded results.",
+      "observe": "At the first yield, does the result object have `.data == {'hero': {'name': 'R2-D2'}}`, `.has_next == False`, `.errors is None`, and `.extensions == {}`? Does the iteration stop after that single yield?",
+      "evidence_ids": [
+        "batch-05-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-05-scenario-2",
+      "requirement_ids": [
+        "r017"
+      ],
+      "given": "An AsyncClientSession is connected to a transport that returns a payload with `hasNext: true` but no `data` and no `incremental` field: `{'hasNext': true}`. The session has `execute_incremental` implemented as an async generator.",
+      "when": "The caller iterates over `session.execute_incremental(gql('{ hero { name } }'))` and collects the yielded results.",
+      "observe": "At the first yield, does the result object have `.data == {}`, `.has_next == True`, `.errors is None`, and `.extensions == {}`? Does the iteration continue to wait for a subsequent payload?",
+      "evidence_ids": [
+        "batch-05-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-05-scenario-3",
+      "requirement_ids": [
+        "r018"
+      ],
+      "given": "An AsyncClientSession is connected to a transport that returns two payloads in sequence: first `{'data': {'hero': {'name': 'R2-D2'}}, 'hasNext': true}` and then `{'incremental': [{'path': ['hero'], 'data': {'friends': ['C-3PO']}, 'errors': [{'message': 'boom'}]}], 'hasNext': false}`. The session has `execute_incremental` implemented as an async generator.",
+      "when": "The caller iterates over `session.execute_incremental(gql('{ hero { name friends } }'))` and collects the yielded results.",
+      "observe": "At the second yield, does the result object have `.data == {'hero': {'name': 'R2-D2', 'friends': ['C-3PO']}}`, `.has_next == False`, `.errors == [{'message': 'boom'}]`, and `.extensions == {}`? Does the iteration continue to yield that second result despite the error in the incremental item?",
+      "evidence_ids": [
+        "batch-05-turn-0-tool-0"
+      ]
+    },
+    {
+      "id": "batch-05-scenario-4",
+      "requirement_ids": [
+        "r019",
+        "r020"
+      ],
+      "given": "An AsyncClientSession is connected to an AIOHTTPTransport with `url='http://example.com/graphql'` and a WebSocket transport with `url='ws://example.com/graphql'`. Both transports are configured to support incremental delivery. The session has `execute_incremental` implemented as an async generator.",
+      "when": "The caller calls `session.execute_incremental(gql('{ hero { name } }'))` on the HTTP transport and on the WebSocket transport, and iterates over both generators.",
+      "observe": "For the HTTP transport, does the request include `Accept: multipart/mixed; boundary=graphql; deferSpec=20220824` and does the response parsing yield incremental results? For the WebSocket transport, does the existing protocol forward incremental payloads (e.g., `next` messages with `incremental` fields) as yielded results?",
+      "evidence_ids": [
+        "batch-05-turn-0-tool-0",
+        "batch-05-turn-0-tool-1"
+      ]
+    },
+    {
+      "id": "batch-06-scenario-1",
+      "requirement_ids": [
+        "r021"
+      ],
+      "given": "A WebSocket transport (WebsocketsProtocolTransportBase) is connected to a server using the graphql-transport-ws subprotocol. The client has sent a subscribe message with id '1' for a query with @defer. The server sends a next message with payload: {'data': {'hero': {'name': 'R2-D2'}}, 'hasNext': true}.",
+      "when": "The transport's _parse_answer method processes this next message and the client iterates the async generator returned by session.execute_incremental(query).",
+      "observe": "Does the first yielded result object have .data equal to {'hero': {'name': 'R2-D2'}} and .has_next equal to True?",
+      "evidence_ids": [
+        "batch-06-turn-0-tool-0",
+        "batch-06-turn-2-tool-2"
+      ]
+    },
+    {
+      "id": "batch-06-scenario-2",
+      "requirement_ids": [
+        "r022"
+      ],
+      "given": "A DSLFragment named 'HeroFields' is defined with a selection set containing a field 'name'. A DSLFragmentSpread referencing 'HeroFields' is used inside a query's selection set.",
+      "when": "The user calls .defer() on the DSLFragmentSpread object.",
+      "observe": "Does the printed query string include '@defer' on the fragment spread?",
+      "evidence_ids": [
+        "batch-06-turn-2-tool-1"
+      ]
+    },
+    {
+      "id": "batch-06-scenario-3",
+      "requirement_ids": [
+        "r023"
+      ],
+      "given": "A DSLField representing a list field 'friends' is created with a selection set containing 'name'. The field is part of a query.",
+      "when": "The user calls .stream() on the DSLField with arguments label='friends_stream' and initial_count=2.",
+      "observe": "Does the printed query string include '@stream(label: ",
+      "evidence_ids": [
+        "batch-06-turn-2-tool-1"
+      ]
+    }
+  ],
+  "failures": []
+}

@@ -1,0 +1,16 @@
+{
+  "given": "A query with a streamed field. The server sends an incremental payload with path [\"items\", 0] and items [\"a\", \"b\"].",
+  "when": "execute_incremental is called and iterated over.",
+  "observe": "What is the .data attribute of the yielded object? Are the items inserted at index 0 in the parent list?",
+  "evidence": [
+    "gql/client.py:AsyncClientSession.execute_batch:1688",
+    "gql/client.py:SyncClientSession.execute_batch:1109"
+  ],
+  "id": "batch-02-scenario-4",
+  "requirement_ids": [
+    "r005",
+    "r006",
+    "r007",
+    "r008"
+  ]
+}

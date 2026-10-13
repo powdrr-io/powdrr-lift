@@ -1,0 +1,8 @@
+{
+  "id": "batch-05-scenario-1",
+  "rendered": "Given An AsyncClientSession is connected to a transport that returns a single non-incremental JSON payload: `{'data': {'hero': {'name': 'R2-D2'}}, 'hasNext': false}`. The session has `execute_incremental` implemented as an async generator. When The caller iterates over `session.execute_incremental(gql('{ hero { name } }'))` and collects the yielded results. Then The first (and only) yielded result object has `.data == {'hero': {'name': 'R2-D2'}}`, `.has_next == False`, `.errors is None`, and `.extensions == {}`. The iteration stops after that single yield because the payload's `hasNext` is `false` and no further payloads are expected.",
+  "premise": "supported",
+  "status": "resolved",
+  "then": "The first (and only) yielded result object has `.data == {'hero': {'name': 'R2-D2'}}`, `.has_next == False`, `.errors is None`, and `.extensions == {}`. The iteration stops after that single yield because the payload's `hasNext` is `false` and no further payloads are expected.",
+  "review": "supported"
+}

@@ -1,0 +1,65 @@
+{
+  "reason": "Fix local Jev adapter only. Reuse all 12 captured Flash candidate selections/scenario proposals unchanged; no oracle selection. Index is same prepared base repository. Fresh outcome decisions and Typesafe.ai calls.",
+  "cached_decisions": [
+    {
+      "request_sha256": "6dfcb3785de915cd9e492ea65efdbb6d356738ba95be8f66d8768c22a0cd0fd1",
+      "source": "symbol-grounded-v1/calls/deepinfra/001/call.json",
+      "source_sha256": "e11099200d2fc1033eaf7bb5c1d3810541630888ac5f196018b000991588d32c"
+    },
+    {
+      "request_sha256": "8dfe5008ebb53ac37b3f1f8939bb670efdb0760641cdf7aff2b9c73ec65c179f",
+      "source": "symbol-grounded-v1/calls/deepinfra/002/call.json",
+      "source_sha256": "78e31bf877fa8b23aae6b74358551a4a8c458c849acc92a07dadfda6efc6899a"
+    },
+    {
+      "request_sha256": "db61bf484c0f87c81d69e7acdc426776f50cb7fc2e773eada7b1526e4fa9f46e",
+      "source": "symbol-grounded-v1/calls/deepinfra/003/call.json",
+      "source_sha256": "3a695d77ffc4e8037d1c3360f4d42d52895c7a77b291617905a609b87aef8ff7"
+    },
+    {
+      "request_sha256": "7475249365b10dec9102bd4553c3929b26d3b756f39580ac1e6755ccf0adba12",
+      "source": "symbol-grounded-v1/calls/deepinfra/004/call.json",
+      "source_sha256": "2bce4bfa859bca26ab619648b3c103e0f3fe1c5a83afbe558efc6929b0d1795d"
+    },
+    {
+      "request_sha256": "a3d85d639d172a0a1a86c7fa515899c8eebfd8d6bea0eb05b36b4ad44459af3d",
+      "source": "symbol-grounded-v1/calls/deepinfra/005/call.json",
+      "source_sha256": "03ed1bc1259fb964eda8ce80850fa4f1359aa1b1734dd3607f2b852ffdacf620"
+    },
+    {
+      "request_sha256": "a3cca63aed2de52f1e8a31cfdd99a5b3199a78b5e6efc77d8f4e63768be9c2f3",
+      "source": "symbol-grounded-v1/calls/deepinfra/006/call.json",
+      "source_sha256": "6df22cf4f3910ea933f740b44bcc2b0f7dc192bca21b1b0f1cfde73d3ce9b8b6"
+    },
+    {
+      "request_sha256": "8b95ff2693590584aa59720636d893292135b6ee0af1a17feb64394d1610ab89",
+      "source": "symbol-grounded-v1/calls/deepinfra/007/call.json",
+      "source_sha256": "62e3daa8cc5f3820ec9923eb93cacdf02f0af417d9e52cf53b05687ec7a0e2f2"
+    },
+    {
+      "request_sha256": "b84daa4c942025fd10b12af327f8343e17657921bc9ccf077774af808662232a",
+      "source": "symbol-grounded-v1/calls/deepinfra/008/call.json",
+      "source_sha256": "e810f6301ea12b3a530bcc9f323fb55ee098503957cedbebcb90e02e024cab5d"
+    },
+    {
+      "request_sha256": "b9b0031e4f673504b5faa81ee48787e11dfc4cb382b6dd0e73a981c03c73d3a8",
+      "source": "symbol-grounded-v1/calls/deepinfra/009/call.json",
+      "source_sha256": "1a34224bc3f25e5e5050ecc8bd2a26b0092b9271c2dcf57e81939abe907b2f39"
+    },
+    {
+      "request_sha256": "dd2132b8a2bb671c521274237bccb32673d5d62f36ac755f27656e1bc241e166",
+      "source": "symbol-grounded-v1/calls/deepinfra/010/call.json",
+      "source_sha256": "303f9c576a4deabff102fca90e4c996e5ba6495762f8c364034c6c2267cfd810"
+    },
+    {
+      "request_sha256": "6959e3f852e8cf256207cf36653a366ff8840bb0337671be928b5c10478c7d63",
+      "source": "symbol-grounded-v1/calls/deepinfra/011/call.json",
+      "source_sha256": "6246e1a18e02b4ab6af5e4e082224b9aa339df656de23bb113c671c3fff101b1"
+    },
+    {
+      "request_sha256": "40c8696673971056ad22ba7977661732e8867e713d0bb8b25ba94bd87f5985d2",
+      "source": "symbol-grounded-v1/calls/deepinfra/012/call.json",
+      "source_sha256": "b46f2ce8c89bcf224c4f779bb8e95995a66c6fe6f4710cfe5b1d2680a50eb396"
+    }
+  ]
+}

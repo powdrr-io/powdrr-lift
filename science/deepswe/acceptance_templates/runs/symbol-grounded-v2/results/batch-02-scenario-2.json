@@ -1,0 +1,29 @@
+{
+  "scenario": {
+    "given": "A query with a deferred field. The server sends two payloads: first a non-incremental payload with data {\"user\": {\"id\": \"1\"}} and extensions {\"trace\": \"a\"}, then an incremental payload with path [\"user\"], data {\"name\": \"Alice\"}, and extensions {\"trace\": \"b\"}.",
+    "when": "execute_incremental is called and iterated over.",
+    "observe": "What is the .data attribute of the second yielded object? What is the .extensions attribute of the second yielded object? Does the .data include the accumulated fields from the first payload?",
+    "evidence": [
+      "gql/client.py:AsyncClientSession.execute_batch:1688",
+      "gql/client.py:SyncClientSession.execute_batch:1109"
+    ],
+    "id": "batch-02-scenario-2",
+    "requirement_ids": [
+      "r005",
+      "r006",
+      "r007",
+      "r008"
+    ]
+  },
+  "premise": {
+    "choice": "supported"
+  },
+  "answer": {
+    "status": "unresolved",
+    "then": "The .data attribute of the second yielded object is {\"user\": {\"id\": \"1\", \"name\": \"Alice\"}}. The .extensions attribute of the second yielded object is {\"trace\": \"b\"}. The .data includes the accumulated fields from the first payload."
+  },
+  "review": {
+    "choice": "unknown"
+  },
+  "rendered": null
+}

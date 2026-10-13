@@ -1,0 +1,7 @@
+{
+  "id": "batch-06-scenario-2",
+  "rendered": null,
+  "premise": "supported",
+  "status": "unresolved",
+  "then": "The printed query string includes '@defer' on the fragment spread."
+}

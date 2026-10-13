@@ -1,0 +1,13 @@
+{
+  "scenarios": 15,
+  "emitted": 9,
+  "tool_requests": 36,
+  "source_reads": 11,
+  "discovery_failures": [],
+  "final_status": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "tests_run": false,
+  "coding_agents_run": false
+}

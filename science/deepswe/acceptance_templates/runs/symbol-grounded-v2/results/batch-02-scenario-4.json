@@ -1,0 +1,29 @@
+{
+  "scenario": {
+    "given": "A query with a streamed field. The server sends an incremental payload with path [\"items\", 0] and items [\"a\", \"b\"].",
+    "when": "execute_incremental is called and iterated over.",
+    "observe": "What is the .data attribute of the yielded object? Are the items inserted at index 0 in the parent list?",
+    "evidence": [
+      "gql/client.py:AsyncClientSession.execute_batch:1688",
+      "gql/client.py:SyncClientSession.execute_batch:1109"
+    ],
+    "id": "batch-02-scenario-4",
+    "requirement_ids": [
+      "r005",
+      "r006",
+      "r007",
+      "r008"
+    ]
+  },
+  "premise": {
+    "choice": "supported"
+  },
+  "answer": {
+    "status": "unresolved",
+    "then": "The .data attribute of the yielded object is the accumulated result with the items inserted at index 0 in the parent list, but the exact structure cannot be determined from the provided evidence."
+  },
+  "review": {
+    "choice": "unknown"
+  },
+  "rendered": null
+}

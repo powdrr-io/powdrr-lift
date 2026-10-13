@@ -1,0 +1,8 @@
+{
+  "id": "batch-04-scenario-3",
+  "rendered": "Given A session has executed a query with two deferred fields: `user.friends` and `user.posts`. The initial payload has `data: {user: {name: 'Alice'}}`. The server sends two incremental items in the same payload: `{path: ['user', 'friends'], data: [{id: '1'}]}` and `{path: ['user', 'posts'], data: [{id: 'p1'}]}`. When The session's `execute_incremental` async generator yields that payload. Then The yielded result's `.data` is `{'user': {'name': 'Alice', 'friends': [{'id': '1'}], 'posts': [{'id': 'p1'}]}}`. Both `friends` and `posts` keys are present in `data['user']`; neither overwrites the other because each incremental item is merged at its distinct path into the accumulated data.",
+  "premise": "supported",
+  "status": "resolved",
+  "then": "The yielded result's `.data` is `{'user': {'name': 'Alice', 'friends': [{'id': '1'}], 'posts': [{'id': 'p1'}]}}`. Both `friends` and `posts` keys are present in `data['user']`; neither overwrites the other because each incremental item is merged at its distinct path into the accumulated data.",
+  "review": "supported"
+}

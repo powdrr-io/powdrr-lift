@@ -1,0 +1,302 @@
+version: 1
+name: code-grounded-criteria
+inputs:
+- name: instruction
+  type: string
+  required: true
+- name: batches
+  type: array
+  required: true
+limits:
+  llm_activations: 90
+  tool_calls: 120
+  context_chars: 120000
+  context_value_chars: 100000
+steps:
+- operation:
+    tool: internal
+    command:
+    - extract_symbols
+    parameters: {}
+    bind: index
+- for_each:
+    snapshot:
+      name: batches
+      max_items: 10
+    item_binding: batch
+    collect:
+      binding: all_records
+      mode: list
+      value: batch_records
+    body:
+    - operation:
+        tool: internal
+        command:
+        - retrieve_candidates
+        parameters:
+          index:
+            type: reference
+            value: index
+          batch:
+            type: reference
+            value: batch
+        bind: candidates
+    - judge:
+        question: Which candidate declarations establish existing APIs relevant to
+          this requirement group?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Choose candidate symbol references from the supplied list. New APIs explicitly
+          requested need not exist yet; choose relevant existing neighbors in that
+          case. Selection is evidence routing, not a behavior decision. Return an
+          empty list when none applies.
+        context:
+        - instruction
+        - batch
+        - candidates
+        provider: flash
+        output:
+          name: selection
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              symbols: &id002
+                type: array
+                items: &id001
+                  type: string
+            required:
+            - symbols
+        validation:
+          kind: json_schema
+    - operation:
+        tool: internal
+        command:
+        - gather_evidence
+        parameters:
+          candidates:
+            type: reference
+            value: candidates
+          selection:
+            type: reference
+            value: selection
+          batch:
+            type: reference
+            value: batch
+        bind: evidence
+    - judge:
+        question: Which concrete scenarios distinguish implementations of these requirements?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Evaluate behavior AFTER implementing the instruction. Missing new implementation
+          is never a reason to withhold a requested outcome. Original code establishes
+          compatible API boundaries, not a veto on new behavior.
+        - Use supplied evidence to establish valid existing receivers, signatures,
+          callback shapes, and transport/session boundaries. Cite evidence references.
+          Give up to four useful scenarios, not a quota, each with a complete small
+          starting state, one operation, and one observable question. Do not supply
+          expected outcomes or candidate answers in observe. Do not introduce arbitrary
+          invalid inputs or unrequested limits. Explicitly identify HTTP or websocket
+          when behavior differs. Do not combine tests of separate operations into
+          one scenario.
+        context:
+        - instruction
+        - batch
+        - evidence
+        provider: flash
+        output:
+          name: proposals
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              scenarios:
+                type: array
+                maxItems: 4
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    given: *id001
+                    when: *id001
+                    observe: *id001
+                    evidence: *id002
+                  required:
+                  - given
+                  - when
+                  - observe
+                  - evidence
+            required:
+            - scenarios
+        validation:
+          kind: json_schema
+    - operation:
+        tool: internal
+        command:
+        - bind_scenarios
+        parameters:
+          proposals:
+            type: reference
+            value: proposals
+          evidence:
+            type: reference
+            value: evidence
+          batch:
+            type: reference
+            value: batch
+        bind: scenario_list
+    - for_each:
+        snapshot:
+          name: scenario_list
+          max_items: 4
+        item_binding: scenario
+        collect:
+          binding: batch_records
+          mode: list
+          value: record
+        body:
+        - operation:
+            tool: internal
+            command:
+            - default_answer
+            parameters: {}
+            bind: answer
+        - operation:
+            tool: internal
+            command:
+            - default_review
+            parameters: {}
+            bind: review
+        - judge:
+            question: Is this scenario's starting state and operation valid for the
+              requested feature?
+            subject: instruction
+            prompt_system: Return only the declared JSON object.
+            instructions:
+            - Evaluate behavior AFTER implementing the instruction. Missing new implementation
+              is never a reason to withhold a requested outcome. Original code establishes
+              compatible API boundaries, not a veto on new behavior.
+            - supported means the API receiver/signature, payload shape and observation
+              layer are valid; contradicted means an invalid premise; unknown means
+              insufficient evidence. Do not answer the observation. Requested new
+              APIs need not exist.
+            context:
+            - instruction
+            - scenario
+            - evidence
+            provider: jev
+            output:
+              name: premise
+              schema: &id003
+                type: object
+                additionalProperties: false
+                properties:
+                  choice:
+                    type: string
+                    enum:
+                    - supported
+                    - contradicted
+                    - unknown
+                required:
+                - choice
+            validation:
+              kind: json_schema
+        - branch:
+            subject: premise.choice
+            cases:
+              supported:
+              - judge:
+                  question: What must the agent observe after this operation?
+                  subject: instruction
+                  prompt_system: Return only the declared JSON object.
+                  instructions:
+                  - Evaluate behavior AFTER implementing the instruction. Missing
+                    new implementation is never a reason to withhold a requested outcome.
+                    Original code establishes compatible API boundaries, not a veto
+                    on new behavior.
+                  - Resolve exactly the stated observation from instruction and code.
+                    Keep concrete values and observation boundaries intact. Preserve
+                    compatible behavior except explicit changes. Infer necessary consequences
+                    rather than demand every detail verbatim. Return unresolved only
+                    if genuinely underdetermined. Do not add unrelated guarantees,
+                    prescribe implementation, or repeat given/when.
+                  context:
+                  - instruction
+                  - scenario
+                  - evidence
+                  provider: flash
+                  output:
+                    name: answer
+                    schema:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        status:
+                          type: string
+                          enum:
+                          - resolved
+                          - unresolved
+                        then: *id001
+                      required:
+                      - status
+                      - then
+                  validation:
+                    kind: json_schema
+              - branch:
+                  subject: answer.status
+                  cases:
+                    resolved:
+                    - judge:
+                        question: Is the proposed outcome correct for this scenario?
+                        subject: instruction
+                        prompt_system: Return only the declared JSON object.
+                        instructions:
+                        - Evaluate behavior AFTER implementing the instruction. Missing
+                          new implementation is never a reason to withhold a requested
+                          outcome. Original code establishes compatible API boundaries,
+                          not a veto on new behavior.
+                        - supported means every assertion agrees with instruction
+                          and compatible code; contradicted means a conflicting assertion
+                          or unsupported guarantee; unknown means genuinely underdetermined.
+                          Check values and exact observation layer; do not trust the
+                          answer because it sounds plausible.
+                        context:
+                        - instruction
+                        - scenario
+                        - answer
+                        - evidence
+                        provider: jev
+                        output:
+                          name: review
+                          schema: *id003
+                        validation:
+                          kind: json_schema
+                  default: []
+            default: []
+        - operation:
+            tool: internal
+            command:
+            - record_criterion
+            parameters:
+              scenario:
+                type: reference
+                value: scenario
+              premise:
+                type: reference
+                value: premise
+              answer:
+                type: reference
+                value: answer
+              review:
+                type: reference
+                value: review
+            bind: record
+- operation:
+    tool: internal
+    command:
+    - render_prompt
+    parameters: {}
+    bind: prompt
+- terminal: succeeded

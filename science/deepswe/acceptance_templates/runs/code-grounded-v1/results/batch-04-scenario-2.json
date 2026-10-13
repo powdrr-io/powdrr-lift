@@ -1,0 +1,7 @@
+{
+  "id": "batch-04-scenario-2",
+  "rendered": null,
+  "premise": "supported",
+  "status": "unresolved",
+  "then": "The expected behavior of the yielded result's `.data` for the incremental item `{path: ['user', 'profile'], data: {age: 31}}` is not determinable from the provided code and instruction. The instruction specifies that deferred fields merge into parent objects at the path given, using a data key, but does not specify whether the merge is shallow (replacing the object) or deep (preserving other keys). The original code does not contain any incremental delivery logic, so it cannot inform the merge semantics. Therefore, the outcome is unresolved."
+}

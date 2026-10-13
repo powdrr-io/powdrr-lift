@@ -1,0 +1,16 @@
+{
+  "given": "A WebSocket transport (e.g., WebsocketsTransport) is connected to a server that supports the graphql-transport-ws subprotocol. The client sends a subscription operation with a @defer directive on a fragment spread.",
+  "when": "The server sends a WebSocket message of type 'next' with a payload containing an 'incremental' field, where the incremental item has a 'path' of ['user', 'friends', 0] and a 'data' field with a new object for a deferred field.",
+  "observe": "Does the transport yield a result object with .data containing the merged data at the specified path, .has_next set to true, and .extensions from that payload? Does the transport continue to yield subsequent results for later payloads?",
+  "evidence": [
+    "gql/transport/websockets_protocol.py:WebsocketsProtocolTransportBase.__init__:35",
+    "gql/transport/websockets.py:WebsocketsTransport.__init__:18",
+    "gql/transport/aiohttp_websockets.py:AIOHTTPWebsocketsTransport.__init__:19"
+  ],
+  "id": "batch-06-scenario-1",
+  "requirement_ids": [
+    "r021",
+    "r022",
+    "r023"
+  ]
+}

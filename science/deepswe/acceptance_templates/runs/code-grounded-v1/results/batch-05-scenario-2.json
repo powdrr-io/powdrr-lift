@@ -1,0 +1,8 @@
+{
+  "id": "batch-05-scenario-2",
+  "rendered": "Given An AsyncClientSession is connected to a transport that returns a payload with `hasNext: true` but no `data` and no `incremental` field: `{'hasNext': true}`. The session has `execute_incremental` implemented as an async generator. When The caller iterates over `session.execute_incremental(gql('{ hero { name } }'))` and collects the yielded results. Then The first yielded result has `.data == {}`, `.has_next == True`, `.errors is None`, and `.extensions == {}`. The iteration does not terminate after this yield; it continues to wait for and process subsequent payloads from the transport, yielding further results as they arrive.",
+  "premise": "supported",
+  "status": "resolved",
+  "then": "The first yielded result has `.data == {}`, `.has_next == True`, `.errors is None`, and `.extensions == {}`. The iteration does not terminate after this yield; it continues to wait for and process subsequent payloads from the transport, yielding further results as they arrive.",
+  "review": "supported"
+}

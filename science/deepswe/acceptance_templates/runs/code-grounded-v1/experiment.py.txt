@@ -1,0 +1,330 @@
+"""Scenario-first prompt experiment with model-selected, recorded repository tools."""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import os
+import time
+from pathlib import Path
+from typing import Any
+
+from jsonschema import validate
+
+from science.deepswe.acceptance_templates.cli import DEFAULT_MODEL, _client
+from science.deepswe.acceptance_templates.common import (
+    Recorder,
+    choice_schema,
+    digest,
+    load_json,
+    object_schema,
+    write_json,
+)
+from science.deepswe.acceptance_templates.repository_planning.prepare import inspect
+
+HERE = Path(__file__).resolve().parent
+BASELINE = HERE.parent / "runs/scenario-first-v1"
+spec = importlib.util.spec_from_file_location(
+    "scenario_experiment", BASELINE / "run.py"
+)
+if spec is None or spec.loader is None:
+    raise RuntimeError("Missing scenario experiment")
+prior = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(prior)
+TEXT = {"type": "string", "minLength": 1}
+SCENARIO = object_schema(
+    id=TEXT,
+    requirement_ids={"type": "array", "items": TEXT, "minItems": 1},
+    given=TEXT,
+    when=TEXT,
+    observe=TEXT,
+    evidence_ids={"type": "array", "items": TEXT, "minItems": 1},
+)
+TOOL = object_schema(
+    operation=choice_schema("symbol", "structure", "read", "search"),
+    query={"type": "string"},
+    path={"type": "string"},
+    start={"type": "integer"},
+    end={"type": "integer"},
+)
+PLAN_SCHEMA = object_schema(
+    tools={"type": "array", "items": TOOL, "maxItems": 3},
+    scenarios={"type": "array", "items": SCENARIO, "maxItems": 4},
+)
+FRAMING = (
+    "Describe expected behavior AFTER the requested feature is implemented. "
+    "The original code intentionally predates the feature: absence of its "
+    "implementation is never evidence that a requested outcome is unresolved. "
+    "The instruction defines the new behavior; existing code supplies API "
+    "boundaries and compatible behavior, not a veto on implementing the task. "
+)
+DISCOVERY = prior.DISCOVER + (
+    " Before creating scenarios, inspect the repository using these tools. "
+    "symbol(query) finds Python declarations; structure(path) lists declarations; "
+    "read(path,start,end) reads 1-160 numbered lines; search(query) finds literal "
+    "substring matches in tracked Python/docs/config files. Set unused fields "
+    "to empty strings or zero. Return tools with scenarios empty while researching; "
+    "return scenarios with tools empty when ready. Cite read-result evidence IDs "
+    "that establish the existing API, receiver, input shape, callback or result "
+    "boundary. Use existing tests/docs to understand compatible behavior. New "
+    "APIs explicitly requested by the instruction need not exist yet. Fully "
+    "specify all payloads; one observation per scenario. Do not infer missing "
+    "parents or a transport's behavior from a different layer. Do not answer "
+    "the observation during discovery. If context is insufficient, omit the "
+    "scenario. Code tools inspect the base implementation, never the solution."
+)
+PREMISE = (
+    "Question:\nIs this a valid scenario for the requested completed feature?\n\n"
+    "Instructions:\nCheck the given state, API receiver/signature, payload shape, "
+    "and observation boundary against the instruction and inspected original "
+    "code. supported means all are valid; contradicted means an invalid premise; "
+    "unknown means evidence is insufficient. Requested new APIs need not exist "
+    "yet. Do not resolve the observe question or assume an implementation exists."
+)
+
+
+def checked(row: dict[str, Any], schema: dict[str, Any]) -> dict[str, Any]:
+    validate(row, schema)
+    return row
+
+
+def call(
+    output: Path,
+    label: str,
+    prompt: str,
+    payload: dict[str, Any],
+    schema: dict[str, Any],
+    *,
+    jev: bool = False,
+) -> dict[str, Any]:
+    directory = output / "calls" / label
+    directory.mkdir(parents=True, exist_ok=True)
+    model = os.environ.get("SYSTEM_ONE_MODEL", "jev-latest") if jev else DEFAULT_MODEL
+    rec = Recorder(
+        prior.prior.ObservedJev(directory / "provider.json")
+        if jev
+        else _client("deepinfra", model, 120, 6000),
+        directory,
+        provider="typesafe.ai" if jev else "deepinfra",
+        model=model,
+        resume=True,
+        repairs=0,
+    )
+    previous = os.environ.get("POWDRR_STREAM_CAPTURE_PATH")
+    os.environ["POWDRR_STREAM_CAPTURE_PATH"] = str(directory / "raw.txt")
+    try:
+        return rec.call("result", prompt, payload, schema, lambda r: checked(r, schema))
+    finally:
+        if previous is None:
+            os.environ.pop("POWDRR_STREAM_CAPTURE_PATH", None)
+        else:
+            os.environ["POWDRR_STREAM_CAPTURE_PATH"] = previous
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--setup", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--task", default="gql-incremental-graphql-delivery")
+    args = parser.parse_args()
+    output = args.output
+    environment = load_json(args.setup / "environment.json")
+    container = environment["container"]
+    packet = load_json(BASELINE / "inputs" / f"{args.task}.json")
+    instruction = (args.setup / "instruction.md").read_text()
+    if instruction != packet["instruction"]:
+        raise ValueError("Instruction differs from frozen routing input")
+    # Reuse exact production routing/splitting output; discard handpicked excerpts.
+    packet = {k: packet[k] for k in ("task_id", "instruction", "routed_clauses")}
+    bootstrap = load_json(args.setup / "bootstrap-response.json")
+    identity = {
+        "packet": digest(packet),
+        "image_id": environment["image_id"],
+        "discovery": DISCOVERY,
+        "premise": PREMISE,
+        "answer": FRAMING + prior.ANSWER,
+        "review": FRAMING + prior.REVIEW,
+        "max_rounds": 7,
+        "oracle_access": False,
+    }
+    if (output / "definition.json").exists() and load_json(
+        output / "definition.json"
+    ) != identity:
+        raise ValueError("Changed experiment; use a fresh output")
+    write_json(output / "definition.json", identity)
+    write_json(output / "input.json", packet)
+    write_json(output / "environment.json", environment)
+    ids = [
+        r["id"]
+        for r in packet["routed_clauses"]
+        if r["route"] in {"include", "include_prohibition"}
+    ]
+    all_evidence = []
+    scenarios = []
+    failures = []
+    for offset in range(0, len(ids), 4):
+        batch = f"batch-{offset // 4 + 1:02}"
+        evidence: list[dict[str, Any]] = []
+        for turn in range(7):
+            payload = {
+                **packet,
+                "active_requirement_ids": ids[offset : offset + 4],
+                "repository_files": bootstrap["files"],
+                "evidence": evidence,
+                "turns_remaining": 7 - turn,
+            }
+            try:
+                decision = call(
+                    output,
+                    f"discovery/{batch}/turn-{turn}",
+                    DISCOVERY,
+                    payload,
+                    PLAN_SCHEMA,
+                )
+            except Exception as exc:
+                failures.append(
+                    {"batch": batch, "stage": "discovery", "error": str(exc)}
+                )
+                break
+            if decision["scenarios"]:
+                read_ids = {
+                    e["id"]
+                    for e in evidence
+                    if e["request"]["operation"] == "read"
+                    and not e["response"].get("error")
+                }
+                valid = not decision["tools"] and all(
+                    set(s["requirement_ids"]) <= set(ids[offset : offset + 4])
+                    and set(s["evidence_ids"]) <= read_ids
+                    for s in decision["scenarios"]
+                )
+                if not valid:
+                    failures.append(
+                        {
+                            "batch": batch,
+                            "stage": "discovery",
+                            "error": "Invalid read citations or requirement IDs",
+                        }
+                    )
+                    break
+                for number, scenario in enumerate(decision["scenarios"], 1):
+                    scenarios.append({**scenario, "id": f"{batch}-scenario-{number}"})
+                break
+            if not decision["tools"]:
+                break
+            for number, request in enumerate(decision["tools"]):
+                started = time.monotonic()
+                try:
+                    response = inspect(container, request)
+                except Exception as exc:
+                    response = {"error": type(exc).__name__, "message": str(exc)}
+                item = {
+                    "id": f"{batch}-turn-{turn}-tool-{number}",
+                    "request": request,
+                    "response": response,
+                    "elapsed_seconds": time.monotonic() - started,
+                }
+                write_json(output / "tools" / f"{item['id']}.json", item)
+                evidence.append(item)
+        else:
+            failures.append(
+                {"batch": batch, "stage": "discovery", "error": "Tool budget exhausted"}
+            )
+        all_evidence.extend(evidence)
+    write_json(
+        output / "scenarios.json", {"scenarios": scenarios, "failures": failures}
+    )
+    reads = [
+        e
+        for e in all_evidence
+        if e["request"]["operation"] == "read" and not e["response"].get("error")
+    ]
+    context = {
+        **packet,
+        "original_code": [{"evidence_id": e["id"], **e["response"]} for e in reads],
+    }
+    results = []
+    for scenario in scenarios:
+        payload = {**context, "scenario": scenario}
+        result: dict[str, Any] = {"id": scenario["id"], "rendered": None}
+        try:
+            premise = call(
+                output,
+                f"premises/{scenario['id']}",
+                PREMISE,
+                payload,
+                prior.REVIEW_SCHEMA,
+                jev=True,
+            )
+            result["premise"] = premise["choice"]
+            if premise["choice"] == "supported":
+                answer = call(
+                    output,
+                    f"answers/{scenario['id']}",
+                    FRAMING + prior.ANSWER,
+                    payload,
+                    object_schema(
+                        status=choice_schema("resolved", "unresolved"), then=TEXT
+                    ),
+                )
+                result.update(answer)
+                if answer["status"] == "resolved":
+                    review = call(
+                        output,
+                        f"reviews/{scenario['id']}",
+                        "Question:\n"
+                        + prior.REVIEW
+                        + "\n\nInstructions:\n"
+                        + FRAMING
+                        + prior.REVIEW,
+                        {**payload, "proposed_observation": answer["then"]},
+                        prior.REVIEW_SCHEMA,
+                        jev=True,
+                    )
+                    result["review"] = review["choice"]
+                    if review["choice"] == "supported":
+                        result["rendered"] = (
+                            f"Given {scenario['given']} "
+                            f"When {scenario['when']} Then {answer['then']}"
+                        )
+        except Exception as exc:
+            result["error"] = str(exc)
+        write_json(output / "results" / f"{scenario['id']}.json", result)
+        results.append(result)
+    # Reuse deterministic six-section shell; retain all routed requirements.
+    original = (BASELINE / "prompts" / f"{args.task}.md").read_text()
+    before, after = original.split("# Acceptance criteria\n", 1)
+    _, tail = after.split("Original requirements remain", 1)
+    before = (
+        before.split("# Relevant context\n", 1)[0]
+        + "# Relevant context\n\nInspected original files: "
+        + ", ".join(sorted({e["response"]["path"] for e in reads}))
+        + ".\n\n"
+    )
+    (output / "prompt.md").write_text(
+        before
+        + "# Acceptance criteria\n\n"
+        + "\n".join(f"- {r['rendered']}" for r in results if r["rendered"])
+        + "\n\nOriginal requirements remain"
+        + tail
+    )
+    final = inspect(container, {"operation": "status"})
+    if final != environment["initial_status"]:
+        raise ValueError("Analysis altered the task repository")
+    write_json(
+        output / "summary.json",
+        {
+            "scenarios": len(scenarios),
+            "emitted": sum(bool(r["rendered"]) for r in results),
+            "tool_requests": len(all_evidence),
+            "source_reads": len(reads),
+            "discovery_failures": failures,
+            "final_status": final,
+            "tests_run": False,
+            "coding_agents_run": False,
+        },
+    )
+
+
+if __name__ == "__main__":
+    main()

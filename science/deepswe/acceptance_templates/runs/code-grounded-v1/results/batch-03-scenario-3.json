@@ -1,0 +1,8 @@
+{
+  "id": "batch-03-scenario-3",
+  "rendered": "Given An AsyncClientSession is connected to a transport that returns incremental payloads. The query uses @defer on a field inside a list. The first payload has `data: {'users': [{'name': 'A'}, {'name': 'B'}]}` and `has_next: true`. The second payload has `incremental: [{'path': ['users', 1, 'age'], 'data': 30}]` and `has_next: false`. When The caller iterates over `session.execute_incremental(query)` and inspects the second yielded result's `.data` attribute. Then The second yielded result's `.data` is `{'users': [{'name': 'A'}, {'name': 'B', 'age': 30}]}`. The incremental item's path `['users', 1, 'age']` is navigated by first indexing into the `users` list at position 1 (the second element), then setting the `age` key to 30 on that element's dict. The accumulated data from the first payload is preserved, and the deferred field is merged into the correct list element.",
+  "premise": "supported",
+  "status": "resolved",
+  "then": "The second yielded result's `.data` is `{'users': [{'name': 'A'}, {'name': 'B', 'age': 30}]}`. The incremental item's path `['users', 1, 'age']` is navigated by first indexing into the `users` list at position 1 (the second element), then setting the `age` key to 30 on that element's dict. The accumulated data from the first payload is preserved, and the deferred field is merged into the correct list element.",
+  "review": "supported"
+}

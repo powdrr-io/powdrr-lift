@@ -1,0 +1,17 @@
+{
+  "given": "A GraphQL query using HTTP multipart transport with a @defer field. The server sends an initial payload with data, then an incremental payload with a path and a data key for the deferred field.",
+  "when": "The client calls session.execute_incremental(query) and processes the yielded results.",
+  "observe": "Does the second yielded result's .data have the deferred field merged into the parent object at the specified path, and does the .extensions attribute contain only the incremental payload's extensions?",
+  "evidence": [
+    "Deferred fields merge into parent objects at the path given, using a data key in the incremental item.",
+    "Each yielded result contains the .extensions from that specific payload, not accumulated across payloads.",
+    "HTTP multipart (boundary=graphql, deferSpec=20220824) must support incremental delivery."
+  ],
+  "id": "batch-03-scenario-2",
+  "requirement_ids": [
+    "r009",
+    "r010",
+    "r011",
+    "r012"
+  ]
+}

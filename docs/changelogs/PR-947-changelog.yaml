@@ -1,0 +1,324 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 947
+title: Add SubQ as a fallback classifier provider
+intent:
+  problem: The design-interview classifier can use Jev but has no typed-decision provider alternative when Jev credentials are unavailable.
+  goal: Preserve Jev as the preferred classifier, use SubQ when only its key is configured, and retain planning as the fallback when neither typed-decision provider is configured or available.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/integrations/harbor/_env.py
+    type: modified
+    span: {start_line: 14, end_line: 16}
+    summary: "Forward SubQ configuration and allow its API host and configured endpoint host."
+    rationale: "Let isolated classifier processes access SubQ with the same credential and egress controls as Jev."
+  - path: src/powdrr_lift/integrations/harbor/_env.py
+    type: modified
+    span: {start_line: 45, end_line: 45}
+    summary: "Forward SubQ configuration and allow its API host and configured endpoint host."
+    rationale: "Let isolated classifier processes access SubQ with the same credential and egress controls as Jev."
+  - path: src/powdrr_lift/integrations/harbor/_env.py
+    type: modified
+    span: {start_line: 51, end_line: 51}
+    summary: "Forward SubQ configuration and allow its API host and configured endpoint host."
+    rationale: "Let isolated classifier processes access SubQ with the same credential and egress controls as Jev."
+  - path: src/powdrr_lift/integrations/harbor/_env.py
+    type: modified
+    span: {start_line: 57, end_line: 60}
+    summary: "Forward SubQ configuration and allow its API host and configured endpoint host."
+    rationale: "Let isolated classifier processes access SubQ with the same credential and egress controls as Jev."
+  - path: src/powdrr_lift/integrations/harbor/powdrr_agent.py
+    type: modified
+    span: {start_line: 108, end_line: 111}
+    summary: "Include the configured SubQ endpoint in Harbor's network allowlist."
+    rationale: "Permit requests to custom SubQ endpoints in isolated runs."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 18, end_line: 18}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 137, end_line: 137}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 144, end_line: 165}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 168, end_line: 169}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 172, end_line: 172}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 183, end_line: 183}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 187, end_line: 189}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 197, end_line: 198}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 202, end_line: 202}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 206, end_line: 207}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 211, end_line: 211}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span: {start_line: 215, end_line: 216}
+    summary: "Check SubQ credentials when no Jev key is configured."
+    rationale: "Make the classifier preflight accurately report SubQ-only installations."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 117, end_line: 119}
+    summary: "Route classifier judges through the preferred configured typed-decision client."
+    rationale: "Keep Jev as the first choice and enable SubQ-only configuration in the design interview."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 640, end_line: 649}
+    summary: "Route classifier judges through the preferred configured typed-decision client."
+    rationale: "Keep Jev as the first choice and enable SubQ-only configuration in the design interview."
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 656, end_line: 656}
+    summary: "Route classifier judges through the preferred configured typed-decision client."
+    rationale: "Keep Jev as the first choice and enable SubQ-only configuration in the design interview."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 1, end_line: 1}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 21, end_line: 22}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 25, end_line: 30}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 40, end_line: 42}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 45, end_line: 46}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 50, end_line: 55}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 48, end_line: 48}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 70, end_line: 71}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 78, end_line: 78}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 80, end_line: 80}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 88, end_line: 89}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 96, end_line: 96}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 100, end_line: 100}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 102, end_line: 102}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 112, end_line: 112}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 114, end_line: 118}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 132, end_line: 133}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 150, end_line: 152}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 155, end_line: 244}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 444, end_line: 444}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 447, end_line: 447}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 454, end_line: 454}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 461, end_line: 461}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 466, end_line: 478}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: src/powdrr_lift/workrr/jev_classifier.py
+    type: modified
+    span: {start_line: 514, end_line: 514}
+    summary: "Share typed decision request handling between Jev and SubQ clients and select Jev before SubQ based on configured credentials."
+    rationale: "Add SubQ as an alternative while preserving existing request mapping and fallback behavior."
+  - path: tests/test_credential_check.py
+    type: modified
+    span: {start_line: 144, end_line: 149}
+    summary: "Cover SubQ-only credential preflight and provider errors."
+    rationale: "Prevent SubQ configurations from being reported as missing classifier credentials."
+  - path: tests/test_credential_check.py
+    type: modified
+    span: {start_line: 155, end_line: 182}
+    summary: "Cover SubQ-only credential preflight and provider errors."
+    rationale: "Prevent SubQ configurations from being reported as missing classifier credentials."
+  - path: tests/test_credential_check.py
+    type: modified
+    span: {start_line: 200, end_line: 200}
+    summary: "Cover SubQ-only credential preflight and provider errors."
+    rationale: "Prevent SubQ configurations from being reported as missing classifier credentials."
+  - path: tests/test_harbor_env.py
+    type: modified
+    span: {start_line: 36, end_line: 36}
+    summary: "Verify SubQ credentials are forwarded and endpoint hosts are allowlisted."
+    rationale: "Protect the isolated execution configuration needed for SubQ requests."
+  - path: tests/test_harbor_env.py
+    type: modified
+    span: {start_line: 40, end_line: 42}
+    summary: "Verify SubQ credentials are forwarded and endpoint hosts are allowlisted."
+    rationale: "Protect the isolated execution configuration needed for SubQ requests."
+  - path: tests/test_harbor_env.py
+    type: modified
+    span: {start_line: 46, end_line: 46}
+    summary: "Verify SubQ credentials are forwarded and endpoint hosts are allowlisted."
+    rationale: "Protect the isolated execution configuration needed for SubQ requests."
+  - path: tests/test_harbor_env.py
+    type: modified
+    span: {start_line: 55, end_line: 57}
+    summary: "Verify SubQ credentials are forwarded and endpoint hosts are allowlisted."
+    rationale: "Protect the isolated execution configuration needed for SubQ requests."
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 31, end_line: 36}
+    summary: "Remove SubQ credentials from deterministic end-to-end tests."
+    rationale: "Ensure fixture workflows cannot make live SubQ requests."
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 10, end_line: 14}
+    summary: "Cover SubQ choice mapping and Jev-first provider selection."
+    rationale: "Verify the alternative provider returns the established workflow result and follows the configured credential priority."
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span: {start_line: 122, end_line: 179}
+    summary: "Cover SubQ choice mapping and Jev-first provider selection."
+    rationale: "Verify the alternative provider returns the established workflow result and follows the configured credential priority."
+entities:
+  - id: typed-decision-classifier-client
+    type: Class
+    action: added
+  - id: preferred-decision-provider-selection
+    type: Function
+    action: added
+  - id: subq-classifier-integration
+    type: Integration connector
+    action: added
+  - id: subq-classifier-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: provider-selection-uses-typed-decision-client
+    type: uses
+    source: preferred-decision-provider-selection
+    target: typed-decision-classifier-client
+    action: added
+    description: Provider selection returns Jev when a Jev key exists and otherwise selects SubQ when its key exists.
+  - id: subq-tests-verify-provider-selection
+    type: verifies
+    source: subq-classifier-regression-tests
+    target: preferred-decision-provider-selection
+    action: added
+    description: Regression tests verify Jev-first priority, SubQ fallback selection, and result mapping.
+invariants:
+  - id: jev-precedes-subq-when-both-keys-exist
+    description: Classifier provider selection chooses Jev whenever a supported Jev key is configured, and chooses SubQ only when no Jev key is configured.
+    action: added
+  - id: typed-provider-absence-uses-planning
+    description: When neither Jev nor SubQ credentials are configured, classifier judges continue through the planning client.
+    action: added
+  - id: subq-results-match-workflow-classifier-schema
+    description: SubQ choices are validated against the declared labels and mapped to the existing resolved or unresolved workflow response schema.
+    action: added
+guidance:
+  - id: configure-subq-classifier
+    description: Set SUBQ_API_KEY to enable SubQ as the classifier provider when no Jev key is configured; optionally set SUBQ_BASE_URL and SUBQ_MODEL to override its endpoint and model.
+    action: added

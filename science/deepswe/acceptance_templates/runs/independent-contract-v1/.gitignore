@@ -1,0 +1,14 @@
+*
+!.gitignore
+!prompt.md
+!summary.json
+!pipeline.yaml
+!definition.json
+!selection.json
+!audit.json
+!RESULTS.md
+!checkpoints.tar.gz
+!checkpoints.json
+!provenance.json
+!dependency-evidence.json
+!model-coverage.json

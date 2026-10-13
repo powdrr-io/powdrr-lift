@@ -1,0 +1,510 @@
+version: 1
+name: requirement-contract-criteria
+inputs:
+- name: instruction
+  type: string
+  required: true
+- name: batches
+  type: array
+  required: true
+- name: requirements
+  type: array
+  required: true
+limits:
+  llm_activations: 250
+  tool_calls: 250
+  context_chars: 120000
+  context_value_chars: 100000
+steps:
+- operation:
+    tool: internal
+    command:
+    - extract_symbols
+    parameters: {}
+    bind: index
+- for_each:
+    snapshot:
+      name: batches
+      max_items: 10
+    item_binding: batch
+    collect:
+      binding: group_records
+      mode: list
+      value: fact_records
+    body:
+    - operation:
+        tool: internal
+        command:
+        - retrieve_candidates
+        parameters:
+          index:
+            type: reference
+            value: index
+          batch:
+            type: reference
+            value: batch
+        bind: candidates
+    - judge:
+        question: Which candidate declarations establish relevant existing API contracts?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Select supplied symbol references for APIs, compatible options, result shapes
+          and lifecycle behavior implicated by this requirement group. New API names
+          may be absent; select relevant existing neighbors. Do not decide new behavior
+          here.
+        context:
+        - instruction
+        - batch
+        - candidates
+        provider: flash
+        output:
+          name: selection
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              symbols: &id002
+                type: array
+                items: &id001
+                  type: string
+            required:
+            - symbols
+        validation:
+          kind: json_schema
+    - operation:
+        tool: internal
+        command:
+        - gather_evidence
+        parameters:
+          candidates:
+            type: reference
+            value: candidates
+          selection:
+            type: reference
+            value: selection
+          batch:
+            type: reference
+            value: batch
+        bind: evidence
+    - judge:
+        question: What existing contracts are relevant to these requirements, and
+          which are explicitly changed?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Return at most four useful cited facts, not a quota. owner identifies the
+          existing API/class/layer and its signature; compatibility describes a relevant
+          existing contract whose scope remains applicable; explicit_change identifies
+          an instruction-mandated change. Scope each statement to its actual operation
+          and applies_to requirement references. Cite source references from evidence;
+          use instruction for explicit changes. Existing absence is not a compatibility
+          constraint. Unrelated helpers and legacy wire formats are not contracts
+          for a new operation. Prefer options, return shapes and cleanup obligations
+          the coding agent must preserve. Do not prescribe a new implementation or
+          infer requested outcomes at this step.
+        context:
+        - instruction
+        - batch
+        - evidence
+        provider: flash
+        output:
+          name: fact_proposal
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              facts:
+                type: array
+                maxItems: 4
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    category:
+                      type: string
+                      enum:
+                      - owner
+                      - compatibility
+                      - explicit_change
+                    statement: *id001
+                    applies_to: *id002
+                    citations: *id002
+                  required:
+                  - category
+                  - statement
+                  - applies_to
+                  - citations
+            required:
+            - facts
+        validation:
+          kind: json_schema
+    - operation:
+        tool: internal
+        command:
+        - bind_contract_facts
+        parameters:
+          proposal:
+            type: reference
+            value: fact_proposal
+          batch:
+            type: reference
+            value: batch
+          evidence:
+            type: reference
+            value: evidence
+        bind: fact_list
+    - for_each:
+        snapshot:
+          name: fact_list
+          max_items: 4
+        item_binding: fact
+        collect:
+          binding: fact_records
+          mode: list
+          value: fact_record
+        body:
+        - judge:
+            question: Is this a correctly scoped and relevant existing-contract fact
+              or explicit instruction override?
+            subject: instruction
+            prompt_system: Return only the declared JSON object.
+            instructions:
+            - Check statement and applicability against source and instruction. supported=correct,
+              relevant and properly scoped; contradicted=incorrect scope, unrelated
+              detail, invented obligation or transfer of a different operation's contract;
+              unknown=insufficient evidence. Existing absence never constrains implementing
+              a requested feature.
+            context:
+            - instruction
+            - fact
+            - evidence
+            provider: jev
+            output:
+              name: fact_review
+              schema: &id003
+                type: object
+                additionalProperties: false
+                properties:
+                  choice:
+                    type: string
+                    enum:
+                    - supported
+                    - contradicted
+                    - unknown
+                required:
+                - choice
+            validation:
+              kind: json_schema
+        - operation:
+            tool: internal
+            command:
+            - record_contract_fact
+            parameters:
+              fact:
+                type: reference
+                value: fact
+              review:
+                type: reference
+                value: fact_review
+            bind: fact_record
+- for_each:
+    snapshot:
+      name: requirements
+      max_items: 40
+    item_binding: requirement
+    collect:
+      binding: coverage_records
+      mode: list
+      value: coverage
+    body:
+    - operation:
+        tool: internal
+        command:
+        - requirement_contracts
+        parameters:
+          requirement:
+            type: reference
+            value: requirement
+        bind: contracts
+    - judge:
+        question: After implementing this requirement, what observable behavior must
+          hold?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - 'Derive the intended post-change behavior from the original instruction,
+          this requirement and relevant verified contracts. Routed clauses are an
+          index: the original instruction governs scope and grammatical attachments;
+          do not amplify a splitter attachment error. Code is not an oracle of new
+          behavior. An explicitly requested feature has a required future behavior
+          even when absent today. Resolve the full meaning of the requirement, including
+          interactions that determine its behavior. Explain outcomes and observation
+          boundaries, not implementation steps. Preserve only contracts actually scoped
+          to the affected API. Distinguish support for a type/value from constructing
+          absent structure or specifying a new error policy. Do not invent limits
+          or error policies. Produce the normative behavior; do not assess whether
+          existing code already implements it.'
+        - Keep the analysis centered on this one requirement. Neighboring requirements
+          supply necessary context, not a checklist to repeat.
+        context:
+        - instruction
+        - requirement
+        - contracts
+        provider: flash
+        output:
+          name: behavior
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              behavior: *id001
+            required:
+            - behavior
+        validation:
+          kind: json_schema
+    - judge:
+        question: Which concrete acceptance criteria distinguish correct behavior
+          from plausible incorrect implementations?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Generate one or two given/when/then criteria for the supplied behavior.
+          Each criterion has one operation and a precise observation point. Fully
+          specify relevant prior state and every input payload, including transport,
+          fields and flags when relevant. Choose scenarios where a plausible wrong
+          implementation produces a different observable result; describe that wrong
+          implementation in rejects. Use collisions, retained values, scope or observation
+          timing only when the behavior makes them relevant. Do not multiply identical
+          easy examples. query is an exact syntactically valid GraphQL document only
+          if needed; otherwise empty. Do not restate query in given. then states exact
+          expected observations, without may/or alternatives. Existing absence is
+          never a reason to omit a requested behavior. Do not transfer a legacy operation's
+          wire envelope to a new operation without evidence.
+        - Assert only the active requirement and necessary interactions. Omit unrelated
+          fields and unstated default values.
+        context:
+        - instruction
+        - requirement
+        - behavior
+        - contracts
+        provider: flash
+        output:
+          name: proposal
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              criteria:
+                type: array
+                minItems: 0
+                maxItems: 2
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    given: *id001
+                    when: *id001
+                    then: *id001
+                    rejects: *id001
+                    query: *id001
+                  required:
+                  - given
+                  - when
+                  - then
+                  - rejects
+                  - query
+            required:
+            - criteria
+        validation:
+          kind: json_schema
+    - operation:
+        tool: internal
+        command:
+        - bind_contract_criteria
+        parameters:
+          proposal:
+            type: reference
+            value: proposal
+          requirement:
+            type: reference
+            value: requirement
+        bind: criteria_list
+    - for_each:
+        snapshot:
+          name: criteria_list
+          max_items: 2
+        item_binding: criterion
+        collect:
+          binding: requirement_records
+          mode: list
+          value: record
+        body:
+        - operation:
+            tool: internal
+            command:
+            - check_examples
+            parameters:
+              criterion:
+                type: reference
+                value: criterion
+            bind: example_check
+        - judge:
+            question: Is this criterion's setup a valid use of the requested feature?
+            subject: instruction
+            prompt_system: Return only the declared JSON object.
+            instructions:
+            - Check API receivers, signatures, complete inputs, wire envelopes and
+              observation layer. New APIs requested by the instruction need not exist
+              yet. Existing wire conventions are scoped to their specific operation;
+              do not transfer an unrelated operation's format. supported=valid, contradicted=invalid,
+              unknown=insufficient evidence. Do not answer the outcome question.
+            context:
+            - instruction
+            - requirement
+            - criterion
+            - contracts
+            - example_check
+            provider: jev
+            output:
+              name: premise
+              schema: *id003
+            validation:
+              kind: json_schema
+        - judge:
+            question: Does this expected outcome unambiguously verify the requested
+              behavior?
+            subject: instruction
+            prompt_system: Return only the declared JSON object.
+            instructions:
+            - Evaluate the specified feature after implementation. The instruction
+              defines the new behavior; cited existing contracts constrain compatibility.
+              Missing implementation never invalidates a requested outcome. Check
+              every assertion, observation point and whether rejects describes a genuinely
+              incorrect implementation. supported=correct and discriminating, contradicted=incorrect/unsupported,
+              unknown=underdetermined. Do not require exact words from the source,
+              but do not invent policy.
+            context:
+            - instruction
+            - requirement
+            - behavior
+            - criterion
+            - contracts
+            provider: jev
+            output:
+              name: review
+              schema: *id003
+            validation:
+              kind: json_schema
+        - operation:
+            tool: internal
+            command:
+            - record_contract_criterion
+            parameters:
+              requirement:
+                type: reference
+                value: requirement
+              behavior:
+                type: reference
+                value: behavior
+              criterion:
+                type: reference
+                value: criterion
+              premise:
+                type: reference
+                value: premise
+              review:
+                type: reference
+                value: review
+              example_check:
+                type: reference
+                value: example_check
+            bind: record
+    - operation:
+        tool: internal
+        command:
+        - record_requirement_coverage
+        parameters:
+          requirement:
+            type: reference
+            value: requirement
+          behavior:
+            type: reference
+            value: behavior
+          records:
+            type: reference
+            value: requirement_records
+        bind: coverage
+- operation:
+    tool: internal
+    command:
+    - prepare_overlap_pairs
+    parameters: {}
+    bind: overlap_pairs
+- for_each:
+    snapshot:
+      name: overlap_pairs
+      max_items: 30
+    item_binding: pair
+    collect:
+      binding: overlap_records
+      mode: list
+      value: overlap_record
+    body:
+    - judge:
+        question: Does one criterion completely cover the other's observable condition?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Choose left_covers_right or right_covers_left only when the keeper preserves
+          every behavior, input condition and observation boundary verified by the
+          other. Similar topic, wording or overlapping requirements is insufficient.
+          Different list positions, payload layers, lifecycle times or omitted fields
+          can distinguish separate conditions. Choose distinct when both add coverage;
+          unknown when equivalence is uncertain. Do not rewrite either criterion.
+        context:
+        - instruction
+        - pair
+        provider: jev
+        output:
+          name: overlap_decision
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              choice:
+                type: string
+                enum:
+                - left_covers_right
+                - right_covers_left
+                - distinct
+                - unknown
+            required:
+            - choice
+        validation:
+          kind: json_schema
+    - operation:
+        tool: internal
+        command:
+        - record_overlap
+        parameters:
+          pair:
+            type: reference
+            value: pair
+          decision:
+            type: reference
+            value: overlap_decision
+        bind: overlap_record
+- operation:
+    tool: internal
+    command:
+    - merge_exact_criteria
+    parameters: {}
+    bind: merge_result
+- operation:
+    tool: internal
+    command:
+    - render_prompt
+    parameters: {}
+    bind: prompt
+- terminal: succeeded

@@ -21,3 +21,51 @@ Use the shared Python interpreter with `PYTHONPATH=<worktree>/src:<worktree>` fo
 The initial runner is scoped to GraphQL and reuses the frozen production routing/splitting input bundled in `baseline/`. Symbol extraction/retrieval and setup operations are generic Python machinery. No embeddings yet; dependencies are installed but external-library symbols are not indexed. Long method excerpts and class headers are explicitly marked truncated. Missing symbols, irrelevant candidates, invalid citations and reviewer mistakes remain evaluation targets.
 
 Full request/response checkpoints and raw Flash captures, Procedrr events, ranked candidates, source reads, environment fingerprints and final prompt are preserved. Solution patches are used only for post-call manual audit. Tests remain disabled by user request.
+
+## Contract and acceptance experiments
+
+These are standalone science workflows. They do not replace production prompt
+generation. The GraphQL comparison in
+[`requirement-contract-v3/RESULTS.md`](../runs/requirement-contract-v3/RESULTS.md)
+found that these variants still produce incorrect criteria.
+
+- `contracts --setup <setup> --output <fresh-run>` extracts scoped, cited facts
+  separately from desired behavior. Each frozen requirement gets behavior
+  analysis, criteria proposals, premise checks and outcome checks. Procedrr
+  controls the sequence, semantic overlap checks and rendering.
+- `dependencies --setup <setup> --output <run>/dependency-evidence.json` captures
+  installed GraphQL result declarations and directive definitions. This is
+  GraphQL-specific evidence gathering; installed result types may describe a
+  newer wire protocol than the task requests. They are not automatically a
+  compatibility requirement for the new API.
+- `refine --setup <setup> --generation <run> --output <fresh-review>` checks
+  every proposed criterion against the original instruction and source,
+  without treating generated behavior or previous approvals as authority.
+  It permits one declared repair, then checks again.
+- `atomic_conditions --setup <setup> --generation <run> --output <fresh-run>`
+  constructs inputs/operation, observation and counterexample in separate
+  decisions. It does not show earlier generated outcomes. Source selection
+  currently reranks the generation's **batch** excerpts, not the full index;
+  this is a measured weakness, especially for the final DSL requirements.
+- `consolidate --setup <setup> --output <run>` runs only the consolidation tail
+  on saved contract-generation decisions. It makes additional recorded Jev
+  calls, so it is not an offline renderer.
+
+Use the same module prefix as above:
+`python -m science.deepswe.acceptance_templates.repository_planning.<module>`.
+For archived runs, extract `checkpoints.tar.gz` into their run directory to
+restore reads and decisions. Model request hashes allow exact completed
+checkpoints to be reused. Historical declarations preserve the actual prompts;
+published error-handling helpers have subsequently been hardened.
+
+The query checks parse documents and inspect known directive locations. They
+do **not** validate the task schema, field types, directive arguments, complete
+wire fixtures, or DSL calls. A successful query check is not proof that an
+example is valid. Model-approved coverage is also not gold solution coverage.
+Unresolved or failed decisions retain the original requirements and continue
+headlessly. Local evaluator failures preserve the partial prompt and error.
+
+`archive <run> --all-files` stores raw calls, proposals, reviews, source reads
+and declarations together and verifies every archived file hash. The small
+top-level summaries and prompts remain reviewable; rejected proposals are
+retained in the archive. No model sees solution or validation patches.

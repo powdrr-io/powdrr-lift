@@ -310,9 +310,7 @@ class Operations:
             write_json(self.output / "results" / f"{scenario['id']}.json", row)
             return row
         if name == "render_prompt":
-            original = (
-                BASELINE / "prompts" / f"{self.packet['task_id']}.md"
-            ).read_text()
+            original = (BASELINE / "prompt.md").read_text()
             before, after = original.split("# Acceptance criteria\n", 1)
             _, tail = after.split("Original requirements remain", 1)
             paths = sorted(

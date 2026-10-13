@@ -1,0 +1,9 @@
+{
+  "criteria": 42,
+  "initially_accepted": 25,
+  "repaired": 17,
+  "finally_accepted": 27,
+  "provider_calls": 135,
+  "tests_run": false,
+  "coding_agents_run": false
+}

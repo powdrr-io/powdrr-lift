@@ -1,0 +1,301 @@
+version: 1
+name: independent-criterion-review
+inputs:
+- name: instruction
+  type: string
+  required: true
+- name: items
+  type: array
+  required: true
+limits:
+  llm_activations: 250
+  tool_calls: 400
+  context_chars: 140000
+  context_value_chars: 120000
+steps:
+- for_each:
+    snapshot:
+      name: items
+      max_items: 80
+    item_binding: item
+    collect:
+      binding: review_records
+      mode: list
+      value: record
+    body:
+    - operation:
+        tool: internal
+        command:
+        - independent_sources
+        parameters:
+          item:
+            type: reference
+            value: item
+        bind: sources
+    - operation:
+        tool: internal
+        command:
+        - original_criterion
+        parameters:
+          item:
+            type: reference
+            value: item
+        bind: candidate
+    - operation:
+        tool: internal
+        command:
+        - quality_query
+        parameters:
+          criterion:
+            type: reference
+            value: candidate
+        bind: syntax
+    - judge:
+        question: Do given and when completely specify valid inputs and an observation
+          point sufficient to verify then?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Check every concrete value/flag used by then against given/when. Do not
+          infer arbitrary example values. Check API/layer, directive locations, complete
+          wire envelopes and input shapes. A requested new API need not exist yet.
+          supported means complete valid setup; contradicted means invalid or invented
+          input; unknown means necessary inputs are unspecified.
+        context:
+        - instruction
+        - item.requirement
+        - candidate
+        - sources
+        - syntax
+        provider: jev
+        output:
+          name: setup
+          schema: &id001
+            type: object
+            additionalProperties: false
+            properties:
+              choice:
+                type: string
+                enum:
+                - supported
+                - contradicted
+                - unknown
+            required:
+            - choice
+        validation:
+          kind: json_schema
+    - judge:
+        question: Does every expected assertion follow independently from the instruction
+          and properly scoped source evidence?
+        subject: instruction
+        prompt_system: Return only the declared JSON object.
+        instructions:
+        - Do not use generated behavior or earlier reviews as authority. Evaluate
+          requested post-change behavior even when implementation is absent. Class
+          identity is not required by a structural attribute requirement; another
+          operation's return type is not a mandate for this one. Check omitted-field
+          defaults, payload-local metadata and exact observation timing. A targeted
+          update must not modify or relocate unrelated state unless requested. Inspect
+          scope and grammatical attachment in the original instruction. Reject unsupported
+          guesses about absent containers or new error policies. supported means all
+          assertions justified; contradicted means any unsupported/conflicting assertion;
+          unknown means genuinely undetermined. Dependency formats are scoped evidence,
+          not mandated implementation classes.
+        context:
+        - instruction
+        - item.requirement
+        - candidate
+        - sources
+        provider: jev
+        output:
+          name: outcome
+          schema: *id001
+        validation:
+          kind: json_schema
+    - operation:
+        tool: internal
+        command:
+        - quality_verdict
+        parameters:
+          setup:
+            type: reference
+            value: setup
+          outcome:
+            type: reference
+            value: outcome
+          syntax:
+            type: reference
+            value: syntax
+        bind: first_verdict
+    - operation:
+        tool: internal
+        command:
+        - quality_verdict
+        parameters:
+          setup:
+            type: reference
+            value: setup
+          outcome:
+            type: reference
+            value: outcome
+          syntax:
+            type: reference
+            value: syntax
+        bind: final_verdict
+    - branch:
+        subject: first_verdict.accepted
+        cases:
+          false:
+          - judge:
+              question: How should this one criterion be corrected to verify the active
+                requirement with justified observations?
+              subject: instruction
+              prompt_system: Return only the declared JSON object.
+              instructions:
+              - Repair the proposed criterion using the original instruction and source
+                evidence. Fully specify concrete inputs and exact observation timing.
+                Query may be empty when not needed; otherwise obey captured directive
+                locations. Assert only the active requirement and necessary interactions.
+                Do not require a concrete output class unless explicitly required.
+                Avoid unrelated default values, legacy wire envelopes and relocating
+                untargeted state. Existing absence never blocks a required feature.
+                Describe a plausible wrong implementation rejected by this condition.
+                No solution patch is available; do not guess unspecified error policies.
+              context:
+              - instruction
+              - item.requirement
+              - candidate
+              - sources
+              - setup
+              - outcome
+              - syntax
+              provider: flash
+              output:
+                name: candidate
+                schema:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    given: &id002
+                      type: string
+                    when: *id002
+                    then: *id002
+                    rejects: *id002
+                    query: *id002
+                  required:
+                  - given
+                  - when
+                  - then
+                  - rejects
+                  - query
+              validation:
+                kind: json_schema
+          - operation:
+              tool: internal
+              command:
+              - quality_query
+              parameters:
+                criterion:
+                  type: reference
+                  value: candidate
+              bind: syntax
+          - judge:
+              question: Do given and when completely specify valid inputs and an observation
+                point sufficient to verify then?
+              subject: instruction
+              prompt_system: Return only the declared JSON object.
+              instructions:
+              - Check every concrete value/flag used by then against given/when. Do
+                not infer arbitrary example values. Check API/layer, directive locations,
+                complete wire envelopes and input shapes. A requested new API need
+                not exist yet. supported means complete valid setup; contradicted
+                means invalid or invented input; unknown means necessary inputs are
+                unspecified.
+              context:
+              - instruction
+              - item.requirement
+              - candidate
+              - sources
+              - syntax
+              provider: jev
+              output:
+                name: setup
+                schema: *id001
+              validation:
+                kind: json_schema
+          - judge:
+              question: Does every expected assertion follow independently from the
+                instruction and properly scoped source evidence?
+              subject: instruction
+              prompt_system: Return only the declared JSON object.
+              instructions:
+              - Do not use generated behavior or earlier reviews as authority. Evaluate
+                requested post-change behavior even when implementation is absent.
+                Class identity is not required by a structural attribute requirement;
+                another operation's return type is not a mandate for this one. Check
+                omitted-field defaults, payload-local metadata and exact observation
+                timing. A targeted update must not modify or relocate unrelated state
+                unless requested. Inspect scope and grammatical attachment in the
+                original instruction. Reject unsupported guesses about absent containers
+                or new error policies. supported means all assertions justified; contradicted
+                means any unsupported/conflicting assertion; unknown means genuinely
+                undetermined. Dependency formats are scoped evidence, not mandated
+                implementation classes.
+              context:
+              - instruction
+              - item.requirement
+              - candidate
+              - sources
+              provider: jev
+              output:
+                name: outcome
+                schema: *id001
+              validation:
+                kind: json_schema
+          - operation:
+              tool: internal
+              command:
+              - quality_verdict
+              parameters:
+                setup:
+                  type: reference
+                  value: setup
+                outcome:
+                  type: reference
+                  value: outcome
+                syntax:
+                  type: reference
+                  value: syntax
+              bind: final_verdict
+        default: []
+    - operation:
+        tool: internal
+        command:
+        - record_quality
+        parameters:
+          item:
+            type: reference
+            value: item
+          candidate:
+            type: reference
+            value: candidate
+          first_verdict:
+            type: reference
+            value: first_verdict
+          final_verdict:
+            type: reference
+            value: final_verdict
+        bind: record
+- operation:
+    tool: internal
+    command:
+    - merge_exact_criteria
+    parameters: {}
+    bind: merge_result
+- operation:
+    tool: internal
+    command:
+    - render_prompt
+    parameters: {}
+    bind: prompt
+- terminal: succeeded

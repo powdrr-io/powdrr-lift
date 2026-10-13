@@ -1,0 +1,153 @@
+{
+  "version": "3.3.0a7",
+  "types": {
+    "ExecutionResult": {
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/execution/incremental_publisher.py",
+      "start": 195,
+      "source": "class ExecutionResult:\n    \"\"\"The result of GraphQL execution.\n\n    - ``data`` is the result of a successful execution of the query.\n    - ``errors`` is included when any errors occurred as a non-empty list.\n    - ``extensions`` is reserved for adding non-standard properties.\n    \"\"\"\n\n    __slots__ = \"data\", \"errors\", \"extensions\"\n\n    data: dict[str, Any] | None\n    errors: list[GraphQLError] | None\n    extensions: dict[str, Any] | None\n\n    def __init__(\n        self,\n        data: dict[str, Any] | None = None,\n        errors: list[GraphQLError] | None = None,\n        extensions: dict[str, Any] | None = None,\n    ) -> None:\n        self.data = data\n        self.errors = errors\n        self.extensions = extensions\n\n    def __repr__(self) -> str:\n        name = self.__class__.__name__\n        ext = \"\" if self.extensions is None else f\", extensions={self.extensions!r}\"\n        return f\"{name}(data={self.data!r}, errors={self.errors!r}{ext})\"\n\n    def __iter__(self) -> Iterator[Any]:\n        return iter((self.data, self.errors))\n\n    @property\n    def formatted(self) -> FormattedExecutionResult:\n        \"\"\"Get execution result formatted according to the specification.\"\"\"\n        formatted: FormattedExecutionResult = {\"data\": self.data}\n        if self.errors is not None:\n            formatted[\"errors\"] = [error.formatted for error in self.errors]\n        if self.extensions is not None:\n            formatted[\"extensions\"] = self.extensions\n        return formatted\n\n    def __eq__(self, other: object) -> bool:\n        if isinstance(other, dict):\n            return (\n                (other.get(\"data\") == self.data)\n                and (other.get(\"errors\") or None) == (self.errors or None)\n                and (other.get(\"extensions\") or None) == (self.extensions or None)\n            )\n        if isinstance(other, tuple):\n            if len(other) == 2:\n                return other == (self.data, self.errors)\n            return other == (self.data, self.errors, self.extensions)\n        return (\n            isinstance(other, self.__class__)\n            and other.data == self.data\n            and other.errors == self.errors\n            and other.extensions == self.extensions\n        )\n\n    def __ne__(self, other: object) -> bool:\n        return not self == other\n",
+      "file_sha256": "a94ab15c9afe3039c50be9de143cb4bc890ab4f3652c7d8e0822c1c25cb6e807"
+    },
+    "ExperimentalIncrementalExecutionResults": {
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/execution/incremental_publisher.py",
+      "start": 355,
+      "source": "class ExperimentalIncrementalExecutionResults(NamedTuple):\n    \"\"\"Execution results when retrieved incrementally.\"\"\"\n\n    initial_result: InitialIncrementalExecutionResult\n    subsequent_results: AsyncGenerator[SubsequentIncrementalExecutionResult, None]\n",
+      "file_sha256": "a94ab15c9afe3039c50be9de143cb4bc890ab4f3652c7d8e0822c1c25cb6e807"
+    },
+    "FormattedIncrementalDeferResult": {
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/execution/incremental_publisher.py",
+      "start": 362,
+      "source": "class FormattedIncrementalDeferResult(TypedDict, total=False):\n    \"\"\"Formatted incremental deferred execution result\"\"\"\n\n    data: dict[str, Any]\n    id: str\n    subPath: list[str | int]\n    errors: list[GraphQLFormattedError]\n    extensions: dict[str, Any]\n",
+      "file_sha256": "a94ab15c9afe3039c50be9de143cb4bc890ab4f3652c7d8e0822c1c25cb6e807"
+    },
+    "FormattedIncrementalStreamResult": {
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/execution/incremental_publisher.py",
+      "start": 454,
+      "source": "class FormattedIncrementalStreamResult(TypedDict, total=False):\n    \"\"\"Formatted incremental stream execution result\"\"\"\n\n    items: list[Any]\n    id: str\n    subPath: list[str | int]\n    errors: list[GraphQLFormattedError]\n    extensions: dict[str, Any]\n",
+      "file_sha256": "a94ab15c9afe3039c50be9de143cb4bc890ab4f3652c7d8e0822c1c25cb6e807"
+    },
+    "FormattedInitialIncrementalExecutionResult": {
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/execution/incremental_publisher.py",
+      "start": 259,
+      "source": "class FormattedInitialIncrementalExecutionResult(TypedDict, total=False):\n    \"\"\"Formatted initial incremental execution result\"\"\"\n\n    data: dict[str, Any] | None\n    errors: list[GraphQLFormattedError]\n    pending: list[FormattedPendingResult]\n    hasNext: bool\n    incremental: list[FormattedIncrementalResult]\n    extensions: dict[str, Any]\n",
+      "file_sha256": "a94ab15c9afe3039c50be9de143cb4bc890ab4f3652c7d8e0822c1c25cb6e807"
+    },
+    "FormattedSubsequentIncrementalExecutionResult": {
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/execution/incremental_publisher.py",
+      "start": 553,
+      "source": "class FormattedSubsequentIncrementalExecutionResult(TypedDict, total=False):\n    \"\"\"Formatted subsequent incremental execution result\"\"\"\n\n    hasNext: bool\n    pending: list[FormattedPendingResult]\n    incremental: list[FormattedIncrementalResult]\n    completed: list[FormattedCompletedResult]\n    extensions: dict[str, Any]\n",
+      "file_sha256": "a94ab15c9afe3039c50be9de143cb4bc890ab4f3652c7d8e0822c1c25cb6e807"
+    },
+    "IncrementalDeferResult": {
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/execution/incremental_publisher.py",
+      "start": 372,
+      "source": "class IncrementalDeferResult:\n    \"\"\"Incremental deferred execution result\"\"\"\n\n    data: dict[str, Any]\n    id: str\n    sub_path: list[str | int] | None\n    errors: list[GraphQLError] | None\n    extensions: dict[str, Any] | None\n\n    __slots__ = \"data\", \"errors\", \"extensions\", \"id\", \"sub_path\"\n\n    def __init__(\n        self,\n        data: dict[str, Any],\n        id: str,  # noqa: A002\n        sub_path: list[str | int] | None = None,\n        errors: list[GraphQLError] | None = None,\n        extensions: dict[str, Any] | None = None,\n    ) -> None:\n        self.data = data\n        self.id = id\n        self.sub_path = sub_path\n        self.errors = errors\n        self.extensions = extensions\n\n    def __repr__(self) -> str:\n        name = self.__class__.__name__\n        args: list[str] = [f\"data={self.data!r}, id={self.id!r}\"]\n        if self.sub_path is not None:\n            args.append(f\"sub_path={self.sub_path!r}\")\n        if self.errors is not None:\n            args.append(f\"errors={self.errors!r}\")\n        if self.extensions is not None:\n            args.append(f\"extensions={self.extensions!r}\")\n        return f\"{name}({', '.join(args)})\"\n\n    @property\n    def formatted(self) -> FormattedIncrementalDeferResult:\n        \"\"\"Get execution result formatted according to the specification.\"\"\"\n        formatted: FormattedIncrementalDeferResult = {\n            \"data\": self.data,\n            \"id\": self.id,\n        }\n        if self.sub_path is not None:\n            formatted[\"subPath\"] = self.sub_path\n        if self.errors is not None:\n            formatted[\"errors\"] = [error.formatted for error in self.errors]\n        if self.extensions is not None:\n            formatted[\"extensions\"] = self.extensions\n        return formatted\n\n    def __eq__(self, other: object) -> bool:\n        if isinstance(other, dict):\n            return (\n                other.get(\"data\") == self.data\n                and other.get(\"id\") == self.id\n                and (other.get(\"subPath\") or None) == (self.sub_path or None)\n                and (other.get(\"errors\") or None) == (self.errors or None)\n                and (other.get(\"extensions\") or None) == (self.extensions or None)\n            )\n        if isinstance(other, tuple):\n            size = len(other)\n            return (\n                1 < size < 6\n                and (self.data, self.id, self.sub_path, self.errors, self.extensions)[\n                    :size\n                ]\n                == other\n            )\n        return (\n            isinstance(other, self.__class__)\n            and other.data == self.data\n            and other.id == self.id\n            and other.sub_path == self.sub_path\n            and other.errors == self.errors\n            and other.extensions == self.extensions\n        )\n\n    def __ne__(self, other: object) -> bool:\n        return not self == other\n",
+      "file_sha256": "a94ab15c9afe3039c50be9de143cb4bc890ab4f3652c7d8e0822c1c25cb6e807"
+    },
+    "IncrementalStreamResult": {
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/execution/incremental_publisher.py",
+      "start": 464,
+      "source": "class IncrementalStreamResult:\n    \"\"\"Incremental streamed execution result\"\"\"\n\n    items: list[Any]\n    id: str\n    sub_path: list[str | int] | None\n    errors: list[GraphQLError] | None\n    extensions: dict[str, Any] | None\n\n    __slots__ = \"errors\", \"extensions\", \"id\", \"items\", \"label\", \"sub_path\"\n\n    def __init__(\n        self,\n        items: list[Any],\n        id: str,  # noqa: A002\n        sub_path: list[str | int] | None = None,\n        errors: list[GraphQLError] | None = None,\n        extensions: dict[str, Any] | None = None,\n    ) -> None:\n        self.items = items\n        self.id = id\n        self.sub_path = sub_path\n        self.errors = errors\n        self.extensions = extensions\n\n    def __repr__(self) -> str:\n        name = self.__class__.__name__\n        args: list[str] = [f\"items={self.items!r}, id={self.id!r}\"]\n        if self.sub_path is not None:\n            args.append(f\"sub_path={self.sub_path!r}\")\n        if self.errors is not None:\n            args.append(f\"errors={self.errors!r}\")\n        if self.extensions is not None:\n            args.append(f\"extensions={self.extensions!r}\")\n        return f\"{name}({', '.join(args)})\"\n\n    @property\n    def formatted(self) -> FormattedIncrementalStreamResult:\n        \"\"\"Get execution result formatted according to the specification.\"\"\"\n        formatted: FormattedIncrementalStreamResult = {\n            \"items\": self.items,\n            \"id\": self.id,\n        }\n        if self.sub_path is not None:\n            formatted[\"subPath\"] = self.sub_path\n        if self.errors is not None:\n            formatted[\"errors\"] = [error.formatted for error in self.errors]\n        if self.extensions is not None:\n            formatted[\"extensions\"] = self.extensions\n        return formatted\n\n    def __eq__(self, other: object) -> bool:\n        if isinstance(other, dict):\n            return (\n                other.get(\"items\") == self.items\n                and other.get(\"id\") == self.id\n                and (other.get(\"subPath\", None) == (self.sub_path or None))\n                and (other.get(\"errors\") or None) == (self.errors or None)\n                and (other.get(\"extensions\", None) == (self.extensions or None))\n            )\n        if isinstance(other, tuple):\n            size = len(other)\n            return (\n                1 < size < 6\n                and (self.items, self.id, self.sub_path, self.errors, self.extensions)[\n                    :size\n                ]\n                == other\n            )\n        return (\n            isinstance(other, self.__class__)\n            and other.items == self.items\n            and other.id == self.id\n            and other.sub_path == self.sub_path\n            and other.errors == self.errors\n            and other.extensions == self.extensions\n        )\n\n    def __ne__(self, other: object) -> bool:\n        return not self == other\n",
+      "file_sha256": "a94ab15c9afe3039c50be9de143cb4bc890ab4f3652c7d8e0822c1c25cb6e807"
+    },
+    "InitialIncrementalExecutionResult": {
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/execution/incremental_publisher.py",
+      "start": 270,
+      "source": "class InitialIncrementalExecutionResult:\n    \"\"\"Initial incremental execution result.\"\"\"\n\n    data: dict[str, Any] | None\n    errors: list[GraphQLError] | None\n    pending: list[PendingResult]\n    has_next: bool\n    extensions: dict[str, Any] | None\n\n    __slots__ = \"data\", \"errors\", \"extensions\", \"has_next\", \"pending\"\n\n    def __init__(\n        self,\n        data: dict[str, Any] | None = None,\n        errors: list[GraphQLError] | None = None,\n        pending: list[PendingResult] | None = None,\n        has_next: bool = False,\n        extensions: dict[str, Any] | None = None,\n    ) -> None:\n        self.data = data\n        self.errors = errors\n        self.pending = pending or []\n        self.has_next = has_next\n        self.extensions = extensions\n\n    def __repr__(self) -> str:\n        name = self.__class__.__name__\n        args: list[str] = [f\"data={self.data!r}\"]\n        if self.errors:\n            args.append(f\"errors={self.errors!r}\")\n        if self.pending:\n            args.append(f\"pending={self.pending!r}\")\n        if self.has_next:\n            args.append(\"has_next\")\n        if self.extensions:\n            args.append(f\"extensions={self.extensions!r}\")\n        return f\"{name}({', '.join(args)})\"\n\n    @property\n    def formatted(self) -> FormattedInitialIncrementalExecutionResult:\n        \"\"\"Get execution result formatted according to the specification.\"\"\"\n        formatted: FormattedInitialIncrementalExecutionResult = {\"data\": self.data}\n        if self.errors is not None:\n            formatted[\"errors\"] = [error.formatted for error in self.errors]\n        formatted[\"pending\"] = [pending.formatted for pending in self.pending]\n        formatted[\"hasNext\"] = self.has_next\n        if self.extensions is not None:\n            formatted[\"extensions\"] = self.extensions\n        return formatted\n\n    def __eq__(self, other: object) -> bool:\n        if isinstance(other, dict):\n            return (\n                other.get(\"data\") == self.data\n                and (other.get(\"errors\") or None) == (self.errors or None)\n                and (other.get(\"pending\") or None) == (self.pending or None)\n                and (other.get(\"hasNext\") or None) == (self.has_next or None)\n                and (other.get(\"extensions\") or None) == (self.extensions or None)\n            )\n        if isinstance(other, tuple):\n            size = len(other)\n            return (\n                1 < size < 6\n                and (\n                    self.data,\n                    self.errors,\n                    self.pending,\n                    self.has_next,\n                    self.extensions,\n                )[:size]\n                == other\n            )\n        return (\n            isinstance(other, self.__class__)\n            and other.data == self.data\n            and other.errors == self.errors\n            and other.pending == self.pending\n            and other.has_next == self.has_next\n            and other.extensions == self.extensions\n        )\n\n    def __ne__(self, other: object) -> bool:\n        return not self == other\n",
+      "file_sha256": "a94ab15c9afe3039c50be9de143cb4bc890ab4f3652c7d8e0822c1c25cb6e807"
+    },
+    "SubsequentIncrementalExecutionResult": {
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/execution/incremental_publisher.py",
+      "start": 563,
+      "source": "class SubsequentIncrementalExecutionResult:\n    \"\"\"Subsequent incremental execution result.\"\"\"\n\n    __slots__ = \"completed\", \"extensions\", \"has_next\", \"incremental\", \"pending\"\n\n    has_next: bool\n    pending: list[PendingResult] | None\n    incremental: list[IncrementalResult] | None\n    completed: list[CompletedResult] | None\n    extensions: dict[str, Any] | None\n\n    def __init__(\n        self,\n        has_next: bool = False,\n        pending: list[PendingResult] | None = None,\n        incremental: list[IncrementalResult] | None = None,\n        completed: list[CompletedResult] | None = None,\n        extensions: dict[str, Any] | None = None,\n    ) -> None:\n        self.has_next = has_next\n        self.pending = pending or []\n        self.incremental = incremental\n        self.completed = completed\n        self.extensions = extensions\n\n    def __repr__(self) -> str:\n        name = self.__class__.__name__\n        args: list[str] = []\n        if self.has_next:\n            args.append(\"has_next\")\n        if self.pending:\n            args.append(f\"pending[{len(self.pending)}]\")\n        if self.incremental:\n            args.append(f\"incremental[{len(self.incremental)}]\")\n        if self.completed:\n            args.append(f\"completed[{len(self.completed)}]\")\n        if self.extensions:\n            args.append(f\"extensions={self.extensions!r}\")\n        return f\"{name}({', '.join(args)})\"\n\n    @property\n    def formatted(self) -> FormattedSubsequentIncrementalExecutionResult:\n        \"\"\"Get execution result formatted according to the specification.\"\"\"\n        formatted: FormattedSubsequentIncrementalExecutionResult = {}\n        formatted[\"hasNext\"] = self.has_next\n        if self.pending:\n            formatted[\"pending\"] = [result.formatted for result in self.pending]\n        if self.incremental:\n            formatted[\"incremental\"] = [result.formatted for result in self.incremental]\n        if self.completed:\n            formatted[\"completed\"] = [result.formatted for result in self.completed]\n        if self.extensions is not None:\n            formatted[\"extensions\"] = self.extensions\n        return formatted\n\n    def __eq__(self, other: object) -> bool:\n        if isinstance(other, dict):\n            return (\n                (other.get(\"hasNext\") or None) == (self.has_next or None)\n                and (other.get(\"pending\") or None) == (self.pending or None)\n                and (other.get(\"incremental\") or None) == (self.incremental or None)\n                and (other.get(\"completed\") or None) == (self.completed or None)\n                and (other.get(\"extensions\") or None) == (self.extensions or None)\n            )\n        if isinstance(other, tuple):\n            size = len(other)\n            return (\n                1 < size < 6\n                and (\n                    self.has_next,\n                    self.pending,\n                    self.incremental,\n                    self.completed,\n                    self.extensions,\n                )[:size]\n                == other\n            )\n        return (\n            isinstance(other, self.__class__)\n            and other.has_next == self.has_next\n            and self.pending == other.pending\n            and other.incremental == self.incremental\n            and other.completed == self.completed\n            and other.extensions == self.extensions\n        )\n\n    def __ne__(self, other: object) -> bool:\n        return not self == other\n",
+      "file_sha256": "a94ab15c9afe3039c50be9de143cb4bc890ab4f3652c7d8e0822c1c25cb6e807"
+    }
+  },
+  "directives": {
+    "defer": {
+      "locations": [
+        "fragment spread",
+        "inline fragment"
+      ],
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/type/directives.py",
+      "definition": "GraphQLDeferDirective = GraphQLDirective(\n    name=\"defer\",\n    description=\"Directs the executor to defer this fragment\"\n    \" when the `if` argument is true or undefined.\",\n    locations=[DirectiveLocation.FRAGMENT_SPREAD, DirectiveLocation.INLINE_FRAGMENT],\n    args={\n        \"if\": GraphQLArgument(\n            GraphQLNonNull(GraphQLBoolean),\n            description=\"Deferred when true or undefined.\",\n            default_value=True,\n        ),\n        \"label\": GraphQLArgument(GraphQLString, description=\"Unique name\"),\n    },\n)",
+      "file_sha256": "8940c5becbc7c67277a984898e3567abc18ec9b790e887a3e75594fae23d74e7",
+      "arguments": {
+        "if": "Boolean!",
+        "label": "String"
+      }
+    },
+    "deprecated": {
+      "locations": [
+        "field definition",
+        "argument definition",
+        "input field definition",
+        "enum value"
+      ],
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/type/directives.py",
+      "definition": "GraphQLDeprecatedDirective = GraphQLDirective(\n    name=\"deprecated\",\n    locations=[\n        DirectiveLocation.FIELD_DEFINITION,\n        DirectiveLocation.ARGUMENT_DEFINITION,\n        DirectiveLocation.INPUT_FIELD_DEFINITION,\n        DirectiveLocation.ENUM_VALUE,\n    ],\n    args={\n        \"reason\": GraphQLArgument(\n            GraphQLString,\n            description=\"Explains why this element was deprecated,\"\n            \" usually also including a suggestion for how to access\"\n            \" supported similar data.\"\n            \" Formatted using the Markdown syntax, as specified by\"\n            \" [CommonMark](https://commonmark.org/).\",\n            default_value=DEFAULT_DEPRECATION_REASON,\n        )\n    },\n    description=\"Marks an element of a GraphQL schema as no longer supported.\",\n)",
+      "file_sha256": "8940c5becbc7c67277a984898e3567abc18ec9b790e887a3e75594fae23d74e7",
+      "arguments": {
+        "reason": "String"
+      }
+    },
+    "include": {
+      "locations": [
+        "field",
+        "fragment spread",
+        "inline fragment"
+      ],
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/type/directives.py",
+      "definition": "GraphQLIncludeDirective = GraphQLDirective(\n    name=\"include\",\n    locations=[\n        DirectiveLocation.FIELD,\n        DirectiveLocation.FRAGMENT_SPREAD,\n        DirectiveLocation.INLINE_FRAGMENT,\n    ],\n    args={\n        \"if\": GraphQLArgument(\n            GraphQLNonNull(GraphQLBoolean), description=\"Included when true.\"\n        )\n    },\n    description=\"Directs the executor to include this field or fragment\"\n    \" only when the `if` argument is true.\",\n)",
+      "file_sha256": "8940c5becbc7c67277a984898e3567abc18ec9b790e887a3e75594fae23d74e7",
+      "arguments": {
+        "if": "Boolean!"
+      }
+    },
+    "oneOf": {
+      "locations": [
+        "input object"
+      ],
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/type/directives.py",
+      "definition": "GraphQLOneOfDirective = GraphQLDirective(\n    name=\"oneOf\",\n    locations=[DirectiveLocation.INPUT_OBJECT],\n    args={},\n    description=\"Indicates exactly one field must be supplied\"\n    \" and this field must not be `null`.\",\n)",
+      "file_sha256": "8940c5becbc7c67277a984898e3567abc18ec9b790e887a3e75594fae23d74e7",
+      "arguments": {}
+    },
+    "skip": {
+      "locations": [
+        "field",
+        "fragment spread",
+        "inline fragment"
+      ],
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/type/directives.py",
+      "definition": "GraphQLSkipDirective = GraphQLDirective(\n    name=\"skip\",\n    locations=[\n        DirectiveLocation.FIELD,\n        DirectiveLocation.FRAGMENT_SPREAD,\n        DirectiveLocation.INLINE_FRAGMENT,\n    ],\n    args={\n        \"if\": GraphQLArgument(\n            GraphQLNonNull(GraphQLBoolean), description=\"Skipped when true.\"\n        )\n    },\n    description=\"Directs the executor to skip this field or fragment\"\n    \" when the `if` argument is true.\",\n)",
+      "file_sha256": "8940c5becbc7c67277a984898e3567abc18ec9b790e887a3e75594fae23d74e7",
+      "arguments": {
+        "if": "Boolean!"
+      }
+    },
+    "specifiedBy": {
+      "locations": [
+        "scalar"
+      ],
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/type/directives.py",
+      "definition": "GraphQLSpecifiedByDirective = GraphQLDirective(\n    name=\"specifiedBy\",\n    locations=[DirectiveLocation.SCALAR],\n    args={\n        \"url\": GraphQLArgument(\n            GraphQLNonNull(GraphQLString),\n            description=\"The URL that specifies the behavior of this scalar.\",\n        )\n    },\n    description=\"Exposes a URL that specifies the behavior of this scalar.\",\n)",
+      "file_sha256": "8940c5becbc7c67277a984898e3567abc18ec9b790e887a3e75594fae23d74e7",
+      "arguments": {
+        "url": "String!"
+      }
+    },
+    "stream": {
+      "locations": [
+        "field"
+      ],
+      "path": "/usr/local/lib/python3.12/site-packages/graphql/type/directives.py",
+      "definition": "GraphQLStreamDirective = GraphQLDirective(\n    name=\"stream\",\n    description=\"Directs the executor to stream plural fields\"\n    \" when the `if` argument is true or undefined.\",\n    locations=[DirectiveLocation.FIELD],\n    args={\n        \"if\": GraphQLArgument(\n            GraphQLNonNull(GraphQLBoolean),\n            description=\"Stream when true or undefined.\",\n            default_value=True,\n        ),\n        \"label\": GraphQLArgument(GraphQLString, description=\"Unique name\"),\n        \"initialCount\": GraphQLArgument(\n            GraphQLInt,\n            description=\"Number of items to return immediately\",\n            default_value=0,\n        ),\n    },\n)",
+      "file_sha256": "8940c5becbc7c67277a984898e3567abc18ec9b790e887a3e75594fae23d74e7",
+      "arguments": {
+        "if": "Boolean!",
+        "label": "String",
+        "initialCount": "Int"
+      }
+    }
+  }
+}

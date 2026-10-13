@@ -1,0 +1,15 @@
+{
+  "run_error": "'rendered'",
+  "requirements": 23,
+  "covered": 0,
+  "criteria": 2,
+  "emitted": 2,
+  "provider_calls": 42,
+  "failures": 0,
+  "final_status": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "tests_run": false,
+  "coding_agents_run": false
+}

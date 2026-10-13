@@ -17,6 +17,11 @@ from science.deepswe.acceptance_templates.common import write_json
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
+    parser.add_argument(
+        "--all-files",
+        action="store_true",
+        help="Also preserve decisions, declarations and other experiment artifacts",
+    )
     args = parser.parse_args()
     root = args.directory
     secrets = [
@@ -25,23 +30,34 @@ def main() -> None:
         if re.search(r"KEY|TOKEN|PASSWORD|SECRET", k, re.I) and len(v) >= 16
     ]
     records: list[dict[str, Any]] = []
+    paths = (
+        sorted(root.rglob("*"))
+        if args.all_files
+        else sorted(
+            p
+            for category in ("calls", "reads", "setup")
+            for p in (root / category).rglob("*")
+        )
+    )
     with tarfile.open(root / "checkpoints.tar.gz", "w:gz") as archive:
-        for category in ("calls", "reads", "setup"):
-            for path in sorted((root / category).rglob("*")):
-                if not path.is_file():
-                    continue
-                data = path.read_bytes()
-                if any(secret in data for secret in secrets):
-                    raise ValueError(f"Credential found in {path}; do not publish")
-                relative = str(path.relative_to(root))
-                archive.add(path, arcname=relative)
-                records.append(
-                    {
-                        "path": relative,
-                        "bytes": len(data),
-                        "sha256": hashlib.sha256(data).hexdigest(),
-                    }
-                )
+        for path in paths:
+            if not path.is_file() or path in {
+                root / "checkpoints.tar.gz",
+                root / "checkpoints.json",
+            }:
+                continue
+            data = path.read_bytes()
+            if any(secret in data for secret in secrets):
+                raise ValueError(f"Credential found in {path}; do not publish")
+            relative = str(path.relative_to(root))
+            archive.add(path, arcname=relative)
+            records.append(
+                {
+                    "path": relative,
+                    "bytes": len(data),
+                    "sha256": hashlib.sha256(data).hexdigest(),
+                }
+            )
     with tarfile.open(root / "checkpoints.tar.gz") as archive:
         for row in records:
             stream = archive.extractfile(row["path"])

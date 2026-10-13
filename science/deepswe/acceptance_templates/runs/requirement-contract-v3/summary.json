@@ -1,0 +1,17 @@
+{
+  "llm_activations": 196,
+  "operations": 229,
+  "run_error": null,
+  "requirements": 23,
+  "covered": 23,
+  "criteria": 42,
+  "emitted": 42,
+  "provider_calls": 196,
+  "failures": 0,
+  "final_status": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "tests_run": false,
+  "coding_agents_run": false
+}

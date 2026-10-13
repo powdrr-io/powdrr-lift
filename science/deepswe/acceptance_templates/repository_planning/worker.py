@@ -37,6 +37,11 @@ def source(path: str) -> Path:
 
 def execute(request: dict[str, Any]) -> dict[str, Any]:
     operation = request["operation"]
+    if operation == "parse_query":
+        from importlib import import_module
+
+        import_module("graphql").parse(request["query"])
+        return {"parsed": True}
     if operation == "index":
         return extract(ROOT, files())
     if operation == "status":

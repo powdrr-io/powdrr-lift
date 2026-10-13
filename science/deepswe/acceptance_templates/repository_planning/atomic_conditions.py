@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -61,12 +62,16 @@ class AtomicOperations(ReviewOperations):
             requirement = parameters["requirement"]
             packet = load_json(self.evidence / "packets" / f"{requirement['id']}.json")
             dependencies = load_json(self.generation / "dependency-evidence.json")
-            text = requirement["text"].casefold()
+            # A routed clause is often a narrow split child. Resolve shared API
+            # facts from the full instruction so examples for that child can use
+            # any directive explicitly introduced by the task.
+            instruction = str(self.packet.get("instruction", ""))
             relevant_directives = {
                 name: value
                 for name, value in dependencies["directives"].items()
-                if name in text
+                if _directive_is_named(name, instruction)
             }
+            text = requirement["text"].casefold()
             result_interface = (
                 dependencies["types"]["ExecutionResult"]
                 if "result" in text
@@ -103,6 +108,7 @@ class AtomicOperations(ReviewOperations):
                 "result_interface": result_interface,
                 "wire_interfaces": wire_interfaces,
                 "directives": relevant_directives,
+                "directive_context_source": "full_instruction",
                 "scope": (
                     "Existing APIs and dependency formats are evidence of "
                     "conventions. They do not mandate an implementation class for a "
@@ -135,6 +141,19 @@ class AtomicOperations(ReviewOperations):
                 tool, {"command": ["record_contract_criterion"], **row}
             )
         return super().__call__(tool, parameters)
+
+
+def _directive_is_named(name: str, instruction: str) -> bool:
+    """Match a dependency directive explicitly named anywhere in the task."""
+    identifier = name.removeprefix("@").casefold()
+    return bool(
+        identifier
+        and re.search(
+            rf"(?<![\w])@{re.escape(identifier)}(?![\w])",
+            instruction,
+            flags=re.IGNORECASE,
+        )
+    )
 
 
 def main() -> None:

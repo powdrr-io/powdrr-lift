@@ -1,3 +1,5 @@
+<sub>[Skip the marketing and get to work](GETTING_STARTED.md)</sub>
+
 # Stop Babysitting Agents. Start Writing Software
 
 Powdrr gives you an agent you can trust with real engineering work. It is high-integrity
@@ -6,7 +8,7 @@ changes isolated, and makes its work ready for review. It also has an elephant-l
 memory. Powdrr carries intent, decisions, constraints, and prior context forward so it
 always has the right context at the right time.
 
-## Your Agent Does Not Know What Is Safe
+### Your Agent Does Not Know What Is Safe
 
 Approval fatigue happens because your agent literally has no idea which commands are safe
 and which ones are not. You end up approving every shell command, second-guessing every
@@ -21,7 +23,7 @@ roundtrips, and stops when the agent cannot make validated progress. When Powdrr
 for permission on those rare occasions, it provides the context and reasoning you need
 to make an informed decision.
 
-## Your Agent Has The Memory of a Goldfish
+### Your Agent Has The Memory of a Goldfish
 
 You constantly have to remind agents what they need to do: restate the goal, repeat the
 constraints, explain an earlier decision, and point them back to the file or change that
@@ -34,14 +36,18 @@ guidance as structured artifacts alongside the code. Each next step receives the
 useful slice of that context, while execution events and review findings remain available
 for later work. The agent can forget the conversation without forgetting the work.
 
-## Your Agent is an Irresponsible Sycophant
+### Your Agent is an Irresponsible Sycophant
 
 Tired of an agent that tells you everything is great, but admits it isn't when you ask
 again? Tired of needing a manager agent just to monitor your coding agent and make sure
 it performs its basic duties? Powdrr does what you ask, doesn't report false success, and
 doesn't need a chaperone to keep it from running amok.
 
-## Your Agent Follows Through
+<br>
+
+# Powdrr Agent Is Steadfast and Accountable
+
+<br>
 
 Most agents treat a request as a prompt and completion as a story they tell about what
 they did. Powdrr treats required follow-up work as an obligation. When a plan, action,
@@ -389,27 +395,17 @@ invocation starts from the primary checkout.
 - The skill loader can validate a directory of skills and ensure every
   referenced skill exists.
 
-### Available Skills
+Browse the current [workflow-chat definitions](skill-definitions/) for planning,
+implementation, validation, and review flows. The shared Procedrr processes used
+by feature implementation live in
+[docs/procedrr/skill-definitions/](docs/procedrr/skill-definitions/) and are included
+in the installed package.
 
-This repository includes 10 reusable skills for planning, implementation, validation,
-review, and repository-state management:
+From a repository checkout, validate the workflow-chat definitions and templates
+with:
 
-1. **bootstrap** - Analyze repository structure and source code to identify taxonomy-compliant entities, relationships, and features. Generate a validated system specification document from the analysis and commit it.
+```bash
+powdrr-lift validate-workflow-definitions skill-definitions templates
+```
 
-2. **code-edit-context** - Use when you are about to edit code and need index-backed context for a file and line ranges.
-
-3. **implement-pr** - Find a proposed PR by fuzzy search, inspect the full proposal, validate it against the current indexed specs and changelogs, implement the requested changes, review the proposal again, and then optionally generate the matching PR changelog.
-
-4. **prepare-pr-changelog** - Use when preparing a pull request or getting a PR ready. Guides the agent through the PR changelog workflow with powdrr-lift.
-
-5. **review-pr-changelog** - Use during code review when the change includes a changelog. This skill complements general code-review skills; do not replace normal review. Check for the changelog first, validate it, then review each change against the PR intent and report the feedback.
-
-6. **specify-architecture** - Create, fill, and validate architecture specification templates with the repository's architecture-specification CLI or MCP endpoints.
-
-7. **specify-implementation** - Create, fill, and validate implementation specification templates with the repository's implementation-specification CLI or MCP endpoints.
-
-8. **specify-prs** - Create, fill, and validate proposed PR specification templates with the repository's pr-specification CLI or MCP endpoints.
-
-9. **specify-system** - Create, fill, and validate system specification templates with the repository's system-specification CLI or MCP endpoints.
-
-10. **synchronize-code-and-state** - Generate the current codebase-state snapshot, compare it to the source tree and changelog index, and reconcile mismatches by changing code and/or the changelog while preserving the repo's intent.
+For local DeepSWE runs, follow [the benchmark instructions](BENCHMARKS.md).

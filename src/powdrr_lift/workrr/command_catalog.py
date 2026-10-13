@@ -10,22 +10,11 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
-from powdrr_lift.core.acceptance_contract import (
-    AcceptanceContractError,
-    AcceptanceCriterion,
-    BehavioralContract,
-    validate_contracts,
-)
 from powdrr_lift.core.behavior_contract import (
     BEHAVIOR_DIMENSIONS,
     SUPPORTED_ASSUMPTION_DIMENSIONS,
-    CriterionQuality,
     compile_behavior_scenarios,
     validate_normative_assumptions,
-)
-from powdrr_lift.core.boolean_expression import (
-    BooleanExpressionError,
-    render_boolean_sentence,
 )
 from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.core.feature_obligation import (
@@ -67,24 +56,11 @@ from powdrr_lift.core.semantic_faithfulness import (
     finalize_scenario_claim_reviews,
     prepare_scenario_claim_reviews,
 )
-from powdrr_lift.core.source_interpretation import SourceInterpretationError
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.obligation_evidence import (
     ObligationEvidenceContract,
     assert_obligation_evidence_complete,
     compile_obligation_evidence_contract,
-)
-from powdrr_lift.workrr.acceptance_contract_compiler import (
-    bind_behavioral_contracts,
-    prepare_behavioral_contracts,
-)
-from powdrr_lift.workrr.acceptance_criterion_compiler import (
-    bind_acceptance_criteria,
-    bind_acceptance_criterion_repairs,
-    bind_acceptance_criterion_reviews,
-    prepare_acceptance_criteria,
-    prepare_acceptance_criterion_repairs,
-    prepare_acceptance_criterion_reviews,
 )
 from powdrr_lift.workrr.external_contract_research import (
     bind_external_contract_assessments,
@@ -110,7 +86,6 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
     bind_behavior_family_decision,
     bind_field_entailment_reviews,
     bind_source_extractions,
-    bind_source_interpretation,
     bind_source_semantic_decisions,
     compile_deterministic_source_extractions,
     compile_source_contract,
@@ -119,7 +94,6 @@ from powdrr_lift.workrr.semantic_contract_compiler import (
     prepare_dependent_source_semantic_decisions,
     prepare_field_entailment_reviews,
     prepare_source_extractions,
-    prepare_source_interpretation,
     prepare_source_semantic_decisions,
     project_partial_contract_to_legacy_design,
 )
@@ -352,26 +326,12 @@ def feature_command_catalog(
         "apply_atomicity_splits": CommandSpec(
             name="apply_atomicity_splits",
             input_schema=object_schema(
-                {
-                    "decisions": {},
-                    "splits": {},
-                    "equivalence_decisions": {},
-                },
-                required=("decisions", "splits", "equivalence_decisions"),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("apply_atomicity_splits"),
-        ),
-        "prepare_atomicity_reconstructions": CommandSpec(
-            name="prepare_atomicity_reconstructions",
-            input_schema=object_schema(
                 {"decisions": {}, "splits": {}},
                 required=("decisions", "splits"),
                 additional_properties=False,
             ),
             output_schema={},
-            logic=implementations.get("prepare_atomicity_reconstructions"),
+            logic=implementations.get("apply_atomicity_splits"),
         ),
         "prepare_source_semantic_decisions": CommandSpec(
             name="prepare_source_semantic_decisions",
@@ -451,28 +411,6 @@ def feature_command_catalog(
             output_schema={},
             logic=implementations.get("prepare_behavior_family_decision"),
         ),
-        "prepare_source_interpretation": CommandSpec(
-            name="prepare_source_interpretation",
-            input_schema=object_schema(
-                {
-                    "clause": {},
-                    "decisions": {},
-                    "extractions": {},
-                    "behavior_family_request": {},
-                    "behavior_family_result": {},
-                },
-                required=(
-                    "clause",
-                    "decisions",
-                    "extractions",
-                    "behavior_family_request",
-                    "behavior_family_result",
-                ),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("prepare_source_interpretation"),
-        ),
         "compile_partial_semantic_contract": CommandSpec(
             name="compile_partial_semantic_contract",
             input_schema=object_schema(
@@ -482,9 +420,6 @@ def feature_command_catalog(
                     "extractions": {},
                     "behavior_family_request": {},
                     "behavior_family_result": {},
-                    "behavior_family_decision": {},
-                    "source_interpretation_request": {},
-                    "source_interpretation_result": {},
                 },
                 required=(
                     "clause",
@@ -492,9 +427,6 @@ def feature_command_catalog(
                     "extractions",
                     "behavior_family_request",
                     "behavior_family_result",
-                    "behavior_family_decision",
-                    "source_interpretation_request",
-                    "source_interpretation_result",
                 ),
                 additional_properties=False,
             ),
@@ -714,8 +646,6 @@ def feature_command_catalog(
                 {
                     "work_item_name": {},
                     "design_decisions": {},
-                    "behavioral_contracts": {},
-                    "acceptance_criteria": {},
                     "scenario_consistency_review": {},
                     "uncertainty_policy": {
                         "type": "string",
@@ -725,98 +655,12 @@ def feature_command_catalog(
                 required=(
                     "work_item_name",
                     "design_decisions",
-                    "behavioral_contracts",
-                    "acceptance_criteria",
                     "scenario_consistency_review",
                 ),
                 additional_properties=False,
             ),
             output_schema={},
             logic=implementations.get("compile_canonical_feature_design"),
-        ),
-        "prepare_behavioral_contracts": CommandSpec(
-            name="prepare_behavioral_contracts",
-            input_schema=object_schema(
-                {"design_decisions": {}},
-                required=("design_decisions",),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("prepare_behavioral_contracts"),
-        ),
-        "bind_behavioral_contracts": CommandSpec(
-            name="bind_behavioral_contracts",
-            input_schema=object_schema(
-                {"plan": {}, "results": {}},
-                required=("plan", "results"),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("bind_behavioral_contracts"),
-        ),
-        "prepare_acceptance_criteria": CommandSpec(
-            name="prepare_acceptance_criteria",
-            input_schema=object_schema(
-                {"behavioral_contracts": {}},
-                required=("behavioral_contracts",),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("prepare_acceptance_criteria"),
-        ),
-        "bind_acceptance_criteria": CommandSpec(
-            name="bind_acceptance_criteria",
-            input_schema=object_schema(
-                {"plan": {}, "results": {}},
-                required=("plan", "results"),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("bind_acceptance_criteria"),
-        ),
-        "prepare_acceptance_criterion_reviews": CommandSpec(
-            name="prepare_acceptance_criterion_reviews",
-            input_schema=object_schema(
-                {"criteria": {}, "behavioral_contracts": {}},
-                required=("criteria", "behavioral_contracts"),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("prepare_acceptance_criterion_reviews"),
-        ),
-        "bind_acceptance_criterion_reviews": CommandSpec(
-            name="bind_acceptance_criterion_reviews",
-            input_schema=object_schema(
-                {"plan": {}, "results": {}},
-                required=("plan", "results"),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("bind_acceptance_criterion_reviews"),
-        ),
-        "prepare_acceptance_criterion_repairs": CommandSpec(
-            name="prepare_acceptance_criterion_repairs",
-            input_schema=object_schema(
-                {
-                    "criteria": {},
-                    "behavioral_contracts": {},
-                    "uncertainty_policy": {"type": "string"},
-                },
-                required=("criteria", "behavioral_contracts", "uncertainty_policy"),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("prepare_acceptance_criterion_repairs"),
-        ),
-        "bind_acceptance_criterion_repairs": CommandSpec(
-            name="bind_acceptance_criterion_repairs",
-            input_schema=object_schema(
-                {"plan": {}, "results": {}},
-                required=("plan", "results"),
-                additional_properties=False,
-            ),
-            output_schema={},
-            logic=implementations.get("bind_acceptance_criterion_repairs"),
         ),
         "assert_feature_design_ready_for_implementation": CommandSpec(
             name="assert_feature_design_ready_for_implementation",
@@ -1664,65 +1508,13 @@ class FeatureCommandRuntime:
             state["atomicity_decisions"] = decisions
             return {
                 "split_requests": [
-                    {
-                        "clause": clause.to_data(),
-                        "context": _bounded_instruction_context(ledger, clause),
-                    }
+                    {"clause": clause.to_data()}
                     for clause, is_multiple in zip(
                         ledger.clauses, multiple, strict=True
                     )
                     if is_multiple
                 ]
             }
-
-        def prepare_atomicity_reconstructions_operation() -> Any:
-            ledger = load_instruction_ledger()
-            decisions = collected_atomicity_decisions()
-            if len(decisions) != len(ledger.clauses):
-                raise PowdrrExecutionError(
-                    "atomicity decision count does not match instruction clauses"
-                )
-            split_results = feature_endpoint._collected_results(
-                parameters.get("splits")
-            )
-            if split_results is None or not all(
-                isinstance(item, Mapping) for item in split_results
-            ):
-                raise PowdrrExecutionError("atomicity splits are missing or malformed")
-            multiple_clauses = [
-                clause
-                for clause, decision in zip(ledger.clauses, decisions, strict=True)
-                if decision["multiple"]
-            ]
-            if len(split_results) != len(multiple_clauses):
-                raise PowdrrExecutionError(
-                    "atomicity split count does not match multi-requirement clauses"
-                )
-            requests: list[dict[str, Any]] = []
-            for clause, split in zip(multiple_clauses, split_results, strict=True):
-                statements = split.get("statements")
-                expression = split.get("boolean_expression")
-                reconstructed = ""
-                valid = isinstance(statements, list) and all(
-                    isinstance(item, str) for item in statements
-                )
-                if valid:
-                    try:
-                        _, reconstructed = render_boolean_sentence(
-                            statements, expression
-                        )
-                    except BooleanExpressionError:
-                        valid = False
-                requests.append(
-                    {
-                        "source_clause_id": clause.clause_id,
-                        "text": clause.text,
-                        "reconstructed_sentence": reconstructed,
-                        "valid": valid,
-                    }
-                )
-            state["atomicity_reconstruction_requests"] = requests
-            return {"reconstruction_requests": requests}
 
         def apply_atomicity_splits_operation() -> Any:
             ledger = load_instruction_ledger()
@@ -1748,54 +1540,18 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     "atomicity split count does not match multi-requirement clauses"
                 )
-            reconstruction_requests = state.get("atomicity_reconstruction_requests")
-            equivalence_results = feature_endpoint._collected_results(
-                parameters.get("equivalence_decisions")
-            )
-            if (
-                not isinstance(reconstruction_requests, list)
-                or len(reconstruction_requests) != len(split_results)
-                or equivalence_results is None
-                or len(equivalence_results) != len(split_results)
-                or not all(isinstance(item, Mapping) for item in equivalence_results)
-            ):
-                raise PowdrrExecutionError(
-                    "atomicity reconstruction equivalence decisions are incomplete"
-                )
             compiler_decisions: dict[str, dict[str, Any]] = {
                 clause.clause_id: {"multiple": False} for clause in ledger.clauses
             }
-            for index, (clause_id, split) in enumerate(
-                zip(multiple_ids, split_results, strict=True)
-            ):
-                if set(split) - {
-                    "statements",
-                    "validation_groups",
-                    "boolean_expression",
-                    "semantic_relations",
-                    "modifier_attachments",
-                } or not {
-                    "statements",
-                    "validation_groups",
-                    "boolean_expression",
-                }.issubset(split):
+            for clause_id, split in zip(multiple_ids, split_results, strict=True):
+                if set(split) != {"statements", "validation_groups"}:
                     raise PowdrrExecutionError(
-                        "atomicity split has unknown or missing required fields"
+                        "atomicity split requires statements and validation_groups"
                     )
                 compiler_decisions[clause_id] = {
                     "multiple": True,
                     "statements": split.get("statements"),
-                    "boolean_expression": split.get("boolean_expression"),
-                    "equivalent": (
-                        equivalence_results[index].get("equivalent") is True
-                        and reconstruction_requests[index].get("valid") is True
-                    ),
-                    "reconstructed_sentence": reconstruction_requests[index].get(
-                        "reconstructed_sentence"
-                    ),
                     "validation_groups": split.get("validation_groups"),
-                    "semantic_relations": split.get("semantic_relations", []),
-                    "modifier_attachments": split.get("modifier_attachments", []),
                 }
             try:
                 refined = apply_atomicity_decisions(ledger, compiler_decisions)
@@ -1841,32 +1597,7 @@ class FeatureCommandRuntime:
                 "clause_id": clause_id,
                 "source_text": text,
                 "reason": reason,
-                "criterion_quality": CriterionQuality(
-                    requirement_status=(
-                        "not_applicable"
-                        if isinstance(partial_contract, Mapping)
-                        and partial_contract.get("routing") in {"context", "exclude"}
-                        else "preserved"
-                    ),
-                    criterion_status=(
-                        "not_applicable"
-                        if isinstance(partial_contract, Mapping)
-                        and partial_contract.get("routing") in {"context", "exclude"}
-                        else "source_only"
-                    ),
-                    failure_stage=(
-                        "scenario_faithfulness"
-                        if details is not None
-                        else "scenario_generation"
-                    ),
-                    failure_reason=reason,
-                    repair_attempts=0,
-                ).to_data(),
-                "disposition": (
-                    partial_contract.get("disposition", "unknown")
-                    if isinstance(partial_contract, Mapping)
-                    else "unknown"
-                ),
+                "disposition": "invariant",
                 "details": dict(details or {}),
             }
             if isinstance(partial_contract, Mapping):
@@ -1940,34 +1671,10 @@ class FeatureCommandRuntime:
                     "capability_matrix": [],
                 },
             }
-            merged = _merge_behavior_scenario_values(
+            return _merge_behavior_scenario_values(
                 {"clause": clause, "design": fallback_design, "scenario": scenario},
                 benchmark_mode=True,
             )
-            compiled_scenario = merged.get("behavior_scenario")
-            if not isinstance(compiled_scenario, Mapping):
-                raise PowdrrExecutionError(
-                    "source-only fallback has no compiled behavior scenario"
-                )
-            fallback_quality = (
-                fallback.get("criterion_quality")
-                if isinstance(fallback, Mapping)
-                else None
-            )
-            if not isinstance(fallback_quality, Mapping):
-                fallback_quality = CriterionQuality(
-                    criterion_status="source_only",
-                    failure_stage="scenario_faithfulness",
-                    failure_reason="scenario faithfulness review rejected the check",
-                ).to_data()
-            return {
-                **merged,
-                "criterion_quality": dict(fallback_quality),
-                "behavior_scenario": {
-                    **dict(compiled_scenario),
-                    "criterion_quality": dict(fallback_quality),
-                },
-            }
 
         def merge_behavior_scenario_operation() -> Any:
             call_parameters = parameters
@@ -2521,72 +2228,27 @@ class FeatureCommandRuntime:
             except SemanticContractError as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
 
-        def prepare_source_interpretation_operation() -> Any:
+        def compile_partial_semantic_contract_operation() -> Any:
+            clause = semantic_clause()
             family_request = parameters.get("behavior_family_request")
             family_result = parameters.get("behavior_family_result")
             if not isinstance(family_request, Mapping) or not isinstance(
                 family_result, Mapping
             ):
                 raise PowdrrExecutionError("behavior-family decision is malformed")
-            decisions = semantic_decisions(parameters.get("decisions"))
             try:
                 family = bind_behavior_family_decision(
                     family_request,
                     family_result,
                     benchmark_mode=benchmark_mode(),
                 )
-                request = prepare_source_interpretation(
-                    semantic_clause(),
-                    decisions,
-                    semantic_extractions(parameters.get("extractions")),
-                    family,
-                )
-            except (SemanticContractError, SemanticDecisionError) as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-            return {
-                "request": request,
-                "behavior_family_decision": family.to_data(),
-            }
-
-        def compile_partial_semantic_contract_operation() -> Any:
-            clause = semantic_clause()
-            family_request = parameters.get("behavior_family_request")
-            family_result = parameters.get("behavior_family_result")
-            family_decision = parameters.get("behavior_family_decision")
-            interpretation_request = parameters.get("source_interpretation_request")
-            interpretation_result = parameters.get("source_interpretation_result")
-            if (
-                not isinstance(family_request, Mapping)
-                or not isinstance(family_result, Mapping)
-                or not isinstance(family_decision, Mapping)
-                or not isinstance(interpretation_request, Mapping)
-                or not isinstance(interpretation_result, Mapping)
-            ):
-                raise PowdrrExecutionError("source interpretation inputs are malformed")
-            try:
-                decisions = semantic_decisions(parameters.get("decisions"))
-                extractions = semantic_extractions(parameters.get("extractions"))
-                family = SemanticDecision.from_data(family_decision)
-                interpretation = bind_source_interpretation(
-                    interpretation_request,
-                    interpretation_result,
-                    decisions,
-                    extractions,
-                    family,
-                    benchmark_mode=benchmark_mode(),
-                )
                 contract = compile_source_contract(
                     clause=clause,
-                    decisions=decisions,
-                    extractions=extractions,
+                    decisions=semantic_decisions(parameters.get("decisions")),
+                    extractions=semantic_extractions(parameters.get("extractions")),
                     behavior_family=family,
-                    source_interpretation=interpretation,
                 )
-            except (
-                SemanticContractError,
-                SemanticDecisionError,
-                SourceInterpretationError,
-            ) as exc:
+            except (SemanticContractError, SemanticDecisionError) as exc:
                 raise PowdrrExecutionError(str(exc)) from exc
             path = semantic_artifact_directory(clause) / "partial-contract.json"
             document = contract.to_data()
@@ -2781,304 +2443,8 @@ class FeatureCommandRuntime:
             )
             return {"passed": True}
 
-        def prepare_behavioral_contracts_operation() -> Any:
-            decisions = feature_endpoint._collected_results(
-                parameters.get("design_decisions")
-            )
-            if decisions is None:
-                raise PowdrrExecutionError("semantic designs are missing or malformed")
-            try:
-                return prepare_behavioral_contracts(
-                    load_instruction_ledger().to_data(), decisions
-                )
-            except (AcceptanceContractError, SemanticContractError) as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-
-        def bind_behavioral_contracts_operation() -> Any:
-            plan = parameters.get("plan")
-            results = feature_endpoint._collected_results(parameters.get("results"))
-            if not isinstance(plan, Mapping) or results is None:
-                raise PowdrrExecutionError("behavioral contract binding is malformed")
-            try:
-                collection = bind_behavioral_contracts(plan, results)
-            except AcceptanceContractError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-            path = output_root / "behavioral-contracts.json"
-            path.write_text(
-                json.dumps(collection, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            return {
-                **collection,
-                "path": str(path),
-                "fingerprint": content_fingerprint(collection),
-            }
-
-        def prepare_acceptance_criteria_operation() -> Any:
-            contract_collection = parameters.get("behavioral_contracts")
-            if not isinstance(contract_collection, Mapping):
-                raise PowdrrExecutionError("behavioral contracts are missing")
-            ledger = load_instruction_ledger()
-            try:
-                return prepare_acceptance_criteria(
-                    contract_collection,
-                    {item.clause_id: item.text for item in ledger.clauses},
-                    [item.to_data() for item in ledger.boolean_combinations],
-                )
-            except AcceptanceContractError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-
-        def bind_acceptance_criteria_operation() -> Any:
-            plan = parameters.get("plan")
-            results = feature_endpoint._collected_results(parameters.get("results"))
-            if not isinstance(plan, Mapping) or results is None:
-                raise PowdrrExecutionError("acceptance criterion binding is malformed")
-            try:
-                collection = bind_acceptance_criteria(plan, results)
-            except AcceptanceContractError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-            path = output_root / "acceptance-criteria.json"
-            path.write_text(
-                json.dumps(collection, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            return {
-                **collection,
-                "path": str(path),
-                "fingerprint": content_fingerprint(collection),
-            }
-
-        def prepare_acceptance_criterion_reviews_operation() -> Any:
-            criterion_collection = parameters.get("criteria")
-            contract_collection = parameters.get("behavioral_contracts")
-            if not isinstance(criterion_collection, Mapping) or not isinstance(
-                contract_collection, Mapping
-            ):
-                raise PowdrrExecutionError("criterion review inputs are missing")
-            ledger = load_instruction_ledger()
-            try:
-                return prepare_acceptance_criterion_reviews(
-                    criterion_collection,
-                    contract_collection,
-                    {item.clause_id: item.text for item in ledger.clauses},
-                )
-            except AcceptanceContractError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-
-        def bind_acceptance_criterion_reviews_operation() -> Any:
-            plan = parameters.get("plan")
-            results = feature_endpoint._collected_results(parameters.get("results"))
-            if not isinstance(plan, Mapping) or results is None:
-                raise PowdrrExecutionError("criterion review binding is malformed")
-            try:
-                collection = bind_acceptance_criterion_reviews(plan, results)
-            except AcceptanceContractError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-            path = output_root / "acceptance-criteria.json"
-            path.write_text(
-                json.dumps(collection, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-            return {
-                **collection,
-                "path": str(path),
-                "fingerprint": content_fingerprint(collection),
-            }
-
-        def prepare_acceptance_criterion_repairs_operation() -> Any:
-            criterion_collection = parameters.get("criteria")
-            contract_collection = parameters.get("behavioral_contracts")
-            if not isinstance(criterion_collection, Mapping) or not isinstance(
-                contract_collection, Mapping
-            ):
-                raise PowdrrExecutionError("criterion repair inputs are missing")
-            ledger = load_instruction_ledger()
-            try:
-                repair_state = prepare_acceptance_criterion_repairs(
-                    criterion_collection,
-                    contract_collection,
-                    {item.clause_id: item.text for item in ledger.clauses},
-                    str(parameters.get("uncertainty_policy", "clarify")),
-                )
-            except AcceptanceContractError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-            repair_state["criterion_collection"] = dict(criterion_collection)
-            return repair_state
-
-        def bind_acceptance_criterion_repairs_operation() -> Any:
-            plan = parameters.get("plan")
-            results = feature_endpoint._collected_results(parameters.get("results"))
-            if not isinstance(plan, Mapping) or results is None:
-                raise PowdrrExecutionError("criterion repair binding is malformed")
-            try:
-                return bind_acceptance_criterion_repairs(plan, results)
-            except AcceptanceContractError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-
         def compile_canonical_feature_design_operation() -> Any:
             ledger = load_instruction_ledger()
-            contract_collection = parameters.get("behavioral_contracts")
-            if not isinstance(contract_collection, Mapping):
-                raise PowdrrExecutionError("behavioral contracts are missing")
-            raw_contracts = contract_collection.get("contracts")
-            if contract_collection.get(
-                "ledger_fingerprint"
-            ) != ledger.fingerprint or not isinstance(raw_contracts, list):
-                raise PowdrrExecutionError(
-                    "behavioral contracts are stale or malformed"
-                )
-            try:
-                behavioral_contracts = tuple(
-                    BehavioralContract.from_data(item)
-                    for item in raw_contracts
-                    if isinstance(item, Mapping)
-                )
-                if len(behavioral_contracts) != len(raw_contracts):
-                    raise AcceptanceContractError(
-                        "behavioral contract entry is malformed"
-                    )
-                decisions_for_contracts = feature_endpoint._collected_results(
-                    parameters.get("design_decisions")
-                )
-                if decisions_for_contracts is None:
-                    raise AcceptanceContractError("semantic designs are malformed")
-                requirement_ids: list[str] = []
-                context_ids: list[str] = []
-                for clause, decision in zip(
-                    ledger.clauses, decisions_for_contracts, strict=True
-                ):
-                    raw_contract = (
-                        decision.get("partial_contract")
-                        if isinstance(decision, Mapping)
-                        else None
-                    )
-                    if not isinstance(raw_contract, Mapping):
-                        raise AcceptanceContractError(
-                            f"source contract missing for {clause.clause_id}"
-                        )
-                    partial = PartialSemanticContract.from_data(raw_contract)
-                    if partial.routing in {
-                        "include",
-                        "include_prohibition",
-                    } and partial.disposition not in {
-                        "context",
-                        "nonactionable",
-                    }:
-                        requirement_ids.append(clause.clause_id)
-                    elif partial.disposition == "context":
-                        context_ids.append(clause.clause_id)
-                validate_contracts(
-                    behavioral_contracts,
-                    requirement_ids=requirement_ids,
-                    context_ids=context_ids,
-                    source_text_by_id={
-                        item.clause_id: item.text for item in ledger.clauses
-                    },
-                )
-            except AcceptanceContractError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-            criterion_collection = parameters.get("acceptance_criteria")
-            if not isinstance(criterion_collection, Mapping):
-                raise PowdrrExecutionError("acceptance criteria are missing")
-            raw_criteria = criterion_collection.get("criteria")
-            if (
-                criterion_collection.get("schema_version") != "acceptance-criterion-v1"
-                or criterion_collection.get("ledger_fingerprint") != ledger.fingerprint
-                or not isinstance(raw_criteria, list)
-            ):
-                raise PowdrrExecutionError("acceptance criteria are stale or malformed")
-            try:
-                acceptance_criteria = tuple(
-                    AcceptanceCriterion.from_data(item)
-                    for item in raw_criteria
-                    if isinstance(item, Mapping)
-                )
-                if len(acceptance_criteria) != len(raw_criteria):
-                    raise AcceptanceContractError("acceptance criterion is malformed")
-                contract_ids = {item.contract_id for item in behavioral_contracts}
-                contract_members = {
-                    item.contract_id: set(item.member_requirement_ids)
-                    for item in behavioral_contracts
-                }
-                seen_criterion_ids: set[str] = set()
-                for criterion in acceptance_criteria:
-                    if criterion.criterion_id in seen_criterion_ids:
-                        raise AcceptanceContractError(
-                            "acceptance criterion IDs are duplicated"
-                        )
-                    seen_criterion_ids.add(criterion.criterion_id)
-                    if criterion.contract_id not in contract_ids:
-                        raise AcceptanceContractError(
-                            "acceptance criterion references an unknown contract"
-                        )
-                    if not set(criterion.source_refs).issubset(
-                        contract_members[criterion.contract_id]
-                    ):
-                        raise AcceptanceContractError(
-                            "acceptance criterion sources are outside its contract"
-                        )
-                    if not set(criterion.source_refs).issubset(requirement_ids):
-                        raise AcceptanceContractError(
-                            "acceptance criterion references a nonrequirement"
-                        )
-                    if criterion.quality.criterion_status not in {
-                        "checkable",
-                        "source_only",
-                        "unresolved",
-                    }:
-                        raise AcceptanceContractError(
-                            "acceptance criterion status does not match review"
-                        )
-            except AcceptanceContractError as exc:
-                raise PowdrrExecutionError(str(exc)) from exc
-            criterion_coverage = criterion_collection.get("requirement_coverage")
-            if not isinstance(criterion_coverage, Mapping):
-                raise PowdrrExecutionError("acceptance criterion coverage is missing")
-            if set(criterion_coverage) != set(requirement_ids):
-                raise PowdrrExecutionError(
-                    "acceptance criterion coverage has missing or extra requirements"
-                )
-            actual_criterion_refs: dict[str, list[str]] = {
-                item: [] for item in requirement_ids
-            }
-            for criterion in acceptance_criteria:
-                for source_id in criterion.source_refs:
-                    actual_criterion_refs[source_id].append(criterion.criterion_id)
-            criterion_by_id = {item.criterion_id: item for item in acceptance_criteria}
-            for source_id in requirement_ids:
-                coverage = criterion_coverage.get(source_id)
-                if not isinstance(coverage, Mapping) or sorted(
-                    coverage.get("criterion_ids", [])
-                ) != sorted(actual_criterion_refs[source_id]):
-                    raise PowdrrExecutionError(
-                        f"acceptance criterion coverage is stale for {source_id}"
-                    )
-                quality = coverage.get("criterion_quality")
-                linked_criteria = [
-                    criterion_by_id[item] for item in actual_criterion_refs[source_id]
-                ]
-                if not linked_criteria:
-                    expected_status = "source_only"
-                elif all(
-                    item.quality.criterion_status == "checkable"
-                    for item in linked_criteria
-                ):
-                    expected_status = "checkable"
-                elif any(
-                    item.quality.criterion_status == "unresolved"
-                    for item in linked_criteria
-                ):
-                    expected_status = "unresolved"
-                else:
-                    expected_status = "source_only"
-                if (
-                    not isinstance(quality, Mapping)
-                    or quality.get("criterion_status") != expected_status
-                    or coverage.get("status") != expected_status
-                ):
-                    raise PowdrrExecutionError(
-                        f"acceptance criterion quality is stale for {source_id}"
-                    )
             raw_design_decisions = feature_endpoint._collected_results(
                 parameters.get("design_decisions")
             )
@@ -3087,9 +2453,6 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(
                     "canonical design decisions are missing or malformed"
                 )
-            raw_design_decisions = _attach_behavioral_contract_context(
-                ledger, raw_design_decisions, behavioral_contracts
-            )
             consistency_review = parameters.get("scenario_consistency_review")
             if not isinstance(consistency_review, Mapping):
                 raise PowdrrExecutionError(
@@ -3139,7 +2502,8 @@ class FeatureCommandRuntime:
                     for clause, decision in zip(
                         ledger.clauses, raw_design_decisions, strict=True
                     )
-                    if isinstance(decision, Mapping)
+                    if clause.clause_id not in decisions_by_clause_id
+                    and isinstance(decision, Mapping)
                 }
             )
             coverage_path = output_root / "instruction-coverage-audit.json"
@@ -3212,22 +2576,12 @@ class FeatureCommandRuntime:
                 coverage_path.write_text(
                     json.dumps(
                         {
-                            "schema_version": "instruction-coverage-audit-v2",
+                            "schema_version": "instruction-coverage-audit-v1",
                             "instruction_ledger_fingerprint": ledger.fingerprint,
                             "instruction_ledger_artifact": str(
                                 state["instruction_ledger_path"]
                             ),
                             "status": "failed",
-                            "requirement_coverage": {
-                                "status": "incomplete",
-                                "total": len(source_records),
-                                "validated_source": sum(
-                                    record.get("status") == "source_validated"
-                                    for record in source_records
-                                ),
-                                "failed": len(source_errors),
-                            },
-                            "criterion_coverage": {"status": "unavailable"},
                             "records": source_records,
                             "errors": source_errors,
                         },
@@ -3254,20 +2608,12 @@ class FeatureCommandRuntime:
                 coverage_path.write_text(
                     json.dumps(
                         {
-                            "schema_version": "instruction-coverage-audit-v2",
+                            "schema_version": "instruction-coverage-audit-v1",
                             "instruction_ledger_fingerprint": ledger.fingerprint,
                             "instruction_ledger_artifact": str(
                                 state["instruction_ledger_path"]
                             ),
                             "status": "failed",
-                            "requirement_coverage": {
-                                "status": "incomplete",
-                                "total": len(source_records),
-                                "validated_source": len(source_records),
-                                "failed": 0,
-                                "design_compilation_failed": len(source_records),
-                            },
-                            "criterion_coverage": {"status": "unavailable"},
                             "records": source_records,
                             "errors": [str(exc)],
                         },
@@ -3296,11 +2642,6 @@ class FeatureCommandRuntime:
                         "end": clause.source_span[1],
                     },
                     "obligation_created": clause.clause_id in obligation_clause_ids,
-                    "criterion_quality": CriterionQuality(
-                        criterion_status="source_only",
-                        failure_stage="scenario_generation",
-                        failure_reason="no behavior scenario was produced",
-                    ).to_data(),
                 }
                 if not isinstance(raw_contract, Mapping):
                     final_record["status"] = "failed"
@@ -3358,140 +2699,22 @@ class FeatureCommandRuntime:
                             raise ValueError(
                                 "source route and compiled obligation coverage disagree"
                             )
-                        scenario = (
-                            decision.get("behavior_scenario")
-                            if isinstance(decision, Mapping)
-                            else None
-                        )
-                        projection = next(
-                            item
-                            for item in design.projections
-                            if item.clause_id == clause.clause_id
-                        )
-                        criterion_quality = (
-                            projection.criterion_quality
-                            if expected_obligation
-                            else CriterionQuality(
-                                requirement_status="not_applicable",
-                                criterion_status="not_applicable",
-                            )
-                        )
-                        final_record["criterion_quality"] = criterion_quality.to_data()
-                        raw_acceptance_coverage = criterion_coverage.get(
-                            clause.clause_id
-                        )
-                        if expected_obligation:
-                            if not isinstance(raw_acceptance_coverage, Mapping):
-                                raise ValueError(
-                                    "acceptance criterion coverage is missing"
-                                )
-                            raw_quality = raw_acceptance_coverage.get(
-                                "criterion_quality"
-                            )
-                            if not isinstance(raw_quality, Mapping):
-                                raise ValueError(
-                                    "acceptance criterion quality is malformed"
-                                )
-                            acceptance_quality = CriterionQuality.from_data(raw_quality)
-                            final_record["acceptance_criterion_ids"] = list(
-                                raw_acceptance_coverage.get("criterion_ids", [])
-                            )
-                            final_record["acceptance_criterion_quality"] = (
-                                acceptance_quality.to_data()
-                            )
-                        else:
-                            final_record["acceptance_criterion_ids"] = []
-                            final_record["acceptance_criterion_quality"] = (
-                                CriterionQuality(
-                                    requirement_status="not_applicable",
-                                    criterion_status="not_applicable",
-                                ).to_data()
-                            )
-                        if isinstance(scenario, Mapping) and expected_obligation:
-                            raw_scenario_quality = scenario.get("criterion_quality")
-                            scenario_status = (
-                                raw_scenario_quality.get("criterion_status")
-                                if isinstance(raw_scenario_quality, Mapping)
-                                else None
-                            )
-                            if scenario_status != projection.criterion_status:
-                                raise ValueError(
-                                    "scenario and design criterion quality disagree"
-                                )
-                        if (
-                            expected_obligation
-                            and criterion_quality.requirement_status != "preserved"
-                        ):
-                            raise ValueError("criterion quality status is invalid")
-                        final_record["requirement_status"] = "covered"
                         final_record["status"] = "covered"
                     except (StopIteration, TypeError, ValueError) as exc:
-                        final_record["requirement_status"] = "failed"
                         final_record["status"] = "failed"
                         final_record["error"] = str(exc)
                         coverage_errors.append(f"{clause.clause_id}: {exc}")
                 coverage_records.append(final_record)
             coverage_path = output_root / "instruction-coverage-audit.json"
-            criterion_counts = {
-                status: sum(
-                    isinstance(record.get("criterion_quality"), Mapping)
-                    and record["criterion_quality"].get("criterion_status") == status
-                    for record in coverage_records
-                )
-                for status in (
-                    "checkable",
-                    "source_only",
-                    "unresolved",
-                    "unassessed",
-                    "not_applicable",
-                )
-            }
-            acceptance_criterion_counts = {
-                status: sum(
-                    isinstance(record.get("acceptance_criterion_quality"), Mapping)
-                    and record["acceptance_criterion_quality"].get("criterion_status")
-                    == status
-                    for record in coverage_records
-                )
-                for status in (
-                    "checkable",
-                    "source_only",
-                    "unresolved",
-                    "unassessed",
-                    "not_applicable",
-                )
-            }
-            applicable_criteria = sum(
-                record.get("obligation_created") is True for record in coverage_records
-            )
             coverage_path.write_text(
                 json.dumps(
                     {
-                        "schema_version": "instruction-coverage-audit-v2",
+                        "schema_version": "instruction-coverage-audit-v1",
                         "instruction_ledger_fingerprint": ledger.fingerprint,
                         "instruction_ledger_artifact": str(
                             state["instruction_ledger_path"]
                         ),
                         "status": "failed" if coverage_errors else "complete",
-                        "requirement_coverage": {
-                            "total": len(coverage_records),
-                            "covered": sum(
-                                record.get("requirement_status") == "covered"
-                                for record in coverage_records
-                            ),
-                            "failed": sum(
-                                record.get("requirement_status") == "failed"
-                                for record in coverage_records
-                            ),
-                        },
-                        "criterion_coverage": {
-                            "applicable_requirements": applicable_criteria,
-                            **criterion_counts,
-                        },
-                        "acceptance_criterion_coverage": {
-                            "applicable_requirements": applicable_criteria,
-                            **acceptance_criterion_counts,
-                        },
                         "records": coverage_records,
                         "errors": coverage_errors,
                     },
@@ -3543,7 +2766,7 @@ class FeatureCommandRuntime:
 
             for item in design.obligations:
                 decision = decisions_by_clause_id.get(item.clause_id)
-                raw_partial_contract = (
+                partial = (
                     decision.get("partial_contract")
                     if isinstance(decision, Mapping)
                     else None
@@ -3559,10 +2782,10 @@ class FeatureCommandRuntime:
                     clause_id=item.clause_id,
                     design_kind=item.projection.kind,
                     partial_contract_path=partial_contract_path,
-                    partial_contract=raw_partial_contract,
+                    partial_contract=partial,
                 )
                 evidence_provenance_by_clause[item.clause_id] = provenance
-                if not isinstance(raw_partial_contract, Mapping):
+                if not isinstance(partial, Mapping):
                     provenance["status"] = "failed"
                     provenance["error"] = "source semantic contract is missing"
                     write_evidence_provenance()
@@ -3575,10 +2798,10 @@ class FeatureCommandRuntime:
                         obligation_id=item.obligation_id,
                         clause_id=item.clause_id,
                         requirement_strength=str(
-                            raw_partial_contract.get("requirement_strength", "")
+                            partial.get("requirement_strength", "")
                         ),
                         kind=item.projection.kind,
-                        polarity=str(raw_partial_contract.get("polarity", "")),
+                        polarity=str(partial.get("polarity", "")),
                     )
                 except ValueError as exc:
                     provenance["status"] = "failed"
@@ -3607,18 +2830,16 @@ class FeatureCommandRuntime:
                 raise PowdrrExecutionError(str(exc)) from exc
             obligations = []
             for index, item in enumerate(design.obligations, start=1):
-                projection_data = item.projection.to_data()
-                projection_data["evidence_contract"] = evidence_by_clause[
-                    item.clause_id
-                ]
+                projection = item.projection.to_data()
+                projection["evidence_contract"] = evidence_by_clause[item.clause_id]
                 repository_binding = repository_bindings_by_clause.get(item.clause_id)
                 if repository_binding is not None:
-                    projection_data["repository_binding"] = dict(repository_binding)
+                    projection["repository_binding"] = dict(repository_binding)
                 obligations.append(
                     {
                         "id": f"sentence-{index}",
                         "description": item.projection.description,
-                        "design": projection_data,
+                        "design": projection,
                     }
                 )
             semantic_cases = [
@@ -3663,15 +2884,6 @@ class FeatureCommandRuntime:
                     }
                 )
             canonical_document = design.to_data()
-            canonical_document["behavioral_contracts"] = [
-                item.to_data() for item in behavioral_contracts
-            ]
-            canonical_document["acceptance_criteria"] = [
-                item.to_data() for item in acceptance_criteria
-            ]
-            canonical_document["acceptance_logic"] = list(
-                criterion_collection.get("boolean_combinations", [])
-            )
             for canonical_obligation in canonical_document["obligations"]:
                 clause_id = canonical_obligation.get("clause_id")
                 if isinstance(clause_id, str):
@@ -3828,9 +3040,6 @@ class FeatureCommandRuntime:
                 "prepare_atomicity_split_requests": bind_handler(
                     prepare_atomicity_split_requests_operation
                 ),
-                "prepare_atomicity_reconstructions": bind_handler(
-                    prepare_atomicity_reconstructions_operation
-                ),
                 "apply_atomicity_splits": bind_handler(
                     apply_atomicity_splits_operation
                 ),
@@ -3855,35 +3064,8 @@ class FeatureCommandRuntime:
                 "prepare_behavior_family_decision": bind_handler(
                     prepare_behavior_family_decision_operation
                 ),
-                "prepare_source_interpretation": bind_handler(
-                    prepare_source_interpretation_operation
-                ),
                 "compile_partial_semantic_contract": bind_handler(
                     compile_partial_semantic_contract_operation
-                ),
-                "prepare_behavioral_contracts": bind_handler(
-                    prepare_behavioral_contracts_operation
-                ),
-                "bind_behavioral_contracts": bind_handler(
-                    bind_behavioral_contracts_operation
-                ),
-                "prepare_acceptance_criteria": bind_handler(
-                    prepare_acceptance_criteria_operation
-                ),
-                "bind_acceptance_criteria": bind_handler(
-                    bind_acceptance_criteria_operation
-                ),
-                "prepare_acceptance_criterion_reviews": bind_handler(
-                    prepare_acceptance_criterion_reviews_operation
-                ),
-                "bind_acceptance_criterion_reviews": bind_handler(
-                    bind_acceptance_criterion_reviews_operation
-                ),
-                "prepare_acceptance_criterion_repairs": bind_handler(
-                    prepare_acceptance_criterion_repairs_operation
-                ),
-                "bind_acceptance_criterion_repairs": bind_handler(
-                    bind_acceptance_criterion_repairs_operation
                 ),
                 "prepare_field_entailment_reviews": bind_handler(
                     prepare_field_entailment_reviews_operation
@@ -4378,64 +3560,6 @@ def _obligation_evidence_provenance_record(
     }
 
 
-def _attach_behavioral_contract_context(
-    ledger: InstructionLedger,
-    semantic_designs: Sequence[Mapping[str, Any]],
-    contracts: Sequence[BehavioralContract],
-) -> list[dict[str, Any]]:
-    """Render validated group relationships into worker-facing scenario context."""
-    clauses = {item.clause_id: item for item in ledger.clauses}
-    output: list[dict[str, Any]] = []
-    for design in semantic_designs:
-        if not isinstance(design, Mapping):
-            raise PowdrrExecutionError("semantic design entry is malformed")
-        copied = dict(design)
-        contract_raw = copied.get("partial_contract")
-        clause_id = (
-            contract_raw.get("source_ref")
-            if isinstance(contract_raw, Mapping)
-            else None
-        )
-        scenario_raw = copied.get("behavior_scenario")
-        if not isinstance(clause_id, str) or not isinstance(scenario_raw, Mapping):
-            output.append(copied)
-            continue
-        scenario = dict(scenario_raw)
-        existing = scenario.get("related_requirements", [])
-        if not isinstance(existing, list):
-            existing = []
-        related = [item for item in existing if isinstance(item, str)]
-        for contract in contracts:
-            if clause_id not in contract.member_requirement_ids:
-                continue
-            for member_id in contract.member_requirement_ids:
-                if member_id != clause_id and member_id in clauses:
-                    related.append(
-                        f"Related requirement {member_id}: {clauses[member_id].text}"
-                    )
-            for edge in contract.relationships:
-                if clause_id in edge.target_requirement_ids:
-                    targets = ", ".join(edge.target_requirement_ids)
-                    related.append(
-                        f"Contract relation {edge.kind} applies to {targets}; "
-                        f"source evidence: {edge.source_evidence}"
-                    )
-            related.extend(
-                f"Shared contract constraint across partition: {constraint}"
-                for constraint in contract.shared_constraints
-            )
-            for context_id in contract.supporting_context_ids:
-                if context_id in clauses:
-                    related.append(
-                        "Context only; this is not an implementation requirement "
-                        f"[{context_id}]: {clauses[context_id].text}"
-                    )
-        scenario["related_requirements"] = list(dict.fromkeys(related))
-        copied["behavior_scenario"] = scenario
-        output.append(copied)
-    return output
-
-
 def _merge_semantic_design_values(parameters: Mapping[str, Any]) -> dict[str, str]:
     """Validate one semantic design, including trace-only clauses."""
     kind = parameters.get("kind")
@@ -4863,34 +3987,7 @@ def _merge_behavior_scenario_values(
         raise PowdrrExecutionError(
             f"behavior scenario is incomplete: {error}"
         ) from error
-    criterion_status = "unresolved" if compiled.unresolved_dimensions else "unassessed"
-    criterion_is_applicable = compiled.routing not in {"context", "exclude"}
-    criterion_quality = CriterionQuality(
-        requirement_status="preserved" if criterion_is_applicable else "not_applicable",
-        criterion_status=criterion_status
-        if criterion_is_applicable
-        else "not_applicable",
-        failure_stage=(
-            "scenario_resolution"
-            if criterion_is_applicable and compiled.unresolved_dimensions
-            else None
-        ),
-        failure_reason=(
-            "scenario retains unresolved dimensions"
-            if criterion_is_applicable and compiled.unresolved_dimensions
-            else None
-        ),
-        repair_attempts=0,
-    )
-    compiled_scenario = {
-        **compiled.to_data(),
-        "criterion_quality": criterion_quality.to_data(),
-    }
-    return {
-        **dict(design),
-        "criterion_quality": criterion_quality.to_data(),
-        "behavior_scenario": compiled_scenario,
-    }
+    return {**dict(design), "behavior_scenario": compiled.to_data()}
 
 
 def _canonicalize_scenario_source_dimensions(
@@ -4985,54 +4082,6 @@ def _validate_scenario_semantic_decisions(
         raise PowdrrExecutionError(
             "scenario marks a source-resolved semantic dimension unresolved"
         )
-
-
-def _bounded_instruction_context(
-    ledger: InstructionLedger, clause: Any
-) -> dict[str, Any]:
-    """Provide one parent sentence, its paragraph, and one neighbor each way."""
-    clauses = ledger.clauses
-    index = next(
-        i for i, item in enumerate(clauses) if item.clause_id == clause.clause_id
-    )
-    source_lines = ledger.source.text.splitlines(keepends=True)
-    start, end = clause.source_span
-    offset = 0
-    paragraph_start = 0
-    paragraph_end = len(ledger.source.text)
-    for line in source_lines:
-        line_end = offset + len(line)
-        if line_end <= start:
-            if not line.strip():
-                paragraph_start = line_end
-        elif offset >= end:
-            if not line.strip():
-                paragraph_end = offset
-                break
-        offset = line_end
-    previous = (
-        {"clause_id": clauses[index - 1].clause_id, "text": clauses[index - 1].text}
-        if index > 0
-        else None
-    )
-    following = (
-        {"clause_id": clauses[index + 1].clause_id, "text": clauses[index + 1].text}
-        if index + 1 < len(clauses)
-        else None
-    )
-    paragraph = ledger.source.text[paragraph_start:paragraph_end].strip()
-    truncated = len(paragraph) > 4000
-    if truncated:
-        relative_start = max(0, start - paragraph_start - 1500)
-        paragraph = paragraph[relative_start : relative_start + 3000]
-    return {
-        "parent_sentence": clause.text,
-        "parent_clause_id": clause.clause_id,
-        "containing_paragraph": paragraph,
-        "preceding_sentence": previous,
-        "following_sentence": following,
-        "paragraph_truncated": truncated,
-    }
 
 
 __all__ = ["FeatureCommandRuntime", "feature_command_catalog"]

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import io
 import json
 import subprocess
@@ -15,11 +14,6 @@ import pytest
 import yaml
 
 from powdrr_lift.cli import main
-from powdrr_lift.core.acceptance_contract import (
-    AcceptanceCriterion,
-    CriterionAssertion,
-)
-from powdrr_lift.core.behavior_contract import CriterionQuality
 from powdrr_lift.core.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
@@ -105,7 +99,6 @@ from powdrr_lift.workrr.feature_endpoint import (
     run_feature_in_place,
 )
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from powdrr_lift.workrr.semantic_prompt_cases import audit_prompt_claim_presence
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
 
@@ -138,30 +131,6 @@ def test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes(
             }
         ],
     }
-    criterion = AcceptanceCriterion(
-        criterion_id="acceptance-criterion:test",
-        contract_id="behavioral-contract:test",
-        kind="transformation",
-        source_refs=("instruction-001",),
-        setup={"input": ["A", "B"]},
-        operation="Response.iter_json returns array elements",
-        events=(),
-        assertions=(
-            CriterionAssertion(
-                assertion_id="acceptance-criterion:test:assertion-01",
-                observation="yielded elements",
-                relation="equals",
-                expected=["A", "B"],
-                source_refs=("instruction-001",),
-                basis="source_derived",
-            ),
-        ),
-        unresolved_questions=(),
-        quality=CriterionQuality(criterion_status="checkable"),
-    )
-    design["acceptance_criteria"] = [
-        replace(criterion, fingerprint=criterion.calculate_fingerprint()).to_data()
-    ]
     test_cases = [{"description": "iter_json returns array elements"}]
     prompt_path = _compile_initial_worker_prompt(
         config=config,
@@ -188,24 +157,6 @@ def test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes(
     assert "python -m pytest" in prompt
     assert "Required product changes:" in prompt
     assert "Response.iter_json yields each array element." in prompt
-    captured_prompt = request["prompt"]
-    assert "Observable acceptance checks:" in captured_prompt
-    assert ('1. Start with {"input":["A","B"]}.') in captured_prompt
-    assert 'Check that yielded elements equals ["A","B"].' in captured_prompt
-    assert "acceptance-criterion:test" not in captured_prompt
-    assert (
-        request["prompt_fingerprint"]
-        == "sha256:" + hashlib.sha256(captured_prompt.encode("utf-8")).hexdigest()
-    )
-    audit = audit_prompt_claim_presence(
-        {
-            "case_id": "iter-json-captured-request",
-            "required_prompt_claims": ['Check that yielded elements equals ["A","B"].'],
-            "forbidden_prompt_claims": ["sources: instruction-001"],
-        },
-        captured_prompt,
-    )
-    assert audit["passed"] is True
     assert request["implementation_packet"] == packet
     assert request["planned_additions"][0]["section"] == "features"
     structrr_diff = yaml.safe_load(
@@ -2971,71 +2922,6 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
-            if "Which candidate requirements form one behavioral contract" in question:
-                context = json.loads(question.rsplit("Context:\n", 1)[1])
-                request = context["behavioral_contract_request"]
-                candidates = request["candidate_requirements"]
-                contexts = request["context_items"]
-                return {
-                    "member_indexes": list(range(len(candidates or []))),
-                    "context_indexes": list(range(len(contexts or []))),
-                    "relationships": [],
-                    "unresolved_questions": [],
-                }
-            if "What one compact acceptance criterion distinguishes" in question:
-                context = json.loads(question.rsplit("Context:\n", 1)[1])
-                request = context["acceptance_criterion_request"]
-                return {
-                    "criterion": {
-                        "kind": "transformation",
-                        "source_indexes": [0],
-                        "setup": "An instruction-supported value is supplied.",
-                        "operation": "apply the requested behavior",
-                        "events": [],
-                        "assertions": [
-                            {
-                                "observation": "result",
-                                "relation": "equals",
-                                "expected": "the specified result",
-                                "source_indexes": [0],
-                                "basis": "source_derived",
-                            }
-                        ],
-                        "unresolved_questions": [],
-                    }
-                }
-            if "Does each assertion follow from cited source evidence" in question:
-                context = json.loads(question.rsplit("Context:\n", 1)[1])
-                request = context["acceptance_criterion_review_request"]
-                evidence = request["source_clauses"][0]["text"]
-                return {
-                    "assertion_reviews": [
-                        json.dumps(
-                            {
-                                "assertion_id": assertion["assertion_id"],
-                                "category": "source_supported",
-                                "source_evidence": evidence,
-                                "reason": "The source clause states the behavior.",
-                            }
-                        )
-                        for assertion in request["assertions"]
-                    ],
-                    "setup_review": json.dumps(
-                        {
-                            "category": "illustrative_setup",
-                            "source_evidence": evidence,
-                            "reason": (
-                                "Fixture values are illustrative and remain within "
-                                "the source-supported input domain."
-                            ),
-                        }
-                    ),
-                    "decision_records": [],
-                    "adequate": True,
-                    "plausible_incorrect_behavior": "the feature returns no result",
-                    "distinguishes": True,
-                    "adequacy_reason": "The observation differs under that behavior.",
-                }
             if "this scenario claim" in question:
                 return {
                     "status": "resolved",
@@ -3067,26 +2953,6 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
                     "status": "resolved",
                     "value": "create",
                     "reason_code": None,
-                }
-            if "source-supported operation and behavior rule" in question:
-                return {
-                    "subject": None,
-                    "operation": None,
-                    "affected_value": None,
-                    "rule": None,
-                    "contrast": None,
-                    "behavior_form": "unclear",
-                    "result_presence": "unspecified",
-                    "event_scope": "unspecified",
-                    "contrast_presence": "absent",
-                    "unresolved_fields": [
-                        "subject|source_underspecified",
-                        "operation|source_underspecified",
-                        "affected_value|source_underspecified",
-                        "rule|source_underspecified",
-                        "behavior_form|source_underspecified",
-                    ],
-                    "field_evidence": [],
                 }
             if "candidate field" in question:
                 return {
@@ -3160,22 +3026,6 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     assert partial.is_file()
     assert json.loads(partial.read_text())["proposition_text"] == "Add the feature."
     canonical = json.loads((tmp_path / "canonical-feature-design.json").read_text())
-    behavioral_contracts = json.loads(
-        (tmp_path / "behavioral-contracts.json").read_text()
-    )
-    assert behavioral_contracts["contracts"][0]["member_requirement_ids"] == [
-        "instruction-001"
-    ]
-    assert canonical["behavioral_contracts"] == behavioral_contracts["contracts"]
-    criteria_collection = json.loads(
-        (tmp_path / "acceptance-criteria.json").read_text()
-    )
-    assert criteria_collection["counts"]["with_criteria"] == 1
-    assert criteria_collection["counts"]["checkable"] == 1
-    assert criteria_collection["reviews"][0]["assertion_reviews"][0]["evidence_valid"]
-    assert canonical["acceptance_criteria"] == criteria_collection["criteria"]
-    coverage = json.loads((tmp_path / "instruction-coverage-audit.json").read_text())
-    assert coverage["acceptance_criterion_coverage"]["checkable"] == 1
     projection = canonical["projections"][0]
     assert projection["description"] == "Add the feature."
     assert (

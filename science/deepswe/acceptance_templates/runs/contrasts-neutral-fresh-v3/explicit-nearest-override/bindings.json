@@ -1,0 +1,290 @@
+{
+  "decisions": [
+    {
+      "requirement_id": "r001",
+      "template_id": "T17",
+      "applicability": "yes",
+      "reason": "The instruction explicitly states a precedence rule ('nearest ancestor') and that a local setting overrides ancestors, which selects an effective value from an ordered hierarchy of configuration sources.",
+      "instances": [
+        {
+          "prerequisites": [
+            {
+              "id": "value_selection",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "support_explanation": "The instruction specifies that the effective setting is determined by the nearest ancestor that defines it, and that a local setting overrides ancestors, which is a source priority rule for selecting an effective value."
+            }
+          ],
+          "slots": [
+            {
+              "name": "target",
+              "kind": "Symbol",
+              "value": "configuration",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "support_explanation": "The instruction refers to a generic configuration context where settings are defined in ancestors and local scopes."
+            },
+            {
+              "name": "setting",
+              "kind": "Symbol",
+              "value": "setting",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "support_explanation": "The instruction explicitly names the value being selected as 'the setting'."
+            },
+            {
+              "name": "precedence_rule",
+              "kind": "Expression",
+              "value": "nearest ancestor that defines the setting, with local overriding ancestors",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "support_explanation": "The instruction states the precedence rule: the nearest ancestor that defines the setting is used, and a local setting overrides ancestors."
+            },
+            {
+              "name": "applicable_sources",
+              "kind": "Symbol",
+              "value": "ancestors and local scope",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "support_explanation": "The instruction identifies the applicable sources as ancestors (which may define the setting) and the local setting."
+            }
+          ],
+          "guard_checks": [
+            {
+              "prerequisite_id": "value_selection",
+              "support_explanation": "The instruction defines a priority rule for resolving configuration settings: the nearest ancestor that defines the setting is used, and a local setting overrides ancestors. This indicates that when multiple configuration sources (e.g., ancestor scopes) provide a value for the same setting, one value is selected as the effective one based on the specified priority (nearest ancestor, with local overriding). This is a selection of an effective value, not a combination or listing.",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+                  "start": 0,
+                  "end": 87
+                }
+              ],
+              "relation": "select_effective_value",
+              "decision": "yes"
+            }
+          ]
+        }
+      ],
+      "rejected_instances": []
+    }
+  ],
+  "criteria": [
+    {
+      "text": "For `configuration`, the effective `setting` is selected by `nearest ancestor that defines the setting, with local overriding ancestors` among `ancestors and local scope`.",
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T17"
+      ],
+      "slots": [
+        {
+          "name": "target",
+          "kind": "Symbol",
+          "value": "configuration",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+              "start": 0,
+              "end": 87
+            }
+          ],
+          "support_explanation": "The instruction refers to a generic configuration context where settings are defined in ancestors and local scopes."
+        },
+        {
+          "name": "setting",
+          "kind": "Symbol",
+          "value": "setting",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+              "start": 0,
+              "end": 87
+            }
+          ],
+          "support_explanation": "The instruction explicitly names the value being selected as 'the setting'."
+        },
+        {
+          "name": "precedence_rule",
+          "kind": "Expression",
+          "value": "nearest ancestor that defines the setting, with local overriding ancestors",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+              "start": 0,
+              "end": 87
+            }
+          ],
+          "support_explanation": "The instruction states the precedence rule: the nearest ancestor that defines the setting is used, and a local setting overrides ancestors."
+        },
+        {
+          "name": "applicable_sources",
+          "kind": "Symbol",
+          "value": "ancestors and local scope",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+              "start": 0,
+              "end": 87
+            }
+          ],
+          "support_explanation": "The instruction identifies the applicable sources as ancestors (which may define the setting) and the local setting."
+        }
+      ],
+      "id": "c001",
+      "bindings": [
+        [
+          {
+            "name": "target",
+            "kind": "Symbol",
+            "value": "configuration",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+                "start": 0,
+                "end": 87
+              }
+            ],
+            "support_explanation": "The instruction refers to a generic configuration context where settings are defined in ancestors and local scopes."
+          },
+          {
+            "name": "setting",
+            "kind": "Symbol",
+            "value": "setting",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+                "start": 0,
+                "end": 87
+              }
+            ],
+            "support_explanation": "The instruction explicitly names the value being selected as 'the setting'."
+          },
+          {
+            "name": "precedence_rule",
+            "kind": "Expression",
+            "value": "nearest ancestor that defines the setting, with local overriding ancestors",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+                "start": 0,
+                "end": 87
+              }
+            ],
+            "support_explanation": "The instruction states the precedence rule: the nearest ancestor that defines the setting is used, and a local setting overrides ancestors."
+          },
+          {
+            "name": "applicable_sources",
+            "kind": "Symbol",
+            "value": "ancestors and local scope",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "Use the nearest ancestor that defines the setting. A local setting overrides ancestors.",
+                "start": 0,
+                "end": 87
+              }
+            ],
+            "support_explanation": "The instruction identifies the applicable sources as ancestors (which may define the setting) and the local setting."
+          }
+        ]
+      ]
+    }
+  ]
+}

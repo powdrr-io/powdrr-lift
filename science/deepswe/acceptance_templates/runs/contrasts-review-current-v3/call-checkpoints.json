@@ -1,0 +1,140 @@
+{
+  "archive": "call-checkpoints.tar.gz",
+  "archive_sha256": "9a1f512d0b6f469cd7b5ff2d2467cc5cc51091c82a89d109e6155e8d5b79a422",
+  "file_count": 19,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/append-order-not-precedence/calls/support-0.json",
+      "sha256": "348f317bdc8c449f3fe57abfdd9c3e458683f7ed8d1039d928c4264b56d5ce4b",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "6dd8371de1610862e257740a594bd750a137d390d3aed02f6cf85c72ab61101a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/compound-extra-obligation/calls/support-0.json",
+      "sha256": "02d99749968dc029bb60dfd3bcc1b9ff47b0c7ddba0d2f1b11e8762dcf3c606f",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "0b5d96db6051212115f7f591132f59ed72a6441c4f3c11699b844402cd0f6f00"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/coverage-with-weak-extra/calls/coverage-complete-0.json",
+      "sha256": "1eee6d8387c581ee47954acbddec132ec0cbd3aadf492b3648b4a604b9fe763e",
+      "status": "failed",
+      "stage": "coverage-complete",
+      "request_sha256": "d0227153b0b5ac9162521465381b94eb64abb9d3251c0ac112f179f4138942f9"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/coverage-with-weak-extra/calls/coverage-complete-1.json",
+      "sha256": "a307a03d015d694a960a6f7e94578af5b4cf5876b08446146bd1766cb3b81451",
+      "status": "failed",
+      "stage": "coverage-complete",
+      "request_sha256": "8bf8e7d8c34f4f910231d717b684200ecb2a1b14ee41b4a058eca226ece06f39"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/coverage-with-weak-extra/calls/coverage-complete-2.json",
+      "sha256": "fb2fbe13754f8dd9b7f9349c369ec67a57daaa09add3a1abeba8efcb46b2d89c",
+      "status": "failed",
+      "stage": "coverage-complete",
+      "request_sha256": "93979f4f8091a4bfe15f4d049eb6efbe3ca4b142eb4a5176e0f1ee5986ba396f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/coverage-with-weak-extra/calls/coverage-constrained-complete-0.json",
+      "sha256": "c975c4fea30726470fadc726a5ab8d6935a207d78e02bb4733286c191cafc039",
+      "status": "failed",
+      "stage": "coverage-constrained-complete",
+      "request_sha256": "4939fcce3e698d5caccb0f9d297a14eab640955c084266317cef0081f2f47e58"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/coverage-with-weak-extra/calls/coverage-constrained-complete-1.json",
+      "sha256": "077eca124284ebfbfbd3dee0432c702a04cc83323b76ed98b848ae8a7e84888a",
+      "status": "completed",
+      "stage": "coverage-constrained-complete",
+      "request_sha256": "032066e8a673ad80e3628c4090d14c6ab159ae5926a23d210719c493b47b9c9f"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/coverage-with-weak-extra/calls/coverage-constrained-complete-plus-weak-0.json",
+      "sha256": "cf89d3b3330ba7a29214646a5def8dc264054521f219fd93b3d275689383b309",
+      "status": "completed",
+      "stage": "coverage-constrained-complete-plus-weak",
+      "request_sha256": "bfc791f387fb158f933739893b086cea7a9442146cefa9135801116b8fcafdcd"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/coverage-with-weak-extra/calls/coverage-constrained-weak-only-0.json",
+      "sha256": "28e7c2d80ef8e6332c25c47e3fc44367a52fcf1b487204a48e7d38c5a120c892",
+      "status": "completed",
+      "stage": "coverage-constrained-weak-only",
+      "request_sha256": "9c55f5b295bc4c3e86c24b02020aaf3e49fbffb629ec967bdc14e836a27a21f3"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/coverage-with-weak-extra/calls/support-0.json",
+      "sha256": "079cf53f43c16184e1d10f932603e4317b69c044ed917b9b4bc1c6d91aeccce0",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "9a56e497b8eef77e5dc9eaf973f6150f724f53f93a2a74d09c93cb65293bc352"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/equality-not-identity/calls/support-0.json",
+      "sha256": "d0ac94c7750b47c6c54a135c3877f51154ca0af1ce3e35baef7f9ced4eeb9185",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "e0633eda64a62033152f3565012adf2e7165eb2b7220db2251a5e0407b119692"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/explicit-collision-winner/calls/support-0.json",
+      "sha256": "82ef89b7865367ea9b2fde174a38304430378dec27d93bf8e48abdb174ecefd9",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "d5e781097fdbabf939a4414c99ddbfd903d8c578b5475a522101f90ee0859b25"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/explicit-nearest-override/calls/support-0.json",
+      "sha256": "48cbc07eda93ed36eaa2b7049a0d892cfedc7f552b21d018bfdb84d038edadaf",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "032de02dfde81c9239dc3fa25805850a7f069116ab078819397fd9f08af7cc7a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/explicit-reference-identity/calls/support-0.json",
+      "sha256": "43e4bb71f52c2edd807d79258869978581e81b7c7b5628fc73cfef27e571eaa5",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "1f3cd116bcee709fdae7720d74e23eafe18de0f8afb5470360b6c0ae195e0880"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/flag-does-not-invent-field-policy/calls/support-0.json",
+      "sha256": "1c1ae76ae08470605ce5561f022500637e8aff6a7e0cd9c5da20f4e46ceb5f3c",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "233f7f9b94d8fc52e8474ab431b6254a62ca2db0511b1ca624a582482b6f590e"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/identity-without-keyword/calls/support-0.json",
+      "sha256": "8147791ee3f7e3ca8e57771e2a9b3bfa8f088aa130367a120d0688f07dd99b66",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "1855e99c1d90df2ce5c13fc5ae78846543bde7ad2a29aedff8b07a0033263fa9"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/operation-scoped-null-behavior/calls/support-0.json",
+      "sha256": "471d0f4ee091a350c7a19c63caaf8db379dd655b91f7436aaf3a8183288f7b71",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "a8fbe11bed441f180bca36f3cbfb88e037686d4424035096fe1d744683937d1a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/readonly-not-identity/calls/support-0.json",
+      "sha256": "5512f3d22efe54abeeeca290d72dfc93adea508cc384d513d5d37425ab3f1834",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "3cd955b4f36429a53529d3d8dc0c88541d0fe1ef2606d653151111d689e3cf85"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-current-v3/traversal-not-override/calls/support-0.json",
+      "sha256": "a137a55fb89067bb11857f7db30c6fc0c33893f097db2d3e2f056e75b183b7ac",
+      "status": "completed",
+      "stage": "support",
+      "request_sha256": "a089fd8f3cd05b342c11a9b554a7f7b423eb11b31051152d0cd82b85e6ba624c"
+    }
+  ]
+}

@@ -1,0 +1,113 @@
+{
+  "review_status": "agent_authored_spotcheck",
+  "author": "Codex",
+  "scope": "Selected discrepancies only; no human review, exhaustive regrading, or replacement of automated scores.",
+  "findings": [
+    {
+      "cohort": "pilot-v1",
+      "task_id": "cattrs-partial-structuring-recovery",
+      "arm": "direct",
+      "criterion_id": "c022",
+      "reference_id": "v016",
+      "finding": "unsupported_specifics_accepted",
+      "assessment": "The criterion mandates empty error_map under detailed_validation=False without source support. The solution fallback still passes per_field_errors to its result. The model support review incorrectly accepts it.",
+      "criterion_text": "When `partial_structure` is called with `detailed_validation=True`, the `error_map` must contain an entry for each failed field, mapping the field name to the specific exception that caused the failure; when `detailed_validation=False`, the `error_map` must be empty (or not populated with per-field exceptions) and the `errors` attribute must contain a single exception summarizing the failure.",
+      "source_span": {
+        "id": "s004",
+        "text": "Exclude `init=False` fields from `structured_fields` and `failed_fields`. With `forbid_extra_keys`, extra keys make `is_complete` False but still produce a value. Respect `detailed_validation`. Handle attrs classes, dataclasses, and TypedDicts. Export `PartialResult`.",
+        "start": 974,
+        "end": 1242
+      },
+      "patch_evidence": {
+        "path": "solution/solution.patch",
+        "lines": [
+          457,
+          519
+        ]
+      },
+      "generation_sha256": "9298147e34b19600f9c702723d3b4c2fb222537cd99a13c87a56d22b710133b7",
+      "review_sha256": "460fd3908f451a4efc1a6b47957c79b6c9a6d50595d701178135920c5d239a12",
+      "instruction_sha256": "289a4520528e7ca03890d10f3945fe3d43a1cbad95dde97ee4c7ce0b780e6de6"
+    },
+    {
+      "cohort": "pilot-v1",
+      "task_id": "helm-array-merge-strategies",
+      "arm": "templates",
+      "criterion_id": "c055",
+      "reference_id": "v024",
+      "finding": "covered_validation_marked_partial",
+      "assessment": "This criterion fully states the invalid non-array path and required warning substring. The review itself acknowledges full satisfaction but assigns partial coverage because another related criterion is vague.",
+      "criterion_text": "Given a strategy path resolves to a non-array value in chart defaults, the lint rule emits a warning whose message contains \"non-array\".",
+      "source_span": {
+        "id": "s008",
+        "text": "Merge strategy annotation warnings must be emitted by the same lint rule that validates other Chart.yaml fields (name, version, type, dependencies) -- not as a separate lint pass. This applies to both stable and internal chart formats. It emits warnings for: unsupported strategy values (message contains `\"unsupported\"` and path), merge without merge-key (message references path), orphan merge-key without strategy (message references path). It also validates strategy paths against chart default values: warns if a path is not found (message contains `\"not found\"`) or resolves to a non-array (message contains `\"non-array\"`).",
+        "start": 1568,
+        "end": 2197
+      },
+      "patch_evidence": null,
+      "generation_sha256": "5c8387873bf9004fec55b5f39330df0c2f3da89d5192298dbb1c3567007e2f97",
+      "review_sha256": "19a9e5361498c28d182af17e04e20e3da0ba11063274084c5cb1b8e45ad268d2",
+      "instruction_sha256": "76284bd44cf47668297b82c819104e13d1894a6ee12730075f971e60760a0f39"
+    },
+    {
+      "cohort": "pilot-v1",
+      "task_id": "helm-array-merge-strategies",
+      "arm": "direct",
+      "criterion_id": "c031",
+      "reference_id": null,
+      "finding": "scope_rationale_incorrect",
+      "assessment": "The instruction explicitly preserves nil during merging and deletes null during coalescing. The review overlooks the former. The criterion says merge strategy without specifying operation mode, so scope still needs adjudication.",
+      "criterion_text": "When a 'merge' strategy is applied and a user object contains a field with a null value, that null must be preserved in the merged result (i.e., the key remains present with a null value). This must be observable by rendering a template that outputs the merged object; the output must include the key with a null value.",
+      "source_span": {
+        "id": "s002",
+        "text": "Two strategies via Chart.yaml annotations: `append` concatenates chart defaults before user elements; `merge` matches array-of-objects by a key field, recursively merging matched pairs (user fields win), preserving unmatched defaults, and appending unmatched user elements. Non-map elements and elements missing the merge key are preserved in the result. Null user values delete the key during coalescing; nil is preserved during merging.",
+        "start": 183,
+        "end": 621
+      },
+      "patch_evidence": null,
+      "generation_sha256": "03c3f2b254290d10cb120850506586be6f3e891c150b91cb85b0ea9194dc4723",
+      "review_sha256": "2415dba10f2345e2b8c77ab470edfbe942b233c22d3dd7fe7817b213cd05f3fe",
+      "instruction_sha256": "76284bd44cf47668297b82c819104e13d1894a6ee12730075f971e60760a0f39"
+    },
+    {
+      "cohort": "pilot-v1",
+      "task_id": "helm-array-merge-strategies",
+      "arm": "templates",
+      "criterion_id": "c039",
+      "reference_id": null,
+      "finding": "correctly_flagged_unsupported_precedence",
+      "assessment": "Old-before-new array ordering does not establish old-config-wins collision precedence.",
+      "criterion_text": "Within `the upgrade result`, expose values from `old config and new values`; collisions resolve to `old config wins for append`.",
+      "source_span": {
+        "id": "s007",
+        "text": "Upgrade behavior: `ResetValues` ignores strategies. `ReuseValues` merges old config with new values using strategy-aware table coalescing (append: old before new). `ResetThenReuseValues` uses new chart defaults as base, merging old config on top with strategies.",
+        "start": 1304,
+        "end": 1566
+      },
+      "patch_evidence": null,
+      "generation_sha256": "5c8387873bf9004fec55b5f39330df0c2f3da89d5192298dbb1c3567007e2f97",
+      "review_sha256": "19a9e5361498c28d182af17e04e20e3da0ba11063274084c5cb1b8e45ad268d2",
+      "instruction_sha256": "76284bd44cf47668297b82c819104e13d1894a6ee12730075f971e60760a0f39"
+    },
+    {
+      "cohort": "pilot-extra-v1",
+      "task_id": "dateutil-rfc5545-timezone-interop",
+      "arm": "templates",
+      "criterion_id": "c035",
+      "reference_id": null,
+      "finding": "correctly_flagged_unsupported_identity",
+      "assessment": "Read-only tuples in insertion order do not require object identity with an internal tuple.",
+      "criterion_text": "For `rruleset attribute access` on `rruleset`, `the returned tuple` is the identical object `the internal tuple of components`.",
+      "source_span": {
+        "id": "s011",
+        "text": "- rruleset.rrules, .rdates, .exrules, .exdates are read-only tuples in insertion order.",
+        "start": 1680,
+        "end": 1767
+      },
+      "patch_evidence": null,
+      "generation_sha256": "a43d2b2b547fd72d2686f05f972c10e25efb56225f5e8c34f379cdf1564c930e",
+      "review_sha256": "bba01bcbda2ee3fffaa95abd33a17cc3d13f3ee811856fd16c1921f37845bf20",
+      "instruction_sha256": "397879d86b9972aa6aee18b5d9db29020471ff12c3b8346951344c489b97c703"
+    }
+  ]
+}

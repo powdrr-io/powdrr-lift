@@ -1,0 +1,10 @@
+# The DeepSWE source-text license is not declared. Keep collected text and
+# blinded review materials local until redistribution terms are verified.
+/raw/source_documents.jsonl
+/data/candidates.jsonl
+/splits/family-splits.jsonl
+/review/
+/annotations/
+/labels/
+/predictions/
+__pycache__/

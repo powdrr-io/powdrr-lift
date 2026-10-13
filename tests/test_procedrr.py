@@ -636,17 +636,13 @@ def test_checked_in_design_interview_definition_parses() -> None:
 
     collect_judges(document["steps"])
     assert judge_providers["classify_one"]
-    assert set(judge_providers["classify_one"]) == {
-        "jev",
-        "jev_required",
-        "planning",
-    }
+    assert set(judge_providers["classify_one"]) == {"jev", "planning"}
     assert set(judge_providers["construct_one"]) == {"planning"}
     assert document["name"] == "design-interview"
     assert validate_single_decision(document) == ()
 
 
-def test_behavioral_contract_provider_schema_uses_supported_array_constraints() -> None:
+def test_design_interview_has_no_behavioral_contract_result_stage() -> None:
     from pathlib import Path
 
     document = parse_and_validate(
@@ -670,10 +666,7 @@ def test_behavioral_contract_provider_schema_uses_supported_array_constraints() 
 
     collect_contract_schemas(document["steps"])
 
-    assert len(schemas) == 1
-    properties = schemas[0]["properties"]
-    assert "uniqueItems" not in properties["member_indexes"]
-    assert "uniqueItems" not in properties["context_indexes"]
+    assert schemas == []
 
 
 def test_design_interview_uses_single_field_source_classification() -> None:
@@ -686,7 +679,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     atomicity_loop = document["steps"][1]["for_each"]
     split_body = document["steps"][3]["for_each"]["body"]
     split_judge = split_body[0]["judge"]
-    body = document["steps"][7]["for_each"]["body"]
+    body = document["steps"][5]["for_each"]["body"]
     root_loop = body[1]["for_each"]
     root_judge = root_loop["body"][0]["judge"]
     dependent_operation = body[3]["operation"]
@@ -694,15 +687,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     classifier_judge = classifier_loop["body"][0]["judge"]
     extraction_operation = body[6]["operation"]
     behavior_judge = body[8]["judge"]
-    scenario_judge = next(
-        item["judge"]
-        for item in body
-        if isinstance(item, dict)
-        and isinstance(item.get("judge"), dict)
-        and item["judge"]
-        .get("question", "")
-        .startswith("Compile one lossless behavior scenario")
-    )
+    scenario_judge = body[17]["judge"]
 
     assert atomicity_judge["question"] == (
         "Does this one instruction clause contain more than one independently "
@@ -711,13 +696,11 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     assert atomicity_judge["output"]["schema"]["required"] == ["multiple"]
     assert atomicity_loop["max_parallel"] == 8
     assert split_judge["question"] == (
-        "How can this clause be decomposed into independently verifiable atoms "
-        "while preserving its exact boolean structure?"
+        "How can this clause be decomposed without losing validation dependencies?"
     )
     assert split_judge["output"]["schema"]["required"] == [
         "statements",
         "validation_groups",
-        "boolean_expression",
     ]
     split_rules = " ".join(split_judge["instructions"])
     assert "Splitting a source clause does not weaken its requiredness" in split_rules
@@ -726,23 +709,6 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     )
     assert "either approach satisfies this request" in split_rules
     assert "not alternatives; preserve each branch condition" in split_rules
-    assert "relation=conditional" in split_rules
-    atomicity_rules = " ".join(atomicity_judge["instructions"])
-    assert (
-        "deep history restores saved data snapshots for full descendants"
-        in atomicity_rules
-    )
-    assert (
-        "shallow history restores saved data snapshots for direct children"
-        in atomicity_rules
-    )
-    assert "Do not flatten nested logic" in split_rules
-
-    reconstruction_judge = document["steps"][5]["for_each"]["body"][0]["judge"]
-    assert reconstruction_judge["provider"] == "jev_required"
-    assert reconstruction_judge["output"]["schema"]["required"] == ["equivalent"]
-    assert "in both directions" in " ".join(reconstruction_judge["instructions"])
-
     assert classifier_loop["snapshot"]["max_items"] == 16
     assert root_judge["question"].startswith("Decide how the pipeline should route")
     assert root_judge["context"] == [
@@ -783,7 +749,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     assert "compile_partial_semantic_contract" in flow_text
 
 
-def test_design_interview_generates_typed_acceptance_criteria_last() -> None:
+def test_design_interview_has_no_acceptance_criteria_compiler_stage() -> None:
     from pathlib import Path
 
     from procedrr import parse_and_validate
@@ -796,42 +762,8 @@ def test_design_interview_generates_typed_acceptance_criteria_last() -> None:
         for step in document["steps"]
         if isinstance(step, dict) and isinstance(step.get("operation"), dict)
     ]
-    assert operation_names.index("prepare_acceptance_criteria") > operation_names.index(
-        "bind_behavioral_contracts"
-    )
-
-    judges: list[dict[str, Any]] = []
-
-    def collect(value: Any) -> None:
-        if isinstance(value, dict):
-            if isinstance(value.get("judge"), dict):
-                judges.append(value["judge"])
-            for nested in value.values():
-                collect(nested)
-        elif isinstance(value, list):
-            for nested in value:
-                collect(nested)
-
-    collect(document["steps"])
-    criterion_judges = [
-        item
-        for item in judges
-        if item.get("question", "").startswith("What one compact acceptance criterion")
-        or item.get("question", "").startswith("Repair only this atomic requirement")
-    ]
-    assert len(criterion_judges) == 2
-    for judge in criterion_judges:
-        schema = judge["output"]["schema"]
-        assert schema["required"] == ["criterion"]
-        assert schema["properties"]["criterion"]["type"] == "object"
-        assert (
-            schema["properties"]["criterion"]["properties"]["assertions"]["items"][
-                "type"
-            ]
-            == "object"
-        )
-        assert "JSON object string" not in " ".join(judge["instructions"])
-        assert any("behavioral contract" in item for item in judge["instructions"])
+    assert "prepare_acceptance_criteria" not in operation_names
+    assert "bind_behavioral_contracts" not in operation_names
 
 
 def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:

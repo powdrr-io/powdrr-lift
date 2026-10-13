@@ -1,0 +1,63 @@
+{
+  "archive": "artifacts.tar.gz",
+  "archive_sha256": "e75818ce9fc79bd52b7afb7667208fbff6bf4268216a01c0e3e1763ad13963c0",
+  "file_count": 14,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/append-order-not-precedence/reviews.json",
+      "sha256": "2387c464069c5a5dcf415e0b2805cc3e70c4dcb35f10f1430ed4909a7a693dd0"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/compound-extra-obligation/reviews.json",
+      "sha256": "3db9a878ecfce9379ada4bccaef06ee83d6e581b3560f3813256c8f15b349191"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/coverage-with-weak-extra/reviews.json",
+      "sha256": "35819f72971596bea5bf8e4b2fe41a4d5bdf571a11916e76cdc27771770969ea"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/equality-not-identity/reviews.json",
+      "sha256": "ea06af33a806c36e415d2846a0311d6cab23833736f2d87fa882e4217279d311"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/explicit-collision-winner/reviews.json",
+      "sha256": "63ebd2db8acccecb974b0a9052ba42745c9970f3ad2fdd8ccd93dd5f93718945"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/explicit-nearest-override/reviews.json",
+      "sha256": "3a73f5f1dfd2a058618ab9533f386bba8920a0e67c52b41df53e7585200f2aff"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/explicit-reference-identity/reviews.json",
+      "sha256": "d2a7d2dff764e95185cc48a7e24e8da111053bab40b99776c960fa00d9ef7699"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/flag-does-not-invent-field-policy/reviews.json",
+      "sha256": "6f13430744936d9196424e296b2c849684a03ec93db75ba839b7a6a6d2e03e00"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/identity-without-keyword/reviews.json",
+      "sha256": "04174f731790d526274f84a2b8f55822f550daed1ca5fd2b12b5a2a84ae5184d"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/operation-scoped-null-behavior/reviews.json",
+      "sha256": "08801033e26e77f611ca5f73a37729b0db9ddb53250467b7691e9b6372e7e0a2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/readonly-not-identity/reviews.json",
+      "sha256": "241dfb2dfe702ce71d6831e9f18aadf5ca36245877459d56b013e5f92b61e1c9"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/report-before-constraints.json",
+      "sha256": "4acc7296d498be7e14512db10ee096ee694d687a1c1ffc3a82c474be287aecdd"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/report.json",
+      "sha256": "59df2d16850262f9bfcde2791636f907fb15495b101427f530f4f6b20a34cdaf"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-review-baseline-v3/traversal-not-override/reviews.json",
+      "sha256": "f0e234282d7cc17997f90d00bd0931184baaabdff4ec17dbb4dece89073a5641"
+    }
+  ]
+}

@@ -1,0 +1,462 @@
+{
+  "label_status": "agent_authored",
+  "limitations": "Small synthetic contrasts based on observed error classes. Development checks, not human gold or held-out accuracy estimates. Expected labels are withheld from model calls.",
+  "fixtures_sha256": "fb0e81597f3aee24c96fac4b19b525fb54b1c65e7dceaf1e2ad9de476eafba38",
+  "catalog_sha256": "0c35dc83a0e558f09b308df6c68fdf39516a06f43ba18c5f3a633345afcaeb47",
+  "phase": "review",
+  "repairs": 2,
+  "provider": "deepinfra",
+  "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+  "review_version": "v2",
+  "review_prompts_sha256": "b041699aa7ac35feaecdb92021b897d8441384be7d28d3905df1bc020acc649f",
+  "passed": 26,
+  "check_count": 27,
+  "eligible_case_count": 12,
+  "checks": [
+    {
+      "case_id": "readonly-not-identity",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "readonly-not-identity",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "equality-not-identity",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "equality-not-identity",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-reference-identity",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-reference-identity",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "identity-without-keyword",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "identity-without-keyword",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "append-order-not-precedence",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "append-order-not-precedence",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "traversal-not-override",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "traversal-not-override",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-collision-winner",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-collision-winner",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-nearest-override",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-nearest-override",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "flag-does-not-invent-field-policy",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "flag-does-not-invent-field-policy",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "operation-scoped-null-behavior",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "operation-scoped-null-behavior",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "partial",
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "compound-extra-obligation",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "compound-extra-obligation",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "partial"
+      ],
+      "observed": "unsupported",
+      "passed": false
+    },
+    {
+      "case_id": "coverage-with-weak-extra",
+      "phase": "support",
+      "criterion_id": "c001",
+      "expected": [
+        "supported"
+      ],
+      "observed": "supported",
+      "passed": true
+    },
+    {
+      "case_id": "coverage-with-weak-extra",
+      "phase": "support",
+      "criterion_id": "c002",
+      "expected": [
+        "partial",
+        "unsupported"
+      ],
+      "observed": "unsupported",
+      "passed": true
+    },
+    {
+      "case_id": "coverage-with-weak-extra",
+      "phase": "coverage",
+      "check_id": "complete",
+      "expected": "full",
+      "observed": "full",
+      "passed": true
+    },
+    {
+      "case_id": "coverage-with-weak-extra",
+      "phase": "coverage",
+      "check_id": "complete-plus-weak",
+      "expected": "full",
+      "observed": "full",
+      "passed": true
+    },
+    {
+      "case_id": "coverage-with-weak-extra",
+      "phase": "coverage",
+      "check_id": "weak-only",
+      "expected": "partial",
+      "observed": "partial",
+      "passed": true
+    }
+  ],
+  "failures": [],
+  "calls": [
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.53,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "readonly-not-identity"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.797,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "equality-not-identity"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.118,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "explicit-reference-identity"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.475,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "identity-without-keyword"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.821,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "append-order-not-precedence"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.725,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "traversal-not-override"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.808,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "explicit-collision-winner"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 2.409,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "explicit-nearest-override"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.521,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "flag-does-not-invent-field-policy"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.437,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "operation-scoped-null-behavior"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.583,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "compound-extra-obligation"
+    },
+    {
+      "stage": "support",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.865,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true,
+      "case_id": "coverage-with-weak-extra"
+    },
+    {
+      "stage": "coverage-constrained-complete",
+      "attempt": 0,
+      "status": "failed",
+      "elapsed_seconds": 45.656,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "coverage-with-weak-extra"
+    },
+    {
+      "stage": "coverage-constrained-complete",
+      "attempt": 1,
+      "status": "completed",
+      "elapsed_seconds": 1.102,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "coverage-with-weak-extra"
+    },
+    {
+      "stage": "coverage-constrained-complete-plus-weak",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.385,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "coverage-with-weak-extra"
+    },
+    {
+      "stage": "coverage-constrained-weak-only",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 1.405,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": false,
+      "case_id": "coverage-with-weak-extra"
+    }
+  ]
+}

@@ -106,109 +106,6 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
-        if required == {"equivalent"}:
-            return {"equivalent": True}
-
-        if required == {
-            "member_indexes",
-            "context_indexes",
-            "relationships",
-            "unresolved_questions",
-        }:
-            candidates = _find_json_value(text, "candidate_requirements")
-            contexts = _find_json_value(text, "context_items")
-            return {
-                "member_indexes": list(range(len(candidates or []))),
-                "context_indexes": list(range(len(contexts or []))),
-                "relationships": [],
-                "unresolved_questions": [],
-            }
-
-        if required == {"criterion"}:
-            candidates = _find_json_value(text, "candidate_requirements")
-            return (
-                {
-                    "criterion": {
-                        "kind": "transformation",
-                        "source_indexes": [0],
-                        "setup": "the requested input",
-                        "operation": "apply the requested behavior",
-                        "events": [],
-                        "assertions": [
-                            {
-                                "observation": "result",
-                                "relation": "equals",
-                                "expected": "the requested result",
-                                "source_indexes": [0],
-                                "basis": "source_derived",
-                            }
-                        ],
-                        "unresolved_questions": [],
-                    }
-                }
-                if candidates
-                else {
-                    "criterion": {
-                        "kind": "transformation",
-                        "source_indexes": [0],
-                        "setup": None,
-                        "operation": "apply the requested behavior",
-                        "events": [],
-                        "assertions": [
-                            {
-                                "observation": "result",
-                                "relation": "equals",
-                                "expected": "the requested result",
-                                "source_indexes": [0],
-                                "basis": "source_derived",
-                            }
-                        ],
-                        "unresolved_questions": [],
-                    }
-                }
-            )
-
-        if required == {
-            "assertion_reviews",
-            "setup_review",
-            "decision_records",
-            "adequate",
-            "plausible_incorrect_behavior",
-            "distinguishes",
-            "adequacy_reason",
-        }:
-            assertions = _find_json_value(text, "assertions") or []
-            source_clauses = _find_json_value(text, "source_clauses") or []
-            evidence = source_clauses[0]["text"]
-            return {
-                "assertion_reviews": [
-                    json.dumps(
-                        {
-                            "assertion_id": item["assertion_id"],
-                            "category": "source_supported",
-                            "source_evidence": evidence,
-                            "reason": "The source clause supports the assertion.",
-                        }
-                    )
-                    for item in assertions
-                ],
-                "setup_review": json.dumps(
-                    {
-                        "category": "illustrative_setup",
-                        "source_evidence": evidence,
-                        "reason": (
-                            "Fixture values are illustrative and stay within the "
-                            "source-supported domain."
-                        ),
-                    }
-                ),
-                "decision_records": [],
-                "adequate": True,
-                "plausible_incorrect_behavior": "the feature returns no result",
-                "distinguishes": True,
-                "adequacy_reason": "The observed result distinguishes this behavior.",
-            }
-
         if required == {"status", "value", "reason_code"} and (
             "scenario claim" in text
         ):
@@ -283,7 +180,7 @@ class DeterministicPlanningClient:
             return {"consistency_review": {"updates": []}}
         if required == {"multiple"}:
             return {"multiple": False}
-        if required == {"statements", "validation_groups", "boolean_expression"}:
+        if required == {"statements", "validation_groups"}:
             raise AssertionError("a non-multiple clause must not be split")
         if required == {"status", "unresolved_dimensions", "scenario"}:
             semantic_dimensions = _find_json_value(text, "semantic_dimensions")
@@ -419,43 +316,6 @@ class DeterministicPlanningClient:
             if not isinstance(proposition, str) or not proposition:
                 raise AssertionError("source extraction has no proposition")
             return {"quote": proposition, "occurrence": None}
-        if required == {
-            "subject",
-            "operation",
-            "affected_value",
-            "rule",
-            "contrast",
-            "behavior_form",
-            "result_presence",
-            "event_scope",
-            "contrast_presence",
-            "unresolved_fields",
-            "field_evidence",
-        }:
-            source = _find_json_value(text, "source_text")
-            if not isinstance(source, str) or not source:
-                raise AssertionError("source interpretation has no proposition")
-            sequence = any(
-                marker in source.casefold()
-                for marker in ("across payloads", "successive", "each event")
-            )
-            return {
-                "subject": source,
-                "operation": source,
-                "affected_value": None,
-                "rule": source,
-                "contrast": None,
-                "behavior_form": "state_transition" if sequence else "invariant",
-                "result_presence": "unspecified",
-                "event_scope": "event_sequence" if sequence else "unspecified",
-                "contrast_presence": "absent",
-                "unresolved_fields": ["affected_value|source_underspecified"],
-                "field_evidence": [
-                    f"subject|{source}",
-                    f"operation|{source}",
-                    f"rule|{source}",
-                ],
-            }
         if required == {"action"}:
             if "required_test_cases" in text:
                 return {
@@ -727,8 +587,8 @@ class StateDataAtomicityPlanningClient(DeterministicPlanningClient):
         required = set((response_schema or {}).get("required", ()))
         text = "\n".join(message.get("content", "") for message in messages)
         if required == {"multiple"}:
-            return {"multiple": "set_state_data" in text}
-        if required == {"statements", "validation_groups", "boolean_expression"}:
+            return {"multiple": "set_state_data(state, key, value)" in text}
+        if required == {"statements", "validation_groups"}:
             return {
                 "statements": [
                     "set_state_data rejects an inactive state.",
@@ -737,15 +597,6 @@ class StateDataAtomicityPlanningClient(DeterministicPlanningClient):
                     "An invalid set_state_data call raises InvalidDefinition.",
                 ],
                 "validation_groups": [],
-                "boolean_expression": {
-                    "op": "and",
-                    "args": [
-                        {"atom": 1},
-                        {"atom": 2},
-                        {"atom": 3},
-                        {"atom": 4},
-                    ],
-                },
             }
         return super().complete_json(messages, response_schema=response_schema)
 
@@ -1010,26 +861,17 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     )
     assert len(canonical_design["projections"]) == 4
     assert len(canonical_design["obligations"]) == 4
-    assert all(
-        item["criterion_quality"]["criterion_status"] == "unassessed"
-        for item in canonical_design["obligations"]
-    )
     packet = json.loads(
         (run_root / "implementation-packet.json").read_text(encoding="utf-8")
     )
-    assert packet["schema_version"] == "implementation-packet-v3"
-    assert packet["acceptance_logic"] == []
-    assert packet["acceptance_criteria"]
+    assert packet["schema_version"] == "implementation-packet-v1"
     prompt = (run_root / "artifacts" / "prompts").glob("*.txt")
     prompt_text = next(prompt).read_text(encoding="utf-8")
-    assert "Observable acceptance checks:" in prompt_text
     assert "Product contract:" in prompt_text
     assert "Validation contract:" in prompt_text
-    assert (
-        "Behavior scenarios not yet assessed as acceptance checks:" not in prompt_text
-    )
-    assert "expect the stated acceptance outcome is observed" not in prompt_text
-    assert "Run the focused required tests after implementation." in prompt_text
+    assert "Required behavior checks:" in prompt_text
+    assert "expect the stated acceptance outcome is observed" in prompt_text
+    assert "Run the tests before reporting completion." in prompt_text
     assert "Worker policy:" in prompt_text
     assert "create the exact selectors" not in prompt_text
     proposal = json.loads(
@@ -1069,24 +911,7 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
 
 def test_implement_feature_decomposes_state_data_api_requirements_before_design(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from powdrr_lift.workrr import jev_classifier
-
-    monkeypatch.setenv("TYPESAFEAI_API_KEY", "test-key")
-
-    def classify_with_jev(classifier: Mapping[str, Any], *_: Any) -> dict[str, str]:
-        question = str(classifier.get("question", ""))
-        return {
-            "choice": (
-                "true"
-                if "more than one independently verifiable" in question
-                or "logically equivalent" in question
-                else "false"
-            )
-        }
-
-    monkeypatch.setattr(jev_classifier, "_call_jev", classify_with_jev)
     repo = _fixture_repo(tmp_path)
     fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
     result = run_feature_in_place(
@@ -1226,7 +1051,7 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
         )
     )
 
-    assert result.status == "completed", (planner.proposal_decision_ids, result.failure)
+    assert result.status == "completed", planner.proposal_decision_ids
     assert result.plan_path.is_file()
     ledger_path = (
         repo
@@ -1262,47 +1087,17 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
     assert coverage_path.is_file()
     coverage = json.loads(coverage_path.read_text(encoding="utf-8"))
     assert coverage["status"] == "complete"
-    assert coverage["schema_version"] == "instruction-coverage-audit-v2"
     assert coverage["instruction_ledger_fingerprint"] == ledger["fingerprint"]
     assert [item["clause_id"] for item in coverage["records"]] == [
         item["clause_id"] for item in ledger["clauses"]
     ]
     for record in coverage["records"]:
         assert record["status"] == "covered"
-        assert record["requirement_status"] == "covered"
         assert record["source_contract_fingerprint"]
         assert Path(record["source_contract_artifact"]).is_file()
         assert record["obligation_created"] is (
             record["routing"] in {"include", "include_prohibition"}
         )
-        assert record["criterion_quality"]["requirement_status"] in {
-            "preserved",
-            "not_applicable",
-        }
-        assert record["criterion_quality"]["criterion_status"] in {
-            "source_only",
-            "unresolved",
-            "unassessed",
-            "not_applicable",
-        }
-        assert record["criterion_quality"]["repair_attempts"] == 0
-    criterion_coverage = coverage["criterion_coverage"]
-    assert criterion_coverage["applicable_requirements"] == sum(
-        record["obligation_created"] for record in coverage["records"]
-    )
-    assert criterion_coverage["checkable"] == 0
-    assert (
-        sum(
-            criterion_coverage[key]
-            for key in ("source_only", "unresolved", "unassessed")
-        )
-        == criterion_coverage["applicable_requirements"]
-    )
-    assert coverage["requirement_coverage"] == {
-        "total": len(coverage["records"]),
-        "covered": len(coverage["records"]),
-        "failed": 0,
-    }
     assert [item["obligation_id"] for item in canonical_design["obligations"]] == [
         f"obligation:instruction-{index:03d}"
         for index in range(1, len(canonical_design["obligations"]) + 1)

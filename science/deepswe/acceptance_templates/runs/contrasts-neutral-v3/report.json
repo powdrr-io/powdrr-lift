@@ -1,0 +1,153 @@
+{
+  "label_status": "agent_authored",
+  "limitations": "Small synthetic contrasts based on observed error classes. Development checks, not human gold or held-out accuracy estimates. Expected labels are withheld from model calls.",
+  "fixtures_sha256": "fb0e81597f3aee24c96fac4b19b525fb54b1c65e7dceaf1e2ad9de476eafba38",
+  "catalog_sha256": "7eadc44c00257f3d5130b96a743cb08e12a1419953408a010e3fb37ce855472a",
+  "baseline_report_sha256": "03eaf07d87d273ce8b9b5840a663d5e721e15a6ca56dabfd93c20a9164021c66",
+  "phase": "binding",
+  "repairs": 1,
+  "provider": "deepinfra",
+  "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "review_version": null,
+  "review_prompts_sha256": null,
+  "passed": 11,
+  "check_count": 11,
+  "eligible_case_count": 8,
+  "checks": [
+    {
+      "case_id": "readonly-not-identity",
+      "phase": "binding",
+      "template_id": "T31",
+      "expected": "no",
+      "observed": "no",
+      "passed": true
+    },
+    {
+      "case_id": "readonly-not-identity",
+      "phase": "binding",
+      "template_id": "T14",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "equality-not-identity",
+      "phase": "binding",
+      "template_id": "T31",
+      "expected": "no",
+      "observed": "no",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-reference-identity",
+      "phase": "binding",
+      "template_id": "T31",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "identity-without-keyword",
+      "phase": "binding",
+      "template_id": "T31",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "append-order-not-precedence",
+      "phase": "binding",
+      "template_id": "T18",
+      "expected": "no",
+      "observed": "no",
+      "passed": true
+    },
+    {
+      "case_id": "append-order-not-precedence",
+      "phase": "binding",
+      "template_id": "T14",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "traversal-not-override",
+      "phase": "binding",
+      "template_id": "T17",
+      "expected": "no",
+      "observed": "no",
+      "passed": true
+    },
+    {
+      "case_id": "traversal-not-override",
+      "phase": "binding",
+      "template_id": "T14",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-collision-winner",
+      "phase": "binding",
+      "template_id": "T18",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    },
+    {
+      "case_id": "explicit-nearest-override",
+      "phase": "binding",
+      "template_id": "T17",
+      "expected": "yes",
+      "observed": "yes",
+      "passed": true
+    }
+  ],
+  "failures": [],
+  "calls": [
+    {
+      "stage": "guard-r001-T31-000-object_identity",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 8.024,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "explicit-reference-identity"
+    },
+    {
+      "stage": "guard-r001-T31-000-object_identity",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 6.038,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "identity-without-keyword"
+    },
+    {
+      "stage": "guard-r001-T18-000-collision_winner",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 3.647,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "explicit-collision-winner"
+    },
+    {
+      "stage": "guard-r001-T17-000-value_selection",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 4.612,
+      "provider": "deepinfra",
+      "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+      "usage": {},
+      "cached": false,
+      "case_id": "explicit-nearest-override"
+    }
+  ]
+}

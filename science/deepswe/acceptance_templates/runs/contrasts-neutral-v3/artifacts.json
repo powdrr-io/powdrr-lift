@@ -1,0 +1,43 @@
+{
+  "archive": "artifacts.tar.gz",
+  "archive_sha256": "c21892d206ca729bbc98ec4cfe0a3e3a5382596c7cd2144a420e86455aea05fa",
+  "file_count": 9,
+  "files": [
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/append-order-not-precedence/bindings.json",
+      "sha256": "159afa93d744565ad2fba72cb9c4e462c0c5c4bf655b70f1e17b182bc60b4108"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/equality-not-identity/bindings.json",
+      "sha256": "64daaf541b3adba86267f1a37a0f19a721501cf3205009f7f7c57b3e50ec93c2"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/explicit-collision-winner/bindings.json",
+      "sha256": "b56f3c71042144da9e4e200bb63d8fe4cc7ec6c7342a1d83affe573772587ecb"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/explicit-nearest-override/bindings.json",
+      "sha256": "ecddd2866666a3103037fde497853c3900c378344bb5110eba384501c53a2a3a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/explicit-reference-identity/bindings.json",
+      "sha256": "53d08aa830bf193994213e87b9527ade75878ca1a28adb5e5f4a02f538ff045a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/identity-without-keyword/bindings.json",
+      "sha256": "3bf92fd07fb05fa7247f44b948496724b1e0c183e9682d7f69f929647e36765a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/readonly-not-identity/bindings.json",
+      "sha256": "c8340a367809141ad0a3a49d44de6383648b8ca877e1e52aedccc01c07091064"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/report.json",
+      "sha256": "0324d1628dbba8365379874ef2c4767e589c2a41c13f2fce0f2a9fb542335b3a"
+    },
+    {
+      "path": "science/deepswe/acceptance_templates/runs/contrasts-neutral-v3/traversal-not-override/bindings.json",
+      "sha256": "4df5e65f21453dc8aff4521b19b7c40d2ca917fabf61b98cae90a23617339779"
+    }
+  ]
+}

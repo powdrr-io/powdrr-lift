@@ -1,0 +1,41 @@
+{
+  "status": "agent_reviewed_spotchecks",
+  "scope": "Selected corroborating assertions, not a full patch audit or task test execution. Patch line numbers, not patched repository line numbers.",
+  "tasks": [
+    {
+      "task_id": "cattrs-partial-structuring-recovery",
+      "artifact": "tests/test.patch",
+      "checks": [
+        {"reference_ids": ["v005", "v006"], "lines": [168, 190], "test": "test_absent_field_with_default", "observation": "An absent defaulted field is failed, the fallback value exists, and is_complete is false."},
+        {"reference_ids": ["v007", "v009"], "lines": [191, 235], "test": "test_nested_partial_propagates", "observation": "Failed required fields prevent values; partial nested values can survive with the parent marked failed."},
+        {"reference_ids": ["v012", "v013"], "lines": [580, 615], "test": "test_preserves_successful_fields", "observation": "Refinement repairs failures while ignoring attempts to replace already successful fields."},
+        {"reference_ids": ["v015"], "lines": [735, 762], "test": "test_actual_extra_keys", "observation": "Extra keys with forbid_extra_keys preserve a value but mark incompleteness."}
+      ]
+    },
+    {
+      "task_id": "helm-array-merge-strategies",
+      "artifact": "tests/test.patch",
+      "checks": [
+        {"reference_ids": ["v028"], "lines": [675, 695], "test": "TestHarness_CoalesceValues_MergeWithoutKey_FallsBackToAppend", "observation": "A merge strategy without its key appends defaults before user values."},
+        {"reference_ids": ["v011"], "lines": [1071, 1100], "test": "TestHarness_CoalesceValues_SubchartDoesNotInheritParentStrategy", "observation": "A parent strategy does not turn an unannotated child array replacement into append."},
+        {"reference_ids": ["v026"], "lines": [1281, 1310], "test": "TestHarness_DeepCopyPreservesChartDefaults", "observation": "Merging a changed nested map leaves chart defaults unchanged."}
+      ]
+    },
+    {
+      "task_id": "koota-entity-snapshot-rollback",
+      "artifact": "tests/test.patch",
+      "checks": [
+        {"reference_ids": ["v017", "v018"], "lines": [927, 947], "test": "non-identical reference values reported as changed in world diff", "observation": "Empty and absent relations are equivalent, but distinct nested reference values compare changed under shallow equality."},
+        {"reference_ids": ["v004"], "lines": [1365, 1378], "test": "snapshot deep copy - modifying entity after snapshot does not affect snapshot data", "observation": "Snapshot trait data remains unchanged after the entity is updated; this particular fixture does not itself prove recursive copy depth."}
+      ]
+    },
+    {
+      "task_id": "dateutil-rfc5545-timezone-interop",
+      "artifact": "tests/test.patch",
+      "checks": [
+        {"reference_ids": ["v004"], "lines": [150, 164], "test": "testToStrRoundtripAware", "observation": "String serialization reparses an equivalent timezone-aware recurrence."},
+        {"reference_ids": ["v023"], "lines": [663, 683], "test": "testVCalendarVTimezonePriorityOverTzids", "observation": "Inline timezone definitions win over the supplied lookup."}
+      ]
+    }
+  ]
+}

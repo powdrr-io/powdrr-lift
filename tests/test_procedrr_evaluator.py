@@ -745,26 +745,6 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "value": "create",
                     "reason_code": None,
                 }
-            if "source-supported operation and behavior rule" in question:
-                return {
-                    "subject": None,
-                    "operation": None,
-                    "affected_value": None,
-                    "rule": None,
-                    "contrast": None,
-                    "behavior_form": "unclear",
-                    "result_presence": "unspecified",
-                    "event_scope": "unspecified",
-                    "contrast_presence": "absent",
-                    "unresolved_fields": [
-                        "subject|source_underspecified",
-                        "operation|source_underspecified",
-                        "affected_value|source_underspecified",
-                        "rule|source_underspecified",
-                        "behavior_form|source_underspecified",
-                    ],
-                    "field_evidence": [],
-                }
             if "lossless behavior scenario" in question:
                 return {
                     "status": "resolved",
@@ -821,8 +801,6 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 }
             if command[0] == "prepare_atomicity_split_requests":
                 return {"split_requests": []}
-            if command[0] == "prepare_atomicity_reconstructions":
-                return {"reconstruction_requests": []}
             if command[0] == "apply_atomicity_splits":
                 return {
                     "path": "instruction-ledger.json",
@@ -871,82 +849,6 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                     "allowed_values": ["create"],
                     "subject_text": "Add",
                 }
-            if command[0] == "prepare_source_interpretation":
-                return {
-                    "request": {"subject_text": "Interpret Add a thing."},
-                    "behavior_family_decision": {},
-                }
-            if command[0] == "prepare_behavioral_contracts":
-                return {
-                    "ledger_fingerprint": "sha256:ledger",
-                    "requirement_ids": ["instruction-001"],
-                    "context_ids": [],
-                    "role_interpretations": {},
-                    "requests": [],
-                }
-            if command[0] == "bind_behavioral_contracts":
-                return {
-                    "schema_version": "behavioral-contract-collection-v1",
-                    "ledger_fingerprint": "sha256:ledger",
-                    "contracts": [],
-                    "covered_requirement_ids": ["instruction-001"],
-                }
-            if command[0] == "prepare_acceptance_criteria":
-                return {
-                    "schema_version": "acceptance-criterion-v1",
-                    "ledger_fingerprint": "sha256:ledger",
-                    "requirement_ids": ["instruction-001"],
-                    "requests": [],
-                }
-            if command[0] == "bind_acceptance_criteria":
-                return {
-                    "schema_version": "acceptance-criterion-v1",
-                    "ledger_fingerprint": "sha256:ledger",
-                    "criteria": [],
-                    "requirement_coverage": {},
-                    "counts": {
-                        "requirements": 1,
-                        "with_criteria": 0,
-                        "unassessed": 0,
-                        "source_only": 1,
-                    },
-                }
-            if command[0] == "prepare_acceptance_criterion_reviews":
-                return {
-                    "schema_version": "acceptance-criterion-review-plan-v1",
-                    "ledger_fingerprint": "sha256:ledger",
-                    "requests": [],
-                }
-            if command[0] == "bind_acceptance_criterion_reviews":
-                return {
-                    "schema_version": "acceptance-criterion-v1",
-                    "ledger_fingerprint": "sha256:ledger",
-                    "criteria": [],
-                    "requirement_coverage": {},
-                    "counts": {
-                        "requirements": 1,
-                        "with_criteria": 0,
-                        "needs_repair": 0,
-                    },
-                    "reviews": [],
-                }
-            if command[0] == "prepare_acceptance_criterion_repairs":
-                return {
-                    "done": True,
-                    "criterion_collection": parameters["criteria"],
-                    "plan": {
-                        "schema_version": "acceptance-criterion-repair-plan-v1",
-                        "ledger_fingerprint": "sha256:ledger",
-                        "requirement_ids": [],
-                        "contracts": [],
-                        "requests": [],
-                        "replaces": {},
-                    },
-                    "requests": [],
-                }
-            if command[0] == "bind_acceptance_criterion_repairs":
-                collection = parameters["plan"]["criterion_collection"]
-                return {"criterion_collection": collection, "criteria": []}
             if command[0] == "compile_partial_semantic_contract":
                 return {
                     "kind": "feature",
@@ -1121,7 +1023,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 16
+    assert result.llm_activations == 15
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events

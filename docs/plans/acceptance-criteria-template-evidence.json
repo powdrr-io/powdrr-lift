@@ -1,0 +1,298 @@
+{
+  "research_date": "2026-10-08",
+  "corpus_root": "~/code/powdrr-deep-swe/tasks",
+  "instruction_file_count": 114,
+  "review_scope": "Read the 12 listed instructions, inspected patch structure, and read selected implementation and validation hunks. Not an exhaustive patch audit. No task solutions or validation suites executed for this proposal.",
+  "purpose": "Identify reusable acceptance-criterion patterns and instruction-versus-solution distinctions. Solution and validation artifacts are offline research evidence, not production generation inputs.",
+  "line_reference_convention": "Line numbers in the proposal refer to patch-file lines, not patched source-file lines.",
+  "tasks": [
+    {
+      "key": "SM",
+      "task": "python-statemachine-state-data-scoping",
+      "artifacts": [
+        {
+          "path": "python-statemachine-state-data-scoping/instruction.md",
+          "sha256": "17e0781f9837bebd7304d5f1594dbf7de9a147a3ba8f03111e005f8376b3126a",
+          "bytes": 1957,
+          "lines": 17
+        },
+        {
+          "path": "python-statemachine-state-data-scoping/solution/solution.patch",
+          "sha256": "4197380535a2e67258afbdac3a7cb91d6a2c9ab1cd70c4cc09e973b739e4f81d",
+          "bytes": 32725,
+          "lines": 879
+        },
+        {
+          "path": "python-statemachine-state-data-scoping/tests/test.patch",
+          "sha256": "fcf7628db832d77da0f31fb287d5f016e27c02550ca54aa6fd19c9aa4d8bf0ec",
+          "bytes": 26030,
+          "lines": 807
+        }
+      ]
+    },
+    {
+      "key": "GQL",
+      "task": "gql-incremental-graphql-delivery",
+      "artifacts": [
+        {
+          "path": "gql-incremental-graphql-delivery/instruction.md",
+          "sha256": "0d14a5dac7fa2d6fe2e9d9d9a113fb02cfb2495f63f8b7edcaa18ba73dd16edf",
+          "bytes": 1558,
+          "lines": 9
+        },
+        {
+          "path": "gql-incremental-graphql-delivery/solution/solution.patch",
+          "sha256": "65d77639c640cde71e5e867089b4bfd55140e9e7d418183c3cb9df570ade30db",
+          "bytes": 24744,
+          "lines": 665
+        },
+        {
+          "path": "gql-incremental-graphql-delivery/tests/test.patch",
+          "sha256": "031de3d902d74cdc8ef142886d5aca3342ff63611a3a903797f3e8d6fb413670",
+          "bytes": 22377,
+          "lines": 539
+        }
+      ]
+    },
+    {
+      "key": "LC",
+      "task": "langchain-request-coalescing",
+      "artifacts": [
+        {
+          "path": "langchain-request-coalescing/instruction.md",
+          "sha256": "208b99162a6a2a40e25630f566c3b735d3fea91dbb3c7b3717f5a3a3c7ea3557",
+          "bytes": 1790,
+          "lines": 7
+        },
+        {
+          "path": "langchain-request-coalescing/solution/solution.patch",
+          "sha256": "7ba4f9d876bd22c96a3588f6beca6acbbbc97022267d93c7a47a9eba7320ecaa",
+          "bytes": 28652,
+          "lines": 890
+        },
+        {
+          "path": "langchain-request-coalescing/tests/test.patch",
+          "sha256": "2b36e5be1d7281433efeb6dd2ee1896db6f268b30f3f12655fb9772324e41c13",
+          "bytes": 30979,
+          "lines": 966
+        }
+      ]
+    },
+    {
+      "key": "CB",
+      "task": "ofetch-per-origin-circuit-breaker",
+      "artifacts": [
+        {
+          "path": "ofetch-per-origin-circuit-breaker/instruction.md",
+          "sha256": "b6f09e6cf27c3116f8f1791a0cd14204b59803d8e2fd4df8275598796d76f83c",
+          "bytes": 3475,
+          "lines": 87
+        },
+        {
+          "path": "ofetch-per-origin-circuit-breaker/solution/solution.patch",
+          "sha256": "a4dad53494d4d061af11531d76a35d923781ca1d378a235554efaae4c150bf4b",
+          "bytes": 21330,
+          "lines": 720
+        },
+        {
+          "path": "ofetch-per-origin-circuit-breaker/tests/test.patch",
+          "sha256": "757b924819aba7f6e7e557021a7fccfb9b3d46c5b8fadc40892b7b0a8f11d307",
+          "bytes": 59163,
+          "lines": 1738
+        }
+      ]
+    },
+    {
+      "key": "HD",
+      "task": "happy-dom-abort-pending-body-reads",
+      "artifacts": [
+        {
+          "path": "happy-dom-abort-pending-body-reads/instruction.md",
+          "sha256": "b6359654736d87c782a090174d53f818b4a98dfe3edbdf45fe327d9dcb1fa4ac",
+          "bytes": 764,
+          "lines": 5
+        },
+        {
+          "path": "happy-dom-abort-pending-body-reads/solution/solution.patch",
+          "sha256": "e918f9851a9d3466f86a550f6cbb91d709224cb8439d7876f65ecb3f9a44078a",
+          "bytes": 32667,
+          "lines": 1064
+        },
+        {
+          "path": "happy-dom-abort-pending-body-reads/tests/test.patch",
+          "sha256": "ac3de2fd7659c284427cbae8502f551f5bceccf142a0deaadf2d65a9fea1cbdc",
+          "bytes": 9190,
+          "lines": 330
+        }
+      ]
+    },
+    {
+      "key": "HX",
+      "task": "httpx-streaming-json-iteration",
+      "artifacts": [
+        {
+          "path": "httpx-streaming-json-iteration/instruction.md",
+          "sha256": "8b9cf46588b87c532be947e1ab102f1bf3241ad01133f5ca6c461dc7f7ecd9e6",
+          "bytes": 2632,
+          "lines": 14
+        },
+        {
+          "path": "httpx-streaming-json-iteration/solution/solution.patch",
+          "sha256": "e5c0c8b05b58adee89e56860a44324f9e8d325171927e56fc7ef0029f64f2438",
+          "bytes": 20560,
+          "lines": 588
+        },
+        {
+          "path": "httpx-streaming-json-iteration/tests/test.patch",
+          "sha256": "bd31b5332a542e94b8ebb1fe9e749512a942db9c7649e74533030e669900e849",
+          "bytes": 19769,
+          "lines": 666
+        }
+      ]
+    },
+    {
+      "key": "SK",
+      "task": "skrub-duration-encoding",
+      "artifacts": [
+        {
+          "path": "skrub-duration-encoding/instruction.md",
+          "sha256": "aecc575c2253564382af8fcb9afb0af11b47b8fda94c7625100a18148919e95d",
+          "bytes": 3448,
+          "lines": 9
+        },
+        {
+          "path": "skrub-duration-encoding/solution/solution.patch",
+          "sha256": "02b3e1aecaebed22fb0e85edf5fc25807c3b1f61e7a06b18c53536aff1258616",
+          "bytes": 31594,
+          "lines": 964
+        },
+        {
+          "path": "skrub-duration-encoding/tests/test.patch",
+          "sha256": "e59bf620b171ab8ead1f288c5cb24e85df61d5ba254028290a4ea3a0dbcdab8f",
+          "bytes": 18994,
+          "lines": 580
+        }
+      ]
+    },
+    {
+      "key": "FA",
+      "task": "fastapi-implicit-head-options",
+      "artifacts": [
+        {
+          "path": "fastapi-implicit-head-options/instruction.md",
+          "sha256": "b55a492424e74cf6267a1bcf75c48942f397e9e9f00ac15e97809145794056d6",
+          "bytes": 1702,
+          "lines": 19
+        },
+        {
+          "path": "fastapi-implicit-head-options/solution/solution.patch",
+          "sha256": "900aa8a64c48adeec77fdb94bbe6f5621c6ed1848e2c13e819cc76206a67708a",
+          "bytes": 50192,
+          "lines": 1338
+        },
+        {
+          "path": "fastapi-implicit-head-options/tests/test.patch",
+          "sha256": "2b7fd7bd3b52f9cbe6f15ac564e7d76c7dadbfdb7deab83e02855f02fa56ad61",
+          "bytes": 25852,
+          "lines": 848
+        }
+      ]
+    },
+    {
+      "key": "OB",
+      "task": "obsidian-linter-scoped-ignore-markers",
+      "artifacts": [
+        {
+          "path": "obsidian-linter-scoped-ignore-markers/instruction.md",
+          "sha256": "4d3c90c60dad5a6c2a760b36b484e510c080fcfd5d6b35779c4e82e869d09014",
+          "bytes": 2241,
+          "lines": 17
+        },
+        {
+          "path": "obsidian-linter-scoped-ignore-markers/solution/solution.patch",
+          "sha256": "4d2a0657b28234fd0566a28913ce266269fa032262968c36601da5f87ea1d96f",
+          "bytes": 35747,
+          "lines": 1019
+        },
+        {
+          "path": "obsidian-linter-scoped-ignore-markers/tests/test.patch",
+          "sha256": "8aaf0e46be0c8ed9e377d5a216b937a8a3e56f56f2028911a1dea43dcabe5da6",
+          "bytes": 34080,
+          "lines": 1153
+        }
+      ]
+    },
+    {
+      "key": "RV",
+      "task": "returns-validated-error-accumulation",
+      "artifacts": [
+        {
+          "path": "returns-validated-error-accumulation/instruction.md",
+          "sha256": "77d27406cd485339c36030cde62de2a50233a0e3253536ac0468b4f1c46cc208",
+          "bytes": 3236,
+          "lines": 17
+        },
+        {
+          "path": "returns-validated-error-accumulation/solution/solution.patch",
+          "sha256": "e3dc80a04199cce09395838bf40ec74494012d44bb196473776291f3f7fcc451",
+          "bytes": 36040,
+          "lines": 1110
+        },
+        {
+          "path": "returns-validated-error-accumulation/tests/test.patch",
+          "sha256": "d4f92adfa57f16c3a05b6990022f4e9cd75979ef63e8f9ee10eb63fe313847d3",
+          "bytes": 45757,
+          "lines": 1434
+        }
+      ]
+    },
+    {
+      "key": "IG",
+      "task": "igel-persist-feature-schema",
+      "artifacts": [
+        {
+          "path": "igel-persist-feature-schema/instruction.md",
+          "sha256": "af7e38939072f50ed4d0fa9743dce1d963140700d4623289fa7ecfbcae301c49",
+          "bytes": 1659,
+          "lines": 7
+        },
+        {
+          "path": "igel-persist-feature-schema/solution/solution.patch",
+          "sha256": "bafbf19f0c48b22e5f17400b8dc8163db3a0b125c93fd76748641949981a2fe4",
+          "bytes": 36586,
+          "lines": 1000
+        },
+        {
+          "path": "igel-persist-feature-schema/tests/test.patch",
+          "sha256": "39cf81de193669537a82544b9ec939aa0c0ce7431f11b1d9cb0a3dcae89b4f61",
+          "bytes": 30118,
+          "lines": 1051
+        }
+      ]
+    },
+    {
+      "key": "TX",
+      "task": "textual-kitty-key-phases",
+      "artifacts": [
+        {
+          "path": "textual-kitty-key-phases/instruction.md",
+          "sha256": "88a48b1028f82a815f135e122e9b57cc0e942c677cf0dfe49cbc93318e1c5093",
+          "bytes": 1765,
+          "lines": 11
+        },
+        {
+          "path": "textual-kitty-key-phases/solution/solution.patch",
+          "sha256": "991514b68f5461ae59936c6d2b6f4df54bfe080755ce216566759b008d38649a",
+          "bytes": 22950,
+          "lines": 696
+        },
+        {
+          "path": "textual-kitty-key-phases/tests/test.patch",
+          "sha256": "501bd72f9f02628b15fb011592b47b647f3c129f098cb946b43434863d386a5d",
+          "bytes": 10503,
+          "lines": 346
+        }
+      ]
+    }
+  ]
+}

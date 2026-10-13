@@ -26,12 +26,8 @@ from powdrr_lift.core.intent_packet import IntentPacket
 from powdrr_lift.minisweagent_monitor import MiniSWEAgentSnapshot, run_minisweagent
 from powdrr_lift.opencode_monitor import run_opencode
 
-CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v3"
+CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v1"
-
-
-def _prompt_fingerprint(prompt: str) -> str:
-    return "sha256:" + hashlib.sha256(prompt.encode("utf-8")).hexdigest()
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,7 +53,7 @@ class ImplementationRequest:
     schema_version: str = CODING_AGENT_REQUEST_SCHEMA_VERSION
 
     def to_data(self) -> dict[str, Any]:
-        data = {
+        return {
             "schema_version": self.schema_version,
             "request_id": self.request_id,
             "objective": self.objective,
@@ -82,9 +78,6 @@ class ImplementationRequest:
                 else None
             ),
         }
-        if self.schema_version == "implementation-request-v3":
-            data["prompt_fingerprint"] = _prompt_fingerprint(self.prompt)
-        return data
 
     def to_json(self) -> str:
         return json.dumps(self.to_data(), indent=2, sort_keys=True) + "\n"
@@ -134,25 +127,10 @@ class ImplementationRequest:
 
     @classmethod
     def from_data(cls, data: Mapping[str, Any]) -> ImplementationRequest:
-        schema_version = data.get("schema_version", "implementation-request-v2")
-        if schema_version not in {
-            "implementation-request-v2",
-            "implementation-request-v3",
-        }:
-            raise ValueError("unsupported implementation request schema")
-        raw_prompt = data.get("prompt")
-        if not isinstance(raw_prompt, str):
-            raise ValueError("implementation request prompt must be text")
-        prompt = raw_prompt
-        prompt_fingerprint = data.get("prompt_fingerprint")
-        if schema_version == "implementation-request-v3" and (
-            prompt_fingerprint != _prompt_fingerprint(prompt)
-        ):
-            raise ValueError("implementation request prompt fingerprint is stale")
         return cls(
             request_id=cast(str, data["request_id"]),
             objective=cast(str, data["objective"]),
-            prompt=prompt,
+            prompt=cast(str, data["prompt"]),
             base_commit=cast(str, data["base_commit"]),
             plan_fingerprint=cast(str, data["plan_fingerprint"]),
             allowed_paths=tuple(cast(list[str], data["allowed_paths"])),
@@ -178,7 +156,7 @@ class ImplementationRequest:
                 if isinstance(packet := data.get("implementation_packet"), Mapping)
                 else None
             ),
-            schema_version=cast(str, schema_version),
+            schema_version=cast(str, data["schema_version"]),
         )
 
     @classmethod

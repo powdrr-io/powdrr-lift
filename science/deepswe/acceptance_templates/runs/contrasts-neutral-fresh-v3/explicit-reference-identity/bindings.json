@@ -1,0 +1,290 @@
+{
+  "decisions": [
+    {
+      "requirement_id": "r001",
+      "template_id": "T31",
+      "applicability": "yes",
+      "reason": "The instruction explicitly states that current() returns the original session object supplied at construction, and that callers can compare references using is. This directly requires the same object reference to be returned, satisfying the same_object relation.",
+      "instances": [
+        {
+          "prerequisites": [
+            {
+              "id": "object_identity",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+                  "start": 0,
+                  "end": 112
+                }
+              ],
+              "support_explanation": "The phrase 'returns the original session object supplied at construction' explicitly requires the same object reference to be returned, and 'callers can compare references using is' confirms that reference identity is preserved."
+            }
+          ],
+          "slots": [
+            {
+              "name": "operation",
+              "kind": "Symbol",
+              "value": "current()",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+                  "start": 0,
+                  "end": 112
+                }
+              ],
+              "support_explanation": "The operation is named 'current()' in the instruction."
+            },
+            {
+              "name": "input",
+              "kind": "Symbol",
+              "value": "the session object supplied at construction",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+                  "start": 0,
+                  "end": 112
+                }
+              ],
+              "support_explanation": "The input is the session object supplied at construction, as stated in the instruction."
+            },
+            {
+              "name": "result",
+              "kind": "Observation",
+              "value": "the identical object",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+                  "start": 0,
+                  "end": 112
+                }
+              ],
+              "support_explanation": "The instruction requires the result to be the original object, and reference comparison via 'is' confirms identity."
+            },
+            {
+              "name": "reference",
+              "kind": "Symbol",
+              "value": "the original session object",
+              "basis": "instruction",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+                  "start": 0,
+                  "end": 112
+                }
+              ],
+              "support_explanation": "The reference is the original session object supplied at construction, as stated."
+            }
+          ],
+          "guard_checks": [
+            {
+              "prerequisite_id": "object_identity",
+              "support_explanation": "The instruction explicitly states that current() returns the original session object supplied at construction, and that callers can compare references using 'is'. This directly requires the same object reference to be returned.",
+              "source_ids": [
+                "s001"
+              ],
+              "source_quotes": [
+                {
+                  "source_id": "s001",
+                  "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+                  "start": 0,
+                  "end": 112
+                }
+              ],
+              "relation": "same_object",
+              "decision": "yes"
+            }
+          ]
+        }
+      ],
+      "rejected_instances": []
+    }
+  ],
+  "criteria": [
+    {
+      "text": "For `current()` on `the session object supplied at construction`, `the identical object` is the identical object `the original session object`.",
+      "requirement_ids": [
+        "r001"
+      ],
+      "source_ids": [
+        "s001"
+      ],
+      "template_ids": [
+        "T31"
+      ],
+      "slots": [
+        {
+          "name": "operation",
+          "kind": "Symbol",
+          "value": "current()",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+              "start": 0,
+              "end": 112
+            }
+          ],
+          "support_explanation": "The operation is named 'current()' in the instruction."
+        },
+        {
+          "name": "input",
+          "kind": "Symbol",
+          "value": "the session object supplied at construction",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+              "start": 0,
+              "end": 112
+            }
+          ],
+          "support_explanation": "The input is the session object supplied at construction, as stated in the instruction."
+        },
+        {
+          "name": "result",
+          "kind": "Observation",
+          "value": "the identical object",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+              "start": 0,
+              "end": 112
+            }
+          ],
+          "support_explanation": "The instruction requires the result to be the original object, and reference comparison via 'is' confirms identity."
+        },
+        {
+          "name": "reference",
+          "kind": "Symbol",
+          "value": "the original session object",
+          "basis": "instruction",
+          "source_ids": [
+            "s001"
+          ],
+          "source_quotes": [
+            {
+              "source_id": "s001",
+              "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+              "start": 0,
+              "end": 112
+            }
+          ],
+          "support_explanation": "The reference is the original session object supplied at construction, as stated."
+        }
+      ],
+      "id": "c001",
+      "bindings": [
+        [
+          {
+            "name": "operation",
+            "kind": "Symbol",
+            "value": "current()",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+                "start": 0,
+                "end": 112
+              }
+            ],
+            "support_explanation": "The operation is named 'current()' in the instruction."
+          },
+          {
+            "name": "input",
+            "kind": "Symbol",
+            "value": "the session object supplied at construction",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+                "start": 0,
+                "end": 112
+              }
+            ],
+            "support_explanation": "The input is the session object supplied at construction, as stated in the instruction."
+          },
+          {
+            "name": "result",
+            "kind": "Observation",
+            "value": "the identical object",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+                "start": 0,
+                "end": 112
+              }
+            ],
+            "support_explanation": "The instruction requires the result to be the original object, and reference comparison via 'is' confirms identity."
+          },
+          {
+            "name": "reference",
+            "kind": "Symbol",
+            "value": "the original session object",
+            "basis": "instruction",
+            "source_ids": [
+              "s001"
+            ],
+            "source_quotes": [
+              {
+                "source_id": "s001",
+                "quote": "current() returns the original session object supplied at construction; callers can compare references using is.",
+                "start": 0,
+                "end": 112
+              }
+            ],
+            "support_explanation": "The reference is the original session object supplied at construction, as stated."
+          }
+        ]
+      ]
+    }
+  ]
+}

@@ -641,12 +641,6 @@ def _execute_procedrr_flow(
             replay_responses=replay_responses,
             telemetry_sink=record_provider_attempt,
         )
-        jev_equivalence_client = WorkrrProcedrrClient(
-            JevSemanticClassifierClient(config.planning_client, fail_closed=True),
-            skills_dir=flow_directory,
-            replay_responses=replay_responses,
-            telemetry_sink=record_provider_attempt,
-        )
         evaluator = Evaluator(
             planning_client,
             execute,
@@ -654,7 +648,6 @@ def _execute_procedrr_flow(
             judge_clients={
                 "planning": planning_client,
                 "jev": jev_classifier_client,
-                "jev_required": jev_equivalence_client,
             },
             command_catalog=command_catalog,
             event_sink=record_procedrr_event,
@@ -2509,27 +2502,6 @@ def _run_code_agent_phase(
             ),
         )
     try:
-        compiled_acceptance_criteria: tuple[Mapping[str, Any], ...] = ()
-        canonical_design_path = state.get("canonical_feature_design_path")
-        if isinstance(canonical_design_path, Path) and canonical_design_path.is_file():
-            try:
-                canonical_for_criteria = json.loads(
-                    canonical_design_path.read_text(encoding="utf-8")
-                )
-            except (OSError, json.JSONDecodeError) as error:
-                raise ValueError(
-                    f"canonical feature design cannot be read: {error}"
-                ) from error
-            if not isinstance(canonical_for_criteria, Mapping):
-                raise ValueError("canonical feature design is malformed")
-            raw_acceptance_criteria = canonical_for_criteria.get(
-                "acceptance_criteria", []
-            )
-            if not isinstance(raw_acceptance_criteria, list) or not all(
-                isinstance(item, Mapping) for item in raw_acceptance_criteria
-            ):
-                raise ValueError("canonical acceptance criteria are malformed")
-            compiled_acceptance_criteria = tuple(raw_acceptance_criteria)
         implementation_packet = compile_implementation_packet(
             objective=feature_description,
             obligations=feature_obligations,
@@ -2550,7 +2522,6 @@ def _run_code_agent_phase(
             obligation_evidence_contracts=tuple(
                 item.to_data() for item in obligation_evidence_contracts
             ),
-            acceptance_criteria=compiled_acceptance_criteria,
         )
     except ValueError as error:
         raise PowdrrExecutionError(
@@ -5781,11 +5752,6 @@ def _compile_initial_worker_prompt(
                 change
             )
     try:
-        raw_acceptance_criteria = canonical_design.get("acceptance_criteria", [])
-        if not isinstance(raw_acceptance_criteria, list) or not all(
-            isinstance(item, Mapping) for item in raw_acceptance_criteria
-        ):
-            raise ValueError("canonical acceptance criteria are malformed")
         packet = compile_implementation_packet(
             objective=config.feature_description,
             obligations=descriptions,
@@ -5797,16 +5763,6 @@ def _compile_initial_worker_prompt(
                 scenario
                 for item in required_test_cases
                 if isinstance((scenario := item.get("behavior_scenario")), Mapping)
-            ),
-            acceptance_criteria=tuple(raw_acceptance_criteria),
-            acceptance_logic=tuple(
-                item
-                for item in (
-                    canonical_design.get("acceptance_logic", [])
-                    if isinstance(canonical_design.get("acceptance_logic", []), list)
-                    else []
-                )
-                if isinstance(item, Mapping)
             ),
         )
         unit = ExecutionUnit(

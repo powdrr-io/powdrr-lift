@@ -1,0 +1,495 @@
+{
+  "run": {
+    "provider": "deepinfra",
+    "planning_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "matching_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "prompt_version": "acceptance-template-evidence-v3",
+    "router_provider": "typesafe.ai",
+    "router_model": "jev-latest",
+    "splitter_provider": "deepinfra",
+    "splitter_model": "deepseek-ai/DeepSeek-V4-Flash-0731",
+    "catalog_sha256": "7eadc44c00257f3d5130b96a743cb08e12a1419953408a010e3fb37ce855472a",
+    "production_flow_sha256": "e4813258ff0365509dfdb4a6e76862ffa9d25e50097085702ae357c6a7f26674",
+    "batch_size": 1,
+    "repairs": 3,
+    "tasks": [
+      "cattrs-partial-structuring-recovery",
+      "helm-array-merge-strategies",
+      "koota-entity-snapshot-rollback",
+      "dateutil-rfc5545-timezone-interop"
+    ],
+    "arms": [
+      "templates"
+    ],
+    "analysis_pipeline": [
+      "production instruction ledger sentence capture",
+      "production Jev atomicity classifier",
+      "production planning model atomicity splitter",
+      "production Jev instruction router",
+      "acceptance template selection and binding"
+    ],
+    "failures": [],
+    "task_routing_counts": {
+      "cattrs-partial-structuring-recovery": {
+        "include": 26,
+        "include_prohibition": 0,
+        "context": 0,
+        "exclude": 2,
+        "unclear": 0
+      },
+      "helm-array-merge-strategies": {
+        "include": 36,
+        "include_prohibition": 0,
+        "context": 1,
+        "exclude": 2,
+        "unclear": 0
+      },
+      "koota-entity-snapshot-rollback": {
+        "include": 46,
+        "include_prohibition": 0,
+        "context": 0,
+        "exclude": 2,
+        "unclear": 0
+      },
+      "dateutil-rfc5545-timezone-interop": {
+        "include": 53,
+        "include_prohibition": 0,
+        "context": 1,
+        "exclude": 2,
+        "unclear": 0
+      }
+    },
+    "status": "completed"
+  },
+  "eligible_task_count": 4,
+  "paired_task_ids": [
+    "cattrs-partial-structuring-recovery",
+    "helm-array-merge-strategies",
+    "koota-entity-snapshot-rollback",
+    "dateutil-rfc5545-timezone-interop"
+  ],
+  "aggregate": {
+    "templates": {
+      "task_count": 4,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 91,
+      "criterion_count": 214,
+      "strict_recall": 0.9340659340659341,
+      "strict_precision": 0.9485981308411215,
+      "missed_or_partial": 6,
+      "unsupported": 7,
+      "partly_supported": 4,
+      "uncertain": 0,
+      "complete_task_fraction": 0.25
+    }
+  },
+  "paired_aggregate": {
+    "templates": {
+      "task_count": 4,
+      "review_statuses": [
+        "automated"
+      ],
+      "reference_label_statuses": [
+        "agent_authored"
+      ],
+      "reference_count": 91,
+      "criterion_count": 214,
+      "strict_recall": 0.9340659340659341,
+      "strict_precision": 0.9485981308411215,
+      "missed_or_partial": 6,
+      "unsupported": 7,
+      "partly_supported": 4,
+      "uncertain": 0,
+      "complete_task_fraction": 0.25
+    }
+  },
+  "scores": [
+    {
+      "task_id": "cattrs-partial-structuring-recovery",
+      "arm": "templates",
+      "input_sha256": "2f35c8ee6f0688b697f5e82d1e8e63fa0d1264338cc5ad50b22c6fb22715406f",
+      "generation_sha256": "284edaeca22b858b46fe2acbb1315c86717896798171da0426e22d3ca30905c3",
+      "reference_sha256": "c53c695260c2c8cb4cd2a12189fef36a744300f1e4c082c0191b722eebd6deb5",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 17,
+      "full": 15,
+      "partial": 1,
+      "missed_or_partial": 2,
+      "missing": 1,
+      "strict_recall": 0.8823529411764706,
+      "including_partial_recall": 0.9411764705882353,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": false,
+      "criterion_count": 25,
+      "supported": 25,
+      "strict_precision": 1.0,
+      "unsupported": 0,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "criteria_by_route": {
+        "include": {
+          "criteria": 25,
+          "supported": 25,
+          "unsupported": 0,
+          "partial": 0,
+          "uncertain": 0
+        }
+      },
+      "candidate_template_label_recall": 0.6470588235294118,
+      "accepted_template_label_recall": 0.6470588235294118,
+      "template_label_reference_count": 17,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 3,
+      "generation_call_count": 27,
+      "criterion_characters": 4978,
+      "generation_elapsed_seconds": 206.085,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [],
+      "misses": [
+        {
+          "reference_id": "v006",
+          "inventory_status": "full",
+          "inventory_requirement_ids": [
+            "r009"
+          ],
+          "criterion_status": "missing",
+          "criterion_ids": [],
+          "rationale": "No criterion explicitly states that failed fields with defaults use those defaults as fallback values in the resulting partial object. While r009 is covered by requirement text, no criterion describes the fallback behavior in the value. This is a missing outcome."
+        },
+        {
+          "reference_id": "v016",
+          "inventory_status": "full",
+          "inventory_requirement_ids": [
+            "r022"
+          ],
+          "criterion_status": "partial",
+          "criterion_ids": [
+            "c003",
+            "c004",
+            "c005",
+            "c006",
+            "c007",
+            "c008",
+            "c010",
+            "c011",
+            "c012",
+            "c013",
+            "c014",
+            "c022",
+            "c023",
+            "c024"
+          ],
+          "rationale": "v016 requires that partial_structure honors the converter's detailed_validation setting without introducing new exception semantics. While the requirement is stated in r022, none of the criteria explicitly mention respect for detailed_validation in error aggregation, exception propagation, or validation depth. Criteria like c007 and c008 describe the existence of errors and error_map but do not tie them to the detailed_validation flag. Thus, coverage is partial due to missing explicit linkage to the setting."
+        }
+      ],
+      "precision_flags": []
+    },
+    {
+      "task_id": "helm-array-merge-strategies",
+      "arm": "templates",
+      "input_sha256": "9234c56d4ba7f2160fb8989e0a2e51a457e5603e23a03a5650e27a94cf65ce3c",
+      "generation_sha256": "7b037bf9564388c1831c323e3815d375adc45a8f75969b0f9f4c1e614f0d8cdb",
+      "reference_sha256": "5c7215db6e4c8f306aa2022a58976660088f5273e573f9a1333d7a5815028fb5",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 29,
+      "full": 27,
+      "partial": 1,
+      "missed_or_partial": 2,
+      "missing": 1,
+      "strict_recall": 0.9310344827586207,
+      "including_partial_recall": 0.9655172413793104,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": false,
+      "criterion_count": 50,
+      "supported": 50,
+      "strict_precision": 1.0,
+      "unsupported": 0,
+      "partly_supported": 0,
+      "uncertain": 0,
+      "criteria_by_route": {
+        "include": {
+          "criteria": 50,
+          "supported": 50,
+          "unsupported": 0,
+          "partial": 0,
+          "uncertain": 0
+        }
+      },
+      "candidate_template_label_recall": 1.0,
+      "accepted_template_label_recall": 0.896551724137931,
+      "template_label_reference_count": 29,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 4,
+      "generation_call_count": 42,
+      "criterion_characters": 8708,
+      "generation_elapsed_seconds": 429.407,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [],
+      "misses": [
+        {
+          "reference_id": "v012",
+          "inventory_status": "full",
+          "inventory_requirement_ids": [
+            "r018",
+            "r019"
+          ],
+          "criterion_status": "missing",
+          "criterion_ids": [],
+          "rationale": "No criterion explicitly states that the global. prefix is stripped before applying the strategy to the globals map. While c026 and c027 address scoping, they do not mention global. prefix handling. This behavior is missing."
+        },
+        {
+          "reference_id": "v024",
+          "inventory_status": "full",
+          "inventory_requirement_ids": [
+            "r031"
+          ],
+          "criterion_status": "partial",
+          "criterion_ids": [
+            "c036"
+          ],
+          "rationale": "Criterion c036 mentions 'same warning conditions' but does not explicitly state that 'non-array' appears in the message. No criterion explicitly contains the phrase 'non-array' in the warning message. Therefore, the requirement for the exact message content is not fully captured."
+        }
+      ],
+      "precision_flags": []
+    },
+    {
+      "task_id": "koota-entity-snapshot-rollback",
+      "arm": "templates",
+      "input_sha256": "45c32083152adefb386cfeb96e7750eaf9373772c95abc99fdcbea7cc66f798f",
+      "generation_sha256": "f48317a827010e02f967e0e999a5e6bdc5963d51864987191a8e3e286a9f307f",
+      "reference_sha256": "5bb212dea4f68c766a3937960f9e3a68379b276af4fae08e057f990d5803cd84",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 20,
+      "full": 20,
+      "partial": 0,
+      "missed_or_partial": 0,
+      "missing": 0,
+      "strict_recall": 1.0,
+      "including_partial_recall": 1.0,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": true,
+      "criterion_count": 74,
+      "supported": 68,
+      "strict_precision": 0.918918918918919,
+      "unsupported": 4,
+      "partly_supported": 2,
+      "uncertain": 0,
+      "criteria_by_route": {
+        "include": {
+          "criteria": 74,
+          "supported": 68,
+          "unsupported": 4,
+          "partial": 2,
+          "uncertain": 0
+        }
+      },
+      "candidate_template_label_recall": 1.0,
+      "accepted_template_label_recall": 1.0,
+      "template_label_reference_count": 20,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 4,
+      "generation_call_count": 50,
+      "criterion_characters": 14206,
+      "generation_elapsed_seconds": 653.008,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [],
+      "misses": [],
+      "precision_flags": [
+        {
+          "criterion_id": "c018",
+          "status": "unsupported",
+          "source_ids": [],
+          "rationale": "The phrase 'exposes the ECS framework' is vague and not defined in the source. The instruction details specific functions and behaviors but never uses or defines 'exposes' as a criterion. This is an interpretive addition without source support."
+        },
+        {
+          "criterion_id": "c030",
+          "status": "unsupported",
+          "source_ids": [],
+          "rationale": "The phrase 'For items equivalent under keys that are equal, retain reject the duplicate key by throwing Error' is ambiguous and not present in the source. The source only requires throwing on duplicate keys (s002), but this criterion adds unclear phrasing ('retain reject'), implies a semantic equivalence rule not mentioned, and lacks source support. It appears to be an attempted paraphrase that introduces confusion and unsupported interpretation."
+        },
+        {
+          "criterion_id": "c032",
+          "status": "unsupported",
+          "source_ids": [
+            "s002"
+          ],
+          "rationale": "The instruction mandates throwing an Error on duplicate traits but does not specify that 'no trait is retained' as a behavioral consequence. This adds an implementation detail (retention policy) not present in the source, making it unsupported."
+        },
+        {
+          "criterion_id": "c061",
+          "status": "partial",
+          "source_ids": [
+            "s007",
+            "s008"
+          ],
+          "rationale": "The instruction specifies that arrays in `diffEntitySnapshots` and `diffWorldSnapshots` are sorted ascending (s007, s008), but 'All arrays in the returned object' is overly broad — it implies every array in every return value (e.g., relation target arrays) must be sorted, which is not mandated. Only the top-level arrays (`addedTraits`, `removedTraits`, etc.) are required to be sorted. This criterion overgeneralizes and adds unsupported obligations."
+        },
+        {
+          "criterion_id": "c062",
+          "status": "unsupported",
+          "source_ids": [
+            "s007",
+            "s008"
+          ],
+          "rationale": "The criterion attempts to combine multiple conditions into a single equivalence claim about 'inputs producing the same equality result', but the source does not define or require equivalence of inputs — only how equality is computed (shallow comparison, ignoring ordering, {} vs absent). The phrasing 'produce the same equality result' is vague and not source-supported; it implies a meta-property not stated or testable from the spec."
+        },
+        {
+          "criterion_id": "c066",
+          "status": "partial",
+          "source_ids": [
+            "s007",
+            "s008"
+          ],
+          "rationale": "The source mandates ascending order only for the top-level arrays in `diffEntitySnapshots` and `diffWorldSnapshots` results (s007, s008). This criterion says 'the returned arrays' without qualification, implying all arrays (e.g., relation target arrays) must be sorted — which is not required. Thus, it overgeneralizes and adds unsupported obligations."
+        }
+      ]
+    },
+    {
+      "task_id": "dateutil-rfc5545-timezone-interop",
+      "arm": "templates",
+      "input_sha256": "29ed87a69cab68f21e44202c6268fc8df9c16de7f66f9f585a06d732d5892493",
+      "generation_sha256": "43c1c8975a312b37000a9f4ae2ab779c4b71e94a1bb6b109ce4027bae039f2a4",
+      "reference_sha256": "9233d539edda24a645a3d8ed49769105d81dd8d438bf77de61937b04e9d3f847",
+      "review_status": "automated",
+      "reference_label_status": "agent_authored",
+      "reference_count": 25,
+      "full": 23,
+      "partial": 1,
+      "missed_or_partial": 2,
+      "missing": 1,
+      "strict_recall": 0.92,
+      "including_partial_recall": 0.96,
+      "inventory_recall": 1.0,
+      "all_reference_validations_present": false,
+      "criterion_count": 65,
+      "supported": 60,
+      "strict_precision": 0.9230769230769231,
+      "unsupported": 3,
+      "partly_supported": 2,
+      "uncertain": 0,
+      "criteria_by_route": {
+        "include": {
+          "criteria": 65,
+          "supported": 60,
+          "unsupported": 3,
+          "partial": 2,
+          "uncertain": 0
+        }
+      },
+      "candidate_template_label_recall": 0.84,
+      "accepted_template_label_recall": 0.76,
+      "template_label_reference_count": 25,
+      "template_label_note": "Diagnostic agreement with reference template groups, not semantic correctness; valid alternative templates can disagree.",
+      "residual_requirement_count": 5,
+      "generation_call_count": 58,
+      "criterion_characters": 10074,
+      "generation_elapsed_seconds": 725.431,
+      "generation_usage": {
+        "prompt_tokens": null,
+        "completion_tokens": null,
+        "total_tokens": null
+      },
+      "generation_usage_record_count": 0,
+      "shared_inventory_calls": [],
+      "misses": [
+        {
+          "reference_id": "v015",
+          "inventory_status": "full",
+          "inventory_requirement_ids": [
+            "r038"
+          ],
+          "criterion_status": "missing",
+          "criterion_ids": [],
+          "rationale": "The reference requires rruleset.copy() to create a shallow copy with identical components. No criterion explicitly states this behavior. Criterion c052 and c053 discuss union and subtract, not copy. No criterion mentions copy at all. Therefore, this requirement is missing."
+        },
+        {
+          "reference_id": "v017",
+          "inventory_status": "full",
+          "inventory_requirement_ids": [
+            "r041",
+            "r042",
+            "r043"
+          ],
+          "criterion_status": "partial",
+          "criterion_ids": [
+            "c054",
+            "c055"
+          ],
+          "rationale": "The reference requires rruleset.subtract to add other's rrules as exrules and rdates as exdates, and raise TypeError for non-rruleset. Criterion c054 explicitly states that the resulting exrules include other's rrules. Criterion c055 explicitly states that subtract raises TypeError for non-rruleset. Although c054 does not mention rdates → exdates, the requirement for rdates → exdates is not captured by any criterion. Therefore, this is partial coverage."
+        }
+      ],
+      "precision_flags": [
+        {
+          "criterion_id": "c004",
+          "status": "partial",
+          "source_ids": [
+            "s002"
+          ],
+          "rationale": "s002 confirms RDATE accepts TZID, VALUE=DATE, and VALUE=DATE-TIME, but does not specify rejection of unsupported forms. The criterion adds an obligation (rejection) not present in the source."
+        },
+        {
+          "criterion_id": "c014",
+          "status": "unsupported",
+          "source_ids": [
+            "s019"
+          ],
+          "rationale": "s019 states rrulestr auto-detects BEGIN:VCALENDAR and extracts VTIMEZONE/VEVENT, but does not mandate rejection of non-VCALENDAR input. It describes behavior for VCALENDAR input but does not specify error handling or rejection for non-compliant input, so the 'rejects' obligation is unsupported."
+        },
+        {
+          "criterion_id": "c015",
+          "status": "unsupported",
+          "source_ids": [
+            "s019"
+          ],
+          "rationale": "s019 says rrulestr extracts VTIMEZONE from VCALENDAR, but does not state that it rejects input lacking VTIMEZONE or containing non-VTIMEZONE content. The criterion demands rejection of non-VTIMEZONE content, which is not mandated in the source."
+        },
+        {
+          "criterion_id": "c037",
+          "status": "partial",
+          "source_ids": [
+            "s009"
+          ],
+          "rationale": "s009 states that rrule.count() 'otherwise iterates (inherited from rrulebase)' when count is not set, which implies equivalence to iteration. However, the criterion phrasing 'behavior is equivalent to iterating over the recurrence set' is not explicitly stated — it is inferred. The source supports the mechanism but not the exact equivalence claim."
+        },
+        {
+          "criterion_id": "c060",
+          "status": "unsupported",
+          "source_ids": [
+            "s018"
+          ],
+          "rationale": "s018 describes rruleset.from_str(s) as wrapping rrulestr with forceset=True, but says nothing about the behavior when forceset is omitted. The criterion invents a default behavior (equivalent to forceset=True) that is not stated, implied, or suggested in the source. This is an unsupported extension."
+        }
+      ]
+    }
+  ],
+  "failures": [],
+  "limitations": [
+    "Agent-authored source-based references and automated judgments are not human gold labels.",
+    "Template-group agreement is diagnostic, not proof.",
+    "No coding agent, task validation suite, or Structrr diff was executed.",
+    "Only declared reference validations contribute to recall; references may omit behavior. Inspect source coverage before interpreting scores."
+  ]
+}

@@ -9,7 +9,6 @@ from powdrr_lift.core.instruction_ledger import (
     apply_atomicity_decisions,
     compile_instruction_ledger,
 )
-from powdrr_lift.workrr.command_catalog import _bounded_instruction_context
 
 
 def test_context_retry_uses_existing_unresolved_reasons() -> None:
@@ -71,28 +70,6 @@ def test_local_context_restores_parent_sentence_for_split_clause() -> None:
     )
 
     assert context == {"source_sentence": instruction}
-
-
-def test_atomicity_context_has_paragraph_and_one_neighbor_with_ids() -> None:
-    ledger = compile_instruction_ledger(
-        "context-test",
-        "Before behavior. Split A and B. After behavior.\n\nAnother paragraph.",
-    )
-
-    context = _bounded_instruction_context(ledger, ledger.clauses[1])
-
-    assert context["parent_sentence"] == "Split A and B."
-    assert context["parent_clause_id"] == "instruction-002"
-    assert context["preceding_sentence"] == {
-        "clause_id": "instruction-001",
-        "text": "Before behavior.",
-    }
-    assert context["following_sentence"] == {
-        "clause_id": "instruction-003",
-        "text": "After behavior.",
-    }
-    assert "Split A and B." in context["containing_paragraph"]
-    assert context["paragraph_truncated"] is False
 
 
 def test_classifier_input_adds_context_but_keeps_target_proposition_explicit() -> None:

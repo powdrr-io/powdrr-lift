@@ -249,6 +249,7 @@ def test_bootstrap_cli_emits_one_json_result(tmp_path: Path) -> None:
                 str(root),
                 "--work-item-name",
                 "sample onboarding",
+                "--no-open-pr",
                 "--json",
             ]
         )

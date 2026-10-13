@@ -150,3 +150,54 @@ def test_returns_no_profiles_when_repository_declares_no_validator(
     profiles = discover_validation_profiles(tmp_path)
 
     assert profiles == ()
+
+
+def test_discovers_nested_package_and_ci_checks_with_working_directory(
+    tmp_path: Path,
+) -> None:
+    backend = tmp_path / "backend"
+    backend.mkdir()
+    (backend / "pyproject.toml").write_text(
+        '[project.optional-dependencies]\ndev = ["pytest"]\n', encoding="utf-8"
+    )
+    (backend / "tests").mkdir()
+    mobile = tmp_path / "mobile-web"
+    mobile.mkdir()
+    (mobile / "package.json").write_text(
+        '{"packageManager": "pnpm@10.30.3", '
+        '"scripts": {"test": "vitest run", "lint": "eslint ."}}\n',
+        encoding="utf-8",
+    )
+    workflow = tmp_path / ".github" / "workflows"
+    workflow.mkdir(parents=True)
+    (workflow / "pr.yml").write_text(
+        "jobs:\n  backend:\n    defaults:\n      run:\n"
+        "        working-directory: backend\n    steps:\n"
+        "      - run: uv run python -m pytest tests -q\n",
+        encoding="utf-8",
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+    backend_test = next(
+        profile
+        for profile in profiles
+        if "backend" in profile.name and profile.provider == "pytest"
+    )
+    frontend_test = next(
+        profile
+        for profile in profiles
+        if "mobile-web" in profile.name and profile.provider == "pnpm"
+    )
+
+    assert backend_test.cwd == "backend"
+    assert backend_test.command == (
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "pytest",
+        "tests",
+        "-q",
+    )
+    assert frontend_test.cwd == "mobile-web"
+    assert frontend_test.command == ("pnpm", "test")

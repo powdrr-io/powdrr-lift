@@ -3364,8 +3364,6 @@ def _run_bootstrap(args: argparse.Namespace) -> int:
             print(f"Worktree: {result.task.worktree}")
         if result.bootstrap is not None:
             print(f"Snapshot: {result.bootstrap.output_path}")
-            if result.bootstrap.manifest_path is not None:
-                print(f"Manifest: {result.bootstrap.manifest_path}")
         if result.pull_request_url:
             print(f"Pull request: {result.pull_request_url}")
         if result.report_markdown_path:

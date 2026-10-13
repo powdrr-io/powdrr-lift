@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-import json
 import os
 import re
 import shlex
@@ -115,7 +114,6 @@ class BootstrapResult:
     validation: BootstrapValidationReport
     evidence_files: tuple[str, ...] = field(default_factory=tuple)
     source_manifest: SourceManifest | None = None
-    manifest_path: Path | None = None
     validation_evidence_files: tuple[str, ...] = field(default_factory=tuple)
     report_path: Path | None = None
 
@@ -167,7 +165,6 @@ def bootstrap_structrr(
         repository_name=repository_name,
         validation_files=validation_files,
     )
-    validation = validate_bootstrap_document(document, root=root, taxonomy=taxonomy)
     source_revision_result = subprocess.run(
         ["git", "-C", str(root), "rev-parse", "HEAD"],
         capture_output=True,
@@ -191,6 +188,8 @@ def bootstrap_structrr(
             *artifact_exclusions,
         ),
     )
+    document["source_manifest"] = source_manifest.to_data()
+    validation = validate_bootstrap_document(document, root=root, taxonomy=taxonomy)
     selected_output = (
         Path(output_path) if output_path is not None else _default_output_path(root)
     )
@@ -203,25 +202,19 @@ def bootstrap_structrr(
             yaml.safe_dump(document, sort_keys=False, allow_unicode=False),
             encoding="utf-8",
         )
+        resolved_output.with_suffix(".manifest.json").unlink(missing_ok=True)
     report_path = resolved_output.with_suffix(".md")
     if validation.successful:
         report_path.write_text(
             render_bootstrap_markdown(document, report_path=report_path, root=root),
             encoding="utf-8",
         )
-    manifest_path = resolved_output.with_suffix(".manifest.json")
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(
-        json.dumps(source_manifest.to_data(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
     return BootstrapResult(
         output_path=resolved_output,
         document=document,
         validation=validation,
         evidence_files=tracked_files,
         source_manifest=source_manifest,
-        manifest_path=manifest_path,
         validation_evidence_files=tuple(
             str(item["path"])
             for item in document.get("validation_context", {}).get("evidence", ())

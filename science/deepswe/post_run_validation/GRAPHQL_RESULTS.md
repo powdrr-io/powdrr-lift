@@ -102,33 +102,61 @@ demonstration, not evidence that the method generalizes across tasks.
 ## Live coding-agent run
 
 The first actual Powdrr/Harbor run did **not** produce an agent candidate, so
-it does not answer whether the agent can generate code that passes the saved
+it did not answer whether the agent can generate code that passes the saved
 solution tests. Planning stopped before prompt generation: the phrase `null
 values` in instruction clause 16 activated the `argument_presence` dimension
 screen, and its classifier abstained. Contract compilation then failed with
 `cannot compile a source contract with unresolved decisions:
-argument_presence`. The report records no prompt, no changed paths, and no
-validation command.
-
-Pier's verifier consequently ran against the untouched baseline: **0/17
-feature tests passed**, while **811/811 pre-existing tests passed**. The
-feature failures all report that `AsyncClientSession` has no
-`execute_incremental` method. This is a planner failure followed by a baseline
-score, not an agent implementation result.
-
+argument_presence`. Pier's verifier ran against the untouched baseline:
+**0/17 feature tests passed**, while **811/811 pre-existing tests passed**.
 The artifact set is preserved at
 `/private/tmp/pier-gql-agent-run-20261013-03/graphql-agent-validation-20261013-03/`.
-I added a narrow regression test and fixed the dimension screen so ordinary
-mentions of null list values do not request an argument-presence decision. The
-next run must use that fix and a fresh Pier job root before we can evaluate
-generated code against the saved solution tests.
+I fixed the false-positive screen and added a regression test.
+
+### Generated-code run
+
+The next run reached the coding agent and its repair attempts, then the saved
+DeepSWE verifier tested the resulting candidate. It passed **12/17 feature
+tests (70.6%)** and **811/811 pre-existing tests**; the benchmark reward was
+**0**, since all feature tests must pass. This answers the central question:
+the agent generated a substantial implementation, but it did **not** pass the
+saved solution tests.
+
+The five failing cases identify specific behavior gaps:
+
+- Deferred item errors were not returned in `result.errors`.
+- A later merge at a list-index path lost a previously deferred nested field.
+- A nested object update replaced rather than recursively merged its contents.
+- WebSocket incremental payloads did not fully merge the streamed and deferred
+  list entries.
+- `execute_incremental` did not apply the client's configured `parse_results`
+  conversion.
+
+These failures overlap with explicit instruction clauses (error continuation,
+nested list paths, concurrent deferred/streamed fields, and the incremental
+result contract). A separate post-run question check could turn those clauses
+into small probes and report these misses independently of a coding agent.
+However, this run did not perform a blinded, independent check before reading
+the saved verifier failures, so it does **not** establish that question-based
+validation would have caught them first or added value beyond the solution
+tests. The earlier stream-overlap mutant experiment is still the only direct
+evidence of added value against a behavior absent from the task's test suite.
+
+The full run artifacts, including `verifier/test-stdout.txt`, are preserved at
+`/private/tmp/pier-gql-agent-run-20261013-05/graphql-agent-validation-20261013-05/`.
+The verifier ran 18 new test cases (13 passed, 5 failed); its F2P scoring
+population is 17, which is why the reported metric is 12/17. The agent's own
+repository-wide validation was also noisy: its container lacked `isort` and
+`tox`, and eight unrelated legacy VCR tests errored because the installed
+`aiohttp` removed `AsyncStreamReaderMixin`. Those local-validation errors are
+separate from the saved task verifier result above.
 
 ## Limits and next step
 
-This is a focused, manual review of one saved reference patch, not a coding-agent
-run or a blinded comparison of reviewer prompts. The run used the actual saved
-task test module in the cached `powdrr-science-gql-base:f07c89f8` container;
-the focused test and mutants were temporary and were not committed to the task
-repository. The next experiment should repeat the protocol on more instruction
-clauses and blinded planted mutations, then compare holistic and per-obligation
-reviewers on recall, false alarms, and review cost.
+This is one generated-code run and one saved-solution overlap experiment, not a
+blinded comparison of reviewer prompts. The overlap test and mutants were
+temporary and were not committed to the task repository. To test whether
+question-driven validation helps the coding-agent objective, the next run
+should use the same saved solution suite, generate post-run probes from the
+instruction clauses without looking at verifier outcomes, and measure whether
+those probes detect additional defects or only repeat the saved tests.

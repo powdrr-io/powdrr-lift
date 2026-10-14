@@ -916,8 +916,8 @@ _DIMENSION_APPLICABILITY_PATTERNS: dict[str, re.Pattern[str]] = {
         re.I,
     ),
     "argument_presence": re.compile(
-        r"\b(default|factory|argument|parameter|non-null|not None|null|"
-        r"None|supplied|provided|omitted|omit)\b",
+        r"\b(default|factory|argument|parameter|non-null|not None|"
+        r"supplied|provided|omitted|omit)\b",
         re.I,
     ),
 }

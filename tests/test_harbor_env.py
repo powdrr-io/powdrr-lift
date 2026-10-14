@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from powdrr_lift.integrations.harbor._env import (
+    CODE_AGENT_ENVIRONMENT_KEYS,
     PROVIDER_ENVIRONMENT_KEYS,
     env_flag_is_enabled,
     network_allowlist_domains,
@@ -57,3 +58,7 @@ def test_provider_credentials_are_forwarded_to_the_classifier_process() -> None:
         "SUBQ_MODEL",
         "TAVILY_API_KEY",
     } <= set(PROVIDER_ENVIRONMENT_KEYS)
+
+
+def test_litellm_local_cost_map_setting_is_forwarded_to_the_code_agent() -> None:
+    assert "LITELLM_LOCAL_MODEL_COST_MAP" in CODE_AGENT_ENVIRONMENT_KEYS

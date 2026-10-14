@@ -19,6 +19,11 @@ PROVIDER_ENVIRONMENT_KEYS = (
     "TAVILY_API_KEY",
 )
 
+CODE_AGENT_ENVIRONMENT_KEYS = (
+    *PROVIDER_ENVIRONMENT_KEYS,
+    "LITELLM_LOCAL_MODEL_COST_MAP",
+)
+
 
 def pip_install_command(package: str, *options: str) -> str:
     """Install into an active venv, or use the user site for system Python."""

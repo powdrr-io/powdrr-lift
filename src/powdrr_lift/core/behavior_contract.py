@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
@@ -463,6 +464,53 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
     return "\n".join(lines)
 
 
+def behavior_scenario_probe_findings(
+    scenarios: Sequence[Mapping[str, Any]],
+) -> list[dict[str, str]]:
+    """Find scenario drafts that cannot serve as falsifiable post-run probes.
+
+    This deliberately catches only clear placeholder and tautology patterns.
+    It does not claim that a passing scenario set covers every requirement.
+    """
+    findings: list[dict[str, str]] = []
+    generic_when = {
+        "the instruction's behavior is exercised",
+        "the behavior is exercised",
+        "the implementation is evaluated",
+        "the implementation is tested",
+    }
+    for item in scenarios:
+        scenario_id = str(item.get("scenario_id", "unknown"))
+        given = _probe_text(item.get("given"))
+        when = _probe_text(item.get("when"))
+        then = _probe_text(item.get("then"))
+        reasons: list[str] = []
+        if when in generic_when:
+            reasons.append("when is a generic placeholder, not an operation or event")
+        if given and given == then:
+            reasons.append("given and expected result repeat the same statement")
+        if given.startswith("the implementation is evaluated against:"):
+            premise = given.removeprefix(
+                "the implementation is evaluated against:"
+            ).strip()
+            if premise and premise == then:
+                reasons.append("expected result merely restates the source clause")
+        if reasons:
+            findings.append(
+                {
+                    "scenario_id": scenario_id,
+                    "reason": "; ".join(dict.fromkeys(reasons)),
+                }
+            )
+    return findings
+
+
+def _probe_text(value: Any) -> str:
+    if not isinstance(value, str):
+        return ""
+    return re.sub(r"\s+", " ", value).strip().casefold()
+
+
 def _worker_text(value: Any) -> str:
     """Render structured outcomes as readable prose without schema syntax."""
     if isinstance(value, Mapping):
@@ -593,6 +641,7 @@ __all__ = [
     "ASSUMPTION_BASES",
     "BehaviorContractError",
     "BehaviorScenario",
+    "behavior_scenario_probe_findings",
     "compile_behavior_scenarios",
     "render_behavior_matrix",
     "validate_capability_matrix",

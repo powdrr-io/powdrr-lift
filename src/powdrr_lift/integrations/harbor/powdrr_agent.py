@@ -7,7 +7,7 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from powdrr_lift.integrations.harbor._env import (
-    PROVIDER_ENVIRONMENT_KEYS,
+    CODE_AGENT_ENVIRONMENT_KEYS,
     env_flag_is_enabled,
     network_allowlist_domains,
     pip_install_command,
@@ -241,7 +241,7 @@ class PowdrrAgent(BaseInstalledAgent):
             command.append("--capture-worker-prompts-only")
         provider_env = {
             key: value
-            for key in PROVIDER_ENVIRONMENT_KEYS
+            for key in CODE_AGENT_ENVIRONMENT_KEYS
             if (value := self._get_env(key)) is not None
         }
         for key in ("POWDRR_INSTALL_SPEC", "POWDRR_VERSION", "POWDRR_REVISION"):

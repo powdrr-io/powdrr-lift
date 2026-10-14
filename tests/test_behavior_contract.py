@@ -7,6 +7,7 @@ import pytest
 from powdrr_lift.core.behavior_contract import (
     BEHAVIOR_DIMENSIONS,
     BehaviorContractError,
+    behavior_scenario_probe_findings,
     compile_behavior_scenarios,
     validate_capability_matrix,
 )
@@ -134,6 +135,45 @@ def test_behavior_scenario_round_trips_faithfulness_artifact_provenance() -> Non
     compiled = compile_behavior_scenarios((scenario,))[0]
 
     assert compiled.to_data()["faithfulness_ref"] == scenario["faithfulness_ref"]
+
+
+def test_behavior_probe_quality_flags_tautological_source_fallback() -> None:
+    clause = "The client preserves deferred GraphQL patches."
+
+    assert behavior_scenario_probe_findings(
+        [
+            {
+                "scenario_id": "clause-1",
+                "given": f"The implementation is evaluated against: {clause}",
+                "when": "The instruction's behavior is exercised",
+                "then": clause,
+            }
+        ]
+    ) == [
+        {
+            "scenario_id": "clause-1",
+            "reason": (
+                "when is a generic placeholder, not an operation or event; "
+                "expected result merely restates the source clause"
+            ),
+        }
+    ]
+
+
+def test_behavior_probe_quality_accepts_distinct_observable_assertion() -> None:
+    assert (
+        behavior_scenario_probe_findings(
+            [
+                {
+                    "scenario_id": "patch-error",
+                    "given": "A deferred response contains an item error.",
+                    "when": "The iterator yields the deferred patch.",
+                    "then": "The item appears in the result's errors list.",
+                }
+            ]
+        )
+        == []
+    )
 
 
 def test_worker_prompt_preserves_joint_validation_groups() -> None:

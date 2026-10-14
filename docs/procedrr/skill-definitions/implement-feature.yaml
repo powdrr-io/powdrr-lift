@@ -649,13 +649,14 @@ steps:
         validation: {type: reference, value: validation}
       returns:
         type: object
-        required: [path, fingerprint, deterministic_decisions, semantic_worklist, instruction_coverage_worklist, proposal_fingerprint, diff_fingerprint, observed_diff, operation_ids, retained_clause_ids, actual_diff_path, actual_diff_fingerprint, candidate_checkpoint_path, candidate_comparison_path, candidate_comparison_fingerprint, candidate_structural_gate_passed, candidate_comparison_blockers, candidate_correction_attempts]
+        required: [path, fingerprint, deterministic_decisions, semantic_worklist, instruction_coverage_worklist, behavior_probe_findings, proposal_fingerprint, diff_fingerprint, observed_diff, operation_ids, retained_clause_ids, actual_diff_path, actual_diff_fingerprint, candidate_checkpoint_path, candidate_comparison_path, candidate_comparison_fingerprint, candidate_structural_gate_passed, candidate_comparison_blockers, candidate_correction_attempts]
         properties:
           path: {type: string, minLength: 1}
           fingerprint: {type: string, minLength: 1}
           deterministic_decisions: {type: array, minItems: 1}
           semantic_worklist: {type: object}
           instruction_coverage_worklist: {type: object}
+          behavior_probe_findings: {type: array}
           actual_diff_path: {type: string, minLength: 1}
           actual_diff_fingerprint: {type: string, minLength: 1}
           candidate_checkpoint_path: {type: string, minLength: 1}

@@ -6655,6 +6655,7 @@ def _prepare_final_implementation_review(
         comparison_fingerprint=candidate_comparison["fingerprint"],
         validation=validation,
     )
+    behavior_probe_findings = _candidate_behavior_probe_findings(state)
     specifications.append(
         {
             "decision_id": "unexplained:semantic-change-review",
@@ -6688,6 +6689,12 @@ def _prepare_final_implementation_review(
                 >= config.max_repair_attempts,
                 "blockers": comparison_blockers,
             },
+            {
+                "decision_id": "final:behavior-probe-quality",
+                "check": "instruction_derived_scenarios_are_falsifiable",
+                "passed": not behavior_probe_findings,
+                "findings": behavior_probe_findings,
+            },
         ],
         "semantic_worklist": {"specifications": specifications},
         "invariant_worklist": {"specifications": invariant_specifications},
@@ -6704,6 +6711,7 @@ def _prepare_final_implementation_review(
         "candidate_comparison_fingerprint": candidate_comparison["fingerprint"],
         "candidate_structural_gate_passed": comparison_passed,
         "candidate_comparison_blockers": comparison_blockers,
+        "behavior_probe_findings": behavior_probe_findings,
         "candidate_correction_attempts": int(
             state.get("candidate_correction_attempts", 0)
         ),
@@ -6730,6 +6738,30 @@ def _prepare_final_implementation_review(
         output_root, "final-implementation-review.json", document
     )
     return {"path": path, "fingerprint": fingerprint, **document}
+
+
+def _candidate_behavior_probe_findings(
+    state: Mapping[str, Any],
+) -> list[dict[str, str]]:
+    packet_path = state.get("implementation_packet_path")
+    if not isinstance(packet_path, Path):
+        return []
+    try:
+        packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise PowdrrExecutionError(
+            f"implementation behavior probes cannot be loaded: {error}"
+        ) from error
+    if not isinstance(packet, Mapping):
+        raise PowdrrExecutionError("implementation packet is malformed")
+    scenarios = packet.get("behavior_scenarios", [])
+    if not isinstance(scenarios, list) or not all(
+        isinstance(item, Mapping) for item in scenarios
+    ):
+        raise PowdrrExecutionError("implementation behavior probes are malformed")
+    from powdrr_lift.core.behavior_contract import behavior_scenario_probe_findings
+
+    return behavior_scenario_probe_findings(scenarios)
 
 
 def _instruction_coverage_worklist(
@@ -6970,7 +7002,12 @@ def _correct_candidate_from_structrr_diff(
     coverage_decisions = _flow_items(parameters.get("instruction_coverage_decisions"))
     coverage_gaps = _instruction_coverage_gaps(coverage_specs, coverage_decisions)
     structural_gaps = review.get("candidate_comparison_blockers", [])
-    if review.get("candidate_structural_gate_passed") is True and not coverage_gaps:
+    behavior_probe_findings = _flow_items(review.get("behavior_probe_findings"))
+    if (
+        review.get("candidate_structural_gate_passed") is True
+        and not coverage_gaps
+        and not behavior_probe_findings
+    ):
         return {"done": True, "review": dict(review), "attempts": attempts}
 
     correction_items = [
@@ -6984,6 +7021,13 @@ def _correct_candidate_from_structrr_diff(
             f"(review outcome: {decision.get('outcome')}; "
             f"evidence assessment: {decision.get('explanation')})"
             for specification, decision in coverage_gaps
+        ),
+        *(
+            "Instruction-derived test probe "
+            f"{finding.get('scenario_id')}: {finding.get('reason')}. Derive a "
+            "concrete setup, operation, and observable assertion from the source "
+            "instruction, then add and run a focused test."
+            for finding in behavior_probe_findings
         ),
     ]
     prompt = (

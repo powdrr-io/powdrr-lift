@@ -65,24 +65,30 @@ The remaining verifier failure, `parse_results=True` compatibility, is
 intentionally outside this instruction-derived set because it is an existing
 client API behavior rather than a requirement in the task instruction.
 
-## What this establishes
+## How this fits the pass-rate goal
 
-The final runner is an independent, repeatable post-run check: it passes the
-saved reference control, fails the candidate on three concrete behaviors, and
-maps those failures to requirements in the instruction. The probe diagnostics
-are more directly tied to requirements than a raw verifier failure list and
-can be turned into targeted repair feedback (for example: preserve list-index
-deferred updates when processing a stream, and collect errors attached to
-incremental entries).
+The task verifier is the acceptance check: generated code needs to pass it.
+These probes are a separate post-coding feedback step. Each failure can be
+handed to the coding or repair agent as a concrete requirement, input sequence,
+expected behavior, and observed behavior. For example: “GQL-15b failed: errors
+on an incremental entry were omitted from `.errors`; preserve and surface
+those errors while processing the later sibling entry.” The agent can repair
+against that diagnosis before the task verifier is run again.
 
-This run does **not** establish new candidate coverage beyond the verifier: all
-three candidate probe failures overlap instruction-related verifier failures.
-It also does not show that a repair based on the probes improves the coding
-agent's result, because no repair was run. The errors probe GQL-15b was added
-after the verifier output exposed the missed error shape, so its agreement is
-not an independent discovery. A next experiment should freeze the probe set
-before a fresh coding run, then check both verifier overlap and new failures
-across multiple candidate runs.
+In this experiment, the probes flagged three defects that correspond to
+instruction-relevant task-verifier failures. The saved solution passes all 19
+probes, which is a useful false-positive check. This is the intended signal:
+probes can identify concrete acceptance risks and make them actionable from the
+instruction. We are not trying to replace or outperform the task verifier.
+
+This run does not yet show that probe feedback raises pass rate: we did not send
+the diagnostics to an agent and rerun the task verifier. Also, GQL-15b was
+added after the verifier output exposed that error shape, so that particular
+match is not an independent discovery. The next experiment should freeze the
+probes before a fresh coding run, pass probe failures into a bounded repair
+step, then run the task verifier before and after repair. Repeating this across
+candidate runs will show whether this feedback makes agents pass the solution
+tests more consistently.
 
 ## Reproduction
 

@@ -151,37 +151,41 @@ repository-wide validation was also noisy: its container lacked `isort` and
 `aiohttp` removed `AsyncStreamReaderMixin`. Those local-validation errors are
 separate from the saved task verifier result above.
 
-### Additional validations that target the misses
+### What instruction-derived validation could have caught
 
-For this objective, a post-run check must do more than report structural
-coverage: that review did not localize five runtime misses. These are the
-focused questions I would ask about the candidate, then turn into executable
-checks:
+The input contains enough semantics to derive executable checks for the
+task-level failures. The generated prompt did not do so: its 29
+"scenarios" were tautologies of the form “Given the implementation is evaluated
+against [requirement], when the instruction's behavior is exercised, expect
+[same requirement].” They specified no payload sequence, observable result, or
+assertion. This is why the source clauses did not become useful post-coding
+validation in this run.
 
-| Miss | Post-run question and check | How it can improve the result |
+The actual instruction-to-validation derivation should have been:
+
+| Input clauses | Derivable post-coding probe | Failure this run exposed |
 | --- | --- | --- |
-| Deferred errors disappear | When an incremental entry has `errors` and `data: null`, are those errors exposed on the yielded result, and does iteration continue to a later recovery payload? | Report the missing error propagation and continuation behavior as one repairable defect. |
-| Nested list-path update is later lost | After writing a field at `org.teams[0].members[0]`, does a later update to `org.teams[0]` preserve the earlier field and untouched siblings? | Detect path traversal plus accumulated-state regressions across payload order. |
-| Existing nested value is not updated | When a patch targets `items[0]` with `meta: {v: 10}`, does the accumulated result show `meta.v == 10` while preserving other list entries, including nulls? | Isolate nested merge semantics from list append behavior. |
-| WebSocket result misses incremental fields | Does the WebSocket transport send both `items` and `data` entries through the same accumulator semantics as HTTP, including list-index paths? | Catch transport parity failures with one shared payload fixture run over both transports. |
-| `parse_results` is skipped | With client result parsing enabled, does `execute_incremental` convert custom scalar values the same way as ordinary `execute`? | Catch public API integration gaps that payload-only merge tests do not cover. |
+| `.errors` is part of each result; errors must not halt subsequent items | Send an initial result, then an incremental entry with `errors` and null data, then a recovery entry. Assert the error is observable on a yielded result, the recovery result is still yielded, and accumulated data contains the recovered field. | The candidate yielded no errors, although it continued and recovered. The source clause “must not halt” alone proves liveness; the `.errors` field clause plus saved solution establish error visibility. |
+| Data accumulates; deferred data merges at `path`; nested paths navigate lists by index; fields can be overwritten | Start with a nested list. Apply a patch to `teams[0].members[0]`, then a second patch to `teams[0]`. Assert both new fields survive and untouched siblings remain. Separately patch `items[0]` with `data={"meta":{"v":10}}` and assert `items[0].meta.v` is 10. | Two failures share the list-index update path: the deeply nested `members[0]` field was lost, and a patch at `items[0]` left `meta.v` at 1. This is a path traversal/write defect, not evidence that recursive deep merge is required. The saved solution uses a shallow object update at the target; it still replaces `meta` with the incoming `{v:10}`. |
+| HTTP and WebSocket must support/forward incremental payloads | Replay one semantic payload sequence through each transport and compare yielded result snapshots. Keep the WebSocket protocol envelope around the same `next.payload` sequence. | The WebSocket candidate did not expose the deferred field at `users[0].name`. A transport-parity check localizes whether the loss occurs before or in the shared accumulator. |
+| Stream uses `items`; trailing path integer is the target start index; support nulls and concurrent defer/stream fields | Exercise append, padding, and an interior start index; interleave a streamed item with a deferred field. Assert exact final indices, overwritten positions, and preserved null/unrelated entries. | This is a source-derived check of stream/path semantics. The saved reference resolves the interior-index behavior as replacement (`[a,x,y]`), while the saved task suite had no overlapping-index case; it is an extra coverage check, separate from the five misses in this live run. |
 
-These checks are expected to catch the five failures in this candidate, but they
-would not add test coverage beyond the saved solution suite: the verifier
-already contains these cases. Their practical value here is diagnostic and
-repair-oriented. Feed each failed check, its observed/expected result, and the
-source clause into a bounded repair attempt; then rerun **all 17 saved feature
-tests**. If the five repairs preserve the 12 existing passes, the target moves
-from 12/17 to 17/17. A check by itself cannot raise F2P; the repair-and-rerun
-step is necessary.
+The fifth failure, custom-scalar conversion when `parse_results=True`, is not
+stated in the new task text. It was derivable only by inspecting the existing
+`Client.execute` contract and checking that the new sibling API preserves that
+option. This should be a separate repository-compatibility validation, not
+misrepresented as instruction-derived.
 
-To establish independent value, the next trial should freeze these questions
-from the instruction before opening verifier output, run them against the
-candidate, and record whether they predict the eventual saved-test failures.
-Then let the coding agent repair from only those diagnostics and measure the
-saved F2P score. The current trial did not do that ordering, so it demonstrates
-five actionable checks, but not yet that the question process found them
-independently or improved the score.
+These probes could have identified and localized the five failures before the
+saved verifier ran. Because the saved suite already contains equivalent cases,
+they add no coverage on this particular task. To improve the 12/17 score, their
+results must be routed into a repair attempt, followed by the full saved feature
+suite. The next experiment should generate and freeze the concrete payload
+traces from the source instructions before seeing verifier output, run them on
+the candidate, send only those diagnostics to a bounded repair attempt, and
+measure whether saved F2P rises. This run's generated tautological scenarios
+provide direct evidence that we did not implement that process; the run does
+not show that the proposed question-to-probe process itself raised F2P.
 
 ## Limits and next step
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import re
 import time
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -14,6 +16,28 @@ from jsonschema import validate as validate_json
 
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from procedrr.fragments import apply_fragment_step_json, start_fragment
+
+_PROVIDER_CREDENTIAL_RE = re.compile(
+    r"(?i)((?:api[_-]?key|access[_-]?key|secret|password|token|authorization)"
+    r"\s*[:=]\s*[\"']?)[^\s,}\"']+"
+)
+_PROVIDER_TOKEN_RE = re.compile(
+    r"(?:ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
+    r"AKIA[0-9A-Z]{16}|Bearer\s+[A-Za-z0-9._-]{20,}|sk-[A-Za-z0-9_-]{20,})"
+)
+
+
+def _safe_provider_error(error: Exception) -> str:
+    """Return bounded provider diagnostics with common credential forms removed."""
+    message = " ".join(str(error).split())
+    for name, secret in os.environ.items():
+        if secret and any(
+            marker in name.upper() for marker in ("KEY", "TOKEN", "SECRET", "PASSWORD")
+        ):
+            message = message.replace(secret, "[redacted]")
+    message = _PROVIDER_CREDENTIAL_RE.sub(r"\1[redacted]", message)
+    message = _PROVIDER_TOKEN_RE.sub("[redacted]", message)
+    return message[:500]
 
 
 class ProcedrrResponseError(RuntimeError):
@@ -182,6 +206,13 @@ class WorkrrProcedrrClient:
                     started,
                     outcome="retrying" if will_retry else "failed",
                     error_type=type(exc).__name__,
+                    error_module=type(exc).__module__,
+                    error_message=_safe_provider_error(exc),
+                    error_status_code=(
+                        getattr(exc, "status_code", None)
+                        if type(getattr(exc, "status_code", None)) is int
+                        else None
+                    ),
                     retryable=retryable,
                 )
                 if not retryable:
@@ -199,6 +230,9 @@ class WorkrrProcedrrClient:
         *,
         outcome: str,
         error_type: str | None = None,
+        error_module: str | None = None,
+        error_message: str | None = None,
+        error_status_code: int | None = None,
         retryable: bool | None = None,
     ) -> None:
         if self._telemetry_sink is None:
@@ -225,6 +259,9 @@ class WorkrrProcedrrClient:
                 "duration_ms": round((time.monotonic() - started) * 1000),
                 "outcome": outcome,
                 "error_type": error_type,
+                "error_module": error_module,
+                "error_message": error_message,
+                "error_status_code": error_status_code,
                 "retryable": retryable,
             }
         )

@@ -1,0 +1,39 @@
+{
+  "repository_revision": "60e3e2f1258fdd2a2689403774e56415919654e4",
+  "task_id": "gql-incremental-graphql-delivery",
+  "task_base_sha": "f07c89f8f065010a36b4263eded209b2b1d37063",
+  "task_checkout_status": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "analysis_container": "powdrr-gql-contracts-20261012-c",
+  "analysis_image": "powdrr-science-gql-contracts:20261012-c",
+  "analysis_image_id": "sha256:c105b9fbd6b4ac3215ca3e90e174a6201202055c73959d8f7a75aab5d2612d9e",
+  "network": "none",
+  "read_only": true,
+  "solution_and_tests_mounted": false,
+  "tests_run": false,
+  "coding_agents_run": false,
+  "model_providers": [
+    "deepinfra",
+    "typesafe.ai"
+  ],
+  "postrun_oracle_audit": {
+    "solution_patch_sha256": "65d77639c640cde71e5e867089b4bfd55140e9e7d418183c3cb9df570ade30db",
+    "validation_patch_sha256": "031de3d902d74cdc8ef142886d5aca3342ff63611a3a903797f3e8d6fb413670",
+    "patches_passed_to_models": false
+  },
+  "experiment": "atomic-criteria-with-requirement-scoped-source",
+  "input_sha256": "a6cad74c22efdcbabaa6a6f73979a2b9b20ecbc2e0a30e81883790535179ce0b",
+  "evidence_summary_sha256": "7f1f47dbaf370c30e15faaea500202dcf6dc0b69c3d251c2046fc57ecd5cba87",
+  "pipeline_sha256": "9a7c32737b7de8d479dfdeb5cd28a3a19c3216bfea6f73baf3d71886b3a830d5",
+  "prompt_sha256": "dbd41a86f8c27e7af12cbbc37017822286376852b0c1b582ce29a4e890c1c49e",
+  "provider_calls": 115,
+  "provider_failures": 0,
+  "criteria_emitted": 0,
+  "source_code_sha256": {
+    "symbols.py": "93e2def84d34852db8915430eab8ef7c286fa7a59cddcd0b16a1c47ac9586fef",
+    "requirement_evidence.py": "c00d6d2b7a91e7d6ec3dc77a20c7a5e25d9ddf8905a6b0f3dd5860d176193dcf",
+    "atomic_conditions.py": "024bbe7ac8e0cc34053d42037c4ee60edf2b2f6528da140424736bf6c1457e98"
+  }
+}

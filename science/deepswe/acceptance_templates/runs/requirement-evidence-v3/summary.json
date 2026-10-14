@@ -1,0 +1,294 @@
+{
+  "base": {
+    "head": "f07c89f8f065010a36b4263eded209b2b1d37063",
+    "status": ""
+  },
+  "requirements": 23,
+  "symbol_count": 1589,
+  "per_requirement": [
+    {
+      "requirement_id": "r001",
+      "matching_symbols": 381,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 1,
+      "top_sources": [
+        "gql/dsl.py:DSLDirectable.is_valid_directive:465",
+        "gql/dsl.py:DSLDirective.args:400",
+        "gql/utilities/get_introspection_query_ast.py:get_introspection_query_ast:8"
+      ]
+    },
+    {
+      "requirement_id": "r002",
+      "matching_symbols": 384,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 2,
+      "top_sources": [
+        "gql/transport/aiohttp.py:AIOHTTPTransport:45",
+        "gql/dsl.py:DSLDirectable.is_valid_directive:465",
+        "gql/dsl.py:DSLDirective.args:400"
+      ]
+    },
+    {
+      "requirement_id": "r003",
+      "matching_symbols": 1203,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 0,
+      "top_sources": [
+        "gql/client.py:AsyncClientSession._subscribe:1290",
+        "gql/client.py:AsyncClientSession.subscribe:1395",
+        "gql/client.py:AsyncClientSession.subscribe:1360"
+      ]
+    },
+    {
+      "requirement_id": "r004",
+      "matching_symbols": 922,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 0,
+      "top_sources": [
+        "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_response:489",
+        "gql/transport/aiohttp.py:AIOHTTPTransport.subscribe:425",
+        "gql/client.py:AsyncClientSession.subscribe:1395"
+      ]
+    },
+    {
+      "requirement_id": "r005",
+      "matching_symbols": 577,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 2,
+      "top_sources": [
+        "gql/transport/exceptions.py:TransportQueryError.__init__:41",
+        "gql/utilities/get_introspection_query_ast.py:get_introspection_query_ast:8",
+        "gql/dsl.py:dsl_gql:1470"
+      ]
+    },
+    {
+      "requirement_id": "r006",
+      "matching_symbols": 402,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 3,
+      "top_sources": [
+        "gql/transport/aiohttp_websockets.py:AIOHTTPWebsocketsTransport.__init__:19",
+        "gql/transport/aiohttp.py:AIOHTTPTransport._prepare_file_uploads:207",
+        "gql/transport/httpx.py:_HTTPXTransport._prepare_file_uploads:92"
+      ]
+    },
+    {
+      "requirement_id": "r007",
+      "matching_symbols": 270,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 6,
+      "top_sources": [
+        "gql/transport/aiohttp_websockets.py:AIOHTTPWebsocketsTransport.__init__:19",
+        "gql/transport/websockets.py:WebsocketsTransport.__init__:18",
+        "gql/transport/websockets_protocol.py:WebsocketsProtocolTransportBase.__init__:35"
+      ]
+    },
+    {
+      "requirement_id": "r008",
+      "matching_symbols": 337,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 4,
+      "top_sources": [
+        "gql/utilities/parse_result.py:ParseResultVisitor.enter_field:170",
+        "gql/utilities/parse_result.py:ParseResultVisitor.leave_field:286",
+        "gql/dsl.py:DSLField.__init__:1084"
+      ]
+    },
+    {
+      "requirement_id": "r009",
+      "matching_symbols": 65,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 2,
+      "top_sources": [
+        "gql/transport/common/listener_queue.py:ListenerQueue.put:46",
+        "gql/transport/aiohttp.py:AIOHTTPTransport:45",
+        "gql/transport/httpx.py:_HTTPXTransport._prepare_file_uploads:92"
+      ]
+    },
+    {
+      "requirement_id": "r010",
+      "matching_symbols": 334,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 2,
+      "top_sources": [
+        "gql/utilities/parse_result.py:ParseResultVisitor.enter_field:170",
+        "gql/utilities/parse_result.py:ParseResultVisitor.leave_field:286",
+        "gql/utilities/parse_result.py:ParseResultVisitor:65"
+      ]
+    },
+    {
+      "requirement_id": "r011",
+      "matching_symbols": 388,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 2,
+      "top_sources": [
+        "gql/utilities/parse_result.py:ParseResultVisitor.__init__:66",
+        "gql/utilities/parse_result.py:ParseResultVisitor.enter_field:170",
+        "gql/utilities/get_introspection_query_ast.py:get_introspection_query_ast:8"
+      ]
+    },
+    {
+      "requirement_id": "r012",
+      "matching_symbols": 306,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 2,
+      "top_sources": [
+        "gql/utilities/parse_result.py:ParseResultVisitor.enter_field:170",
+        "gql/utilities/parse_result.py:ParseResultVisitor.leave_field:286",
+        "gql/utilities/parse_result.py:ParseResultVisitor:65"
+      ]
+    },
+    {
+      "requirement_id": "r013",
+      "matching_symbols": 423,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 2,
+      "top_sources": [
+        "gql/transport/file_upload.py:extract_files.recurse_extract:86",
+        "gql/utilities/parse_result.py:ParseResultVisitor.enter_field:170",
+        "gql/utilities/parse_result.py:_ignore_non_null:47"
+      ]
+    },
+    {
+      "requirement_id": "r014",
+      "matching_symbols": 140,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 2,
+      "top_sources": [
+        "gql/transport/file_upload.py:extract_files.recurse_extract:86",
+        "gql/utilities/parse_result.py:ParseResultVisitor.enter_field:170",
+        "gql/utilities/parse_result.py:ParseResultVisitor.get_current_result_type:151"
+      ]
+    },
+    {
+      "requirement_id": "r015",
+      "matching_symbols": 1,
+      "selected": 1,
+      "anchors": [],
+      "truncated_sources": 0,
+      "top_sources": [
+        "tests/test_aiohttp_multipart.py:create_multipart_response:33"
+      ]
+    },
+    {
+      "requirement_id": "r016",
+      "matching_symbols": 352,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 3,
+      "top_sources": [
+        "gql/transport/common/base.py:SubscriptionTransportBase._handle_answer:252",
+        "gql/transport/phoenix_channel_websockets.py:PhoenixChannelWebsocketsTransport._handle_answer:391",
+        "gql/transport/websockets_protocol.py:WebsocketsProtocolTransportBase._handle_answer:458"
+      ]
+    },
+    {
+      "requirement_id": "r017",
+      "matching_symbols": 244,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 5,
+      "top_sources": [
+        "gql/client.py:AsyncClientSession.subscribe:1395",
+        "gql/transport/aiohttp_websockets.py:AIOHTTPWebsocketsTransport.__init__:19",
+        "gql/transport/websockets_protocol.py:WebsocketsProtocolTransportBase._parse_answer_graphqlws:259"
+      ]
+    },
+    {
+      "requirement_id": "r018",
+      "matching_symbols": 525,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 3,
+      "top_sources": [
+        "gql/transport/common/listener_queue.py:ListenerQueue.put:46",
+        "gql/transport/phoenix_channel_websockets.py:PhoenixChannelWebsocketsTransport._parse_answer._required_subscription_id:245",
+        "gql/transport/aiohttp_websockets.py:AIOHTTPWebsocketsTransport.__init__:19"
+      ]
+    },
+    {
+      "requirement_id": "r019",
+      "matching_symbols": 855,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 2,
+      "top_sources": [
+        "gql/transport/requests.py:RequestsHTTPTransport:41",
+        "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_part:532",
+        "gql/transport/aiohttp.py:AIOHTTPTransport._parse_multipart_response:489"
+      ]
+    },
+    {
+      "requirement_id": "r020",
+      "matching_symbols": 1055,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 1,
+      "top_sources": [
+        "gql/transport/common/adapters/aiohttp.py:AIOHTTPWebSocketsAdapter.__init__:21",
+        "gql/transport/common/adapters/aiohttp.py:AIOHTTPWebSocketsAdapter.close:244",
+        "gql/transport/common/adapters/aiohttp.py:AIOHTTPWebSocketsAdapter.connect:121"
+      ]
+    },
+    {
+      "requirement_id": "r021",
+      "matching_symbols": 1066,
+      "selected": 9,
+      "anchors": [],
+      "truncated_sources": 4,
+      "top_sources": [
+        "gql/transport/websockets_protocol.py:WebsocketsProtocolTransportBase.__init__:35",
+        "gql/transport/websockets_protocol.py:WebsocketsProtocolTransportBase.send_ping:158",
+        "gql/transport/websockets_protocol.py:WebsocketsProtocolTransportBase.send_pong:168"
+      ]
+    },
+    {
+      "requirement_id": "r022",
+      "matching_symbols": 202,
+      "selected": 9,
+      "anchors": [
+        "gql/dsl.py:DSLFragment.spread:1387",
+        "gql/dsl.py:DSLFragmentSpread:1306",
+        "gql/dsl.py:DSLFragment:1352"
+      ],
+      "truncated_sources": 0,
+      "top_sources": [
+        "gql/dsl.py:DSLFragment.spread:1387",
+        "gql/dsl.py:DSLFragmentSpread:1306",
+        "gql/dsl.py:DSLFragment:1352"
+      ]
+    },
+    {
+      "requirement_id": "r023",
+      "matching_symbols": 490,
+      "selected": 9,
+      "anchors": [
+        "gql/dsl.py:DSLField:1069"
+      ],
+      "truncated_sources": 1,
+      "top_sources": [
+        "gql/dsl.py:DSLField:1069",
+        "gql/dsl.py:DSLField.name:1117",
+        "gql/dsl.py:DSLField.__call__:1122"
+      ]
+    }
+  ],
+  "retrieval": "Whole-index lexical retrieval per routed requirement; exact CamelCase receiver terms are expanded and prioritized.",
+  "oracle_access": false,
+  "tests_run": false,
+  "coding_agents_run": false
+}

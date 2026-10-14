@@ -14,16 +14,22 @@ STOP = frozenset(
     (
         "a an the to of in on and or with from for by be as is must should "
         "support implements implement optional existing new both using given "
-        "when then result field fields"
+        "when then result critical essential incrementally non send server while "
+        "first streaming"
     ).split()
 )
 
 
 def terms(text: str) -> set[str]:
-    text = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", text)
+    # Retain whole identifiers (e.g. ``DSLFragmentSpread``) and add their
+    # component words (``DSL``, ``Fragment``, ``Spread``) for prose matching.
+    complete = re.findall(r"[a-zA-Z][a-zA-Z0-9]*", text.lower())
+    split = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", text)
+    split = re.sub(r"([A-Z])([A-Z][a-z])", r"\1 \2", split)
+    words = complete + re.findall(r"[a-zA-Z][a-zA-Z0-9]*", split.lower())
     return {
         t.rstrip("s") if len(t) > 4 and t.endswith("s") else t
-        for t in re.findall(r"[a-zA-Z][a-zA-Z0-9]*", text.lower())
+        for t in words
         if len(t) > 1 and t not in STOP
     }
 
@@ -119,6 +125,18 @@ def extract(root: Path, paths: list[str]) -> dict[str, Any]:
 
 def retrieve(index: dict[str, Any], requirement: str) -> dict[str, Any]:
     symbols = index["symbols"]
+    query = terms(requirement)
+    # If prose names all the words in a CamelCase API receiver, index that
+    # whole receiver too. This helps "DSL ... list fields" find DSLField while
+    # retaining the ordinary lexical matches and their ranked alternatives.
+    receiver_terms: set[str] = set()
+    for row in symbols:
+        parts = re.findall(r"[A-Z]+(?=[A-Z][a-z]|$)|[A-Z]?[a-z]+|[0-9]+", row["name"])
+        normalized = [part.lower() for part in parts]
+        if 1 < len(normalized) <= 4 and set(normalized) <= query:
+            receiver_terms.add("".join(normalized))
+    query.discard("field")
+    query.update(receiver_terms)
     documents = [
         terms(
             " ".join(
@@ -134,7 +152,6 @@ def retrieve(index: dict[str, Any], requirement: str) -> dict[str, Any]:
         for r in symbols
     ]
     counts = Counter(t for document in documents for t in document)
-    query = terms(requirement)
     scores = []
     for row, document in zip(symbols, documents, strict=True):
         matched = query & document

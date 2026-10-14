@@ -105,6 +105,31 @@ from powdrr_lift.workrr.uncertainty_decisions import (
 from procedrr.command_catalog import CommandCatalog, CommandSpec, object_schema
 
 
+def _split_source_context(
+    ledger: InstructionLedger, clause_ordinal: int
+) -> dict[str, str] | None:
+    """Return the source sentence and adjacent sentences for a split request."""
+    context: dict[str, str] = {}
+    for key, index in (
+        ("previous_sentence", clause_ordinal - 2),
+        ("source_sentence", clause_ordinal - 1),
+        ("next_sentence", clause_ordinal),
+    ):
+        if not 0 <= index < len(ledger.clauses):
+            continue
+        start, end = ledger.clauses[index].source_span
+        text = ledger.source.text[start:end].strip()
+        if text:
+            context[key] = text
+    if not context or (
+        context.get("source_sentence") == ledger.clauses[clause_ordinal - 1].text
+        and "previous_sentence" not in context
+        and "next_sentence" not in context
+    ):
+        return None
+    return context
+
+
 def feature_command_catalog(
     implementations: Mapping[str, Callable[[Mapping[str, Any]], Any]] | None = None,
 ) -> CommandCatalog:
@@ -1508,7 +1533,16 @@ class FeatureCommandRuntime:
             state["atomicity_decisions"] = decisions
             return {
                 "split_requests": [
-                    {"clause": clause.to_data()}
+                    {
+                        "clause": clause.to_data(),
+                        "source_context": _split_source_context(ledger, clause.ordinal),
+                        "source_context_instruction": (
+                            "Use this adjacent source text only to resolve references, "
+                            "conditions, and shared terminology in the clause being "
+                            "split. Do not split or add requirements from neighboring "
+                            "sentences."
+                        ),
+                    }
                     for clause, is_multiple in zip(
                         ledger.clauses, multiple, strict=True
                     )

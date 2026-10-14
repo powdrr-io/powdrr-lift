@@ -1,0 +1,7 @@
+*
+!.gitignore
+!RESULTS.md
+!summary.json
+!provenance.json
+!checkpoints.tar.gz
+!checkpoints.json

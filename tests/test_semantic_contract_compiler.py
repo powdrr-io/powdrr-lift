@@ -100,6 +100,15 @@ def test_dimension_screen_skips_ordinary_clauses() -> None:
     )
 
 
+def test_null_list_values_do_not_trigger_argument_presence_dimension() -> None:
+    source = (
+        "Support nested paths navigating through lists by index, null values, "
+        "field overwrites, and concurrent deferred/streamed fields."
+    )
+
+    assert "argument_presence" not in applicable_source_semantic_dimensions(source)
+
+
 def test_dimension_classifiers_are_requested_only_for_relevant_clauses() -> None:
     clause = _clause("Create a fresh copy of the defaults.")
     root_plan = prepare_source_semantic_decisions(clause, created_at=NOW)

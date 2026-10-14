@@ -151,6 +151,38 @@ repository-wide validation was also noisy: its container lacked `isort` and
 `aiohttp` removed `AsyncStreamReaderMixin`. Those local-validation errors are
 separate from the saved task verifier result above.
 
+### Additional validations that target the misses
+
+For this objective, a post-run check must do more than report structural
+coverage: that review did not localize five runtime misses. These are the
+focused questions I would ask about the candidate, then turn into executable
+checks:
+
+| Miss | Post-run question and check | How it can improve the result |
+| --- | --- | --- |
+| Deferred errors disappear | When an incremental entry has `errors` and `data: null`, are those errors exposed on the yielded result, and does iteration continue to a later recovery payload? | Report the missing error propagation and continuation behavior as one repairable defect. |
+| Nested list-path update is later lost | After writing a field at `org.teams[0].members[0]`, does a later update to `org.teams[0]` preserve the earlier field and untouched siblings? | Detect path traversal plus accumulated-state regressions across payload order. |
+| Existing nested value is not updated | When a patch targets `items[0]` with `meta: {v: 10}`, does the accumulated result show `meta.v == 10` while preserving other list entries, including nulls? | Isolate nested merge semantics from list append behavior. |
+| WebSocket result misses incremental fields | Does the WebSocket transport send both `items` and `data` entries through the same accumulator semantics as HTTP, including list-index paths? | Catch transport parity failures with one shared payload fixture run over both transports. |
+| `parse_results` is skipped | With client result parsing enabled, does `execute_incremental` convert custom scalar values the same way as ordinary `execute`? | Catch public API integration gaps that payload-only merge tests do not cover. |
+
+These checks are expected to catch the five failures in this candidate, but they
+would not add test coverage beyond the saved solution suite: the verifier
+already contains these cases. Their practical value here is diagnostic and
+repair-oriented. Feed each failed check, its observed/expected result, and the
+source clause into a bounded repair attempt; then rerun **all 17 saved feature
+tests**. If the five repairs preserve the 12 existing passes, the target moves
+from 12/17 to 17/17. A check by itself cannot raise F2P; the repair-and-rerun
+step is necessary.
+
+To establish independent value, the next trial should freeze these questions
+from the instruction before opening verifier output, run them against the
+candidate, and record whether they predict the eventual saved-test failures.
+Then let the coding agent repair from only those diagnostics and measure the
+saved F2P score. The current trial did not do that ordering, so it demonstrates
+five actionable checks, but not yet that the question process found them
+independently or improved the score.
+
 ## Limits and next step
 
 This is one generated-code run and one saved-solution overlap experiment, not a

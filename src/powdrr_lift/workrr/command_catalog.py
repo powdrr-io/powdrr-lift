@@ -1696,26 +1696,50 @@ class FeatureCommandRuntime:
                     f"benchmark invariant fallback for {clause_id!r} has no "
                     "source semantic contract"
                 )
-            fallback_design = _benchmark_invariant_design(clause, partial_contract)
+            capture_prompts_only = bool(
+                config is not None
+                and getattr(config, "capture_worker_prompts_only", False)
+            )
+            fallback_design = _benchmark_invariant_design(
+                clause,
+                partial_contract,
+                allow_unresolved=capture_prompts_only,
+            )
             dimensions = {name: "not_applicable" for name in BEHAVIOR_DIMENSIONS}
             dimensions["normal_result"] = (
                 "unresolved: derive an observable result from the full instruction "
                 "and repository evidence"
+                if capture_prompts_only
+                else text
             )
-            scenario = {
-                "status": "needs_clarification",
-                "unresolved_dimensions": ["normal_result"],
+            scenario: dict[str, Any] = {
+                "status": "needs_clarification" if capture_prompts_only else "resolved",
+                "unresolved_dimensions": ["normal_result"]
+                if capture_prompts_only
+                else [],
                 "scenario": {
-                    "subject": "The requirement described by the source clause",
+                    "subject": (
+                        "The requirement described by the source clause"
+                        if capture_prompts_only
+                        else "The source instruction"
+                    ),
                     "given": (
                         "The complete instruction and relevant repository evidence "
                         "are available"
+                        if capture_prompts_only
+                        else f"The implementation is evaluated against: {text}"
                     ),
-                    "when": "The requirement is translated into an acceptance check",
+                    "when": (
+                        "The requirement is translated into an acceptance check"
+                        if capture_prompts_only
+                        else "The instruction's behavior is exercised"
+                    ),
                     "then": (
                         "Unresolved: derive the observable result without treating "
                         "the source sentence as its own expected result. Source: "
                         f"{text}"
+                        if capture_prompts_only
+                        else text
                     ),
                     "dimensions": dimensions,
                     "related_requirements": [],
@@ -1725,8 +1749,11 @@ class FeatureCommandRuntime:
             }
             return _merge_behavior_scenario_values(
                 {"clause": clause, "design": fallback_design, "scenario": scenario},
-                allow_clarification=True,
-                uncertainty_policy="clarify",
+                allow_clarification=capture_prompts_only,
+                uncertainty_policy=(
+                    "clarify" if capture_prompts_only else "normative_default"
+                ),
+                benchmark_mode=not capture_prompts_only,
             )
 
         def merge_behavior_scenario_operation() -> Any:
@@ -3598,7 +3625,10 @@ class FeatureCommandRuntime:
 
 
 def _benchmark_invariant_design(
-    clause: Mapping[str, Any], partial_contract: Mapping[str, Any]
+    clause: Mapping[str, Any],
+    partial_contract: Mapping[str, Any],
+    *,
+    allow_unresolved: bool = False,
 ) -> dict[str, Any]:
     """Keep source-contract fields when benchmark mode falls back to an invariant."""
     text = clause.get("text")
@@ -3619,6 +3649,19 @@ def _benchmark_invariant_design(
             "operation": supported_check["operation"],
             "oracle": supported_check["oracle"],
             "evidence_case": supported_check["case"],
+            "acceptance_status": "resolved",
+            "partial_contract": dict(partial_contract),
+        }
+    if not allow_unresolved:
+        return {
+            "kind": "invariant",
+            "description": text,
+            "acceptance_criterion": text,
+            "expected_test": f"Exercise the behavior stated by the source: {text}",
+            "population": "The source instruction",
+            "operation": "Exercise the behavior described by the source instruction",
+            "oracle": text,
+            "evidence_case": text,
             "acceptance_status": "resolved",
             "partial_contract": dict(partial_contract),
         }

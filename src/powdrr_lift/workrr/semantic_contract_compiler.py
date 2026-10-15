@@ -893,6 +893,7 @@ SEMANTIC_DIMENSION_DEFINITIONS: dict[str, ClassifierDefinition] = {
 
 _DIMENSION_APPLICABILITY_PATTERNS: dict[str, re.Pattern[str]] = {
     "copy_depth": re.compile(
+        r"\bdeep(?:ly)? duplicate\b|"
         r"\b(copy|copies|copied|copying|clone|clones|cloned|replicate|"
         r"replicates)\b",
         re.I,
@@ -916,8 +917,8 @@ _DIMENSION_APPLICABILITY_PATTERNS: dict[str, re.Pattern[str]] = {
         re.I,
     ),
     "argument_presence": re.compile(
-        r"\b(default|factory|argument|parameter|optional|non-null|not None|null|"
-        r"None|supplied|provided)\b",
+        r"\b(default|factory|argument|parameter|optional|non-null|not None|"
+        r"supplied|provided)\b",
         re.I,
     ),
 }

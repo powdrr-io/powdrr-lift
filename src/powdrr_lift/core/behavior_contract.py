@@ -358,6 +358,17 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
         item for item in scenarios if item.routing in {"include", "include_prohibition"}
     ]
     unclear_scenarios = [item for item in scenarios if item.routing == "unclear"]
+    if any(item.unresolved_dimensions for item in implementation_scenarios):
+        lines.extend(
+            (
+                "Some source requirements do not yet have a verified observable "
+                "result. For each check marked unresolved, use the complete "
+                "instruction and repository evidence to derive the most "
+                "source-supported testable behavior. Continue without waiting for "
+                "clarification, and report any interpretation you had to make.",
+                "",
+            )
+        )
     related_requirements: list[str] = []
     seen_related_requirements: set[str] = set()
     for index, item in enumerate(implementation_scenarios, start=1):

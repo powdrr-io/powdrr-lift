@@ -1,5 +1,45 @@
 # Acceptance criteria template experiment
 
+The [source-bound stages experiment](runs/source-bound-discovery-v1/README.md)
+does not improve automatic discovery: two of the same 18 target distinctions get
+fully correct clarifications, and 17 emitted criteria are incorrect or overbroad.
+A matched diagnostic removing intermediate records recovers only one consensus
+decision. The report recommends testing concrete scenarios before policy choices.
+
+The [automatic-discovery experiment](runs/automatic-discovery-v1/README.md)
+finds that generating questions and answer choices loses the gains from manually
+supplied decisions: 16/48 pairs lack a safe complete choice, and nine agreed
+clarifications conflict with the solution or add unsupported guarantees. The
+next experiment should separate source-bound facts and conditions from choices.
+
+The [decision-instruction experiment](runs/decision-instructions-v1/README.md)
+compares current wording, consistency-focused questions and contrasting examples.
+On audited GraphQL/Bandit evaluation decisions, Flash improves from five correct
+out of ten to nine; examples add no further gain. Streaming-index semantics
+remain wrong, and a manually authored option overstates extensions behavior.
+
+The [complete-prompt comparison](runs/full-prompt-comparison-v1/README.md)
+finds that preserving the original requirements plus three directly rendered
+clarifications removes contradictions but loses substantial semantic coverage.
+It includes full candidate/reference prompts and a per-target comparison.
+
+The [direct-rendering experiment](runs/deterministic-decisions-v1/README.md)
+removes contract synthesis, preserves selected meanings, and explicitly asks
+about inherited behavior. Three focused statements match the solution; metadata
+container protection and nested freezing remain unresolved.
+
+The [narrow-question experiment](runs/narrow-questions-v1/README.md) compares
+direct analysis, fact/scope decomposition, and concrete observations with
+independent Flash/Jev choices on three known Koota failures. Two target choices
+recover; shallow freezing and evidence accuracy remain incomplete.
+
+The newer [operation-analysis experiment](runs/operation-analysis-v1/README.md)
+evaluates decision extraction before acceptance-criteria generation using Koota
+composite aspects. It treats the solution as the authoritative target, compares
+instruction-only and repository-grounded analysis, and records where focused
+questions help and final prompt rewriting loses detail. It does not use catalog
+matching.
+
 A standalone science runner for the [template catalog proposal](../../../docs/plans/acceptance-criteria-template-catalog-proposal.md). Its original pilot compares direct acceptance-criteria generation with whole-catalog selection, source-based slot binding, and deterministic rendering. A separate production-routed experiment feeds the production ledger, atomicity judge, splitter, and JEV router into template matching; it does not change the production prompt or Structrr diff paths.
 
 The initial dataset has four tasks from repository families outside the twelve used to design the catalog: cattrs partial structuring, Helm merge strategies, Koota entity snapshots, and dateutil timezone interoperability. There are 91 agent-authored source-based reference validations, prepared before inspecting generated criteria. These are development evaluation labels, not human gold and not an untouched final holdout after this experiment.

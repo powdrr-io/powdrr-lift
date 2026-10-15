@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -695,8 +696,14 @@ def feature_command_catalog(
                 additional_properties=False,
             ),
             output_schema=object_schema(
-                {"passed": {"type": "boolean"}},
-                required=("passed",),
+                {
+                    "passed": {"type": "boolean"},
+                    "deferred_unresolved": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                },
+                required=("passed", "deferred_unresolved"),
                 additional_properties=False,
             ),
             logic=implementations.get("assert_feature_design_ready_for_implementation"),
@@ -1631,6 +1638,7 @@ class FeatureCommandRuntime:
                 "clause_id": clause_id,
                 "source_text": text,
                 "reason": reason,
+                "resolution_status": "unresolved",
                 "disposition": "invariant",
                 "details": dict(details or {}),
             }
@@ -1690,15 +1698,25 @@ class FeatureCommandRuntime:
                 )
             fallback_design = _benchmark_invariant_design(clause, partial_contract)
             dimensions = {name: "not_applicable" for name in BEHAVIOR_DIMENSIONS}
-            dimensions["normal_result"] = text
+            dimensions["normal_result"] = (
+                "unresolved: derive an observable result from the full instruction "
+                "and repository evidence"
+            )
             scenario = {
-                "status": "resolved",
-                "unresolved_dimensions": [],
+                "status": "needs_clarification",
+                "unresolved_dimensions": ["normal_result"],
                 "scenario": {
-                    "subject": "The source instruction",
-                    "given": f"The implementation is evaluated against: {text}",
-                    "when": "The instruction's behavior is exercised",
-                    "then": text,
+                    "subject": "The requirement described by the source clause",
+                    "given": (
+                        "The complete instruction and relevant repository evidence "
+                        "are available"
+                    ),
+                    "when": "The requirement is translated into an acceptance check",
+                    "then": (
+                        "Unresolved: derive the observable result without treating "
+                        "the source sentence as its own expected result. Source: "
+                        f"{text}"
+                    ),
                     "dimensions": dimensions,
                     "related_requirements": [],
                     "assumptions": [],
@@ -1707,7 +1725,8 @@ class FeatureCommandRuntime:
             }
             return _merge_behavior_scenario_values(
                 {"clause": clause, "design": fallback_design, "scenario": scenario},
-                benchmark_mode=True,
+                allow_clarification=True,
+                uncertainty_policy="clarify",
             )
 
         def merge_behavior_scenario_operation() -> Any:
@@ -1740,6 +1759,7 @@ class FeatureCommandRuntime:
                 try:
                     return _merge_behavior_scenario_values(
                         call_parameters,
+                        allow_clarification=True,
                         uncertainty_policy=uncertainty_policy(),
                         benchmark_mode=benchmark_mode(),
                     )
@@ -1832,18 +1852,63 @@ class FeatureCommandRuntime:
                         "scenario-faithfulness gate failed: "
                         + json.dumps(faithfulness.get("findings", []), sort_keys=True)
                     )
-                partial_contract = design.get("partial_contract")
-                record_benchmark_invariant_fallback(
-                    clause,
-                    reason="scenario-faithfulness gate rejected generated claims",
-                    details=faithfulness,
-                    partial_contract=(
-                        partial_contract
-                        if isinstance(partial_contract, Mapping)
-                        else None
-                    ),
+                repaired_scenario, removed_claims = (
+                    _prune_unfaithful_optional_scenario_claims(
+                        scenario, faithfulness.get("findings", [])
+                    )
                 )
-                design = merge_as_source_invariant(clause)
+                if repaired_scenario is None:
+                    partial_contract = design.get("partial_contract")
+                    record_benchmark_invariant_fallback(
+                        clause,
+                        reason=(
+                            "scenario-faithfulness rejected a core claim or had no "
+                            "safe local repair"
+                        ),
+                        details=faithfulness,
+                        partial_contract=(
+                            partial_contract
+                            if isinstance(partial_contract, Mapping)
+                            else None
+                        ),
+                    )
+                    design = merge_as_source_invariant(clause)
+                else:
+                    repair_body = {
+                        "schema_version": "scenario-claim-prune-v1",
+                        "source_ref": source_id,
+                        "original_scenario_fingerprint": content_fingerprint(scenario),
+                        "repaired_scenario_fingerprint": content_fingerprint(
+                            repaired_scenario
+                        ),
+                        "original_faithfulness_artifact": str(artifact_file),
+                        "original_faithfulness_fingerprint": artifact_fingerprint,
+                        "removed_claims": removed_claims,
+                        "accepted": True,
+                    }
+                    repair_fingerprint = content_fingerprint(repair_body)
+                    repair_artifact = {
+                        **repair_body,
+                        "fingerprint": repair_fingerprint,
+                    }
+                    repair_path = (
+                        output_root
+                        / "semantic-contracts"
+                        / str(source_id)
+                        / "scenario-claim-prune.json"
+                    )
+                    repair_path.parent.mkdir(parents=True, exist_ok=True)
+                    repair_path.write_text(
+                        json.dumps(repair_artifact, indent=2, sort_keys=True) + "\n",
+                        encoding="utf-8",
+                    )
+                    artifact_path = str(repair_path)
+                    artifact_fingerprint = repair_fingerprint
+                    design = {
+                        **dict(design),
+                        "behavior_scenario": repaired_scenario,
+                        "acceptance_status": "partially_repaired",
+                    }
             scenario = design.get("behavior_scenario")
             if not isinstance(scenario, Mapping):
                 raise PowdrrExecutionError(
@@ -2472,10 +2537,16 @@ class FeatureCommandRuntime:
                         "canonical feature design artifact is malformed"
                     )
                 canonical_design = loaded
-            feature_endpoint._assert_feature_design_ready_for_implementation(
-                canonical_design
+            unresolved = (
+                feature_endpoint._assert_feature_design_ready_for_implementation(
+                    canonical_design,
+                    allow_unresolved=bool(
+                        config is not None
+                        and getattr(config, "capture_worker_prompts_only", False)
+                    ),
+                )
             )
-            return {"passed": True}
+            return {"passed": True, "deferred_unresolved": list(unresolved)}
 
         def compile_canonical_feature_design_operation() -> Any:
             ledger = load_instruction_ledger()
@@ -3537,17 +3608,214 @@ def _benchmark_invariant_design(
         raise PowdrrExecutionError(
             "benchmark invariant fallback has no source semantic contract"
         )
+    supported_check = _source_supported_check(text)
+    if supported_check is not None:
+        return {
+            "kind": "invariant",
+            "description": text,
+            "acceptance_criterion": supported_check["criterion"],
+            "expected_test": supported_check["test"],
+            "population": supported_check["population"],
+            "operation": supported_check["operation"],
+            "oracle": supported_check["oracle"],
+            "evidence_case": supported_check["case"],
+            "acceptance_status": "resolved",
+            "partial_contract": dict(partial_contract),
+        }
     return {
         "kind": "invariant",
         "description": text,
-        "acceptance_criterion": text,
-        "expected_test": f"Verify the invariant stated by the source: {text}",
+        "acceptance_criterion": (
+            "Unresolved: derive an observable, source-supported acceptance check. "
+            f"Source requirement: {text}"
+        ),
+        "expected_test": (
+            "Derive a focused test from the complete instruction and repository "
+            "evidence; do not use the source sentence as its own expected result."
+        ),
         "population": "The scope stated by the source instruction",
-        "operation": "Preserve the source instruction as an invariant",
-        "oracle": text,
+        "operation": "Resolve the source requirement into observable behavior",
+        "oracle": "Unresolved by semantic analysis; no expected result is established.",
         "evidence_case": f"Exact source instruction: {text}",
+        "acceptance_status": "unresolved",
         "partial_contract": dict(partial_contract),
     }
+
+
+def _source_supported_check(text: str) -> dict[str, str] | None:
+    """Turn explicit source predicates into narrow, observable checks.
+
+    These patterns encode verification mechanics only. They return ``None``
+    when the source does not state one of the supported predicates, leaving
+    the normal semantic analysis path in control.
+    """
+    source = text.strip()
+
+    export_match = re.fullmatch(
+        r"Export\s+[`']?([A-Za-z_$][\w$]*)[`']?\s+from\s+"
+        r"(?:the\s+)?package(?:['’]s)\s+public\s+API\.?",
+        source,
+        flags=re.IGNORECASE,
+    )
+    if export_match:
+        symbol = export_match.group(1)
+        return {
+            "criterion": "The package's public entry point exposes "
+            f"{symbol!r} as a named export.",
+            "test": (
+                f"Import the package's public entry point and assert that the named "
+                f"export {symbol!r} is present."
+            ),
+            "population": "The package's public entry point",
+            "operation": "Import the public entry point and inspect its named exports",
+            "oracle": f"The named export {symbol!r} is present.",
+            "case": f"Import the package and inspect the {symbol!r} export",
+        }
+
+    if re.search(
+        r"\bdeep cop(?:y|ies)\b", source, flags=re.IGNORECASE
+    ) and not re.search(
+        r"\b(?:not|never|avoid|without|isn't|aren't|can't|cannot)\b"
+        r"[^.]{0,40}\bdeep cop(?:y|ies)\b",
+        source,
+        flags=re.IGNORECASE,
+    ):
+        return {
+            "criterion": (
+                "After creating the snapshot, mutating a nested value in the source "
+                "data does not change the corresponding value in the snapshot."
+            ),
+            "test": (
+                "Create a snapshot containing nested data, mutate a nested source "
+                "value, and assert that the snapshot retains the original value."
+            ),
+            "population": "The data explicitly required to be stored as a deep copy",
+            "operation": "Create a snapshot and then mutate nested source data",
+            "oracle": "The snapshot retains its pre-mutation nested value.",
+            "case": "Mutate a nested source value after snapshot creation",
+        }
+
+    sorted_match = re.search(r"\bsorted\s+ascending\b", source, re.IGNORECASE)
+    if sorted_match and re.search(
+        r"\b(?:not|never|avoid|without|isn't|aren't|can't|cannot)\b"
+        r"[^.]{0,40}\bsorted\s+ascending\b",
+        source,
+        flags=re.IGNORECASE,
+    ):
+        sorted_match = None
+    if sorted_match:
+        return {
+            "criterion": (
+                "Every result array covered by the source clause is in ascending order."
+            ),
+            "test": (
+                "Use input that produces at least two result entries in reverse "
+                "order, then assert that each covered result array is returned "
+                "in ascending order."
+            ),
+            "population": "The result arrays named by the source clause",
+            "operation": "Call the operation with entries in a non-ascending order",
+            "oracle": "Each covered result array is ordered from lowest to highest.",
+            "case": "Use input entries that require sorting",
+        }
+
+    omitted_match = re.search(
+        r"(?:the\s+)?[`']?([A-Za-z_$][\w$]*)[`']?\s+property\s+is\s+omitted\s+"
+        r"(?:entirely\s+)?when\s+(.+?)[.]?$",
+        source,
+        re.IGNORECASE,
+    )
+    if omitted_match:
+        property_name, condition = omitted_match.groups()
+        return {
+            "criterion": (
+                f"When {condition.rstrip('.')} , the result has no "
+                f"{property_name!r} property."
+            ).replace(" ,", ","),
+            "test": (
+                f"Construct the case where {condition.rstrip('.')} and assert that "
+                f"the result does not contain the {property_name!r} property."
+            ),
+            "population": "Results for the condition stated by the source clause",
+            "operation": "Call the operation under the stated condition",
+            "oracle": f"The result does not contain the {property_name!r} property.",
+            "case": condition.rstrip("."),
+        }
+
+    error_match = re.fullmatch(
+        r"(?:The operation\s+)?throws?\s+[`']?([A-Za-z_$][\w$]*)[`']?\s+"
+        r"for\s+(.+?)[.]?",
+        source,
+        re.IGNORECASE,
+    )
+    if error_match:
+        error_type, condition = error_match.groups()
+        condition = condition.rstrip(".")
+        return {
+            "criterion": f"The operation throws {error_type} for {condition}.",
+            "test": (
+                f"Call the operation for {condition} and assert that it "
+                f"throws {error_type}."
+            ),
+            "population": "Inputs described by the source clause",
+            "operation": (
+                "Call the operation with an input described by the source clause"
+            ),
+            "oracle": f"The operation throws {error_type}.",
+            "case": condition,
+        }
+    return None
+
+
+def _prune_unfaithful_optional_scenario_claims(
+    scenario: Mapping[str, Any], findings: Any
+) -> tuple[dict[str, Any] | None, list[str]]:
+    """Drop rejected cross-links/capability annotations without losing a scenario.
+
+    The scenario's core expected behavior is never silently weakened. If the
+    faithfulness review rejects a core field, this function declines repair so
+    the caller can preserve the requirement as explicitly unresolved.
+    """
+    if not isinstance(findings, list) or not findings:
+        return None, []
+    indexes: dict[str, set[int]] = {
+        "related_requirements": set(),
+        "capability_matrix": set(),
+    }
+    for finding in findings:
+        if not isinstance(finding, Mapping):
+            return None, []
+        paths = finding.get("field_paths")
+        if not isinstance(paths, list) or not paths:
+            return None, []
+        for path in paths:
+            if not isinstance(path, str):
+                return None, []
+            matched = False
+            for field in indexes:
+                prefix = f"{field}["
+                if path.startswith(prefix) and path.endswith("]"):
+                    raw_index = path[len(prefix) : -1]
+                    if raw_index.isdecimal():
+                        indexes[field].add(int(raw_index))
+                        matched = True
+                    break
+            if not matched:
+                return None, []
+
+    repaired = dict(scenario)
+    removed: list[str] = []
+    for field, field_indexes in indexes.items():
+        values = repaired.get(field, [])
+        if not isinstance(values, list):
+            return None, []
+        if any(index >= len(values) for index in field_indexes):
+            return None, []
+        for index in sorted(field_indexes, reverse=True):
+            removed.append(f"{field}[{index}]")
+            del values[index]
+        repaired[field] = values
+    return repaired, sorted(removed)
 
 
 def _kind_from_semantic_contract(
@@ -3793,6 +4061,56 @@ def _merge_behavior_scenario_values(
             "behavior scenario status conflicts with unresolved_dimensions"
         )
     raw_scenario = dict(raw_scenario)
+    source_text = clause.get("text")
+    supported_check = (
+        _source_supported_check(source_text) if isinstance(source_text, str) else None
+    )
+    is_split_child = isinstance(clause.get("parent_clause_id"), str)
+    if is_split_child and isinstance(source_text, str):
+        design = {**dict(design), "description": source_text}
+    if supported_check is not None:
+        # Split children keep their own source text as the requirement. The
+        # parent sentence remains available through source_span/provenance, but
+        # cannot replace the child's narrower obligation in the final prompt.
+        design = dict(design)
+        design.update(
+            {
+                "description": source_text,
+                "acceptance_criterion": supported_check["criterion"],
+                "expected_test": supported_check["test"],
+                "population": supported_check["population"],
+                "operation": supported_check["operation"],
+                "oracle": supported_check["oracle"],
+                "evidence_case": supported_check["case"],
+                "acceptance_status": "resolved",
+            }
+        )
+        raw_scenario.update(
+            {
+                "subject": "The behavior specified by this source clause",
+                "given": (
+                    "The input or condition stated by this source clause is set up"
+                ),
+                "when": supported_check["operation"],
+                "then": supported_check["criterion"],
+                "dimensions": {
+                    name: (
+                        supported_check["criterion"]
+                        if name == "normal_result"
+                        else (
+                            "No additional behavior is specified by this source clause."
+                        )
+                    )
+                    for name in BEHAVIOR_DIMENSIONS
+                },
+                "assumptions": [],
+                "unresolved_dimensions": [],
+                "related_requirements": [],
+                "capability_matrix": [],
+            }
+        )
+        status = "resolved"
+        unresolved = []
     assumptions = raw_scenario.get("assumptions", [])
     resolves_defaults = uncertainty_policy == "normative_default" or benchmark_mode
     if status == "needs_clarification" and resolves_defaults:

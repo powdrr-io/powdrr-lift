@@ -30,17 +30,6 @@ REVIEWABLE_FIELDS = (
     "explicit_result",
 )
 
-REQUIRED_FIELDS = {
-    "entity": ("subject",),
-    "feature": ("polarity", "subject", "behavior", "predicate"),
-    "interface": ("polarity", "subject", "behavior", "predicate"),
-    "invariant": ("polarity", "quantifier", "subject", "behavior", "predicate"),
-    "guidance": ("subject", "behavior"),
-    "non_goal": ("polarity", "subject", "behavior"),
-    "nonactionable": (),
-    "context": (),
-}
-
 
 class FaithfulnessError(ValueError):
     """Raised when a faithfulness artifact is malformed."""
@@ -683,6 +672,13 @@ def finalize_source_faithfulness(
     contract: PartialSemanticContract,
     reviews: Sequence[FieldEntailmentReview],
 ) -> FaithfulnessOutcome:
+    """Reject contradictions while carrying incomplete meaning forward.
+
+    Exact source spans establish provenance but do not necessarily isolate a
+    semantic subject or behavior. Unresolved fields therefore remain visible
+    to scenario construction instead of rejecting the contract before that
+    stage can interpret the complete instruction.
+    """
     expected = {
         item["spec"]["field"] for item in prepare_field_entailment_reviews(contract)
     }
@@ -703,12 +699,13 @@ def finalize_source_faithfulness(
             )
         elif value != "entailed":
             raise FaithfulnessError("field entailment returned an invalid value")
-    required = set(REQUIRED_FIELDS.get(contract.disposition, ()))
-    unresolved_required = sorted(required.intersection(unresolved))
-    for field in unresolved_required:
-        findings.append({"field": field, "reason_code": "source_underspecified"})
+    # The source spans in a partial contract are provenance evidence, not
+    # semantic interpretations. An exact whole-clause quote can therefore be
+    # insufficient to establish a subject or behavior without being unfaithful.
+    # Keep those fields unresolved and let scenario construction derive meaning
+    # from the instruction ledger; only an actual contradiction blocks it.
     return FaithfulnessOutcome(
-        accepted=not findings and not unresolved_required,
+        accepted=not findings,
         unresolved_fields=tuple(sorted(unresolved)),
         findings=tuple(findings),
     )

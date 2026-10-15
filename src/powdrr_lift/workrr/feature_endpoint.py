@@ -5808,7 +5808,9 @@ def _compile_initial_worker_prompt(
 
 def _assert_feature_design_ready_for_implementation(
     canonical_design: Mapping[str, Any],
-) -> None:
+    *,
+    allow_unresolved: bool = False,
+) -> tuple[str, ...]:
     """Reject draft clarification markers after the shared design stage."""
     projections = canonical_design.get("projections")
     if not isinstance(projections, list):
@@ -5829,11 +5831,12 @@ def _assert_feature_design_ready_for_implementation(
             for name, value in dimensions.items()
             if isinstance(value, str) and value.startswith("NEEDS CLARIFICATION:")
         )
-    if unresolved:
+    if unresolved and not allow_unresolved:
         raise PowdrrExecutionError(
             "behavior scenario needs clarification before implementation: "
             + ", ".join(unresolved)
         )
+    return tuple(unresolved)
 
 
 def _compile_initial_structrr_diff(

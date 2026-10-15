@@ -203,23 +203,32 @@ class ImplementationRequest:
             implementation_packet.render() if implementation_packet is not None else ""
         )
         product_changes = ""
+        behavior_scenarios = (
+            implementation_packet.behavior_scenarios
+            if implementation_packet is not None
+            else ()
+        )
         if unit.planned_additions or unit.planned_deletions:
-            behavior_scenarios = (
-                implementation_packet.behavior_scenarios
-                if implementation_packet is not None
-                else ()
-            )
             additions = _format_planned_changes(
                 unit.planned_additions, behavior_scenarios
             )
             deletions = _format_planned_changes(
                 unit.planned_deletions, behavior_scenarios
             )
-            product_changes = (
-                "\nRequired product changes:\n"
-                f"Additions: {additions}\n"
-                f"Deletions: {deletions}\n"
-            )
+            remaining_changes = []
+            if additions:
+                remaining_changes.append(f"Additions: {additions}")
+            if deletions:
+                remaining_changes.append(f"Deletions: {deletions}")
+            if remaining_changes:
+                heading = (
+                    "Additional planned changes"
+                    if behavior_scenarios
+                    else "Required product changes"
+                )
+                product_changes = (
+                    f"\n{heading}:\n" + "\n".join(remaining_changes) + "\n"
+                )
         non_goals = (
             "\nNon-goals:\n" + "\n".join(f"- {item}" for item in unit.non_goals) + "\n"
             if unit.non_goals
@@ -317,7 +326,7 @@ def _format_planned_changes(
     behavior_scenarios: Sequence[BehaviorScenario] = (),
 ) -> str:
     if not changes:
-        return "- None declared. Do not invent additional product changes."
+        return ""
     scenario_text = {
         _normalize_planned_change_text(text)
         for scenario in behavior_scenarios
@@ -348,6 +357,8 @@ def _format_planned_changes(
                 isinstance(description, str)
                 and _normalize_planned_change_text(description) in scenario_text
             ):
+                if not extra_fields:
+                    continue
                 description = None
         label_parts = [str(change_id)] if isinstance(change_id, str) else []
         if isinstance(source_ref, str):
@@ -401,7 +412,6 @@ def _scenario_requirement_text(scenario: BehaviorScenario) -> tuple[str, ...]:
         "unresolved_dimensions",
         "related_requirements",
         "capability_matrix",
-        "assumptions",
     )
     return tuple(
         text

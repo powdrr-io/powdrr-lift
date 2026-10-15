@@ -369,8 +369,23 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
                 "",
             )
         )
-    related_requirements: list[str] = []
-    seen_related_requirements: set[str] = set()
+    scenario_text = {
+        " ".join(value.casefold().split())
+        for item in implementation_scenarios
+        for field_name in (
+            "subject",
+            "given",
+            "when",
+            "then",
+            "dimensions",
+            "source_dimensions",
+            "semantic_dimension_applicability",
+            "unresolved_dimensions",
+            "capability_matrix",
+        )
+        for value in _nested_text_values(item.to_data().get(field_name))
+    }
+    unique_related_requirements: list[tuple[str, str]] = []
     for index, item in enumerate(implementation_scenarios, start=1):
         detail = (
             f"{index}. [{item.scenario_id}] Given {_worker_text(item.given)}, "
@@ -411,12 +426,14 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
         lines.append(detail)
         for relationship in item.related_requirements:
             normalized = " ".join(relationship.casefold().split())
-            if normalized not in seen_related_requirements:
-                seen_related_requirements.add(normalized)
-                related_requirements.append(relationship)
-    if related_requirements:
+            if normalized not in scenario_text:
+                unique_related_requirements.append((item.scenario_id, relationship))
+    if unique_related_requirements:
         lines.extend(("", "Additional cross-requirement constraints:"))
-        lines.extend(f"- {relationship}" for relationship in related_requirements)
+        lines.extend(
+            f"- [{scenario_id}] {relationship}"
+            for scenario_id, relationship in unique_related_requirements
+        )
     related_groups: dict[tuple[str, str], list[str]] = {}
     for item in scenarios:
         if item.validation_group_id is not None:
@@ -460,19 +477,22 @@ def render_behavior_matrix(scenarios: Sequence[BehaviorScenario]) -> str:
                 f"given {_worker_text(item.given)}, when {item.when}, "
                 f"expect {_worker_text(item.then)}."
             )
-    assumptions = [
-        (item.scenario_id, value["dimension"], value["resolution"])
-        for item in scenarios
-        for value in item.assumptions
-    ]
-    if assumptions:
-        lines.extend(("", "Defaults for behavior the source leaves unspecified:"))
-        for scenario_id, dimension, resolution in assumptions:
-            lines.append(f"- [{scenario_id}] {dimension}: {resolution}")
     lines.append(
         "Do not treat a passing test on one execution path as proof for another."
     )
     return "\n".join(lines)
+
+
+def _nested_text_values(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, Mapping):
+        return tuple(
+            text for item in value.values() for text in _nested_text_values(item)
+        )
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return tuple(text for item in value for text in _nested_text_values(item))
+    return ()
 
 
 def behavior_scenario_probe_findings(

@@ -612,6 +612,34 @@ class ProbeEnabledPlanningClient(DeterministicPlanningClient):
         return super().complete_json(messages, response_schema=response_schema)
 
 
+class RepairProbePlanningClient(ProbeEnabledPlanningClient):
+    """Generate a probe that forces the post-coding repair path once."""
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        required = set((response_schema or {}).get("required", ()))
+        if required == {"probes"}:
+            return {
+                "probes": [
+                    {
+                        "probe_id": "greeting-count",
+                        "scenario_id": "scenario:instruction-001",
+                        "oracle_basis": "The instruction requires greeting_count() to return 2.",
+                        "test_source": (
+                            "import hello_world\n"
+                            "def test_probe_greeting_count():\n"
+                            "    assert hello_world.greeting_count() == 2\n"
+                        ),
+                    }
+                ]
+            }
+        return super().complete_json(messages, response_schema=response_schema)
+
+
 class StateDataAtomicityPlanningClient(DeterministicPlanningClient):
     """Planning double that takes the bounded split path for one real clause."""
 
@@ -749,7 +777,11 @@ def _collect_json_values(value: Any, key: str, values: list[Any]) -> None:
 
 
 def _fake_opencode(
-    path: Path, *, out_of_scope: bool = False, write_required_tests: bool = False
+    path: Path,
+    *,
+    out_of_scope: bool = False,
+    write_required_tests: bool = False,
+    repair_second_attempt: bool = False,
 ) -> Path:
     unexpected_edit = (
         'Path("unexpected.py").write_text("changed\\n", encoding="utf-8")'
@@ -774,6 +806,22 @@ for plan_path in Path("docs/proposals").glob("*/structrr-diff.yaml"):
         if write_required_tests
         else ""
     )
+    attempt_tracking = (
+        """
+attempt_path = Path(".powdrr/fake-opencode-attempt-count")
+attempt_path.parent.mkdir(parents=True, exist_ok=True)
+attempt_number = int(attempt_path.read_text()) + 1 if attempt_path.exists() else 1
+attempt_path.write_text(str(attempt_number), encoding="utf-8")
+if attempt_number > 1:
+    Path("hello_world.py").write_text(
+        'def greeting_count():\\n    return 2\\n\\n'
+        'print("Hello, world!")\\nprint("Hello from Powdrr!")\\n',
+        encoding="utf-8",
+    )
+"""
+        if repair_second_attempt
+        else ""
+    )
     path.write_text(
         f"""#!{sys.executable}
 from pathlib import Path
@@ -781,6 +829,7 @@ Path("hello_world.py").write_text(
     'print("Hello, world!")\\nprint("Hello from Powdrr!")\\n',
     encoding="utf-8",
 )
+{attempt_tracking}
 {unexpected_edit}
 {required_tests}
 print('{{"type":"session.completed"}}')
@@ -951,6 +1000,63 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     )
 
 
+def test_implement_feature_generates_tailored_repair_prompt_and_retries_probe(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    fake_opencode = _fake_opencode(
+        tmp_path / "fake-opencode", repair_second_attempt=True
+    )
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description=(
+                "Add greeting_count() to hello_world.py and have it return 2. "
+                "Keep printing Hello, world! followed by Hello from Powdrr!."
+            ),
+            work_item_name="hello-world-count-repair",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
+            code_agent="opencode",
+            opencode_executable=str(fake_opencode),
+            opencode_model="deterministic-test-model",
+            max_repair_attempts=1,
+            open_pr=False,
+            push_changes=False,
+            planning_client=RepairProbePlanningClient(),
+        )
+    )
+
+    assert result.review["candidate_correction_attempts"] == 1
+    assert [item["status"] for item in result.review["postrun_probe_results"]] == [
+        "passed"
+    ]
+    assert "def greeting_count():" in (repo / "hello_world.py").read_text(
+        encoding="utf-8"
+    )
+    repair_prompts = list(
+        (
+            result.worktree
+            / ".powdrr"
+            / "feature-runs"
+            / "hello-world-count-repair"
+            / "candidate-corrections"
+            / "artifacts"
+            / "prompts"
+        ).glob("*.txt")
+    )
+    assert len(repair_prompts) == 1
+    repair_prompt = repair_prompts[0].read_text(encoding="utf-8")
+    assert "Instruction-derived test probe" in repair_prompt
+    assert "greeting_count" in repair_prompt
+
+
 def test_implement_feature_decomposes_state_data_api_requirements_before_design(
     tmp_path: Path,
 ) -> None:
@@ -1095,6 +1201,21 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
 
     assert result.status == "completed", planner.proposal_decision_ids
     assert result.plan_path.is_file()
+    run_root = (
+        repo
+        / ".powdrr"
+        / "feature-runs"
+        / "python-statemachine-state-data-scoping"
+    )
+    prompt_files = list((run_root / "artifacts" / "prompts").glob("*.txt"))
+    assert prompt_files
+    prompt_texts = [path.read_text(encoding="utf-8") for path in prompt_files]
+    assert any("set_state_data" in prompt for prompt in prompt_texts)
+    assert any("DataVar" in prompt for prompt in prompt_texts)
+    assert all(
+        "Run the tests before reporting completion." in prompt
+        for prompt in prompt_texts
+    )
     ledger_path = (
         repo
         / ".powdrr"

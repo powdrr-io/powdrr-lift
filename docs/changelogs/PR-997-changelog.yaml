@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 997
+title: Preserve inputs for candidate repair runs
+intent:
+  problem: Post-coding repairs failed before reaching the coding agent because the repair call omitted required implementation bindings.
+  goal: Resume the same code task with its original validated inputs and a tailored repair request.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6244, end_line: 6248}
+    summary: Save the resolved parameters from the original code-task invocation.
+    rationale: Make baseline, proposal, obligations, and task context available to a later correction.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 7112, end_line: 7121}
+    summary: Load the saved code-task parameters for candidate correction.
+    rationale: Fail clearly if a correction has no original task context.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 7200, end_line: 7203}
+    summary: Pass original task parameters together with the tailored repair request.
+    rationale: Allow the correction phase to build and dispatch a valid implementation request.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2509, end_line: 2519}
+    summary: Provide original task bindings in the repair-limit regression test.
+    rationale: Exercise candidate correction with the required implementation context.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2602, end_line: 2612}
+    summary: Provide original task bindings for the instruction-gap repair regression test.
+    rationale: Reproduce the failed run path while checking the focused repair request.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2657, end_line: 2662}
+    summary: Assert baseline, proposal, and obligation bindings reach the repair invocation.
+    rationale: Prevent future repair calls from dropping the context required by the coding-agent runner.
+entities:
+  - id: candidate-repair-parameter-binding
+    type: Function
+    action: added
+  - id: candidate-repair-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: repair-resumes-original-task
+    type: invokes
+    source: candidate-repair-parameter-binding
+    target: candidate-repair-regression-tests
+    action: added
+    description: Regression tests verify that candidate correction reuses the original implementation inputs.
+invariants:
+  - id: repairs-retain-original-task-context
+    description: A candidate correction carries the original baseline, plan, obligations, proposal review receipt, and code task into the coding-agent runner alongside the tailored repair request.
+    action: added
+guidance: []

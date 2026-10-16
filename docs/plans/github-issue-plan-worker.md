@@ -37,10 +37,19 @@ the publisher pins each issue to that merge commit.
 ## First worker boundary
 
 `powdrr-lift publish-plan-issues` idempotently creates one issue per item. It
-does not rewrite an existing issue's tracking state. `powdrr-lift
-github-issue-worker` selects the lowest-numbered open `ready` item whose
-dependencies are closed, marks it `claimed`, and invokes the existing
-`process-workflow-task` runtime for the workflow named by the pinned plan.
+does not rewrite an existing issue's tracking state. Each item issue carries a
+deterministic plan label as an index, alongside its mutable queue state label.
+Publisher and plan lookup requests filter to that plan label; the worker asks
+GitHub for open issues with the `powdrr:ready` label and loads dependencies from
+the plan-scoped issue set. These filtered requests avoid scanning unrelated
+repository issues. The body pointer remains the source of truth and is checked
+after GitHub returns the indexed candidates. For issues published before the
+plan label existed, lookup searches the generated title prefix; republishing
+adds the label while preserving the item's queue state. `powdrr-lift
+github-issue-worker`
+selects the lowest-numbered open `ready` item whose dependencies are closed,
+marks it `claimed`, and invokes the existing `process-workflow-task` runtime
+for the workflow named by the pinned plan.
 
 `powdrr-lift list-plan-issues` reads the pinned plan and GitHub issue pointers,
 then prints one result per plan item with its issue number, URL, state, and

@@ -57,6 +57,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _apply_sentence_design_trace,
     _assert_feature_design_ready_for_implementation,
     _candidate_structural_gate,
+    _candidate_validation_expectations,
     _capture_worker_prompt,
     _compile_code_task_plan,
     _compile_code_task_postconditions,
@@ -2414,6 +2415,74 @@ def test_candidate_structural_gate_rejects_unexplained_observations() -> None:
     assert blockers == [
         "unexplained structural operation: observed:entity:unrelated:added"
     ]
+
+
+def test_candidate_structural_gate_routes_in_scope_additions_to_review() -> None:
+    proposal = compile_proposal_revision(
+        "candidate-gate",
+        {"entities": [], "entity_relationships": []},
+        {"files": []},
+        acceptance_criteria=("The requested behavior works.",),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src", "tests"),
+        source_refs=("instruction:scope",),
+    )
+    actual_diff = StructrrActualDiff(
+        baseline_snapshot_fingerprint="baseline",
+        candidate_snapshot_fingerprint="candidate",
+        baseline_manifest_fingerprint="baseline-manifest",
+        candidate_manifest_fingerprint="candidate-manifest",
+        baseline_product_digest="baseline-product",
+        candidate_product_digest="candidate-product",
+        submission_base="base",
+        baseline_revision="base",
+        candidate_revision="candidate",
+        structural_operations=(),
+        source_observations=(),
+        declaration_changes=(),
+        behavioral_review_candidates=(),
+        extraction_complete=True,
+        unknowns=(),
+    )
+
+    passed, blockers = _candidate_structural_gate(
+        proposal,
+        actual_diff,
+        {
+            "extraction_complete": True,
+            "findings": [
+                {
+                    "finding_id": (
+                        "observed:source_subject:python::src.helpers.helper:added"
+                    ),
+                    "status": "unexpected",
+                    "review_classification": "implementation_detail",
+                    "review_required": True,
+                }
+            ],
+        },
+    )
+
+    assert passed is True
+    assert blockers == []
+
+
+def test_candidate_validation_expectations_do_not_require_test_file_changes() -> None:
+    result = _candidate_validation_expectations(
+        {
+            "expected_tests": [
+                {"id": "nested-partial", "description": "Retain nested partial values."}
+            ],
+            "required_test_cases": [
+                {"id": "collection-atomicity", "name": "test_collection_atomicity"}
+            ],
+        }
+    )
+
+    assert len(result) == 2
+    assert result[0]["id"] == "nested-partial"
+    assert result[1]["id"] == "collection-atomicity"
 
 
 @pytest.mark.parametrize(

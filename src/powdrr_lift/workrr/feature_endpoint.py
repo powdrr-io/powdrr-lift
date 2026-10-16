@@ -6622,6 +6622,9 @@ def _prepare_final_implementation_review(
         candidate_bootstrap.document,
         extraction_complete=candidate_bootstrap.validation.successful,
         actual_diff=actual_diff,
+        validation_expectations=_candidate_validation_expectations(
+            _load_yaml_mapping(Path(state["plan_path"]))
+        ),
     )
     comparison_passed, comparison_blockers = _candidate_structural_gate(
         proposal, actual_diff, candidate_comparison
@@ -6764,7 +6767,10 @@ def _prepare_final_implementation_review(
             "subject_id": proposal.proposal_id,
             "predicate": (
                 "every semantic change in the observed diff is explained by an "
-                "accepted proposal operation or is an implementation detail"
+                "accepted proposal operation or is a necessary implementation "
+                "detail; review the grouped reviewable additions by path, and do "
+                "not treat a test-file edit as required when the behavior has "
+                "separate validation evidence"
             ),
             "evidence_fingerprint": diff_fingerprint,
         }
@@ -6812,6 +6818,12 @@ def _prepare_final_implementation_review(
         "candidate_comparison_fingerprint": candidate_comparison["fingerprint"],
         "candidate_structural_gate_passed": comparison_passed,
         "candidate_comparison_blockers": comparison_blockers,
+        "reviewable_additions_by_path": candidate_comparison.get(
+            "reviewable_additions_by_path", []
+        ),
+        "validation_expectations": candidate_comparison.get(
+            "validation_expectations", []
+        ),
         "behavior_probe_findings": behavior_probe_findings,
         "postrun_probe_results": list(generated_probe_results),
         "postrun_probe_results_path": generated_probe_results_path,
@@ -7222,7 +7234,7 @@ def _candidate_structural_gate(
     actual_diff: StructrrActualDiff,
     comparison: Mapping[str, Any],
 ) -> tuple[bool, list[str]]:
-    """Require observable proposal operations and explain all additions."""
+    """Require planned operations; route in-scope additions to semantic review."""
     structural_sections = {"entities", "entity_relationships", "files"}
     structural_operation_ids = {
         operation.operation_id
@@ -7252,6 +7264,15 @@ def _candidate_structural_gate(
             if status not in {"fulfilled", "already_satisfied"}:
                 blockers.append(f"{operation_id}: {status or 'missing status'}")
         elif status == "unexpected":
+            if (
+                finding.get("review_classification")
+                in {
+                    "implementation_detail",
+                    "validation_change",
+                }
+                and finding.get("review_required") is True
+            ):
+                continue
             observed = finding.get("observed")
             if _is_source_span_only_change(observed):
                 continue
@@ -7262,6 +7283,19 @@ def _candidate_structural_gate(
     for operation_id in sorted(structural_operation_ids - observed_operation_ids):
         blockers.append(f"{operation_id}: no structural comparison finding")
     return not blockers, blockers
+
+
+def _candidate_validation_expectations(
+    plan_document: Mapping[str, Any],
+) -> tuple[Mapping[str, Any], ...]:
+    """Collect test expectations as evidence routes, not patch-file demands."""
+    expectations: list[Mapping[str, Any]] = []
+    for section in ("expected_tests", "required_test_cases"):
+        raw_items = plan_document.get(section)
+        if not isinstance(raw_items, list):
+            continue
+        expectations.extend(item for item in raw_items if isinstance(item, Mapping))
+    return tuple(expectations)
 
 
 def _is_source_span_only_change(observed: Any) -> bool:
@@ -7433,6 +7467,10 @@ def _finalize_implementation_review(
     result["candidate_comparison_fingerprint"] = str(
         review.get("candidate_comparison_fingerprint", "")
     )
+    result["reviewable_additions_by_path"] = review.get(
+        "reviewable_additions_by_path", []
+    )
+    result["validation_expectations"] = review.get("validation_expectations", [])
     result["candidate_correction_attempts"] = int(
         review.get("candidate_correction_attempts", 0)
     )
@@ -7507,6 +7545,8 @@ def _finalize_implementation_review(
             "postrun_probe_generation": result["postrun_probe_generation"],
             "postrun_probe_results": result["postrun_probe_results"],
             "postrun_probe_results_path": result["postrun_probe_results_path"],
+            "reviewable_additions_by_path": result["reviewable_additions_by_path"],
+            "validation_expectations": result["validation_expectations"],
         },
     )
     result["receipt_path"] = receipt_path

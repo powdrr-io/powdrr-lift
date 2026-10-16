@@ -199,6 +199,159 @@ def test_candidate_comparison_fails_closed_on_incomplete_extraction() -> None:
     assert report["extraction_complete"] is False
 
 
+def test_candidate_comparison_ignores_span_only_extraction_noise() -> None:
+    baseline_subject = {
+        "stable_key": "python::pkg.module.Api",
+        "path": "src/pkg/module.py",
+        "kind": "class",
+        "qualified_name": "pkg.module.Api",
+        "span": {"start_line": 1, "end_line": 10},
+    }
+    baseline: dict[str, object] = {
+        "entities": [],
+        "entity_relationships": [],
+        "source_subjects": [baseline_subject],
+    }
+    candidate = {
+        **baseline,
+        "source_subjects": [
+            {
+                **baseline_subject,
+                "span": {"start_line": 1, "end_line": 14},
+            }
+        ],
+    }
+    proposal = _proposal({}, baseline)
+
+    report = compare_candidate_snapshot(
+        proposal, baseline, candidate, extraction_complete=True
+    )
+
+    assert report["findings"] == []
+    assert report["ignored_structural_noise"]["source_span_only_changes"] == 1
+    assert report["passed"] is True
+
+
+def test_candidate_comparison_matches_named_symbol_at_allowed_location() -> None:
+    baseline: dict[str, object] = {
+        "entities": [],
+        "entity_relationships": [],
+        "source_subjects": [],
+    }
+    proposal = _proposal(
+        {
+            "files": [
+                {
+                    "id": "python::old_module.partial_structure",
+                    "qualified_name": "old_module.partial_structure",
+                    "kind": "function",
+                    "action": "added",
+                    "implementation_paths": ["src"],
+                }
+            ]
+        },
+        baseline,
+    )
+    candidate: dict[str, object] = {
+        **baseline,
+        "source_subjects": [
+            {
+                "stable_key": "python::new_module.partial_structure",
+                "path": "src/new_module.py",
+                "kind": "function",
+                "qualified_name": "new_module.partial_structure",
+            }
+        ],
+    }
+
+    report = compare_candidate_snapshot(
+        proposal, baseline, candidate, extraction_complete=True
+    )
+
+    assert report["findings"][0]["status"] == "fulfilled"
+    assert report["findings"][0]["match_mode"] == "allowed_location"
+    assert report["findings"][0]["matched_path"] == "src/new_module.py"
+    assert report["passed"] is True
+
+
+def test_candidate_comparison_reports_in_scope_helpers_without_requiring_test_files(
+    tmp_path: Path,
+) -> None:
+    from powdrr_lift.structrr.actual_diff import compile_actual_structrr_diff
+    from powdrr_lift.structrr.source_manifest import compile_source_manifest
+
+    root = tmp_path
+    (root / "src").mkdir()
+    (root / "src/helpers.py").write_text("def helper(): pass\n", encoding="utf-8")
+    baseline: dict[str, Any] = {
+        "entities": [],
+        "entity_relationships": [],
+        "source_subjects": [],
+        "source_bindings": [],
+    }
+    candidate = {
+        **baseline,
+        "source_subjects": [
+            {
+                "stable_key": "python::src.helpers.helper",
+                "path": "src/helpers.py",
+                "kind": "function",
+                "qualified_name": "src.helpers.helper",
+            }
+        ],
+    }
+    proposal = _proposal({}, baseline)
+    baseline_manifest = compile_source_manifest(
+        root,
+        (),
+        submission_base="base",
+        source_revision="base",
+        taxonomy_fingerprint="taxonomy",
+    )
+    candidate_manifest = compile_source_manifest(
+        root,
+        ("src/helpers.py",),
+        submission_base="base",
+        source_revision="candidate",
+        taxonomy_fingerprint="taxonomy",
+    )
+    actual_diff = compile_actual_structrr_diff(
+        baseline, candidate, baseline_manifest, candidate_manifest
+    )
+
+    report = compare_candidate_snapshot(
+        proposal,
+        baseline,
+        candidate,
+        extraction_complete=True,
+        actual_diff=actual_diff,
+        validation_expectations=(
+            {"id": "expected-test", "description": "Exercise the requested behavior."},
+        ),
+    )
+
+    assert report["passed"] is True
+    assert report["findings"][0]["review_classification"] == "implementation_detail"
+    assert report["reviewable_additions_by_path"] == [
+        {
+            "path": "src/helpers.py",
+            "classification": "implementation_detail",
+            "change_count": 1,
+            "subjects": ["python::src.helpers.helper"],
+            "roles": ["function"],
+            "review_required": True,
+        }
+    ]
+    assert report["validation_expectations"] == [
+        {
+            "expectation_id": "expected-test",
+            "description": "Exercise the requested behavior.",
+            "evidence_route": "task_validation_or_instruction_probe",
+            "file_change_required": False,
+        }
+    ]
+
+
 def test_candidate_comparison_accepts_evidenced_in_scope_helper_detail(
     tmp_path: Path,
 ) -> None:

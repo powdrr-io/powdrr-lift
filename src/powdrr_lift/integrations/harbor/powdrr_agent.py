@@ -33,6 +33,7 @@ except ImportError:
 POWDRR_VERSION = "0.1.0"
 OPENCODE_VERSION = "1.18.31"
 MINISWEAGENT_VERSION = "2.4.6"
+MINISWEAGENT_REQUESTS_VERSION = "2.34.2"
 MINISWEAGENT_MODEL = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
 
 
@@ -69,28 +70,43 @@ class PowdrrAgent(BaseInstalledAgent):
                     "--disable-pip-version-check",
                 )
             )
-            verification = "powdrr-lift --help >/dev/null && mini --help >/dev/null"
+            requests_install = InstallStep(
+                run=pip_install_command(
+                    f"requests=={MINISWEAGENT_REQUESTS_VERSION}",
+                    "--upgrade",
+                    "--no-cache-dir",
+                    "--disable-pip-version-check",
+                )
+            )
+            verification = (
+                "powdrr-lift --help >/dev/null && mini --help >/dev/null && "
+                "python3 -c 'from requests.cookies import RequestsCookieJar'"
+            )
         else:
             agent_install = InstallStep(
                 run=f"npm install --global opencode-ai@{OPENCODE_VERSION}",
                 user="root",
             )
+            requests_install = None
             verification = "powdrr-lift --help >/dev/null && opencode --version"
+        install_steps = [
+            InstallStep(
+                run=pip_install_command(
+                    package,
+                    "--upgrade",
+                    "--force-reinstall",
+                    "--no-cache-dir",
+                    "--disable-pip-version-check",
+                )
+            ),
+            agent_install,
+        ]
+        if requests_install is not None:
+            install_steps.append(requests_install)
         return AgentInstallSpec(
             agent_name=self.name(),
             version=self.version(),
-            steps=[
-                InstallStep(
-                    run=pip_install_command(
-                        package,
-                        "--upgrade",
-                        "--force-reinstall",
-                        "--no-cache-dir",
-                        "--disable-pip-version-check",
-                    )
-                ),
-                agent_install,
-            ],
+            steps=install_steps,
             verification_command=verification,
         )
 
@@ -148,12 +164,19 @@ class PowdrrAgent(BaseInstalledAgent):
                 "--no-cache-dir",
                 "--disable-pip-version-check",
             )
+            requests_install = pip_install_command(
+                f"requests=={MINISWEAGENT_REQUESTS_VERSION}",
+                "--upgrade",
+                "--no-cache-dir",
+                "--disable-pip-version-check",
+            )
             await self.exec_as_agent(
                 environment,
                 command=(
                     "if ! command -v mini >/dev/null 2>&1; then "
                     f"{minisweagent_install}; "
-                    "fi"
+                    "fi; "
+                    f"{requests_install}"
                 ),
             )
         else:

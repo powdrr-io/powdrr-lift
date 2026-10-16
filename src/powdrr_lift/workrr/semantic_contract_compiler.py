@@ -1297,6 +1297,11 @@ def _normative_source_decision_default(
         "has_explicit_result",
     }:
         return "absent"
+    if spec.decision_kind in SOURCE_SEMANTIC_DIMENSION_KINDS:
+        # These labels describe what the instruction explicitly settles. In an
+        # unattended run, an abstention means the source leaves the dimension
+        # unspecified; it must not prevent prompt generation or invite invention.
+        return "unspecified"
     if spec.decision_kind == "source_predicate" and root in {
         "feature",
         "interface",

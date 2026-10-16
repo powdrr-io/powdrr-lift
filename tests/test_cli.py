@@ -28,6 +28,55 @@ def test_harbor_feature_defaults_to_benchmark_mode_without_policy_option() -> No
     assert "--clarification-policy" not in stdout.getvalue()
 
 
+def test_list_plan_issues_prints_item_to_issue_mapping(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("powdrr_lift.cli.resolve_repo_root", lambda _path: tmp_path)
+    monkeypatch.setattr(
+        "powdrr_lift.cli.load_reviewed_plan_at_commit",
+        lambda *_args, **_kwargs: SimpleNamespace(plan_id="plan-v1"),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.cli.find_plan_issues",
+        lambda **_kwargs: (
+            SimpleNamespace(
+                item_id="base",
+                issue_number=42,
+                url="https://github.com/example/project/issues/42",
+                state="open",
+                labels=("powdrr:ready",),
+            ),
+            SimpleNamespace(
+                item_id="followup",
+                issue_number=None,
+                url=None,
+                state=None,
+                labels=(),
+            ),
+        ),
+    )
+    stdout = io.StringIO()
+
+    with redirect_stdout(stdout):
+        exit_code = main(
+            [
+                "list-plan-issues",
+                "--repository",
+                "example/project",
+                "--plan",
+                "docs/plans/plan.yaml",
+                "--plan-commit",
+                "a" * 40,
+            ]
+        )
+
+    assert exit_code == 0
+    result = json.loads(stdout.getvalue())
+    assert result["plan_id"] == "plan-v1"
+    assert result["issues"][0]["issue_number"] == 42
+    assert result["missing_item_ids"] == ["followup"]
+
+
 def test_harbor_feature_returns_success_for_completed_run_with_issues(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

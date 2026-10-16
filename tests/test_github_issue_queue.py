@@ -10,10 +10,13 @@ from powdrr_lift.workrr.github_issue_queue import (
     QUEUE_LABELS,
     GitHubIssueClient,
     GitHubIssueQueueError,
+    PlanIssueMatch,
     PlannedWorkItem,
     QueueIssue,
     ReviewedExecutionPlan,
     _parse_plan,
+    _plan_label,
+    find_plan_issues,
     parse_issue_pointer,
     publish_plan_issues,
     run_worker_once,
@@ -34,19 +37,31 @@ class FakeIssueClient:
     def ensure_queue_labels(self) -> None:
         self.labels_ensured = True
 
+    def ensure_plan_label(self, plan_id: str) -> str:
+        return _plan_label(plan_id)
+
     def ensure_plan_commit_merged(self, plan_commit: str) -> None:
         self.merged_commit = plan_commit
 
-    def list_issues(self) -> tuple[QueueIssue, ...]:
-        return tuple(self.issues)
+    def list_issues(
+        self, *, labels: tuple[str, ...] = (), state: str = "all"
+    ) -> tuple[QueueIssue, ...]:
+        return tuple(
+            issue
+            for issue in self.issues
+            if all(label in issue.labels for label in labels)
+            and (state == "all" or issue.state == state)
+        )
 
-    def create_issue(self, *, body: str, label: str, title: str) -> QueueIssue:
+    def create_issue(
+        self, *, body: str, labels: tuple[str, ...], title: str
+    ) -> QueueIssue:
         issue = QueueIssue(
             self._next_number,
             title,
             body,
             "open",
-            (label,),
+            labels,
             f"https://github.com/example/project/issues/{self._next_number}",
         )
         self._next_number += 1
@@ -174,6 +189,23 @@ def test_github_issue_client_paginates_and_ignores_pull_requests() -> None:
     assert [issue.number for issue in issues] == [1, 2]
 
 
+def test_github_issue_client_filters_issues_server_side_by_label_and_state() -> None:
+    commands: list[list[str]] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        return subprocess.CompletedProcess(arguments, 0, "[[]]", "")
+
+    client = GitHubIssueClient("example/project", run=run)
+    assert client.list_issues(labels=(QUEUE_LABELS["ready"],), state="open") == ()
+
+    assert commands[0][4] == (
+        "repos/example/project/issues?state=open&per_page=100&labels=powdrr%3Aready"
+    )
+
+
 def test_github_client_requires_plan_commit_on_default_branch() -> None:
     commands: list[list[str]] = []
 
@@ -205,6 +237,49 @@ def test_publisher_records_verified_merged_commit() -> None:
     )
 
     assert client.merged_commit == PLAN_COMMIT
+
+
+def test_plan_lookup_returns_item_to_issue_status_and_missing_items() -> None:
+    existing_issue = QueueIssue(
+        42,
+        "Powdrr work item: feature-v1/base",
+        "Reviewed plan pointer",
+        "open",
+        (QUEUE_LABELS["claimed"], _plan_label("feature-v1")),
+        "https://github.com/example/project/issues/42",
+    )
+    client = FakeIssueClient((existing_issue,))
+    client.issues[0] = QueueIssue(
+        existing_issue.number,
+        existing_issue.title,
+        "Reviewed plan: link\n\n"
+        "<!-- powdrr-queue-item:v1 "
+        '{"item_id":"base","plan_commit":"'
+        + PLAN_COMMIT
+        + '","plan_id":"feature-v1","plan_path":"docs/plans/feature.yaml"} -->\n',
+        existing_issue.state,
+        existing_issue.labels,
+        existing_issue.url,
+    )
+
+    matches = find_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+
+    assert matches == (
+        PlanIssueMatch(
+            "base",
+            42,
+            "https://github.com/example/project/issues/42",
+            "open",
+            (QUEUE_LABELS["claimed"], _plan_label("feature-v1")),
+        ),
+        PlanIssueMatch("followup", None, None, None, ()),
+    )
+    assert not client.labels_ensured
 
 
 def test_publisher_creates_minimal_pointer_issues_and_is_idempotent() -> None:

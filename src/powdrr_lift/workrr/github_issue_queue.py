@@ -7,6 +7,7 @@ and contain only stable pointers back to the reviewed plan revision.
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import posixpath
 import re
@@ -69,6 +70,15 @@ class PublishReport:
 
 
 @dataclass(frozen=True, slots=True)
+class PlanIssueMatch:
+    item_id: str
+    issue_number: int | None
+    url: str | None
+    state: str | None
+    labels: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class WorkerReport:
     outcome: str
     issue_number: int | None = None
@@ -96,13 +106,22 @@ class GitHubIssueClient:
         self.executable = executable
         self._run = run
 
-    def list_issues(self) -> tuple[QueueIssue, ...]:
+    def list_issues(
+        self, *, labels: Sequence[str] = (), state: str = "all"
+    ) -> tuple[QueueIssue, ...]:
+        if state not in {"open", "closed", "all"}:
+            raise GitHubIssueQueueError(
+                "issue state filter must be open, closed, or all"
+            )
+        endpoint = f"repos/{self.repository}/issues?state={state}&per_page=100"
+        if labels:
+            endpoint += "&labels=" + quote(",".join(labels), safe=",")
         result = self._invoke(
             [
                 "api",
                 "--paginate",
                 "--slurp",
-                f"repos/{self.repository}/issues?state=all&per_page=100",
+                endpoint,
             ]
         )
         try:
@@ -138,40 +157,48 @@ class GitHubIssueClient:
             )
         return tuple(issues)
 
-    def create_issue(self, *, body: str, label: str, title: str) -> QueueIssue:
-        result = self._api(
+    def create_issue(
+        self, *, body: str, labels: Sequence[str], title: str
+    ) -> QueueIssue:
+        arguments = [
             "POST",
             f"repos/{self.repository}/issues",
             "-f",
             f"title={title}",
             "-f",
             f"body={body}",
-            "-f",
-            f"labels[]={label}",
-        )
+        ]
+        for label in labels:
+            arguments.extend(("-f", f"labels[]={label}"))
+        result = self._api(*arguments)
         return _issue_from_api(result.stdout)
 
-    def ensure_queue_labels(self) -> None:
-        result = self._invoke(
+    def ensure_plan_label(self, plan_id: str) -> str:
+        label = _plan_label(plan_id)
+        created = self._invoke(
             [
                 "api",
-                "--paginate",
-                "--slurp",
-                f"repos/{self.repository}/labels?per_page=100",
-            ]
+                f"repos/{self.repository}/labels",
+                "--method",
+                "POST",
+                "-f",
+                f"name={label}",
+                "-f",
+                "color=5319e7",
+                "-f",
+                f"description=Powdrr plan index for {plan_id}",
+            ],
+            check=False,
         )
-        try:
-            values = json.loads(result.stdout)
-        except json.JSONDecodeError as error:
-            raise GitHubIssueQueueError("gh returned malformed label JSON") from error
-        existing = {
-            str(item.get("name"))
-            for item in _flatten_pages(values)
-            if isinstance(item, Mapping) and isinstance(item.get("name"), str)
-        }
+        if created.returncode != 0 and "already_exists" not in created.stderr:
+            raise GitHubIssueQueueError(
+                f"could not create GitHub plan label {label!r}: "
+                f"{created.stderr.strip()}"
+            )
+        return label
+
+    def ensure_queue_labels(self) -> None:
         for status, label in QUEUE_LABELS.items():
-            if label in existing:
-                continue
             created = self._invoke(
                 [
                     "api",
@@ -317,7 +344,8 @@ def publish_plan_issues(
     _validate_plan_reference(plan_path, plan_commit)
     client.ensure_plan_commit_merged(plan_commit)
     client.ensure_queue_labels()
-    existing = _plan_issue_index(client.list_issues())
+    plan_label = client.ensure_plan_label(plan.plan_id)
+    existing = _plan_issue_index(client.list_issues(labels=(plan_label,)))
     created: list[int] = []
     reused: list[int] = []
     for item in plan.items:
@@ -349,11 +377,52 @@ def publish_plan_issues(
         created_issue = client.create_issue(
             title=f"Powdrr work item: {plan.plan_id}/{item.item_id}",
             body=body,
-            label=QUEUE_LABELS["ready"],
+            labels=(QUEUE_LABELS["ready"], plan_label),
         )
         created.append(created_issue.number)
         existing[key] = created_issue
     return PublishReport(plan.plan_id, plan_commit, tuple(created), tuple(reused))
+
+
+def find_plan_issues(
+    *,
+    plan: ReviewedExecutionPlan,
+    plan_path: str,
+    plan_commit: str,
+    client: GitHubIssueClient,
+) -> tuple[PlanIssueMatch, ...]:
+    """Resolve every plan item to its GitHub issue without mutating GitHub."""
+    _validate_plan_reference(plan_path, plan_commit)
+    issues_by_item = _plan_issue_index(
+        client.list_issues(labels=(_plan_label(plan.plan_id),))
+    )
+    matches: list[PlanIssueMatch] = []
+    for item in plan.items:
+        issue = issues_by_item.get((plan.plan_id, item.item_id))
+        if issue is None:
+            matches.append(PlanIssueMatch(item.item_id, None, None, None, ()))
+            continue
+        expected_pointer = {
+            "plan_id": plan.plan_id,
+            "item_id": item.item_id,
+            "plan_path": plan_path,
+            "plan_commit": plan_commit,
+        }
+        if parse_issue_pointer(issue.body) != expected_pointer:
+            raise GitHubIssueQueueError(
+                f"issue #{issue.number} for {plan.plan_id}/{item.item_id} "
+                "points to a different plan revision"
+            )
+        matches.append(
+            PlanIssueMatch(
+                item.item_id,
+                issue.number,
+                issue.url,
+                issue.state,
+                issue.labels,
+            )
+        )
+    return tuple(matches)
 
 
 def run_worker_once(
@@ -367,9 +436,8 @@ def run_worker_once(
     """Claim and execute the first ready item whose dependencies are closed."""
     root = Path(repo_root).resolve()
     with _worker_lock(root):
-        issues = client.list_issues()
-        indexed = _plan_issue_index(issues)
-        by_number = {issue.number: issue for issue in issues}
+        issues = client.list_issues(labels=(QUEUE_LABELS["ready"],), state="open")
+        plan_issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
         for issue in sorted(issues, key=lambda value: value.number):
             if QUEUE_LABELS["ready"] not in issue.labels or issue.state != "open":
                 continue
@@ -398,6 +466,13 @@ def run_worker_once(
                     "Please repair the plan pointer before retrying.",
                 )
                 return WorkerReport("blocked", issue.number, pointer["item_id"])
+            indexed = plan_issue_indexes.get(plan.plan_id)
+            if indexed is None:
+                indexed = _plan_issue_index(
+                    client.list_issues(labels=(_plan_label(plan.plan_id),))
+                )
+                plan_issue_indexes[plan.plan_id] = indexed
+            by_number = {value.number: value for value in indexed.values()}
             unmet = [
                 dependency
                 for dependency in item.dependencies
@@ -408,7 +483,11 @@ def run_worker_once(
             if unmet:
                 continue
             issue = next(
-                value for value in client.list_issues() if value.number == issue.number
+                value
+                for value in client.list_issues(
+                    labels=(QUEUE_LABELS["ready"],), state="open"
+                )
+                if value.number == issue.number
             )
             if QUEUE_LABELS["ready"] not in issue.labels:
                 continue
@@ -703,6 +782,12 @@ def _label_color(status: str) -> str:
         "awaiting_review": "FBCA04",
         "blocked": "D93F0B",
     }[status]
+
+
+def _plan_label(plan_id: str) -> str:
+    """Return a short, deterministic GitHub label for a plan ID."""
+    digest = hashlib.sha256(plan_id.encode("utf-8")).hexdigest()[:32]
+    return f"powdrr-plan-{digest}"
 
 
 def _flatten_pages(value: Any) -> list[Any]:

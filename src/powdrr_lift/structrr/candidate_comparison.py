@@ -14,7 +14,7 @@ from powdrr_lift.structrr.rebase import (
     snapshot_digest,
 )
 
-CANDIDATE_COMPARISON_SCHEMA_VERSION = "candidate-comparison-v2"
+CANDIDATE_COMPARISON_SCHEMA_VERSION = "candidate-comparison-v3"
 
 _STRUCTURAL_SECTIONS = {
     "entities": "entity",
@@ -82,6 +82,7 @@ def compare_candidate_snapshot(
     extraction_complete: bool,
     actual_diff: StructrrActualDiff | None = None,
     scope_decisions: Sequence[CandidateScopeDecision] = (),
+    validation_expectations: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Report how observed candidate changes relate to a frozen proposal.
 
@@ -103,7 +104,16 @@ def compare_candidate_snapshot(
         raise ValueError("actual diff does not match the comparison snapshots")
 
     structural = rebase_structrr_snapshot(baseline_snapshot, candidate_snapshot)
-    observed = list(structural.changes)
+    span_only_changes = [
+        change
+        for change in structural.changes
+        if _is_source_span_only_change(change.to_data())
+    ]
+    observed = [
+        change
+        for change in structural.changes
+        if not _is_source_span_only_change(change.to_data())
+    ]
     findings: list[dict[str, Any]] = []
     consumed: set[int] = set()
 
@@ -150,10 +160,24 @@ def compare_candidate_snapshot(
             for index, change in matching
             if change.kind in expected_kinds
         ]
+        match_mode = "exact"
+        if not exact and operation.section == "files":
+            flexible = _flexible_source_subject_matches(
+                operation, observed, consumed, proposal.allowed_paths
+            )
+            if len(flexible) == 1:
+                exact = flexible
+                matching = flexible
+                match_mode = "allowed_location"
         if len(exact) == 1:
             index, change = exact[0]
             related = [change.to_data()]
-            if _after_matches(operation, change.after):
+            after_matches = (
+                True
+                if match_mode == "allowed_location"
+                else _after_matches(operation, change.after)
+            )
+            if after_matches:
                 consumed.add(index)
                 status = "fulfilled"
                 reason = "the candidate contains the proposed structural operation"
@@ -183,6 +207,14 @@ def compare_candidate_snapshot(
                 "expected": operation.to_data(),
                 "observed": related,
                 "reason": reason,
+                "match_mode": match_mode if status == "fulfilled" else None,
+                "matched_path": (
+                    change.after.get("path")
+                    if status == "fulfilled"
+                    and match_mode == "allowed_location"
+                    and isinstance(change.after, Mapping)
+                    else None
+                ),
             }
         )
 
@@ -202,6 +234,7 @@ def compare_candidate_snapshot(
             }
         )
 
+    _classify_reviewable_additions(findings, proposal.allowed_paths)
     _apply_scope_decisions(
         findings,
         scope_decisions,
@@ -210,11 +243,19 @@ def compare_candidate_snapshot(
         actual_diff=actual_diff,
     )
 
-    blockers = {"missing", "contradictory", "unexpected", "not_evaluable"}
+    blockers = {"missing", "contradictory", "not_evaluable"}
     complete = extraction_complete and (
         actual_diff is None or actual_diff.extraction_complete
     )
-    passed = complete and not any(item["status"] in blockers for item in findings)
+    passed = complete and not any(
+        item["status"] in blockers
+        or (
+            item["status"] == "unexpected"
+            and item.get("review_classification")
+            not in {"implementation_detail", "validation_change"}
+        )
+        for item in findings
+    )
     report: dict[str, Any] = {
         "schema_version": CANDIDATE_COMPARISON_SCHEMA_VERSION,
         "scope": "structural_operations_only",
@@ -225,6 +266,21 @@ def compare_candidate_snapshot(
         "separate_behavior_and_invariant_review_required": True,
         "passed": passed,
         "findings": findings,
+        "ignored_structural_noise": {
+            "source_span_only_changes": len(span_only_changes),
+            "paths": sorted(
+                {
+                    str(change.after["path"])
+                    for change in span_only_changes
+                    if change.after is not None
+                    and isinstance(change.after.get("path"), str)
+                }
+            ),
+        },
+        "reviewable_additions_by_path": _group_reviewable_additions(findings),
+        "validation_expectations": _normalize_validation_expectations(
+            validation_expectations
+        ),
     }
     if actual_diff is not None:
         report["actual_diff_fingerprint"] = actual_diff.fingerprint
@@ -238,6 +294,204 @@ def compare_candidate_snapshot(
         report["extraction_unknowns"] = list(actual_diff.unknowns)
     report["fingerprint"] = content_fingerprint(report)
     return report
+
+
+def _flexible_source_subject_matches(
+    operation: Any,
+    observed: Sequence[Any],
+    consumed: set[int],
+    allowed_paths: Sequence[str],
+) -> list[tuple[int, Any]]:
+    """Match a planned symbol at another allowed path when its name is stable.
+
+    Only `files` operations opt into this location-flexible behavior. An
+    implementation location can be narrowed with `implementation_paths` in the
+    plan item; otherwise the proposal's allowed paths form the scope.
+    """
+    content = operation.content
+    raw_paths = content.get("implementation_paths", allowed_paths)
+    if not isinstance(raw_paths, Sequence) or isinstance(raw_paths, (str, bytes)):
+        return []
+    scopes = tuple(
+        item
+        for item in raw_paths
+        if isinstance(item, str) and _is_repository_relative_path(item)
+    )
+    if not scopes:
+        return []
+    expected_name = content.get("qualified_name") or content.get("symbol")
+    if not isinstance(expected_name, str) or not expected_name.strip():
+        expected_name = operation.subject_id
+    expected_name = expected_name.split("::")[-1].strip(" .")
+    suffix = expected_name.rsplit(".", 1)[-1]
+    expected_kind = content.get("kind")
+    matches: list[tuple[int, Any]] = []
+    for index, change in enumerate(observed):
+        if index in consumed or change.area != "source_subject":
+            continue
+        if change.kind not in _OBSERVED_KINDS.get(operation.action, set()):
+            continue
+        record = change.after
+        if not isinstance(record, Mapping):
+            continue
+        qualified_name = record.get("qualified_name")
+        path = record.get("path")
+        if not isinstance(qualified_name, str) or not isinstance(path, str):
+            continue
+        if (
+            qualified_name != expected_name
+            and qualified_name.rsplit(".", 1)[-1] != suffix
+        ):
+            continue
+        if isinstance(expected_kind, str) and record.get("kind") != expected_kind:
+            continue
+        if not _within_allowed_path(path, scopes):
+            continue
+        matches.append((index, change))
+    return matches
+
+
+def _is_source_span_only_change(change: Mapping[str, Any]) -> bool:
+    return (
+        change.get("area") == "source_subject"
+        and change.get("kind") == "changed"
+        and bool(change.get("changed_fields"))
+        and set(change.get("changed_fields", ())) <= {"span"}
+    )
+
+
+def _change_paths(change: Mapping[str, Any]) -> tuple[str, ...]:
+    observed = change.get("observed")
+    records = observed if isinstance(observed, list) else [change]
+    paths = {
+        str(record[key])
+        for item in records
+        if isinstance(item, Mapping)
+        for record in (item.get("before"), item.get("after"))
+        if isinstance(record, Mapping)
+        for key in ("path",)
+        if isinstance(record.get(key), str) and record[key]
+    }
+    if not paths:
+        identity = change.get("observed", [{}])
+        identity_record = identity[0] if isinstance(identity, list) and identity else {}
+        subject_id = (
+            identity_record.get("identity")
+            if isinstance(identity_record, Mapping)
+            else None
+        )
+        if isinstance(subject_id, str) and subject_id.startswith("file:"):
+            paths.add(subject_id.removeprefix("file:"))
+    return tuple(sorted(paths))
+
+
+def _classify_reviewable_additions(
+    findings: list[dict[str, Any]], allowed_paths: Sequence[str]
+) -> None:
+    """Keep in-scope additions visible without treating helpers as missing APIs."""
+    for finding in findings:
+        if finding.get("status") != "unexpected":
+            continue
+        observed_records = finding.get("observed")
+        if not isinstance(observed_records, list) or len(observed_records) != 1:
+            continue
+        change = observed_records[0]
+        if not isinstance(change, Mapping) or change.get("kind") != "added":
+            continue
+        area = change.get("area")
+        if area not in {"source_subject", "entity"}:
+            continue
+        paths = _change_paths(finding)
+        if not paths or not all(
+            _within_allowed_path(path, allowed_paths) for path in paths
+        ):
+            continue
+        is_test_path = all(
+            path == "tests" or path.startswith("tests/") for path in paths
+        )
+        finding["review_classification"] = (
+            "validation_change" if is_test_path else "implementation_detail"
+        )
+        finding["review_paths"] = list(paths)
+        finding["review_required"] = True
+
+
+def _group_reviewable_additions(
+    findings: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    grouped: dict[str, dict[str, Any]] = {}
+    for finding in findings:
+        classification = finding.get("review_classification")
+        if classification not in {"implementation_detail", "validation_change"}:
+            continue
+        paths = finding.get("review_paths")
+        if not isinstance(paths, list):
+            continue
+        change = finding.get("observed", [{}])[0]
+        subject_id = change.get("identity") if isinstance(change, Mapping) else None
+        for path in paths:
+            if not isinstance(path, str):
+                continue
+            item = grouped.setdefault(
+                path,
+                {
+                    "path": path,
+                    "classification": classification,
+                    "change_count": 0,
+                    "subjects": [],
+                    "roles": [],
+                    "review_required": True,
+                },
+            )
+            item["change_count"] += 1
+            if isinstance(subject_id, str):
+                item["subjects"].append(subject_id)
+            after = change.get("after") if isinstance(change, Mapping) else None
+            role = (
+                after.get("kind") or after.get("type")
+                if isinstance(after, Mapping)
+                else None
+            )
+            if isinstance(role, str) and role:
+                item["roles"].append(role)
+    return [
+        {
+            **item,
+            "subjects": sorted(set(item["subjects"])),
+            "roles": sorted(set(item["roles"])),
+        }
+        for _, item in sorted(grouped.items())
+    ]
+
+
+def _normalize_validation_expectations(
+    expectations: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Expose tests as evidence requests, never as required patch paths."""
+    normalized: list[dict[str, Any]] = []
+    for index, item in enumerate(expectations, start=1):
+        identifier = item.get("id")
+        description = (
+            item.get("description")
+            or item.get("text")
+            or item.get("name")
+            or item.get("selector")
+        )
+        if not isinstance(description, str) or not description.strip():
+            continue
+        normalized.append(
+            {
+                "expectation_id": (
+                    identifier.strip()
+                    if isinstance(identifier, str) and identifier.strip()
+                    else f"validation-{index}"
+                ),
+                "description": description.strip(),
+                "evidence_route": "task_validation_or_instruction_probe",
+                "file_change_required": False,
+            }
+        )
+    return normalized
 
 
 def _already_satisfied(operation: Any, baseline_snapshot: Mapping[str, Any]) -> bool:
@@ -341,6 +595,15 @@ def _within_allowed_path(path: str, scopes: Sequence[str]) -> bool:
         or normalized == scope.rstrip("/")
         or normalized.startswith(scope.rstrip("/") + "/")
         for scope in scopes
+    )
+
+
+def _is_repository_relative_path(value: str) -> bool:
+    normalized = value.replace("\\", "/")
+    return normalized == "." or (
+        bool(normalized)
+        and not normalized.startswith("/")
+        and all(part not in {"", ".", ".."} for part in normalized.split("/"))
     )
 
 

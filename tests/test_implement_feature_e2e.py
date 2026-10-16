@@ -580,6 +580,38 @@ class DeterministicPlanningClient:
         raise AssertionError(f"unhandled planning schema: {sorted(required)}")
 
 
+class ProbeEnabledPlanningClient(DeterministicPlanningClient):
+    """Provide one executable instruction probe for the headless integration."""
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        required = set((response_schema or {}).get("required", ()))
+        if required == {"probes"}:
+            return {
+                "probes": [
+                    {
+                        "probe_id": "greeting-output",
+                        "scenario_id": "scenario:instruction-001",
+                        "oracle_basis": (
+                            "The instruction explicitly names both output lines."
+                        ),
+                        "test_source": (
+                            "import runpy\n"
+                            "def test_probe_second_greeting(capsys):\n"
+                            "    runpy.run_path('hello_world.py')\n"
+                            "    assert capsys.readouterr().out.splitlines() == ["
+                            "'Hello, world!', 'Hello from Powdrr!']\n"
+                        ),
+                    }
+                ]
+            }
+        return super().complete_json(messages, response_schema=response_schema)
+
+
 class StateDataAtomicityPlanningClient(DeterministicPlanningClient):
     """Planning double that takes the bounded split path for one real clause."""
 
@@ -838,7 +870,7 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
             opencode_model="deterministic-test-model",
             open_pr=False,
             push_changes=False,
-            planning_client=DeterministicPlanningClient(),
+            planning_client=ProbeEnabledPlanningClient(),
         )
     )
 
@@ -849,6 +881,11 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     assert result.validation.status.value == "passed"
     assert result.review["passed"] is True
     assert result.review["candidate_structural_gate_passed"] is True
+    assert result.review["postrun_probe_generation"]["status"] == "generated"
+    assert [item["status"] for item in result.review["postrun_probe_results"]] == [
+        "passed"
+    ]
+    assert Path(result.review["postrun_probe_results_path"]).is_file()
     assert Path(result.review["actual_diff_path"]).is_file()
     assert Path(result.review["candidate_comparison_path"]).is_file()
     assert (repo / "hello_world.py").read_text(encoding="utf-8") == (

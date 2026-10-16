@@ -2367,6 +2367,7 @@ def _run_code_agent_phase(
     parameters: Mapping[str, Any],
 ) -> dict[str, Any]:
     del branch
+    output_root.mkdir(parents=True, exist_ok=True)
     baseline_path = Path(_require_flow_text(parameters, "baseline"))
     plan_path = Path(_require_flow_text(parameters, "plan"))
     if baseline_path != state["baseline_path"] or plan_path != state["plan_path"]:
@@ -2399,8 +2400,14 @@ def _run_code_agent_phase(
             *source_refs,
             _evidence_source_ref("obligations", Path(obligation_path), worktree),
         )
+    accepted_proposal = state.get("proposal_revision")
+    proposal_id = (
+        accepted_proposal.proposal_id
+        if isinstance(accepted_proposal, ProposalRevision)
+        else slug
+    )
     proposal_revision = compile_proposal_revision(
-        slug,
+        proposal_id,
         baseline_document,
         plan_document,
         acceptance_criteria=acceptance_criteria,

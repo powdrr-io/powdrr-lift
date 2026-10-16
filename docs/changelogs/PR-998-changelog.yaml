@@ -1,0 +1,64 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 998
+title: Exercise prompt generation and repair end to end
+intent:
+  problem: Feature runs can fail before a coding prompt reaches the coding agent, and unit tests did not exercise the full prompt and repair handoff.
+  goal: Protect prompt generation across task shapes and verify a probe-driven repair reaches the coding agent and resolves the reported gap.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2370, end_line: 2370}
+    summary: Create the output directory before writing implementation artifacts.
+    rationale: Permit a candidate repair run to write its prompt and packet into a new artifact directory.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2403, end_line: 2408}
+    summary: Reuse the accepted proposal ID when preparing a candidate repair.
+    rationale: Preserve proposal identity when repair attempts have distinct artifact slugs.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2410, end_line: 2410}
+    summary: Compile the repair proposal with the accepted proposal ID.
+    rationale: Keep the existing proposal revision stable across the repair handoff.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 615, end_line: 644}
+    summary: Add a deterministic planner that emits a probe for the repair-path integration test.
+    rationale: Make probe failure and repair behavior reproducible without a live planning model.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 782, end_line: 786}
+    summary: Let the fake coding agent record attempts and implement a repair on retry.
+    rationale: Exercise both initial and tailored repair prompts through the same coding-agent boundary.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 811, end_line: 826}
+    summary: Track fake coding-agent attempts and apply a repair edit on retry.
+    rationale: Make the candidate repair and second prompt observable in the test fixture.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 834, end_line: 834}
+    summary: Include second-attempt behavior in the fake coding-agent script.
+    rationale: Use one deterministic fake agent for the original implementation and repair.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 1005, end_line: 1061}
+    summary: Verify a failed instruction-derived probe triggers a tailored repair and passes afterward.
+    rationale: Catch missing task bindings, proposal identity changes, and missing repair artifact directories before a benchmark run.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 1206, end_line: 1217}
+    summary: Check generated prompts for a long DeepSWE state-data task.
+    rationale: Cover provider-ready prompt generation for a multi-obligation task shape.
+entities:
+  - id: end-to-end-prompt-generation-regressions
+    type: Regression test
+    action: added
+entity_relationships: []
+invariants:
+  - id: generated-prompts-reach-coding-agent
+    description: Initial and probe-driven repair prompts are persisted and dispatched with the inputs needed to produce a coding-agent run.
+    action: added
+guidance: []

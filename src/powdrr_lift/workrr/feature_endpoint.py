@@ -117,6 +117,13 @@ from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
 from powdrr_lift.workrr.jev_classifier import (
     preferred_semantic_classifier_client,
 )
+from powdrr_lift.workrr.postrun_probes import (
+    POSTRUN_PROBE_SCHEMA_VERSION,
+    PostRunProbe,
+    generate_postrun_probes,
+    probe_failures,
+    run_postrun_probes,
+)
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_lift.workrr.run_artifacts import (
@@ -656,6 +663,7 @@ def _execute_procedrr_flow(
             command_catalog=command_catalog,
             event_sink=record_procedrr_event,
         )
+        state["probe_generation_client"] = planning_client
         evaluator.evaluate(
             flow,
             {
@@ -2609,6 +2617,51 @@ def _run_code_agent_phase(
         implementation_packet = replace(
             implementation_packet, contract_closure=dict(closure)
         )
+    if (
+        not config.capture_worker_prompts_only
+        and "postrun_probes" not in state
+        and implementation_packet.behavior_scenarios
+    ):
+        probe_client = state.get("probe_generation_client")
+        probes: tuple[PostRunProbe, ...] = ()
+        generation_error: str | None = None
+        try:
+            if probe_client is None or not callable(
+                getattr(probe_client, "complete_json", None)
+            ):
+                raise ValueError("planning client is unavailable")
+            probes = generate_postrun_probes(
+                probe_client,
+                instruction=feature_description,
+                scenarios=tuple(
+                    item.to_data() for item in implementation_packet.behavior_scenarios
+                ),
+                repository_contract=implementation_packet.contract_closure,
+            )
+        except Exception as error:
+            generation_error = str(error)
+        probe_artifact_root = output_root / "postrun-probes"
+        probe_artifact_root.mkdir(parents=True, exist_ok=True)
+        suite_document = {
+            "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
+            "generation_status": "generated"
+            if generation_error is None
+            else "unavailable",
+            "generation_error": generation_error,
+            "source_instruction": feature_description,
+            "probes": [item.to_data() for item in probes],
+            "scenarios_without_executable_probe": sorted(
+                {item.scenario_id for item in implementation_packet.behavior_scenarios}
+                - {item.scenario_id for item in probes}
+            ),
+        }
+        (probe_artifact_root / "probe-suite.json").write_text(
+            json.dumps(suite_document, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        state["postrun_probes"] = probes
+        state["postrun_probe_artifact_root"] = probe_artifact_root
+        state["postrun_probe_generation_error"] = generation_error
     implementation_packet_path = output_root / "implementation-packet.json"
     implementation_packet_path.write_text(
         json.dumps(implementation_packet.to_data(), indent=2, sort_keys=True) + "\n",
@@ -2940,7 +2993,7 @@ def _prepare_implementation_review(
     worktree: Path,
     output_root: Path,
     runner: Runner,
-    state: Mapping[str, Any],
+    state: dict[str, Any],
     parameters: Mapping[str, Any],
 ) -> dict[str, Any]:
     implementation = parameters.get("implementation")
@@ -6485,7 +6538,7 @@ def _prepare_final_implementation_review(
     worktree: Path,
     runner: Runner,
     output_root: Path,
-    state: Mapping[str, Any],
+    state: dict[str, Any],
     config: FeatureEndpointConfig,
     **_: Any,
 ) -> dict[str, Any]:
@@ -6656,6 +6709,51 @@ def _prepare_final_implementation_review(
         validation=validation,
     )
     behavior_probe_findings = _candidate_behavior_probe_findings(state)
+    generated_probe_results: tuple[dict[str, Any], ...] = ()
+    generated_probe_results_path: str | None = None
+    generated_probes = state.get("postrun_probes")
+    if isinstance(generated_probes, tuple) and generated_probes:
+        raw_profiles = state.get("validation_profiles", ())
+        profiles = (
+            tuple(
+                item
+                for item in raw_profiles
+                if isinstance(item, DiscoveredValidationProfile)
+            )
+            if isinstance(raw_profiles, Sequence)
+            else ()
+        )
+        generated_probe_results = tuple(
+            item.to_data()
+            for item in run_postrun_probes(
+                generated_probes,
+                root=worktree,
+                profiles=profiles,
+            )
+        )
+        probe_root = state.get("postrun_probe_artifact_root")
+        if isinstance(probe_root, Path):
+            probe_root.mkdir(parents=True, exist_ok=True)
+            run_number = int(state.get("postrun_probe_run_count", 0)) + 1
+            state["postrun_probe_run_count"] = run_number
+            result_document = {
+                "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
+                "run_number": run_number,
+                "candidate_diff_fingerprint": diff_fingerprint,
+                "results": list(generated_probe_results),
+            }
+            generated_probe_results_path = str(
+                probe_root / f"results-{run_number:02d}.json"
+            )
+            (probe_root / f"results-{run_number:02d}.json").write_text(
+                json.dumps(result_document, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            (probe_root / "latest-results.json").write_text(
+                json.dumps(result_document, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        behavior_probe_findings.extend(probe_failures(generated_probe_results))
     specifications.append(
         {
             "decision_id": "unexplained:semantic-change-review",
@@ -6712,6 +6810,23 @@ def _prepare_final_implementation_review(
         "candidate_structural_gate_passed": comparison_passed,
         "candidate_comparison_blockers": comparison_blockers,
         "behavior_probe_findings": behavior_probe_findings,
+        "postrun_probe_results": list(generated_probe_results),
+        "postrun_probe_results_path": generated_probe_results_path,
+        "postrun_probe_generation": {
+            "status": (
+                "unavailable"
+                if state.get("postrun_probe_generation_error")
+                else "generated"
+                if isinstance(state.get("postrun_probes"), tuple)
+                else "not_run"
+            ),
+            "error": state.get("postrun_probe_generation_error"),
+            "suite_path": str(
+                Path(state["postrun_probe_artifact_root"]) / "probe-suite.json"
+            )
+            if isinstance(state.get("postrun_probe_artifact_root"), Path)
+            else None,
+        },
         "candidate_correction_attempts": int(
             state.get("candidate_correction_attempts", 0)
         ),
@@ -7319,6 +7434,11 @@ def _finalize_implementation_review(
         review.get("candidate_correction_attempts", 0)
     )
     result["candidate_correction_limit"] = correction_limit
+    result["postrun_probe_generation"] = review.get(
+        "postrun_probe_generation", {"status": "not_run"}
+    )
+    result["postrun_probe_results"] = review.get("postrun_probe_results", [])
+    result["postrun_probe_results_path"] = review.get("postrun_probe_results_path")
     bound_decisions = [
         {
             "decision_id": specification.get("decision_id"),
@@ -7381,6 +7501,9 @@ def _finalize_implementation_review(
             "semantic_decisions": semantic,
             "actualization_report": actualization,
             "instruction_coverage_receipt": coverage_receipt,
+            "postrun_probe_generation": result["postrun_probe_generation"],
+            "postrun_probe_results": result["postrun_probe_results"],
+            "postrun_probe_results_path": result["postrun_probe_results_path"],
         },
     )
     result["receipt_path"] = receipt_path

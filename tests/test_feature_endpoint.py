@@ -2509,6 +2509,12 @@ def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(
         "candidate_comparison_path": "comparison.json",
         "actual_diff_path": "actual-diff.json",
         "instruction_coverage_worklist": {"specifications": [specification]},
+        "behavior_probe_findings": [
+            {
+                "scenario_id": "scenario-1",
+                "reason": "probe failed: expected second greeting, observed none",
+            }
+        ],
     }
     state: dict[str, Any] = {
         "latest_candidate_review": review,
@@ -2559,6 +2565,8 @@ def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(
     assert len(agent_calls) == 1
     assert "The command preserves both greetings." in agent_calls[0]["repair_request"]
     assert "The second greeting is missing." in agent_calls[0]["repair_request"]
+    assert "scenario-1" in agent_calls[0]["repair_request"]
+    assert "expected second greeting, observed none" in agent_calls[0]["repair_request"]
     assert result["done"] is False
 
 

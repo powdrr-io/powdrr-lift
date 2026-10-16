@@ -232,6 +232,13 @@ from powdrr_lift.workrr.git import (
     slugify_workflow_id,
     synchronize_workflow_initialization,
 )
+from powdrr_lift.workrr.github_issue_queue import (
+    GitHubIssueClient,
+    GitHubIssueQueueError,
+    load_reviewed_plan_at_commit,
+    publish_plan_issues,
+    run_worker_once,
+)
 from powdrr_lift.workrr.human_task import (
     HumanTaskRunnerConfig,
     run_human_task,
@@ -342,6 +349,41 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root to inspect; defaults to the current worktree.",
     )
     repository_state_parser.set_defaults(func=_run_repository_state)
+
+    publish_plan_issues_parser = subparsers.add_parser(
+        "publish-plan-issues",
+        help="Publish one minimal GitHub issue per item in a merged plan revision.",
+    )
+    publish_plan_issues_parser.add_argument("--plan", type=Path, required=True)
+    publish_plan_issues_parser.add_argument("--plan-commit", required=True)
+    publish_plan_issues_parser.add_argument("--repository", required=True)
+    publish_plan_issues_parser.add_argument(
+        "--repo-root", type=Path, help="Checkout containing the merged plan revision."
+    )
+    publish_plan_issues_parser.set_defaults(func=_run_publish_plan_issues)
+
+    github_issue_worker_parser = subparsers.add_parser(
+        "github-issue-worker",
+        help="Claim and execute one eligible GitHub issue work item.",
+    )
+    github_issue_worker_parser.add_argument("--repository", required=True)
+    github_issue_worker_parser.add_argument(
+        "--repo-root", type=Path, help="Checkout containing plan and workflow files."
+    )
+    github_issue_worker_parser.add_argument(
+        "--worker-id", default=f"local-{uuid.uuid4().hex[:8]}"
+    )
+    github_issue_worker_parser.add_argument(
+        "--provider", choices=["auto", *ALL_PROVIDERS], default="auto"
+    )
+    github_issue_worker_parser.add_argument("--api-key")
+    github_issue_worker_parser.add_argument("--base-url")
+    github_issue_worker_parser.add_argument("--max-roundtrips", type=int, default=128)
+    github_issue_worker_parser.add_argument(
+        "--context-compaction-threshold", type=float, default=0.75
+    )
+    github_issue_worker_parser.add_argument("--verbose", action="store_true")
+    github_issue_worker_parser.set_defaults(func=_run_github_issue_worker)
 
     pull_request_description_parser = subparsers.add_parser(
         "pull-request-description",
@@ -2577,6 +2619,87 @@ def _run_repository_state(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     sys.stdout.write(render_repository_state(repo_root))
     return 0
+
+
+def _run_publish_plan_issues(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    plan_path = args.plan
+    if plan_path.is_absolute():
+        try:
+            plan_path = plan_path.resolve().relative_to(repo_root.resolve())
+        except ValueError:
+            print("Plan path must be inside the repository checkout.", file=sys.stderr)
+            return 2
+    normalized_plan_path = plan_path.as_posix()
+    try:
+        plan = load_reviewed_plan_at_commit(
+            normalized_plan_path, args.plan_commit, repo_root=repo_root
+        )
+        report = publish_plan_issues(
+            plan=plan,
+            plan_path=normalized_plan_path,
+            plan_commit=args.plan_commit,
+            client=GitHubIssueClient(args.repository),
+        )
+    except GitHubIssueQueueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "plan_id": report.plan_id,
+                "plan_commit": report.plan_commit,
+                "created_issue_numbers": report.created_issue_numbers,
+                "existing_issue_numbers": report.existing_issue_numbers,
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
+def _run_github_issue_worker(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+
+    def run_task(workflow_dir: Path, workflow_id: str, _worker_id: str) -> int:
+        return run_workflow_task(
+            WorkflowTaskAgentConfig(
+                workflow_dir=workflow_dir,
+                repo_root=repo_root,
+                provider=args.provider,
+                workflow_id=workflow_id,
+                api_key=args.api_key,
+                base_url=args.base_url,
+                max_roundtrips=args.max_roundtrips,
+                context_compaction_threshold=args.context_compaction_threshold,
+                verbose=args.verbose,
+            ),
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
+
+    try:
+        report = run_worker_once(
+            client=GitHubIssueClient(args.repository),
+            repo_root=repo_root,
+            worker_id=args.worker_id,
+            run_task=run_task,
+        )
+    except GitHubIssueQueueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "outcome": report.outcome,
+                "issue_number": report.issue_number,
+                "item_id": report.item_id,
+                "detail": report.detail,
+            },
+            indent=2,
+        )
+    )
+    return 0 if report.outcome in {"no_eligible_work", "awaiting_review"} else 1
 
 
 def _run_pull_request_description(args: argparse.Namespace) -> int:

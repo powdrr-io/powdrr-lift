@@ -6241,6 +6241,11 @@ def _run_code_task_agent(
             "obligations",
             {"obligations": [{"description": task.get("objective", "")}], "path": ""},
         )
+    # Keep the fully resolved implementation inputs so the later bounded
+    # candidate-correction phase can resume the same task with a tailored
+    # repair request. Passing only `repair_request` to _run_code_agent_phase
+    # loses the baseline, plan, obligations, and proposal receipt bindings.
+    state["code_task_agent_parameters"] = dict(forwarded)
     # A provider timeout is not a completed coding task.  It also must not
     # discard useful partial edits: the next session needs to inspect the
     # current tree and continue from the actual failure.  Keep this recovery
@@ -7104,6 +7109,16 @@ def _coverage_expectation(specification: Mapping[str, Any]) -> str:
     )
 
 
+def _code_task_agent_parameters(state: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the resolved inputs from the original code-task invocation."""
+    parameters = state.get("code_task_agent_parameters")
+    if not isinstance(parameters, Mapping):
+        raise PowdrrExecutionError(
+            "candidate correction has no original code-task parameters"
+        )
+    return dict(parameters)
+
+
 def _correct_candidate_from_structrr_diff(
     parameters: Mapping[str, Any],
     *,
@@ -7182,7 +7197,10 @@ def _correct_candidate_from_structrr_diff(
         branch=branch,
         slug=f"{slug}-structrr-correction-{attempts + 1}",
         state=state,
-        parameters={"repair_request": prompt},
+        parameters={
+            **_code_task_agent_parameters(state),
+            "repair_request": prompt,
+        },
     )
     profiles = state.get("validation_profiles", ())
     validation_results = [

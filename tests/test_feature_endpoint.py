@@ -2506,6 +2506,17 @@ def test_candidate_correction_obeys_configured_repair_limit(
             "actual_diff_path": "actual-diff.json",
         },
         "validation_profiles": (),
+        "code_task_agent_parameters": {
+            "baseline": str(tmp_path / "baseline.yaml"),
+            "plan": str(tmp_path / "structrr-diff.yaml"),
+            "feature_description": "Add the proposed entity.",
+            "work_item_name": "candidate-correction",
+            "proposal_review_receipt": str(tmp_path / "proposal-review.json"),
+            "obligations": {
+                "path": str(tmp_path / "obligations.json"),
+                "obligations": [{"description": "Add the proposed entity."}],
+            },
+        },
     }
     agent_attempts: list[dict[str, Any]] = []
     generated_reviews = iter(review_outcomes)
@@ -2588,6 +2599,17 @@ def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(
     state: dict[str, Any] = {
         "latest_candidate_review": review,
         "validation_profiles": (),
+        "code_task_agent_parameters": {
+            "baseline": str(tmp_path / "baseline.yaml"),
+            "plan": str(tmp_path / "structrr-diff.yaml"),
+            "feature_description": "Preserve both greetings.",
+            "work_item_name": "instruction-repair",
+            "proposal_review_receipt": str(tmp_path / "proposal-review.json"),
+            "obligations": {
+                "path": str(tmp_path / "obligations.json"),
+                "obligations": [{"description": "Preserve both greetings."}],
+            },
+        },
     }
     agent_calls: list[dict[str, Any]] = []
 
@@ -2632,6 +2654,12 @@ def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(
     )
 
     assert len(agent_calls) == 1
+    assert agent_calls[0]["baseline"] == str(tmp_path / "baseline.yaml")
+    assert agent_calls[0]["plan"] == str(tmp_path / "structrr-diff.yaml")
+    assert agent_calls[0]["proposal_review_receipt"] == str(
+        tmp_path / "proposal-review.json"
+    )
+    assert agent_calls[0]["obligations"]["obligations"]
     assert "The command preserves both greetings." in agent_calls[0]["repair_request"]
     assert "The second greeting is missing." in agent_calls[0]["repair_request"]
     assert "scenario-1" in agent_calls[0]["repair_request"]

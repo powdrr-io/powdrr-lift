@@ -43,10 +43,7 @@ Publisher and plan lookup requests filter to that plan label; the worker asks
 GitHub for open issues with the `powdrr:ready` label and loads dependencies from
 the plan-scoped issue set. These filtered requests avoid scanning unrelated
 repository issues. The body pointer remains the source of truth and is checked
-after GitHub returns the indexed candidates. For issues published before the
-plan label existed, lookup searches the generated title prefix; republishing
-adds the label while preserving the item's queue state. `powdrr-lift
-github-issue-worker`
+after GitHub returns the indexed candidates. `powdrr-lift github-issue-worker`
 selects the lowest-numbered open `ready` item whose dependencies are closed,
 marks it `claimed`, and invokes the existing `process-workflow-task` runtime
 for the workflow named by the pinned plan.

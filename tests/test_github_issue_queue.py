@@ -53,12 +53,6 @@ class FakeIssueClient:
             and (state == "all" or issue.state == state)
         )
 
-    def search_plan_issues(self, plan_id: str) -> tuple[QueueIssue, ...]:
-        title_prefix = f"Powdrr work item: {plan_id}/"
-        return tuple(
-            issue for issue in self.issues if issue.title.startswith(title_prefix)
-        )
-
     def create_issue(
         self, *, body: str, labels: tuple[str, ...], title: str
     ) -> QueueIssue:
@@ -251,7 +245,7 @@ def test_plan_lookup_returns_item_to_issue_status_and_missing_items() -> None:
         "Powdrr work item: feature-v1/base",
         "Reviewed plan pointer",
         "open",
-        (QUEUE_LABELS["claimed"],),
+        (QUEUE_LABELS["claimed"], _plan_label("feature-v1")),
         "https://github.com/example/project/issues/42",
     )
     client = FakeIssueClient((existing_issue,))
@@ -281,7 +275,7 @@ def test_plan_lookup_returns_item_to_issue_status_and_missing_items() -> None:
             42,
             "https://github.com/example/project/issues/42",
             "open",
-            (QUEUE_LABELS["claimed"],),
+            (QUEUE_LABELS["claimed"], _plan_label("feature-v1")),
         ),
         PlanIssueMatch("followup", None, None, None, ()),
     )
@@ -317,35 +311,6 @@ def test_publisher_creates_minimal_pointer_issues_and_is_idempotent() -> None:
     }
     assert "Add the shared base" not in client.issues[0].body
     assert "https://github.com/example/project/blob/" in client.issues[0].body
-
-
-def test_publisher_indexes_reused_legacy_issue_without_changing_queue_state() -> None:
-    legacy = QueueIssue(
-        42,
-        "Powdrr work item: feature-v1/base",
-        "Reviewed plan: link\n\n"
-        "<!-- powdrr-queue-item:v1 "
-        '{"item_id":"base","plan_commit":"'
-        + PLAN_COMMIT
-        + '","plan_id":"feature-v1","plan_path":"docs/plans/feature.yaml"} -->\n',
-        "open",
-        (QUEUE_LABELS["claimed"],),
-        "https://github.com/example/project/issues/42",
-    )
-    client = FakeIssueClient((legacy,))
-
-    report = publish_plan_issues(
-        plan=plan(),
-        plan_path="docs/plans/feature.yaml",
-        plan_commit=PLAN_COMMIT,
-        client=client,  # type: ignore[arg-type]
-    )
-
-    assert report.existing_issue_numbers == (42,)
-    assert client.issues[0].labels == (
-        QUEUE_LABELS["claimed"],
-        _plan_label("feature-v1"),
-    )
 
 
 def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) -> None:

@@ -157,53 +157,6 @@ class GitHubIssueClient:
             )
         return tuple(issues)
 
-    def search_plan_issues(self, plan_id: str) -> tuple[QueueIssue, ...]:
-        """Find older, not-yet-indexed items using their generated title prefix."""
-        query = (
-            f'repo:{self.repository} is:issue in:title "Powdrr work item: {plan_id}"'
-        )
-        result = self._invoke(
-            [
-                "api",
-                "--paginate",
-                "--slurp",
-                f"search/issues?q={quote(query, safe=':')}&per_page=100",
-            ]
-        )
-        try:
-            pages = json.loads(result.stdout)
-        except json.JSONDecodeError as error:
-            raise GitHubIssueQueueError(
-                "gh returned malformed issue search JSON"
-            ) from error
-        values = _flatten_pages(pages)
-        total_count = max(
-            (
-                int(page.get("total_count", 0))
-                for page in values
-                if isinstance(page, Mapping)
-            ),
-            default=0,
-        )
-        if total_count > 1000:
-            raise GitHubIssueQueueError(
-                f"plan {plan_id!r} has over 1,000 legacy issues without a plan label; "
-                "add the plan label to those issues before listing or running it"
-            )
-        issues: list[QueueIssue] = []
-        for page in values:
-            if not isinstance(page, Mapping):
-                continue
-            items = page.get("items", [])
-            if not isinstance(items, list):
-                continue
-            issues.extend(
-                _issue_from_api(json.dumps(value))
-                for value in items
-                if isinstance(value, Mapping)
-            )
-        return tuple(issues)
-
     def create_issue(
         self, *, body: str, labels: Sequence[str], title: str
     ) -> QueueIssue:
@@ -392,11 +345,7 @@ def publish_plan_issues(
     client.ensure_plan_commit_merged(plan_commit)
     client.ensure_queue_labels()
     plan_label = client.ensure_plan_label(plan.plan_id)
-    existing = _plan_issue_index(
-        _plan_issue_candidates(
-            client, plan.plan_id, (item.item_id for item in plan.items)
-        )
-    )
+    existing = _plan_issue_index(client.list_issues(labels=(plan_label,)))
     created: list[int] = []
     reused: list[int] = []
     for item in plan.items:
@@ -423,8 +372,6 @@ def publish_plan_issues(
                     f"{plan.plan_id}/{item.item_id} "
                     "from a different plan revision; use a new plan or item ID"
                 )
-            if plan_label not in issue.labels:
-                client.update_issue(issue, labels=(*issue.labels, plan_label))
             reused.append(issue.number)
             continue
         created_issue = client.create_issue(
@@ -447,9 +394,7 @@ def find_plan_issues(
     """Resolve every plan item to its GitHub issue without mutating GitHub."""
     _validate_plan_reference(plan_path, plan_commit)
     issues_by_item = _plan_issue_index(
-        _plan_issue_candidates(
-            client, plan.plan_id, (item.item_id for item in plan.items)
-        )
+        client.list_issues(labels=(_plan_label(plan.plan_id),))
     )
     matches: list[PlanIssueMatch] = []
     for item in plan.items:
@@ -524,9 +469,7 @@ def run_worker_once(
             indexed = plan_issue_indexes.get(plan.plan_id)
             if indexed is None:
                 indexed = _plan_issue_index(
-                    _plan_issue_candidates(
-                        client, plan.plan_id, (value.item_id for value in plan.items)
-                    )
+                    client.list_issues(labels=(_plan_label(plan.plan_id),))
                 )
                 plan_issue_indexes[plan.plan_id] = indexed
             by_number = {value.number: value for value in indexed.values()}
@@ -766,30 +709,6 @@ def _plan_issue_index(
             )
         indexed[key] = issue
     return indexed
-
-
-def _plan_issue_candidates(
-    client: GitHubIssueClient,
-    plan_id: str,
-    item_ids: Sequence[str] | Iterator[str],
-) -> tuple[QueueIssue, ...]:
-    """Use the plan label first, then search only for missing legacy items."""
-    issues = list(client.list_issues(labels=(_plan_label(plan_id),)))
-    indexed = _plan_issue_index(issues)
-    missing = set(item_ids) - {
-        item_id for found_plan_id, item_id in indexed if found_plan_id == plan_id
-    }
-    if not missing:
-        return tuple(issues)
-    for issue in client.search_plan_issues(plan_id):
-        pointer = parse_issue_pointer(issue.body)
-        if (
-            pointer is not None
-            and pointer["plan_id"] == plan_id
-            and pointer["item_id"] in missing
-        ):
-            issues.append(issue)
-    return tuple(issues)
 
 
 def _replace_queue_status(labels: Sequence[str], status: str) -> tuple[str, ...]:

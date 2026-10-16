@@ -10,10 +10,12 @@ from powdrr_lift.workrr.github_issue_queue import (
     QUEUE_LABELS,
     GitHubIssueClient,
     GitHubIssueQueueError,
+    PlanIssueMatch,
     PlannedWorkItem,
     QueueIssue,
     ReviewedExecutionPlan,
     _parse_plan,
+    find_plan_issues,
     parse_issue_pointer,
     publish_plan_issues,
     run_worker_once,
@@ -205,6 +207,49 @@ def test_publisher_records_verified_merged_commit() -> None:
     )
 
     assert client.merged_commit == PLAN_COMMIT
+
+
+def test_plan_lookup_returns_item_to_issue_status_and_missing_items() -> None:
+    existing_issue = QueueIssue(
+        42,
+        "Powdrr work item: feature-v1/base",
+        "Reviewed plan pointer",
+        "open",
+        (QUEUE_LABELS["claimed"],),
+        "https://github.com/example/project/issues/42",
+    )
+    client = FakeIssueClient((existing_issue,))
+    client.issues[0] = QueueIssue(
+        existing_issue.number,
+        existing_issue.title,
+        "Reviewed plan: link\n\n"
+        "<!-- powdrr-queue-item:v1 "
+        '{"item_id":"base","plan_commit":"'
+        + PLAN_COMMIT
+        + '","plan_id":"feature-v1","plan_path":"docs/plans/feature.yaml"} -->\n',
+        existing_issue.state,
+        existing_issue.labels,
+        existing_issue.url,
+    )
+
+    matches = find_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+
+    assert matches == (
+        PlanIssueMatch(
+            "base",
+            42,
+            "https://github.com/example/project/issues/42",
+            "open",
+            (QUEUE_LABELS["claimed"],),
+        ),
+        PlanIssueMatch("followup", None, None, None, ()),
+    )
+    assert not client.labels_ensured
 
 
 def test_publisher_creates_minimal_pointer_issues_and_is_idempotent() -> None:

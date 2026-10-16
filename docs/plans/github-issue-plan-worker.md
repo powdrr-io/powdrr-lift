@@ -42,6 +42,11 @@ github-issue-worker` selects the lowest-numbered open `ready` item whose
 dependencies are closed, marks it `claimed`, and invokes the existing
 `process-workflow-task` runtime for the workflow named by the pinned plan.
 
+`powdrr-lift list-plan-issues` reads the pinned plan and GitHub issue pointers,
+then prints one result per plan item with its issue number, URL, state, and
+labels. Items without a published issue appear in `missing_item_ids`; the
+lookup does not create issues or change labels.
+
 A successful execution moves the issue to `awaiting-review`; the worker does
 not close it or merge a pull request. A failed execution moves it to `blocked`
 and records a short failure comment. A human may return a blocked item to
@@ -66,6 +71,11 @@ retry it.
 
 ```sh
 powdrr-lift publish-plan-issues \
+  --repository owner/repository \
+  --plan docs/plans/feature-execution-plan.yaml \
+  --plan-commit <merged-plan-commit>
+
+powdrr-lift list-plan-issues \
   --repository owner/repository \
   --plan docs/plans/feature-execution-plan.yaml \
   --plan-commit <merged-plan-commit>

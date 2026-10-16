@@ -235,6 +235,7 @@ from powdrr_lift.workrr.git import (
 from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueClient,
     GitHubIssueQueueError,
+    find_plan_issues,
     load_reviewed_plan_at_commit,
     publish_plan_issues,
     run_worker_once,
@@ -361,6 +362,18 @@ def build_parser() -> argparse.ArgumentParser:
         "--repo-root", type=Path, help="Checkout containing the merged plan revision."
     )
     publish_plan_issues_parser.set_defaults(func=_run_publish_plan_issues)
+
+    list_plan_issues_parser = subparsers.add_parser(
+        "list-plan-issues",
+        help="Read the GitHub issue status for every item in a pinned plan revision.",
+    )
+    list_plan_issues_parser.add_argument("--plan", type=Path, required=True)
+    list_plan_issues_parser.add_argument("--plan-commit", required=True)
+    list_plan_issues_parser.add_argument("--repository", required=True)
+    list_plan_issues_parser.add_argument(
+        "--repo-root", type=Path, help="Checkout containing the pinned plan revision."
+    )
+    list_plan_issues_parser.set_defaults(func=_run_list_plan_issues)
 
     github_issue_worker_parser = subparsers.add_parser(
         "github-issue-worker",
@@ -2651,6 +2664,54 @@ def _run_publish_plan_issues(args: argparse.Namespace) -> int:
                 "plan_commit": report.plan_commit,
                 "created_issue_numbers": report.created_issue_numbers,
                 "existing_issue_numbers": report.existing_issue_numbers,
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
+def _run_list_plan_issues(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    plan_path = args.plan
+    if plan_path.is_absolute():
+        try:
+            plan_path = plan_path.resolve().relative_to(repo_root.resolve())
+        except ValueError:
+            print("Plan path must be inside the repository checkout.", file=sys.stderr)
+            return 2
+    normalized_plan_path = plan_path.as_posix()
+    try:
+        plan = load_reviewed_plan_at_commit(
+            normalized_plan_path, args.plan_commit, repo_root=repo_root
+        )
+        matches = find_plan_issues(
+            plan=plan,
+            plan_path=normalized_plan_path,
+            plan_commit=args.plan_commit,
+            client=GitHubIssueClient(args.repository),
+        )
+    except GitHubIssueQueueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "plan_id": plan.plan_id,
+                "plan_commit": args.plan_commit,
+                "issues": [
+                    {
+                        "item_id": match.item_id,
+                        "issue_number": match.issue_number,
+                        "url": match.url,
+                        "state": match.state,
+                        "labels": match.labels,
+                    }
+                    for match in matches
+                ],
+                "missing_item_ids": [
+                    match.item_id for match in matches if match.issue_number is None
+                ],
             },
             indent=2,
         )

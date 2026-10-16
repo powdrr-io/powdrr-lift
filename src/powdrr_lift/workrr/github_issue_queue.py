@@ -69,6 +69,15 @@ class PublishReport:
 
 
 @dataclass(frozen=True, slots=True)
+class PlanIssueMatch:
+    item_id: str
+    issue_number: int | None
+    url: str | None
+    state: str | None
+    labels: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class WorkerReport:
     outcome: str
     issue_number: int | None = None
@@ -354,6 +363,45 @@ def publish_plan_issues(
         created.append(created_issue.number)
         existing[key] = created_issue
     return PublishReport(plan.plan_id, plan_commit, tuple(created), tuple(reused))
+
+
+def find_plan_issues(
+    *,
+    plan: ReviewedExecutionPlan,
+    plan_path: str,
+    plan_commit: str,
+    client: GitHubIssueClient,
+) -> tuple[PlanIssueMatch, ...]:
+    """Resolve every plan item to its GitHub issue without mutating GitHub."""
+    _validate_plan_reference(plan_path, plan_commit)
+    issues_by_item = _plan_issue_index(client.list_issues())
+    matches: list[PlanIssueMatch] = []
+    for item in plan.items:
+        issue = issues_by_item.get((plan.plan_id, item.item_id))
+        if issue is None:
+            matches.append(PlanIssueMatch(item.item_id, None, None, None, ()))
+            continue
+        expected_pointer = {
+            "plan_id": plan.plan_id,
+            "item_id": item.item_id,
+            "plan_path": plan_path,
+            "plan_commit": plan_commit,
+        }
+        if parse_issue_pointer(issue.body) != expected_pointer:
+            raise GitHubIssueQueueError(
+                f"issue #{issue.number} for {plan.plan_id}/{item.item_id} "
+                "points to a different plan revision"
+            )
+        matches.append(
+            PlanIssueMatch(
+                item.item_id,
+                issue.number,
+                issue.url,
+                issue.state,
+                issue.labels,
+            )
+        )
+    return tuple(matches)
 
 
 def run_worker_once(

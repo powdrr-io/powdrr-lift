@@ -628,7 +628,9 @@ class RepairProbePlanningClient(ProbeEnabledPlanningClient):
                     {
                         "probe_id": "greeting-count",
                         "scenario_id": "scenario:instruction-001",
-                        "oracle_basis": "The instruction requires greeting_count() to return 2.",
+                        "oracle_basis": (
+                            "The instruction requires greeting_count() to return 2."
+                        ),
                         "test_source": (
                             "import hello_world\n"
                             "def test_probe_greeting_count():\n"
@@ -1202,10 +1204,7 @@ def test_deepswe_state_data_instructions_produce_valid_test_contracts(
     assert result.status == "completed", planner.proposal_decision_ids
     assert result.plan_path.is_file()
     run_root = (
-        repo
-        / ".powdrr"
-        / "feature-runs"
-        / "python-statemachine-state-data-scoping"
+        repo / ".powdrr" / "feature-runs" / "python-statemachine-state-data-scoping"
     )
     prompt_files = list((run_root / "artifacts" / "prompts").glob("*.txt"))
     assert prompt_files

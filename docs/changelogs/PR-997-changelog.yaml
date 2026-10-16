@@ -1,25 +1,40 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 997
-title: Preserve inputs for candidate repair runs
+title: Guard prompt generation and candidate repair handoffs
 intent:
-  problem: Post-coding repairs failed before reaching the coding agent because the repair call omitted required implementation bindings.
-  goal: Resume the same code task with its original validated inputs and a tailored repair request.
+  problem: Some feature runs failed before a coding prompt was generated, and the existing repair path could fail before dispatching its tailored prompt.
+  goal: Preserve accepted task context across repair calls and exercise prompt generation through initial and repair runs.
 human-decisions: []
 structured_files: []
 files:
   - path: src/powdrr_lift/workrr/feature_endpoint.py
     type: modified
-    span: {start_line: 6244, end_line: 6248}
+    span: {start_line: 2370, end_line: 2370}
+    summary: Create nested output directories before writing implementation artifacts.
+    rationale: Allow candidate-correction runs to produce prompts and packets in their own artifact directory.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2403, end_line: 2408}
+    summary: Reuse the accepted proposal ID when preparing a repair request.
+    rationale: Keep the proposal fingerprint stable while repair attempts use unique artifact names.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2410, end_line: 2410}
+    summary: Compile the repair proposal with the accepted proposal ID.
+    rationale: Avoid treating an attempt-specific artifact slug as a new proposal revision.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6251, end_line: 6255}
     summary: Save the resolved parameters from the original code-task invocation.
     rationale: Make baseline, proposal, obligations, and task context available to a later correction.
   - path: src/powdrr_lift/workrr/feature_endpoint.py
     type: modified
-    span: {start_line: 7112, end_line: 7121}
+    span: {start_line: 7119, end_line: 7128}
     summary: Load the saved code-task parameters for candidate correction.
     rationale: Fail clearly if a correction has no original task context.
   - path: src/powdrr_lift/workrr/feature_endpoint.py
     type: modified
-    span: {start_line: 7200, end_line: 7203}
+    span: {start_line: 7207, end_line: 7210}
     summary: Pass original task parameters together with the tailored repair request.
     rationale: Allow the correction phase to build and dispatch a valid implementation request.
   - path: tests/test_feature_endpoint.py
@@ -37,11 +52,44 @@ files:
     span: {start_line: 2657, end_line: 2662}
     summary: Assert baseline, proposal, and obligation bindings reach the repair invocation.
     rationale: Prevent future repair calls from dropping the context required by the coding-agent runner.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 615, end_line: 642}
+    summary: Add a deterministic planning client that emits an instruction-derived repair probe.
+    rationale: Exercise probe failure and repair behavior without a live planning model.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 780, end_line: 784}
+    summary: Allow the fake coding agent to apply a repair on its second invocation.
+    rationale: Simulate a repair response while keeping the integration test deterministic.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 809, end_line: 824}
+    summary: Track fake coding-agent attempts and apply the repair edit on retry.
+    rationale: Make the end-to-end repair path observable in the candidate tree.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 832, end_line: 832}
+    summary: Include repair behavior in the generated fake coding-agent executable.
+    rationale: Use one test worker for both the initial implementation and repair prompt.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 1003, end_line: 1059}
+    summary: Verify a failed post-run probe generates a tailored repair prompt and the repaired candidate passes the probe.
+    rationale: Catch failures before repair reaches the coding agent, including missing bindings, proposal identity drift, and missing artifact directories.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 1204, end_line: 1218}
+    summary: Verify a long DeepSWE instruction produces provider-ready coding prompts.
+    rationale: Protect prompt generation for a multi-obligation task shape, not only the small greeting fixture.
 entities:
   - id: candidate-repair-parameter-binding
     type: Function
     action: added
   - id: candidate-repair-regression-tests
+    type: Regression test
+    action: added
+  - id: headless-prompt-generation-tests
     type: Regression test
     action: added
 entity_relationships:

@@ -1,0 +1,144 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 993
+title: Improve headless candidate structural validation
+intent:
+  problem: Post-coding Structrr comparison can mistake flexible implementation choices and source-span shifts for missing or unexplained work, and it does not clearly separate behavior evidence from expected code changes.
+  goal: Make headless candidate validation report required structural outcomes, flexible locations, validation evidence requests, and reviewable additions distinctly.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 17, end_line: 17}
+    summary: Version the candidate comparison report for the expanded structural validation fields.
+    rationale: Distinguish the updated report contract from prior comparison artifacts.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 85, end_line: 85}
+    summary: Accept behavior validation expectations as inputs to candidate comparison.
+    rationale: Keep evidence expectations alongside structural results.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 107, end_line: 116}
+    summary: Filter source-subject changes that only reflect extracted span movement.
+    rationale: Prevent line-number shifts from appearing as missing implementation work.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 163, end_line: 171}
+    summary: Match named planned symbols at another path within the declared implementation scope.
+    rationale: Accept equivalent allowed code organization while retaining symbol and kind checks.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 175, end_line: 180}
+    summary: Record flexible symbol match mode and the path where the symbol was found.
+    rationale: Make location-flexible fulfillment auditable.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 210, end_line: 217}
+    summary: Include match details in candidate comparison findings.
+    rationale: Expose how required structural outcomes were satisfied.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 237, end_line: 237}
+    summary: Classify in-scope added symbols for semantic review.
+    rationale: Keep additions visible without treating all helper symbols as blockers.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 246, end_line: 246}
+    summary: Identify structural finding statuses that remain automatic blockers.
+    rationale: Keep failures for unmet requirements distinct from additions routed to review.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 250, end_line: 258}
+    summary: Exclude reviewable in-scope implementation and validation additions from automatic structural blockers.
+    rationale: Route these additions to semantic review while preserving other structural failures.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 269, end_line: 283}
+    summary: Report ignored span noise, grouped reviewable additions, and normalized validation expectations.
+    rationale: Make post-coding evidence and review targets available in run artifacts.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 299, end_line: 496}
+    summary: Add helpers for flexible symbol matching, noise filtering, review grouping, and validation expectation normalization.
+    rationale: Implement the new comparison classifications as explicit, inspectable rules.
+  - path: src/powdrr_lift/structrr/candidate_comparison.py
+    type: modified
+    span: {start_line: 601, end_line: 609}
+    summary: Validate repository-relative implementation paths before flexible matching.
+    rationale: Keep matching scopes confined to valid repository paths.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6625, end_line: 6627}
+    summary: Pass plan-derived validation expectations into candidate comparison.
+    rationale: Connect task requirements to post-coding evidence reporting.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6770, end_line: 6773}
+    summary: Direct final review to inspect grouped implementation additions and behavioral evidence.
+    rationale: Give reviewers concrete guidance for interpreting nonblocking structural details.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6821, end_line: 6826}
+    summary: Include reviewable additions and validation expectations in final comparison data.
+    rationale: Preserve the evidence in the headless run receipt.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 7237, end_line: 7237}
+    summary: Clarify structural gate behavior for additions that need semantic review.
+    rationale: Document how the gate routes implementation details.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 7267, end_line: 7275}
+    summary: Allow review-required in-scope additions through the structural gate.
+    rationale: Preserve them for semantic review instead of requesting their removal.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 7288, end_line: 7300}
+    summary: Extract expected tests and required test cases from the plan.
+    rationale: Treat them as evidence requests rather than required patch paths.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 7470, end_line: 7473}
+    summary: Preserve grouped structural review details and validation expectations in final review results.
+    rationale: Keep final review output aligned with the comparison report.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 7548, end_line: 7549}
+    summary: Add reviewable additions and validation expectations to the run receipt.
+    rationale: Make post-coding evidence available to benchmark consumers.
+  - path: tests/test_candidate_comparison.py
+    type: modified
+    span: {start_line: 202, end_line: 354}
+    summary: Test span-noise filtering, flexible symbol matching, grouped additions, and validation evidence requests.
+    rationale: Lock the comparison behavior to deterministic regression expectations.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 60, end_line: 60}
+    summary: Import the plan expectation extraction helper for focused endpoint coverage.
+    rationale: Test the evidence-routing behavior directly.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2420, end_line: 2487}
+    summary: Test structural review routing and ensure test expectations do not require test-file edits.
+    rationale: Protect benchmark/headless final review behavior.
+entities:
+  - id: headless-structural-candidate-comparison
+    type: Function
+    action: added
+  - id: headless-candidate-review
+    type: Function
+    action: added
+  - id: structural-candidate-comparison-regressions
+    type: Regression test
+    action: added
+invariants:
+  - id: behavioral-evidence-does-not-require-test-file-edits
+    description: Test expectations are reported as validation evidence requests and are not treated as required candidate patch paths.
+    action: added
+  - id: span-only-structrr-changes-do-not-block-candidate-review
+    description: Source-subject changes limited to extracted line spans are summarized as noise and do not create structural blockers.
+    action: added
+  - id: in-scope-implementation-details-remain-reviewable
+    description: Added implementation and test symbols within accepted paths remain visible for final semantic review without automatically blocking the structural gate.
+    action: added

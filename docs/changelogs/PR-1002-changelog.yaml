@@ -1,0 +1,78 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1002
+title: Generate reviewable issue plans from Markdown proposals
+intent:
+  problem: The issue queue publisher accepts reviewed execution plans, but Powdrr has no plan-only command to derive one from an existing implementation proposal.
+  goal: Add a CLI that generates a dependency-ordered, schema-validated execution plan for human review without publishing issues or executing work.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 37, end_line: 52}
+    summary: Document the plan-only command and its inputs, output, and review boundary.
+    rationale: Explain how to generate a candidate execution plan before issue publication.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 235, end_line: 238}
+    summary: Import the execution-plan generator into the CLI.
+    rationale: Connect the plan-only command to the shared generation function.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 370, end_line: 391}
+    summary: Add the plan-issues command and its plan, workflow, provider, and output options.
+    rationale: Expose a review-only plan generation entry point.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2663, end_line: 2758}
+    summary: Read the source plan, generate and validate issue-plan YAML, then stage the candidate file.
+    rationale: Keep issue publication and execution outside the planning operation.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: added
+    span: {start_line: 1, end_line: 202}
+    summary: Add schema-constrained plan decomposition and validation against the existing execution-plan contract.
+    rationale: Prevent malformed model output, missing dependencies, cycles, and dependency-order errors from becoming review artifacts.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 305, end_line: 310}
+    summary: Expose the execution-plan YAML parser for generated-plan validation.
+    rationale: Reuse the queue's authoritative parser before writing candidate plans.
+  - path: tests/test_github_issue_plan_generation.py
+    type: added
+    span: {start_line: 1, end_line: 173}
+    summary: Cover valid generation, malformed plans, dependency ordering, and CLI output staging.
+    rationale: Verify generated files match the publisher's plan contract and remain review-only.
+entities:
+  - id: plan-issues
+    type: Subcommand
+    action: added
+  - id: generate_execution_plan_yaml
+    type: Function
+    action: added
+  - id: parse_reviewed_plan_yaml
+    type: Function
+    action: added
+  - id: plan-issue-plan-generation-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: plan-generation-tests-verify-execution-plan-generation
+    type: verifies
+    source: plan-issue-plan-generation-tests
+    target: generate_execution_plan_yaml
+    action: added
+    description: Regression tests verify valid plans are compiled and invalid model responses are rejected.
+invariants:
+  - id: plan-issues-stops-before-publication
+    description: Generating a candidate execution plan never creates GitHub issues or starts the worker.
+    action: added
+  - id: generated-execution-plan-matches-queue-contract
+    description: Candidate plans pass the same parser used by the GitHub issue queue before they are written.
+    action: added
+  - id: generated-plan-dependencies-are-ordered
+    description: Every dependency appears earlier than its dependent item in the generated plan.
+    action: added
+guidance:
+  - id: review-execution-plan-before-publishing
+    description: Commit and review the generated execution plan before publishing issues from its merged revision.
+    action: added

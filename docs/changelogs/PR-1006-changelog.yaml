@@ -1,0 +1,128 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1006
+title: Add bounded pre-coding behavior-probe repair
+intent:
+  problem: Weak behavior probes reach the coding agent with only advisory feedback, and there is no saved record of a repair attempt.
+  goal: Revise degraded probes once before coding, retain only revisions accepted by existing scenario faithfulness checks, and preserve the original, candidate, and final probe sets with readiness results.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 19, end_line: 19}
+    summary: Import the behavior-scenario compiler for accepted revisions.
+    rationale: Recompile revised scenarios before placing them in the implementation packet.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 128, end_line: 128}
+    summary: Add the pre-coding probe-repair stage to feature execution.
+    rationale: Run the bounded revision step before the first coding-agent invocation.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 669, end_line: 669}
+    summary: Retain the selected faithfulness classifier for revision checks.
+    rationale: Reuse the classifier configured by the existing planning flow.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2630, end_line: 2679}
+    summary: Revise degraded scenarios once and persist the repair record before coding.
+    rationale: Make repaired probes the candidate acceptance contract while retaining originals and continuing with degraded findings when checks reject a change.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2726, end_line: 2746}
+    summary: Add the repair artifact reference and fingerprint to the implementation packet.
+    rationale: Let saved worker input point to the probe history used to build it.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2748, end_line: 2748}
+    summary: Serialize the packet with its repair provenance.
+    rationale: Include the repair artifact reference in the persisted packet.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2842, end_line: 2842}
+    summary: Rename the existing worker ledger variable to avoid shadowing repair inputs.
+    rationale: Keep repair and worker-context source data separately typed.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2847, end_line: 2847}
+    summary: Use the worker-specific instruction ledger value.
+    rationale: Preserve instruction-clause context in the coding prompt.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2850, end_line: 2850}
+    summary: Use the worker-specific instruction ledger value when building context.
+    rationale: Avoid reusing the separate source data passed to probe repair.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 6914, end_line: 6919}
+    summary: Include probe-repair status and artifact path in final review metadata.
+    rationale: Make the pre-coding result visible with post-run review artifacts.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 7591, end_line: 7593}
+    summary: Return probe-repair metadata in the run result.
+    rationale: Expose whether probes were repaired, partial, unavailable, or unnecessary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 7659, end_line: 7659}
+    summary: Bind probe-repair metadata into the final review receipt.
+    rationale: Preserve the pre-coding artifact reference in the final receipt.
+  - path: src/powdrr_lift/workrr/probe_repair.py
+    type: added
+    span: {start_line: 1, end_line: 322}
+    summary: Generate one targeted probe revision and validate it against schema, readiness, and scenario-claim faithfulness.
+    rationale: Keep only source-faithful revisions, record rejected or unavailable checks, and fail open to the accepted original scenarios.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 593, end_line: 618}
+    summary: Provide deterministic repaired probe and faithfulness responses for the end-to-end flow.
+    rationale: Exercise the extra pre-coding model boundary without live providers.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 641, end_line: 661}
+    summary: Add a planning client that deliberately generates one weak probe.
+    rationale: Ensure the end-to-end flow reaches the repair path.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 971, end_line: 971}
+    summary: Use the weak-probe client in the complete feature flow.
+    rationale: Test repair before the deterministic coding worker starts.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 983, end_line: 993}
+    summary: Assert that the repair artifact preserves the original and accepted scenarios.
+    rationale: Verify the model revision passed readiness and faithfulness checks before coding.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 1019, end_line: 1022}
+    summary: Verify the implementation packet references the repair artifact.
+    rationale: Keep the saved coding input traceable to the repaired probes.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 1028, end_line: 1028}
+    summary: Assert the coding prompt includes the repaired observable outcome.
+    rationale: Verify MiniSWE receives the accepted revision rather than the weak source restatement.
+  - path: tests/test_probe_repair.py
+    type: added
+    span: {start_line: 1, end_line: 138}
+    summary: Cover successful, rejected, and malformed-response repair outcomes.
+    rationale: Protect fail-open behavior and ensure only faithfulness-accepted revisions replace the original probe.
+entities:
+  - id: pre-coding-behavior-probe-repair
+    type: Code quality gate
+    action: added
+  - id: pre-coding-probe-repair-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: probe-repair-is-verified
+    type: verified by
+    source: pre-coding-behavior-probe-repair
+    target: pre-coding-probe-repair-tests
+    action: added
+    description: Deterministic tests verify accepted revision, fail-open rejection, and persisted handoff.
+invariants:
+  - id: probe-repair-does-not-block-coding
+    description: A single targeted revision is attempted for degraded text probes; malformed or unfaithful revisions are discarded, the original probes remain available to coding, and repair status and both versions are persisted.
+    action: added
+guidance: []

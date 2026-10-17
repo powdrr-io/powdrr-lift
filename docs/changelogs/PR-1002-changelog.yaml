@@ -20,7 +20,7 @@ files:
   - path: src/powdrr_lift/cli.py
     type: modified
     span: {start_line: 370, end_line: 391}
-    summary: Add the plan-issues command and its plan, workflow, provider, and output options.
+    summary: Add the plan command and its plan, workflow, provider, and output options.
     rationale: Expose a review-only plan generation entry point.
   - path: src/powdrr_lift/cli.py
     type: modified
@@ -43,7 +43,7 @@ files:
     summary: Cover valid generation, malformed plans, dependency ordering, and CLI output staging.
     rationale: Verify generated files match the publisher's plan contract and remain review-only.
 entities:
-  - id: plan-issues
+  - id: plan
     type: Subcommand
     action: added
   - id: generate_execution_plan_yaml
@@ -63,7 +63,7 @@ entity_relationships:
     action: added
     description: Regression tests verify valid plans are compiled and invalid model responses are rejected.
 invariants:
-  - id: plan-issues-stops-before-publication
+  - id: plan-stops-before-publication
     description: Generating a candidate execution plan never creates GitHub issues or starts the worker.
     action: added
   - id: generated-execution-plan-matches-queue-contract

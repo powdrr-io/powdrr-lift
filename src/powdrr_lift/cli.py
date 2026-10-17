@@ -367,27 +367,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     publish_plan_issues_parser.set_defaults(func=_run_publish_plan_issues)
 
-    plan_issues_parser = subparsers.add_parser(
-        "plan-issues",
+    plan_parser = subparsers.add_parser(
+        "plan",
         help=(
             "Analyze a Markdown plan and write a reviewable GitHub issue "
             "execution plan."
         ),
     )
-    plan_issues_parser.add_argument("--source", type=Path, required=True)
-    plan_issues_parser.add_argument("--plan-id", required=True)
-    plan_issues_parser.add_argument("--workflow-directory", required=True)
-    plan_issues_parser.add_argument("--workflow-id", required=True)
-    plan_issues_parser.add_argument("--output", type=Path)
-    plan_issues_parser.add_argument("--repo-root", type=Path)
-    plan_issues_parser.add_argument(
+    plan_parser.add_argument("--source", type=Path, required=True)
+    plan_parser.add_argument("--plan-id", required=True)
+    plan_parser.add_argument("--workflow-directory", required=True)
+    plan_parser.add_argument("--workflow-id", required=True)
+    plan_parser.add_argument("--output", type=Path)
+    plan_parser.add_argument("--repo-root", type=Path)
+    plan_parser.add_argument(
         "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
     )
-    plan_issues_parser.add_argument("--planning-model")
-    plan_issues_parser.add_argument("--planning-api-key")
-    plan_issues_parser.add_argument("--planning-base-url")
-    plan_issues_parser.add_argument("--json", action="store_true")
-    plan_issues_parser.set_defaults(func=_run_plan_issues)
+    plan_parser.add_argument("--planning-model")
+    plan_parser.add_argument("--planning-api-key")
+    plan_parser.add_argument("--planning-base-url")
+    plan_parser.add_argument("--json", action="store_true")
+    plan_parser.set_defaults(func=_run_plan)
 
     list_plan_issues_parser = subparsers.add_parser(
         "list-plan-issues",
@@ -2660,7 +2660,7 @@ def _run_repository_state(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_plan_issues(args: argparse.Namespace) -> int:
+def _run_plan(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root).resolve()
     try:
         source_path = _repository_file_path(args.source, repo_root, "Source plan")

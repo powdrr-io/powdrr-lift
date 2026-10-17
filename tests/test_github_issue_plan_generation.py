@@ -127,7 +127,7 @@ def test_generate_execution_plan_yaml_rejects_empty_and_oversized_sources() -> N
         )
 
 
-def test_plan_issues_cli_writes_and_stages_reviewable_plan(
+def test_plan_cli_writes_and_stages_reviewable_plan(
     tmp_path: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     source = tmp_path / "proposal.md"
@@ -152,7 +152,7 @@ def test_plan_issues_cli_writes_and_stages_reviewable_plan(
 
     status = cli.main(
         [
-            "plan-issues",
+            "plan",
             "--source",
             str(source),
             "--plan-id",

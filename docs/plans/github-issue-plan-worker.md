@@ -34,7 +34,7 @@ and an existing durable workflow. Dependencies must name items in the same
 plan and form an acyclic graph. Publish only after the plan review PR merges;
 the publisher pins each issue to that merge commit.
 
-`powdrr-lift plan-issues` analyzes a Markdown proposal and writes a candidate
+`powdrr-lift plan` analyzes a Markdown proposal and writes a candidate
 document using this schema. It does not create GitHub issues or execute work.
 The caller supplies one existing workflow reference for all generated items;
 reviewers can edit the generated YAML before committing it. The command refuses
@@ -42,7 +42,7 @@ to overwrite an existing output file and stages a newly generated file in the
 current checkout.
 
 ```sh
-powdrr-lift plan-issues \
+powdrr-lift plan \
   --source docs/plans/feature-proposal.md \
   --plan-id feature-key-v1 \
   --workflow-directory docs/workflows/implement-pr \

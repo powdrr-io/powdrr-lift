@@ -302,7 +302,12 @@ def load_reviewed_plan(
             raise GitHubIssueQueueError(
                 "plan path must be inside the repository"
             ) from error
-    return _parse_plan(path.read_text(encoding="utf-8"))
+    return parse_reviewed_plan_yaml(path.read_text(encoding="utf-8"))
+
+
+def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
+    """Parse and validate a GitHub issue execution plan document."""
+    return _parse_plan(text)
 
 
 def load_reviewed_plan_at_commit(

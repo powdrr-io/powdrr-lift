@@ -1,0 +1,88 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1004
+title: Make behavior-probe readiness actionable before coding
+intent:
+  problem: The worker prompt could contain generic behavior probes that were only flagged during post-coding review.
+  goal: Diagnose weak probe setup, operation, and expected outcome separately, then give the coding agent scenario-specific repair guidance before implementation.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 11, end_line: 12}
+    summary: Reuse the behavior-probe quality findings.
+    rationale: Apply the same probe checks before the coding agent starts.
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 106, end_line: 143}
+    summary: Record probe readiness against setup, operation, and outcome criteria.
+    rationale: Show which parts of the probe set need improvement instead of reducing all weak probes to one status.
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 159, end_line: 165}
+    summary: Persist the versioned probe-readiness result with criterion statuses and findings.
+    rationale: Make probe quality and its limits visible in the saved packet artifact.
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 283, end_line: 312}
+    summary: Include each weak scenario and its failed criteria in worker guidance.
+    rationale: Give MiniSWE a specific, source-grounded probe repair before coding without blocking implementation.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 519, end_line: 519}
+    summary: Start tracking criteria failed by each weak probe.
+    rationale: Report concrete quality dimensions rather than an unexplained degraded label.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 521, end_line: 521}
+    summary: Mark generic operations as lacking operation specificity.
+    rationale: Distinguish an actionable event from a placeholder phrase.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 524, end_line: 524}
+    summary: Mark repeated setup and outcome text as failures of specificity and observability.
+    rationale: Identify probes that cannot show an independent outcome.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 527, end_line: 527}
+    summary: Mark meta-level setup text as non-specific.
+    rationale: Ask for a concrete scenario precondition.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 532, end_line: 532}
+    summary: Mark an expected result that repeats its source clause as unobservable.
+    rationale: Require a testable effect instead of a paraphrase.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 538, end_line: 538}
+    summary: Classify probe findings by failed setup, operation, or outcome criterion.
+    rationale: Keep the readiness report actionable and explain why each scenario is weak.
+  - path: tests/test_behavior_contract.py
+    type: modified
+    span: {start_line: 155, end_line: 157}
+    summary: Assert that probe findings identify each failed quality criterion.
+    rationale: Protect the diagnostic detail used by readiness metadata and repair guidance.
+  - path: tests/test_behavior_contract.py
+    type: modified
+    span: {start_line: 182, end_line: 279}
+    summary: Verify criterion-level readiness, scenario-specific repair guidance, and ready/not-applicable states.
+    rationale: Protect the expanded quality report and worker prompt behavior.
+entities:
+  - id: behavior-probe-readiness-guidance
+    type: Code quality gate
+    action: added
+  - id: behavior-probe-readiness-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: readiness-guidance-is-tested
+    type: verified by
+    source: behavior-probe-readiness-guidance
+    target: behavior-probe-readiness-regression-tests
+    action: added
+    description: Regression tests verify the readiness status and the instructions rendered for weak probes.
+invariants:
+  - id: weak-probes-are-addressed-before-coding
+    description: Generic or tautological behavior probes identify failed setup, operation, or outcome criteria and the initial worker prompt gives scenario-specific, source-grounded repair guidance before code changes; the coding stage is not blocked.
+    action: added
+guidance: []

@@ -86,6 +86,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _render_pull_request_body,
     _resolve_bootstrap_subject_binding,
     _run_code_task_agent,
+    _run_code_agent_phase,
     _structrr_taxonomy_path,
     _task_structrr_changes,
     _update_plan_from_sentence_trace,
@@ -2506,6 +2507,16 @@ def test_candidate_correction_obeys_configured_repair_limit(
             "actual_diff_path": "actual-diff.json",
         },
         "validation_profiles": (),
+        "proposal_revision": compile_proposal_revision(
+            "candidate-correction",
+            {},
+            {},
+            acceptance_criteria=(),
+            must_preserve=(),
+            non_goals=(),
+            allowed_paths=(),
+            source_refs=(),
+        ),
         "code_task_agent_parameters": {
             "baseline": str(tmp_path / "baseline.yaml"),
             "plan": str(tmp_path / "structrr-diff.yaml"),
@@ -2519,11 +2530,13 @@ def test_candidate_correction_obeys_configured_repair_limit(
         },
     }
     agent_attempts: list[dict[str, Any]] = []
+    agent_slugs: list[str] = []
     generated_reviews = iter(review_outcomes)
 
     def run_agent(*args: Any, **kwargs: Any) -> dict[str, Any]:
         del args
         agent_attempts.append(kwargs["parameters"])
+        agent_slugs.append(kwargs["slug"])
         return {"attempt": {"status": "completed"}}
 
     def prepare_review(*args: Any, **kwargs: Any) -> dict[str, Any]:
@@ -2569,6 +2582,10 @@ def test_candidate_correction_obeys_configured_repair_limit(
             break
 
     assert len(agent_attempts) == expected_agent_attempts
+    assert agent_slugs == [
+        f"candidate-correction-structrr-correction-{index}"
+        for index in range(1, expected_agent_attempts + 1)
+    ]
     assert result["done"] is True
     assert result["review"]["candidate_structural_gate_passed"] is (review_outcomes[-1])
 
@@ -2599,6 +2616,16 @@ def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(
     state: dict[str, Any] = {
         "latest_candidate_review": review,
         "validation_profiles": (),
+        "proposal_revision": compile_proposal_revision(
+            "instruction-repair",
+            {},
+            {},
+            acceptance_criteria=(),
+            must_preserve=(),
+            non_goals=(),
+            allowed_paths=(),
+            source_refs=(),
+        ),
         "code_task_agent_parameters": {
             "baseline": str(tmp_path / "baseline.yaml"),
             "plan": str(tmp_path / "structrr-diff.yaml"),
@@ -2612,10 +2639,12 @@ def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(
         },
     }
     agent_calls: list[dict[str, Any]] = []
+    agent_slugs: list[str] = []
 
     def run_agent(*args: Any, **kwargs: Any) -> dict[str, Any]:
         del args
         agent_calls.append(kwargs["parameters"])
+        agent_slugs.append(kwargs["slug"])
         return {"attempt": {"status": "completed"}}
 
     def prepare_review(*args: Any, **kwargs: Any) -> dict[str, Any]:
@@ -2654,6 +2683,7 @@ def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(
     )
 
     assert len(agent_calls) == 1
+    assert agent_slugs == ["instruction-repair-structrr-correction-1"]
     assert agent_calls[0]["baseline"] == str(tmp_path / "baseline.yaml")
     assert agent_calls[0]["plan"] == str(tmp_path / "structrr-diff.yaml")
     assert agent_calls[0]["proposal_review_receipt"] == str(
@@ -2667,6 +2697,81 @@ def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(
     assert result["done"] is False
 
 
+def test_code_agent_phase_revalidates_correction_against_accepted_proposal_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import powdrr_lift.workrr.feature_endpoint as endpoint
+
+    baseline_path = tmp_path / "docs/structrr/current/baseline.yaml"
+    plan_path = tmp_path / "docs/proposals/task/structrr-diff.yaml"
+    obligations_path = tmp_path / "feature-obligations.json"
+    procedrr_path = tmp_path / "docs/procedrr/skill-definitions/implement-feature.yaml"
+    proposal_id = "accepted-task-proposal"
+    accepted_proposal = compile_proposal_revision(
+        proposal_id,
+        {},
+        {},
+        acceptance_criteria=(),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src",),
+        source_refs=(
+            f"structrr:{baseline_path.relative_to(tmp_path)}",
+            f"structrr-diff:{plan_path.relative_to(tmp_path)}",
+            f"procedrr:{procedrr_path.relative_to(tmp_path)}",
+            f"obligations:{obligations_path.relative_to(tmp_path)}",
+        ),
+    )
+    proposal_path = plan_path.parent / "proposal-revision.json"
+    proposal_path.parent.mkdir(parents=True)
+    proposal_path.write_text("{}\n", encoding="utf-8")
+
+    class ProposalValidationReached(Exception):
+        pass
+
+    def validate_proposal(_path: Path, expected: Any) -> None:
+        assert expected.proposal_id == proposal_id
+        raise ProposalValidationReached
+
+    monkeypatch.setattr(
+        endpoint, "_load_implementation_plan", lambda *_args: ((), (), (), (), ())
+    )
+    monkeypatch.setattr(endpoint, "_load_yaml_mapping", lambda _path: {})
+    monkeypatch.setattr(endpoint, "_require_required_test_cases", lambda _plan: ())
+    monkeypatch.setattr(
+        endpoint, "_validate_procedrr_flow", lambda _worktree: procedrr_path
+    )
+    monkeypatch.setattr(endpoint, "validate_proposal_revision", validate_proposal)
+
+    with pytest.raises(ProposalValidationReached):
+        _run_code_agent_phase(
+            FeatureEndpointConfig(
+                feature_description="Implement the task.",
+                work_item_name="task",
+                repo_root=tmp_path,
+                allowed_paths=("src",),
+            ),
+            runner=lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, "", ""),
+            worktree=tmp_path,
+            output_root=tmp_path / "candidate-corrections",
+            branch="feature",
+            slug="task-structrr-correction-1",
+            state={
+                "baseline_path": baseline_path,
+                "plan_path": plan_path,
+                "proposal_revision": accepted_proposal,
+            },
+            parameters={
+                "baseline": str(baseline_path),
+                "plan": str(plan_path),
+                "feature_description": "Implement the task.",
+                "work_item_name": "task",
+                "obligations": {
+                    "path": str(obligations_path),
+                    "obligations": [{"description": "Implement the task."}],
+                },
+            },
+        )
 @pytest.mark.parametrize(
     ("outcome", "accepted"), [("pass", True), ("unknown", False), ("fail", False)]
 )

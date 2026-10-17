@@ -7195,6 +7195,11 @@ def _correct_candidate_from_structrr_diff(
         f"Actual diff artifact: {review.get('actual_diff_path', '')}\n"
         "Reported gaps:\n" + "\n".join(f"- {item}" for item in correction_items)
     )
+    accepted_proposal = state.get("proposal_revision")
+    if not isinstance(accepted_proposal, ProposalRevision):
+        raise PowdrrExecutionError(
+            "candidate correction requires the accepted proposal revision"
+        )
     state["candidate_correction_attempts"] = attempts + 1
     _run_code_agent_phase(
         config,

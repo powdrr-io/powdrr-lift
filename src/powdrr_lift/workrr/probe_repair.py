@@ -243,16 +243,10 @@ def _check_revised_scenario_faithfulness(
             for key, value in faithfulness_artifact.items()
             if key != "fingerprint"
         }
-        original_without_ref = {
-            key: value for key, value in original.items() if key != "faithfulness_ref"
-        }
-        if (
-            fingerprint != reference.get("fingerprint")
-            or fingerprint != content_fingerprint(artifact_body)
-            or faithfulness_artifact.get("scenario_fingerprint")
-            != content_fingerprint(original_without_ref)
-        ):
-            raise ValueError("faithfulness artifact does not match original scenario")
+        if fingerprint != reference.get(
+            "fingerprint"
+        ) or fingerprint != content_fingerprint(artifact_body):
+            raise ValueError("faithfulness artifact fingerprint is invalid")
         source_ref = faithfulness_artifact.get("source_ref")
         if not isinstance(source_ref, str) or not source_ref.strip():
             raise ValueError("faithfulness artifact has no source reference")

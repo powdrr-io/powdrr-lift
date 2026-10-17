@@ -69,7 +69,7 @@ files:
     rationale: Preserve the pre-coding artifact reference in the final receipt.
   - path: src/powdrr_lift/workrr/probe_repair.py
     type: added
-    span: {start_line: 1, end_line: 322}
+    span: {start_line: 1, end_line: 316}
     summary: Generate one targeted probe revision and validate it against schema, readiness, and scenario-claim faithfulness.
     rationale: Keep only source-faithful revisions, record rejected or unavailable checks, and fail open to the accepted original scenarios.
   - path: tests/test_implement_feature_e2e.py
@@ -104,9 +104,9 @@ files:
     rationale: Verify MiniSWE receives the accepted revision rather than the weak source restatement.
   - path: tests/test_probe_repair.py
     type: added
-    span: {start_line: 1, end_line: 138}
-    summary: Cover successful, rejected, and malformed-response repair outcomes.
-    rationale: Protect fail-open behavior and ensure only faithfulness-accepted revisions replace the original probe.
+    span: {start_line: 1, end_line: 194}
+    summary: Cover successful, rejected, malformed-response, and canonicalized-scenario faithfulness outcomes.
+    rationale: Protect fail-open behavior, ensure only faithfulness-accepted revisions replace the original probe, and allow safe rechecks after pipeline canonicalization.
 entities:
   - id: pre-coding-behavior-probe-repair
     type: Code quality gate

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -136,3 +137,58 @@ def test_probe_repair_fails_open_when_repair_response_is_malformed(
     assert revised == (_scenario(),)
     assert artifact["status"] == "unavailable"
     assert "omitted" in artifact["error"]
+
+
+def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    contract_dir = tmp_path / "contract-1"
+    contract_dir.mkdir()
+    (contract_dir / "partial-contract.json").write_text("{}", encoding="utf-8")
+    artifact_path = tmp_path / "scenario-faithfulness.json"
+    artifact_body = {
+        "source_ref": "contract-1",
+        "contract_fingerprint": "sha256:contract",
+        "scenario_fingerprint": "sha256:earlier-canonical-form",
+    }
+    fingerprint = probe_repair.content_fingerprint(artifact_body)
+    artifact_path.write_text(
+        json.dumps({**artifact_body, "fingerprint": fingerprint}), encoding="utf-8"
+    )
+
+    class Contract:
+        source_ref = "contract-1"
+        fingerprint = "sha256:contract"
+
+        @classmethod
+        def from_data(cls, _: Mapping[str, Any]) -> Contract:
+            return cls()
+
+    monkeypatch.setattr(probe_repair, "PartialSemanticContract", Contract)
+    monkeypatch.setattr(
+        probe_repair,
+        "prepare_scenario_claim_reviews",
+        lambda *_args, **_kwargs: {"requests": []},
+    )
+    monkeypatch.setattr(
+        probe_repair,
+        "finalize_scenario_claim_reviews",
+        lambda *_args, **_kwargs: {"accepted": True},
+    )
+
+    accepted, review = probe_repair._check_revised_scenario_faithfulness(
+        {
+            "scenario_id": "instruction-001",
+            "faithfulness_ref": {
+                "artifact_path": str(artifact_path),
+                "fingerprint": fingerprint,
+            },
+        },
+        {"scenario_id": "instruction-001", "then": "Revised supported claim."},
+        contract_directory=tmp_path,
+        ledger_clauses=(),
+        client=None,
+    )
+
+    assert accepted is True
+    assert review["status"] == "accepted"

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
 
 from powdrr_lift import cli
+from powdrr_lift.process.tasks import load_workflow_task
+from powdrr_lift.workrr.git import load_workflow_git_state
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PLAN_ITEMS_RESPONSE_SCHEMA,
     PlanGenerationError,
     generate_execution_plan_yaml,
+    write_execution_plan_artifacts,
 )
 
 
@@ -53,8 +57,6 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     rendered, plan = generate_execution_plan_yaml(
         source_plan="# Plan\nImplement a foundation, then integration.",
         plan_id="local-attestation-v1",
-        workflow_directory="docs/workflows/implement-pr",
-        workflow_id="implement-pr",
         client=client,
     )
 
@@ -63,11 +65,14 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     assert "Implement a foundation" in client.messages[1]["content"]
     assert [item.item_id for item in plan.items] == ["foundation", "integration"]
     assert plan.items[1].dependencies == ("foundation",)
-    assert all(
-        item.workflow_directory == "docs/workflows/implement-pr"
-        and item.workflow_id == "implement-pr"
-        for item in plan.items
+    assert plan.items[0].workflow_directory == (
+        "docs/workflows/local-attestation-v1/local-attestation-v1-foundation"
     )
+    assert plan.items[0].workflow_id == "local-attestation-v1-foundation"
+    assert plan.items[1].workflow_directory == (
+        "docs/workflows/local-attestation-v1/local-attestation-v1-integration"
+    )
+    assert plan.items[1].workflow_id == "local-attestation-v1-integration"
     assert (
         "schema: https://powdrr.io/schemas/github-issue-execution-plan-v1" in rendered
     )
@@ -100,8 +105,6 @@ def test_generate_execution_plan_yaml_rejects_invalid_model_output(
         generate_execution_plan_yaml(
             source_plan="# Plan\nDo the work.",
             plan_id="local-attestation-v1",
-            workflow_directory="docs/workflows/implement-pr",
-            workflow_id="implement-pr",
             client=client,
         )
 
@@ -113,16 +116,12 @@ def test_generate_execution_plan_yaml_rejects_empty_and_oversized_sources() -> N
         generate_execution_plan_yaml(
             source_plan="\n",
             plan_id="local-attestation-v1",
-            workflow_directory="docs/workflows/implement-pr",
-            workflow_id="implement-pr",
             client=client,
         )
     with pytest.raises(PlanGenerationError, match="exceeds"):
         generate_execution_plan_yaml(
             source_plan="x" * 500_001,
             plan_id="local-attestation-v1",
-            workflow_directory="docs/workflows/implement-pr",
-            workflow_id="implement-pr",
             client=client,
         )
 
@@ -157,17 +156,93 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
             str(source),
             "--plan-id",
             "proposal-v1",
-            "--workflow-directory",
-            "docs/workflows/implement-pr",
-            "--workflow-id",
-            "implement-pr",
+            "--verification-command",
+            "scripts/verify-all.sh",
             "--repo-root",
             str(tmp_path),
+            "--json",
         ]
     )
 
     output = tmp_path / "docs/plans/proposal-v1-execution-plan.yaml"
+    workflow_directory = tmp_path / "docs/workflows/proposal-v1/proposal-v1-foundation"
     assert status == 0
     assert output.is_file()
-    assert staged == [output]
-    assert "No GitHub issues were published" in capsys.readouterr().out
+    assert workflow_directory.is_dir()
+    assert len(tuple(workflow_directory.glob("*.yaml"))) == 14
+    first_task = load_workflow_task(
+        workflow_directory / "proposal-v1-foundation-task-001.yaml"
+    )
+    assert first_task.pre_step is None
+    assert first_task.input_state["structured_pr_context"] == {
+        "plan_id": "proposal-v1",
+        "item_id": "foundation",
+        "title": "Implement foundation",
+        "objective": "Deliver foundation from the plan.",
+        "scope": ["component: foundation"],
+        "acceptance_criteria": ["foundation meets its documented acceptance criteria."],
+        "dependencies": [],
+        "source_plan": "proposal.md",
+    }
+    workflow_state = load_workflow_git_state(
+        workflow_directory, "proposal-v1-foundation"
+    )
+    assert workflow_state is not None
+    assert workflow_state.integration_branch == "powdrr/proposal-v1-foundation"
+    assert workflow_state.workflow_relative_directory == (
+        "docs/workflows/proposal-v1/proposal-v1-foundation"
+    )
+    proposal_document = (
+        tmp_path / "docs/proposals/proposal-v1-foundation/plan-item.yaml"
+    )
+    assert proposal_document.is_file()
+    assert len(staged) == 16
+    assert set(staged) == {
+        output,
+        proposal_document,
+        *workflow_directory.glob("*.yaml"),
+    }
+    response = capsys.readouterr().out
+    assert '"workflow_count": 1' in response
+    assert '"published_issues": false' in response
+
+
+def test_generate_execution_plan_yaml_rejects_colliding_workflow_ids() -> None:
+    client = FakePlanningClient({"items": [_item("area/first"), _item("area-first")]})
+
+    with pytest.raises(PlanGenerationError, match="unique workflow ids"):
+        generate_execution_plan_yaml(
+            source_plan="# Plan\nDo the work.",
+            plan_id="local-attestation-v1",
+            client=client,
+        )
+
+
+def test_plan_artifact_writer_preserves_existing_workflow_files(tmp_path: Any) -> None:
+    rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nDo the work.",
+        plan_id="local-attestation-v1",
+        client=FakePlanningClient({"items": [_item("foundation")]}),
+    )
+    workflow_directory = tmp_path / plan.items[0].workflow_directory
+    workflow_directory.mkdir(parents=True)
+    sentinel = workflow_directory / "keep.yaml"
+    sentinel.write_text("preserve", encoding="utf-8")
+    output_path = tmp_path / "docs/plans/local-attestation-v1-execution-plan.yaml"
+    template_path = (
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
+    )
+
+    with pytest.raises(FileExistsError, match="already exists"):
+        write_execution_plan_artifacts(
+            rendered_plan=rendered,
+            plan=plan,
+            output_path=output_path,
+            repo_root=tmp_path,
+            source_plan_path="proposal.md",
+            template_path=template_path,
+            verification_command="pytest -q",
+        )
+
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
+    assert not output_path.exists()

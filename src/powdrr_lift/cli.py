@@ -235,6 +235,7 @@ from powdrr_lift.workrr.git import (
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanGenerationError,
     generate_execution_plan_yaml,
+    write_execution_plan_artifacts,
 )
 from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueClient,
@@ -370,14 +371,17 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser = subparsers.add_parser(
         "plan",
         help=(
-            "Analyze a Markdown plan and write a reviewable GitHub issue "
-            "execution plan."
+            "Analyze a Markdown plan and generate a reviewable issue plan "
+            "with per-item PR workflows."
         ),
     )
     plan_parser.add_argument("--source", type=Path, required=True)
     plan_parser.add_argument("--plan-id", required=True)
-    plan_parser.add_argument("--workflow-directory", required=True)
-    plan_parser.add_argument("--workflow-id", required=True)
+    plan_parser.add_argument(
+        "--verification-command",
+        required=True,
+        help="Repository validation command embedded in each generated PR workflow.",
+    )
     plan_parser.add_argument("--output", type=Path)
     plan_parser.add_argument("--repo-root", type=Path)
     plan_parser.add_argument(
@@ -2706,13 +2710,25 @@ def _run_plan(args: argparse.Namespace) -> int:
         rendered, plan = generate_execution_plan_yaml(
             source_plan=source_plan,
             plan_id=args.plan_id,
-            workflow_directory=args.workflow_directory,
-            workflow_id=args.workflow_id,
             client=planning_client,
         )
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.write_text(rendered, encoding="utf-8")
-        _stage_generated_file(repo_root, output_path)
+        template_path = (
+            Path(__file__).resolve().parents[2]
+            / "templates"
+            / "execute-proposed-pr.yaml"
+        )
+        source_plan_relative = source_path.relative_to(repo_root).as_posix()
+        generated_files = write_execution_plan_artifacts(
+            rendered_plan=rendered,
+            plan=plan,
+            output_path=output_path,
+            repo_root=repo_root,
+            source_plan_path=source_plan_relative,
+            template_path=template_path,
+            verification_command=args.verification_command,
+        )
+        for generated_file in generated_files:
+            _stage_generated_file(repo_root, generated_file)
     except (
         FileExistsError,
         GitHubIssueQueueError,
@@ -2732,6 +2748,11 @@ def _run_plan(args: argparse.Namespace) -> int:
                     "plan_id": plan.plan_id,
                     "path": relative_path,
                     "items": [item.item_id for item in plan.items],
+                    "generated_files": [
+                        path.relative_to(repo_root).as_posix()
+                        for path in generated_files
+                    ],
+                    "workflow_count": len(plan.items),
                     "status": "ready_for_review",
                     "published_issues": False,
                 },
@@ -2742,6 +2763,7 @@ def _run_plan(args: argparse.Namespace) -> int:
     else:
         print(f"Wrote reviewable execution plan to {relative_path}")
         print(f"Proposed items: {len(plan.items)}")
+        print(f"Generated PR workflows: {len(plan.items)}")
         print("No GitHub issues were published and no work was executed.")
     return 0
 

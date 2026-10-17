@@ -1,9 +1,9 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1004
-title: Surface weak behavior probes before coding
+title: Make behavior-probe readiness actionable before coding
 intent:
   problem: The worker prompt could contain generic behavior probes that were only flagged during post-coding review.
-  goal: Tell the coding agent to derive a concrete, source-grounded test before implementation when a generated probe is tautological or generic.
+  goal: Diagnose weak probe setup, operation, and expected outcome separately, then give the coding agent scenario-specific repair guidance before implementation.
 human-decisions: []
 structured_files: []
 files:
@@ -14,24 +14,24 @@ files:
     rationale: Apply the same probe checks before the coding agent starts.
   - path: src/powdrr_lift/core/implementation_packet.py
     type: modified
-    span: {start_line: 105, end_line: 106}
-    summary: Derive readiness findings from the packet's behavior scenarios.
-    rationale: Keep the persisted readiness status tied to the actual prompt inputs.
+    span: {start_line: 104, end_line: 142}
+    summary: Record probe readiness against setup, operation, and outcome criteria.
+    rationale: Show which parts of the probe set need improvement instead of reducing all weak probes to one status.
   - path: src/powdrr_lift/core/implementation_packet.py
     type: modified
-    span: {start_line: 122, end_line: 133}
-    summary: Record a versioned behavior-probe readiness result.
-    rationale: Distinguish ready, degraded, and not-applicable probe sets.
-  - path: src/powdrr_lift/core/implementation_packet.py
+    span: {start_line: 280, end_line: 311}
+    summary: Include each weak scenario and its failed criteria in worker guidance.
+    rationale: Give MiniSWE a specific, source-grounded probe repair before coding without blocking implementation.
+  - path: src/powdrr_lift/core/behavior_contract.py
     type: modified
-    span: {start_line: 251, end_line: 270}
-    summary: Add behavior-probe readiness metadata and targeted worker guidance.
-    rationale: Reuse existing probe-quality findings before the first coding attempt without blocking it.
+    span: {start_line: 498, end_line: 542}
+    summary: Classify probe findings by failed setup, operation, or outcome criterion.
+    rationale: Keep the readiness report actionable and explain why each scenario is weak.
   - path: tests/test_behavior_contract.py
     type: modified
-    span: {start_line: 179, end_line: 259}
-    summary: Verify weak probes receive pre-coding guidance and concrete probes do not.
-    rationale: Protect the prompt-readiness behavior and its not-applicable state.
+    span: {start_line: 143, end_line: 275}
+    summary: Verify criterion-level readiness, scenario-specific repair guidance, and ready/not-applicable states.
+    rationale: Protect the expanded quality report and worker prompt behavior.
 entities:
   - id: behavior-probe-readiness-guidance
     type: Code quality gate
@@ -48,6 +48,6 @@ entity_relationships:
     description: Regression tests verify the readiness status and the instructions rendered for weak probes.
 invariants:
   - id: weak-probes-are-addressed-before-coding
-    description: Generic or tautological behavior probes are marked degraded and the initial worker prompt asks for a concrete source-grounded test before code changes; the coding stage is not blocked.
+    description: Generic or tautological behavior probes identify failed setup, operation, or outcome criteria and the initial worker prompt gives scenario-specific, source-grounded repair guidance before code changes; the coding stage is not blocked.
     action: added
 guidance: []

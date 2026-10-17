@@ -8,6 +8,7 @@ from typing import Any
 
 from powdrr_lift.core.behavior_contract import (
     BehaviorScenario,
+    _worker_text,
     behavior_scenario_probe_findings,
     compile_behavior_scenarios,
     render_behavior_matrix,
@@ -104,6 +105,42 @@ class ImplementationPacket:
     def to_data(self) -> dict[str, Any]:
         scenario_data = [item.to_data() for item in self.behavior_scenarios]
         probe_findings = behavior_scenario_probe_findings(scenario_data)
+        failed_criteria = {
+            criterion
+            for finding in probe_findings
+            for criterion in str(finding.get("failed_criteria", "")).split(", ")
+            if criterion
+        }
+        readiness_status = (
+            "degraded"
+            if probe_findings
+            else "ready"
+            if scenario_data
+            else "not_applicable"
+        )
+        criteria = {
+            "setup_specificity": (
+                "not_applicable"
+                if readiness_status == "not_applicable"
+                else "degraded"
+                if "setup_specificity" in failed_criteria
+                else "passed"
+            ),
+            "operation_specificity": (
+                "not_applicable"
+                if readiness_status == "not_applicable"
+                else "degraded"
+                if "operation_specificity" in failed_criteria
+                else "passed"
+            ),
+            "outcome_observability": (
+                "not_applicable"
+                if readiness_status == "not_applicable"
+                else "degraded"
+                if "outcome_observability" in failed_criteria
+                else "passed"
+            ),
+        }
         data = {
             "schema_version": "implementation-packet-v1",
             "objective": self.objective,
@@ -121,14 +158,9 @@ class ImplementationPacket:
             "repository": self.repository.to_data(),
             "behavior_scenarios": scenario_data,
             "behavior_probe_readiness": {
-                "schema_version": "behavior-probe-readiness-v1",
-                "status": (
-                    "degraded"
-                    if probe_findings
-                    else "ready"
-                    if scenario_data
-                    else "not_applicable"
-                ),
+                "schema_version": "behavior-probe-readiness-v2",
+                "status": readiness_status,
+                "criteria": criteria,
                 "findings": probe_findings,
             },
         }
@@ -252,20 +284,30 @@ class ImplementationPacket:
                 tuple(item.to_data() for item in self.behavior_scenarios)
             )
             if probe_findings:
+                scenarios_by_id = {
+                    scenario.scenario_id: scenario
+                    for scenario in self.behavior_scenarios
+                }
                 finding_lines = [
                     "Prompt readiness review:",
-                    "Some generated behavior probes are too generic to guide "
-                    "implementation or validate the source requirement. Before "
-                    "editing code, inspect the corresponding source requirement "
-                    "and repository behavior, then derive a concrete focused test "
-                    "with a setup, operation, and observable result. Do not count "
-                    "a test that merely repeats the requirement as coverage. Keep "
-                    "source requirements authoritative; label necessary assumptions "
-                    "and do not add unsupported product behavior.",
+                    "Review the failed probe criteria below before editing. For "
+                    "each finding, inspect its source requirement and repository "
+                    "behavior, then revise that probe into a focused test with a "
+                    "specific setup, operation, and observable result. Preserve "
+                    "the source scope and scenario identity. Do not count a test "
+                    "that merely repeats the requirement as coverage, and do not "
+                    "add unsupported product behavior.",
                 ]
                 finding_lines.extend(
-                    f"- {item['scenario_id']}: {item['reason']}"
+                    (
+                        f"- {item['scenario_id']}: failed criteria "
+                        f"{item['failed_criteria']}; {item['reason']}. Current "
+                        f"probe: Given {_worker_text(scenario.given)}, when "
+                        f"{_worker_text(scenario.when)}, expect "
+                        f"{_worker_text(scenario.then)}."
+                    )
                     for item in probe_findings
+                    if (scenario := scenarios_by_id.get(item["scenario_id"]))
                 )
                 behavior_text = f"{behavior_text}\n\n" + "\n".join(finding_lines)
         else:

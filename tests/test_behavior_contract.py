@@ -152,6 +152,9 @@ def test_behavior_probe_quality_flags_tautological_source_fallback() -> None:
     ) == [
         {
             "scenario_id": "clause-1",
+            "failed_criteria": (
+                "operation_specificity, setup_specificity, outcome_observability"
+            ),
             "reason": (
                 "when is a generic placeholder, not an operation or event; "
                 "expected result merely restates the source clause"
@@ -202,11 +205,19 @@ def test_implementation_prompt_surfaces_weak_probes_before_coding() -> None:
     readiness = packet.to_data()["behavior_probe_readiness"]
 
     assert readiness == {
-        "schema_version": "behavior-probe-readiness-v1",
+        "schema_version": "behavior-probe-readiness-v2",
         "status": "degraded",
+        "criteria": {
+            "setup_specificity": "degraded",
+            "operation_specificity": "degraded",
+            "outcome_observability": "degraded",
+        },
         "findings": [
             {
                 "scenario_id": "instruction-020",
+                "failed_criteria": (
+                    "operation_specificity, setup_specificity, outcome_observability"
+                ),
                 "reason": (
                     "when is a generic placeholder, not an operation or event; "
                     "expected result merely restates the source clause"
@@ -215,11 +226,10 @@ def test_implementation_prompt_surfaces_weak_probes_before_coding() -> None:
         ],
     }
     assert "Prompt readiness review:" in rendered
-    assert "derive a concrete focused test" in rendered
-    assert (
-        "Do not count a test that merely repeats the requirement as coverage."
-        in rendered
-    )
+    assert "revise that probe into a focused test" in rendered
+    assert "failed criteria operation_specificity, setup_specificity" in rendered
+    assert "Current probe: Given The implementation is evaluated against" in rendered
+    assert "Do not count a test" in rendered
     assert "do not add unsupported product behavior" in rendered
 
 
@@ -234,8 +244,13 @@ def test_implementation_prompt_readiness_is_ready_for_concrete_probe() -> None:
     )
 
     assert packet.to_data()["behavior_probe_readiness"] == {
-        "schema_version": "behavior-probe-readiness-v1",
+        "schema_version": "behavior-probe-readiness-v2",
         "status": "ready",
+        "criteria": {
+            "setup_specificity": "passed",
+            "operation_specificity": "passed",
+            "outcome_observability": "passed",
+        },
         "findings": [],
     }
     assert "Prompt readiness review:" not in packet.render()
@@ -251,8 +266,13 @@ def test_implementation_probe_readiness_is_not_applicable_without_scenarios() ->
     )
 
     assert packet.to_data()["behavior_probe_readiness"] == {
-        "schema_version": "behavior-probe-readiness-v1",
+        "schema_version": "behavior-probe-readiness-v2",
         "status": "not_applicable",
+        "criteria": {
+            "setup_specificity": "not_applicable",
+            "operation_specificity": "not_applicable",
+            "outcome_observability": "not_applicable",
+        },
         "findings": [],
     }
 

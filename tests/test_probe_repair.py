@@ -75,7 +75,12 @@ def test_probe_repair_revises_only_flagged_scenario_after_faithfulness(
         instruction="Deferred fields merge at the path given.",
         scenarios=(_scenario(),),
         contract_directory=tmp_path,
-        ledger_clauses=(),
+        ledger_clauses=(
+            {
+                "clause_id": "instruction-001",
+                "text": "Deferred fields merge at the path given.",
+            },
+        ),
         faithfulness_client=client,
         repository_contract={"records": []},
     )
@@ -89,6 +94,8 @@ def test_probe_repair_revises_only_flagged_scenario_after_faithfulness(
     assert artifact["initial_findings"]
     assert artifact["final_findings"] == []
     assert "Do not add capabilities" in str(client.messages)
+    assert "authoritative_source_clause" in str(client.messages)
+    assert "instruction-001" in str(client.messages)
 
 
 def test_probe_repair_discards_candidate_rejected_by_faithfulness(
@@ -165,10 +172,17 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
             return cls()
 
     monkeypatch.setattr(probe_repair, "PartialSemanticContract", Contract)
+
+    reviewed_scenarios: list[Mapping[str, Any]] = []
+
+    def prepare(_: Any, *, scenario: Mapping[str, Any], **__: Any) -> dict[str, Any]:
+        reviewed_scenarios.append(scenario)
+        return {"requests": []}
+
     monkeypatch.setattr(
         probe_repair,
         "prepare_scenario_claim_reviews",
-        lambda *_args, **_kwargs: {"requests": []},
+        prepare,
     )
     monkeypatch.setattr(
         probe_repair,
@@ -179,12 +193,17 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
     accepted, review = probe_repair._check_revised_scenario_faithfulness(
         {
             "scenario_id": "instruction-001",
+            "subject": "The source instruction",
             "faithfulness_ref": {
                 "artifact_path": str(artifact_path),
                 "fingerprint": fingerprint,
             },
         },
-        {"scenario_id": "instruction-001", "then": "Revised supported claim."},
+        {
+            "scenario_id": "instruction-001",
+            "subject": "The source instruction",
+            "then": "Revised supported claim.",
+        },
         contract_directory=tmp_path,
         ledger_clauses=(),
         client=None,
@@ -192,3 +211,6 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
 
     assert accepted is True
     assert review["status"] == "accepted"
+    assert reviewed_scenarios == [
+        {"scenario_id": "instruction-001", "then": "Revised supported claim."}
+    ]

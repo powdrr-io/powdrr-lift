@@ -121,12 +121,13 @@ def repair_behavior_probes(
             "role": "system",
             "content": (
                 "Revise only the flagged behavior probes so each has a concrete "
-                "setup, operation, and observable result. The source instruction "
-                "and accepted scenario are authoritative. Use the supplied "
-                "repository contract only to make examples concrete. Do not add "
-                "capabilities, rules, edge cases, or assumptions absent from those "
-                "sources. Keep scenario IDs unchanged. If a probe cannot be made "
-                "more concrete from the sources, return its fields unchanged."
+                "setup, operation, and observable result. For each probe, use its "
+                "authoritative source clause as the boundary for claims. Do not "
+                "borrow behavior from another clause in the full instruction. Use "
+                "the supplied repository contract only to make examples concrete. "
+                "Do not add capabilities, rules, edge cases, or assumptions absent "
+                "from that clause. Keep scenario IDs unchanged. If the clause does "
+                "not support a more concrete probe, return its fields unchanged."
             ),
         },
         {
@@ -135,10 +136,9 @@ def repair_behavior_probes(
                 {
                     "source_instruction": instruction,
                     "repository_contract": repository_contract or {},
-                    "flagged_scenarios": [
-                        {"scenario": repairable[item["scenario_id"]], "finding": item}
-                        for item in initial_findings
-                    ],
+                    "flagged_scenarios": _flagged_scenarios_with_sources(
+                        initial_findings, repairable, ledger_clauses
+                    ),
                 },
                 ensure_ascii=False,
                 sort_keys=True,
@@ -213,6 +213,37 @@ def _parse_revisions(
     return revisions
 
 
+def _flagged_scenarios_with_sources(
+    findings: Sequence[Mapping[str, Any]],
+    scenarios: Mapping[str, Mapping[str, Any]],
+    ledger_clauses: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    clauses = {
+        str(clause.get("clause_id")): clause
+        for clause in ledger_clauses
+        if isinstance(clause.get("clause_id"), str)
+    }
+    result: list[dict[str, Any]] = []
+    for finding in findings:
+        scenario_id = str(finding["scenario_id"])
+        source_id = scenario_id.removeprefix("scenario:")
+        clause = clauses.get(source_id)
+        source_clause = None
+        if clause is not None:
+            source_clause = {
+                "clause_id": source_id,
+                "text": clause.get("text"),
+            }
+        result.append(
+            {
+                "scenario": scenarios[scenario_id],
+                "finding": finding,
+                "authoritative_source_clause": source_clause,
+            }
+        )
+    return result
+
+
 def _check_revised_scenario_faithfulness(
     original: Mapping[str, Any],
     candidate: Mapping[str, Any],
@@ -261,8 +292,16 @@ def _check_revised_scenario_faithfulness(
         ):
             raise ValueError("partial contract does not match faithfulness artifact")
 
+        changed_claims = {
+            "scenario_id": scenario_id,
+            **{
+                key: value
+                for key, value in candidate.items()
+                if key != "scenario_id" and original.get(key) != value
+            },
+        }
         plan = prepare_scenario_claim_reviews(
-            contract, scenario=candidate, ledger_clauses=ledger_clauses
+            contract, scenario=changed_claims, ledger_clauses=ledger_clauses
         )
         requests = plan.get("requests")
         if not isinstance(requests, list):

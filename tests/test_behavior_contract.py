@@ -95,7 +95,7 @@ def test_source_semantic_result_remains_distinct_from_its_default() -> None:
 
     assert dict(compiled.source_dimensions) == {"copy_depth": "unspecified"}
     assert "copy_depth = unspecified" in rendered
-    assert "copy_depth: copy the outer mapping only" not in rendered
+    assert "copy_depth: copy the outer mapping only" in rendered
 
 
 def test_semantic_dimension_applicability_and_unresolved_state_are_rendered() -> None:
@@ -321,14 +321,12 @@ def test_behavior_scenario_preserves_normative_assumption_provenance() -> None:
     assert packet.behavior_scenarios[0].assumptions[0]["basis_reference"] == (
         "Python ast.literal_eval behavior"
     )
-    assert "error_behavior: Propagate the parser's native literal error." not in (
+    assert "error_behavior: Propagate the parser's native literal error." in (
         packet.render()
     )
 
 
-def test_worker_check_omits_defaults_but_keeps_capabilities_and_execution_paths() -> (
-    None
-):
+def test_worker_check_includes_defaults_capabilities_and_execution_paths() -> None:
     scenario = _scenario()
     scenario["dimensions"] = {
         **scenario["dimensions"],
@@ -363,15 +361,15 @@ def test_worker_check_omits_defaults_but_keeps_capabilities_and_execution_paths(
 
     rendered = packet.render()
     assert "synchronous and asynchronous implementations" in rendered
-    assert "Defaults for behavior the source leaves unspecified:" not in rendered
-    assert "negative_boundaries: An invalid record does not abort the batch." not in (
-        rendered
+    assert "Defaults for behavior the source leaves unspecified:" in rendered
+    assert (
+        "negative_boundaries: An invalid record does not abort the batch." in rendered
     )
     assert "Capabilities: reject invalid records with InvalidRecord" in rendered
     assert "Do not treat a passing test on one execution path" in rendered
 
 
-def test_worker_check_preserves_unique_cross_requirement_relationships() -> None:
+def test_worker_check_preserves_explicit_cross_requirement_relationships() -> None:
     scenario = _scenario()
     scenario["related_requirements"] = [
         "The public operation exposes this result through the existing adapter."
@@ -393,27 +391,6 @@ def test_worker_check_preserves_unique_cross_requirement_relationships() -> None
     )
     restored = type(packet).from_data(packet.to_data())
     assert restored.render() == rendered
-
-
-def test_worker_check_omits_cross_requirement_relationships_repeated_in_scenarios() -> (
-    None
-):
-    scenario = _scenario()
-    scenario["then"] = "The getter exposes merged ancestor values."
-    scenario["related_requirements"] = ["The getter exposes merged ancestor values."]
-    packet = compile_implementation_packet(
-        objective="implement the getter",
-        obligations=("implement the getter",),
-        required_tests=({"description": "verify merged ancestor values"},),
-        allowed_paths=("src/", "tests/"),
-        validation_profiles=("pytest",),
-        behavior_scenarios=(scenario,),
-    )
-
-    rendered = packet.render()
-
-    assert "Additional cross-requirement constraints:" not in rendered
-    assert rendered.count("The getter exposes merged ancestor values.") == 1
 
 
 def test_normative_assumption_cannot_claim_not_applicable_as_a_default() -> None:

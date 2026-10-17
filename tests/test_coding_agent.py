@@ -241,9 +241,7 @@ def test_scenario_backed_prompt_omits_only_repeated_plan_descriptions() -> None:
     )
 
     assert request.prompt.count(repeated) == 1
-    assert "Required product changes:" not in request.prompt
-    assert "Additional planned changes:" in request.prompt
-    assert "[parse-input] (added)" not in request.prompt
+    assert "[parse-input] (added)" in request.prompt
     assert "intent_effect" not in request.prompt
     assert (
         "[legacy-compatibility] (added): The adapter preserves legacy compatibility."

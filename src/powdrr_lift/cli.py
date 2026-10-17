@@ -232,6 +232,10 @@ from powdrr_lift.workrr.git import (
     slugify_workflow_id,
     synchronize_workflow_initialization,
 )
+from powdrr_lift.workrr.github_issue_plan_generation import (
+    PlanGenerationError,
+    generate_execution_plan_yaml,
+)
 from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueClient,
     GitHubIssueQueueError,
@@ -362,6 +366,28 @@ def build_parser() -> argparse.ArgumentParser:
         "--repo-root", type=Path, help="Checkout containing the merged plan revision."
     )
     publish_plan_issues_parser.set_defaults(func=_run_publish_plan_issues)
+
+    plan_issues_parser = subparsers.add_parser(
+        "plan-issues",
+        help=(
+            "Analyze a Markdown plan and write a reviewable GitHub issue "
+            "execution plan."
+        ),
+    )
+    plan_issues_parser.add_argument("--source", type=Path, required=True)
+    plan_issues_parser.add_argument("--plan-id", required=True)
+    plan_issues_parser.add_argument("--workflow-directory", required=True)
+    plan_issues_parser.add_argument("--workflow-id", required=True)
+    plan_issues_parser.add_argument("--output", type=Path)
+    plan_issues_parser.add_argument("--repo-root", type=Path)
+    plan_issues_parser.add_argument(
+        "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
+    )
+    plan_issues_parser.add_argument("--planning-model")
+    plan_issues_parser.add_argument("--planning-api-key")
+    plan_issues_parser.add_argument("--planning-base-url")
+    plan_issues_parser.add_argument("--json", action="store_true")
+    plan_issues_parser.set_defaults(func=_run_plan_issues)
 
     list_plan_issues_parser = subparsers.add_parser(
         "list-plan-issues",
@@ -2632,6 +2658,102 @@ def _run_repository_state(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     sys.stdout.write(render_repository_state(repo_root))
     return 0
+
+
+def _run_plan_issues(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root).resolve()
+    try:
+        source_path = _repository_file_path(args.source, repo_root, "Source plan")
+        if not source_path.is_file():
+            raise ValueError(f"Source plan does not exist: {source_path}")
+        source_plan = source_path.read_text(encoding="utf-8")
+        output_path = (
+            _repository_file_path(args.output, repo_root, "Output plan")
+            if args.output is not None
+            else repo_root
+            / "docs"
+            / "plans"
+            / f"{slugify_workflow_id(args.plan_id)}-execution-plan.yaml"
+        )
+        if output_path == source_path:
+            raise ValueError("Output plan must be different from the source plan")
+        if output_path.exists():
+            raise FileExistsError(
+                f"Output plan already exists: {output_path}; choose another path "
+                "so the reviewed plan is not overwritten."
+            )
+
+        planning_provider = resolve_workflow_provider(args.planning_provider)
+        planning_mapping = configured_model_mapping(
+            planning_provider, args.planning_model
+        )
+        planning_credentials = resolve_provider_credentials(
+            planning_mapping.provider,
+            args.planning_api_key,
+            args.planning_base_url,
+        )
+        planning_client = build_workflow_client(
+            planning_credentials,
+            model=planning_mapping.model,
+            model_cache_dir=repo_root / ".powdrr" / "models",
+            progress_stream=sys.stderr,
+        )
+        set_output_limit = getattr(
+            planning_client, "set_structured_output_token_limit", None
+        )
+        if callable(set_output_limit):
+            set_output_limit(8192)
+        rendered, plan = generate_execution_plan_yaml(
+            source_plan=source_plan,
+            plan_id=args.plan_id,
+            workflow_directory=args.workflow_directory,
+            workflow_id=args.workflow_id,
+            client=planning_client,
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(rendered, encoding="utf-8")
+        _stage_generated_file(repo_root, output_path)
+    except (
+        FileExistsError,
+        GitHubIssueQueueError,
+        OSError,
+        PlanGenerationError,
+        PowdrrExecutionError,
+        ValueError,
+    ) as error:
+        print(f"Could not create execution plan: {error}", file=sys.stderr)
+        return 2
+
+    relative_path = output_path.relative_to(repo_root).as_posix()
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "plan_id": plan.plan_id,
+                    "path": relative_path,
+                    "items": [item.item_id for item in plan.items],
+                    "status": "ready_for_review",
+                    "published_issues": False,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        print(f"Wrote reviewable execution plan to {relative_path}")
+        print(f"Proposed items: {len(plan.items)}")
+        print("No GitHub issues were published and no work was executed.")
+    return 0
+
+
+def _repository_file_path(path: Path, repo_root: Path, label: str) -> Path:
+    candidate = path if path.is_absolute() else repo_root / path
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(repo_root)
+    except ValueError as error:
+        raise ValueError(f"{label} path must be inside the repository") from error
+    return resolved
 
 
 def _run_publish_plan_issues(args: argparse.Namespace) -> int:

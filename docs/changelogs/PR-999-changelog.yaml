@@ -14,7 +14,7 @@ files:
     rationale: Ensure a correction cannot fall back to a request slug as its proposal identity.
   - path: tests/test_feature_endpoint.py
     type: modified
-    span: {start_line: 89, end_line: 89}
+    span: {start_line: 88, end_line: 88}
     summary: Import the implementation-phase function for direct proposal-revalidation coverage.
     rationale: Exercise the real revision compilation path rather than only mocking correction dispatch.
   - path: tests/test_feature_endpoint.py
@@ -59,7 +59,7 @@ files:
     rationale: Keep the accepted proposal ID separate from request naming.
   - path: tests/test_feature_endpoint.py
     type: modified
-    span: {start_line: 2700, end_line: 2774}
+    span: {start_line: 2700, end_line: 2776}
     summary: Verify a retry-specific slug revalidates against the accepted proposal ID.
     rationale: Prevent a stale-revision failure when request and proposal identities differ.
 entities:

@@ -196,7 +196,10 @@ values for the corresponding feature run.
 
 Powdrr uses Git to create a separate branch and worktree for each task. Start
 from a clean checkout. A bootstrap run creates a validated Structrr snapshot and
-opens a pull request containing the onboarding artifacts:
+opens a pull request containing the onboarding artifacts. If the local
+repository has no commits, bootstrap creates an empty base commit. When the
+remote is also empty, it pushes that base branch so the onboarding pull request
+has a target; the generated onboarding artifacts remain in the pull request:
 
 ```bash
 powdrr-lift bootstrap --repo-root . --open-pr

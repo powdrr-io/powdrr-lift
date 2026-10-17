@@ -85,8 +85,8 @@ from powdrr_lift.workrr.feature_endpoint import (
     _remove_temporary_feature_artifacts,
     _render_pull_request_body,
     _resolve_bootstrap_subject_binding,
-    _run_code_task_agent,
     _run_code_agent_phase,
+    _run_code_task_agent,
     _structrr_taxonomy_path,
     _task_structrr_changes,
     _update_plan_from_sentence_trace,
@@ -2772,6 +2772,8 @@ def test_code_agent_phase_revalidates_correction_against_accepted_proposal_id(
                 },
             },
         )
+
+
 @pytest.mark.parametrize(
     ("outcome", "accepted"), [("pass", True), ("unknown", False), ("fail", False)]
 )

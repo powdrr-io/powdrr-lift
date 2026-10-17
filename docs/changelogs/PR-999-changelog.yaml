@@ -1,0 +1,83 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 999
+title: Guard candidate correction proposal identity
+intent:
+  problem: Candidate correction retries have unique request slugs, and proposal revalidation must stay bound to the accepted proposal revision.
+  goal: Require the accepted proposal revision before candidate correction and cover revalidation when the request slug differs from the proposal ID.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 7198, end_line: 7202}
+    summary: Require the accepted proposal revision before starting candidate correction.
+    rationale: Ensure a correction cannot fall back to a request slug as its proposal identity.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 89, end_line: 89}
+    summary: Import the implementation-phase function for direct proposal-revalidation coverage.
+    rationale: Exercise the real revision compilation path rather than only mocking correction dispatch.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2510, end_line: 2519}
+    summary: Give repair-limit scenarios an accepted proposal revision.
+    rationale: Model the required accepted proposal state during candidate correction.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2533, end_line: 2533}
+    summary: Capture the unique slug used by each correction attempt.
+    rationale: Verify retries remain uniquely identified as requests.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2539, end_line: 2539}
+    summary: Record the request slug passed to the correction phase.
+    rationale: Assert request uniqueness independently from proposal identity.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2585, end_line: 2588}
+    summary: Assert each correction retry uses a distinct request slug.
+    rationale: Preserve retry traceability while the proposal ID remains stable.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2619, end_line: 2628}
+    summary: Give instruction-coverage correction a reviewed proposal revision.
+    rationale: Keep the regression scenario bound to the accepted proposal.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2642, end_line: 2642}
+    summary: Track the request slug for instruction-coverage correction.
+    rationale: Verify correction naming stays request-specific.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2647, end_line: 2647}
+    summary: Record the unique slug passed to the repair call.
+    rationale: Assert correction request identity independently from proposal identity.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2686, end_line: 2686}
+    summary: Assert the correction request retains its retry-specific slug.
+    rationale: Keep the accepted proposal ID separate from request naming.
+  - path: tests/test_feature_endpoint.py
+    type: modified
+    span: {start_line: 2700, end_line: 2774}
+    summary: Verify a retry-specific slug revalidates against the accepted proposal ID.
+    rationale: Prevent a stale-revision failure when request and proposal identities differ.
+entities:
+  - id: candidate-correction-proposal-identity
+    type: Function
+    action: added
+  - id: candidate-correction-proposal-identity-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: correction-proposal-identity-is-tested
+    type: verifies
+    source: candidate-correction-proposal-identity-regression
+    target: candidate-correction-proposal-identity
+    action: added
+    description: Regression tests verify correction attempts retain unique request slugs while proposal revalidation uses the accepted proposal ID.
+invariants:
+  - id: candidate-correction-preserves-accepted-proposal-id
+    description: Candidate correction requires an accepted proposal revision and revalidates against its proposal ID, independent of the correction request slug.
+    action: added
+guidance: []

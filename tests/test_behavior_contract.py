@@ -176,6 +176,87 @@ def test_behavior_probe_quality_accepts_distinct_observable_assertion() -> None:
     )
 
 
+def test_implementation_prompt_surfaces_weak_probes_before_coding() -> None:
+    scenario = _scenario()
+    scenario.update(
+        {
+            "scenario_id": "instruction-020",
+            "given": (
+                "The implementation is evaluated against: "
+                "Errors must not halt subsequent items."
+            ),
+            "when": "The instruction's behavior is exercised",
+            "then": "Errors must not halt subsequent items.",
+        }
+    )
+    packet = compile_implementation_packet(
+        objective="Process incremental GraphQL responses.",
+        obligations=("Errors must not halt subsequent items.",),
+        required_tests=({"description": "process later items after an error"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(scenario,),
+    )
+
+    rendered = packet.render()
+    readiness = packet.to_data()["behavior_probe_readiness"]
+
+    assert readiness == {
+        "schema_version": "behavior-probe-readiness-v1",
+        "status": "degraded",
+        "findings": [
+            {
+                "scenario_id": "instruction-020",
+                "reason": (
+                    "when is a generic placeholder, not an operation or event; "
+                    "expected result merely restates the source clause"
+                ),
+            }
+        ],
+    }
+    assert "Prompt readiness review:" in rendered
+    assert "derive a concrete focused test" in rendered
+    assert (
+        "Do not count a test that merely repeats the requirement as coverage."
+        in rendered
+    )
+    assert "do not add unsupported product behavior" in rendered
+
+
+def test_implementation_prompt_readiness_is_ready_for_concrete_probe() -> None:
+    packet = compile_implementation_packet(
+        objective="Process incremental GraphQL responses.",
+        obligations=("Errors must not halt subsequent items.",),
+        required_tests=({"description": "process later items after an error"},),
+        allowed_paths=("src/", "tests/"),
+        validation_profiles=("pytest",),
+        behavior_scenarios=(_scenario(),),
+    )
+
+    assert packet.to_data()["behavior_probe_readiness"] == {
+        "schema_version": "behavior-probe-readiness-v1",
+        "status": "ready",
+        "findings": [],
+    }
+    assert "Prompt readiness review:" not in packet.render()
+
+
+def test_implementation_probe_readiness_is_not_applicable_without_scenarios() -> None:
+    packet = compile_implementation_packet(
+        objective="Provide a non-actionable guide.",
+        obligations=("Explain the available options.",),
+        required_tests=({"description": "no behavior test applies"},),
+        allowed_paths=("docs/",),
+        validation_profiles=("markdown",),
+    )
+
+    assert packet.to_data()["behavior_probe_readiness"] == {
+        "schema_version": "behavior-probe-readiness-v1",
+        "status": "not_applicable",
+        "findings": [],
+    }
+
+
 def test_worker_prompt_preserves_joint_validation_groups() -> None:
     first = _scenario()
     first["scenario_id"] = "status-200"

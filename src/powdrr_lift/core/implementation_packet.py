@@ -8,6 +8,7 @@ from typing import Any
 
 from powdrr_lift.core.behavior_contract import (
     BehaviorScenario,
+    behavior_scenario_probe_findings,
     compile_behavior_scenarios,
     render_behavior_matrix,
 )
@@ -101,6 +102,8 @@ class ImplementationPacket:
         )
 
     def to_data(self) -> dict[str, Any]:
+        scenario_data = [item.to_data() for item in self.behavior_scenarios]
+        probe_findings = behavior_scenario_probe_findings(scenario_data)
         data = {
             "schema_version": "implementation-packet-v1",
             "objective": self.objective,
@@ -116,7 +119,18 @@ class ImplementationPacket:
                 for index, item in enumerate(self.required_tests, start=1)
             ],
             "repository": self.repository.to_data(),
-            "behavior_scenarios": [item.to_data() for item in self.behavior_scenarios],
+            "behavior_scenarios": scenario_data,
+            "behavior_probe_readiness": {
+                "schema_version": "behavior-probe-readiness-v1",
+                "status": (
+                    "degraded"
+                    if probe_findings
+                    else "ready"
+                    if scenario_data
+                    else "not_applicable"
+                ),
+                "findings": probe_findings,
+            },
         }
         if self.contract_closure is not None:
             data["contract_closure"] = dict(self.contract_closure)
@@ -234,6 +248,26 @@ class ImplementationPacket:
         test_lines = test_lines or ["- none"]
         if self.behavior_scenarios:
             behavior_text = render_behavior_matrix(self.behavior_scenarios)
+            probe_findings = behavior_scenario_probe_findings(
+                tuple(item.to_data() for item in self.behavior_scenarios)
+            )
+            if probe_findings:
+                finding_lines = [
+                    "Prompt readiness review:",
+                    "Some generated behavior probes are too generic to guide "
+                    "implementation or validate the source requirement. Before "
+                    "editing code, inspect the corresponding source requirement "
+                    "and repository behavior, then derive a concrete focused test "
+                    "with a setup, operation, and observable result. Do not count "
+                    "a test that merely repeats the requirement as coverage. Keep "
+                    "source requirements authoritative; label necessary assumptions "
+                    "and do not add unsupported product behavior.",
+                ]
+                finding_lines.extend(
+                    f"- {item['scenario_id']}: {item['reason']}"
+                    for item in probe_findings
+                )
+                behavior_text = f"{behavior_text}\n\n" + "\n".join(finding_lines)
         else:
             behavior_text = "\n".join(
                 (

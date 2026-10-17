@@ -41,9 +41,11 @@ using this schema. For every item, it also writes
 `docs/workflows/<plan-id>/<workflow-id>/`. Each workflow directory contains its
 task YAML files and workflow metadata. The item points to that generated
 directory and workflow ID. Reviewers can edit the plan, context, and workflow
-files before committing them together. The command does not create GitHub issues
-or execute work, refuses to overwrite existing generated artifacts, and stages
-every generated file in the current checkout.
+files before merging them together. The command creates a unique branch, commits
+only the generated plan files, pushes it, and opens a pull request against the
+current branch. Other staged changes are excluded from the plan commit. The
+command does not create GitHub issues or execute work, and it refuses to
+overwrite existing generated artifacts.
 
 The caller supplies the repository validation command because generated PR
 workflows use it as their implementation-loop gate. The workflow's first task
@@ -57,6 +59,10 @@ powdrr-lift plan \
   --verification-command "make test" \
   --output docs/plans/feature-key-execution-plan.yaml
 ```
+
+The command prints the plan review PR URL and returns it in JSON output. Review
+the plan, item context, and generated workflows in that PR; merge it before
+publishing the plan items as GitHub issues.
 
 ## First worker boundary
 

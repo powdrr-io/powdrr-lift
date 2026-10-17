@@ -6,9 +6,11 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 import tempfile
+import uuid
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -105,6 +107,167 @@ PLAN_ITEMS_RESPONSE_SCHEMA: dict[str, Any] = {
 
 class PlanGenerationError(ValueError):
     """The model response cannot be compiled into a valid execution plan."""
+
+
+@dataclass(frozen=True, slots=True)
+class PlanPullRequest:
+    """Published plan-review pull request details."""
+
+    branch_name: str
+    base_branch: str
+    commit_sha: str
+    pull_request_url: str
+
+
+def publish_execution_plan_pull_request(
+    *,
+    repo_root: Path,
+    plan: ReviewedExecutionPlan,
+    generated_files: tuple[Path, ...],
+    source_plan_path: str,
+    remote: str = "origin",
+    runner: Any = subprocess.run,
+) -> PlanPullRequest:
+    """Commit only generated plan files, push a branch, and open a review PR."""
+    repo_root = repo_root.resolve()
+    current_branch = _run_publication_command(
+        runner, repo_root, ["git", "branch", "--show-current"]
+    ).strip()
+    if not current_branch:
+        raise PlanGenerationError(
+            "Cannot open a plan pull request from a detached HEAD."
+        )
+    selected_base = current_branch
+    _run_publication_command(runner, repo_root, ["git", "remote", "get-url", remote])
+
+    relative_paths: list[str] = []
+    for generated_file in generated_files:
+        try:
+            relative = generated_file.resolve().relative_to(repo_root)
+        except ValueError as error:
+            raise PlanGenerationError(
+                "Generated plan files must stay inside the repository."
+            ) from error
+        if not generated_file.is_file():
+            raise PlanGenerationError(
+                f"Generated plan file is missing: {relative.as_posix()}"
+            )
+        relative_paths.append(relative.as_posix())
+    if not relative_paths:
+        raise PlanGenerationError("Cannot publish an empty execution plan.")
+
+    branch_name = (
+        f"powdrr/plan-{slugify_workflow_id(plan.plan_id)}-{uuid.uuid4().hex[:8]}"
+    )
+    _run_publication_command(runner, repo_root, ["git", "switch", "-c", branch_name])
+    _run_publication_command(runner, repo_root, ["git", "add", "--", *relative_paths])
+    _run_publication_command(
+        runner,
+        repo_root,
+        [
+            "git",
+            "-c",
+            "user.name=Powdrr Automation",
+            "-c",
+            "user.email=powdrr-automation@users.noreply.github.com",
+            "commit",
+            "--only",
+            "-m",
+            f"Add reviewable execution plan {plan.plan_id}",
+            "--",
+            *relative_paths,
+        ],
+    )
+    commit_sha = _run_publication_command(
+        runner, repo_root, ["git", "rev-parse", "--verify", "HEAD^{commit}"]
+    ).strip()
+    _run_publication_command(
+        runner,
+        repo_root,
+        ["git", "push", "--set-upstream", remote, branch_name],
+    )
+
+    title = f"Review execution plan: {plan.plan_id}"
+    body = _render_plan_pull_request_body(
+        plan,
+        source_plan_path=source_plan_path,
+        plan_path=relative_paths[0],
+    )
+    output = _run_publication_command(
+        runner,
+        repo_root,
+        [
+            "gh",
+            "pr",
+            "create",
+            "--base",
+            selected_base,
+            "--head",
+            branch_name,
+            "--title",
+            title,
+            "--body",
+            body,
+        ],
+    )
+    pull_request_url = next(
+        (
+            line.strip()
+            for line in reversed(output.splitlines())
+            if line.strip().startswith("https://github.com/") and "/pull/" in line
+        ),
+        "",
+    )
+    if not pull_request_url:
+        raise PlanGenerationError(
+            "GitHub CLI did not return the created plan pull request URL."
+        )
+    return PlanPullRequest(
+        branch_name=branch_name,
+        base_branch=selected_base,
+        commit_sha=commit_sha,
+        pull_request_url=pull_request_url,
+    )
+
+
+def _render_plan_pull_request_body(
+    plan: ReviewedExecutionPlan, *, source_plan_path: str, plan_path: str
+) -> str:
+    item_lines = []
+    for item in plan.items:
+        dependencies = (
+            f"; depends on {', '.join(item.dependencies)}" if item.dependencies else ""
+        )
+        item_lines.append(f"- **{item.item_id}: {item.title}**{dependencies}")
+    return "\n".join(
+        [
+            "## Review this execution plan",
+            "",
+            "This pull request contains the generated queue plan, structured context "
+            "documents, and one `execute-proposed-pr` workflow per item.",
+            f"- Source plan: `{source_plan_path}`",
+            f"- Queue plan: `{plan_path}`",
+            "Review and revise these files together. After this PR merges, publish "
+            "the reviewed plan items as GitHub issues.",
+            "",
+            "### Proposed items",
+            *item_lines,
+            "",
+            "GitHub issues have not been created and no workflow tasks have run.",
+        ]
+    )
+
+
+def _run_publication_command(runner: Any, repo_root: Path, args: list[str]) -> str:
+    executable = args[0]
+    result = runner(args, cwd=repo_root, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown error"
+        raise PlanGenerationError(
+            f"Could not publish execution-plan pull request: "
+            f"{executable} {' '.join(args[1:])} failed: {detail}"
+        )
+    return result.stdout
 
 
 def generate_execution_plan_yaml(

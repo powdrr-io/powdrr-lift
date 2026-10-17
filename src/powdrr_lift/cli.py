@@ -235,6 +235,7 @@ from powdrr_lift.workrr.git import (
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanGenerationError,
     generate_execution_plan_yaml,
+    publish_execution_plan_pull_request,
     write_execution_plan_artifacts,
 )
 from powdrr_lift.workrr.github_issue_queue import (
@@ -371,8 +372,8 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser = subparsers.add_parser(
         "plan",
         help=(
-            "Analyze a Markdown plan and generate a reviewable issue plan "
-            "with per-item PR workflows."
+            "Analyze a Markdown plan, generate per-item PR workflows, and open "
+            "a review pull request."
         ),
     )
     plan_parser.add_argument("--source", type=Path, required=True)
@@ -2729,6 +2730,12 @@ def _run_plan(args: argparse.Namespace) -> int:
         )
         for generated_file in generated_files:
             _stage_generated_file(repo_root, generated_file)
+        pull_request = publish_execution_plan_pull_request(
+            repo_root=repo_root,
+            plan=plan,
+            generated_files=generated_files,
+            source_plan_path=source_plan_relative,
+        )
     except (
         FileExistsError,
         GitHubIssueQueueError,
@@ -2753,7 +2760,11 @@ def _run_plan(args: argparse.Namespace) -> int:
                         for path in generated_files
                     ],
                     "workflow_count": len(plan.items),
-                    "status": "ready_for_review",
+                    "branch": pull_request.branch_name,
+                    "base_branch": pull_request.base_branch,
+                    "commit": pull_request.commit_sha,
+                    "pull_request_url": pull_request.pull_request_url,
+                    "status": "pull_request_opened",
                     "published_issues": False,
                 },
                 indent=2,
@@ -2764,6 +2775,7 @@ def _run_plan(args: argparse.Namespace) -> int:
         print(f"Wrote reviewable execution plan to {relative_path}")
         print(f"Proposed items: {len(plan.items)}")
         print(f"Generated PR workflows: {len(plan.items)}")
+        print(f"Opened plan review PR: {pull_request.pull_request_url}")
         print("No GitHub issues were published and no work was executed.")
     return 0
 

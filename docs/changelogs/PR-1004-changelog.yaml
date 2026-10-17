@@ -1,0 +1,53 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1004
+title: Surface weak behavior probes before coding
+intent:
+  problem: The worker prompt could contain generic behavior probes that were only flagged during post-coding review.
+  goal: Tell the coding agent to derive a concrete, source-grounded test before implementation when a generated probe is tautological or generic.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 11, end_line: 11}
+    summary: Reuse the behavior-probe quality findings.
+    rationale: Apply the same probe checks before the coding agent starts.
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 105, end_line: 106}
+    summary: Derive readiness findings from the packet's behavior scenarios.
+    rationale: Keep the persisted readiness status tied to the actual prompt inputs.
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 122, end_line: 133}
+    summary: Record a versioned behavior-probe readiness result.
+    rationale: Distinguish ready, degraded, and not-applicable probe sets.
+  - path: src/powdrr_lift/core/implementation_packet.py
+    type: modified
+    span: {start_line: 251, end_line: 270}
+    summary: Add behavior-probe readiness metadata and targeted worker guidance.
+    rationale: Reuse existing probe-quality findings before the first coding attempt without blocking it.
+  - path: tests/test_behavior_contract.py
+    type: modified
+    span: {start_line: 179, end_line: 259}
+    summary: Verify weak probes receive pre-coding guidance and concrete probes do not.
+    rationale: Protect the prompt-readiness behavior and its not-applicable state.
+entities:
+  - id: behavior-probe-readiness-guidance
+    type: Code quality gate
+    action: added
+  - id: behavior-probe-readiness-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: readiness-guidance-is-tested
+    type: verified by
+    source: behavior-probe-readiness-guidance
+    target: behavior-probe-readiness-regression-tests
+    action: added
+    description: Regression tests verify the readiness status and the instructions rendered for weak probes.
+invariants:
+  - id: weak-probes-are-addressed-before-coding
+    description: Generic or tautological behavior probes are marked degraded and the initial worker prompt asks for a concrete source-grounded test before code changes; the coding stage is not blocked.
+    action: added
+guidance: []

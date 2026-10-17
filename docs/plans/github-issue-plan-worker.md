@@ -34,19 +34,27 @@ and an existing durable workflow. Dependencies must name items in the same
 plan and form an acyclic graph. Publish only after the plan review PR merges;
 the publisher pins each issue to that merge commit.
 
-`powdrr-lift plan` analyzes a Markdown proposal and writes a candidate
-document using this schema. It does not create GitHub issues or execute work.
-The caller supplies one existing workflow reference for all generated items;
-reviewers can edit the generated YAML before committing it. The command refuses
-to overwrite an existing output file and stages a newly generated file in the
-current checkout.
+`powdrr-lift plan` analyzes a Markdown proposal and writes a candidate document
+using this schema. For every item, it also writes
+`docs/proposals/<workflow-id>/plan-item.yaml` and instantiates the built-in
+`execute-proposed-pr` workflow template into
+`docs/workflows/<plan-id>/<workflow-id>/`. Each workflow directory contains its
+task YAML files and workflow metadata. The item points to that generated
+directory and workflow ID. Reviewers can edit the plan, context, and workflow
+files before committing them together. The command does not create GitHub issues
+or execute work, refuses to overwrite existing generated artifacts, and stages
+every generated file in the current checkout.
+
+The caller supplies the repository validation command because generated PR
+workflows use it as their implementation-loop gate. The workflow's first task
+receives the structured plan item directly; it does not rediscover or reinterpret
+the proposal.
 
 ```sh
 powdrr-lift plan \
   --source docs/plans/feature-proposal.md \
   --plan-id feature-key-v1 \
-  --workflow-directory docs/workflows/implement-pr \
-  --workflow-id implement-pr \
+  --verification-command "make test" \
   --output docs/plans/feature-key-execution-plan.yaml
 ```
 

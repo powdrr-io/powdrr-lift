@@ -317,6 +317,8 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
 
 
 def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
+    from procedrr import ProcessCatalog
+
     template_path = (
         Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
     )
@@ -384,6 +386,14 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     report = build_workflow_template_validation_report(template.to_json())
     assert report.validation_successful is True
     assert report.issues == []
+    process_catalog = ProcessCatalog.load(
+        Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    )
+    assert {
+        process_id
+        for task in template.task_templates
+        for process_id in task.uses_processes
+    } <= {process.name for process in process_catalog.list()}
     assert [
         (task.assignee_type.value, task.assignee_role.value)
         for task in template.task_templates

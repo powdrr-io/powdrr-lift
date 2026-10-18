@@ -516,20 +516,26 @@ def behavior_scenario_probe_findings(
         when = _probe_text(item.get("when"))
         then = _probe_text(item.get("then"))
         reasons: list[str] = []
+        failed_criteria: list[str] = []
         if when in generic_when:
+            failed_criteria.append("operation_specificity")
             reasons.append("when is a generic placeholder, not an operation or event")
         if given and given == then:
+            failed_criteria.extend(("setup_specificity", "outcome_observability"))
             reasons.append("given and expected result repeat the same statement")
         if given.startswith("the implementation is evaluated against:"):
+            failed_criteria.append("setup_specificity")
             premise = given.removeprefix(
                 "the implementation is evaluated against:"
             ).strip()
             if premise and premise == then:
+                failed_criteria.append("outcome_observability")
                 reasons.append("expected result merely restates the source clause")
         if reasons:
             findings.append(
                 {
                     "scenario_id": scenario_id,
+                    "failed_criteria": ", ".join(dict.fromkeys(failed_criteria)),
                     "reason": "; ".join(dict.fromkeys(reasons)),
                 }
             )

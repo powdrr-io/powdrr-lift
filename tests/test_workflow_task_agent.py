@@ -1006,6 +1006,7 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
     )
     workflow.add_task(downstream)
     published_reasons: list[str] = []
+    checkpoints: list[tuple[str, str, object, str | None]] = []
 
     def _record_publish(
         repo_root: Path,
@@ -1017,11 +1018,12 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         open_pull_request: bool = True,
         events: Sequence[Mapping[str, object]] = (),
         runtime: object = None,
-    ) -> None:
+    ) -> str:
         del workflow_id, open_pull_request, events, runtime
         assert repo_root == tmp_path
         assert published_workflow.directory == workflow.directory
         published_reasons.append(reason)
+        return "d" * 40
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.task_agent._publish_workflow_progress",
@@ -1038,6 +1040,9 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         WorkflowTaskAgentConfig(
             workflow_dir=workflow.directory,
             repo_root=tmp_path,
+            task_checkpoint_callback=lambda task_id, state_type, state, commit: (
+                checkpoints.append((task_id, state_type, state, commit))
+            ),
         ),
         client=client,
         stdout=io.StringIO(),
@@ -1059,6 +1064,10 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         "next_step agent-task",
         "claim next-task",
         "next_step next-task",
+    ]
+    assert checkpoints == [
+        ("agent-task", "state", {"plan": ["step"]}, "d" * 40),
+        ("next-task", "implementation-state", {"result": "done"}, "d" * 40),
     ]
 
 

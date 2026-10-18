@@ -9,15 +9,16 @@ new `plan_id` and new item IDs for work whose meaning changed.
 
 GitHub Issues own mutable execution state. Their title is a stable ID, and their
 body contains only a machine-readable pointer to the plan ID, item ID, document
-path, and plan commit. Labels record `ready`, `claimed`, `awaiting-review`, or
-`blocked`; closing an issue records that its work has been accepted and merged.
-Do not copy objective or acceptance text into issue bodies.
+path, and plan commit. Labels record `ready`, `blocked-on-dependency`, `claimed`,
+`awaiting-review`, or `blocked`; closing an issue records that its work has been
+accepted and merged. Do not copy objective or acceptance text into issue bodies.
 
 ## Plan document contract
 
 ```yaml
 schema: https://powdrr.io/schemas/github-issue-execution-plan-v1
 plan_id: feature-key-v1
+source_document: docs/plans/feature-proposal.md
 items:
   - id: foundational-change
     title: Foundational change
@@ -25,28 +26,89 @@ items:
     scope: [src/foundation, tests/test_foundation.py]
     acceptance_criteria: [Foundation behavior is covered by focused tests.]
     dependencies: []
-    workflow_directory: docs/workflows/feature-key/foundational-change
+    workflow_file: docs/workflows/feature-key/foundational-change.yaml
     workflow_id: foundational-change
 ```
 
 Every item must have a unique stable ID, objective, scope, acceptance criteria,
-and an existing durable workflow. Dependencies must name items in the same
+and an existing workflow definition. Dependencies must name items in the same
 plan and form an acyclic graph. Publish only after the plan review PR merges;
 the publisher pins each issue to that merge commit.
 
+`powdrr-lift plan` analyzes a Markdown proposal and writes a candidate document
+using this schema. The top-level `source_document` field records the
+repository-relative path to the Markdown proposal, keeping the generated plan
+discoverably linked to its source. For every item, it writes one small workflow definition at
+`docs/workflows/<plan-id>/<workflow-id>.yaml`. The definition names the packaged
+`execute-proposed-pr` template and records its parameters, such as the proposed
+PR ID and verification command. Each workflow definition also lists prerequisite
+workflow IDs in its top-level `dependencies` field. The generator derives that
+list from the plan item's dependencies, and the worker verifies the two lists
+match before executing the workflow. The reviewed plan remains the source for
+the item's objective, scope, acceptance criteria, and dependency graph. The
+worker reads the definition and materializes the packaged task workflow when it
+claims the issue. Reviewers can revise the plan decomposition and template
+parameters in the PR. The command creates a unique branch, commits only the
+generated plan and workflow definitions, pushes it, and opens a pull request
+against the current branch. Other staged changes are excluded from the plan
+commit. The command does not create GitHub issues or execute work, and it
+refuses to overwrite existing generated artifacts.
+
+For example, the integration workflow names its prerequisite explicitly:
+
+```yaml
+schema: https://powdrr.io/schemas/plan-workflow-instance-v1
+workflow_id: local-validation-attestation-v1-pr-02
+template: execute-proposed-pr
+dependencies:
+  - local-validation-attestation-v1-pr-01
+parameters:
+  proposed-pr-id: local-validation-attestation-v1-pr-02
+  verification-command: bash attestation/scripts/verify-all.sh
+```
+
+The caller supplies the repository validation command because generated PR
+workflows use it as their implementation-loop gate. The workflow's first task
+receives the structured plan item from the pinned plan; it does not rediscover or
+reinterpret the proposal.
+
+```sh
+powdrr-lift plan \
+  --source docs/plans/feature-proposal.md \
+  --plan-id feature-key-v1 \
+  --verification-command "make test" \
+  --output docs/plans/feature-key-execution-plan.yaml
+```
+
+The command prints the plan review PR URL and returns it in JSON output. Review
+the plan, item context, and generated workflows in that PR; merge it before
+publishing the plan items as GitHub issues.
+
 ## First worker boundary
 
-`powdrr-lift publish-plan-issues` idempotently creates one issue per item. It
-does not rewrite an existing issue's tracking state. Each item issue carries a
-deterministic plan label as an index, alongside its mutable queue state label.
-Publisher and plan lookup requests filter to that plan label; the worker asks
-GitHub for open issues with the `powdrr:ready` label and loads dependencies from
-the plan-scoped issue set. These filtered requests avoid scanning unrelated
-repository issues. The body pointer remains the source of truth and is checked
-after GitHub returns the indexed candidates. `powdrr-lift github-issue-worker`
-selects the lowest-numbered open `ready` item whose dependencies are closed,
-marks it `claimed`, and invokes the existing `process-workflow-task` runtime
-for the workflow named by the pinned plan.
+`powdrr-lift publish-plan-issues` idempotently creates one issue per item. Items
+with no dependencies start as `powdrr:ready`; items with dependencies start as
+`powdrr:blocked-on-dependency`. Therefore, a plan with one root item has exactly
+one ready issue when it is first published. The publisher also reconciles these
+two dependency-derived labels when it is rerun, while preserving execution
+states such as `claimed`, `awaiting-review`, and `blocked`. Each item issue
+carries a deterministic plan label as an index. The worker asks GitHub for open
+issues with `powdrr:ready` and `powdrr:blocked-on-dependency` labels, then loads
+dependencies from the plan-scoped issue set. These filtered requests avoid
+scanning unrelated repository issues. The body pointer remains the source of
+truth and is checked after GitHub returns the indexed candidates.
+`powdrr-lift github-issue-worker` promotes dependency-blocked issues to ready
+when all prerequisite issues are closed, then selects the lowest-numbered
+eligible item, marks it `claimed`, and invokes the existing
+`process-workflow-task` runtime for the workflow named by the pinned plan.
+
+When a workflow task finishes, the worker first commits and pushes its workflow
+state, then appends a `Powdrr task checkpoint` comment to that item's issue. The
+comment contains the plan, item, workflow, and task IDs; the declared output
+state type and value; and the commit SHA containing the persisted workflow
+state. These comments form a task-by-task history alongside the issue's queue
+labels and claim/final-status comments. They are scoped to one issue; plan-level
+dependencies continue to determine when an item becomes eligible to run.
 
 `powdrr-lift list-plan-issues` reads the pinned plan and GitHub issue pointers,
 then prints one result per plan item with its issue number, URL, state, and
@@ -70,8 +132,10 @@ retry it.
    the decomposition and dependencies, then merge the approved plan.
 2. From the merged checkout, publish issues with the repository name, plan path,
    and merge commit. Repeating the command reuses issues by stable plan/item ID.
-3. Run one worker item at a time. Issues with unmet dependencies remain ready
-   and are skipped. Close an issue only after its implementation PR is merged.
+3. Run one worker item at a time. Issues with unmet dependencies remain
+   `powdrr:blocked-on-dependency` until the worker observes that their
+   prerequisite issues are closed. Close an issue only after its implementation
+   PR is merged.
 4. To retry blocked work, resolve the issue and replace its `powdrr:blocked`
    label with `powdrr:ready`.
 

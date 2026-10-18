@@ -236,6 +236,7 @@ class WorkflowTaskAgentConfig:
     allow_unmanaged_git: bool = False
     run_deterministic_invoke_tool_pre_steps: bool = False
     guidance: tuple[str, ...] = ()
+    task_checkpoint_callback: Callable[[str, str, Any, str | None], None] | None = None
 
 
 def _context_compaction_threshold(context_window: int, fraction: float) -> int:
@@ -743,7 +744,7 @@ class _TaskWorkflowExecutionStrategy:
                     "output_state": output_state,
                 }
             )
-            _publish_workflow_progress(
+            commit_sha = _publish_workflow_progress(
                 self.repo_root,
                 self.workflow,
                 workflow_id=workflow_id_from_task_id(self.task.task_id),
@@ -753,6 +754,13 @@ class _TaskWorkflowExecutionStrategy:
                 events=self.events,
                 runtime=self.runtime,
             )
+            if self.config.task_checkpoint_callback is not None:
+                self.config.task_checkpoint_callback(
+                    completed.task_id,
+                    completed.output_state_type,
+                    completed.output_state,
+                    commit_sha,
+                )
             print(f"Completed workflow task: {completed.task_id}", file=self.stdout)
             return WorkflowActionOutcome(continue_running=False)
         if action.kind == "read_document":
@@ -911,7 +919,7 @@ class _TaskWorkflowExecutionStrategy:
                 self.task.task_id,
                 action.output_state,
             )
-            _publish_workflow_progress(
+            commit_sha = _publish_workflow_progress(
                 self.repo_root,
                 self.workflow,
                 workflow_id=workflow_id_from_task_id(self.task.task_id),
@@ -921,6 +929,13 @@ class _TaskWorkflowExecutionStrategy:
                 events=self.events,
                 runtime=self.runtime,
             )
+            if self.config.task_checkpoint_callback is not None:
+                self.config.task_checkpoint_callback(
+                    completed.task_id,
+                    completed.output_state_type,
+                    completed.output_state,
+                    commit_sha,
+                )
             if action.text:
                 print(action.text, file=self.stdout)
             print(f"Terminated workflow: {completed.task_id}", file=self.stdout)
@@ -2339,7 +2354,7 @@ def _publish_workflow_progress(
     open_pull_request: bool = True,
     events: Sequence[Mapping[str, Any]] = (),
     runtime: ExecutionRuntime | None = None,
-) -> None:
+) -> str | None:
     """Commit and publish durable workflow progress for execution tasks.
 
     Unit tests and callers operating outside a git checkout can still use the
@@ -2349,7 +2364,7 @@ def _publish_workflow_progress(
     when the workflow reaches completion.
     """
     if not _is_git_worktree(repo_root):
-        return
+        return None
     workflow_git_state = load_workflow_git_state(
         workflow.directory,
         workflow_id=workflow_id,
@@ -2358,7 +2373,7 @@ def _publish_workflow_progress(
         workflow_git_state is None
         and not _git_result(repo_root, ["remote"], runtime=runtime).stdout.strip()
     ):
-        return
+        return None
     branch = _git_output(repo_root, ["branch", "--show-current"], runtime=runtime)
     if (
         workflow_git_state is not None
@@ -2400,9 +2415,10 @@ def _publish_workflow_progress(
     # Always push at a task boundary. A nested operation may have created a
     # local commit, leaving no working-tree changes for the add/status check.
     _run_git(repo_root, ["push", "--set-upstream", "origin", branch], runtime=runtime)
+    commit_sha = _git_output(repo_root, ["rev-parse", "HEAD"], runtime=runtime).strip()
     if not open_pull_request:
         print(f"Published workflow progress on branch: {branch}", file=stdout)
-        return
+        return commit_sha
 
     default_branch = (
         workflow_git_state.integration_branch
@@ -2426,7 +2442,7 @@ def _publish_workflow_progress(
         print(
             f"Updated workflow progress PR: {existing_pr.stdout.strip()}", file=stdout
         )
-        return
+        return commit_sha
 
     title = f"Workflow progress: {workflow.directory.name}"
     body = (
@@ -2459,6 +2475,7 @@ def _publish_workflow_progress(
         runtime=runtime,
     )
     print(f"Created workflow progress PR: {created_pr.stdout.strip()}", file=stdout)
+    return commit_sha
 
 
 def publish_workflow_progress(

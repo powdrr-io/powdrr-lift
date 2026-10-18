@@ -26,10 +26,12 @@ QUEUE_LABELS = {
     "ready": "powdrr:ready",
     "claimed": "powdrr:claimed",
     "awaiting_review": "powdrr:awaiting-review",
+    "blocked_on_dependency": "powdrr:blocked-on-dependency",
     "blocked": "powdrr:blocked",
 }
 _MARKER_START = "<!-- powdrr-queue-item:v1 "
 _MARKER_END = " -->"
+_TASK_CHECKPOINT_START = "<!-- powdrr-task-checkpoint:v1 -->"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 
 
@@ -41,14 +43,16 @@ class PlannedWorkItem:
     scope: tuple[str, ...]
     acceptance_criteria: tuple[str, ...]
     dependencies: tuple[str, ...]
-    workflow_directory: str
+    workflow_directory: str | None
     workflow_id: str
+    workflow_file: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ReviewedExecutionPlan:
     plan_id: str
     items: tuple[PlannedWorkItem, ...]
+    source_document: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +88,22 @@ class WorkerReport:
     issue_number: int | None = None
     item_id: str | None = None
     detail: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TaskCheckpoint:
+    """Structured, append-only record of one completed workflow task."""
+
+    plan_id: str
+    item_id: str
+    workflow_id: str
+    task_id: str
+    output_state_type: str
+    output_state: Any
+    commit_sha: str | None = None
+
+
+TaskCheckpointCallback = Callable[[str, str, Any, str | None], None]
 
 
 class GitHubIssueQueueError(RuntimeError):
@@ -302,7 +322,12 @@ def load_reviewed_plan(
             raise GitHubIssueQueueError(
                 "plan path must be inside the repository"
             ) from error
-    return _parse_plan(path.read_text(encoding="utf-8"))
+    return parse_reviewed_plan_yaml(path.read_text(encoding="utf-8"))
+
+
+def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
+    """Parse and validate a GitHub issue execution plan document."""
+    return _parse_plan(text)
 
 
 def load_reviewed_plan_at_commit(
@@ -374,13 +399,41 @@ def publish_plan_issues(
                 )
             reused.append(issue.number)
             continue
+        status = "ready" if not item.dependencies else "blocked_on_dependency"
         created_issue = client.create_issue(
             title=f"Powdrr work item: {plan.plan_id}/{item.item_id}",
             body=body,
-            labels=(QUEUE_LABELS["ready"], plan_label),
+            labels=(QUEUE_LABELS[status], plan_label),
         )
         created.append(created_issue.number)
         existing[key] = created_issue
+    by_number = {issue.number: issue for issue in existing.values()}
+    for item in plan.items:
+        issue = existing[(plan.plan_id, item.item_id)]
+        if issue.state != "open":
+            continue
+        current_statuses = {
+            QUEUE_LABELS["ready"],
+            QUEUE_LABELS["blocked_on_dependency"],
+        }
+        if not current_statuses.intersection(issue.labels):
+            continue
+        dependencies_closed = all(
+            _dependency_is_closed(existing.get((plan.plan_id, dependency)), by_number)
+            for dependency in item.dependencies
+        )
+        status = "ready" if dependencies_closed else "blocked_on_dependency"
+        labels = _replace_queue_status(issue.labels, status)
+        if labels != issue.labels:
+            client.update_issue(issue, labels=labels)
+            existing[(plan.plan_id, item.item_id)] = QueueIssue(
+                issue.number,
+                issue.title,
+                issue.body,
+                issue.state,
+                labels,
+                issue.url,
+            )
     return PublishReport(plan.plan_id, plan_commit, tuple(created), tuple(reused))
 
 
@@ -430,12 +483,27 @@ def run_worker_once(
     client: GitHubIssueClient,
     repo_root: str | Path,
     worker_id: str,
-    run_task: Callable[[Path, str, str], int],
+    run_task: Callable[
+        [
+            Path,
+            str,
+            str,
+            PlannedWorkItem,
+            ReviewedExecutionPlan,
+            TaskCheckpointCallback,
+        ],
+        int,
+    ],
     plan_loader: Callable[..., ReviewedExecutionPlan] = load_reviewed_plan_at_commit,
 ) -> WorkerReport:
     """Claim and execute the first ready item whose dependencies are closed."""
     root = Path(repo_root).resolve()
     with _worker_lock(root):
+        _promote_unblocked_issues(
+            client=client,
+            repo_root=root,
+            plan_loader=plan_loader,
+        )
         issues = client.list_issues(labels=(QUEUE_LABELS["ready"],), state="open")
         plan_issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
         for issue in sorted(issues, key=lambda value: value.number):
@@ -481,6 +549,10 @@ def run_worker_once(
                 )
             ]
             if unmet:
+                client.update_issue(
+                    issue,
+                    labels=_replace_queue_status(issue.labels, "blocked_on_dependency"),
+                )
                 continue
             issue = next(
                 value
@@ -496,20 +568,78 @@ def run_worker_once(
                 labels=_replace_queue_status(issue.labels, "claimed"),
             )
             client.add_comment(issue, f"Powdrr worker {worker_id} claimed this item.")
-            workflow_dir = (root / item.workflow_directory).resolve()
+            workflow_reference = item.workflow_file or item.workflow_directory
+            assert workflow_reference is not None
+            workflow_path = (root / workflow_reference).resolve()
             detail: str | None = None
-            if not workflow_dir.is_relative_to(root) or not workflow_dir.is_dir():
+            expected_kind_exists = (
+                workflow_path.is_file()
+                if item.workflow_file is not None
+                else workflow_path.is_dir()
+            )
+            if not workflow_path.is_relative_to(root) or not expected_kind_exists:
                 client.update_issue(
                     issue,
                     labels=_replace_queue_status(
                         _replace_queue_status(issue.labels, "claimed"), "blocked"
                     ),
                 )
-                detail = f"workflow directory is missing: {item.workflow_directory}"
+                detail = f"workflow definition is missing: {workflow_reference}"
                 client.add_comment(issue, f"Powdrr worker blocked this item: {detail}.")
                 return WorkerReport("blocked", issue.number, item.item_id, detail)
+            if item.workflow_file is not None:
+                from powdrr_lift.workrr.github_issue_plan_generation import (
+                    PlanGenerationError,
+                    load_plan_workflow_instance,
+                )
+
+                try:
+                    workflow_instance = load_plan_workflow_instance(workflow_path)
+                    workflow_ids = {
+                        candidate.item_id: candidate.workflow_id
+                        for candidate in plan.items
+                    }
+                    expected_dependencies = tuple(
+                        workflow_ids[dependency] for dependency in item.dependencies
+                    )
+                    if (
+                        workflow_instance.workflow_id != item.workflow_id
+                        or workflow_instance.dependencies != expected_dependencies
+                    ):
+                        detail = (
+                            "workflow dependencies do not match the pinned plan; "
+                            f"expected {expected_dependencies!r}, found "
+                            f"{workflow_instance.dependencies!r}"
+                        )
+                    else:
+                        detail = None
+                except (PlanGenerationError, KeyError) as error:
+                    detail = f"invalid workflow definition: {error}"
+                if detail is not None:
+                    client.update_issue(
+                        issue,
+                        labels=_replace_queue_status(
+                            _replace_queue_status(issue.labels, "claimed"), "blocked"
+                        ),
+                    )
+                    client.add_comment(
+                        issue, f"Powdrr worker blocked this item: {detail}."
+                    )
+                    return WorkerReport("blocked", issue.number, item.item_id, detail)
             try:
-                return_code = run_task(workflow_dir, item.workflow_id, worker_id)
+                return_code = run_task(
+                    workflow_path,
+                    item.workflow_id,
+                    worker_id,
+                    item,
+                    plan,
+                    _task_checkpoint_callback(
+                        client=client,
+                        issue=issue,
+                        plan=plan,
+                        item=item,
+                    ),
+                )
             except Exception as error:
                 return_code = 1
                 detail = f"{type(error).__name__}: {error}"
@@ -532,6 +662,124 @@ def run_worker_once(
             client.add_comment(issue, note)
             return WorkerReport(outcome, issue.number, item.item_id, detail)
     return WorkerReport("no_eligible_work")
+
+
+def render_task_checkpoint_comment(checkpoint: TaskCheckpoint) -> str:
+    """Render a readable GitHub comment with machine-readable checkpoint data."""
+    payload = {
+        "schema": "https://powdrr.io/schemas/github-issue-task-checkpoint-v1",
+        "plan_id": checkpoint.plan_id,
+        "item_id": checkpoint.item_id,
+        "workflow_id": checkpoint.workflow_id,
+        "task_id": checkpoint.task_id,
+        "status": "completed",
+        "output_state_type": checkpoint.output_state_type,
+        "output_state": checkpoint.output_state,
+        "commit_sha": checkpoint.commit_sha,
+    }
+    return (
+        "### Powdrr task checkpoint\n\n"
+        f"{_TASK_CHECKPOINT_START}\n"
+        "```json\n"
+        f"{json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True)}\n"
+        "```"
+    )
+
+
+def _task_checkpoint_callback(
+    *,
+    client: GitHubIssueClient,
+    issue: QueueIssue,
+    plan: ReviewedExecutionPlan,
+    item: PlannedWorkItem,
+) -> TaskCheckpointCallback:
+    def persist(
+        task_id: str,
+        output_state_type: str,
+        output_state: Any,
+        commit_sha: str | None,
+        *,
+        target_issue: QueueIssue = issue,
+        target_plan: ReviewedExecutionPlan = plan,
+        target_item: PlannedWorkItem = item,
+    ) -> None:
+        client.add_comment(
+            target_issue,
+            render_task_checkpoint_comment(
+                TaskCheckpoint(
+                    plan_id=target_plan.plan_id,
+                    item_id=target_item.item_id,
+                    workflow_id=target_item.workflow_id,
+                    task_id=task_id,
+                    output_state_type=output_state_type,
+                    output_state=output_state,
+                    commit_sha=commit_sha,
+                )
+            ),
+        )
+
+    return persist
+
+
+def _promote_unblocked_issues(
+    *,
+    client: GitHubIssueClient,
+    repo_root: Path,
+    plan_loader: Callable[..., ReviewedExecutionPlan],
+) -> None:
+    """Make dependency-blocked work ready after all prerequisite issues close."""
+    blocked = client.list_issues(
+        labels=(QUEUE_LABELS["blocked_on_dependency"],), state="open"
+    )
+    loaded_plans: dict[tuple[str, str, str], ReviewedExecutionPlan] = {}
+    issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
+    for issue in sorted(blocked, key=lambda value: value.number):
+        if (
+            QUEUE_LABELS["blocked_on_dependency"] not in issue.labels
+            or issue.state != "open"
+        ):
+            continue
+        pointer = parse_issue_pointer(issue.body)
+        if pointer is None:
+            continue
+        plan_key = (
+            pointer["plan_id"],
+            pointer["plan_path"],
+            pointer["plan_commit"],
+        )
+        plan = loaded_plans.get(plan_key)
+        if plan is None:
+            plan = plan_loader(
+                pointer["plan_path"], pointer["plan_commit"], repo_root=repo_root
+            )
+            loaded_plans[plan_key] = plan
+        if plan.plan_id != pointer["plan_id"]:
+            continue
+        item = next(
+            (
+                candidate
+                for candidate in plan.items
+                if candidate.item_id == pointer["item_id"]
+            ),
+            None,
+        )
+        if item is None:
+            continue
+        indexed = issue_indexes.get(plan.plan_id)
+        if indexed is None:
+            indexed = _plan_issue_index(
+                client.list_issues(labels=(_plan_label(plan.plan_id),))
+            )
+            issue_indexes[plan.plan_id] = indexed
+        by_number = {value.number: value for value in indexed.values()}
+        if all(
+            _dependency_is_closed(indexed.get((plan.plan_id, dependency)), by_number)
+            for dependency in item.dependencies
+        ):
+            client.update_issue(
+                issue,
+                labels=_replace_queue_status(issue.labels, "ready"),
+            )
 
 
 def parse_issue_pointer(body: str) -> dict[str, str] | None:
@@ -561,9 +809,22 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
         raise GitHubIssueQueueError(f"invalid plan YAML: {error}") from error
     if not isinstance(data, Mapping) or data.get("schema") != QUEUE_SCHEMA:
         raise GitHubIssueQueueError(f"plan schema must be {QUEUE_SCHEMA!r}")
-    if set(data) != {"schema", "plan_id", "items"}:
+    if set(data) not in (
+        {"schema", "plan_id", "items"},
+        {"schema", "plan_id", "source_document", "items"},
+    ):
         raise GitHubIssueQueueError("plan has unknown or missing top-level fields")
     plan_id = data.get("plan_id")
+    source_document = data.get("source_document")
+    if source_document is not None and (
+        not isinstance(source_document, str)
+        or not source_document.strip()
+        or Path(source_document).is_absolute()
+        or ".." in Path(source_document).parts
+    ):
+        raise GitHubIssueQueueError(
+            "source_document must be a repository-relative path without traversal"
+        )
     raw_items = data.get("items")
     if not isinstance(plan_id, str) or not _safe_id(plan_id):
         raise GitHubIssueQueueError("plan_id must be a stable safe identifier")
@@ -574,27 +835,37 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
         field = f"items[{index}]"
         if not isinstance(raw, Mapping):
             raise GitHubIssueQueueError(f"{field} must be a mapping")
-        if set(raw) != {
+        common_fields = {
             "id",
             "title",
             "objective",
             "scope",
             "acceptance_criteria",
             "dependencies",
-            "workflow_directory",
             "workflow_id",
-        }:
+        }
+        if set(raw) not in (
+            common_fields | {"workflow_directory"},
+            common_fields | {"workflow_file"},
+        ):
             raise GitHubIssueQueueError(f"{field} has unknown or missing fields")
         item_id = raw.get("id")
         workflow_dir = raw.get("workflow_directory")
+        workflow_file = raw.get("workflow_file")
         workflow_id = raw.get("workflow_id")
         if not isinstance(item_id, str) or not _safe_id(item_id):
             raise GitHubIssueQueueError(f"{field}.id must be a stable safe identifier")
-        if not isinstance(workflow_dir, str) or not workflow_dir:
-            raise GitHubIssueQueueError(f"{field}.workflow_directory is required")
-        if Path(workflow_dir).is_absolute() or ".." in Path(workflow_dir).parts:
+        workflow_reference = (
+            workflow_file if workflow_file is not None else workflow_dir
+        )
+        if not isinstance(workflow_reference, str) or not workflow_reference:
+            raise GitHubIssueQueueError(f"{field}.workflow_file is required")
+        if (
+            Path(workflow_reference).is_absolute()
+            or ".." in Path(workflow_reference).parts
+        ):
             raise GitHubIssueQueueError(
-                f"{field}.workflow_directory must stay in the repository"
+                f"{field}.workflow_file must stay in the repository"
             )
         if not isinstance(workflow_id, str) or not _safe_id(workflow_id):
             raise GitHubIssueQueueError(
@@ -607,8 +878,9 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             scope=_string_list(raw, "scope", field),
             acceptance_criteria=_string_list(raw, "acceptance_criteria", field),
             dependencies=_string_list(raw, "dependencies", field, allow_empty=True),
-            workflow_directory=workflow_dir,
+            workflow_directory=workflow_dir if isinstance(workflow_dir, str) else None,
             workflow_id=workflow_id,
+            workflow_file=workflow_file if isinstance(workflow_file, str) else None,
         )
         if not item.scope or not item.acceptance_criteria:
             raise GitHubIssueQueueError(
@@ -630,7 +902,7 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             )
     if _has_dependency_cycle(items):
         raise GitHubIssueQueueError("plan dependencies must be acyclic")
-    return ReviewedExecutionPlan(plan_id, tuple(items))
+    return ReviewedExecutionPlan(plan_id, tuple(items), source_document)
 
 
 def _required_text(raw: Mapping[str, Any], key: str, field: str) -> str:
@@ -780,6 +1052,7 @@ def _label_color(status: str) -> str:
         "ready": "0E8A16",
         "claimed": "1D76DB",
         "awaiting_review": "FBCA04",
+        "blocked_on_dependency": "D4C5F9",
         "blocked": "D93F0B",
     }[status]
 

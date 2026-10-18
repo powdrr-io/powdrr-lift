@@ -16,6 +16,7 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.change_log_parser import parse_change_log
+from powdrr_lift.core.behavior_contract import compile_behavior_scenarios
 from powdrr_lift.core.contract_closure import (
     ContractClosureError,
     RepositoryEvidence,
@@ -124,6 +125,7 @@ from powdrr_lift.workrr.postrun_probes import (
     probe_failures,
     run_postrun_probes,
 )
+from powdrr_lift.workrr.probe_repair import repair_behavior_probes
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
@@ -670,6 +672,7 @@ def _execute_procedrr_flow(
             event_sink=record_procedrr_event,
         )
         state["probe_generation_client"] = planning_client
+        state["scenario_claim_faithfulness_client"] = classifier_judge_client
         execution_result = execution_service.execute(
             str(flow["name"]),
             {
@@ -2635,6 +2638,56 @@ def _run_code_agent_phase(
         implementation_packet = replace(
             implementation_packet, contract_closure=dict(closure)
         )
+    if implementation_packet.behavior_scenarios:
+        repair_client = state.get("probe_generation_client")
+        ledger_clauses: Sequence[Mapping[str, Any]] = ()
+        ledger_path = state.get("instruction_ledger_path")
+        if isinstance(ledger_path, Path) and ledger_path.is_file():
+            try:
+                ledger_document = json.loads(ledger_path.read_text(encoding="utf-8"))
+                raw_clauses = (
+                    ledger_document.get("clauses")
+                    if isinstance(ledger_document, Mapping)
+                    else None
+                )
+                if isinstance(raw_clauses, list) and all(
+                    isinstance(item, Mapping) for item in raw_clauses
+                ):
+                    ledger_clauses = tuple(raw_clauses)
+            except (OSError, json.JSONDecodeError):
+                ledger_clauses = ()
+        repaired_scenarios, repair_artifact = repair_behavior_probes(
+            cast(WorkflowLLMClient | None, repair_client),
+            instruction=feature_description,
+            scenarios=tuple(
+                item.to_data() for item in implementation_packet.behavior_scenarios
+            ),
+            contract_directory=output_root / "semantic-contracts",
+            ledger_clauses=ledger_clauses,
+            faithfulness_client=cast(
+                WorkflowLLMClient | None,
+                state.get("scenario_claim_faithfulness_client"),
+            ),
+            repository_contract=implementation_packet.contract_closure,
+        )
+        if (
+            tuple(item.to_data() for item in implementation_packet.behavior_scenarios)
+            != repaired_scenarios
+        ):
+            implementation_packet = replace(
+                implementation_packet,
+                behavior_scenarios=compile_behavior_scenarios(repaired_scenarios),
+            )
+        repair_body = dict(repair_artifact)
+        repair_body["fingerprint"] = content_fingerprint(repair_artifact)
+        repair_path = output_root / "artifacts" / "behavior-probe-repair.json"
+        repair_path.parent.mkdir(parents=True, exist_ok=True)
+        repair_path.write_text(
+            json.dumps(repair_body, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        state["behavior_probe_repair_path"] = repair_path
+        state["behavior_probe_repair_status"] = repair_artifact.get("status")
     if (
         not config.capture_worker_prompts_only
         and "postrun_probes" not in state
@@ -2681,8 +2734,29 @@ def _run_code_agent_phase(
         state["postrun_probe_artifact_root"] = probe_artifact_root
         state["postrun_probe_generation_error"] = generation_error
     implementation_packet_path = output_root / "implementation-packet.json"
+    packet_document = implementation_packet.to_data()
+    behavior_probe_repair_path = state.get("behavior_probe_repair_path")
+    if (
+        isinstance(behavior_probe_repair_path, Path)
+        and behavior_probe_repair_path.is_file()
+    ):
+        try:
+            repair_document = json.loads(
+                behavior_probe_repair_path.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as error:
+            raise PowdrrExecutionError(
+                f"behavior-probe repair artifact cannot be read: {error}"
+            ) from error
+        if not isinstance(repair_document, Mapping):
+            raise PowdrrExecutionError("behavior-probe repair artifact is malformed")
+        packet_document["behavior_probe_repair"] = {
+            "status": repair_document.get("status"),
+            "artifact_path": str(behavior_probe_repair_path),
+            "fingerprint": repair_document.get("fingerprint"),
+        }
     implementation_packet_path.write_text(
-        json.dumps(implementation_packet.to_data(), indent=2, sort_keys=True) + "\n",
+        json.dumps(packet_document, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
     state["implementation_packet_path"] = implementation_packet_path
@@ -2776,15 +2850,15 @@ def _run_code_agent_phase(
                 raise PowdrrExecutionError(
                     f"instruction ledger cannot be loaded for worker context: {error}"
                 ) from error
-            ledger_clauses = (
+            worker_ledger_clauses = (
                 instruction_ledger.get("clauses")
                 if isinstance(instruction_ledger, Mapping)
                 else None
             )
-            if isinstance(ledger_clauses, list):
+            if isinstance(worker_ledger_clauses, list):
                 clause_context = "\n".join(
                     f"- {item.get('clause_id')}: {item.get('text')}"
-                    for item in ledger_clauses
+                    for item in worker_ledger_clauses
                     if isinstance(item, Mapping)
                 )
                 if clause_context:
@@ -6848,6 +6922,12 @@ def _prepare_final_implementation_review(
             "validation_expectations", []
         ),
         "behavior_probe_findings": behavior_probe_findings,
+        "behavior_probe_repair": {
+            "status": state.get("behavior_probe_repair_status", "not_run"),
+            "artifact_path": str(state["behavior_probe_repair_path"])
+            if isinstance(state.get("behavior_probe_repair_path"), Path)
+            else None,
+        },
         "postrun_probe_results": list(generated_probe_results),
         "postrun_probe_results_path": generated_probe_results_path,
         "postrun_probe_generation": {
@@ -7519,6 +7599,9 @@ def _finalize_implementation_review(
     result["postrun_probe_generation"] = review.get(
         "postrun_probe_generation", {"status": "not_run"}
     )
+    result["behavior_probe_repair"] = review.get(
+        "behavior_probe_repair", {"status": "not_run"}
+    )
     result["postrun_probe_results"] = review.get("postrun_probe_results", [])
     result["postrun_probe_results_path"] = review.get("postrun_probe_results_path")
     bound_decisions = [
@@ -7584,6 +7667,7 @@ def _finalize_implementation_review(
             "actualization_report": actualization,
             "instruction_coverage_receipt": coverage_receipt,
             "postrun_probe_generation": result["postrun_probe_generation"],
+            "behavior_probe_repair": result["behavior_probe_repair"],
             "postrun_probe_results": result["postrun_probe_results"],
             "postrun_probe_results_path": result["postrun_probe_results_path"],
             "reviewable_additions_by_path": result["reviewable_additions_by_path"],

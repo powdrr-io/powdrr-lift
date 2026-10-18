@@ -1,0 +1,109 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1011
+title: Preserve source document references in execution plans
+intent:
+  problem: Generated execution plans do not identify the Markdown document from which their work items were derived.
+  goal: Record and validate a repository-relative source document path in generated plans so reviewers and workers can trace a plan back to its proposal.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 341, end_line: 341}
+    summary: Accept a source document path when generating a plan.
+    rationale: Keep the generated plan connected to its proposal.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 352, end_line: 359}
+    summary: Accept and validate a repository-relative source document path when generating a plan.
+    rationale: Keep the generated provenance pointer within the repository.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 430, end_line: 433}
+    summary: Emit the source document path in the plan YAML and validate it with the plan parser.
+    rationale: Make the relationship between the execution plan and its proposal durable in the reviewed artifact.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 54, end_line: 54}
+    summary: Retain the optional source document path on the parsed execution plan.
+    rationale: Preserve provenance when queue code loads a generated plan.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 718, end_line: 721}
+    summary: Allow an optional source document field at the plan document's top level.
+    rationale: Permit generated plan documents to preserve their source link.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 724, end_line: 733}
+    summary: Accept and validate the optional source document field in queue plan YAML.
+    rationale: Reject absolute paths and traversal while keeping existing plan documents compatible.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 811, end_line: 811}
+    summary: Preserve the parsed source document path in the execution plan object.
+    rationale: Keep provenance available after YAML parsing.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2719, end_line: 2719}
+    summary: Pass the source proposal's repository-relative path into plan generation.
+    rationale: Connect the CLI input file to the generated plan metadata.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2724, end_line: 2724}
+    summary: Supply the source path to the plan generator.
+    rationale: Ensure the CLI-generated artifact records its source.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2724, end_line: 2724}
+    summary: Move source path retention to the plan publication step.
+    rationale: Preserve the existing source link in the pull request details.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 82, end_line: 93}
+    summary: Verify generated plan YAML and parsed data retain the source document path.
+    rationale: Cover provenance emission by the plan generator.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 227, end_line: 227}
+    summary: Verify the plan CLI records its source input path in generated YAML.
+    rationale: Cover wiring from the CLI argument to the durable plan artifact.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 150, end_line: 188}
+    summary: Verify the queue parser preserves valid source references and rejects traversal.
+    rationale: Cover safe loading of the new optional metadata field.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 21, end_line: 21}
+    summary: Add the source_document field to the plan format example.
+    rationale: Make the plan's link to its Markdown source explicit in the contract.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 39, end_line: 41}
+    summary: Document the source_document field and generator behavior.
+    rationale: Explain how reviewers can trace a generated plan back to its Markdown proposal.
+entities:
+  - id: execution-plan-generator
+    type: Module
+    action: added
+  - id: execution-plan-queue-parser
+    type: Module
+    action: added
+  - id: execution-plan-provenance-regression-tests
+    type: Regression test
+    action: added
+  - id: github-issue-plan-worker-design-doc
+    type: Design doc
+    action: added
+entity_relationships:
+  - id: generated-plan-identifies-source-document
+    type: records
+    source: execution-plan-generator
+    target: github-issue-plan-worker-design-doc
+    action: added
+    description: Generated plan YAML retains the repository-relative path of its source proposal.
+invariants:
+  - id: execution-plan-source-document-stays-in-repository
+    description: A present source_document value is a non-empty repository-relative path without traversal components.
+    action: added
+guidance: []

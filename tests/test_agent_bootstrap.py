@@ -36,6 +36,12 @@ def _repository(root: Path) -> Path:
     return root
 
 
+def _empty_repository(root: Path) -> Path:
+    root.mkdir()
+    _git(root, "init", "-q", "--initial-branch=main")
+    return root
+
+
 def test_bootstrap_uses_packaged_taxonomy_and_retains_local_worktree(
     tmp_path: Path,
 ) -> None:
@@ -66,6 +72,94 @@ def test_bootstrap_uses_packaged_taxonomy_and_retains_local_worktree(
     assert _git(result.task.worktree, "log", "-1", "--format=%s") == (
         "Bootstrap repository structure"
     )
+
+
+def test_bootstrap_initializes_an_unborn_local_repository(tmp_path: Path) -> None:
+    root = _empty_repository(tmp_path / "repo")
+
+    result = run_bootstrap_task(
+        BootstrapTaskConfig(
+            repo_root=root,
+            open_pr=False,
+            run_id="bootstrap-unborn-local",
+        )
+    )
+
+    assert result.status == "completed_unverified"
+    assert result.task is not None
+    assert result.bootstrap is not None
+    assert _git(root, "log", "-1", "--format=%s") == (
+        "Initialize repository for Powdrr bootstrap"
+    )
+    assert (
+        _git(result.task.worktree, "rev-parse", "HEAD^") == result.task.starting_commit
+    )
+    assert _git(root, "status", "--porcelain") == ""
+
+
+def test_bootstrap_opens_pr_from_an_unborn_repository_and_empty_remote(
+    tmp_path: Path,
+) -> None:
+    root = _empty_repository(tmp_path / "repo")
+    remote = tmp_path / "origin.git"
+    subprocess.run(
+        ["git", "init", "--bare", "--initial-branch=main", str(remote)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    _git(root, "remote", "add", "origin", str(remote))
+    gh_calls: list[list[str]] = []
+
+    def runner(
+        command: Sequence[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        args = list(command)
+        if args and args[0] == "gh":
+            gh_calls.append(args)
+            return subprocess.CompletedProcess(
+                args, 0, "https://github.com/acme/repo/pull/77\n", ""
+            )
+        return subprocess.run(args, **kwargs)
+
+    result = run_bootstrap_task(
+        BootstrapTaskConfig(
+            repo_root=root,
+            open_pr=True,
+            run_id="bootstrap-unborn-publish",
+        ),
+        runner=runner,
+    )
+
+    assert result.status == "pr_opened"
+    assert result.pull_request_url == "https://github.com/acme/repo/pull/77"
+    assert result.task is not None
+    assert result.task.base_branch == "main"
+    assert len(gh_calls) == 1
+    assert _git(root, "log", "-1", "--format=%s") == (
+        "Initialize repository for Powdrr bootstrap"
+    )
+    assert _git(root, "status", "--porcelain") == ""
+
+
+def test_bootstrap_does_not_initialize_an_unborn_repository_with_user_files(
+    tmp_path: Path,
+) -> None:
+    root = _empty_repository(tmp_path / "repo")
+    user_file = root / "notes.txt"
+    user_file.write_text("keep me", encoding="utf-8")
+
+    result = run_bootstrap_task(
+        BootstrapTaskConfig(
+            repo_root=root, open_pr=False, run_id="bootstrap-dirty-empty"
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.failure_stage == "initialization"
+    assert "notes.txt" in (result.error or "")
+    assert user_file.read_text(encoding="utf-8") == "keep me"
+    assert _git(root, "status", "--porcelain")
 
 
 def test_bootstrap_runs_discovered_validation_and_records_pass(

@@ -590,6 +590,32 @@ class ProbeEnabledPlanningClient(DeterministicPlanningClient):
         response_schema: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         required = set((response_schema or {}).get("required", ()))
+        if required == {"revisions"}:
+            payload = json.loads(messages[-1]["content"])
+            return {
+                "revisions": [
+                    {
+                        "scenario_id": item["scenario"]["scenario_id"],
+                        "given": (
+                            'hello_world.py prints "Hello, world!" before the new line.'
+                        ),
+                        "when": "Run hello_world.py and capture stdout.",
+                        "then": (
+                            'stdout lines equal ["Hello, world!", '
+                            '"Hello from Powdrr!"] in that order.'
+                        ),
+                    }
+                    for item in payload["flagged_scenarios"]
+                ]
+            }
+        if required == {"results"}:
+            payload = json.loads(messages[-1]["content"])
+            return {
+                "results": [
+                    {"status": "resolved", "value": "entailed", "reason_code": None}
+                    for _ in payload["requests"]
+                ]
+            }
         if required == {"probes"}:
             return {
                 "probes": [
@@ -610,6 +636,27 @@ class ProbeEnabledPlanningClient(DeterministicPlanningClient):
                 ]
             }
         return super().complete_json(messages, response_schema=response_schema)
+
+
+class WeakProbePlanningClient(ProbeEnabledPlanningClient):
+    """Produce one weak initial scenario so pre-coding repair runs end to end."""
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        required = set((response_schema or {}).get("required", ()))
+        response = super().complete_json(messages, response_schema=response_schema)
+        if required == {"status", "unresolved_dimensions", "scenario"}:
+            response["scenario"]["given"] = (
+                "The implementation is evaluated against: "
+                "Add a second greeting to hello_world.py."
+            )
+            response["scenario"]["when"] = "The instruction's behavior is exercised"
+            response["scenario"]["then"] = "Add a second greeting to hello_world.py."
+        return response
 
 
 class RepairProbePlanningClient(ProbeEnabledPlanningClient):
@@ -921,7 +968,7 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
             opencode_model="deterministic-test-model",
             open_pr=False,
             push_changes=False,
-            planning_client=ProbeEnabledPlanningClient(),
+            planning_client=WeakProbePlanningClient(),
         )
     )
 
@@ -933,6 +980,17 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     assert result.review["passed"] is True
     assert result.review["candidate_structural_gate_passed"] is True
     assert result.review["postrun_probe_generation"]["status"] == "generated"
+    assert result.review["behavior_probe_repair"]["status"] == "repaired"
+    repair_artifact = Path(result.review["behavior_probe_repair"]["artifact_path"])
+    repair_document = json.loads(repair_artifact.read_text(encoding="utf-8"))
+    assert repair_document["initial_findings"]
+    assert repair_document["final_findings"] == []
+    assert repair_document["original_scenarios"][0]["when"] == (
+        "The instruction's behavior is exercised"
+    )
+    assert repair_document["used_scenarios"][0]["when"] == (
+        "Run hello_world.py and capture stdout."
+    )
     assert [item["status"] for item in result.review["postrun_probe_results"]] == [
         "passed"
     ]
@@ -958,12 +1016,16 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
         (run_root / "implementation-packet.json").read_text(encoding="utf-8")
     )
     assert packet["schema_version"] == "implementation-packet-v1"
+    assert packet["behavior_probe_repair"]["status"] == "repaired"
+    assert (
+        packet["behavior_probe_repair"]["fingerprint"] == repair_document["fingerprint"]
+    )
     prompt = (run_root / "artifacts" / "prompts").glob("*.txt")
     prompt_text = next(prompt).read_text(encoding="utf-8")
     assert "Product contract:" in prompt_text
     assert "Validation contract:" in prompt_text
     assert "Required behavior checks:" in prompt_text
-    assert "expect the stated acceptance outcome is observed" in prompt_text
+    assert "stdout lines equal" in prompt_text
     assert "Run the tests before reporting completion." in prompt_text
     assert "Worker policy:" in prompt_text
     assert "create the exact selectors" not in prompt_text

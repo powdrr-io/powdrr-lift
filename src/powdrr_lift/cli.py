@@ -11,6 +11,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
@@ -121,7 +122,11 @@ from powdrr_lift.openai_proxy import (
 from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
 )
-from powdrr_lift.process.tasks import HumanRole, validate_workflow_task_directory
+from powdrr_lift.process.tasks import (
+    HumanRole,
+    save_workflow_task,
+    validate_workflow_task_directory,
+)
 from powdrr_lift.process.templates import (
     instantiate_workflow_template,
     instantiated_workflow_relationships,
@@ -196,14 +201,24 @@ from powdrr_lift.workrr.git import (
     commit_and_push_workflow_initialization,
     create_workflow_worktree,
     inspect_workflow_run,
+    integration_branch_name,
     resolve_git_repository_root,
     save_workflow_git_state,
     slugify_workflow_id,
     synchronize_workflow_initialization,
 )
+from powdrr_lift.workrr.github_issue_plan_generation import (
+    PlanGenerationError,
+    generate_execution_plan_yaml,
+    load_plan_workflow_instance,
+    publish_execution_plan_pull_request,
+    write_execution_plan_artifacts,
+)
 from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueClient,
     GitHubIssueQueueError,
+    ReviewedExecutionPlan,
+    TaskCheckpointCallback,
     find_plan_issues,
     load_reviewed_plan_at_commit,
     publish_plan_issues,
@@ -316,6 +331,31 @@ def build_parser() -> argparse.ArgumentParser:
         "--repo-root", type=Path, help="Checkout containing the merged plan revision."
     )
     publish_plan_issues_parser.set_defaults(func=_run_publish_plan_issues)
+
+    plan_parser = subparsers.add_parser(
+        "plan",
+        help=(
+            "Analyze a Markdown plan, generate per-item PR workflows, and open "
+            "a review pull request."
+        ),
+    )
+    plan_parser.add_argument("--source", type=Path, required=True)
+    plan_parser.add_argument("--plan-id", required=True)
+    plan_parser.add_argument(
+        "--verification-command",
+        required=True,
+        help="Repository validation command embedded in each generated PR workflow.",
+    )
+    plan_parser.add_argument("--output", type=Path)
+    plan_parser.add_argument("--repo-root", type=Path)
+    plan_parser.add_argument(
+        "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
+    )
+    plan_parser.add_argument("--planning-model")
+    plan_parser.add_argument("--planning-api-key")
+    plan_parser.add_argument("--planning-base-url")
+    plan_parser.add_argument("--json", action="store_true")
+    plan_parser.set_defaults(func=_run_plan)
 
     list_plan_issues_parser = subparsers.add_parser(
         "list-plan-issues",
@@ -2367,6 +2407,125 @@ def _run_repository_state(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_plan(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root).resolve()
+    try:
+        source_path = _repository_file_path(args.source, repo_root, "Source plan")
+        if not source_path.is_file():
+            raise ValueError(f"Source plan does not exist: {source_path}")
+        source_plan = source_path.read_text(encoding="utf-8")
+        output_path = (
+            _repository_file_path(args.output, repo_root, "Output plan")
+            if args.output is not None
+            else repo_root
+            / "docs"
+            / "plans"
+            / f"{slugify_workflow_id(args.plan_id)}-execution-plan.yaml"
+        )
+        if output_path == source_path:
+            raise ValueError("Output plan must be different from the source plan")
+        if output_path.exists():
+            raise FileExistsError(
+                f"Output plan already exists: {output_path}; choose another path "
+                "so the reviewed plan is not overwritten."
+            )
+
+        planning_provider = resolve_workflow_provider(args.planning_provider)
+        planning_mapping = configured_model_mapping(
+            planning_provider, args.planning_model
+        )
+        planning_credentials = resolve_provider_credentials(
+            planning_mapping.provider,
+            args.planning_api_key,
+            args.planning_base_url,
+        )
+        planning_client = build_workflow_client(
+            planning_credentials,
+            model=planning_mapping.model,
+            model_cache_dir=repo_root / ".powdrr" / "models",
+            progress_stream=sys.stderr,
+        )
+        set_output_limit = getattr(
+            planning_client, "set_structured_output_token_limit", None
+        )
+        if callable(set_output_limit):
+            set_output_limit(8192)
+        source_plan_relative = source_path.relative_to(repo_root).as_posix()
+        rendered, plan = generate_execution_plan_yaml(
+            source_plan=source_plan,
+            plan_id=args.plan_id,
+            client=planning_client,
+            source_document=source_plan_relative,
+        )
+        generated_files = write_execution_plan_artifacts(
+            rendered_plan=rendered,
+            plan=plan,
+            output_path=output_path,
+            repo_root=repo_root,
+            verification_command=args.verification_command,
+        )
+        for generated_file in generated_files:
+            _stage_generated_file(repo_root, generated_file)
+        pull_request = publish_execution_plan_pull_request(
+            repo_root=repo_root,
+            plan=plan,
+            generated_files=generated_files,
+            source_plan_path=source_plan_relative,
+        )
+    except (
+        FileExistsError,
+        GitHubIssueQueueError,
+        OSError,
+        PlanGenerationError,
+        PowdrrExecutionError,
+        ValueError,
+    ) as error:
+        print(f"Could not create execution plan: {error}", file=sys.stderr)
+        return 2
+
+    relative_path = output_path.relative_to(repo_root).as_posix()
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "plan_id": plan.plan_id,
+                    "path": relative_path,
+                    "items": [item.item_id for item in plan.items],
+                    "generated_files": [
+                        path.relative_to(repo_root).as_posix()
+                        for path in generated_files
+                    ],
+                    "workflow_count": len(plan.items),
+                    "branch": pull_request.branch_name,
+                    "base_branch": pull_request.base_branch,
+                    "commit": pull_request.commit_sha,
+                    "pull_request_url": pull_request.pull_request_url,
+                    "status": "pull_request_opened",
+                    "published_issues": False,
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        print(f"Wrote reviewable execution plan to {relative_path}")
+        print(f"Proposed items: {len(plan.items)}")
+        print(f"Generated PR workflows: {len(plan.items)}")
+        print(f"Opened plan review PR: {pull_request.pull_request_url}")
+        print("No GitHub issues were published and no work was executed.")
+    return 0
+
+
+def _repository_file_path(path: Path, repo_root: Path, label: str) -> Path:
+    candidate = path if path.is_absolute() else repo_root / path
+    resolved = candidate.resolve()
+    try:
+        resolved.relative_to(repo_root)
+    except ValueError as error:
+        raise ValueError(f"{label} path must be inside the repository") from error
+    return resolved
+
+
 def _run_publish_plan_issues(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     plan_path = args.plan
@@ -2455,7 +2614,106 @@ def _run_list_plan_issues(args: argparse.Namespace) -> int:
 def _run_github_issue_worker(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
 
-    def run_task(workflow_dir: Path, workflow_id: str, _worker_id: str) -> int:
+    def run_task(
+        workflow_path: Path,
+        workflow_id: str,
+        _worker_id: str,
+        item: Any,
+        plan: ReviewedExecutionPlan,
+        checkpoint_callback: TaskCheckpointCallback,
+    ) -> int:
+        if workflow_path.is_dir():
+            workflow_dir = workflow_path
+        else:
+            instance = load_plan_workflow_instance(workflow_path)
+            if instance.workflow_id != workflow_id:
+                raise PlanGenerationError(
+                    "workflow definition ID does not match its plan item"
+                )
+            template_path = (
+                Path(__file__).resolve().parents[2]
+                / "templates"
+                / f"{instance.template_id}.yaml"
+            )
+            with tempfile.TemporaryDirectory(
+                prefix=f"powdrr-{workflow_id}-"
+            ) as temporary_root:
+                workflow_dir, tasks = instantiate_workflow_template(
+                    template_path=template_path,
+                    work_item_name=workflow_id,
+                    workflow_instance_name=workflow_id,
+                    output_root=Path(temporary_root),
+                    template_values=instance.parameters,
+                )
+                context = {
+                    "plan_id": plan.plan_id,
+                    "item_id": item.item_id,
+                    "title": item.title,
+                    "objective": item.objective,
+                    "scope": list(item.scope),
+                    "acceptance_criteria": list(item.acceptance_criteria),
+                    "dependencies": list(item.dependencies),
+                }
+                first_task = replace(
+                    tasks[0],
+                    input_state={
+                        **tasks[0].input_state,
+                        "structured_pr_context": context,
+                    },
+                    details=(
+                        "Use input_state.structured_pr_context as the authoritative "
+                        "proposed PR context. Do not run proposal discovery or alter "
+                        "the item meaning. Return exactly one next_step action, "
+                        "copying the complete input object into "
+                        "output_state.proposed-pr-context-state, for example: "
+                        '{"action":"next_step","output_state":'
+                        '{"proposed-pr-context-state":'
+                        f"{json.dumps(context, ensure_ascii=False)}"
+                        '}},"decisions_and_context":"Recorded the reviewed plan item."}'
+                    ),
+                    actions=(),
+                    actions_declared=True,
+                    step_type="governed",
+                    pre_step=None,
+                )
+                save_workflow_task(
+                    first_task, workflow_dir / f"{first_task.task_id}.yaml"
+                )
+                save_workflow_git_state(
+                    workflow_dir,
+                    WorkflowGitState(
+                        proposed_pr_id=workflow_id,
+                        base_branch="main",
+                        integration_branch=integration_branch_name(workflow_id),
+                        workflow_relative_directory=(
+                            Path(item.workflow_file).parent.as_posix()
+                            if item.workflow_file is not None
+                            else ""
+                        ),
+                        depends_on_workflows=tuple(
+                            planned.workflow_id
+                            for dependency in item.dependencies
+                            for planned in plan.items
+                            if planned.item_id == dependency
+                        ),
+                    ),
+                )
+                return run_workflow_task(
+                    WorkflowTaskAgentConfig(
+                        workflow_dir=workflow_dir,
+                        repo_root=repo_root,
+                        provider=args.provider,
+                        workflow_id=workflow_id,
+                        api_key=args.api_key,
+                        base_url=args.base_url,
+                        max_roundtrips=args.max_roundtrips,
+                        context_compaction_threshold=args.context_compaction_threshold,
+                        verbose=args.verbose,
+                        task_checkpoint_callback=checkpoint_callback,
+                    ),
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
+                )
         return run_workflow_task(
             WorkflowTaskAgentConfig(
                 workflow_dir=workflow_dir,
@@ -2467,6 +2725,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 max_roundtrips=args.max_roundtrips,
                 context_compaction_threshold=args.context_compaction_threshold,
                 verbose=args.verbose,
+                task_checkpoint_callback=checkpoint_callback,
             ),
             stdout=sys.stdout,
             stderr=sys.stderr,

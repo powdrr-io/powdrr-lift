@@ -110,12 +110,21 @@ def run_bootstrap_task(
     validation_status: str | None = None
     try:
         _emit_bootstrap_progress(progress, "Preparing an isolated worktree.")
-        task = prepare_agent_worktree(
+        base_ref, base_branch = _prepare_bootstrap_base(
             repo_root,
-            config.task_name,
             base_ref=config.base_ref,
             remote=config.remote,
             base_branch=config.base_branch,
+            publish=config.open_pr,
+            runner=runner,
+            progress=progress,
+        )
+        task = prepare_agent_worktree(
+            repo_root,
+            config.task_name,
+            base_ref=base_ref,
+            remote=config.remote,
+            base_branch=base_branch,
             publish=config.open_pr,
             run_id=config.run_id,
             runner=runner,
@@ -450,6 +459,158 @@ def _persist_result(
         report_json_path=report_json,
         report_markdown_path=report_markdown,
     )
+
+
+def _prepare_bootstrap_base(
+    repository: Path,
+    *,
+    base_ref: str,
+    remote: str,
+    base_branch: str | None,
+    publish: bool,
+    runner: Any,
+    progress: Callable[[str], None] | None,
+) -> tuple[str, str | None]:
+    resolved = runner(
+        ["git", "rev-parse", "--verify", f"{base_ref}^{{commit}}"],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if resolved.returncode == 0:
+        return base_ref, base_branch
+    if base_ref != "HEAD":
+        return base_ref, base_branch
+
+    current_branch = runner(
+        ["git", "symbolic-ref", "--quiet", "--short", "HEAD"],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if current_branch.returncode != 0 or not current_branch.stdout.strip():
+        raise PowdrrExecutionError(
+            "Cannot initialize an unborn repository with a detached HEAD."
+        )
+    branch = current_branch.stdout.strip()
+    dirty = _bootstrap_git_output(runner, repository, ["status", "--porcelain"])
+    if dirty:
+        paths = ", ".join(line[3:] for line in dirty.splitlines() if len(line) > 3)
+        raise PowdrrExecutionError(
+            "Starting checkout must be clean; found changes in: "
+            + (paths or "unknown paths")
+        )
+
+    if publish:
+        remotes = _bootstrap_git_output(runner, repository, ["remote"]).splitlines()
+        if remote not in remotes:
+            raise PowdrrExecutionError(
+                f"Cannot publish: Git remote {remote!r} is not configured."
+            )
+        remote_heads = _bootstrap_git_output(
+            runner, repository, ["ls-remote", "--heads", remote]
+        )
+        branches: set[str] = set()
+        for line in remote_heads.splitlines():
+            parts = line.split("\t")
+            if len(parts) == 2 and parts[1].startswith("refs/heads/"):
+                branches.add(parts[1].removeprefix("refs/heads/"))
+        if branches:
+            selected_branch = base_branch or _remote_default_branch(
+                runner, repository, remote
+            )
+            if selected_branch is None and len(branches) == 1:
+                selected_branch = next(iter(branches))
+            if selected_branch is None or selected_branch not in branches:
+                raise PowdrrExecutionError(
+                    f"Cannot determine a valid base branch for remote {remote!r}; "
+                    "pass --base-branch explicitly."
+                )
+            _bootstrap_git_output(
+                runner, repository, ["fetch", remote, selected_branch]
+            )
+            remote_ref = f"refs/remotes/{remote}/{selected_branch}"
+            _bootstrap_git_output(
+                runner, repository, ["rev-parse", "--verify", remote_ref]
+            )
+            _emit_bootstrap_progress(
+                progress,
+                f"Using existing remote base {remote}/{selected_branch}.",
+            )
+            return remote_ref, selected_branch
+
+    _emit_bootstrap_progress(
+        progress,
+        f"Creating an initial empty commit on {branch} so bootstrap can proceed.",
+    )
+    _bootstrap_git_output(
+        runner,
+        repository,
+        [
+            "-c",
+            "user.name=Powdrr Automation",
+            "-c",
+            "user.email=powdrr-automation@users.noreply.github.com",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "Initialize repository for Powdrr bootstrap",
+        ],
+    )
+    if not publish:
+        return "HEAD", None
+
+    selected_branch = base_branch or branch
+    _emit_bootstrap_progress(
+        progress,
+        f"Establishing {remote}/{selected_branch} as the initial remote base branch.",
+    )
+    _bootstrap_git_output(
+        runner,
+        repository,
+        ["push", remote, f"HEAD:refs/heads/{selected_branch}"],
+    )
+    return "HEAD", selected_branch
+
+
+def _remote_default_branch(runner: Any, repository: Path, remote: str) -> str | None:
+    result = runner(
+        ["git", "ls-remote", "--symref", remote, "HEAD"],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise PowdrrExecutionError(
+            "Could not determine the remote default branch: " + result.stderr.strip()
+        )
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if (
+            len(fields) == 3
+            and fields[0] == "ref:"
+            and fields[1].startswith("refs/heads/")
+        ):
+            return fields[1].removeprefix("refs/heads/")
+    return None
+
+
+def _bootstrap_git_output(runner: Any, repository: Path, args: list[str]) -> str:
+    result = runner(
+        ["git", *args],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise PowdrrExecutionError(
+            f"git {' '.join(args)} failed: {result.stderr.strip()}"
+        )
+    return result.stdout.strip()
 
 
 def _validation_report_data(result: BootstrapTaskResult) -> dict[str, Any]:

@@ -1,0 +1,175 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1005
+title: Open a review pull request from plan generation
+intent:
+  problem: The plan command generated and staged a complete artifact bundle but left
+    branch creation, commit, push, and PR opening to the caller.
+  goal: Make plan generation publish its generated artifacts as a focused pull request
+    while preserving unrelated staged changes.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 44
+    end_line: 48
+  summary: Document automatic plan review PR creation and output.
+  rationale: Make the review workflow clear from planning through merging.
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 63
+    end_line: 66
+  summary: Document automatic plan review PR creation and output.
+  rationale: Make the review workflow clear from planning through merging.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 238
+    end_line: 238
+  summary: Publish generated plans as pull requests and return the PR details.
+  rationale: Turn the plan command output into a reviewable GitHub change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 375
+    end_line: 376
+  summary: Publish generated plans as pull requests and return the PR details.
+  rationale: Turn the plan command output into a reviewable GitHub change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2733
+    end_line: 2738
+  summary: Publish generated plans as pull requests and return the PR details.
+  rationale: Turn the plan command output into a reviewable GitHub change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2763
+    end_line: 2767
+  summary: Publish generated plans as pull requests and return the PR details.
+  rationale: Turn the plan command output into a reviewable GitHub change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2778
+    end_line: 2778
+  summary: Publish generated plans as pull requests and return the PR details.
+  rationale: Turn the plan command output into a reviewable GitHub change.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Create a branch, commit generated files only, push, and open the plan review
+    PR.
+  rationale: Publish the artifact bundle without including unrelated staged changes.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Create a branch, commit generated files only, push, and open the plan review
+    PR.
+  rationale: Publish the artifact bundle without including unrelated staged changes.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Create a branch, commit generated files only, push, and open the plan review
+    PR.
+  rationale: Publish the artifact bundle without including unrelated staged changes.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 112
+    end_line: 272
+  summary: Create a branch, commit generated files only, push, and open the plan review
+    PR.
+  rationale: Publish the artifact bundle without including unrelated staged changes.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Verify PR publication, focused commits, and preservation of other staged
+    work.
+  rationale: Guard the plan-to-review-PR behavior and its Git safety boundary.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Verify PR publication, focused commits, and preservation of other staged
+    work.
+  rationale: Guard the plan-to-review-PR behavior and its Git safety boundary.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 164
+  summary: Verify PR publication, focused commits, and preservation of other staged
+    work.
+  rationale: Guard the plan-to-review-PR behavior and its Git safety boundary.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 214
+    end_line: 216
+  summary: Verify PR publication, focused commits, and preservation of other staged
+    work.
+  rationale: Guard the plan-to-review-PR behavior and its Git safety boundary.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 224
+    end_line: 225
+  summary: Verify PR publication, focused commits, and preservation of other staged
+    work.
+  rationale: Guard the plan-to-review-PR behavior and its Git safety boundary.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 408
+  summary: Verify PR publication, focused commits, and preservation of other staged
+    work.
+  rationale: Guard the plan-to-review-PR behavior and its Git safety boundary.
+entities:
+- id: plan
+  type: Subcommand
+  action: modified
+- id: publish_execution_plan_pull_request
+  type: Function
+  action: added
+- id: plan-review-pull-request-publication
+  type: Workflow
+  action: added
+- id: plan-pr-publication-regression
+  type: Regression test
+  action: added
+entity_relationships:
+- id: plan-publication-is-tested
+  type: verifies
+  source: plan-pr-publication-regression
+  target: publish_execution_plan_pull_request
+  action: added
+  description: Tests exercise branch creation, a generated-files-only commit, push,
+    and review PR creation.
+invariants:
+- id: plan-pr-contains-only-generated-artifacts
+  description: The plan PR commit contains generated plan artifacts and excludes unrelated
+    staged changes.
+  action: added
+- id: plan-command-opens-review-pr
+  description: Successful plan command completion includes a pushed branch and a GitHub
+    pull request URL.
+  action: added
+guidance:
+- id: review-plan-artifacts-before-publishing-issues
+  description: Review and merge the plan pull request before publishing its items
+    as GitHub issues.
+  action: added

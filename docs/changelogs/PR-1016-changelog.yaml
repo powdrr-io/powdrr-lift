@@ -1,0 +1,67 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1016
+title: Report commit-pinned Powdrr artifact state
+intent:
+  problem: Repository users cannot retrieve one complete view of plans, workflows, entities, and changelogs at a selected commit.
+  goal: Add a read-only CLI inventory that combines a Structrr bootstrap with later changelog changes and plan/workflow artifacts at a branch and SHA.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/artifact_state.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 680
+  summary: Build a commit-pinned artifact inventory
+  rationale: Read repository files and changelog history at the requested SHA, materialize entity lifecycle state, connect plans to workflows, and optionally attach live GitHub pull request metadata.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Connect the artifact state builder to the CLI
+  rationale: Expose the artifact inventory through the powdrr-lift command.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 977
+    end_line: 1003
+  summary: Add the artifact-state command options
+  rationale: Require branch and SHA inputs and allow selecting the local clone and GitHub repository.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 4512
+    end_line: 4528
+  summary: Emit the artifact inventory as JSON
+  rationale: Return a machine-readable state report and surface revision-resolution errors.
+- path: README.md
+  type: modified
+  span:
+    start_line: 227
+    end_line: 239
+  summary: Document commit-pinned artifact inspection
+  rationale: Show how to request a repository artifact inventory and explain that GitHub pull request state is observed live.
+entities:
+- id: artifact-state
+  type: Command
+  action: added
+- id: powdrr_lift.artifact_state
+  type: Module
+  action: added
+- id: build_artifact_state
+  type: Function
+  action: added
+entity_relationships:
+- id: artifact-state-command-builds-artifact-state-report
+  type: invokes
+  source: artifact-state
+  target: build_artifact_state
+  action: added
+  description: The CLI command invokes the commit-pinned artifact inventory builder.
+- id: artifact-state-module-defines-inventory-builder
+  type: contains
+  source: powdrr_lift.artifact_state
+  target: build_artifact_state
+  action: added
+  description: The artifact state module defines the inventory builder.

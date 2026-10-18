@@ -125,6 +125,7 @@ from powdrr_lift.workrr.postrun_probes import (
     run_postrun_probes,
 )
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
+from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_lift.workrr.run_artifacts import (
     RunFailure,
@@ -613,24 +614,25 @@ def _execute_procedrr_flow(
         if not isinstance(command, list) or not command:
             raise PowdrrExecutionError("feature flow operation command is malformed")
         name = command[0]
-        if isinstance(name, str):
-            spec = command_catalog.get(name)
-            if spec is not None:
-                try:
-                    spec.validate_input(
-                        {
-                            key: value
-                            for key, value in parameters.items()
-                            if key != "command"
-                        }
-                    )
-                except ValueError as exc:
-                    raise PowdrrExecutionError(str(exc)) from exc
         return command_runtime.dispatch(
             str(name),
             command,
             {key: value for key, value in parameters.items() if key != "command"},
         )
+
+    def operation_handler(name: str) -> Callable[[Mapping[str, Any]], Any]:
+        def dispatch(parameters: Mapping[str, Any]) -> Any:
+            return execute(name, parameters)
+
+        return dispatch
+
+    operation_executor = WorkrrOperationExecutor(
+        {
+            name: operation_handler(name)
+            for name in ("gather_context", "edit", "yaml_edit", "internal")
+        },
+        command_catalog=command_catalog,
+    )
 
     if config.planning_client is None:
         raise PowdrrExecutionError(
@@ -659,7 +661,7 @@ def _execute_procedrr_flow(
         execution_service = ProcedrrExecutionService(
             process_catalog,
             planning_client,
-            execute,
+            operation_executor,
             judge_clients={
                 "planning": planning_client,
                 "jev": classifier_judge_client,

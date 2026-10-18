@@ -2645,7 +2645,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
             ) as temporary_root:
                 workflow_dir, tasks = instantiate_procedrr_process_workflow(
                     process_id=instance.process_id,
-                    process_directory=(repo_root / "docs" / "procedrr" / "processes"),
+                    process_directory=_bundled_procedrr_process_directory(),
                     input_state=instance.inputs,
                     work_item_name=workflow_id,
                     workflow_instance_name=workflow_id,
@@ -2725,6 +2725,11 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
         )
     )
     return 0 if report.outcome in {"no_eligible_work", "awaiting_review"} else 1
+
+
+def _bundled_procedrr_process_directory() -> Path:
+    """Locate Powdrr-Lift's process catalog, independent of target repository."""
+    return Path(__file__).resolve().parents[2] / "docs" / "procedrr" / "processes"
 
 
 def _run_pull_request_description(args: argparse.Namespace) -> int:

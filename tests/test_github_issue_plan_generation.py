@@ -112,9 +112,7 @@ def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> No
 
     workflow_dir, tasks = instantiate_procedrr_process_workflow(
         process_id=instance.process_id,
-        process_directory=(
-            Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
-        ),
+        process_directory=cli._bundled_procedrr_process_directory(),
         input_state=instance.inputs,
         work_item_name=instance.workflow_id,
         workflow_instance_name=instance.workflow_id,
@@ -129,6 +127,18 @@ def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> No
     assert tasks[0].input_state["proposed_pr_context"]["verification_command"] == (
         "scripts/verify-all.sh"
     )
+
+
+def test_plan_worker_process_catalog_does_not_depend_on_target_repo(
+    tmp_path: Path,
+) -> None:
+    from procedrr import ProcessCatalog
+
+    process_directory = cli._bundled_procedrr_process_directory()
+    target_process_directory = tmp_path / "docs" / "procedrr" / "processes"
+
+    assert not target_process_directory.exists()
+    assert ProcessCatalog.load(process_directory).get("execute-proposed-pr-workflow")
 
 
 def test_generated_plan_rejects_unknown_procedrr_process(tmp_path: Path) -> None:

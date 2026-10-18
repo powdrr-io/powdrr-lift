@@ -121,20 +121,21 @@ def repair_behavior_probes(
             "role": "system",
             "content": (
                 "Revise only the flagged behavior probes so each has a concrete "
-                "setup, operation, and observable result. For each probe, use its "
-                "authoritative source clause as the boundary for claims. Do not "
-                "borrow behavior from another clause in the full instruction. Use "
-                "the supplied repository contract only to make examples concrete. "
-                "Do not add capabilities, rules, edge cases, or assumptions absent "
-                "from that clause. Keep scenario IDs unchanged. If the clause does "
-                "not support a more concrete probe, return its fields unchanged."
+                "setup, operation, and observable result. Each probe includes its "
+                "authoritative source clause; treat that clause as the sole source "
+                "for the probe's required behavior. Make the `then` field one "
+                "observable outcome strictly entailed by that clause. Do not add "
+                "intermediate payload details, transport behavior, edge cases, or "
+                "assumptions unless the clause states them. Use the supplied "
+                "repository contract only to make the setup concrete. Keep scenario "
+                "IDs unchanged. If the clause does not support a more concrete "
+                "probe, return its fields unchanged."
             ),
         },
         {
             "role": "user",
             "content": json.dumps(
                 {
-                    "source_instruction": instruction,
                     "repository_contract": repository_contract or {},
                     "flagged_scenarios": _flagged_scenarios_with_sources(
                         initial_findings, repairable, ledger_clauses

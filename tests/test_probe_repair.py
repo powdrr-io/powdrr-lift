@@ -93,9 +93,10 @@ def test_probe_repair_revises_only_flagged_scenario_after_faithfulness(
     assert artifact["used_scenarios"] == list(revised)
     assert artifact["initial_findings"]
     assert artifact["final_findings"] == []
-    assert "Do not add capabilities" in str(client.messages)
+    assert "Do not add intermediate payload details" in str(client.messages)
     assert "authoritative_source_clause" in str(client.messages)
     assert "instruction-001" in str(client.messages)
+    assert "source_instruction" not in str(client.messages)
 
 
 def test_probe_repair_discards_candidate_rejected_by_faithfulness(

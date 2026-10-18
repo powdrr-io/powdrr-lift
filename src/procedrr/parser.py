@@ -28,6 +28,9 @@ KNOWN_TOOLS = frozenset(
         "procedrr_fragment_apply_edit",
         "workflow_chat_snapshot",
         "workflow_chat_changes",
+        "task_complete",
+        "task_handoff",
+        "task_run_process",
     }
 )
 KNOWN_VALIDATORS = frozenset({"json_schema"})

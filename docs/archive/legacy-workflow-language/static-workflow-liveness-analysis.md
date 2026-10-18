@@ -1,5 +1,8 @@
 # Static Workflow Liveness Analysis Plan
 
+> Archived reference for the retired legacy workflow analyzer. This plan is
+> historical; current process validation uses `validate-procedrr-processes`.
+
 ## Objective
 
 Detect workflow definitions that can deadlock, livelock, or repeatedly perform

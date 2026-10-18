@@ -19,10 +19,7 @@ from powdrr_lift.workrr.chat_io import (
     _verbose_json,
     _verbose_print,
 )
-from powdrr_lift.workrr.chat_selection import (
-    SkillChatConfig,
-    WorkflowChatConfig,
-)
+from powdrr_lift.workrr.chat_selection import SkillChatConfig
 from powdrr_lift.workrr.execution_loop import _print_waiting_for_model
 from powdrr_lift.workrr.llm import (
     WorkflowLLMClient,
@@ -168,7 +165,7 @@ def _complete_json_with_repair(
     model: str,
     parser: Callable[[dict[str, Any]], Any],
     repair_instructions: str,
-    config: WorkflowChatConfig,
+    config: SkillChatConfig,
     input_func: Callable[[], str],
     stdout: TextIO,
     stderr: TextIO,

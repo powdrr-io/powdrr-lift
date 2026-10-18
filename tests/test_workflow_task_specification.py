@@ -113,7 +113,7 @@ def test_workflow_task_round_trips_executable_step_fields() -> None:
         description="Run the implementation step.",
         details="Use the approved design and preserve the recorded decisions.",
         llm_type="standard_reasoning",
-        uses_skills=("review-context",),
+        uses_processes=("review-context",),
         tool_invocations=(SkillToolInvocation(tool="shell", command=("pytest", "-q")),),
     )
 
@@ -123,6 +123,36 @@ def test_workflow_task_round_trips_executable_step_fields() -> None:
     assert parsed.to_data()["tool_invocations"] == [
         {"tool": "shell", "command": ["pytest", "-q"]}
     ]
+
+
+def test_workflow_task_persists_procedrr_identity_and_checkpoint() -> None:
+    checkpoint = {
+        "schema_version": 1,
+        "process_id": "durable-task",
+        "process_fingerprint": "abc123",
+        "evaluator": {
+            "initial_bindings": {"task_context": {"task_id": "task-1"}},
+            "events": [{"kind": "suspend", "path": "steps[0]", "data": {}}],
+            "suspended_at": "steps[0]",
+            "event_cursor": 1,
+        },
+    }
+    task = WorkflowTask(
+        task_id="task-1",
+        status=TaskStatus.LOCKED,
+        upstream_task_ids=(),
+        dependent_state=(),
+        complexity=TaskComplexity.HIGH,
+        input_state={"task_id": "task-1"},
+        description="Continue implementation after review.",
+        process_id="durable-task",
+        process_checkpoint=checkpoint,
+    )
+
+    parsed = workflow_task_from_yaml(workflow_task_to_yaml(task))
+
+    assert parsed.process_id == "durable-task"
+    assert parsed.process_checkpoint == checkpoint
 
 
 def test_workflow_task_interaction_style_round_trips_and_validates() -> None:

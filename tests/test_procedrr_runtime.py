@@ -5,9 +5,16 @@ from typing import Any
 
 import pytest
 
-from procedrr import ProcessCatalog, ProcessCatalogError
+from procedrr import ProcessCatalog, ProcessCatalogError, ProcessIdentity
+from procedrr_evaluator.evaluator import (
+    EvaluationCheckpoint,
+    EvaluationError,
+    EvaluationEvent,
+    SuspendEvaluation,
+)
 from procedrr_evaluator.runtime import (
     ProcedrrExecutionService,
+    ProcessExecutionCheckpoint,
     ProcessTerminalStatus,
 )
 
@@ -128,6 +135,99 @@ steps:
     assert result.terminal_status is ProcessTerminalStatus.FAILED
     assert [event.kind for event in result.events] == ["terminal"]
     assert calls == []
+
+
+def test_suspended_process_resumes_without_replaying_completed_operations(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "durable-process.yaml"
+    path.write_text(
+        """\
+version: 1
+name: durable-process
+inputs:
+  - {name: request, type: string, required: true}
+steps:
+  - operation:
+      tool: internal
+      command: [prepare]
+      parameters: {request: "${request}"}
+      bind: prepared
+  - operation:
+      tool: prompt_user
+      parameters: {question: "Confirm the prepared result"}
+      bind: human_response
+  - operation:
+      tool: internal
+      command: [finish]
+      parameters:
+        prepared: "${prepared}"
+        human_response: "${human_response}"
+      bind: outcome
+  - terminal: succeeded
+""",
+        encoding="utf-8",
+    )
+    catalog = ProcessCatalog.load(tmp_path)
+    calls: list[str] = []
+
+    def execute(tool: str, parameters: Any) -> Any:
+        command = parameters.get("command", [tool])[0]
+        calls.append(command)
+        if tool == "prompt_user":
+            raise SuspendEvaluation(
+                {"pending": True, "question": parameters["question"]},
+                "waiting for a human response",
+            )
+        if command == "prepare":
+            return f"prepared:{parameters['request']}"
+        return {
+            "prepared": parameters["prepared"],
+            "human_response": parameters["human_response"],
+        }
+
+    service = ProcedrrExecutionService(catalog, NoCallLLM(), execute)
+    suspended = service.execute("durable-process", {"request": "change"})
+
+    assert suspended.terminal_status is ProcessTerminalStatus.SUSPENDED
+    assert suspended.checkpoint is not None
+    assert suspended.checkpoint.evaluator.event_cursor == suspended.event_cursor
+    assert calls == ["prepare", "prompt_user"]
+
+    serialized = suspended.checkpoint.to_data()
+    checkpoint = ProcessExecutionCheckpoint.from_data(serialized)
+    resumed = service.execute(
+        "durable-process",
+        checkpoint=checkpoint,
+        resume_value={"approved": True},
+    )
+
+    assert resumed.terminal_status is ProcessTerminalStatus.SUCCEEDED
+    assert resumed.checkpoint is None
+    assert resumed.bindings["outcome"] == {
+        "prepared": "prepared:change",
+        "human_response": {"approved": True},
+    }
+    assert calls == ["prepare", "prompt_user", "finish"]
+    assert [event.kind for event in resumed.events].count("resume") == 1
+
+
+def test_process_checkpoint_rejects_a_changed_process_revision(tmp_path: Path) -> None:
+    _write_process(tmp_path / "smoke-process.yaml")
+    catalog = ProcessCatalog.load(tmp_path)
+    checkpoint = ProcessExecutionCheckpoint(
+        ProcessIdentity("smoke-process", "old-fingerprint"),
+        EvaluationCheckpoint(
+            {"greeting": "hello"},
+            (EvaluationEvent("suspend", "steps[0]", {"reason": "wait"}),),
+            "steps[0]",
+            1,
+        ),
+    )
+    with pytest.raises(EvaluationError, match="identity or revision"):
+        ProcedrrExecutionService(catalog, NoCallLLM(), lambda *_: None).execute(
+            "smoke-process", checkpoint=checkpoint, resume_value="continue"
+        )
 
 
 def test_migrated_independent_review_runs_as_a_procedrr_process() -> None:

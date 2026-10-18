@@ -256,9 +256,9 @@ def run_workflow_scenario(
         try:
             result = run_workflow_task_scenario(
                 workflow_source=workflow_dir,
-                skill_definitions_source=(
-                    source_root / "skill-definitions"
-                    if (source_root / "skill-definitions").is_dir()
+                process_catalog_source=(
+                    source_root / "docs" / "procedrr" / "processes"
+                    if (source_root / "docs" / "procedrr" / "processes").is_dir()
                     else None
                 ),
                 task_id=(
@@ -573,7 +573,7 @@ def _run_scripted_skill(
     entry = SkillCatalogEntry(definition_path, skill)
     execution_client = client or _ScriptedWorkflowClient(responses)
     config = SkillChatConfig(
-        skills_dir=definition_path.parent,
+        processes_dir=definition_path.parent,
         repo_root=worktree_root,
         provider=provider,
         model=model,
@@ -1036,9 +1036,9 @@ def _run_workflow_chain_scenario(
                         ),
                         source_root,
                     ),
-                    skill_definitions_source=(
-                        source_root / "skill-definitions"
-                        if (source_root / "skill-definitions").is_dir()
+                    process_catalog_source=(
+                        source_root / "docs" / "procedrr" / "processes"
+                        if (source_root / "docs" / "procedrr" / "processes").is_dir()
                         else None
                     ),
                     responses=_scenario_responses(

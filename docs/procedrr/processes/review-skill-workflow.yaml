@@ -24,10 +24,10 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
-      ---\nname: review-skill-workflow\ninputs:\n- name: skill-definitions-or-workflow-root\n\
+      ---\nname: review-skill-workflow\ninputs:\n- name: process definitions-or-workflow-root\n\
       - name: target-name\n- name: target-definition\n- name: rewrite-context\n- name: accepted-rewrites\n\
       - name: target-definition-path\n- name: staged-definition\n- name: files-to-publish\n\
       - name: review-report\n- name: validation-result\nwhen_to_use:\n- When the user wants\
@@ -45,14 +45,14 @@ steps:
       \ Read the complete target definition with\n    read_document. Do not edit it during\
       \ this step. Record its goal, inputs,\n    outputs, dependencies, steps or tasks, and\
       \ existing validation\n    requirements.\n  tool_invocations:\n  - tool: fuzzy-match\n\
-      \    command:\n    - fuzzy-match\n    - <skill-definitions-or-workflow-root>\n    -\
+      \    command:\n    - fuzzy-match\n    - <process definitions-or-workflow-root>\n    -\
       \ -name\n    - <target-name>\n    - -type\n    - f\n    - -print\n- id: inventory-steps\n\
       \  actions: [edit, yaml_edit, file_management, read_document]\n  step_type: governed\n\
       \  description: Inventory every target step and its execution surface.\n  llm_type:\
       \ standard_reasoning\n  details: >-\n    Read the `target_definition` input and build\
       \ an inventory table with one row\n    for each target step or task. Preserve\n    source\
       \ order and quote the description and English instructions in that\n    row. For each\
-      \ row count explicit\n    tool_invocations, uses_skill steps or nested workflow calls,\
+      \ row count explicit\n    tool_invocations, uses_process steps or nested workflow calls,\
       \ and distinct action\n    clauses in the English instructions. Count an action clause\
       \ whenever the\n    text tells the LLM to inspect, decide, edit, invoke, validate, record,\
       \ ask,\n    or report; count conditional branches separately. Mark whether every tool\n\
@@ -83,10 +83,10 @@ steps:
       \  into a single step and do not invent a tool, file, field, or dependency.\n    Present\
       \ original text, proposed text, tool count, action-clause count, and\n    preserved\
       \ requirements for every rewrite.\n- id: independent-review\n  actions: [edit, yaml_edit,\
-      \ file_management, read_document, invoke_skill]\n  step_type: governed\n  description:\
+      \ file_management, read_document, task_run_process]\n  step_type: governed\n  description:\
       \ Obtain an independent adversarial completeness review.\n  llm_type: high_reasoning\n\
       \  details: >-\n    Return this exact action shape to invoke the independent review:\n\
-      \    {\"action\":\"invoke_skill\",\"skill\":\"independent-skill-workflow-review\",\n\
+      \    {\"action\":\"task_run_process\",\"skill\":\"independent-skill-workflow-review\",\n\
       \    \"provider_role\":\"adversarial\",\"clean\":true,\"context\":[\"<target goal>\"\
       ,\n    \"<original step text>\",\"<proposed replacement text>\",\n    \"<preserved requirements>\"\
       ,\"<inventory counts>\"],\n    \"decisions_and_context\":\"Compare the rewrite with\
@@ -138,12 +138,12 @@ steps:
       \ definition for pull-request preparation.\n  llm_type: simple_task\n  pre_step:\n \
       \   action: invoke_tool\n    template:\n      tool: git\n      operation: add\n    \
       \  paths: [<target-definition-path>]\n\n- id: finish-pull-request-prep\n  step_type:\
-      \ uses_skill\n  description: Run final pull-request preparation checks.\n  llm_type:\
+      \ uses_process\n  description: Run final pull-request preparation checks.\n  llm_type:\
       \ simple_task\n  details: >-\n    Invoke `finish-pr-prep` with `staged_definition` and\
       \ the\n    `apply_and_publish.validation_result`\n    result from `apply-and-publish`.\
       \ Do not create or update a pull request in\n    this step; continue only when the nested\
-      \ skill confirms the final staged\n    scope and required checks are clean.\n  uses_skill:\n\
-      \    skill: finish-pr-prep\n\n- id: create-pull-request\n  step_type: uses_skill\n \
+      \ skill confirms the final staged\n    scope and required checks are clean.\n  uses_process:\n\
+      \    process: finish-pr-prep\n\n- id: create-pull-request\n  step_type: uses_process\n \
       \ description: Create or update the pull request for the reviewed definition.\n  llm_type:\
       \ simple_task\n  details: >-\n    Invoke `create-pull-request` with pr-kind `skill-workflow-review`,\
       \ a commit\n    message of at most 72 characters, a title containing the target definition\n\
@@ -151,7 +151,7 @@ steps:
       \   files, and validation result. Pass the exact `files_to_publish`,\n    `review_report`,\
       \ and `validation_result` inputs to the nested skill. Do not\n    report completion\
       \ until it returns a pull-request URL. Never merge the PR\n    or push directly to main.\n\
-      \  uses_skill:\n    skill: create-pull-request"
+      \  uses_process:\n    process: create-pull-request"
     context:
     - user_request
     - workflow_context

@@ -75,7 +75,7 @@ class WorkflowTaskTemplate:
     details: str | None = None
     llm_type: str | None = None
     interaction_style: str | None = None
-    uses_skills: tuple[str, ...] = field(default_factory=tuple)
+    uses_processes: tuple[str, ...] = field(default_factory=tuple)
     tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     actions: tuple[str, ...] = field(default_factory=tuple)
@@ -114,7 +114,7 @@ class WorkflowTaskTemplate:
             "details": self.details,
             "llm_type": self.llm_type,
             "interaction_style": self.interaction_style,
-            "uses_skills": list(self.uses_skills),
+            "uses_processes": list(self.uses_processes),
             "tool_invocations": [
                 invocation.to_data() for invocation in self.tool_invocations
             ],
@@ -368,7 +368,7 @@ def instantiate_workflow_template(
             ),
             llm_type=task_template.llm_type,
             interaction_style=task_template.interaction_style,
-            uses_skills=task_template.uses_skills,
+            uses_processes=task_template.uses_processes,
             tool_invocations=tuple(
                 _substitute_tool_invocation(invocation, explicit_substitutions)
                 for invocation in task_template.tool_invocations
@@ -691,7 +691,7 @@ def build_workflow_template_validation_report(
                 "details",
                 "llm_type",
                 "interaction_style",
-                "uses_skills",
+                "uses_processes",
                 "tool_invocations",
                 "prompt_catalogs",
                 "actions",
@@ -762,18 +762,18 @@ def build_workflow_template_validation_report(
                 )
             )
         pre_step = raw_task_template_mapping.get("pre_step")
-        uses_skills = raw_task_template_mapping.get("uses_skills")
+        uses_processes = raw_task_template_mapping.get("uses_processes")
         if (
             pre_step is not None
-            and isinstance(uses_skills, Sequence)
-            and not isinstance(uses_skills, (str, bytes, bytearray))
-            and uses_skills
+            and isinstance(uses_processes, Sequence)
+            and not isinstance(uses_processes, (str, bytes, bytearray))
+            and uses_processes
         ):
             issues.append(
                 WorkflowTemplateValidationIssue(
-                    code="uses_skills_with_pre_step",
+                    code="uses_processes_with_pre_step",
                     message=(
-                        "Workflow task templates must use either uses_skills or "
+                        "Workflow task templates must use either uses_processes or "
                         "pre_step, not both."
                     ),
                     path=_child_path(task_template_path, "pre_step"),
@@ -1158,8 +1158,10 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         _required_string(data, "assignee_role"),
     )
     step = skill_step_from_data(data)
-    uses_skills = (
-        _required_string_sequence(data, "uses_skills") if "uses_skills" in data else ()
+    uses_processes = (
+        _required_string_sequence(data, "uses_processes")
+        if "uses_processes" in data
+        else ()
     )
     output_state_type = _required_string(data, "output_state_type")
     dependent_state = _required_string_sequence(data, "dependent_state")
@@ -1178,7 +1180,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         details=step.details,
         llm_type=step.llm_type,
         interaction_style=step.interaction_style,
-        uses_skills=uses_skills,
+        uses_processes=uses_processes,
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
         actions=step.actions,

@@ -36,8 +36,8 @@ The repository already contains substantial pieces of the target system.
 | Capability exceptions | `core/capability_exception.py` | Exact argument binding, manifest fingerprint, signed approval, expiration, and use count |
 | Durable truth | `core/execution_state.py` | Action, obligation, evidence, finding, checkpoint, and capability decision events |
 | Workflow compilation | `execution/compile.py` | Closed phase action contracts and durable task generation |
-| Feature specification | `skill-definitions/specify-a-feature.yaml` and `design-interview.yaml` | Category-specific context gathering, typed proposal edits, deterministic generation, and evaluation |
-| Feature planning | `skill-definitions/start-implementing-feature.yaml` | Deterministic discovery, separated PR planning/effect allocation, workflow instantiation, and relationship checks |
+| Feature specification | `docs/procedrr/processes/specify-a-feature.yaml` and `design-interview.yaml` | Category-specific context gathering, typed proposal edits, deterministic generation, and evaluation |
+| Feature planning | `docs/procedrr/processes/start-implementing-feature.yaml` | Deterministic discovery, separated PR planning/effect allocation, workflow instantiation, and relationship checks |
 | Proposed-PR execution | `templates/execute-proposed-pr.yaml` and [PR #660](https://github.com/powdrr-io/powdrr-lift/pull/660) | Separate plan judgment, inspections, mechanical checks, scope capture, and one-action coding-loop round trips |
 
 This is not a greenfield design. The main work is to make these components use

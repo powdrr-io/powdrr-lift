@@ -1,7 +1,6 @@
-"""Skill selection contracts and routing prompts for the workflow agent.
+"""Procedrr process selection contracts and routing prompts.
 
-This module owns the data and prompt contract used to choose a skill. Runtime
-execution remains in the chat agent.
+This module owns the data and prompt contract used to choose a process.
 """
 
 from __future__ import annotations
@@ -33,30 +32,6 @@ from powdrr_lift.workrr.provider_config import (
 
 
 @dataclass(frozen=True, slots=True)
-class SkillChatConfig:
-    skills_dir: Path
-    repo_root: Path | None = None
-    output_dir: Path | None = None
-    provider: str = "auto"
-    normal_provider: str | None = None
-    adversarial_provider: str | None = None
-    model: str = DEFAULT_MODEL
-    llm_mappings: tuple[tuple[str, LLMModelMapping], ...] = ()
-    api_key: str | None = None
-    base_url: str | None = None
-    max_turns: int = 8
-    max_stalled_roundtrips: int = 3
-    provider_retry_attempts: int = 3
-    provider_retry_delay_seconds: float = 30.0
-    verbose: bool = False
-    execution_id: str | None = None
-
-    @property
-    def templates_dir(self) -> Path:
-        return self.skills_dir
-
-
-@dataclass(frozen=True, slots=True)
 class SkillChatResult:
     selected_skill_path: Path
     summary_path: Path
@@ -83,7 +58,36 @@ class SkillChatSelection:
         return self.ready_to_execute
 
 
-WorkflowChatConfig = SkillChatConfig
+@dataclass(frozen=True, slots=True)
+class WorkflowChatConfig:
+    processes_dir: Path
+    repo_root: Path | None = None
+    output_dir: Path | None = None
+    provider: str = "auto"
+    normal_provider: str | None = None
+    adversarial_provider: str | None = None
+    model: str = DEFAULT_MODEL
+    llm_mappings: tuple[tuple[str, LLMModelMapping], ...] = ()
+    api_key: str | None = None
+    base_url: str | None = None
+    max_turns: int = 8
+    max_stalled_roundtrips: int = 3
+    provider_retry_attempts: int = 3
+    provider_retry_delay_seconds: float = 30.0
+    verbose: bool = False
+    execution_id: str | None = None
+
+    @property
+    def skills_dir(self) -> Path:
+        """Temporary compatibility view for the retired chat interpreter."""
+        return self.processes_dir
+
+    @property
+    def templates_dir(self) -> Path:
+        return self.processes_dir
+
+
+SkillChatConfig = WorkflowChatConfig
 WorkflowChatResult = SkillChatResult
 WorkflowChatSelection = SkillChatSelection
 

@@ -23,7 +23,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: address-review-comments\nwhen_to_use:\n- When an existing pull request has\
@@ -81,21 +81,21 @@ steps:
       \ Stage only the intended files after\n    the changes are complete; do not create a\
       \ new pull request for this workflow.\n  tool_invocations:\n  - tool: shell\n    command:\n\
       \    - git\n    - diff\n    - --check\n  - tool: internal\n    command:\n    - powdrr-lift\n\
-      \    - repository-state\n- id: validate-corrections\n  step_type: uses_skill\n  description:\
+      \    - repository-state\n- id: validate-corrections\n  step_type: uses_process\n  description:\
       \ Run finish-pr-prep on the final staged changes.\n  llm_type: fast_iteration\n  details:\
       \ >-\n    Invoke finish-pr-prep after all implementation, test, documentation, and\n\
       \    v1 specification files are staged. If validation or cleanup changes files,\n  \
       \  inspect the edits, restage only the intended files, and rerun finish-pr-prep\n  \
       \  until the final staged state is clean. Do not push while any required check\n   \
-      \ is failing.\n  uses_skill:\n    skill: finish-pr-prep\n- description: Commit and push\
-      \ the addressed changes to the existing pull request.\n  step_type: uses_skill\n  llm_type:\
+      \ is failing.\n  uses_process:\n    process: finish-pr-prep\n- description: Commit and push\
+      \ the addressed changes to the existing pull request.\n  step_type: uses_process\n  llm_type:\
       \ simple_task\n  details: >-\n    Invoke create-pull-request with pr-kind `review-comments`,\
       \ commit message\n    `Address pull request review comments`, and the existing pull-request\n\
       \    reference and title. Pass a `files_to_publish` context list containing\n    every\
       \ intended changed file, along with the review ledger, and require one\n    Review Feedback\
       \ Addressed row per actionable comment. Resolve each review\n    thread only after its\
       \ requested change is present and pushed. Never merge\n    the pull request or push\
-      \ directly to main.\n  uses_skill:\n    skill: create-pull-request"
+      \ directly to main.\n  uses_process:\n    process: create-pull-request"
     context:
     - user_request
     - workflow_context

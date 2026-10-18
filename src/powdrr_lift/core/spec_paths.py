@@ -9,7 +9,6 @@ CURRENT_ROOT = Path("docs") / "current"
 # Kept for reading repositories created before proposal/current separation.
 LEGACY_SPECIFICATIONS_ROOT = Path("docs") / "specs"
 PLAN_DIFFS_ROOT = Path("docs") / "plan-diffs"
-SKILL_DEFINITIONS_ROOT = Path("skill-definitions")
 
 ARCHITECTURE_SPECIFICATION_FILENAME = "architecture-specification.yaml"
 SYSTEM_SPECIFICATION_FILENAME = "system-specification.yaml"
@@ -18,7 +17,6 @@ PROPOSED_PR_SPECIFICATION_FILENAME = "proposed-pr-specification.yaml"
 SYSTEM_MAP_SPECIFICATION_FILENAME = "system-map-specification.yaml"
 FEATURE_PR_SPECIFICATION_FILENAME = "feature-pr-specification.yaml"
 PLAN_DIFF_SPECIFICATION_FILENAME = "plan-diff.yaml"
-SKILL_DEFINITION_FILENAME_SUFFIX = ".yaml"
 
 
 def normalize_work_item_name(work_item_name: str) -> str:
@@ -32,17 +30,6 @@ def normalize_work_item_name(work_item_name: str) -> str:
         )
 
     return normalized_work_item_name
-
-
-def normalize_skill_name(skill_name: str) -> str:
-    normalized_skill_name = skill_name.strip()
-    if not normalized_skill_name:
-        raise ValueError("skill_name must not be empty.")
-
-    if normalized_skill_name.startswith(".") or "/" in normalized_skill_name:
-        raise ValueError("skill_name must be a simple name without path separators.")
-
-    return normalized_skill_name
 
 
 def work_item_proposal_root(
@@ -153,17 +140,6 @@ def plan_diff_specification_path(
     )
 
 
-def skill_definition_path(
-    repo_root: str | Path,
-    skill_name: str,
-) -> Path:
-    return (
-        Path(repo_root)
-        / SKILL_DEFINITIONS_ROOT
-        / f"{normalize_skill_name(skill_name)}{SKILL_DEFINITION_FILENAME_SUFFIX}"
-    )
-
-
 def is_specification_path(path: str) -> bool:
     normalized_path = path.replace("\\", "/")
     return (
@@ -187,10 +163,3 @@ def is_proposal_specification_path(path: str | Path) -> bool:
         parts[index : index + 2] in (("docs", "proposals"), ("docs", "specs"))
         for index in range(max(0, len(parts) - 1))
     )
-
-
-def is_skill_definition_path(path: str) -> bool:
-    normalized_path = path.replace("\\", "/")
-    return normalized_path.startswith(
-        "skill-definitions/"
-    ) and normalized_path.endswith(SKILL_DEFINITION_FILENAME_SUFFIX)

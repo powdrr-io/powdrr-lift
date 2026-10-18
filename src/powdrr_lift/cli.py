@@ -121,14 +121,6 @@ from powdrr_lift.openai_proxy import (
 from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
 )
-from powdrr_lift.process.compiler import (
-    analyze_workflow_definition,
-    analyze_workflow_definitions,
-    apply_liveness_baseline,
-    apply_warning_budget,
-    warning_report_data,
-)
-from powdrr_lift.process.model import validate_skill_directory
 from powdrr_lift.process.tasks import HumanRole, validate_workflow_task_directory
 from powdrr_lift.process.templates import (
     instantiate_workflow_template,
@@ -197,7 +189,6 @@ from powdrr_lift.workrr.definition_comparison import (
     WorkflowComparisonError,
     compare_workflow_definitions,
 )
-from powdrr_lift.workrr.definition_prompts import render_skill_prompt_snapshots
 from powdrr_lift.workrr.differential_verification import (
     classify_differential_result,
     detect_verifier_changes,
@@ -1795,46 +1786,13 @@ def build_parser() -> argparse.ArgumentParser:
     extract_responses_parser.add_argument("--output", required=True, type=Path)
     extract_responses_parser.set_defaults(func=_extract_workflow_responses)
 
-    definition_validation_parser = subparsers.add_parser(
-        "validate-workflow-definition",
-        aliases=["validate_workflow_definition"],
-        help=(
-            "Run schema and deterministic confusion checks for a skill or "
-            "workflow template."
-        ),
+    procedrr_validation_parser = subparsers.add_parser(
+        "validate-procedrr-processes",
+        help="Validate every Procedrr process in one or more process directories.",
     )
-    definition_validation_parser.add_argument("definition", type=Path)
-    definition_validation_parser.add_argument("--json", action="store_true")
-    definition_validation_parser.add_argument(
-        "--liveness", action="store_true", help="Enable static liveness diagnostics."
-    )
-    definition_validation_parser.add_argument("--baseline", type=Path)
-    definition_validation_parser.set_defaults(func=_run_validate_workflow_definition)
-
-    definitions_validation_parser = subparsers.add_parser(
-        "validate-workflow-definitions",
-        aliases=["validate_workflow_definitions"],
-        help="Statically compile all skills and workflow templates under the paths.",
-    )
-    definitions_validation_parser.add_argument("paths", nargs="+", type=Path)
-    definitions_validation_parser.add_argument("--json", action="store_true")
-    definitions_validation_parser.add_argument(
-        "--liveness", action="store_true", help="Enable static liveness diagnostics."
-    )
-    definitions_validation_parser.add_argument("--baseline", type=Path)
-    definitions_validation_parser.add_argument("--warning-budget", type=Path)
-    definitions_validation_parser.add_argument("--warning-report", type=Path)
-    definitions_validation_parser.set_defaults(func=_run_validate_workflow_definitions)
-
-    prompt_snapshot_parser = subparsers.add_parser(
-        "render-workflow-prompts",
-        aliases=["render_workflow_prompts"],
-        help="Render normalized production prompt snapshots for every skill step.",
-    )
-    prompt_snapshot_parser.add_argument("--definition", required=True, type=Path)
-    prompt_snapshot_parser.add_argument("--output-dir", required=True, type=Path)
-    prompt_snapshot_parser.add_argument("--repo-root", type=Path)
-    prompt_snapshot_parser.set_defaults(func=_run_render_workflow_prompts)
+    procedrr_validation_parser.add_argument("paths", nargs="+", type=Path)
+    procedrr_validation_parser.add_argument("--json", action="store_true")
+    procedrr_validation_parser.set_defaults(func=_run_validate_procedrr_processes)
 
     error_analysis_parser = subparsers.add_parser(
         "analyze-workflow-errors",
@@ -3921,21 +3879,6 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
             overall_success = False
             continue
 
-        if relative_path.parts[:1] == ("skill-definitions",) and path.suffix in {
-            ".yaml",
-            ".yml",
-            ".json",
-        }:
-            skill_directory = repo_root / "skill-definitions"
-            if skill_directory not in validated_groups:
-                add_result(
-                    validator="validate_skill_directory",
-                    paths=[skill_directory],
-                    report_text=validate_skill_directory(skill_directory),
-                )
-                validated_groups.add(skill_directory)
-            continue
-
         if (
             relative_path.parts[:2] == ("docs", "workflows")
             and path.name.endswith((".yaml", ".yml", ".json"))
@@ -5647,54 +5590,53 @@ def _extract_workflow_responses(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_validate_workflow_definition(args: argparse.Namespace) -> int:
-    report = analyze_workflow_definition(args.definition)
-    data = report.to_data()
-    if args.json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-    else:
-        status = "valid" if report.validation_successful else "invalid"
-        stream = sys.stdout if report.validation_successful else sys.stderr
-        print(f"Workflow definition {status}: {report.definition}", file=stream)
-        for issue in report.issues:
-            print(
-                f"{issue.path}: {issue.code}: {issue.message}",
-                file=sys.stderr if issue.severity == "error" else sys.stdout,
+def _run_validate_procedrr_processes(args: argparse.Namespace) -> int:
+    from procedrr import ProcessCatalog
+    from procedrr.catalog import ProcessCatalogError
+
+    results: list[dict[str, Any]] = []
+    for directory in args.paths:
+        try:
+            catalog = ProcessCatalog.load(directory)
+        except (OSError, ProcessCatalogError, ValueError) as error:
+            results.append(
+                {
+                    "directory": str(directory),
+                    "validation_successful": False,
+                    "error": str(error),
+                }
             )
-    return 0 if report.validation_successful else 1
-
-
-def _run_validate_workflow_definitions(args: argparse.Namespace) -> int:
-    report = analyze_workflow_definitions(args.paths)
-    report = apply_liveness_baseline(report, args.baseline)
-    report = apply_warning_budget(report, args.warning_budget)
-    if args.warning_report is not None:
-        args.warning_report.parent.mkdir(parents=True, exist_ok=True)
-        args.warning_report.write_text(
-            json.dumps(warning_report_data(report), indent=2, ensure_ascii=False)
-            + "\n",
-            encoding="utf-8",
+            continue
+        results.append(
+            {
+                "directory": str(directory),
+                "processes": [process.name for process in catalog.list()],
+                "validation_successful": True,
+            }
         )
+    successful = bool(results) and all(
+        result["validation_successful"] for result in results
+    )
     if args.json:
-        print(json.dumps(report.to_data(), indent=2, ensure_ascii=False))
+        print(
+            json.dumps(
+                {"validation_successful": successful, "results": results}, indent=2
+            )
+        )
     else:
-        for definition_report in report.reports:
-            status = "valid" if definition_report.validation_successful else "invalid"
-            stream = (
-                sys.stdout if definition_report.validation_successful else sys.stderr
-            )
-            print(
-                f"Workflow definition {status}: {definition_report.definition}",
-                file=stream,
-            )
-            for issue in definition_report.issues:
+        for result in results:
+            if result["validation_successful"]:
                 print(
-                    f"{issue.path}: {issue.code}: {issue.message}",
-                    file=(sys.stderr if issue.severity == "error" else sys.stdout),
+                    f"Validated {len(result['processes'])} Procedrr processes in "
+                    f"{result['directory']}"
                 )
-        if not report.reports:
-            print("No workflow definitions found.", file=sys.stderr)
-    return 0 if report.validation_successful and report.reports else 1
+            else:
+                print(
+                    f"Invalid Procedrr process directory {result['directory']}: "
+                    f"{result['error']}",
+                    file=sys.stderr,
+                )
+    return 0 if successful else 1
 
 
 def _run_validate_delivery_profile(args: argparse.Namespace) -> int:
@@ -5713,17 +5655,6 @@ def _run_validate_delivery_profile(args: argparse.Namespace) -> int:
         for issue in report.issues:
             print(f"{issue.path}: {issue.code}: {issue.message}", file=sys.stderr)
     return 0 if report.validation_successful else 1
-
-
-def _run_render_workflow_prompts(args: argparse.Namespace) -> int:
-    paths = render_skill_prompt_snapshots(
-        args.definition,
-        output_dir=args.output_dir,
-        repo_root=args.repo_root,
-    )
-    for path in paths:
-        print(path)
-    return 0
 
 
 def _run_analyze_workflow_errors(args: argparse.Namespace) -> int:
@@ -5995,7 +5926,7 @@ def _run_download_qwen_model(args: argparse.Namespace) -> int:
 def _run_workflow_chat(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     config = WorkflowChatConfig(
-        skills_dir=args.processes_dir,
+        processes_dir=args.processes_dir,
         repo_root=repo_root,
         output_dir=args.output_dir,
         provider=args.provider,

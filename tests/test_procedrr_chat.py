@@ -48,17 +48,35 @@ def test_process_selector_returns_only_a_catalogued_process() -> None:
     assert unknown is None
 
 
-def test_all_legacy_root_names_have_procedrr_processes() -> None:
-    root = Path("skill-definitions")
+def test_all_supported_workflow_names_have_procedrr_processes() -> None:
     catalog = ProcessCatalog.load(Path("docs/procedrr/processes"))
-
-    missing = sorted(
-        path.stem
-        for path in root.glob("*.yaml")
-        if path.stem not in {process.name for process in catalog.list()}
-    )
-
-    assert missing == []
+    names = {process.name for process in catalog.list()}
+    assert {
+        "address-review-comments",
+        "adversarial-pr-review",
+        "bootstrap-code-structure",
+        "create-pull-request",
+        "dead-code-review",
+        "design-interview",
+        "feature-functionality-review",
+        "feature-test-coverage-review",
+        "finish-pr-prep",
+        "fix-ci-failures",
+        "fix-merge-conflicts",
+        "handle-ad-hoc",
+        "independent-skill-workflow-review",
+        "review-architecture",
+        "review-skill-workflow",
+        "review-system",
+        "run-tests-and-fix",
+        "security-review",
+        "spec-v1-design-review",
+        "specify-a-feature",
+        "specify-architecture",
+        "specify-implementation",
+        "specify-system",
+        "start-implementing-feature",
+    } <= names
 
 
 def test_chat_operation_adapter_converts_line_edits() -> None:

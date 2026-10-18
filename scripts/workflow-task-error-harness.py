@@ -448,7 +448,7 @@ def _reopen_task(workflow_dir: Path, task_id: str) -> None:
             details=task.details,
             llm_type=task.llm_type,
             interaction_style=task.interaction_style,
-            uses_skills=task.uses_skills,
+            uses_processes=task.uses_processes,
             tool_invocations=task.tool_invocations,
             prompt_catalogs=task.prompt_catalogs,
             output_state_type=task.output_state_type,
@@ -587,7 +587,7 @@ def _mirror_repair_changes(
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    allowed_prefixes = ("src/", "skill-definitions/", "scripts/", "templates/")
+    allowed_prefixes = ("src/", "docs/procedrr/processes/", "scripts/", "templates/")
     for relative_name in changed:
         if not relative_name.startswith(allowed_prefixes):
             continue

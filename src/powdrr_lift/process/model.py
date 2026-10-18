@@ -108,6 +108,7 @@ SUPPORTED_STEP_ACTIONS = frozenset(
         "file_management",
         "delete_file",
         "invoke_skill",
+        "task_run_process",
         "invoke_tool",
         "read_document",
         "list_files",

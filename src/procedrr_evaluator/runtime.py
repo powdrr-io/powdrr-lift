@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 from procedrr.catalog import ProcessCatalog, ProcessIdentity
 from procedrr_evaluator.evaluator import (
+    EvaluationCheckpoint,
     EvaluationError,
     EvaluationEvent,
     EvaluationResult,
@@ -61,10 +62,45 @@ class ProcessExecutionResult:
     terminal_status: ProcessTerminalStatus
     llm_activations: int
     tool_calls: int
+    checkpoint: ProcessExecutionCheckpoint | None = None
 
     @property
     def event_cursor(self) -> int:
         return len(self.events)
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessExecutionCheckpoint:
+    """Evaluator checkpoint pinned to one validated process revision."""
+
+    identity: ProcessIdentity
+    evaluator: EvaluationCheckpoint
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "process_id": self.identity.process_id,
+            "process_fingerprint": self.identity.fingerprint,
+            "evaluator": self.evaluator.to_data(),
+        }
+
+    @classmethod
+    def from_data(cls, data: Mapping[str, Any]) -> ProcessExecutionCheckpoint:
+        if data.get("schema_version") != 1:
+            raise EvaluationError("unsupported Procedrr execution checkpoint version")
+        process_id = data.get("process_id")
+        fingerprint = data.get("process_fingerprint")
+        evaluator_data = data.get("evaluator")
+        if (
+            not isinstance(process_id, str)
+            or not isinstance(fingerprint, str)
+            or not isinstance(evaluator_data, Mapping)
+        ):
+            raise EvaluationError("invalid Procedrr execution checkpoint")
+        return cls(
+            ProcessIdentity(process_id, fingerprint),
+            EvaluationCheckpoint.from_data(evaluator_data),
+        )
 
 
 class ProcedrrExecutionService:
@@ -91,11 +127,40 @@ class ProcedrrExecutionService:
         self,
         process_id: str,
         bindings: Mapping[str, Any] | None = None,
+        *,
+        checkpoint: ProcessExecutionCheckpoint | None = None,
+        resume_value: Any = None,
     ) -> ProcessExecutionResult:
         """Validate bindings and execute one exact catalog revision."""
         process = self.catalog.get(process_id)
-        initial_bindings = process.validate_inputs(bindings or {})
-        events: list[ProcessExecutionEvent] = []
+        if checkpoint is not None and checkpoint.identity != process.identity:
+            raise EvaluationError(
+                "checkpoint process identity or revision does not match the catalog"
+            )
+        if checkpoint is not None:
+            if bindings is not None and dict(bindings) != dict(
+                checkpoint.evaluator.initial_bindings
+            ):
+                raise EvaluationError("resume bindings differ from checkpoint inputs")
+            initial_bindings = process.validate_inputs(
+                checkpoint.evaluator.initial_bindings
+            )
+            if resume_value is None:
+                raise EvaluationError("resuming a process requires a resume value")
+            prior = checkpoint.evaluator.events
+        else:
+            initial_bindings = process.validate_inputs(bindings or {})
+            prior = ()
+        events: list[ProcessExecutionEvent] = [
+            ProcessExecutionEvent(
+                sequence=index,
+                identity=process.identity,
+                kind=event.kind,
+                path=event.path,
+                data=dict(event.data),
+            )
+            for index, event in enumerate(prior)
+        ]
 
         def record(event: EvaluationEvent) -> None:
             wrapped = ProcessExecutionEvent(
@@ -118,7 +183,12 @@ class ProcedrrExecutionService:
             event_sink=record,
         )
         try:
-            result = evaluator.evaluate(process.document, initial_bindings)
+            result = evaluator.evaluate(
+                process.document,
+                initial_bindings,
+                checkpoint=(checkpoint.evaluator if checkpoint is not None else None),
+                resume_value=resume_value,
+            )
         except EvaluationError:
             raise
         status = _terminal_status(result)
@@ -126,9 +196,16 @@ class ProcedrrExecutionService:
             identity=process.identity,
             bindings=result.bindings,
             events=tuple(events),
-            terminal_status=status,
+            terminal_status=(
+                ProcessTerminalStatus.SUSPENDED if result.suspended else status
+            ),
             llm_activations=result.llm_activations,
             tool_calls=result.tool_calls,
+            checkpoint=(
+                ProcessExecutionCheckpoint(process.identity, result.checkpoint)
+                if result.checkpoint is not None
+                else None
+            ),
         )
 
 
@@ -146,6 +223,7 @@ def _terminal_status(result: EvaluationResult) -> ProcessTerminalStatus:
 
 
 __all__ = [
+    "ProcessExecutionCheckpoint",
     "ProcessExecutionEvent",
     "ProcessExecutionResult",
     "ProcessTerminalStatus",

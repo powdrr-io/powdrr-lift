@@ -5,8 +5,8 @@
 This document expands the feature-development example in
 `llm-execution-language-safety.md` to at least the scope represented by:
 
-- `skill-definitions/specify-a-feature.yaml` and its `design-interview` child;
-- `skill-definitions/start-implementing-feature.yaml`;
+- `docs/procedrr/processes/specify-a-feature.yaml` and its `design-interview` child;
+- `docs/procedrr/processes/start-implementing-feature.yaml`;
 - the `execute-proposed-pr` changes in
   [pull request #660](https://github.com/powdrr-io/powdrr-lift/pull/660); and
 - feature-level validation after all proposed PR workflows finish.

@@ -1,5 +1,8 @@
 # Workflow Definition Iteration Plan
 
+> Archived reference for the retired legacy workflow-definition runtime. Use
+> the Procedrr process catalog and evaluator for current workflow behavior.
+
 ## Objective
 
 Create a fast, repeatable way to improve skill and workflow definitions so LLM
@@ -462,7 +465,7 @@ workflow-replay
 workflow-scenario
     Execute one isolated trajectory scenario.
 
-validate-workflow-definition
+validate-workflow-definitions
     Run static confusion-oriented checks in addition to schema validation.
 
 render-workflow-prompts

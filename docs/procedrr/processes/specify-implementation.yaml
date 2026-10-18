@@ -21,20 +21,20 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: specify-implementation\ninputs:\n- name: work-item-name\n- name: architecture-id\n\
       when_to_use:\n- When an architecture specification already exists and you need implementation\
       \ detail.\n- When the TUI should guide the user through a synchronous implementation\
       \ flow.\nsteps:\n- id: review-implementation-context\n  description: Review the system\
-      \ and architecture context first.\n  step_type: uses_skill\n  llm_type: high_reasoning\n\
+      \ and architecture context first.\n  step_type: uses_process\n  llm_type: high_reasoning\n\
       \  details: Confirm the source architecture id and the relevant entities before drafting\n\
-      \    implementation detail.\n  uses_skill:\n    skill: review-system\n- id: review-architecture-context\n\
+      \    implementation detail.\n  uses_process:\n    process: review-system\n- id: review-architecture-context\n\
       \  description: Review the architecture context before drafting implementation detail.\n\
-      \  step_type: uses_skill\n  llm_type: high_reasoning\n  details: Confirm the source\
+      \  step_type: uses_process\n  llm_type: high_reasoning\n  details: Confirm the source\
       \ architecture id and relevant entities before drafting\n    implementation detail.\n\
-      \  uses_skill:\n    skill: review-architecture\n- id: generate-implementation\n  description:\
+      \  uses_process:\n    process: review-architecture\n- id: generate-implementation\n  description:\
       \ Generate the implementation specification template.\n  actions: []\n  step_type: invoke_tool\n\
       \  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n    template:\n    \
       \  tool: internal\n      command:\n      - powdrr-lift\n      - implementation-specification\n\

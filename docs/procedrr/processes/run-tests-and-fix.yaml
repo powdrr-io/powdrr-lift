@@ -21,7 +21,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: run-tests-and-fix\nwhen_to_use:\n- When implementation and generated tests\

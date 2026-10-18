@@ -23,7 +23,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: start-implementing-feature\ninputs:\n- name: canonical-feature-name\n- name:\
@@ -100,12 +100,12 @@ steps:
       \    type: array\n    required: true\n    source: previous_step\n  - name: current_feature_candidates\n\
       \    type: array\n    required: true\n    source: previous_step\n  - name: workflow_candidates\n\
       \    type: array\n    required: true\n    source: previous_step\n- id: bootstrap-project-structure\n\
-      \  description: Bootstrap the project-wide module and tool structure.\n  actions: [invoke_skill]\n\
+      \  description: Bootstrap the project-wide module and tool structure.\n  actions: [task_run_process]\n\
       \  step_type: governed\n  llm_type: standard_reasoning\n  pre_step:\n    action: invoke_tool\n\
       \    template:\n      tool: shell\n      command:\n      - test\n      - -f\n      -\
       \ docs/project_structure/project-structure.yaml\n  details: >-\n    The engine-owned\
       \ pre-step result is authoritative; do not reread it. If the\n    artifact exists, emit\
-      \ one next_step action and reuse it. If it is missing,\n    emit one invoke_skill action\
+      \ one next_step action and reuse it. If it is missing,\n    emit one task_run_process action\
       \ for the exact skill id\n    `bootstrap-code-structure`; after that action returns,\
       \ emit next_step in the\n    following turn. The nested skill is project-wide\n    and\
       \ must not ask for a feature or target module. Never invoke bootstrap\n    merely because\
@@ -417,8 +417,8 @@ steps:
       \  outputs:\n  - name: staged_artifact_repository_state\n    type: any\n    required_for_next_step:\
       \ true\n    schema: {type: object, additionalProperties: true}\n- id: prepare-feature-pull-request-dependency\n\
       \  description: Run finish-pr-prep on the validated planning artifacts.\n  step_type:\
-      \ uses_skill\n  llm_type: fast_iteration\n  details: >-\n    Run finish-pr-prep before\
-      \ publishing the required preparation handoffs.\n  uses_skill:\n    skill: finish-pr-prep\n\
+      \ uses_process\n  llm_type: fast_iteration\n  details: >-\n    Run finish-pr-prep before\
+      \ publishing the required preparation handoffs.\n  uses_process:\n    process: finish-pr-prep\n\
       \n- id: prepare-feature-pull-request\n  description: Run finish-pr-prep on the validated\
       \ planning artifacts.\n  actions: []\n  step_type: predicated\n  llm_type: fast_iteration\n\
       \  completion:\n    required_outputs:\n    - final_repository_state\n    - readiness_report\n\
@@ -427,7 +427,7 @@ steps:
       \ and\n    readiness report are acceptable; do not invoke tools or the nested skill\n\
       \    again. After the nested skill returns, explicitly publish both handoffs with\n\
       \    an `emit_outputs` action,\n    copying the exact values returned by the nested\
-      \ skill:\n    {\"action\":\"emit_outputs\",\"outputs\":{\"final_repository_state\":{\"\
+      \ process:\n    {\"action\":\"emit_outputs\",\"outputs\":{\"final_repository_state\":{\"\
       clean\":true,\"files\":[]},\"readiness_report\":{\"ready\":true,\"reasons\":[],\"satisfied_requirements\"\
       :[]}}}\n    Do not return next_step or synthesize either value; the step advances only\n\
       \    after both declared outputs are explicitly emitted and the readiness report\n \
@@ -447,14 +447,14 @@ steps:
       \   reasons:\n          type: array\n          items: {type: string}\n        satisfied_requirements:\n\
       \          type: array\n          items: {type: string}\n- id: create-feature-pull-request\n\
       \  description: Commit the validated artifacts and open a draft pull request.\n  actions:\
-      \ []\n  step_type: uses_skill\n  llm_type: simple_task\n  details: >-\n    Invoke create-pull-request\
+      \ []\n  step_type: uses_process\n  llm_type: simple_task\n  details: >-\n    Invoke create-pull-request\
       \ with pr-kind `feature`, commit message `Add\n    <feature-name> implementation workflow`,\
       \ and pull-request title\n    `<pull-request-title>`. Pass files_to_publish containing\
       \ exactly every\n    validated file under docs/proposals/<feature-name>/ and docs/workflows/,\n\
       \    plus the validated planning artifacts and Feature Plan context. The nested\n  \
       \  skill must stage exactly that list. Do not advance until it has committed,\n    pushed,\
       \ and created or updated a pull request successfully. Never claim a\n    PR is ready\
-      \ without a returned PR URL.\n  uses_skill:\n    skill: create-pull-request\n- id: handoff-feature-pull-request\n\
+      \ without a returned PR URL.\n  uses_process:\n    process: create-pull-request\n- id: handoff-feature-pull-request\n\
       \  description: Hand the draft pull request to the user for review.\n  actions: [edit,\
       \ yaml_edit, file_management, read_document]\n  step_type: governed\n  llm_type: standard_reasoning\n\
       \  details: Show the pull request URL. Summarize the selected feature, every proposed\

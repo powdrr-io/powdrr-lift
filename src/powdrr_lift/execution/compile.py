@@ -24,13 +24,13 @@ def compile_execution_plan(
     plan: ExecutionPlan,
     *,
     actions_by_phase: Mapping[PhaseType, tuple[str, ...]],
-    skills_by_phase: Mapping[PhaseType, tuple[str, ...]] | None = None,
+    processes_by_phase: Mapping[PhaseType, tuple[str, ...]] | None = None,
     intent_ids_by_phase: Mapping[PhaseType, tuple[str, ...]] | None = None,
     clause_ids_by_phase: Mapping[PhaseType, tuple[str, ...]] | None = None,
 ) -> tuple[WorkflowTask, ...]:
     """Produce deterministic tasks while preserving step actions verbatim."""
 
-    skills = skills_by_phase or {}
+    processes = processes_by_phase or {}
     intent_ids = intent_ids_by_phase or {}
     clause_ids = clause_ids_by_phase or {}
     assignments = {item.phase_type: item for item in profile.phases}
@@ -116,7 +116,7 @@ def compile_execution_plan(
                     assignee_type=AssigneeType.AGENT,
                     assignee_role=_agent_role(persona.persona_type),
                     llm_type=persona.model_profile,
-                    uses_skills=skills.get(phase, persona.skill_references),
+                    uses_processes=processes.get(phase, persona.process_references),
                     prompt_catalogs=persona.prompt_catalogs,
                     actions=actions,
                     actions_declared=True,

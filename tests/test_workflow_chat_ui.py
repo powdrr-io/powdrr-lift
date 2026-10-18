@@ -15,7 +15,7 @@ from textual.events import Key
 from textual.widgets import Label, ListItem, ListView, Static, TextArea
 
 from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.process.model import Skill, SkillStep, load_skill
+from powdrr_lift.process.model import Skill, SkillStep
 from powdrr_lift.workrr.chat_selection import SkillChatConfig
 from powdrr_lift.workrr.chat_tui import (
     WorkflowChatApp,
@@ -34,12 +34,21 @@ def test_textual_response_grows_and_submits_on_return(
         kwargs["stdout"].flush()
         received.append(kwargs["input_func"]())
         if len(received) == 1:
-            skill_path = Path("skill-definitions/bootstrap-code-structure.yaml")
-            skill = SkillCatalogEntry(skill_path, load_skill(skill_path))
+            skill = type(
+                "Progress",
+                (),
+                {
+                    "skill": type(
+                        "Process",
+                        (),
+                        {"name": "bootstrap-code-structure", "steps": [None]},
+                    )()
+                },
+            )()
             kwargs["progress_callback"](
                 skill,
                 len(skill.skill.steps),
-                "bootstrap-code-structure skill completed",
+                "bootstrap-code-structure process completed",
                 None,
                 None,
             )
@@ -51,7 +60,9 @@ def test_textual_response_grows_and_submits_on_return(
     )
 
     async def exercise() -> int:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         async with app.run_test() as pilot:
             await pilot.pause()
             assert "What do you want to do?" in str(
@@ -68,7 +79,7 @@ def test_textual_response_grows_and_submits_on_return(
                 await pilot.pause(0.05)
                 if received:
                     break
-            assert "skill completed" in str(app.query_one("#status", Static).render())
+            assert "process completed" in str(app.query_one("#status", Static).render())
             response.text = "follow-up request"
             await pilot.press("enter")
             await pilot.pause(0.1)
@@ -82,7 +93,9 @@ def test_textual_response_grows_and_submits_on_return(
 
 def test_textual_response_grows_for_trailing_newline() -> None:
     async def exercise() -> tuple[int, float]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             response = app.query_one("#response", TextArea)
@@ -99,7 +112,9 @@ def test_textual_response_grows_for_trailing_newline() -> None:
 
 def test_textual_response_grows_for_wrapped_text() -> None:
     async def exercise() -> tuple[int, float]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             response = app.query_one("#response", TextArea)
@@ -117,7 +132,9 @@ def test_textual_response_grows_for_wrapped_text() -> None:
 
 def test_textual_response_grows_beyond_previous_thirty_row_cap() -> None:
     async def exercise() -> tuple[int, float]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test(size=(80, 50)) as pilot:
             response = app.query_one("#response", TextArea)
@@ -134,7 +151,9 @@ def test_textual_response_grows_beyond_previous_thirty_row_cap() -> None:
 
 def test_textual_status_textarea_does_not_reserve_hidden_label_row() -> None:
     async def exercise() -> tuple[int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             await pilot.pause()
@@ -161,7 +180,9 @@ def test_textual_startup_shows_initial_question(
     )
 
     async def exercise() -> tuple[str, bool]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         async with app.run_test() as pilot:
             await pilot.pause()
             response = app.query_one("#response", TextArea)
@@ -174,7 +195,9 @@ def test_textual_startup_shows_initial_question(
 
 
 def test_textual_quit_unblocks_workflow_input() -> None:
-    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+    app = WorkflowChatApp(
+        SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+    )
 
     app.action_quit_workflow()
 
@@ -183,7 +206,9 @@ def test_textual_quit_unblocks_workflow_input() -> None:
 
 def test_textual_input_marker_preserves_follow_up_question() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -199,7 +224,9 @@ def test_textual_input_marker_preserves_follow_up_question() -> None:
 
 def test_textual_submit_shows_user_response_before_calling_llm() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             response = app.query_one("#response", TextArea)
@@ -219,7 +246,9 @@ def test_textual_submit_shows_user_response_before_calling_llm() -> None:
 
 def test_textual_submit_ignores_empty_response() -> None:
     async def exercise() -> tuple[str, str, bool, bool]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             response = app.query_one("#response", TextArea)
@@ -243,7 +272,9 @@ def test_textual_submit_ignores_empty_response() -> None:
 
 def test_textual_submit_retains_initial_prompt_and_echoes_user_response() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -266,7 +297,9 @@ def test_textual_submit_retains_initial_prompt_and_echoes_user_response() -> Non
 
 def test_textual_status_retains_multiple_user_responses() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -297,7 +330,9 @@ def test_textual_status_retains_multiple_user_responses() -> None:
 
 def test_textual_status_is_visible_and_not_collapsed() -> None:
     async def exercise() -> tuple[str, int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             status = app.query_one("#status", Static)
@@ -319,7 +354,9 @@ def test_textual_status_is_visible_and_not_collapsed() -> None:
 
 def test_textual_panels_have_the_same_width() -> None:
     async def exercise() -> tuple[int, int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             await pilot.pause()
@@ -334,7 +371,9 @@ def test_textual_panels_have_the_same_width() -> None:
 
 def test_textual_files_panel_preserves_add_order_without_duplicates() -> None:
     async def exercise() -> list[str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             app._record_added_files(("docs/first.yaml", "src/first.py"))
@@ -355,7 +394,9 @@ def test_textual_files_panel_preserves_add_order_without_duplicates() -> None:
 
 def test_textual_files_panel_limits_retained_history() -> None:
     async def exercise() -> list[str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             app._record_added_files(tuple(f"file-{index}.py" for index in range(81)))
@@ -373,7 +414,9 @@ def test_textual_files_panel_limits_retained_history() -> None:
 
 def test_textual_orange_panels_share_the_width() -> None:
     async def exercise() -> tuple[int, int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
         async with app.run_test() as pilot:
@@ -390,7 +433,9 @@ def test_textual_orange_panels_share_the_width() -> None:
 
 def test_textual_panels_place_green_output_above_orange_steps() -> None:
     async def exercise() -> tuple[int, int, int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             await pilot.pause()
@@ -422,7 +467,9 @@ def test_visible_step_window_is_limited_to_ten_steps() -> None:
 
 def test_textual_long_step_list_shows_requested_window() -> None:
     async def exercise() -> tuple[list[str], float]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         skill = SkillCatalogEntry(
             Path("long-skill.yaml"),
@@ -461,7 +508,9 @@ def test_textual_long_step_list_shows_requested_window() -> None:
 
 def test_textual_nested_steps_fit_without_scrolling() -> None:
     async def exercise() -> tuple[int, float]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         parent = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
         nested = SkillCatalogEntry(Path("nested.yaml"), _build_skill())
@@ -484,7 +533,9 @@ def test_textual_nested_steps_fit_without_scrolling() -> None:
 
 def test_textual_completed_skill_removes_orange_step_list() -> None:
     async def exercise() -> tuple[int, int, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             skill = SkillCatalogEntry(Path("skill.yaml"), _build_skill())
@@ -511,7 +562,9 @@ def test_textual_completed_skill_removes_orange_step_list() -> None:
 
 def test_textual_nested_progress_shows_parent_separator_and_nested_steps() -> None:
     async def exercise() -> list[str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             parent_skill = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
@@ -548,7 +601,9 @@ def test_textual_nested_progress_shows_parent_separator_and_nested_steps() -> No
 
 def test_textual_parent_progress_is_colored_after_nested_completion() -> None:
     async def exercise() -> list[tuple[str, bool, bool]]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             parent_skill = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
@@ -585,7 +640,9 @@ def test_textual_parent_progress_is_colored_after_nested_completion() -> None:
 
 
 def test_textual_skill_path_tracks_deep_nesting_and_parent_resume() -> None:
-    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+    app = WorkflowChatApp(
+        SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+    )
     parent = SkillCatalogEntry(Path("parent.yaml"), _build_skill())
     child = SkillCatalogEntry(
         Path("child.yaml"),
@@ -622,7 +679,9 @@ def test_textual_skill_path_tracks_deep_nesting_and_parent_resume() -> None:
 
 def test_textual_status_scrolls_to_new_output_and_retains_history() -> None:
     async def exercise() -> tuple[str, float, int, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test(size=(80, 12)) as pilot:
             status = app.query_one("#status", Static)
@@ -644,7 +703,9 @@ def test_textual_status_scrolls_to_new_output_and_retains_history() -> None:
 
 def test_textual_status_history_is_bounded() -> None:
     async def exercise() -> tuple[int, int, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             for number in range(200):
@@ -665,7 +726,9 @@ def test_textual_status_history_is_bounded() -> None:
 
 def test_textual_status_truncates_large_messages() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             app._set_message("start-" + ("x" * 20_000) + "-end")
@@ -682,7 +745,9 @@ def test_textual_failure_retains_diagnostics_instead_of_unknown_error(
 ) -> None:
     async def exercise(repo_root: Path) -> str:
         app = WorkflowChatApp(
-            SkillChatConfig(skills_dir=Path("skill-definitions"), repo_root=repo_root)
+            SkillChatConfig(
+                processes_dir=Path("docs/procedrr/processes"), repo_root=repo_root
+            )
         )
         app._stop_requested.set()
         async with app.run_test() as pilot:
@@ -709,7 +774,9 @@ def test_textual_failure_retains_diagnostics_instead_of_unknown_error(
 
 def test_textual_status_shows_latest_output() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             for message in ("first", "second", "third", "fourth"):
@@ -724,7 +791,9 @@ def test_textual_status_shows_latest_output() -> None:
 
 def test_textual_status_surfaces_provider_wait_after_local_tool() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             app._set_status("calling LLM...")
@@ -745,7 +814,9 @@ def test_textual_status_surfaces_provider_wait_after_local_tool() -> None:
 
 def test_textual_status_retains_full_empty_response_prompt() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         exchange = (
@@ -776,7 +847,9 @@ def test_textual_status_retains_full_empty_response_prompt() -> None:
 
 def test_textual_status_keeps_all_questions_visible() -> None:
     async def exercise() -> tuple[str, int]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             status = app.query_one("#status-text", TextArea)
@@ -798,7 +871,9 @@ def test_textual_status_keeps_all_questions_visible() -> None:
 
 def test_textual_output_hides_debug_and_promotes_question() -> None:
     async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -828,7 +903,9 @@ def test_textual_output_hides_debug_and_promotes_question() -> None:
 
 def test_textual_output_keeps_multiline_question_complete() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -868,7 +945,9 @@ def test_textual_output_keeps_multiline_question_complete() -> None:
 
 def test_textual_output_buffers_partial_writes_until_the_line_is_complete() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -890,7 +969,9 @@ def test_textual_output_buffers_partial_writes_until_the_line_is_complete() -> N
 
 def test_textual_execution_transition_retains_output_history() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -916,7 +997,9 @@ def test_textual_execution_transition_retains_output_history() -> None:
 
 def test_textual_status_surfaces_provider_warning() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             writer = Thread(
@@ -935,7 +1018,9 @@ def test_textual_status_surfaces_provider_warning() -> None:
 
 def test_textual_empty_human_prompt_replaces_llm_wait_status_with_warning() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -953,7 +1038,9 @@ def test_textual_empty_human_prompt_replaces_llm_wait_status_with_warning() -> N
 
 def test_textual_bare_prompt_marker_does_not_create_empty_response_warning() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -972,7 +1059,9 @@ def test_textual_bare_prompt_marker_does_not_create_empty_response_warning() -> 
 
 def test_textual_answer_echo_before_prompt_marker_does_not_create_warning() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -997,7 +1086,9 @@ def test_textual_answer_echo_before_prompt_marker_does_not_create_warning() -> N
 
 def test_textual_flush_displays_nonstandard_human_prompt_before_next_output() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -1020,7 +1111,9 @@ def test_textual_flush_displays_nonstandard_human_prompt_before_next_output() ->
 
 def test_textual_each_execution_step_retains_status_history() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -1049,7 +1142,9 @@ def test_textual_each_execution_step_retains_status_history() -> None:
 
 def test_textual_initial_prompt_and_response_remain_before_matched_skill() -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -1094,7 +1189,9 @@ def test_textual_initial_prompt_and_response_remain_before_matched_skill() -> No
 
 def test_textual_response_supports_copy() -> None:
     async def exercise() -> tuple[bool, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             response = app.query_one("#response", TextArea)
@@ -1111,7 +1208,9 @@ def test_textual_response_supports_copy() -> None:
 def test_textual_copy_uses_native_macos_clipboard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+    app = WorkflowChatApp(
+        SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+    )
     monkeypatch.setattr(sys, "platform", "darwin")
     with patch("powdrr_lift.workrr.chat_tui.subprocess.run") as run:
         app.copy_to_clipboard("copy this output")
@@ -1129,7 +1228,9 @@ def test_textual_copy_uses_native_macos_clipboard(
 
 def test_textual_response_supports_cut_through_app_action() -> None:
     async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             response = app.query_one("#response", TextArea)
@@ -1145,7 +1246,9 @@ def test_textual_response_supports_cut_through_app_action() -> None:
 
 def test_textual_response_supports_cut_key_without_beeping() -> None:
     async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             response = app.query_one("#response", TextArea)
@@ -1161,7 +1264,9 @@ def test_textual_response_supports_cut_key_without_beeping() -> None:
 
 def test_textual_response_supports_command_copy_and_cut_keys() -> None:
     async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             response = app.query_one("#response", TextArea)
@@ -1195,7 +1300,9 @@ def test_textual_response_supports_command_paste_from_native_clipboard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     async def exercise() -> str:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             response = app.query_one("#response", TextArea)
@@ -1219,7 +1326,9 @@ def test_textual_response_supports_command_paste_from_native_clipboard(
 
 def test_textual_read_only_panels_support_copy_and_cut() -> None:
     async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         app._workflow_active = True
         async with app.run_test() as pilot:
@@ -1246,7 +1355,9 @@ def test_textual_read_only_panels_support_copy_and_cut() -> None:
 
 def test_textual_status_textarea_supports_range_copy_and_cut() -> None:
     async def exercise() -> tuple[str, str]:
-        app = WorkflowChatApp(SkillChatConfig(skills_dir=Path("skill-definitions")))
+        app = WorkflowChatApp(
+            SkillChatConfig(processes_dir=Path("docs/procedrr/processes"))
+        )
         app._stop_requested.set()
         async with app.run_test() as pilot:
             status = app.query_one("#status-text", TextArea)

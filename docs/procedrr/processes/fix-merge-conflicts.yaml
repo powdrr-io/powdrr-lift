@@ -22,7 +22,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: fix-merge-conflicts\nwhen_to_use:\n- When a referenced pull request cannot\
@@ -114,20 +114,20 @@ steps:
       \    - git\n    - diff\n    - --cached\n    - --check\n  - tool: shell\n    command:\n\
       \    - git\n    - diff\n    - --cached\n    - --stat\n  - tool: ref\n    label: pr-prep\n\
       - description: Run the PR-preparation workflow on the resolved merge.\n  step_type:\
-      \ uses_skill\n  llm_type: simple_task\n  uses_skill:\n    skill: finish-pr-prep\n  details:\
+      \ uses_process\n  llm_type: simple_task\n  uses_process:\n    process: finish-pr-prep\n  details:\
       \ >-\n    Invoke finish-pr-prep only after every conflict is resolved, all conflict\n\
       \    markers are gone, the intended merge result is staged, and the focused\n    checks\
       \ pass. Pass the conflict ledger, semantic resolution plan, changed\n    file set, and\
       \ test evidence as context. Let finish-pr-prep discover the\n    canonical formatting,\
       \ lint, type-check, and test commands. Do not push or\n    update the PR until finish-pr-prep\
       \ reports the staged merge is ready.\n- description: Commit and push the resolved branch\
-      \ to the existing pull request.\n  step_type: uses_skill\n  llm_type: simple_task\n\
+      \ to the existing pull request.\n  step_type: uses_process\n  llm_type: simple_task\n\
       \  details: >-\n    Invoke create-pull-request with pr-kind `merge-conflict`, commit\
       \ message\n    `Resolve merge conflicts`, and the existing pull-request reference and\n\
       \    title. Pass a `files_to_publish` context list containing every resolved\n    file,\
       \ along with the conflict ledger, and require one Conflict\n    Resolution row per conflicted\
       \ file containing the competing intent,\n    selected resolution, and validation. Never\
-      \ create a second PR or merge it.\n  uses_skill:\n    skill: create-pull-request"
+      \ create a second PR or merge it.\n  uses_process:\n    process: create-pull-request"
     context:
     - user_request
     - workflow_context

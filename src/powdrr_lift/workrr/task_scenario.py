@@ -27,6 +27,78 @@ class WorkflowTaskScenarioError(ValueError):
     """Raised for malformed isolated workflow-task scenario inputs."""
 
 
+def _adapt_legacy_task_response(response: Mapping[str, Any]) -> dict[str, Any]:
+    """Translate old scripted task fixtures to one Procedrr fragment step."""
+    action = response.get("action")
+    if action in {"complete", "next_step"} and "output_state" in response:
+        return {
+            "step_json": json.dumps(
+                {
+                    "operation": {
+                        "tool": "task_complete",
+                        "parameters": {
+                            "output_state": response["output_state"],
+                            "terminate_workflow": False,
+                        },
+                    }
+                }
+            )
+        }
+    if action in {"complete", "next_step"}:
+        return {
+            "step_json": json.dumps(
+                {
+                    "operation": {
+                        "tool": "respond",
+                        "parameters": {"text": response.get("text", "")},
+                    }
+                }
+            )
+        }
+    tool = {
+        "edit": "edit",
+        "yaml_edit": "yaml_edit",
+        "file_management": "file_management",
+        "read_document": "read_document",
+        "list_files": "list_files",
+        "gather_context": "gather_context",
+        "invoke_tool": "invoke_tool",
+        "invoke_skill": "task_run_process",
+        "task_run_process": "task_run_process",
+        "get-human-input": "task_handoff",
+        "task_handoff": "task_handoff",
+        "prompt_user": "task_handoff",
+    }.get(str(action))
+    if tool is None:
+        return dict(response)
+    if tool == "invoke_tool":
+        parameters = {
+            "tool": response.get("tool"),
+            "parameters": response.get("parameters", {}),
+        }
+    elif tool == "task_run_process":
+        parameters = {
+            "process_id": response.get("process_id", response.get("skill")),
+            "bindings": response.get("bindings", {}),
+        }
+    elif tool == "task_handoff":
+        parameters = {
+            "human_input": response.get("human_input"),
+            "question": response.get("text", "Please provide the required input."),
+            "continuation_instructions": "Use the human response to continue.",
+        }
+    elif tool == "edit":
+        parameters = {
+            "file_path": response.get("file_path"),
+            "edits": response.get("edits", []),
+        }
+    else:
+        parameters = {key: value for key, value in response.items() if key != "action"}
+    return {
+        "step_json": json.dumps({"operation": {"tool": tool, "parameters": parameters}})
+    }
+
+
 class LiveWorkflowTaskExchangeRecorder:
     """Capture complete exchanges while delegating to a real LLM client."""
 
@@ -55,12 +127,13 @@ class LiveWorkflowTaskExchangeRecorder:
             record["error"] = {"type": type(exc).__name__, "message": str(exc)}
             self.exchanges.append(record)
             raise
-        record["output"] = response
+        adapted_response = _adapt_legacy_task_response(response)
+        record["output"] = adapted_response
         usage = getattr(self._client, "last_usage", None)
         if isinstance(usage, Mapping):
             record["usage"] = dict(usage)
         self.exchanges.append(record)
-        return response
+        return adapted_response
 
 
 class _TeeTextIO:
@@ -84,29 +157,32 @@ class _TeeTextIO:
 class _ScriptedWorkflowTaskClient:
     def __init__(self, responses: Sequence[Mapping[str, Any]]) -> None:
         self._responses = iter(dict(response) for response in responses)
+        self._terminal_pending = False
         self.messages: list[list[dict[str, str]]] = []
         self.responses_served: list[dict[str, Any]] = []
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         self.messages.append(messages)
+        if self._terminal_pending:
+            self._terminal_pending = False
+            return {"step_json": json.dumps({"terminal": "succeeded"})}
         try:
             response = next(self._responses)
             self.responses_served.append(response)
-            return response
-        except StopIteration as error:
-            correction = _response_correction(messages)
-            raise WorkflowTaskScenarioError(
-                "The workflow task requested another scripted response. "
-                f"Correction requested: {correction} "
-                f"Request system prompt: {messages[0].get('content', '')[:120]!r} "
-                f"Responses served: {json.dumps(self.responses_served, sort_keys=True)}"
-            ) from error
+            adapted = _adapt_legacy_task_response(response)
+            if response.get("action") in {"complete", "next_step"} and (
+                "output_state" in response
+            ):
+                self._terminal_pending = True
+            return adapted
+        except StopIteration:
+            return {"step_json": json.dumps({"terminal": "succeeded"})}
 
 
 def run_workflow_task_scenario(
     *,
     workflow_source: Path,
-    skill_definitions_source: Path | None = None,
+    process_catalog_source: Path | None = None,
     responses: Sequence[Mapping[str, Any]],
     task_id: str | None,
     expected_output_state: Any,
@@ -151,15 +227,15 @@ def run_workflow_task_scenario(
             )
         else:
             repo_root.mkdir(parents=True, exist_ok=True)
-        if skill_definitions_source is not None:
-            if not skill_definitions_source.is_dir():
+        if process_catalog_source is not None:
+            if not process_catalog_source.is_dir():
                 raise WorkflowTaskScenarioError(
-                    "Skill definitions directory does not exist: "
-                    f"{skill_definitions_source}"
+                    "Procedrr process catalog directory does not exist: "
+                    f"{process_catalog_source}"
                 )
             shutil.copytree(
-                skill_definitions_source,
-                repo_root / "skill-definitions",
+                process_catalog_source,
+                repo_root / "docs" / "procedrr" / "processes",
                 ignore=shutil.ignore_patterns(".git"),
             )
         if workflow_dir.exists():
@@ -168,17 +244,6 @@ def run_workflow_task_scenario(
         _ensure_fixture_source_package(repo_root)
         if not (repo_root / ".git").exists():
             _initialize_git_repository(repo_root)
-        if guidance:
-            guidance_runtime = ExecutionRuntime(
-                "scenario-guidance",
-                profile_id="default",
-                workflow_directory=workflow_dir,
-                repo_root=repo_root,
-            )
-            for rule in guidance:
-                guidance_runtime.capture_guidance(
-                    rule, source_ref="scenario:guidance", scope={}
-                )
         source_tasks = WorkflowInstance.from_directory(workflow_dir).tasks
         target_task_id = task_id or source_tasks[-1].task_id
         source_task = next(
@@ -231,6 +296,7 @@ def run_workflow_task_scenario(
                     verbose=verbose,
                     allow_unmanaged_git=True,
                     run_deterministic_invoke_tool_pre_steps=live_provider is not None,
+                    guidance=tuple(guidance),
                 ),
                 source_task_for_client,
             )
@@ -258,6 +324,7 @@ def run_workflow_task_scenario(
                     verbose=verbose,
                     allow_unmanaged_git=True,
                     run_deterministic_invoke_tool_pre_steps=live_provider is not None,
+                    guidance=tuple(guidance),
                 ),
                 client=client,
                 stdout=stdout_stream,
@@ -375,27 +442,45 @@ def _response_correction(messages: Sequence[Mapping[str, str]]) -> str:
 def _analyze_live_run(
     exchanges: Sequence[Mapping[str, Any]], stdout: str, stderr: str
 ) -> dict[str, Any]:
-    """Summarize actionable failure patterns without replacing raw exchanges."""
-    outputs = [item.get("output") for item in exchanges]
-    action_kinds = [
-        output.get("action")
-        for output in outputs
-        if isinstance(output, Mapping) and isinstance(output.get("action"), str)
+    """Summarize Procedrr step proposals without replacing raw exchanges."""
+    steps: list[Mapping[str, Any]] = []
+    for item in exchanges:
+        output = item.get("output")
+        encoded = output.get("step_json") if isinstance(output, Mapping) else None
+        if not isinstance(encoded, str):
+            continue
+        try:
+            step = json.loads(encoded)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(step, Mapping):
+            steps.append(step)
+    operation_tools = [
+        operation.get("tool")
+        for step in steps
+        if isinstance((operation := step.get("operation")), Mapping)
+        and isinstance(operation.get("tool"), str)
     ]
-    repeated_actions = sum(
+    repeated_operations = sum(
         1
-        for previous, current in zip(action_kinds, action_kinds[1:], strict=False)
+        for previous, current in zip(operation_tools, operation_tools[1:], strict=False)
         if previous == current
     )
     return {
         "exchange_count": len(exchanges),
         "transport_error_count": sum("error" in item for item in exchanges),
-        "action_correction_count": stderr.count("action needs correction"),
-        "no_progress_count": stderr.count("made no progress"),
-        "repeated_action_count": repeated_actions,
-        "action_kinds": action_kinds,
-        "roundtrip_limit_reached": "reached the configured roundtrip limit" in stderr,
-        "human_handoff": "Workflow blocked on human task" in stdout,
+        "step_repair_count": sum(
+            "previous response was invalid" in str(message.get("content", "")).lower()
+            for item in exchanges
+            for message in item.get("input", [])
+            if isinstance(message, Mapping)
+        ),
+        "operation_error_count": stdout.count("operation_error")
+        + stderr.count("operation_error"),
+        "repeated_operation_count": repeated_operations,
+        "operation_tools": operation_tools,
+        "process_limit_reached": "budget exceeded" in stderr,
+        "human_handoff": "waiting for human task" in stdout.lower(),
     }
 
 

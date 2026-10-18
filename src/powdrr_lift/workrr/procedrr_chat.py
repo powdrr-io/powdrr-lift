@@ -53,7 +53,7 @@ def run_procedrr_workflow_chat(
 ) -> int:
     """Select and run a catalogued Procedrr process for one chat request."""
     configured_repo_root = resolve_repo_root(config.repo_root)
-    process_dir = config.skills_dir
+    process_dir = config.processes_dir
     if not process_dir.is_absolute():
         process_dir = configured_repo_root / process_dir
     try:

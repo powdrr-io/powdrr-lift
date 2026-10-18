@@ -9,6 +9,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import nullcontext
 from dataclasses import asdict, dataclass, field, replace
+from datetime import UTC, datetime
 from functools import partial
 from pathlib import Path
 from typing import Any, TextIO
@@ -45,7 +46,7 @@ from powdrr_lift.pr_workflow_record import (
 from powdrr_lift.process.action_catalog import step_actions
 from powdrr_lift.process.branching import select_branch_target
 from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.process.discovery import find_skill_by_name, load_skill_catalog
+from powdrr_lift.process.discovery import find_skill_by_name
 from powdrr_lift.process.step_behavior import behavior_for_step
 from powdrr_lift.process.tasks import (
     AgentRole,
@@ -118,7 +119,6 @@ from powdrr_lift.workrr.llm import (
     WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
     WorkflowLLMClient,
-    WorkflowLLMTimeoutExhausted,
     WorkflowStepRunner,
     assert_material_repair_prompt,
     build_clean_room_action_parameters_prompt,
@@ -136,15 +136,14 @@ from powdrr_lift.workrr.llm import (
 from powdrr_lift.workrr.observer import (
     ObserverActionRecommendation,
     ObserverDecision,
-    ObserverExecutionContext,
-    ShadowWorkflowObserver,
-    compact_observer_mapping,
     observer_action_matches,
 )
 from powdrr_lift.workrr.paths import (
     resolve_project_root,
     resolve_worktree_file_path,
 )
+from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
+from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.prompting import (
     _action_system_prompt,
     _step_needs_prompt_catalog,
@@ -169,6 +168,13 @@ from powdrr_lift.workrr.providers import (
     resolve_llm_mapping,
     resolve_local_model_path,
     resolve_provider_credentials,
+)
+from procedrr import ProcessCatalog
+from procedrr_evaluator import (
+    ProcedrrExecutionService,
+    ProcessExecutionCheckpoint,
+    ProcessTerminalStatus,
+    SuspendEvaluation,
 )
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
@@ -277,6 +283,7 @@ class WorkflowTaskAgentConfig:
     verbose: bool = False
     allow_unmanaged_git: bool = False
     run_deterministic_invoke_tool_pre_steps: bool = False
+    guidance: tuple[str, ...] = ()
 
 
 def _context_compaction_threshold(context_window: int, fraction: float) -> int:
@@ -706,7 +713,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "task_id": self.task.task_id,
                 "description": self.task.description,
                 "details": self.task.details,
-                "uses_skills": list(self.task.uses_skills),
+                "uses_processes": list(self.task.uses_processes),
             },
             "workflow": {
                 "directory": str(self.workflow.directory),
@@ -717,7 +724,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             "model": self.model,
             "action_contract": {
                 "allowed_actions": allowed_actions,
-                "declared_nested_skills": list(self.task.uses_skills),
+                "declared_nested_processes": list(self.task.uses_processes),
             },
             "recent_events": recent_events,
             "last_successful_action": last_successful_action,
@@ -1691,6 +1698,315 @@ def _record_task_pull_request(
     )
 
 
+class _TaskProcedrrOperations:
+    """Expose only this claimed task's authorized Workrr operations."""
+
+    def __init__(
+        self,
+        strategy: _TaskWorkflowExecutionStrategy,
+        *,
+        process_id: str,
+        process_catalog: ProcessCatalog,
+        process_client: WorkrrProcedrrClient,
+    ) -> None:
+        self.strategy = strategy
+        self.workflow = strategy.workflow
+        self.task = strategy.task
+        self.process_id = process_id
+        self.process_catalog = process_catalog
+        self.process_client = process_client
+        self.operation_executor: WorkrrOperationExecutor | None = None
+        self.follow_up_task_id: str | None = None
+        self.original_task_id = self.task.task_id
+        checkpoint_data = self.task.process_checkpoint
+        if checkpoint_data is not None:
+            checkpoint = ProcessExecutionCheckpoint.from_data(checkpoint_data)
+            context = checkpoint.evaluator.initial_bindings.get("task_context")
+            if isinstance(context, Mapping) and isinstance(context.get("task_id"), str):
+                self.original_task_id = context["task_id"]
+
+    def execute(self, operation: str, parameters: Mapping[str, Any]) -> Any:
+        if operation == "procedrr_fragment_start":
+            from procedrr.fragments import start_fragment
+
+            available = parameters.get("available_bindings", [])
+            allowed = parameters.get("allowed_tools", [])
+            if not isinstance(available, list) or not all(
+                isinstance(item, str) for item in available
+            ):
+                raise PowdrrExecutionError(
+                    "fragment start available_bindings must be a string list"
+                )
+            if not isinstance(allowed, list) or not all(
+                isinstance(item, str) for item in allowed
+            ):
+                raise PowdrrExecutionError(
+                    "fragment start allowed_tools must be a string list"
+                )
+            return start_fragment(
+                name=str(parameters.get("name", "task-program")),
+                available_bindings=available,
+                allowed_tools=allowed,
+                max_steps=int(parameters.get("max_steps", 64)),
+            )
+        if operation == "procedrr_fragment_apply_edit":
+            from procedrr.fragments import apply_fragment_step_json
+
+            state = parameters.get("state")
+            step_json = parameters.get("step_json")
+            if not isinstance(state, Mapping) or not isinstance(step_json, str):
+                raise PowdrrExecutionError(
+                    "fragment apply requires state and step_json"
+                )
+            return apply_fragment_step_json(
+                state, step_json, evidence=parameters.get("evidence")
+            )
+        if operation == "task_complete":
+            return self._complete(parameters)
+        if operation == "task_handoff":
+            return self._handoff(parameters)
+        if operation == "task_run_process":
+            return self._run_nested_process(parameters)
+        if operation == "respond":
+            text = parameters.get("text")
+            if not isinstance(text, str):
+                raise PowdrrExecutionError("respond requires a text string")
+            print(text, file=self.strategy.stdout)
+            self.strategy.events.append({"kind": "respond", "text": text})
+            return {"text": text}
+
+        from powdrr_lift.workrr.procedrr_chat import _operation_to_action
+
+        normalized = dict(parameters)
+        if operation == "internal":
+            normalized = {
+                "kind": "invoke_tool",
+                "tool": "internal",
+                "parameters": dict(parameters),
+            }
+        elif operation == "invoke_tool":
+            normalized["kind"] = "invoke_tool"
+        else:
+            normalized["kind"] = operation
+        action = _operation_to_action(normalized)
+        before = len(self.strategy.events)
+        try:
+            outcome = self.strategy.execute_action(action)
+        except (PowdrrExecutionError, RuntimeError, ValueError) as error:
+            if isinstance(error, PowdrrExecutionError) and (
+                error.error_code in {"action_not_allowed", "action_unauthorized"}
+                or "not allowed by the active step contract" in str(error)
+            ):
+                raise
+            failure = {
+                "kind": "operation_error",
+                "operation": operation,
+                "error": str(error),
+            }
+            self.strategy.events.append(failure)
+            return {"error": str(error), "retryable": True}
+        observed = self.strategy.events[before:]
+        return {
+            "continue_running": outcome.continue_running,
+            "events": observed,
+        }
+
+    def _run_nested_process(self, parameters: Mapping[str, Any]) -> dict[str, Any]:
+        process_id = parameters.get("process_id")
+        bindings = parameters.get("bindings", {})
+        if not isinstance(process_id, str) or not isinstance(bindings, Mapping):
+            raise PowdrrExecutionError(
+                "task_run_process requires process_id and a bindings mapping"
+            )
+        if self.task.actions_declared and not {
+            "task_run_process",
+            "invoke_skill",
+        }.intersection(self.task.actions):
+            raise PowdrrExecutionError(
+                "task_run_process is not allowed by the task action contract"
+            )
+        if self.task.uses_processes and process_id not in self.task.uses_processes:
+            raise PowdrrExecutionError(
+                f"nested process {process_id!r} is not declared by this task"
+            )
+        if process_id in {"durable-task", "generate-fragment", "select-process"}:
+            raise PowdrrExecutionError(
+                f"nested process {process_id!r} cannot be called by a durable task"
+            )
+        if self.operation_executor is None:
+            raise PowdrrExecutionError("task process operation adapter is not ready")
+        self.process_catalog.get(process_id)
+        resume_marker = parameters.get("__procedrr_resume__")
+        checkpoint = None
+        resume_value = None
+        if isinstance(resume_marker, Mapping):
+            resume_data = resume_marker.get("data")
+            if isinstance(resume_data, Mapping):
+                checkpoint_data = resume_data.get("nested_checkpoint")
+                if isinstance(checkpoint_data, Mapping):
+                    checkpoint = ProcessExecutionCheckpoint.from_data(checkpoint_data)
+            resume_value = resume_marker.get("value")
+        result = ProcedrrExecutionService(
+            self.process_catalog,
+            self.process_client,
+            self.operation_executor,
+        ).execute(
+            process_id,
+            bindings,
+            checkpoint=checkpoint,
+            resume_value=resume_value,
+        )
+        if result.terminal_status is ProcessTerminalStatus.SUSPENDED:
+            if result.checkpoint is None:
+                raise PowdrrExecutionError(
+                    f"nested process {process_id!r} suspended without a checkpoint"
+                )
+            checkpoint_data = result.checkpoint.to_data()
+            raise SuspendEvaluation(
+                {"process_id": process_id, "checkpoint": checkpoint_data},
+                f"nested process {process_id!r} is waiting for a human response",
+                resume_data={"nested_checkpoint": checkpoint_data},
+                resume_with_executor=True,
+            )
+        if result.terminal_status is not ProcessTerminalStatus.SUCCEEDED:
+            raise PowdrrExecutionError(
+                f"nested process {process_id!r} ended with "
+                f"{result.terminal_status.value}"
+            )
+        return {
+            "process_id": process_id,
+            "bindings": dict(result.bindings),
+            "terminal_status": result.terminal_status.value,
+        }
+
+    def _complete(self, parameters: Mapping[str, Any]) -> dict[str, Any]:
+        if "output_state" not in parameters:
+            raise PowdrrExecutionError("task_complete requires output_state")
+        output_state = parameters["output_state"]
+        if (
+            self.strategy.requires_deterministic_output_state
+            and output_state != self.strategy.deterministic_output_state
+        ):
+            output_state = self.strategy.deterministic_output_state
+        if self.original_task_id != self.task.task_id:
+            original = next(
+                (
+                    item
+                    for item in self.workflow.tasks
+                    if item.task_id == self.original_task_id
+                ),
+                None,
+            )
+            if original is not None and original.status is TaskStatus.LOCKED:
+                self.workflow.complete_task(self.original_task_id, output_state)
+        action = WorkflowAction(
+            kind=(
+                "complete"
+                if parameters.get("terminate_workflow") is True
+                else "next_step"
+            ),
+            output_state=output_state,
+            text=(
+                str(parameters["text"])
+                if isinstance(parameters.get("text"), str)
+                else None
+            ),
+        )
+        outcome = self.strategy.execute_action(action)
+        return {"completed": True, "continue_running": outcome.continue_running}
+
+    def _handoff(self, parameters: Mapping[str, Any]) -> None:
+        allowed_actions = (
+            self.strategy.runtime.allowed_actions()
+            if self.strategy.runtime is not None
+            else None
+        )
+        if allowed_actions is not None and not {
+            "prompt_user",
+            "get-human-input",
+        }.intersection(allowed_actions):
+            raise PowdrrExecutionError(
+                "task_handoff is not allowed by the task action contract"
+            )
+        provided_handoff = parameters.get("human_input")
+        if isinstance(provided_handoff, Mapping):
+            human_input = dict(provided_handoff)
+            follow_up_spec = human_input.get("follow_up_task")
+            if not isinstance(follow_up_spec, Mapping):
+                raise PowdrrExecutionError(
+                    "durable task handoffs require a follow_up_task"
+                )
+            follow_up_data = dict(follow_up_spec)
+            follow_up_data["include_human_response"] = True
+            human_input["follow_up_task"] = follow_up_data
+        else:
+            question = parameters.get("question")
+            if not isinstance(question, str) or not question.strip():
+                raise PowdrrExecutionError("task_handoff requires a non-empty question")
+            instructions = parameters.get("continuation_instructions")
+            human_role = parameters.get("human_role", "reviewer")
+            output_state_type = parameters.get(
+                "output_state_type", "human-response-state"
+            )
+            if not isinstance(human_role, str) or human_role not in {
+                HumanRole.DECIDER.value,
+                HumanRole.REVIEWER.value,
+            }:
+                raise PowdrrExecutionError("task_handoff human_role is invalid")
+            if not isinstance(output_state_type, str) or not output_state_type.strip():
+                raise PowdrrExecutionError("task_handoff output_state_type is invalid")
+            human_input = {
+                "human_task": {
+                    "description": question,
+                    "role": human_role,
+                    "input_state": {
+                        "question": question,
+                        "task": self.task.to_data(),
+                    },
+                    "output_state_type": output_state_type,
+                },
+                "incorporation_instructions": (
+                    instructions
+                    if isinstance(instructions, str) and instructions.strip()
+                    else "Use the human response to continue the durable task."
+                ),
+                "follow_up_task": {
+                    "description": self.task.description,
+                    "role": self.task.assignee_role.value,
+                    "input_state": self.task.input_state,
+                    "output_state_type": self.task.output_state_type,
+                    "include_human_response": True,
+                },
+            }
+        human_task, follow_up = _insert_human_handoff(
+            self.workflow,
+            self.task,
+            human_input,
+        )
+        if follow_up is None:
+            raise PowdrrExecutionError("task_handoff did not create a follow-up task")
+        follow_up = replace(follow_up, process_id=self.process_id)
+        self.workflow.update_task(follow_up)
+        self.follow_up_task_id = follow_up.task_id
+        _publish_workflow_progress(
+            self.strategy.repo_root,
+            self.workflow,
+            workflow_id=workflow_id_from_task_id(self.task.task_id),
+            reason=f"Procedrr task handoff {self.task.task_id}",
+            stdout=self.strategy.stdout,
+            open_pull_request=False,
+            events=self.strategy.events,
+            runtime=self.strategy.runtime,
+        )
+        raise SuspendEvaluation(
+            {
+                "human_task_id": human_task.task_id,
+                "follow_up_task_id": follow_up.task_id,
+            },
+            f"waiting for human response in {human_task.task_id}",
+        )
+
+
 def run_workflow_task(
     config: WorkflowTaskAgentConfig,
     *,
@@ -1754,10 +2070,15 @@ def run_workflow_task(
         )
         print(str(exc), file=stderr)
         return 2
-    skill_catalog = load_skill_catalog(
-        repo_root / "skill-definitions",
-        stderr=stderr,
-    )
+    try:
+        process_catalog = _load_task_process_catalog(repo_root)
+    except ValueError as error:
+        print(f"Could not load Procedrr processes: {error}", file=stderr)
+        return 1
+    process_directory = process_catalog.get("durable-task").path.parent
+    # The old strategy type remains temporarily for shared action adapters, but
+    # the durable task path no longer loads or selects legacy skill definitions.
+    skill_catalog: tuple[SkillCatalogEntry, ...] = ()
     workflow = _select_workflow_instance(
         WorkflowInstance.from_directory(workflow_dir),
         configured_workflow_id,
@@ -1889,6 +2210,11 @@ def run_workflow_task(
             phase=execution_phase,
             profile=delivery_profile,
         )
+        for guidance in config.guidance:
+            runtime.capture_guidance(
+                guidance,
+                source_ref=f"{task.task_id}:explicit-guidance",
+            )
         last_runtime = runtime
         try:
             if workflow_git_state is not None:
@@ -1994,11 +2320,17 @@ def run_workflow_task(
             frozenset(task.actions),
             enforce_empty=task.actions_declared,
         )
-        driver = WorkflowStepRunner(
-            max_stalled_roundtrips=config.max_stalled_roundtrips,
-            runtime=runtime,
-            phase_type=execution_phase.value,
-            actor_id=task.persona_id or task.assignee_role.value,
+        process_id = task.process_id or "durable-task"
+        if task.process_id != process_id:
+            task = replace(task, process_id=process_id)
+            workflow.update_task(task)
+        try:
+            process_catalog.get(process_id)
+        except ValueError as error:
+            print(f"Unknown task Procedrr process {process_id!r}: {error}", file=stderr)
+            return 1
+        action_engine = WorkflowLLMActionEngine(
+            max_stalled_roundtrips=config.max_stalled_roundtrips
         )
         strategy = _TaskWorkflowExecutionStrategy(
             config=config,
@@ -2015,110 +2347,182 @@ def run_workflow_task(
             mapping_provider=mapping.provider,
             stdout=stdout,
             stderr=stderr,
-            action_engine=driver.action_engine,
+            action_engine=action_engine,
             runtime=runtime,
             events=driver_events,
             deterministic_output_state=deterministic_output_state,
             requires_deterministic_output_state=requires_deterministic_output_state,
         )
-        observer_mapping = _resolve_workflow_task_mapping(
-            "high_reasoning",
-            mappings=mappings,
-            provider=provider,
+        process_client = WorkrrProcedrrClient(
+            task_client,
+            process_directory=process_directory,
+            max_retries=config.max_stalled_roundtrips,
+            provider_retry_attempts=config.max_timeout_retries,
+            provider_retry_delay_seconds=config.timeout_backoff_seconds,
         )
-        # An injected client is the deterministic task-response seam used by
-        # tests and scenario fixtures.  It supplies task actions only; sharing
-        # it with the observer would consume those scripted actions before the
-        # task agent receives them.  Production runs construct both clients
-        # and continue to enable the observer normally.
-        if observer_mapping is not None and not client_was_provided:
-            observer_client = maybe_record_llm_exchanges(
-                _build_workflow_client_for_mapping(
-                    config,
-                    task,
-                    observer_mapping,
-                ),
-                dump_root,
-            )
+        operations = _TaskProcedrrOperations(
+            strategy,
+            process_id=process_id,
+            process_catalog=process_catalog,
+            process_client=process_client,
+        )
+        operation_names = (
+            "procedrr_fragment_start",
+            "procedrr_fragment_apply_edit",
+            "internal",
+            "edit",
+            "yaml_edit",
+            "file_management",
+            "read_document",
+            "list_files",
+            "invoke_tool",
+            "gather_context",
+            "task_complete",
+            "task_handoff",
+            "task_run_process",
+            "respond",
+        )
 
-            def observer_context(
-                _workflow: WorkflowInstance = workflow,
-                _task: WorkflowTask = task,
-                _events: list[dict[str, Any]] = driver_events,
-            ) -> ObserverExecutionContext:
-                return ObserverExecutionContext(
-                    execution_mode="process_workflow_task",
-                    root_intent=(
-                        f"Complete workflow {_workflow.directory.name}: "
-                        f"{_task.description}"
-                    ),
-                    skill_or_workflow=_workflow.directory.name,
-                    current_step_id=_task.task_id,
-                    current_step_intent=_task.details or _task.description,
-                    skill_definition={
-                        "task": _task.to_data(),
-                        "skills": [entry.skill.to_data() for entry in skill_catalog],
-                    },
-                    error_state={
-                        "recent_errors": [
-                            event
-                            for event in _events
-                            if event.get("kind")
-                            in {"validation_error", "action_error", "tool_error"}
-                        ][-8:],
-                        "error_count": sum(
-                            event.get("kind")
-                            in {"validation_error", "action_error", "tool_error"}
-                            for event in _events
-                        ),
-                    },
-                    validation_state={
-                        "status": _task.status.value,
-                        "output_state_type": _task.output_state_type,
-                        "issue_count": sum(
-                            event.get("kind")
-                            in {
-                                "validation_error",
-                                "action_error",
-                                "tool_error",
-                                "no_progress",
-                            }
-                            for event in _events
-                        ),
-                    },
-                    handoff_state=compact_observer_mapping(
-                        {
-                            "input_state": _task.input_state,
-                            "output_state": _task.output_state,
-                            "upstream_task_ids": list(_task.upstream_task_ids),
-                        }
-                    ),
-                )
+        def operation_handler(
+            operation_name: str,
+            task_operations: _TaskProcedrrOperations = operations,
+        ) -> Callable[[Mapping[str, Any]], Any]:
+            def execute(parameters: Mapping[str, Any]) -> Any:
+                return task_operations.execute(operation_name, parameters)
 
-            driver.observer = ShadowWorkflowObserver(
-                client=observer_client,
-                model=observer_mapping.model,
-                provider=observer_mapping.provider,
-                worktree_root=repo_root,
-                log_root=dump_root,
-                context_provider=observer_context,
-            )
+            return execute
+
+        operation_executor = WorkrrOperationExecutor(
+            {name: operation_handler(name) for name in operation_names}
+        )
+        operations.operation_executor = operation_executor
+        run_directory = repo_root / ".powdrr" / "procedrr-runs"
+        run_directory.mkdir(parents=True, exist_ok=True)
+        events_path = run_directory / f"{task.task_id}.events.jsonl"
+        manifest_path = run_directory / f"{task.task_id}.json"
+        checkpoint = (
+            ProcessExecutionCheckpoint.from_data(task.process_checkpoint)
+            if task.process_checkpoint is not None
+            else None
+        )
+        if checkpoint is None:
+            events_path.write_text("", encoding="utf-8")
+        manifest: dict[str, Any] = {
+            "schema_version": 1,
+            "execution_id": task.task_id,
+            "process_id": process_id,
+            "process_fingerprint": process_catalog.get(process_id).identity.fingerprint,
+            "status": "running",
+            "event_cursor": checkpoint.evaluator.event_cursor
+            if checkpoint is not None
+            else 0,
+            "started_at": datetime.now(UTC).isoformat(),
+        }
+        _write_task_process_manifest(manifest_path, manifest)
+
+        def persist_process_event(
+            event: Any,
+            events_file: Path = events_path,
+            task_manifest: dict[str, Any] = manifest,
+            task_manifest_path: Path = manifest_path,
+        ) -> None:
+            with events_file.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(event.to_data(), ensure_ascii=False) + "\n")
+            task_manifest["event_cursor"] = event.sequence + 1
+            _write_task_process_manifest(task_manifest_path, task_manifest)
+
+        execution_service = ProcedrrExecutionService(
+            process_catalog,
+            process_client,
+            operation_executor,
+            event_sink=persist_process_event,
+        )
         try:
-            exit_code = driver.run(
-                strategy,
-                max_roundtrips=config.max_roundtrips,
-                signature=workflow_action_signature,
+            if checkpoint is None:
+                task_context = _resolve_task_prompt_data(
+                    task.to_data(), task.input_state
+                )
+                task_context = {
+                    **task_context,
+                    "execution_context": runtime.prompt_context(),
+                }
+                if requires_deterministic_output_state:
+                    task_context = {
+                        **task_context,
+                        "deterministic_output_state": deterministic_output_state,
+                        "deterministic_output_state_required": True,
+                    }
+                result = execution_service.execute(
+                    process_id,
+                    {"task_context": task_context},
+                )
+            else:
+                if (
+                    not isinstance(task.input_state, Mapping)
+                    or "human_response" not in task.input_state
+                ):
+                    raise PowdrrExecutionError(
+                        "A suspended task checkpoint requires its resolved "
+                        "human_response input."
+                    )
+                result = execution_service.execute(
+                    process_id,
+                    checkpoint=checkpoint,
+                    resume_value=task.input_state["human_response"],
+                )
+        except (PowdrrExecutionError, RuntimeError, ValueError) as error:
+            manifest["status"] = "failed"
+            manifest["failure"] = f"{type(error).__name__}: {error}"
+            manifest["finished_at"] = datetime.now(UTC).isoformat()
+            _write_task_process_manifest(manifest_path, manifest)
+            print(f"Procedrr task failed: {error}", file=stderr)
+            return 1
+        manifest["status"] = result.terminal_status.value
+        manifest["finished_at"] = datetime.now(UTC).isoformat()
+        if result.checkpoint is not None:
+            manifest["checkpoint"] = result.checkpoint.to_data()
+            if operations.follow_up_task_id is None:
+                raise PowdrrExecutionError(
+                    "Procedrr suspended without creating a follow-up task."
+                )
+            follow_up = next(
+                item
+                for item in workflow.tasks
+                if item.task_id == operations.follow_up_task_id
             )
-        except WorkflowLLMTimeoutExhausted as exc:
-            return _handle_exhausted_timeout(
+            workflow.update_task(
+                replace(
+                    follow_up,
+                    process_id=process_id,
+                    process_checkpoint=result.checkpoint.to_data(),
+                )
+            )
+            _publish_workflow_progress(
                 repo_root,
-                task,
+                workflow,
+                workflow_id=workflow_id_from_task_id(task.task_id),
+                reason=f"Persist Procedrr checkpoint for {follow_up.task_id}",
                 stdout=stdout,
-                stderr=stderr,
-                error=exc,
+                open_pull_request=False,
+                events=driver_events,
+                runtime=runtime,
             )
-        if exit_code != 0:
-            return exit_code
+        elif result.terminal_status is ProcessTerminalStatus.SUCCEEDED:
+            completed = next(
+                (item for item in workflow.tasks if item.task_id == task.task_id),
+                None,
+            )
+            if completed is None or completed.status is not TaskStatus.COMPLETED:
+                manifest["status"] = "failed"
+                manifest["failure"] = (
+                    "Procedrr task succeeded without completing its durable task "
+                    "record."
+                )
+                manifest["finished_at"] = datetime.now(UTC).isoformat()
+                _write_task_process_manifest(manifest_path, manifest)
+                print(manifest["failure"], file=stderr)
+                return 1
+        _write_task_process_manifest(manifest_path, manifest)
         workflow = _select_workflow_instance(
             WorkflowInstance.from_directory(workflow_dir),
             configured_workflow_id,
@@ -2136,6 +2540,32 @@ def _select_task(
             raise ValueError(f"Task is not a ready agent task: {task_id}")
         return selected
     return ready_tasks[0] if ready_tasks else None
+
+
+def _load_task_process_catalog(repo_root: Path) -> ProcessCatalog:
+    """Combine bundled task-runtime processes with the target repository catalog."""
+    bundled_directory = (
+        Path(__file__).resolve().parents[3] / "docs" / "procedrr" / "processes"
+    )
+    bundled = ProcessCatalog.load(bundled_directory)
+    processes = {process.name: process for process in bundled.list()}
+    repository_directory = repo_root / "docs" / "procedrr" / "processes"
+    if (
+        repository_directory.is_dir()
+        and repository_directory.resolve() != bundled_directory.resolve()
+    ):
+        repository = ProcessCatalog.load(repository_directory)
+        processes.update({process.name: process for process in repository.list()})
+    return ProcessCatalog(processes)
+
+
+def _write_task_process_manifest(path: Path, manifest: Mapping[str, Any]) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
 
 
 def _validate_workflow_task_state(
@@ -2464,7 +2894,7 @@ def _workflow_task_record(task: WorkflowTask) -> dict[str, Any]:
             "status",
             "description",
             "assignee_role",
-            "uses_skills",
+            "uses_processes",
             "tool_invocations",
         )
         if key in data
@@ -2789,7 +3219,7 @@ def _build_task_messages(
     available_skills: list[dict[str, Any]] = []
     for entry in skill_catalog:
         skill_data: dict[str, Any] = {"name": entry.skill.name}
-        if entry.skill.name in task.uses_skills:
+        if entry.skill.name in task.uses_processes:
             skill_data["when_to_use"] = list(entry.skill.when_to_use)
         available_skills.append(skill_data)
     return [
@@ -4790,12 +5220,20 @@ def _insert_human_handoff(
     follow_up_spec = human_input.get("follow_up_task")
     if follow_up_spec is None:
         return human_task, None
+    follow_up_input_state = follow_up_spec["input_state"]
+    if follow_up_spec.get("include_human_response") is True:
+        if not isinstance(follow_up_input_state, Mapping):
+            raise ValueError("follow-up input_state must be a mapping")
+        follow_up_input_state = dict(follow_up_input_state)
+        follow_up_input_state["human_response"] = (
+            f"{human_id}.{human_task.output_state_type}"
+        )
     follow_up_task = WorkflowTask(
         task_id=f"{human_id}-follow-up",
         status=TaskStatus.OPEN,
         description=follow_up_spec["description"],
         complexity=TaskComplexity.MEDIUM,
-        input_state=follow_up_spec["input_state"],
+        input_state=follow_up_input_state,
         assignee_type=AssigneeType.AGENT,
         assignee_role=AgentRole(follow_up_spec["role"]),
         details=human_input["incorporation_instructions"],

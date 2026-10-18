@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import redirect_stderr
 from io import StringIO
 from pathlib import Path
+
+import pytest
 
 from powdrr_lift.cli import main
 from powdrr_lift.process.compiler import (
@@ -308,7 +310,7 @@ steps:
     assert str(tmp_path) not in paths[0].read_text(encoding="utf-8")
 
 
-def test_definition_validation_cli_emits_machine_readable_report(
+def test_legacy_definition_validation_cli_is_removed(
     tmp_path: Path,
 ) -> None:
     from powdrr_lift.cli import main
@@ -327,13 +329,13 @@ steps:
 """,
         encoding="utf-8",
     )
-    stdout = StringIO()
+    stderr = StringIO()
 
-    with redirect_stdout(stdout):
-        exit_code = main(["validate-workflow-definition", str(definition), "--json"])
+    with redirect_stderr(stderr), pytest.raises(SystemExit) as exit_info:
+        main(["validate-workflow-definition", str(definition), "--json"])
 
-    assert exit_code == 0
-    assert json.loads(stdout.getvalue())["validation_successful"] is True
+    assert exit_info.value.code == 2
+    assert "invalid choice" in stderr.getvalue()
 
 
 def test_definition_discovery_recurses_and_ignores_unsupported_files(
@@ -373,7 +375,7 @@ steps:
     assert report.reports[1].definition == valid
 
 
-def test_batch_definition_validation_cli_fails_for_any_invalid_definition(
+def test_legacy_batch_definition_validation_cli_is_removed(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "valid.yaml").write_text(
@@ -381,15 +383,13 @@ def test_batch_definition_validation_cli_fails_for_any_invalid_definition(
         encoding="utf-8",
     )
     (tmp_path / "invalid.yaml").write_text("steps: invalid\n", encoding="utf-8")
-    stdout = StringIO()
+    stderr = StringIO()
 
-    with redirect_stdout(stdout):
-        exit_code = main(["validate-workflow-definitions", str(tmp_path), "--json"])
+    with redirect_stderr(stderr), pytest.raises(SystemExit) as exit_info:
+        main(["validate-workflow-definitions", str(tmp_path), "--json"])
 
-    assert exit_code == 1
-    report = json.loads(stdout.getvalue())
-    assert report["definition_count"] == 2
-    assert report["validation_successful"] is False
+    assert exit_info.value.code == 2
+    assert "invalid choice" in stderr.getvalue()
 
 
 def test_prompt_snapshots_support_workflow_templates(tmp_path: Path) -> None:
@@ -586,7 +586,7 @@ steps:
     assert "non_progress_cycle" in {issue.code for issue in report.issues}
 
 
-def test_definition_validation_cli_prints_liveness_warnings(
+def test_legacy_definition_validation_cli_does_not_accept_liveness_options(
     tmp_path: Path,
 ) -> None:
     definition = tmp_path / "skill.yaml"
@@ -603,15 +603,13 @@ steps:
 """,
         encoding="utf-8",
     )
-    stdout = StringIO()
     stderr = StringIO()
 
-    with redirect_stdout(stdout), redirect_stderr(stderr):
-        exit_code = main(["validate-workflow-definition", str(definition)])
+    with redirect_stderr(stderr), pytest.raises(SystemExit) as exit_info:
+        main(["validate-workflow-definition", str(definition)])
 
-    assert exit_code == 1
-    assert "Workflow definition invalid" in stderr.getvalue()
-    assert "idempotent_action_without_auto_advance" in stderr.getvalue()
+    assert exit_info.value.code == 2
+    assert "invalid choice" in stderr.getvalue()
 
 
 def test_definition_analysis_warns_on_repeated_read_cycle(tmp_path: Path) -> None:

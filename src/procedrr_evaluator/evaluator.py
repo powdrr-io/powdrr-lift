@@ -38,6 +38,31 @@ class ValidationGateError(EvaluationError):
         super().__init__("validation gate failed")
 
 
+class SuspendEvaluation(Exception):
+    """Request a durable pause after recording an operation result."""
+
+    def __init__(
+        self,
+        result: Any,
+        reason: str,
+        *,
+        resume_data: Mapping[str, Any] | None = None,
+        resume_with_executor: bool = False,
+    ) -> None:
+        self.result = result
+        self.reason = reason
+        self.resume_data = dict(resume_data or {})
+        self.resume_with_executor = resume_with_executor
+        super().__init__(reason)
+
+
+class _Suspended(Exception):
+    def __init__(self, path: str, reason: str) -> None:
+        self.path = path
+        self.reason = reason
+        super().__init__(reason)
+
+
 class _TerminalReached(Exception):
     """Stop the current process after a declared terminal control node."""
 
@@ -77,6 +102,62 @@ class EvaluationResult:
     llm_activations: int
     tool_calls: int
     binding_schemas: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
+    suspended: bool = False
+    checkpoint: EvaluationCheckpoint | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EvaluationCheckpoint:
+    """Replayable evaluator state at an explicit operation suspension point."""
+
+    initial_bindings: Mapping[str, Any]
+    events: tuple[EvaluationEvent, ...]
+    suspended_at: str
+    event_cursor: int
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "initial_bindings": dict(self.initial_bindings),
+            "events": [
+                {"kind": event.kind, "path": event.path, "data": dict(event.data)}
+                for event in self.events
+            ],
+            "suspended_at": self.suspended_at,
+            "event_cursor": self.event_cursor,
+        }
+
+    @classmethod
+    def from_data(cls, data: Mapping[str, Any]) -> EvaluationCheckpoint:
+        initial_bindings = data.get("initial_bindings")
+        events_data = data.get("events")
+        suspended_at = data.get("suspended_at")
+        event_cursor = data.get("event_cursor")
+        if (
+            not isinstance(initial_bindings, Mapping)
+            or not isinstance(events_data, list)
+            or not isinstance(suspended_at, str)
+            or not suspended_at
+            or type(event_cursor) is not int
+            or event_cursor != len(events_data)
+        ):
+            raise EvaluationError("invalid Procedrr evaluation checkpoint")
+        events: list[EvaluationEvent] = []
+        for item in events_data:
+            if (
+                not isinstance(item, Mapping)
+                or not isinstance(item.get("kind"), str)
+                or not isinstance(item.get("path"), str)
+                or not isinstance(item.get("data", {}), Mapping)
+            ):
+                raise EvaluationError("invalid event in Procedrr checkpoint")
+            events.append(
+                EvaluationEvent(item["kind"], item["path"], dict(item.get("data", {})))
+            )
+        if not events or not any(
+            event.kind == "suspend" and event.path == suspended_at for event in events
+        ):
+            raise EvaluationError("checkpoint has no matching suspension event")
+        return cls(dict(initial_bindings), tuple(events), suspended_at, event_cursor)
 
 
 class Evaluator:
@@ -99,6 +180,11 @@ class Evaluator:
         self.command_catalog = command_catalog
         self.event_sink = event_sink
         self._schemas_by_state: dict[int, dict[str, Mapping[str, Any]]] = {}
+        self._replay_events: dict[tuple[str, str], EvaluationEvent] = {}
+        self._suspended_at: str | None = None
+        self._suspension_reason: str | None = None
+        self._resume_value: Any = None
+        self._resume_path: str | None = None
 
     @classmethod
     def with_workrr(
@@ -126,25 +212,66 @@ class Evaluator:
         self,
         document: Mapping[str, Any],
         bindings: Mapping[str, Any] | None = None,
+        *,
+        checkpoint: EvaluationCheckpoint | None = None,
+        resume_value: Any = None,
     ) -> EvaluationResult:
-        state = dict(bindings or {})
+        if checkpoint is not None and resume_value is None:
+            raise EvaluationError("resuming a checkpoint requires a resume value")
+        initial_bindings = (
+            dict(checkpoint.initial_bindings)
+            if checkpoint is not None
+            else dict(bindings or {})
+        )
+        state = dict(initial_bindings)
         self._schemas_by_state = {id(state): {}}
         self._document_recoveries = document.get("recoveries", {})
         events: _EventLog = _EventLog(self.event_sink)
-        usage = {"llm": 0, "tools": 0}
+        if checkpoint is not None:
+            list.extend(events, checkpoint.events)
+            self._replay_events = {
+                (event.kind, event.path): event for event in checkpoint.events
+            }
+            self._resume_value = resume_value
+            self._resume_path = checkpoint.suspended_at
+        else:
+            self._replay_events = {}
+            self._resume_value = None
+            self._resume_path = None
+        self._suspended_at = None
+        self._suspension_reason = None
+        usage = {
+            "llm": sum(event.kind == "judge" for event in events),
+            "tools": sum(event.kind == "operation" for event in events),
+        }
         limits = document.get("limits", {})
         try:
             self._steps(document["steps"], state, events, usage, limits, "steps")
         except _TerminalReached:
             pass
+        except _Suspended as suspended:
+            self._suspended_at = suspended.path
+            self._suspension_reason = suspended.reason
         except (KeyError, TypeError, ValueError, JsonSchemaError) as exc:
             raise EvaluationError(str(exc)) from exc
+        evaluation_checkpoint = (
+            EvaluationCheckpoint(
+                initial_bindings=initial_bindings,
+                events=tuple(events),
+                suspended_at=self._suspended_at,
+                event_cursor=len(events),
+            )
+            if self._suspended_at is not None
+            else None
+        )
         return EvaluationResult(
             state,
             tuple(events),
             usage["llm"],
             usage["tools"],
             dict(self._schemas_by_state[id(state)]),
+            self._suspended_at is not None,
+            evaluation_checkpoint,
         )
 
     def _schemas_for_state(self, state: dict[str, Any]) -> dict[str, Mapping[str, Any]]:
@@ -218,16 +345,30 @@ class Evaluator:
         bind = declaration.get("bind")
         if not isinstance(context, list) or not isinstance(bind, str):
             raise EvaluationError(f"{path}.specialize is malformed")
+        process_name = declaration.get("process", "generate-fragment")
+        if not isinstance(process_name, str) or not process_name:
+            raise EvaluationError(f"{path}.specialize.process must be a name")
+        process = self._load_process(process_name)
+        process_fingerprint = _fingerprint_document(process)
+        cached = self._replay_events.get(("specialize", path))
+        if cached is not None:
+            if cached.data.get("process_fingerprint") != process_fingerprint:
+                raise EvaluationError(
+                    f"{path}.specialize subprocess revision changed since checkpoint"
+                )
+            fragment = cached.data.get("fragment")
+            if not isinstance(fragment, Mapping):
+                raise EvaluationError(
+                    f"{path}.specialize checkpoint has no generated fragment"
+                )
+            state[bind] = dict(fragment)
+            return
         value_limit = _positive_limit(limits, "context_value_chars", 6000)
         context_data = {
             name: _compact_value(_resolve_binding(state, name), max_chars=value_limit)
             for name in context
         }
         allowed_tools = declaration.get("allowed_tools")
-        process_name = declaration.get("process", "generate-fragment")
-        if not isinstance(process_name, str) or not process_name:
-            raise EvaluationError(f"{path}.specialize.process must be a name")
-        process = self._load_process(process_name)
         maximum = declaration.get("max_steps", 64)
         if not isinstance(maximum, int) or maximum <= 0:
             raise EvaluationError(f"{path}.specialize.max_steps must be positive")
@@ -273,7 +414,12 @@ class Evaluator:
             EvaluationEvent(
                 "specialize",
                 path,
-                {"bind": bind, "name": fragment.get("name")},
+                {
+                    "bind": bind,
+                    "name": fragment.get("name"),
+                    "fragment": fragment,
+                    "process_fingerprint": process_fingerprint,
+                },
             )
         )
 
@@ -337,9 +483,39 @@ class Evaluator:
         if not isinstance(outputs, Mapping) or not outputs:
             raise EvaluationError(f"{path}.call.outputs is required")
         process = self._load_process(process_name)
+        process_fingerprint = _fingerprint_document(process)
         declared_outputs = process.get("outputs")
         if not isinstance(declared_outputs, Mapping) or not declared_outputs:
             raise EvaluationError(f"{path}.call process must declare named outputs")
+        cached = self._replay_events.get(("process", path))
+        if cached is not None:
+            if cached.data.get("process_fingerprint") != process_fingerprint:
+                raise EvaluationError(
+                    f"{path}.call process revision changed since checkpoint"
+                )
+            cached_outputs = cached.data.get("output_bindings")
+            if not isinstance(cached_outputs, Mapping):
+                raise EvaluationError(
+                    f"{path}.call checkpoint has no recorded output bindings"
+                )
+            if set(cached_outputs) != set(outputs):
+                raise EvaluationError(f"{path}.call checkpoint outputs do not match")
+            for name, child_reference in outputs.items():
+                if not isinstance(name, str) or not isinstance(child_reference, str):
+                    raise EvaluationError(f"{path}.call output mapping is malformed")
+                if child_reference not in declared_outputs:
+                    raise EvaluationError(
+                        f"{path}.call output is not declared by {process_name}: "
+                        f"{child_reference}"
+                    )
+                value = cached_outputs[name]
+                schema = declared_outputs[child_reference]
+                if isinstance(schema, Mapping):
+                    validate_json(value, schema)
+                state[name] = value
+                if isinstance(schema, Mapping):
+                    self._schemas_for_state(state)[name] = dict(schema)
+            return
         process_inputs = process.get("inputs", [])
         if not isinstance(process_inputs, list):
             raise EvaluationError(f"{path}.call process has malformed inputs")
@@ -434,7 +610,11 @@ class Evaluator:
                 path,
                 {
                     "name": process_name,
+                    "process_fingerprint": process_fingerprint,
                     "outputs": list(outputs),
+                    "output_bindings": {
+                        parent_name: state[parent_name] for parent_name in outputs
+                    },
                     "terminal_status": terminal_status,
                 },
             )
@@ -576,8 +756,6 @@ class Evaluator:
         tool = operation.get("tool")
         if not isinstance(tool, str):
             raise EvaluationError(f"{path}.operation.tool is required")
-        usage["tools"] += 1
-        self._limit(usage, limits, "tool_calls", "tool calls")
         raw_parameters = operation.get("parameters")
         if raw_parameters is None:
             raw_parameters = {
@@ -593,6 +771,81 @@ class Evaluator:
                 "command": _resolve_value(operation["command"], state),
                 **parameters,
             }
+        cached = self._replay_events.get(("operation", path))
+        suspended_reason: str | None
+        if cached is not None:
+            if cached.data.get("tool") != tool:
+                raise EvaluationError(f"{path}.operation differs from checkpoint")
+            replay_inputs = cached.data.get("replay_inputs")
+            if isinstance(replay_inputs, Mapping) and dict(replay_inputs) != dict(
+                parameters
+            ):
+                raise EvaluationError(
+                    f"{path}.operation inputs differ from checkpoint replay state"
+                )
+            result = cached.data.get("replay_output", cached.data.get("output"))
+            resumed = path == self._resume_path
+            if resumed:
+                if cached.data.get("resume_with_executor") is True:
+                    resume_parameters = dict(parameters)
+                    resume_parameters["__procedrr_resume__"] = {
+                        "value": self._resume_value,
+                        "data": cached.data.get("resume_data", {}),
+                    }
+                    try:
+                        result = self.operation_executor(tool, resume_parameters)
+                    except SuspendEvaluation as suspension:
+                        result = suspension.result
+                        suspended_reason = suspension.reason
+                        resume_data = suspension.resume_data
+                        resume_with_executor = suspension.resume_with_executor
+                    else:
+                        suspended_reason = None
+                        resume_data = {}
+                        resume_with_executor = False
+                else:
+                    result = self._resume_value
+                    suspended_reason = None
+                    resume_data = {}
+                    resume_with_executor = False
+                returns = operation.get("returns")
+                if isinstance(returns, Mapping):
+                    validate_json(result, returns)
+                bind = operation.get("bind")
+                if isinstance(bind, str):
+                    state[bind] = result
+                    if isinstance(returns, Mapping):
+                        self._schemas_for_state(state)[bind] = dict(returns)
+                events.append(
+                    EvaluationEvent(
+                        "resume",
+                        path,
+                        {
+                            "output": _compact_value(result, max_chars=12000),
+                            "suspended": suspended_reason is not None,
+                        },
+                    )
+                )
+                if suspended_reason is not None:
+                    events.append(
+                        EvaluationEvent(
+                            "suspend",
+                            path,
+                            {"reason": suspended_reason},
+                        )
+                    )
+                    raise _Suspended(path, suspended_reason)
+            else:
+                returns = operation.get("returns")
+                if isinstance(returns, Mapping):
+                    validate_json(result, returns)
+                if isinstance((bind := operation.get("bind")), str):
+                    state[bind] = result
+                    if isinstance(returns, Mapping):
+                        self._schemas_for_state(state)[bind] = dict(returns)
+            return
+        usage["tools"] += 1
+        self._limit(usage, limits, "tool_calls", "tool calls")
         if self.command_catalog is not None and tool == "internal":
             command = (
                 parameters.get("command") if isinstance(parameters, Mapping) else None
@@ -617,7 +870,17 @@ class Evaluator:
                     )
                 except ValueError as exc:
                     raise EvaluationError(str(exc)) from exc
-        result = self.operation_executor(tool, parameters)
+        try:
+            result = self.operation_executor(tool, parameters)
+        except SuspendEvaluation as suspension:
+            result = suspension.result
+            suspended_reason = suspension.reason
+            resume_data = suspension.resume_data
+            resume_with_executor = suspension.resume_with_executor
+        else:
+            suspended_reason = None
+            resume_data = {}
+            resume_with_executor = False
         returns = operation.get("returns")
         output_schema = returns if isinstance(returns, Mapping) else None
         if isinstance(output_schema, Mapping):
@@ -635,10 +898,19 @@ class Evaluator:
                     "tool": tool,
                     "bind": bind,
                     "inputs": _compact_value(dict(parameters), max_chars=12000),
+                    "replay_inputs": dict(parameters),
                     "output": _compact_value(result, max_chars=12000),
+                    "replay_output": result,
+                    "resume_data": resume_data,
+                    "resume_with_executor": resume_with_executor,
                 },
             )
         )
+        if suspended_reason is not None:
+            events.append(
+                EvaluationEvent("suspend", path, {"reason": suspended_reason})
+            )
+            raise _Suspended(path, suspended_reason)
 
     def _judge(
         self,
@@ -649,6 +921,18 @@ class Evaluator:
         limits: Mapping[str, Any],
         path: str,
     ) -> None:
+        cached = self._replay_events.get(("judge", path))
+        if cached is not None:
+            output_name = cached.data.get("output")
+            output = cached.data.get("value")
+            if not isinstance(output_name, str):
+                raise EvaluationError(f"{path}.judge checkpoint is malformed")
+            validate_json(output, judge["output"]["schema"])
+            state[output_name] = output
+            self._schemas_for_state(state)[output_name] = dict(
+                judge["output"]["schema"]
+            )
+            return
         context = judge.get("context", [])
         if not isinstance(context, list):
             raise EvaluationError(f"{path}.judge.context must be a list")
@@ -734,6 +1018,7 @@ class Evaluator:
                     # validation can inspect classification and contract
                     # quality, rather than checking only final artifacts.
                     "value": output,
+                    "replay_value": output,
                     "messages": messages,
                     "context_metrics": {
                         "raw_chars": sum(raw_binding_chars.values()),
@@ -952,6 +1237,13 @@ def _judge_only_steps(steps: Sequence[Any]) -> bool:
     return bool(steps) and all(
         isinstance(step, Mapping) and set(step) == {"judge"} for step in steps
     )
+
+
+def _fingerprint_document(document: Mapping[str, Any]) -> str:
+    canonical = json.dumps(
+        document, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _resolve_binding(state: Mapping[str, Any], path: str) -> Any:

@@ -1,11 +1,12 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1010
-title: Add the shared Procedrr runtime foundation
+title: Migrate workflow runtime to Procedrr
 intent:
-  problem: The Procedrr evaluator had no shared catalog or caller-facing execution
-    contract, and the feature endpoint invoked evaluator control flow directly.
-  goal: Add typed process identity, input validation, execution events, and terminal
-    outcomes as the foundation for migrating workflow callers.
+  problem: Workflow chat and durable tasks still depended on legacy skill definitions
+    and parallel step interpreters.
+  goal: Route supported workflow behavior through the Procedrr catalog and shared
+    evaluator, persist durable task execution state, and remove the checked-in legacy
+    definition catalog and validation entry points.
 human-decisions: []
 structured_files: []
 files:
@@ -1110,6 +1111,434 @@ files:
     end_line: 3911
   summary: Update CLI tests for the process directory option
   rationale: Verify workflow chat uses the Procedrr command interface.
+- path: .github/workflows/ci.yml
+  type: modified
+  span:
+    start_line: 1
+    end_line: 83
+  summary: Validate the Procedrr process catalog in CI
+  rationale: Make the migrated process definitions the CI validation target.
+- path: delivery-profiles/default-software-delivery.yaml
+  type: modified
+  span:
+    start_line: 1
+    end_line: 152
+  summary: Reference Procedrr processes in the default delivery profile
+  rationale: Keep profile-backed task references consistent with the process catalog.
+- path: docs/archive/legacy-workflow-language/static-workflow-liveness-analysis.md
+  type: modified
+  span:
+    start_line: 1
+    end_line: 513
+  summary: Archive the retired legacy workflow plan static-workflow-liveness-analysis.md
+  rationale: Keep historical design details discoverable without presenting them as current guidance.
+- path: docs/archive/legacy-workflow-language/workflow-definition-iteration.md
+  type: modified
+  span:
+    start_line: 1
+    end_line: 844
+  summary: Archive the retired legacy workflow plan workflow-definition-iteration.md
+  rationale: Keep historical design details discoverable without presenting them as current guidance.
+- path: docs/design/single-decision-feature-development.md
+  type: modified
+  span:
+    start_line: 1
+    end_line: 970
+  summary: Update single-decision-feature-development.md for Procedrr workflows
+  rationale: Keep active workflow guidance aligned with the migrated process catalog.
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span:
+    start_line: 1
+    end_line: 689
+  summary: Update bootstrap-validation-discovery.md for Procedrr workflows
+  rationale: Keep active workflow guidance aligned with the migrated process catalog.
+- path: docs/plans/llm-execution-language-safety-implementation.md
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1194
+  summary: Update llm-execution-language-safety-implementation.md for Procedrr workflows
+  rationale: Keep active workflow guidance aligned with the migrated process catalog.
+- path: docs/procedrr/processes/durable-task.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 50
+  summary: Update durable-task.yaml for Procedrr workflows
+  rationale: Keep active workflow guidance aligned with the migrated process catalog.
+- path: scripts/live-implement-feature-smoke.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 273
+  summary: Use the Procedrr process catalog in live-implement-feature-smoke.py
+  rationale: Keep smoke and scenario tooling on the migrated workflow runtime.
+- path: scripts/start-implementing-feature-harness.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 701
+  summary: Use the Procedrr process catalog in start-implementing-feature-harness.py
+  rationale: Keep smoke and scenario tooling on the migrated workflow runtime.
+- path: scripts/workflow-task-error-harness.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1137
+  summary: Use the Procedrr process catalog in workflow-task-error-harness.py
+  rationale: Keep smoke and scenario tooling on the migrated workflow runtime.
+- path: skill-definitions/address-review-comments.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 127
+  summary: Remove legacy workflow definition address-review-comments
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/adversarial-pr-review.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 190
+  summary: Remove legacy workflow definition adversarial-pr-review
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/bootstrap-code-structure.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 196
+  summary: Remove legacy workflow definition bootstrap-code-structure
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/create-pull-request.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 216
+  summary: Remove legacy workflow definition create-pull-request
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/dead-code-review.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 173
+  summary: Remove legacy workflow definition dead-code-review
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/design-interview.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 619
+  summary: Remove legacy workflow definition design-interview
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/feature-functionality-review.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 136
+  summary: Remove legacy workflow definition feature-functionality-review
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/feature-test-coverage-review.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 120
+  summary: Remove legacy workflow definition feature-test-coverage-review
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/finish-pr-prep.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 140
+  summary: Remove legacy workflow definition finish-pr-prep
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/fix-ci-failures.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 177
+  summary: Remove legacy workflow definition fix-ci-failures
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/fix-merge-conflicts.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 226
+  summary: Remove legacy workflow definition fix-merge-conflicts
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/handle-ad-hoc.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 26
+  summary: Remove legacy workflow definition handle-ad-hoc
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/independent-skill-workflow-review.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 33
+  summary: Remove legacy workflow definition independent-skill-workflow-review
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/review-architecture.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 110
+  summary: Remove legacy workflow definition review-architecture
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/review-skill-workflow.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 219
+  summary: Remove legacy workflow definition review-skill-workflow
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/review-system.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 110
+  summary: Remove legacy workflow definition review-system
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/run-tests-and-fix.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 240
+  summary: Remove legacy workflow definition run-tests-and-fix
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/security-review.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 236
+  summary: Remove legacy workflow definition security-review
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/spec-v1-design-review.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 336
+  summary: Remove legacy workflow definition spec-v1-design-review
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/specify-a-feature.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 109
+  summary: Remove legacy workflow definition specify-a-feature
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/specify-architecture.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 110
+  summary: Remove legacy workflow definition specify-architecture
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/specify-implementation.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 105
+  summary: Remove legacy workflow definition specify-implementation
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/specify-system.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 98
+  summary: Remove legacy workflow definition specify-system
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: skill-definitions/start-implementing-feature.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 915
+  summary: Remove legacy workflow definition start-implementing-feature
+  rationale: Its supported workflow is represented in the Procedrr process catalog.
+- path: src/powdrr_lift/core/delivery_profile.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1087
+  summary: Migrate delivery_profile.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/core/spec_paths.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 165
+  summary: Migrate spec_paths.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/execution/compile.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 159
+  summary: Migrate compile.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/process/compiler.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1702
+  summary: Migrate compiler.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/process/model.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 3282
+  summary: Migrate model.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/process/tasks.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1403
+  summary: Migrate tasks.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/process/templates.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1489
+  summary: Migrate templates.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/workrr/chat_agent.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 2926
+  summary: Migrate chat_agent.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/workrr/chat_selection.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 343
+  summary: Migrate chat_selection.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/workrr/chat_transport.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 835
+  summary: Migrate chat_transport.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/workrr/feature_run.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 411
+  summary: Migrate feature_run.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1478
+  summary: Migrate scenario.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 5320
+  summary: Migrate task_agent.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 549
+  summary: Migrate task_scenario.py workflow handling to Procedrr
+  rationale: Remove legacy definition dependencies and persist process identity and execution state.
+- path: templates/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 1
+    end_line: 413
+  summary: Declare Procedrr processes in execute-proposed-pr.yaml
+  rationale: Ensure generated durable tasks reference process ids and authorized process operations.
+- path: templates/fully-review-pr.yaml
+  type: modified
+  span:
+    start_line: 1
+    end_line: 77
+  summary: Declare Procedrr processes in fully-review-pr.yaml
+  rationale: Ensure generated durable tasks reference process ids and authorized process operations.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 1
+    end_line: 64
+  summary: Update golden-python-symbols.yaml for the Procedrr migration
+  rationale: Keep regression coverage aligned with the process catalog and durable task runtime.
+- path: tests/test_agent_feature_run.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 95
+  summary: Update test_agent_feature_run.py for the Procedrr migration
+  rationale: Keep regression coverage aligned with the process catalog and durable task runtime.
+- path: tests/test_skill_specification.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 937
+  summary: Update test_skill_specification.py for the Procedrr migration
+  rationale: Keep regression coverage aligned with the process catalog and durable task runtime.
+- path: tests/test_workflow_chat_ui.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1374
+  summary: Update test_workflow_chat_ui.py for the Procedrr migration
+  rationale: Keep regression coverage aligned with the process catalog and durable task runtime.
+- path: tests/test_workflow_definition_analysis.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 804
+  summary: Update test_workflow_definition_analysis.py for the Procedrr migration
+  rationale: Keep regression coverage aligned with the process catalog and durable task runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 2101
+  summary: Update test_workflow_task_agent.py for the Procedrr migration
+  rationale: Keep regression coverage aligned with the process catalog and durable task runtime.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 453
+  summary: Update test_workflow_task_scenario.py for the Procedrr migration
+  rationale: Keep regression coverage aligned with the process catalog and durable task runtime.
+- path: tests/test_workflow_task_specification.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 738
+  summary: Update test_workflow_task_specification.py for the Procedrr migration
+  rationale: Keep regression coverage aligned with the process catalog and durable task runtime.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 707
+  summary: Update test_workflow_template_specification.py for the Procedrr migration
+  rationale: Keep regression coverage aligned with the process catalog and durable task runtime.
+- path: workflow-evals/scenarios/execute-proposed-pr/human-handoff.yaml
+  type: modified
+  span:
+    start_line: 1
+    end_line: 24
+  summary: Update the durable-task handoff fixture for Procedrr operations
+  rationale: Exercise the task handoff checkpoint contract through the current process runtime.
+
 entities:
 - id: procedrr-process-catalog
   type: Module

@@ -48,7 +48,6 @@ from powdrr_lift.process.model import (
     SkillStepRequiredAction,
     SkillToolInvocation,
     SkillUsesSkill,
-    load_skill,
     save_skill,
 )
 from powdrr_lift.test_failure_packet import build_test_failure_packet
@@ -120,6 +119,7 @@ from powdrr_lift.workrr.chat_contract import (
 from powdrr_lift.workrr.chat_io import _prompt_user
 from powdrr_lift.workrr.chat_selection import (
     SkillChatConfig,
+    WorkflowChatConfig,
     _build_selection_messages,
     _catalog_entry_to_data,
     _resolve_skill_path,
@@ -2529,7 +2529,7 @@ def test_oversized_context_uses_long_context_backup_model(
         provider="zai",
         parser=lambda payload: payload,
         repair_instructions="",
-        config=SkillChatConfig(skills_dir=Path("skills")),
+        config=SkillChatConfig(processes_dir=Path("skills")),
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
@@ -2576,7 +2576,7 @@ def test_repeated_invalid_response_switches_to_backup_model() -> None:
             RuntimeError("types must be an array")
         ),
         repair_instructions='Return an action with a "types" array.',
-        config=SkillChatConfig(skills_dir=Path("skills")),
+        config=SkillChatConfig(processes_dir=Path("skills")),
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
@@ -3019,7 +3019,7 @@ def test_model_unavailable_uses_backup_model_without_prompting() -> None:
         provider="zai",
         parser=lambda payload: payload,
         repair_instructions="",
-        config=SkillChatConfig(skills_dir=Path("skills")),
+        config=SkillChatConfig(processes_dir=Path("skills")),
         input_func=lambda: "abort",
         stdout=io.StringIO(),
         stderr=io.StringIO(),
@@ -3067,7 +3067,7 @@ def test_repeated_timeouts_use_backup_model_after_retries() -> None:
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
-            skills_dir=Path("skills"),
+            processes_dir=Path("skills"),
             provider_retry_attempts=2,
             provider_retry_delay_seconds=0,
         ),
@@ -3122,7 +3122,7 @@ def test_timeout_followed_by_other_transient_errors_uses_backup_model() -> None:
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
-            skills_dir=Path("skills"),
+            processes_dir=Path("skills"),
             provider_retry_attempts=2,
             provider_retry_delay_seconds=0,
         ),
@@ -3174,7 +3174,7 @@ def test_repeated_rate_limits_use_backup_model_after_retries() -> None:
         parser=lambda payload: payload,
         repair_instructions="",
         config=SkillChatConfig(
-            skills_dir=Path("skills"),
+            processes_dir=Path("skills"),
             provider_retry_attempts=3,
             provider_retry_delay_seconds=0,
         ),
@@ -3600,7 +3600,7 @@ def test_cli_workflow_chat_wires_configuration(
     repo_root.mkdir()
     captured: dict[str, object] = {"messages": []}
 
-    def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
+    def _fake_run_workflow_chat(config: WorkflowChatConfig, **kwargs: object) -> int:
         captured["config"] = config
         return 0
 
@@ -3624,9 +3624,9 @@ def test_cli_workflow_chat_wires_configuration(
 
     assert exit_code == 0
     config = captured["config"]
-    assert isinstance(config, SkillChatConfig)
+    assert isinstance(config, WorkflowChatConfig)
     assert config.repo_root == repo_root
-    assert config.skills_dir == Path("procedrr-processes")
+    assert config.processes_dir == Path("procedrr-processes")
     assert config.templates_dir == Path("procedrr-processes")
     assert config.output_dir == Path("generated")
     assert config.model == "test-model"
@@ -3716,7 +3716,7 @@ def test_workflow_execution_terminalizes_unrepairable_actions(
     progress_statuses: list[str] = []
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=tmp_path / "generated",
             provider="openai",
@@ -3814,7 +3814,7 @@ def test_workflow_execution_retries_stalled_step_with_clean_context(
     stderr = io.StringIO()
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=tmp_path / "generated",
             provider="openai",
@@ -3866,7 +3866,7 @@ def test_cli_workflow_chat_defaults_to_glm_5_2(
     repo_root.mkdir()
     captured: dict[str, object] = {"messages": []}
 
-    def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
+    def _fake_run_workflow_chat(config: WorkflowChatConfig, **kwargs: object) -> int:
         captured["config"] = config
         return 0
 
@@ -3884,7 +3884,7 @@ def test_cli_workflow_chat_defaults_to_glm_5_2(
 
     assert exit_code == 0
     config = captured["config"]
-    assert isinstance(config, SkillChatConfig)
+    assert isinstance(config, WorkflowChatConfig)
     assert config.model == "glm-5.2"
 
 
@@ -3896,7 +3896,7 @@ def test_cli_workflow_chat_wires_verbose_flag(
     repo_root.mkdir()
     captured: dict[str, object] = {"messages": []}
 
-    def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
+    def _fake_run_workflow_chat(config: WorkflowChatConfig, **kwargs: object) -> int:
         captured["config"] = config
         return 0
 
@@ -3915,7 +3915,7 @@ def test_cli_workflow_chat_wires_verbose_flag(
 
     assert exit_code == 0
     config = captured["config"]
-    assert isinstance(config, SkillChatConfig)
+    assert isinstance(config, WorkflowChatConfig)
     assert config.repo_root == repo_root
     assert config.verbose is True
 
@@ -3985,7 +3985,7 @@ def test_run_workflow_chat_generates_skill_summary(
 
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=output_dir,
             api_key="test-key",
@@ -4070,7 +4070,7 @@ def test_workflow_chat_runs_declared_nested_skill_in_same_worktree(
 
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=Path("generated"),
             api_key="test-key",
@@ -4260,7 +4260,7 @@ def test_read_document_action_returns_requested_lines_as_next_context(
             io.StringIO(),
             io.StringIO(),
             lambda: "",
-            SkillChatConfig(skills_dir=Path("skill-definitions")),
+            SkillChatConfig(processes_dir=Path("skill-definitions")),
         )
         is True
     )
@@ -4307,7 +4307,7 @@ def test_read_document_action_clamps_range_past_end_of_short_document(
             io.StringIO(),
             io.StringIO(),
             lambda: "",
-            SkillChatConfig(skills_dir=Path("skill-definitions")),
+            SkillChatConfig(processes_dir=Path("skill-definitions")),
         )
         is True
     )
@@ -4349,7 +4349,7 @@ def test_read_document_action_accepts_zero_to_max_lines_range(
             io.StringIO(),
             io.StringIO(),
             lambda: "",
-            SkillChatConfig(skills_dir=Path("skill-definitions")),
+            SkillChatConfig(processes_dir=Path("skill-definitions")),
         )
         is True
     )
@@ -4393,7 +4393,7 @@ def test_read_document_action_clamps_overlapping_range_and_reports_continuation(
             io.StringIO(),
             io.StringIO(),
             lambda: "",
-            SkillChatConfig(skills_dir=Path("skill-definitions")),
+            SkillChatConfig(processes_dir=Path("skill-definitions")),
         )
         is True
     )
@@ -4436,7 +4436,7 @@ def test_read_document_missing_file_lists_directory_files(
             io.StringIO(),
             io.StringIO(),
             lambda: "",
-            SkillChatConfig(skills_dir=Path("skill-definitions")),
+            SkillChatConfig(processes_dir=Path("skill-definitions")),
         )
 
 
@@ -4467,7 +4467,7 @@ def test_file_management_action_renames_and_records_result(tmp_path: Path) -> No
             io.StringIO(),
             io.StringIO(),
             lambda: "",
-            SkillChatConfig(skills_dir=Path("skill-definitions")),
+            SkillChatConfig(processes_dir=Path("skill-definitions")),
         )
         is True
     )
@@ -4504,7 +4504,7 @@ def test_file_management_delete_accepts_either_path_field(
             io.StringIO(),
             io.StringIO(),
             lambda: "",
-            SkillChatConfig(skills_dir=Path("skill-definitions")),
+            SkillChatConfig(processes_dir=Path("skill-definitions")),
         )
         is True
     )
@@ -4703,7 +4703,7 @@ def test_run_workflow_chat_gathers_context_into_follow_up_step(
 
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=Path("generated"),
             api_key="test-key",
@@ -4921,7 +4921,7 @@ def test_run_workflow_chat_surfaces_current_file_context_for_edit_actions(
 
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=Path("generated"),
             api_key="test-key",
@@ -5295,7 +5295,7 @@ def test_edit_action_can_update_multiple_files_in_one_response(
         io.StringIO(),
         io.StringIO(),
         lambda: "",
-        SkillChatConfig(skills_dir=tmp_path),
+        SkillChatConfig(processes_dir=tmp_path),
     )
 
     assert first_path.read_text(encoding="utf-8") == "updated first\n"
@@ -5527,7 +5527,7 @@ def test_edit_action_normalizes_fenced_json_before_validation(tmp_path: Path) ->
         io.StringIO(),
         io.StringIO(),
         lambda: "",
-        SkillChatConfig(skills_dir=tmp_path),
+        SkillChatConfig(processes_dir=tmp_path),
     )
 
     assert json.loads(json_path.read_text(encoding="utf-8")) == {"name": "corrected"}
@@ -5565,7 +5565,7 @@ def test_edit_action_rejects_invalid_json_before_writing(tmp_path: Path) -> None
             io.StringIO(),
             io.StringIO(),
             lambda: "",
-            SkillChatConfig(skills_dir=tmp_path),
+            SkillChatConfig(processes_dir=tmp_path),
         )
 
     assert json_path.read_text(encoding="utf-8") == '{"name": "original"}\n'
@@ -5673,7 +5673,7 @@ def test_workflow_edit_failure_is_sent_back_to_llm_for_correction(
     stderr = io.StringIO()
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=Path("generated"),
             api_key="test-key",
@@ -5793,7 +5793,7 @@ def test_workflow_fuzzy_match_failure_is_sent_back_to_llm_for_correction(
     stderr = io.StringIO()
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=Path("generated"),
             api_key="test-key",
@@ -5880,7 +5880,7 @@ def test_run_workflow_chat_verbose_prints_progress(
 
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=output_dir,
             api_key="test-key",
@@ -5968,7 +5968,7 @@ def test_run_workflow_chat_prints_selection_follow_up_question(
     stderr = io.StringIO()
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=tmp_path / "generated",
             api_key="test-key",
@@ -6054,7 +6054,7 @@ def test_run_workflow_chat_uses_anthropic_provider(
 
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=output_dir,
             provider="anthropic",
@@ -6136,7 +6136,7 @@ def test_run_workflow_chat_uses_zai_provider_for_glm_models(
 
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=output_dir,
             model="glm-5.2",
@@ -6227,7 +6227,7 @@ def test_run_workflow_chat_prompts_for_retry_on_provider_failure(
 
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=Path("generated"),
             api_key="test-key",
@@ -6324,7 +6324,7 @@ def test_run_workflow_chat_repairs_missing_action_fields(
 
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=Path("generated"),
             api_key="test-key",
@@ -6405,7 +6405,7 @@ def test_empty_prompt_user_action_is_reprompted_until_question_is_present(
     stderr = io.StringIO()
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=Path("generated"),
             api_key="test-key",
@@ -6478,7 +6478,7 @@ def test_workflow_action_repair_retries_empty_provider_response_automatically(
     stderr = io.StringIO()
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=Path("generated"),
             api_key="test-key",
@@ -6628,11 +6628,11 @@ def test_selection_context_lists_matched_existing_specification_documents(
     ) == tuple(payload["work_item_context"]["documents"]["interaction-file-log"])
 
 
-def test_catalog_entry_to_data_includes_structured_tool_invocations() -> None:
-    skill_path = (
-        Path(__file__).resolve().parents[1] / "skill-definitions" / "review-system.yaml"
-    )
-    skill = load_skill(skill_path)
+def test_catalog_entry_to_data_includes_structured_tool_invocations(
+    tmp_path: Path,
+) -> None:
+    skill_path = tmp_path / "review-system.yaml"
+    skill = _build_skill()
     data = _catalog_entry_to_data(
         SkillCatalogEntry(path=skill_path, skill=skill),
     )
@@ -6754,7 +6754,7 @@ def test_run_workflow_chat_executes_shell_tool_actions(
 
     exit_code = run_workflow_chat(
         SkillChatConfig(
-            skills_dir=skills_dir,
+            processes_dir=skills_dir,
             repo_root=repo_root,
             output_dir=output_dir,
             api_key="test-key",

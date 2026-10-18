@@ -90,8 +90,8 @@ from powdrr_lift.workrr.chat_io import (
     _write_agent_error,
 )
 from powdrr_lift.workrr.chat_selection import (
+    SkillChatConfig,
     SkillChatSelection,
-    WorkflowChatConfig,
     _active_llm_mappings,
     _build_selection_messages,
     _parse_selection_response,
@@ -245,7 +245,7 @@ class _ChatActionProgressStrategy(WorkflowActionProgressStrategy[SkillChatAction
 class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     """Interactive adapter around the shared action-roundtrip driver."""
 
-    config: WorkflowChatConfig
+    config: SkillChatConfig
     selection: SkillChatSelection
     catalog: tuple[SkillCatalogEntry, ...]
     workflow_context: WorkflowContext | None
@@ -1835,7 +1835,7 @@ class _WorkflowProgressDisplay:
 
 
 def run_workflow_chat(
-    config: WorkflowChatConfig,
+    config: SkillChatConfig,
     *,
     input_func: Callable[[], str] = input,
     stdout: TextIO = sys.stdout,

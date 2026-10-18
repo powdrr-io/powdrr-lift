@@ -385,13 +385,13 @@ task_templates:
 - description: Finish pull request preparation
   phase_type: publish_pr
   persona_id: engineering-manager
-  actions: [invoke_skill]
+  actions: [task_run_process]
   step_type: governed
   complexity: medium
   assignee_type: agent
   assignee_role: reviewer
   llm_type: fast_iteration
-  uses_skills:
+  uses_processes:
   - finish-pr-prep
   input_state:
     proposed_pr_context: <upstream-task-0>.proposed-pr-context-state
@@ -404,14 +404,10 @@ task_templates:
     promoted_documents: <upstream-task-10>.promoted-current-state-documents
     staged_changes: <upstream-task-11>.staged-pull-request-state
   details: >-
-    The listed finish-pr-prep skill runs automatically because it is declared
-    in uses_skills. Do not return invoke_skill for it; doing so is recursive and
-    will be rejected. Do not independently edit, stage, commit, push, or create
-    a pull request here; the attached skill owns its validation operations.
-    After the attached skill returns, pass its complete evidence to the next
-    workflow boundary with a separate next_step action,
-    for example:
-    {"action":"next_step","output_state":{"pull-request-prep-state":{"checks":[],"files_to_publish":[]}},"decisions_and_context":"finish-pr-prep completed with the recorded validation evidence."}
+    Run the declared finish-pr-prep process through task_run_process. Do not
+    independently edit, stage, commit, push, or create a pull request here; the
+    process owns its validation operations. Pass its complete evidence to the
+    next workflow boundary in the declared output state.
   output_state_type: pull-request-prep-state
   dependent_state:
   - pull-request-prep-complete

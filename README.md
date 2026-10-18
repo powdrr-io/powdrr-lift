@@ -224,6 +224,31 @@ branch, and retained worktree; run artifacts and worktrees are stored under the
 repository's common Git directory in `powdrr-lift/runs/` and
 `powdrr-lift/worktrees/`.
 
+To inspect the Powdrr artifacts recorded at a specific commit, request the full
+JSON inventory with its containing branch and commit SHA:
+
+```bash
+powdrr-lift artifact-state --repo-root . --branch main --sha <commit-sha>
+```
+
+The report combines the Structrr bootstrap with later changelog entity changes,
+and lists plans, their attached published workflows, workflow task states, and
+changelogs from that commit. When `gh` is authenticated, it also includes live
+GitHub pull request matches for each plan; those PR statuses are observed at
+query time. Use `--no-github` to omit live GitHub data. To return only selected
+areas, add one or more of `--bootstrap`, `--entities`, `--relationships`,
+`--workflows`, `--plans`, `--changelogs`, or `--pull-requests`. For example:
+
+```bash
+powdrr-lift artifact-state --repo-root . --branch main --sha <commit-sha> \
+  --plans --workflows
+```
+
+With no area flags, the command returns the full inventory. Plan results include
+attached workflow and publication details; live plan pull request counts are
+included when GitHub lookup is enabled, even when the pull request area is not
+selected.
+
 Implementation is limited to the repository by default. Use repeated
 `--allowed-path` options to narrow it, for example `--allowed-path src
 --allowed-path tests`. If the request leaves behavior undefined, headless mode

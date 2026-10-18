@@ -25,32 +25,33 @@ items:
     scope: [src/foundation, tests/test_foundation.py]
     acceptance_criteria: [Foundation behavior is covered by focused tests.]
     dependencies: []
-    workflow_directory: docs/workflows/feature-key/foundational-change
+    workflow_file: docs/workflows/feature-key/foundational-change.yaml
     workflow_id: foundational-change
 ```
 
 Every item must have a unique stable ID, objective, scope, acceptance criteria,
-and an existing durable workflow. Dependencies must name items in the same
+and an existing workflow definition. Dependencies must name items in the same
 plan and form an acyclic graph. Publish only after the plan review PR merges;
 the publisher pins each issue to that merge commit.
 
 `powdrr-lift plan` analyzes a Markdown proposal and writes a candidate document
-using this schema. For every item, it also writes
-`docs/proposals/<workflow-id>/plan-item.yaml` and instantiates the built-in
-`execute-proposed-pr` workflow template into
-`docs/workflows/<plan-id>/<workflow-id>/`. Each workflow directory contains its
-task YAML files and workflow metadata. The item points to that generated
-directory and workflow ID. Reviewers can edit the plan, context, and workflow
-files before merging them together. The command creates a unique branch, commits
-only the generated plan files, pushes it, and opens a pull request against the
-current branch. Other staged changes are excluded from the plan commit. The
-command does not create GitHub issues or execute work, and it refuses to
-overwrite existing generated artifacts.
+using this schema. For every item, it writes one small workflow definition at
+`docs/workflows/<plan-id>/<workflow-id>.yaml`. The definition names the packaged
+`execute-proposed-pr` template and records only its parameters, such as the
+proposed PR ID and verification command. The reviewed plan remains the source
+for the item's objective, scope, acceptance criteria, and dependencies. The
+worker reads the definition and materializes the packaged task workflow when it
+claims the issue. Reviewers can revise the plan decomposition and template
+parameters in the PR. The command creates a unique branch, commits only the
+generated plan and workflow definitions, pushes it, and opens a pull request
+against the current branch. Other staged changes are excluded from the plan
+commit. The command does not create GitHub issues or execute work, and it
+refuses to overwrite existing generated artifacts.
 
 The caller supplies the repository validation command because generated PR
 workflows use it as their implementation-loop gate. The workflow's first task
-receives the structured plan item directly; it does not rediscover or reinterpret
-the proposal.
+receives the structured plan item from the pinned plan; it does not rediscover or
+reinterpret the proposal.
 
 ```sh
 powdrr-lift plan \

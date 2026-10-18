@@ -332,7 +332,13 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) 
         assert Path(repo_root) == root
         return plan()
 
-    def run_task(_directory: Path, workflow_id: str, _worker_id: str) -> int:
+    def run_task(
+        _directory: Path,
+        workflow_id: str,
+        _worker_id: str,
+        _item: PlannedWorkItem,
+        _plan: ReviewedExecutionPlan,
+    ) -> int:
         executed.append(workflow_id)
         return 0
 
@@ -378,6 +384,63 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) 
     assert executed == ["base", "followup"]
 
 
+def test_worker_accepts_one_file_workflow_definition(tmp_path: Path) -> None:
+    workflow_file = tmp_path / "docs/workflows/feature-v1/base.yaml"
+    workflow_file.parent.mkdir(parents=True)
+    workflow_file.write_text("template: execute-proposed-pr\n", encoding="utf-8")
+    reviewed_plan = ReviewedExecutionPlan(
+        "feature-v1",
+        (
+            PlannedWorkItem(
+                "base",
+                "Base work",
+                "Add the shared base.",
+                ("src/base.py",),
+                ("Base behavior is covered.",),
+                (),
+                None,
+                "base",
+                "docs/workflows/feature-v1/base.yaml",
+            ),
+        ),
+    )
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=reviewed_plan,
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    observed: list[Path] = []
+
+    def load_plan(
+        _path: str, _commit: str, *, repo_root: str | Path
+    ) -> ReviewedExecutionPlan:
+        assert Path(repo_root) == tmp_path
+        return reviewed_plan
+
+    def run_task(
+        path: Path,
+        _workflow_id: str,
+        _worker_id: str,
+        _item: PlannedWorkItem,
+        _plan: ReviewedExecutionPlan,
+    ) -> int:
+        observed.append(path)
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-a",
+        run_task=run_task,
+        plan_loader=load_plan,
+    )
+
+    assert report.outcome == "awaiting_review"
+    assert observed == [workflow_file]
+
+
 def test_worker_marks_failed_execution_blocked(tmp_path: Path) -> None:
     (tmp_path / "docs/workflows/base").mkdir(parents=True)
     client = FakeIssueClient()
@@ -398,7 +461,7 @@ def test_worker_marks_failed_execution_blocked(tmp_path: Path) -> None:
         client=client,  # type: ignore[arg-type]
         repo_root=tmp_path,
         worker_id="worker-a",
-        run_task=lambda _directory, _workflow_id, _worker_id: 1,
+        run_task=lambda _directory, _workflow_id, _worker_id, _item, _plan: 1,
         plan_loader=load_plan,
     )
     assert report.outcome == "blocked"

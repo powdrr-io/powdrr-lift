@@ -94,15 +94,16 @@ def checkpoint_candidate_changes(
             f"{list(unexpected_staged)}"
         )
 
+    staged_paths = set(staged_before)
     if product_paths:
-        _git_run(runner, root_path, ["add", "-A", "--", *product_paths])
+        staged_paths.update(_stage_product_paths(runner, root_path, product_paths))
     staged_after = _git_paths(
         runner, root_path, ["diff", "--cached", "--name-only", "-z", "--no-renames"]
     )
-    if set(staged_after) != set(product_paths):
+    if set(staged_after) != staged_paths:
         raise ValueError(
             "staged candidate paths do not match the validated product paths: "
-            f"expected={list(product_paths)}, staged={list(staged_after)}"
+            f"expected={sorted(staged_paths)}, staged={list(staged_after)}"
         )
 
     if staged_after:
@@ -168,6 +169,50 @@ def _status_paths(runner: Runner, root: Path) -> tuple[str, ...]:
             raise ValueError("Git returned malformed porcelain status output")
         paths.add(record[3:].decode("utf-8", errors="surrogateescape"))
     return tuple(sorted(paths))
+
+
+def _stage_product_paths(
+    runner: Runner, root: Path, product_paths: Sequence[str]
+) -> tuple[str, ...]:
+    """Stage validated paths while tolerating untracked files removed meanwhile.
+
+    Candidate validation and checkpointing are separate phases. A path reported
+    by Git can disappear between them (for example, when an agent renames a
+    generated file). Stage existing paths individually, stage tracked deletions
+    directly in the index, and ignore paths that were untracked and have since
+    disappeared.
+    """
+    indexed_paths = set(
+        _git_paths(runner, root, ["ls-files", "-z", "--", *product_paths])
+    )
+    staged: list[str] = []
+    for path in product_paths:
+        path_in_root = root / path
+        if path_in_root.exists() or path_in_root.is_symlink():
+            try:
+                _git_run(runner, root, ["add", "-A", "--", f":(literal){path}"])
+            except ValueError:
+                # If the path vanished after the filesystem check, re-evaluate
+                # it as a deletion or a stale untracked path.
+                if path_in_root.exists() or path_in_root.is_symlink():
+                    raise
+                if path in indexed_paths:
+                    _git_run(
+                        runner,
+                        root,
+                        ["add", "-A", "--", f":(literal){path}"],
+                    )
+                    staged.append(path)
+                continue
+            staged.append(path)
+        elif path in indexed_paths:
+            _git_run(
+                runner,
+                root,
+                ["add", "-A", "--", f":(literal){path}"],
+            )
+            staged.append(path)
+    return tuple(staged)
 
 
 def _git_paths(runner: Runner, root: Path, args: Sequence[str]) -> tuple[str, ...]:

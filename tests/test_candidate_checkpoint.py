@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -94,6 +95,61 @@ def test_candidate_checkpoint_skips_empty_commits(tmp_path: Path) -> None:
 
     assert checkpoint.committed is False
     assert checkpoint.candidate_revision == submission_base
+
+
+def test_candidate_checkpoint_ignores_untracked_path_removed_after_status_scan(
+    tmp_path: Path,
+) -> None:
+    root, submission_base = _repo(tmp_path)
+    (root / "src" / "state.py").write_text("state = 2\n", encoding="utf-8")
+    stale_path = root / "tests" / "django_project" / "core" / "__init__,.py"
+    stale_path.parent.mkdir(parents=True)
+    stale_path.write_text("# generated during validation\n", encoding="utf-8")
+    removed_after_status = False
+
+    def runner(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[Any]:
+        nonlocal removed_after_status
+        result = subprocess.run(args, **kwargs)
+        if "status" in args and "--porcelain=v1" in args and not removed_after_status:
+            stale_path.unlink()
+            removed_after_status = True
+        return result
+
+    checkpoint = checkpoint_candidate_changes(
+        root,
+        submission_base=submission_base,
+        allowed_paths=("src", "tests"),
+        artifact_exclusions=(),
+        message="checkpoint surviving candidate changes",
+        runner=runner,
+    )
+
+    assert removed_after_status is True
+    assert checkpoint.committed is True
+    assert checkpoint.committed_paths == ("src/state.py",)
+    assert checkpoint.cumulative_paths == ("src/state.py",)
+
+
+def test_candidate_checkpoint_stages_tracked_rename(tmp_path: Path) -> None:
+    root, submission_base = _repo(tmp_path)
+    old_path = root / "src" / "removed.py"
+    new_path = root / "src" / "renamed.py"
+    old_path.rename(new_path)
+
+    checkpoint = checkpoint_candidate_changes(
+        root,
+        submission_base=submission_base,
+        allowed_paths=("src",),
+        artifact_exclusions=(),
+        message="checkpoint rename",
+    )
+
+    assert checkpoint.committed is True
+    assert set(checkpoint.committed_paths) == {"src/removed.py", "src/renamed.py"}
+    assert set(checkpoint.cumulative_paths) == {
+        "src/removed.py",
+        "src/renamed.py",
+    }
 
 
 def test_candidate_checkpoint_rejects_changes_outside_allowed_paths(

@@ -17,12 +17,15 @@ KNOWN_TOOLS = frozenset(
         "gather_context",
         "internal",
         "edit",
+        "file_management",
         "yaml_edit",
         "read_document",
         "invoke_tool",
         "list_files",
         "procedrr_fragment_start",
         "procedrr_fragment_apply_edit",
+        "workflow_chat_snapshot",
+        "workflow_chat_changes",
     }
 )
 KNOWN_VALIDATORS = frozenset({"json_schema"})

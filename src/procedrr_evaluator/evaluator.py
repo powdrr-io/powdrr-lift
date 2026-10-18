@@ -395,12 +395,22 @@ class Evaluator:
         if not isinstance(steps, list):
             raise EvaluationError(f"{path}.call process has no steps")
         terminal_status = "succeeded"
+        parent_recoveries = self._document_recoveries
+        child_recoveries = process.get("recoveries", {})
+        self._document_recoveries = (
+            child_recoveries if isinstance(child_recoveries, Mapping) else {}
+        )
         try:
-            self._steps(steps, child_state, events, usage, child_limits, f"{path}.call")
-        except _TerminalReached as terminal:
-            terminal_status = terminal.status
-            if terminal_status != "succeeded":
-                raise
+            try:
+                self._steps(
+                    steps, child_state, events, usage, child_limits, f"{path}.call"
+                )
+            except _TerminalReached as terminal:
+                terminal_status = terminal.status
+                if terminal_status != "succeeded":
+                    raise
+        finally:
+            self._document_recoveries = parent_recoveries
         for parent_name, child_reference in outputs.items():
             if not isinstance(parent_name, str) or not isinstance(child_reference, str):
                 raise EvaluationError(

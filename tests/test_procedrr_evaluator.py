@@ -294,6 +294,67 @@ steps:
     assert calls == [{"command": ["record_feature", "Add a greeting"]}]
 
 
+def test_called_process_uses_its_own_recovery_declarations(tmp_path: Path) -> None:
+    from procedrr import parse_and_validate
+
+    (tmp_path / "recoverable-child.yaml").write_text(
+        """\
+version: 1
+name: recoverable-child
+outputs: {result: {type: object}}
+steps:
+  - attempt:
+      id: child-validation
+      max_attempts: 2
+      body:
+        - operation:
+            tool: internal
+            parameters: {command: [check]}
+            bind: result
+        - gate:
+            subject: result.passed
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {recovery: child-repair, resume: child-validation}
+  - terminal: succeeded
+recoveries:
+  child-repair:
+    steps:
+      - operation:
+          tool: internal
+          parameters: {command: [repair]}
+""",
+        encoding="utf-8",
+    )
+    document = parse_and_validate(
+        """\
+version: 1
+name: recovery-parent
+steps:
+  - call:
+      process: recoverable-child
+      inputs: {}
+      outputs: {child_result: result}
+  - terminal: succeeded
+"""
+    )
+    calls: list[str] = []
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        command = str(parameters["command"][0])
+        calls.append(command)
+        if command == "check":
+            return {"passed": calls.count("check") > 1}
+        return {"repaired": True}
+
+    result = Evaluator(FakeLLM(), execute, process_directory=tmp_path).evaluate(
+        document
+    )
+
+    assert result.bindings["child_result"] == {"passed": True}
+    assert calls == ["check", "repair", "check"]
+
+
 def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
     llm = FakeLLM()
     calls: list[tuple[str, dict[str, Any]]] = []

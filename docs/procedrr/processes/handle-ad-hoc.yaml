@@ -1,0 +1,47 @@
+version: 1
+name: handle-ad-hoc
+description: >-
+  Handle a small follow-up request in the current worktree and run PR
+  preparation when this execution changes files.
+inputs:
+  - {name: user_request, type: string, required: true}
+  - {name: workflow_context, type: object, required: true}
+  - {name: language_labels, type: array, required: true}
+limits: {llm_activations: 80, tool_calls: 100, context_chars: 20000, context_value_chars: 8000}
+steps:
+  - operation:
+      tool: workflow_chat_snapshot
+      parameters: {}
+      bind: initial_snapshot
+  - specialize:
+      process: generate-fragment
+      max_steps: 32
+      question: >-
+        Handle the user's exact ad-hoc follow-up in the current worktree. Treat
+        user_request as the complete instruction and use workflow_context to
+        continue prior work when the request refers to it. Make only the
+        requested changes. Do not create a worktree or expand the scope. If no
+        file change is needed, produce a concise response and succeed.
+      context: [user_request, workflow_context]
+      allowed_tools: [edit, yaml_edit, file_management, read_document, list_files]
+      bind: ad_hoc_program
+  - call:
+      fragment: "${ad_hoc_program}"
+      max_steps: 40
+  - operation:
+      tool: workflow_chat_changes
+      parameters: {snapshot: "${initial_snapshot}"}
+      bind: worktree_changes
+  - branch:
+      subject: worktree_changes.has_changes
+      cases:
+        false:
+          - terminal: succeeded
+        true:
+          - call:
+              process: finish-pr-prep
+              inputs:
+                files_to_publish: "${worktree_changes.paths}"
+                language_labels: "${language_labels}"
+              outputs: {pr_prep_results: validation_results}
+          - terminal: succeeded

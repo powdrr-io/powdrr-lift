@@ -48,12 +48,16 @@ list from the plan item's dependencies, and the worker verifies the two lists
 match before executing the workflow. The reviewed plan remains the source for
 the item's objective, scope, acceptance criteria, and dependency graph. The
 worker reads the definition and materializes a durable process-backed task when
-it claims the issue. Reviewers can revise the plan decomposition and process
-inputs in the PR. The command creates a unique branch, commits only the
-generated plan and workflow definitions, pushes it, and opens a pull request
-against the current branch. Other staged changes are excluded from the plan
-commit. The command does not create GitHub issues or execute work, and it
-refuses to overwrite existing generated artifacts.
+it claims the issue. The worker resolves this process from Powdrr-Lift's bundled
+process catalog; the target repository does not need to copy runtime process
+definitions into its own `docs/procedrr/processes/`. At task execution time,
+Powdrr-Lift also loads the target repository's process catalog for
+repository-specific nested processes. Reviewers can revise the plan
+decomposition and process inputs in the PR. The command creates a unique
+branch, commits only the generated plan and workflow definitions, pushes it,
+and opens a pull request against the current branch. Other staged changes are
+excluded from the plan commit. The command does not create GitHub issues or
+execute work, and it refuses to overwrite existing generated artifacts.
 
 For example, the integration workflow names its prerequisite explicitly:
 

@@ -1,0 +1,21 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1015
+title: Load plan worker process from Powdrr-Lift bundle
+intent:
+  problem: Plan workers tried to load the shared execution process from the target repository, which does not own Powdrr-Lift runtime definitions.
+  goal: Instantiate plan workflows from Powdrr-Lift's bundled Procedrr catalog so repositories only need the generated plan and workflow references.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/cli.py
+  type: modified
+  summary: Resolve bundled plan process
+  rationale: Let the issue worker instantiate the plan's Procedrr process without requiring a copy in the target repository.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  summary: Cover bundled process lookup
+  rationale: Verify a plan workflow resolves its process even when the target repository has no Procedrr process directory.
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  summary: Document process ownership
+  rationale: Clarify that Powdrr-Lift provides the shared execution process and target repositories provide optional repository-specific processes.

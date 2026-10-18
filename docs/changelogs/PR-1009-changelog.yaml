@@ -9,54 +9,79 @@ structured_files: []
 files:
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 25, end_line: 30}
+    span: {start_line: 29, end_line: 29}
     summary: Add a distinct queue label for work blocked on plan dependencies.
     rationale: Keep dependency waits distinguishable from execution failures that need human retry.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 343, end_line: 417}
-    summary: Publish dependency-free items as ready and reconcile dependency-derived labels on reruns.
+    span: {start_line: 384, end_line: 384}
+    summary: Assign new issues their initial status from plan dependencies.
+    rationale: Keep dependent work out of the ready queue until prerequisites close.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 388, end_line: 388}
+    summary: Apply the dependency-derived status label when creating a GitHub issue.
+    rationale: Publish a visible ready frontier that reflects the reviewed plan.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 392, end_line: 418}
+    summary: Reconcile existing ready and dependency-blocked issues against closed prerequisites.
     rationale: Make issue status reflect the reviewed plan's currently executable frontier.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 465, end_line: 654}
-    summary: Promote dependency-blocked items after all prerequisite issues close and reclassify stale ready issues.
+    span: {start_line: 474, end_line: 478}
+    summary: Refresh dependency-blocked issue statuses before selecting worker tasks.
+    rationale: Advance eligible work whenever the worker runs.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 524, end_line: 527}
+    summary: Move stale ready issues with unmet prerequisites into dependency-blocked state.
+    rationale: Prevent execution with unmet dependencies while migrating older queue issues.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 590, end_line: 650}
+    summary: Promote dependency-blocked items after all prerequisite issues close.
     rationale: Advance the queue as work is accepted while preventing execution with unmet dependencies.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 903, end_line: 910}
+    span: {start_line: 908, end_line: 908}
     summary: Assign a GitHub color to the dependency-blocked label.
     rationale: Ensure the new queue state label is created consistently.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 289, end_line: 420}
-    summary: Cover initial frontier labels, dependency promotion, and migration of previously ready dependent issues.
+    span: {start_line: 305, end_line: 307}
+    summary: Assert only dependency-free work starts ready.
+    rationale: Verify initial publication exposes the plan's dependency frontier.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 359, end_line: 360}
+    summary: Assert a dependent issue stays blocked while its prerequisite remains open.
+    rationale: Prevent dependent work from appearing ready prematurely.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 387, end_line: 387}
+    summary: Add spacing before the migration regression test.
+    rationale: Keep the related queue behavior tests grouped clearly.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 391, end_line: 419}
+    summary: Cover promotion after closure and migration of old ready issues.
     rationale: Prevent the publisher and worker from exposing or executing dependent work too early.
   - path: docs/plans/github-issue-plan-worker.md
     type: modified
-    span: {start_line: 10, end_line: 109}
-    summary: Document dependency-blocked issue state and promotion behavior.
+    span: {start_line: 12, end_line: 14}
+    summary: Document dependency-blocked issue state.
     rationale: Describe how reviewers and operators can interpret the queue labels.
-entities:
-  - id: dependency-blocked-queue-state
-    type: Queue label
-    action: added
-  - id: github-issue-plan-publisher
-    type: Function
-    action: modified
-  - id: github-issue-plan-worker
-    type: Function
-    action: modified
-  - id: github-issue-queue-dependency-tests
-    type: Regression test
-    action: modified
-entity_relationships:
-  - id: dependency-tests-verify-queue-promotion
-    type: verifies
-    source: github-issue-queue-dependency-tests
-    target: github-issue-plan-worker
-    action: added
-    description: Queue tests verify that dependent work becomes ready only after prerequisite issues close.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 70, end_line: 84}
+    summary: Document the initial dependency frontier and worker promotion behavior.
+    rationale: Explain how publication and worker runs keep issue labels aligned with plan dependencies.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 108, end_line: 111}
+    summary: Document that dependent work stays blocked until prerequisite issues close.
+    rationale: Give operators the correct queue status expectations.
 invariants:
   - id: only-satisfied-dependency-frontier-is-ready
     description: Open plan issues with unmet dependencies carry the dependency-blocked label rather than the ready label.

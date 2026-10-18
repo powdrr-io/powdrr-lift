@@ -1,0 +1,50 @@
+version: 1
+name: execute-proposed-pr-workflow
+description: Execute one durable proposed-PR task through implementation, validation, scope review, and pull-request preparation.
+inputs:
+- name: task_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: >-
+      Execute this proposed-PR workflow for the claimed durable task in
+      task_context. Preserve this order. First call the `execute-proposed-pr`
+      Procedrr process, passing task_context as its task_context input. Wait
+      for its result; do not claim implementation or completeness without the
+      returned evidence. Next run the repository's formatting, lint, type, and
+      other validation commands that apply to the changed files. Read validation
+      commands from repository tool context and the proposed-PR context; do not
+      assume a command passed without its result. Review the complete diff for
+      scope, missing files, generated artifacts, and secrets. Repair only
+      findings supported by that review, then rerun affected validation. If
+      task_context.input_state marks this as the final proposed PR and supplies
+      proposal-document paths, promote those documents to their declared
+      current-state paths and verify the move. Finally derive the exact files
+      and language labels to publish and call `finish-pr-prep` with
+      files_to_publish and language_labels. Wait for its result before reporting
+      success. Return a concise report containing implementation, validation,
+      scope-review, document-promotion when applicable, and pull-request
+      preparation results. Do not stage, commit, push, or open a pull request
+      outside the finish-pr-prep process.
+    context: [task_context]
+    allowed_tools:
+    - gather_context
+    - read_document
+    - invoke_tool
+    - file_management
+    - edit
+    - yaml_edit
+    - task_run_process
+    - respond
+    bind: proposed_pr_workflow
+- call:
+    fragment: "${proposed_pr_workflow}"
+    max_steps: 120

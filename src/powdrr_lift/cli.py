@@ -124,14 +124,13 @@ from powdrr_lift.openai_proxy import (
 )
 from powdrr_lift.process.tasks import (
     HumanRole,
-    save_workflow_task,
     validate_workflow_task_directory,
 )
 from powdrr_lift.process.templates import (
+    instantiate_procedrr_process_workflow,
     instantiate_workflow_template,
     instantiated_workflow_relationships,
     load_workflow_template,
-    validate_workflow_template_json,
 )
 from powdrr_lift.pull_request_description import (
     find_existing_pull_request,
@@ -1859,6 +1858,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Legacy workflow template YAML or JSON to instantiate.",
     )
     instantiate_workflow_parser.add_argument(
+        "--process",
+        help="Procedrr process to run as a durable workflow task.",
+    )
+    instantiate_workflow_parser.add_argument(
+        "--process-input",
+        action="append",
+        default=[],
+        metavar="NAME=JSON",
+        help="JSON value for a process task input-state field; may be repeated.",
+    )
+    instantiate_workflow_parser.add_argument(
         "--execution-plan",
         type=Path,
         help="Typed execution plan to compile instead of using a template.",
@@ -2630,50 +2640,16 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 raise PlanGenerationError(
                     "workflow definition ID does not match its plan item"
                 )
-            template_path = _resolve_plan_workflow_template(instance.template_id)
             with tempfile.TemporaryDirectory(
                 prefix=f"powdrr-{workflow_id}-"
             ) as temporary_root:
-                workflow_dir, tasks = instantiate_workflow_template(
-                    template_path=template_path,
+                workflow_dir, tasks = instantiate_procedrr_process_workflow(
+                    process_id=instance.process_id,
+                    process_directory=(repo_root / "docs" / "procedrr" / "processes"),
+                    input_state=instance.inputs,
                     work_item_name=workflow_id,
                     workflow_instance_name=workflow_id,
                     output_root=Path(temporary_root),
-                    template_values=instance.parameters,
-                )
-                context = {
-                    "plan_id": plan.plan_id,
-                    "item_id": item.item_id,
-                    "title": item.title,
-                    "objective": item.objective,
-                    "scope": list(item.scope),
-                    "acceptance_criteria": list(item.acceptance_criteria),
-                    "dependencies": list(item.dependencies),
-                }
-                first_task = replace(
-                    tasks[0],
-                    input_state={
-                        **tasks[0].input_state,
-                        "structured_pr_context": context,
-                    },
-                    details=(
-                        "Use input_state.structured_pr_context as the authoritative "
-                        "proposed PR context. Do not run proposal discovery or alter "
-                        "the item meaning. Return exactly one next_step action, "
-                        "copying the complete input object into "
-                        "output_state.proposed-pr-context-state, for example: "
-                        '{"action":"next_step","output_state":'
-                        '{"proposed-pr-context-state":'
-                        f"{json.dumps(context, ensure_ascii=False)}"
-                        '}},"decisions_and_context":"Recorded the reviewed plan item."}'
-                    ),
-                    actions=(),
-                    actions_declared=True,
-                    step_type="governed",
-                    pre_step=None,
-                )
-                save_workflow_task(
-                    first_task, workflow_dir / f"{first_task.task_id}.yaml"
                 )
                 save_workflow_git_state(
                     workflow_dir,
@@ -2751,26 +2727,6 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
     return 0 if report.outcome in {"no_eligible_work", "awaiting_review"} else 1
 
 
-def _resolve_plan_workflow_template(template_id: str) -> Path:
-    """Resolve a plan's task-template from a checkout or an installed wheel."""
-    relative_path = Path("templates") / f"{template_id}.yaml"
-    candidates = (
-        Path(__file__).resolve().parents[2] / relative_path,
-        Path(sys.prefix) / f"{template_id}.yaml",
-    )
-    for candidate in candidates:
-        if candidate.is_file():
-            template = load_workflow_template(candidate)
-            if template.id != template_id:
-                raise PlanGenerationError(
-                    f"plan workflow template ID does not match {template_id!r}"
-                )
-            return candidate
-    raise PlanGenerationError(
-        f"could not find packaged task template for plan workflow {template_id!r}"
-    )
-
-
 def _run_pull_request_description(args: argparse.Namespace) -> int:
     existing_pull_request = find_existing_pull_request(args.repo_root)
     sys.stdout.write(
@@ -2818,6 +2774,26 @@ def _parse_template_values(values: list[str]) -> dict[str, str]:
     return parsed
 
 
+def _parse_process_inputs(values: list[str]) -> dict[str, Any]:
+    parsed: dict[str, Any] = {}
+    for value in values:
+        name, separator, encoded = value.partition("=")
+        if not separator or not name.strip():
+            raise ValueError(
+                "--process-input must use NAME=JSON with a non-empty NAME."
+            )
+        key = name.strip()
+        if key in parsed:
+            raise ValueError(f"--process-input repeated input {key!r}.")
+        try:
+            parsed[key] = json.loads(encoded)
+        except json.JSONDecodeError as error:
+            raise ValueError(
+                f"--process-input {key!r} must contain valid JSON: {error.msg}"
+            ) from error
+    return parsed
+
+
 def _run_instantiate_workflow(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     compiled_inputs = (
@@ -2834,23 +2810,53 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             file=sys.stderr,
         )
         return 2
-    if args.template is None and not all(
-        value is not None for value in compiled_inputs
-    ):
+    if args.template is not None and args.process is not None:
+        print("--template and --process cannot be used together", file=sys.stderr)
+        return 2
+    if args.process is not None and any(value is not None for value in compiled_inputs):
         print(
-            "--template or the complete compiled execution-plan options are required",
+            "--process cannot be combined with compiled execution-plan options",
             file=sys.stderr,
         )
+        return 2
+    if (
+        args.template is None
+        and args.process is None
+        and not all(value is not None for value in compiled_inputs)
+    ):
+        print(
+            "--template, --process, or the complete compiled execution-plan "
+            "options are required",
+            file=sys.stderr,
+        )
+        return 2
+    if args.process is None and args.process_input:
+        print("--process-input requires --process", file=sys.stderr)
         return 2
     template_path = _resolve_cli_path(repo_root, args.template)
     output_root = args.output_root
     if not output_root.is_absolute():
         output_root = repo_root / output_root
     template_values = _parse_template_values(args.template_value)
+    process_inputs = _parse_process_inputs(args.process_input)
     reused_existing = False
     try:
         project_root = resolve_git_repository_root(repo_root)
-        proposed_pr_id = template_values.get("proposed-pr-id", args.work_item_name)
+        process_task_context = process_inputs.get("task_context")
+        process_task_state = (
+            process_task_context.get("input_state", {})
+            if isinstance(process_task_context, Mapping)
+            else process_inputs
+        )
+        proposed_pr_id = template_values.get(
+            "proposed-pr-id",
+            (
+                str(process_task_state.get("proposed_pr_id"))
+                if isinstance(process_task_state, Mapping)
+                and process_task_state.get("proposed_pr_id")
+                else args.work_item_name
+            ),
+        )
         dependency_graph = load_proposed_pr_dependency_graph(repo_root)
         if proposed_pr_id not in dependency_graph:
             raise ValueError(
@@ -2898,6 +2904,27 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             ).tasks
             invariants: tuple[Any, ...] = ()
             relationships: tuple[Any, ...] = ()
+        elif args.process is not None:
+            instance_slug = re.sub(
+                r"[^a-z0-9]+",
+                "-",
+                (args.workflow_instance_name or args.work_item_name).strip().lower(),
+            ).strip("-")
+            expected_directory = _workflow_output_directory(
+                output_root, args.work_item_name
+            )
+            reused_existing = (
+                expected_directory / f"{instance_slug}-task-001.yaml"
+            ).is_file()
+            output_directory, tasks = instantiate_procedrr_process_workflow(
+                process_id=args.process,
+                process_directory=repo_root / "docs" / "procedrr" / "processes",
+                input_state=process_inputs,
+                work_item_name=args.work_item_name,
+                output_root=output_root,
+                workflow_instance_name=args.workflow_instance_name,
+            )
+            invariants, relationships = (), ()
         else:
             assert template_path is not None
             output_directory = _workflow_output_directory(
@@ -2931,7 +2958,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             )
         relative_workflow = output_directory.relative_to(repo_root)
         state = WorkflowGitState(
-            proposed_pr_id=template_values.get("proposed-pr-id", args.work_item_name),
+            proposed_pr_id=proposed_pr_id,
             base_branch="main",
             integration_branch=integration_branch,
             workflow_relative_directory=str(relative_workflow),
@@ -3914,6 +3941,25 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
 
     for path in changed_paths:
         relative_path = path.relative_to(repo_root)
+        if (
+            relative_path
+            in {
+                Path("templates/execute-proposed-pr.yaml"),
+                Path("templates/fully-review-pr.yaml"),
+            }
+            and not path.exists()
+        ):
+            results.append(
+                {
+                    "validator": "validate_legacy_template_removal",
+                    "files": [str(relative_path)],
+                    "validation_successful": True,
+                    "report": {
+                        "message": "Legacy template was replaced by a Procedrr process."
+                    },
+                }
+            )
+            continue
         if not path.exists():
             results.append(
                 {
@@ -3969,15 +4015,27 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
             )
             continue
 
-        if relative_path.parts[:1] == ("templates",) and path.name.endswith(
-            "execute-proposed-pr.yaml"
-        ):
+        if relative_path.parts[:3] == ("docs", "procedrr", "processes"):
+            from procedrr import ProcessCatalog
+            from procedrr.catalog import ProcessCatalogError
+
+            try:
+                catalog = ProcessCatalog.load(path.parent)
+            except (OSError, ProcessCatalogError, ValueError) as error:
+                report_text = json.dumps(
+                    {"validation_successful": False, "error": str(error)}
+                )
+            else:
+                report_text = json.dumps(
+                    {
+                        "validation_successful": True,
+                        "process_count": len(catalog.list()),
+                    }
+                )
             add_result(
-                validator="validate_workflow_template_json",
+                validator="validate_procedrr_processes",
                 paths=[path],
-                report_text=validate_workflow_template_json(
-                    path.read_text(encoding="utf-8")
-                ),
+                report_text=report_text,
             )
             continue
 

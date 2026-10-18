@@ -14,7 +14,7 @@ collections so one workflow can adapt to the actual size, risk, and structure
 of a feature while remaining total and operationally contained.
 
 The target design is defined in
-`docs/design/llm-execution-language-safety.md`, with the full coding-flow
+`docs/archive/legacy-workflow-language/llm-execution-language-safety.md`, with the full coding-flow
 lowering in `docs/design/single-decision-feature-development.md`. This document
 maps that design onto the current repository and identifies the required code
 changes, migration order, and acceptance tests.

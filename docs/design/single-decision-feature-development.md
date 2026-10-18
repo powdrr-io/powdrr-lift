@@ -3,7 +3,8 @@
 ## Purpose
 
 This document expands the feature-development example in
-`llm-execution-language-safety.md` to at least the scope represented by:
+`../archive/legacy-workflow-language/llm-execution-language-safety.md` to at
+least the scope represented by:
 
 - `docs/procedrr/processes/specify-a-feature.yaml` and its `design-interview` child;
 - `docs/procedrr/processes/start-implementing-feature.yaml`;

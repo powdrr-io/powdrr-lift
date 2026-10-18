@@ -136,7 +136,7 @@ entities:
 modules:
 - id: mod-start-implementing-feature-skill
   action: changed
-  relative_location: docs/procedrr/processes/start-implementing-feature.yaml
+  relative_location: skill-definitions/start-implementing-feature.yaml
   purpose: Declare separate planning and allocation steps, their strict output schemas,
     the authoritative-effect handoff, compilation inputs, and direct evaluator gate
     routing.

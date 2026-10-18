@@ -422,7 +422,16 @@ def test_publisher_reconciles_old_ready_issues_with_plan_dependencies() -> None:
 def test_worker_accepts_one_file_workflow_definition(tmp_path: Path) -> None:
     workflow_file = tmp_path / "docs/workflows/feature-v1/base.yaml"
     workflow_file.parent.mkdir(parents=True)
-    workflow_file.write_text("template: execute-proposed-pr\n", encoding="utf-8")
+    workflow_file.write_text(
+        "schema: https://powdrr.io/schemas/plan-workflow-instance-v1\n"
+        "workflow_id: base\n"
+        "template: execute-proposed-pr\n"
+        "dependencies: []\n"
+        "parameters:\n"
+        "  proposed-pr-id: base\n"
+        "  verification-command: pytest -q\n",
+        encoding="utf-8",
+    )
     reviewed_plan = ReviewedExecutionPlan(
         "feature-v1",
         (
@@ -474,6 +483,90 @@ def test_worker_accepts_one_file_workflow_definition(tmp_path: Path) -> None:
 
     assert report.outcome == "awaiting_review"
     assert observed == [workflow_file]
+
+
+def test_worker_blocks_when_workflow_dependencies_disagree_with_plan(
+    tmp_path: Path,
+) -> None:
+    workflow_root = tmp_path / "docs/workflows/feature-v1"
+    workflow_root.mkdir(parents=True)
+    base_workflow = workflow_root / "base.yaml"
+    followup_workflow = workflow_root / "followup.yaml"
+    base_workflow.write_text(
+        "schema: https://powdrr.io/schemas/plan-workflow-instance-v1\n"
+        "workflow_id: feature-v1-base\n"
+        "template: execute-proposed-pr\n"
+        "dependencies: []\n"
+        "parameters:\n"
+        "  proposed-pr-id: feature-v1-base\n"
+        "  verification-command: pytest -q\n",
+        encoding="utf-8",
+    )
+    followup_workflow.write_text(
+        "schema: https://powdrr.io/schemas/plan-workflow-instance-v1\n"
+        "workflow_id: feature-v1-followup\n"
+        "template: execute-proposed-pr\n"
+        "dependencies: []\n"
+        "parameters:\n"
+        "  proposed-pr-id: feature-v1-followup\n"
+        "  verification-command: pytest -q\n",
+        encoding="utf-8",
+    )
+    reviewed_plan = ReviewedExecutionPlan(
+        "feature-v1",
+        (
+            PlannedWorkItem(
+                "base",
+                "Base work",
+                "Add the shared base.",
+                ("src/base.py",),
+                ("Base behavior is covered.",),
+                (),
+                None,
+                "feature-v1-base",
+                "docs/workflows/feature-v1/base.yaml",
+            ),
+            PlannedWorkItem(
+                "followup",
+                "Follow-up work",
+                "Build on the shared base.",
+                ("src/followup.py",),
+                ("Follow-up behavior is covered.",),
+                ("base",),
+                None,
+                "feature-v1-followup",
+                "docs/workflows/feature-v1/followup.yaml",
+            ),
+        ),
+    )
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=reviewed_plan,
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    client.issues[0] = QueueIssue(
+        client.issues[0].number,
+        client.issues[0].title,
+        client.issues[0].body,
+        "closed",
+        client.issues[0].labels,
+        client.issues[0].url,
+    )
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-a",
+        run_task=lambda *_args: pytest.fail("mismatched workflow must not run"),
+        plan_loader=lambda *_args, **_kwargs: reviewed_plan,
+    )
+
+    assert report.outcome == "blocked"
+    assert report.item_id == "followup"
+    assert "workflow dependencies do not match" in (report.detail or "")
+    assert QUEUE_LABELS["blocked"] in client.issues[1].labels
 
 
 def test_worker_marks_failed_execution_blocked(tmp_path: Path) -> None:

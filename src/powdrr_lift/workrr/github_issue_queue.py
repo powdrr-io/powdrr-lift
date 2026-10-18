@@ -559,6 +559,45 @@ def run_worker_once(
                 detail = f"workflow definition is missing: {workflow_reference}"
                 client.add_comment(issue, f"Powdrr worker blocked this item: {detail}.")
                 return WorkerReport("blocked", issue.number, item.item_id, detail)
+            if item.workflow_file is not None:
+                from powdrr_lift.workrr.github_issue_plan_generation import (
+                    PlanGenerationError,
+                    load_plan_workflow_instance,
+                )
+
+                try:
+                    workflow_instance = load_plan_workflow_instance(workflow_path)
+                    workflow_ids = {
+                        candidate.item_id: candidate.workflow_id
+                        for candidate in plan.items
+                    }
+                    expected_dependencies = tuple(
+                        workflow_ids[dependency] for dependency in item.dependencies
+                    )
+                    if (
+                        workflow_instance.workflow_id != item.workflow_id
+                        or workflow_instance.dependencies != expected_dependencies
+                    ):
+                        detail = (
+                            "workflow dependencies do not match the pinned plan; "
+                            f"expected {expected_dependencies!r}, found "
+                            f"{workflow_instance.dependencies!r}"
+                        )
+                    else:
+                        detail = None
+                except (PlanGenerationError, KeyError) as error:
+                    detail = f"invalid workflow definition: {error}"
+                if detail is not None:
+                    client.update_issue(
+                        issue,
+                        labels=_replace_queue_status(
+                            _replace_queue_status(issue.labels, "claimed"), "blocked"
+                        ),
+                    )
+                    client.add_comment(
+                        issue, f"Powdrr worker blocked this item: {detail}."
+                    )
+                    return WorkerReport("blocked", issue.number, item.item_id, detail)
             try:
                 return_code = run_task(
                     workflow_path, item.workflow_id, worker_id, item, plan

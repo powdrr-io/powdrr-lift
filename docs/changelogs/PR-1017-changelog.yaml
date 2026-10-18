@@ -79,7 +79,7 @@ files:
     rationale: Make the operation available to generated workflow tasks.
   - path: src/powdrr_lift/workrr/task_agent.py
     type: modified
-    span: {start_line: 2720, end_line: 2721}
+    span: {start_line: 2730, end_line: 2731}
     summary: Map checkpoint commit lookups to the structured HEAD operation.
     rationale: Keep task-agent Git access within the intrinsic repository boundary.
   - path: tests/test_intrinsic_git_gh.py
@@ -104,9 +104,34 @@ files:
     rationale: Include checkpoint rollback in the workflow recovery report.
   - path: src/powdrr_lift/workrr/git.py
     type: modified
-    span: {start_line: 657, end_line: 670}
+    span: {start_line: 657, end_line: 666}
     summary: Restore generated workflow files after rolling back interrupted task state.
     rationale: Preserve the initial workflow definition while clearing only interrupted progress.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 882, end_line: 882}
+    summary: Track task files whose first recorded checkpoint is already locked.
+    rationale: Handle interrupted workers whose claim commit is the task file's initial history.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 937, end_line: 939}
+    summary: Read the current locked task when no earlier task snapshot is available.
+    rationale: Distinguish an initial interrupted claim from an invalid task checkpoint.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 941, end_line: 953}
+    summary: Queue a valid first-claim task for reopening when its history has no prior state.
+    rationale: Recover a task whose first published state was locked.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 957, end_line: 957}
+    summary: Allow recovery from either an earlier checkpoint or a first recorded claim.
+    rationale: Avoid leaving the issue blocked when no prior task snapshot exists.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 959, end_line: 1015}
+    summary: Reopen and publish a first-claim task as open when no earlier snapshot exists.
+    rationale: Clear the durable lock without discarding the generated workflow definition.
   - path: tests/test_workflow_git.py
     type: modified
     span: {start_line: 334, end_line: 481}
@@ -117,36 +142,31 @@ files:
     span: {start_line: 20, end_line: 26}
     summary: Instruct the outer plan workflow to pass task_context through nested process bindings.
     rationale: Ensure execute-proposed-pr receives its required task_context input.
-  - path: src/powdrr_lift/workrr/git.py
-    type: modified
-    span: {start_line: 886, end_line: 886}
-    summary: Track task files whose first recorded checkpoint is already locked.
-    rationale: Handle interrupted workers whose claim commit is the task file's initial history.
-  - path: src/powdrr_lift/workrr/git.py
-    type: modified
-    span: {start_line: 941, end_line: 943}
-    summary: Read the current locked task when no earlier task snapshot is available.
-    rationale: Distinguish an initial interrupted claim from an invalid task checkpoint.
-  - path: src/powdrr_lift/workrr/git.py
-    type: modified
-    span: {start_line: 945, end_line: 957}
-    summary: Queue a valid first-claim task for reopening when its history has no prior state.
-    rationale: Recover a task whose first published state was locked.
-  - path: src/powdrr_lift/workrr/git.py
-    type: modified
-    span: {start_line: 961, end_line: 961}
-    summary: Allow recovery from either an earlier checkpoint or a first recorded claim.
-    rationale: Avoid leaving the issue blocked when no prior task snapshot exists.
-  - path: src/powdrr_lift/workrr/git.py
-    type: modified
-    span: {start_line: 963, end_line: 1019}
-    summary: Reopen and publish a first-claim task as open when no earlier snapshot exists.
-    rationale: Clear the durable lock without discarding the generated workflow definition.
   - path: tests/test_workflow_template_specification.py
     type: modified
     span: {start_line: 330, end_line: 331}
     summary: Assert the plan workflow documents nested process binding syntax.
     rationale: Prevent the outer workflow from omitting execute-proposed-pr's required input.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1475, end_line: 1484}
+    summary: Return the latest nested tool result alongside its execution events.
+    rationale: Let Procedrr processes inspect command return codes and other outputs through result bindings.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Import a lightweight task strategy fixture for nested operation result coverage.
+    rationale: Exercise the Procedrr operation adapter without running another workflow.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 52, end_line: 52}
+    summary: Import the task Procedrr operation adapter for direct result binding coverage.
+    rationale: Verify nested operations expose return values to the calling process.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 688, end_line: 725}
+    summary: Verify nested Procedrr operations expose command results as bindings.
+    rationale: Prevent validation and repair steps from failing to read operation outputs.
 entities:
   - id: plan-worker-runtime-directory-regression
     type: Regression test

@@ -11,6 +11,7 @@ from powdrr_lift.workrr.scenario import (
     WorkflowScenarioError,
     WorkflowScenarioResult,
     extract_scripted_responses,
+    load_workflow_scenario,
     run_workflow_scenario,
 )
 
@@ -115,6 +116,29 @@ expect: {}
         "mode": "scripted",
         "responses": [{"action": "next_step"}],
     }
+
+
+def test_live_execute_workflow_scenario_uses_checked_in_workflow_tasks() -> None:
+    repository_root = Path(__file__).resolve().parents[1]
+    scenario_path = (
+        repository_root
+        / "workflow-evals/scenarios/execute-proposed-pr/live-task-all.yaml"
+    )
+    scenario = load_workflow_scenario(scenario_path)
+    scripted_scenario = load_workflow_scenario(
+        repository_root / "workflow-evals/scenarios/execute-proposed-pr/task-all.yaml"
+    )
+    scenario["provider"] = scripted_scenario["provider"]
+    scenario["expect"] = scripted_scenario["expect"]
+
+    result = run_workflow_scenario(
+        scenario, scenario_path=scenario_path, repo_root=repository_root
+    )
+
+    assert result.status == "passed"
+    assert result.assertions
+    assert all(assertion["passed"] for assertion in result.assertions)
+    assert result.roundtrips > 0
 
 
 def test_checked_in_workflow_scenario_suite_passes() -> None:

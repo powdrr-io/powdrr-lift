@@ -51,7 +51,6 @@ module-name = ["powdrr_lift", "procedrr", "procedrr_evaluator"]
 
 [tool.uv.build-backend.data]
 purelib = "docs/procedrr/processes"
-data = "templates"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

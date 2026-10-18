@@ -1,0 +1,46 @@
+version: 1
+name: fully-review-pr
+description: Run functionality, test-coverage, and security reviews for one pull request in order.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: pull_request_id
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: >-
+      Run the complete pull-request review sequence for the supplied request
+      and workflow context for the supplied pull-request identifier. First run the `feature-functionality-review`
+      Procedrr process for the referenced pull request. Wait for it to finish
+      and retain its complete review report. Then run
+      `feature-test-coverage-review` for the same pull request, passing the
+      functionality report as context. Wait for it to finish and retain its
+      complete report. Finally run `security-review` for that pull request,
+      passing both earlier review reports as context. Do not start a review
+      before its predecessors finish. Do not replace a nested process with a
+      summary or claim that it ran without its returned result. Finish by
+      returning a combined report containing the pull-request identifier, all
+      three review reports in order, and any unresolved findings.
+    context: [user_request, pull_request_id, workflow_context]
+    allowed_tools:
+    - gather_context
+    - read_document
+    - invoke_tool
+    - task_run_process
+    - respond
+    bind: review_program
+- call:
+    fragment: "${review_program}"
+    max_steps: 120

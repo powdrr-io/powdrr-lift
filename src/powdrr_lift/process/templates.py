@@ -414,6 +414,86 @@ def instantiate_workflow_template(
     return output_directory, tuple(tasks)
 
 
+def instantiate_procedrr_process_workflow(
+    *,
+    process_id: str,
+    process_directory: str | Path,
+    input_state: Mapping[str, Any],
+    work_item_name: str,
+    output_root: str | Path = Path("docs") / "workflows",
+    workflow_instance_name: str | None = None,
+) -> tuple[Path, tuple[WorkflowTask, ...]]:
+    """Create a durable one-task workflow that runs a catalogued Procedrr process."""
+    from procedrr import ProcessCatalog
+
+    catalog = ProcessCatalog.load(Path(process_directory))
+    process = catalog.get(process_id)
+    slug = re.sub(r"[^a-z0-9]+", "-", work_item_name.strip().lower()).strip("-")
+    if not slug:
+        raise ValueError("work-item-name must contain at least one letter or digit")
+    output_directory = Path(output_root) / slug
+    if (
+        workflow_instance_name is None
+        and output_directory.exists()
+        and any(output_directory.iterdir())
+    ):
+        raise FileExistsError(
+            f"Workflow output directory is not empty: {output_directory}. "
+            "Choose a new work item or remove it with explicit approval."
+        )
+    output_directory.mkdir(parents=True, exist_ok=True)
+    instance_slug = re.sub(
+        r"[^a-z0-9]+",
+        "-",
+        (workflow_instance_name or work_item_name).strip().lower(),
+    ).strip("-")
+    if not instance_slug:
+        raise ValueError(
+            "workflow-instance-name must contain at least one letter or digit"
+        )
+    task_id = f"{instance_slug}-task-001"
+    task_path = output_directory / f"{task_id}.yaml"
+    normalized_input_state = dict(input_state)
+    process.validate_inputs({"task_context": {"input_state": normalized_input_state}})
+    if task_path.exists():
+        existing_task = load_workflow_task(task_path)
+        if (
+            existing_task.process_id != process_id
+            or existing_task.input_state != normalized_input_state
+        ):
+            raise FileExistsError(
+                f"Workflow task already exists with different Procedrr inputs: "
+                f"{task_path}. Choose a new workflow-instance-name."
+            )
+        report = build_workflow_task_directory_validation_report(output_directory)
+        if not report.validation_successful:
+            issues = "; ".join(issue.message for issue in report.issues)
+            raise ValueError(
+                f"Existing workflow failed validation and cannot be reused: {issues}"
+            )
+        return output_directory, (existing_task,)
+    task = WorkflowTask(
+        task_id=task_id,
+        status=TaskStatus.OPEN,
+        description=f"Run Procedrr process {process_id}",
+        complexity=TaskComplexity.HIGH,
+        input_state=normalized_input_state,
+        details=(
+            f"Execute the catalogued Procedrr process {process.name!r} using "
+            "this task's input_state as its workflow context. Preserve the "
+            "durable workflow checkpoint and report the process result."
+        ),
+        output_state_type=f"{process_id}-result-state",
+        process_id=process_id,
+    )
+    save_workflow_task(task, task_path)
+    report = build_workflow_task_directory_validation_report(output_directory)
+    if not report.validation_successful:
+        issues = "; ".join(issue.message for issue in report.issues)
+        raise ValueError(f"Generated workflow failed validation: {issues}")
+    return output_directory, (task,)
+
+
 def _substitute_workflow_placeholders(
     value: Any,
     substitutions: Mapping[str, str],

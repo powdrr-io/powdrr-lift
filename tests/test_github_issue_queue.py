@@ -28,6 +28,43 @@ from powdrr_lift.workrr.github_issue_queue import (
 PLAN_COMMIT = "a" * 40
 
 
+def _write_process_workflow(
+    path: Path,
+    *,
+    plan_id: str,
+    item_id: str,
+    workflow_id: str,
+    dependencies: list[str] | None = None,
+) -> None:
+    objective = f"Implement {item_id}."
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "https://powdrr.io/schemas/plan-workflow-instance-v2",
+                "workflow_id": workflow_id,
+                "process_id": "execute-proposed-pr-workflow",
+                "dependencies": dependencies or [],
+                "inputs": {
+                    "work_item_name": plan_id,
+                    "proposed_pr_id": workflow_id,
+                    "feature_description": objective,
+                    "proposed_pr_context": {
+                        "plan_id": plan_id,
+                        "item_id": item_id,
+                        "title": f"Implement {item_id}",
+                        "objective": objective,
+                        "scope": [f"src/{item_id}.py"],
+                        "acceptance_criteria": [f"{item_id} works."],
+                        "dependencies": dependencies or [],
+                        "verification_command": "pytest -q",
+                    },
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 class FakeIssueClient:
     def __init__(self, issues: tuple[QueueIssue, ...] = ()) -> None:
         self.repository = "example/project"
@@ -465,15 +502,11 @@ def test_publisher_reconciles_old_ready_issues_with_plan_dependencies() -> None:
 def test_worker_accepts_one_file_workflow_definition(tmp_path: Path) -> None:
     workflow_file = tmp_path / "docs/workflows/feature-v1/base.yaml"
     workflow_file.parent.mkdir(parents=True)
-    workflow_file.write_text(
-        "schema: https://powdrr.io/schemas/plan-workflow-instance-v1\n"
-        "workflow_id: base\n"
-        "template: execute-proposed-pr\n"
-        "dependencies: []\n"
-        "parameters:\n"
-        "  proposed-pr-id: base\n"
-        "  verification-command: pytest -q\n",
-        encoding="utf-8",
+    _write_process_workflow(
+        workflow_file,
+        plan_id="feature-v1",
+        item_id="base",
+        workflow_id="base",
     )
     reviewed_plan = ReviewedExecutionPlan(
         "feature-v1",
@@ -536,25 +569,17 @@ def test_worker_blocks_when_workflow_dependencies_disagree_with_plan(
     workflow_root.mkdir(parents=True)
     base_workflow = workflow_root / "base.yaml"
     followup_workflow = workflow_root / "followup.yaml"
-    base_workflow.write_text(
-        "schema: https://powdrr.io/schemas/plan-workflow-instance-v1\n"
-        "workflow_id: feature-v1-base\n"
-        "template: execute-proposed-pr\n"
-        "dependencies: []\n"
-        "parameters:\n"
-        "  proposed-pr-id: feature-v1-base\n"
-        "  verification-command: pytest -q\n",
-        encoding="utf-8",
+    _write_process_workflow(
+        base_workflow,
+        plan_id="feature-v1",
+        item_id="base",
+        workflow_id="feature-v1-base",
     )
-    followup_workflow.write_text(
-        "schema: https://powdrr.io/schemas/plan-workflow-instance-v1\n"
-        "workflow_id: feature-v1-followup\n"
-        "template: execute-proposed-pr\n"
-        "dependencies: []\n"
-        "parameters:\n"
-        "  proposed-pr-id: feature-v1-followup\n"
-        "  verification-command: pytest -q\n",
-        encoding="utf-8",
+    _write_process_workflow(
+        followup_workflow,
+        plan_id="feature-v1",
+        item_id="followup",
+        workflow_id="feature-v1-followup",
     )
     reviewed_plan = ReviewedExecutionPlan(
         "feature-v1",

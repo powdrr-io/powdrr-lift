@@ -1,9 +1,7 @@
 version: 1
 name: execute-proposed-pr
 inputs:
-  - {name: work_item_name, type: string, required: true}
-  - {name: proposed_pr_id, type: string, required: true}
-  - {name: feature_description, type: string, required: true}
+  - {name: task_context, type: object, required: true}
 description: >-
   Execute one proposed PR through planning, a Workrr-validated JSON Procedrr
   implementation fragment, mechanical validation, and completeness, invariant,
@@ -11,25 +9,11 @@ description: >-
 limits: {llm_activations: 128, tool_calls: 256, max_epochs: 3, context_chars: 24000, context_value_chars: 6000}
 steps:
   - operation:
-      tool: internal
-      command: [powdrr-lift, show-proposed-pr, "${proposed_pr_id}"]
-      bind: proposed_pr
-  - operation:
       tool: gather_context
       parameters:
         types: [requirements, approach, entities, modules, tools, invariants]
-        feature_id: "${work_item_name}"
+        feature_id: "${task_context.input_state.work_item_name}"
       bind: repository_context
-  - operation:
-      tool: read_document
-      parameters:
-        file_path: docs/proposals/${work_item_name}/proposed-pr-specification.yaml
-      bind: proposed_pr_source
-  - operation:
-      tool: read_document
-      parameters:
-        file_path: docs/proposals/${work_item_name}/implementation-specification.yaml
-      bind: implementation_specification_source
   - operation:
       tool: invoke_tool
       parameters:
@@ -45,7 +29,7 @@ steps:
         - Request only files needed to resolve symbols, interfaces, and integration points.
         - Use repository-relative paths and give a reason for every request.
         - Request no more than 16 files.
-      context: [proposed_pr, repository_context, proposed_pr_source, implementation_specification_source]
+      context: [task_context, repository_context]
       output:
         name: planning_source_request
         schema:
@@ -63,7 +47,7 @@ steps:
   - judge:
       kind: construct_one
       question: What is the smallest ordered implementation plan for this proposed PR?
-      subject: proposed_pr
+      subject: task_context.input_state.proposed_pr_context
       prompt_system: >-
         You are the implementation planner. Return only the declared JSON
         object. Every action must be independently executable and scoped to the
@@ -74,7 +58,7 @@ steps:
         - Order actions so each action leaves the tree buildable and testable.
         - Include the command-level validation needed after the actions.
         - Do not include unrelated refactors or speculative work.
-      context: [work_item_name, proposed_pr_id, feature_description, proposed_pr, proposed_pr_source, implementation_specification_source, repository_context, source_document, initial_static_analysis]
+      context: [task_context, repository_context, source_document, initial_static_analysis]
       output:
         name: implementation_plan
         schema:
@@ -100,7 +84,7 @@ steps:
         proposed feature. The fragment must inspect source on demand, make one
         edit decision at a time, validate each edit, repair failures, and finish
         only after all acceptance conditions are evidenced.
-      context: [work_item_name, proposed_pr_id, feature_description, implementation_plan, repository_context, source_document, initial_static_analysis]
+      context: [task_context, implementation_plan, repository_context, source_document, initial_static_analysis]
       allowed_tools: [gather_context, internal, edit, read_document, invoke_tool, list_files]
       bind: implementation_program
   - call:
@@ -139,7 +123,7 @@ steps:
                   instructions:
                     - Use only this validation record as failure evidence.
                     - Return the exact one-based line range and replacement text.
-                  context: [feature_description, validation_record]
+                  context: [task_context, validation_record]
                   output:
                     name: repair_action
                     schema:
@@ -165,7 +149,7 @@ steps:
       tool: gather_context
       parameters:
         types: [requirements, features, invariants, expected_tests, expected_outcomes]
-        feature_id: "${work_item_name}"
+        feature_id: "${task_context.input_state.work_item_name}"
       bind: final_repository_context
   - judge:
       kind: verify_completeness
@@ -176,7 +160,7 @@ steps:
         - Judge against the actual final repository context and validation results.
         - Mark complete only when every condition is evidenced.
         - List each missing condition precisely.
-      context: [feature_description, implementation_plan, current_validation_results, final_repository_context]
+      context: [task_context, implementation_plan, current_validation_results, final_repository_context]
       output:
         name: completeness_review
         schema:
@@ -259,7 +243,7 @@ recoveries:
             - Use the supplied failure record as evidence; Powdrr owns failure identity and provenance.
             - Preserve unrelated content; the replacement must implement the missing behavior and must not be a no-op.
             - Do not broaden the proposed PR or change unrelated behavior.
-          context: [failure, feature_description, implementation_plan, completeness_review, invariant_review, security_review, final_repository_context]
+          context: [failure, task_context, implementation_plan, completeness_review, invariant_review, security_review, final_repository_context]
           output:
             name: final_repair_action
             schema:
@@ -312,7 +296,7 @@ recoveries:
           tool: gather_context
           parameters:
             types: [requirements, features, invariants, expected_tests, expected_outcomes]
-            feature_id: "${work_item_name}"
+            feature_id: "${task_context.input_state.work_item_name}"
           bind: final_repository_context
       - judge:
           kind: verify_completeness
@@ -323,7 +307,7 @@ recoveries:
             - Judge against the corrected repository context and latest structured validation results.
             - Mark complete only when every condition is evidenced.
             - List each missing condition precisely.
-          context: [feature_description, implementation_plan, current_validation_results, final_revalidation_results, final_repository_context]
+          context: [task_context, implementation_plan, current_validation_results, final_revalidation_results, final_repository_context]
           output:
             name: completeness_review
             schema:

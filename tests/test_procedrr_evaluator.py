@@ -1453,9 +1453,17 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
     result = Evaluator(HelloWorldLLM(), StructuredToolExecutor(execute)).evaluate(
         document,
         {
-            "work_item_name": "hello-world",
-            "proposed_pr_id": "hello-world",
-            "feature_description": "Print an additional line: Here I Am.",
+            "task_context": {
+                "input_state": {
+                    "work_item_name": "hello-world",
+                    "proposed_pr_id": "hello-world",
+                    "feature_description": "Print an additional line: Here I Am.",
+                    "proposed_pr_context": {
+                        "id": "hello-world",
+                        "intent": "Add a second output line.",
+                    },
+                }
+            },
         },
     )
 
@@ -1591,9 +1599,17 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
     ).evaluate(
         document,
         {
-            "work_item_name": "hello-world-live",
-            "proposed_pr_id": "hello-world-live",
-            "feature_description": "Print an additional line: Here I Am.",
+            "task_context": {
+                "input_state": {
+                    "work_item_name": "hello-world-live",
+                    "proposed_pr_id": "hello-world-live",
+                    "feature_description": "Print an additional line: Here I Am.",
+                    "proposed_pr_context": {
+                        "id": "hello-world-live",
+                        "intent": "Add a second output line.",
+                    },
+                }
+            },
         },
     )
     assert (

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -92,59 +91,59 @@ def test_generated_plan_records_source_document() -> None:
     assert plan.source_document == "docs/plans/proposal.md"
 
 
-def test_generated_plan_resolves_procedrr_backed_task_template(tmp_path: Path) -> None:
-    from powdrr_lift.process.templates import instantiate_workflow_template
+def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> None:
+    from powdrr_lift.process.templates import instantiate_procedrr_process_workflow
 
     rendered, plan = generate_execution_plan_yaml(
         source_plan="# Plan\nImplement the feature.",
-        plan_id="procedrr-template-v1",
+        plan_id="procedrr-process-v1",
         client=FakePlanningClient({"items": [_item("foundation")]}),
     )
     assert plan.items[0].workflow_file is not None
     write_execution_plan_artifacts(
         rendered_plan=rendered,
         plan=plan,
-        output_path=tmp_path / "docs/plans/procedrr-template-v1.yaml",
+        output_path=tmp_path / "docs/plans/procedrr-process-v1.yaml",
         repo_root=tmp_path,
         verification_command="scripts/verify-all.sh",
     )
     workflow_file = tmp_path / plan.items[0].workflow_file
     instance = load_plan_workflow_instance(workflow_file)
 
-    template_path = cli._resolve_plan_workflow_template(instance.template_id)
-    workflow_dir, tasks = instantiate_workflow_template(
-        template_path=template_path,
+    workflow_dir, tasks = instantiate_procedrr_process_workflow(
+        process_id=instance.process_id,
+        process_directory=(
+            Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+        ),
+        input_state=instance.inputs,
         work_item_name=instance.workflow_id,
         workflow_instance_name=instance.workflow_id,
         output_root=tmp_path / "workflows",
-        template_values=instance.parameters,
     )
 
-    assert template_path == (
-        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
-    )
+    assert instance.process_id == "execute-proposed-pr-workflow"
     assert workflow_dir.name == instance.workflow_id
-    assert tasks[0].input_state["proposed_pr"] == instance.workflow_id
-    assert tasks[2].coding_loop is not None
-    assert tasks[2].coding_loop.verification[0].command == "scripts/verify-all.sh"
+    assert len(tasks) == 1
+    assert tasks[0].process_id == instance.process_id
+    assert tasks[0].input_state["proposed_pr_id"] == instance.workflow_id
+    assert tasks[0].input_state["proposed_pr_context"]["verification_command"] == (
+        "scripts/verify-all.sh"
+    )
 
 
-def test_plan_template_resolver_finds_wheel_data_directory(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    package_template = (
-        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
-    )
-    installed_template = tmp_path / package_template.name
-    shutil.copyfile(package_template, installed_template)
-    monkeypatch.setattr(
-        cli, "__file__", str(tmp_path / "site-packages/powdrr_lift/cli.py")
-    )
-    monkeypatch.setattr(cli.sys, "prefix", str(tmp_path))
+def test_generated_plan_rejects_unknown_procedrr_process(tmp_path: Path) -> None:
+    from powdrr_lift.process.templates import instantiate_procedrr_process_workflow
 
-    assert cli._resolve_plan_workflow_template("execute-proposed-pr") == (
-        installed_template
-    )
+    with pytest.raises(ValueError, match="unknown Procedrr process"):
+        instantiate_procedrr_process_workflow(
+            process_id="missing-process",
+            process_directory=(
+                Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+            ),
+            input_state={},
+            work_item_name="proposal-v1-foundation",
+            output_root=tmp_path / "workflows",
+        )
 
 
 @pytest.mark.parametrize(
@@ -262,16 +261,29 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
     assert workflow_file.is_file()
     assert dependent_workflow_file.is_file()
     workflow_definition = workflow_file.read_text(encoding="utf-8")
-    assert "template: execute-proposed-pr" in workflow_definition
-    assert "proposed-pr-id: proposal-v1-foundation" in workflow_definition
-    assert "verification-command: scripts/verify-all.sh" in workflow_definition
+    assert "process_id: execute-proposed-pr-workflow" in workflow_definition
+    assert "proposed_pr_id: proposal-v1-foundation" in workflow_definition
+    assert "verification_command: scripts/verify-all.sh" in workflow_definition
     instance = load_plan_workflow_instance(workflow_file)
     assert instance.workflow_id == "proposal-v1-foundation"
-    assert instance.template_id == "execute-proposed-pr"
+    assert instance.process_id == "execute-proposed-pr-workflow"
     assert instance.dependencies == ()
-    assert instance.parameters == {
-        "proposed-pr-id": "proposal-v1-foundation",
-        "verification-command": "scripts/verify-all.sh",
+    assert instance.inputs == {
+        "work_item_name": "proposal-v1",
+        "proposed_pr_id": "proposal-v1-foundation",
+        "feature_description": "Deliver foundation from the plan.",
+        "proposed_pr_context": {
+            "plan_id": "proposal-v1",
+            "item_id": "foundation",
+            "title": "Implement foundation",
+            "objective": "Deliver foundation from the plan.",
+            "scope": ["component: foundation"],
+            "acceptance_criteria": [
+                "foundation meets its documented acceptance criteria."
+            ],
+            "dependencies": [],
+            "verification_command": "scripts/verify-all.sh",
+        },
     }
     assert not list((tmp_path / "docs/workflows/proposal-v1").glob("*-task-*.yaml"))
     dependent_instance = load_plan_workflow_instance(dependent_workflow_file)

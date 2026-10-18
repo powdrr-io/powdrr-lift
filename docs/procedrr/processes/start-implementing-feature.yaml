@@ -140,7 +140,7 @@ steps:
       \ and risks. Record every action-bearing id from the\n    feature-wide specification-v1\
       \ sections after the proposed_prs section,\n    preserving source order and action.\
       \ Label every change item with the\n    proposed_pr_id that will deliver it. Use the\n\
-      \    read_document action to inspect templates/execute-proposed-pr.yaml; do not\n  \
+      \    read_document action to inspect docs/procedrr/processes/execute-proposed-pr-workflow.yaml; do not\n  \
       \  use shell commands to read the template. A proposed PR dependency means\n    the\
       \ predecessor workflow is complete only after its integration pull\n    request is merged;\
       \ completion of the predecessor's final task or creation\n    of its pull request is\
@@ -255,24 +255,24 @@ steps:
       \ `feature_name`, and\n    `proposed_pr_specification_template` inputs from the preceding\
       \ steps. For each\n    validated proposed PR, inspect whether its matching workflow\n\
       \    already exists and reuse it when present. For each missing workflow,\n    inspect\
-      \ templates/execute-proposed-pr.yaml with read_document, resolve\n    every task input_state\
+      \ docs/procedrr/processes/execute-proposed-pr-workflow.yaml with read_document, resolve\n    every process input\
       \ placeholder from the matching validated proposed PR,\n    and prepare the complete\
-      \ instantiation\n    values. Use the fixed template, canonical feature name, distinct\
+      \ instantiation\n    values. Use the fixed Procedrr process, canonical feature name, distinct\
       \ workflow\n    instance names, proposed-PR order, and dependency relationships. Before\n\
       \    finalizing the values, use gather_context with type `tools` for the\n    selected\
       \ feature to discover the repository's authoritative test command.\n    Include that\
-      \ command as the `verification-command` template value for every\n    execute-proposed-pr\
+      \ command in `proposed_pr_context.verification_command` for every\n    execute-proposed-pr\
       \ workflow.\n    The workflow metadata file is named exactly\n    `<proposed_pr_id>-workflow.yaml`\
       \ inside\n    `docs/workflows/<canonical-feature-name>/`; `<proposed_pr_id>` is the\
       \ exact\n    id from `proposed_prs`, such as `interaction-log-core`. Do not prepend\
-      \ the\n    template id (`execute-proposed-pr`), the template filename, or a branch name.\n\
+      \ the\n    process id (`execute-proposed-pr-workflow`), the process filename, or a branch name.\n\
       \    Use the exact path returned by instantiation or an exact filename listed by\n \
       \   the workflow directory; never compose a filename from memory. Do not\n    pass workflow\
       \ dependencies manually: instantiate-workflow derives them from\n    dependent_prs in\
       \ the matching proposed PR specification. The resulting\n    workflow state must preserve\
       \ those derived dependencies so its integration\n    PR must be MERGED before any task\
       \ in the dependent workflow is selected.\n    Do not model this only as an upstream\
-      \ task dependency. Never ask the user\n    for a template path, leave a required placeholder\
+      \ task dependency. Never ask the user\n    for a process id, leave a required placeholder\
       \ empty, or overwrite an\n    existing workflow without approval. Pass an invocation\
       \ plan containing\n    every created or reused workflow and its proposed-PR relationship\
       \ onward.\n  outputs:\n  - name: verification-command\n    type: string\n    required_for_next_step:\
@@ -285,8 +285,8 @@ steps:
       \ previous_step\n  - name: verification-command\n    type: string\n    required: true\n\
       \    source: previous_step\n  - name: feature_name\n    type: string\n    required:\
       \ true\n    source: previous_step\n  details: >-\n    Invoke instantiate-workflow once\
-      \ for each missing workflow listed in the\n    `invocation-plan` input. Use templates/execute-proposed-pr.yaml,\
-      \ pass every\n    template-specific value with repeated --template-value NAME=VALUE\
+      \ for each missing workflow listed in the\n    `invocation-plan` input. Use docs/procedrr/processes/execute-proposed-pr-workflow.yaml,\
+      \ pass every\n    process inputs as JSON with repeated --process-input NAME=JSON\
       \ options,\n    Do not pass workflow dependencies manually: instantiate-workflow derives\n\
       \    them from the unified proposed-PR specification. The dependency graph is\n    the\
       \ source of truth; do not claim dependencies were applied unless they\n    are present\
@@ -314,13 +314,11 @@ steps:
       \ identities only in decisions_and_context.\n  tool_invocations:\n  - tool: internal\n\
       \    command:\n    - powdrr-lift\n    - instantiate-workflow\n    - --work-item-name\n\
       \    - <feature-name>\n    - --workflow-instance-name\n    - <proposed-pr-name>\n  \
-      \  - --template-value\n    - proposed-pr-id=<proposed-pr-name>\n    - --template-value\n\
-      \    - verification-command=<verification-command>\n    - --template\n    - templates/execute-proposed-pr.yaml\n\
+      \  - --process-input\n    - work_item_name=<feature-name-json>\n    - --process-input\n    - proposed_pr_id=<proposed-pr-name-json>\n    - --process-input\n    - feature_description=<feature-description-json>\n    - --process-input\n    - proposed_pr_context=<proposed-pr-context-json>\n    - --process\n    - execute-proposed-pr-workflow\n\
       \  - tool: internal\n    command:\n    - powdrr-lift\n    - instantiate-workflow\n \
       \   - --work-item-name\n    - <feature-name>\n    - --workflow-instance-name\n    -\
-      \ <proposed-pr-name>\n    - --template-value\n    - proposed-pr-id=<proposed-pr-name>\n\
-      \    - --template-value\n    - verification-command=<verification-command>\n    - --template\n\
-      \    - templates/execute-proposed-pr.yaml\n    - --force\n  outputs:\n  - name: workflow_instantiation_report\n\
+      \ <proposed-pr-name>\n    - --process-input\n    - work_item_name=<feature-name-json>\n    - --process-input\n    - proposed_pr_id=<proposed-pr-name-json>\n    - --process-input\n    - feature_description=<feature-description-json>\n    - --process-input\n    - proposed_pr_context=<proposed-pr-context-json>\n    - --process\n\
+      \    - execute-proposed-pr-workflow\n    - --force\n  outputs:\n  - name: workflow_instantiation_report\n\
       \    type: any\n    required_for_next_step: true\n    schema:\n      type: object\n\
       \      additionalProperties: false\n      properties:\n        workflows:\n        \
       \  type: array\n          items:\n            type: object\n            additionalProperties:\
@@ -337,7 +335,7 @@ steps:
       \ the dependency relationships in the unified proposed-PR file with every\n    generated\
       \ or reused `<proposed_pr_id>-workflow.yaml` in\n    docs/workflows/<feature-name>/.\
       \ The filename is derived only from the exact\n    proposed_pr_id; do not use the template\
-      \ id, template filename, branch name,\n    or a guessed name. If a path is not present\
+      \ id, process filename, branch name,\n    or a guessed name. If a path is not present\
       \ in the instantiation result,\n    use the exact filenames returned by read_document's\
       \ missing-file error\n    before reading it. Read each workflow state document and build\n\
       \    an exact table of workflow id to depends_on_workflows. Confirm that every\n   \

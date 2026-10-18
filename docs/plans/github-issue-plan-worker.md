@@ -40,15 +40,16 @@ using this schema. The top-level `source_document` field records the
 repository-relative path to the Markdown proposal, keeping the generated plan
 discoverably linked to its source. For every item, it writes one small workflow definition at
 `docs/workflows/<plan-id>/<workflow-id>.yaml`. The definition names the packaged
-`execute-proposed-pr` template and records its parameters, such as the proposed
-PR ID and verification command. Each workflow definition also lists prerequisite
+`execute-proposed-pr-workflow` Procedrr process and records its complete input
+object, including the proposed PR ID, reviewed item context, and verification
+command. Each workflow definition also lists prerequisite
 workflow IDs in its top-level `dependencies` field. The generator derives that
 list from the plan item's dependencies, and the worker verifies the two lists
 match before executing the workflow. The reviewed plan remains the source for
 the item's objective, scope, acceptance criteria, and dependency graph. The
-worker reads the definition and materializes the packaged task workflow when it
-claims the issue. Reviewers can revise the plan decomposition and template
-parameters in the PR. The command creates a unique branch, commits only the
+worker reads the definition and materializes a durable process-backed task when
+it claims the issue. Reviewers can revise the plan decomposition and process
+inputs in the PR. The command creates a unique branch, commits only the
 generated plan and workflow definitions, pushes it, and opens a pull request
 against the current branch. Other staged changes are excluded from the plan
 commit. The command does not create GitHub issues or execute work, and it
@@ -57,20 +58,29 @@ refuses to overwrite existing generated artifacts.
 For example, the integration workflow names its prerequisite explicitly:
 
 ```yaml
-schema: https://powdrr.io/schemas/plan-workflow-instance-v1
+schema: https://powdrr.io/schemas/plan-workflow-instance-v2
 workflow_id: local-validation-attestation-v1-pr-02
-template: execute-proposed-pr
+process_id: execute-proposed-pr-workflow
 dependencies:
   - local-validation-attestation-v1-pr-01
-parameters:
-  proposed-pr-id: local-validation-attestation-v1-pr-02
-  verification-command: bash attestation/scripts/verify-all.sh
+inputs:
+  work_item_name: Local validation attestation
+  proposed_pr_id: local-validation-attestation-v1-pr-02
+  feature_description: Add an end-to-end validation attestation.
+  proposed_pr_context:
+    plan_id: local-validation-attestation-v1
+    item_id: local-validation-attestation-v1-pr-02
+    title: Add end-to-end attestation
+    objective: Add an end-to-end validation attestation.
+    scope: [attestation scripts]
+    acceptance_criteria: [The attestation verifies all required checks.]
+    dependencies: [local-validation-attestation-v1-pr-01]
+    verification_command: bash attestation/scripts/verify-all.sh
 ```
 
-The caller supplies the repository validation command because generated PR
-workflows use it as their implementation-loop gate. The workflow's first task
-receives the structured plan item from the pinned plan; it does not rediscover or
-reinterpret the proposal.
+The process input includes the repository validation command and reviewed plan
+item. The task receives that context from the pinned plan; it does not rediscover
+or reinterpret the proposal.
 
 ```sh
 powdrr-lift plan \

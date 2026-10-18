@@ -26,8 +26,8 @@ from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
 
 MAX_SOURCE_PLAN_CHARS = 500_000
 MAX_PLAN_ITEMS = 100
-PLAN_WORKFLOW_SCHEMA = "https://powdrr.io/schemas/plan-workflow-instance-v1"
-PLAN_WORKFLOW_TEMPLATE = "execute-proposed-pr"
+PLAN_WORKFLOW_SCHEMA = "https://powdrr.io/schemas/plan-workflow-instance-v2"
+PLAN_WORKFLOW_PROCESS = "execute-proposed-pr-workflow"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 
 PLAN_ITEMS_RESPONSE_SCHEMA: dict[str, Any] = {
@@ -111,12 +111,12 @@ class PlanPullRequest:
 
 @dataclass(frozen=True, slots=True)
 class PlanWorkflowInstance:
-    """A compact reference to a packaged workflow template and its parameters."""
+    """A compact reference to a Procedrr process and its task inputs."""
 
     workflow_id: str
-    template_id: str
+    process_id: str
     dependencies: tuple[str, ...]
-    parameters: dict[str, str]
+    inputs: dict[str, Any]
 
 
 def load_plan_workflow_instance(path: str | Path) -> PlanWorkflowInstance:
@@ -130,23 +130,21 @@ def load_plan_workflow_instance(path: str | Path) -> PlanWorkflowInstance:
     if not isinstance(data, Mapping) or set(data) != {
         "schema",
         "workflow_id",
-        "template",
+        "process_id",
         "dependencies",
-        "parameters",
+        "inputs",
     }:
         raise PlanGenerationError("workflow definition has unknown or missing fields")
     if data.get("schema") != PLAN_WORKFLOW_SCHEMA:
         raise PlanGenerationError("workflow definition has an unsupported schema")
     workflow_id = data.get("workflow_id")
-    template_id = data.get("template")
+    process_id = data.get("process_id")
     raw_dependencies = data.get("dependencies")
-    parameters = data.get("parameters")
+    inputs = data.get("inputs")
     if not isinstance(workflow_id, str) or not _SAFE_ID.fullmatch(workflow_id):
         raise PlanGenerationError("workflow_id must be a stable safe identifier")
-    if template_id != PLAN_WORKFLOW_TEMPLATE:
-        raise PlanGenerationError(
-            f"unsupported plan workflow template: {template_id!r}"
-        )
+    if process_id != PLAN_WORKFLOW_PROCESS:
+        raise PlanGenerationError(f"unsupported plan workflow process: {process_id!r}")
     if (
         not isinstance(raw_dependencies, list)
         or not all(
@@ -159,26 +157,47 @@ def load_plan_workflow_instance(path: str | Path) -> PlanWorkflowInstance:
         raise PlanGenerationError(
             "dependencies must be unique workflow IDs without self-dependencies"
         )
+    if not isinstance(inputs, Mapping) or set(inputs) != {
+        "work_item_name",
+        "proposed_pr_id",
+        "feature_description",
+        "proposed_pr_context",
+    }:
+        raise PlanGenerationError(
+            "workflow process inputs have unknown or missing fields"
+        )
+    if inputs.get("proposed_pr_id") != workflow_id:
+        raise PlanGenerationError("proposed_pr_id must match workflow_id")
     if (
-        not isinstance(parameters, Mapping)
-        or set(parameters)
-        != {
-            "proposed-pr-id",
-            "verification-command",
-        }
-        or not all(isinstance(value, str) for value in parameters.values())
+        not isinstance(inputs.get("work_item_name"), str)
+        or not inputs["work_item_name"].strip()
     ):
-        raise PlanGenerationError("workflow parameters have unknown or missing fields")
-    if parameters.get("proposed-pr-id") != workflow_id:
-        raise PlanGenerationError("proposed-pr-id must match workflow_id")
-    verification_command = parameters.get("verification-command")
-    if not isinstance(verification_command, str) or not verification_command.strip():
-        raise PlanGenerationError("verification-command must not be empty")
+        raise PlanGenerationError("work_item_name must not be empty")
+    if (
+        not isinstance(inputs.get("feature_description"), str)
+        or not inputs["feature_description"].strip()
+    ):
+        raise PlanGenerationError("feature_description must not be empty")
+    context = inputs.get("proposed_pr_context")
+    if not isinstance(context, Mapping):
+        raise PlanGenerationError("proposed_pr_context must be an object")
+    for field in ("plan_id", "item_id", "title", "objective", "verification_command"):
+        value = context.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise PlanGenerationError(f"proposed_pr_context.{field} must not be empty")
+    for field in ("scope", "acceptance_criteria", "dependencies"):
+        value = context.get(field)
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) and item.strip() for item in value
+        ):
+            raise PlanGenerationError(
+                f"proposed_pr_context.{field} must be a string list"
+            )
     return PlanWorkflowInstance(
         workflow_id,
-        template_id,
+        process_id,
         tuple(raw_dependencies),
-        {key: str(value) for key, value in parameters.items()},
+        dict(inputs),
     )
 
 
@@ -307,7 +326,7 @@ def _render_plan_pull_request_body(
             "## Review this execution plan",
             "",
             "This pull request contains the generated queue plan, structured context "
-            "documents, and one `execute-proposed-pr` workflow per item.",
+            "documents, and one Procedrr process-backed workflow per item.",
             f"- Source plan: `{source_plan_path}`",
             f"- Queue plan: `{plan_path}`",
             "Review and revise these files together. After this PR merges, publish "
@@ -453,7 +472,7 @@ def write_execution_plan_artifacts(
     repo_root: Path,
     verification_command: str,
 ) -> tuple[Path, ...]:
-    """Write the queue plan and one compact template reference per work item."""
+    """Write the queue plan and one compact Procedrr process reference per item."""
     if not verification_command.strip():
         raise PlanGenerationError("verification_command must not be empty")
     output_path = output_path.resolve()
@@ -507,13 +526,24 @@ def write_execution_plan_artifacts(
             definition = {
                 "schema": PLAN_WORKFLOW_SCHEMA,
                 "workflow_id": item.workflow_id,
-                "template": PLAN_WORKFLOW_TEMPLATE,
+                "process_id": PLAN_WORKFLOW_PROCESS,
                 "dependencies": [
                     workflow_ids[dependency] for dependency in item.dependencies
                 ],
-                "parameters": {
-                    "proposed-pr-id": item.workflow_id,
-                    "verification-command": verification_command,
+                "inputs": {
+                    "work_item_name": plan.plan_id,
+                    "proposed_pr_id": item.workflow_id,
+                    "feature_description": item.objective,
+                    "proposed_pr_context": {
+                        "plan_id": plan.plan_id,
+                        "item_id": item.item_id,
+                        "title": item.title,
+                        "objective": item.objective,
+                        "scope": list(item.scope),
+                        "acceptance_criteria": list(item.acceptance_criteria),
+                        "dependencies": list(item.dependencies),
+                        "verification_command": verification_command,
+                    },
                 },
             }
             workflow_file.write_text(

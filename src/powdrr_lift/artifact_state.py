@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -28,8 +28,29 @@ def build_artifact_state(
     sha: str,
     repository: str | None = None,
     include_github: bool = True,
+    areas: Sequence[str] | None = None,
 ) -> dict[str, Any]:
-    """Build a read-only artifact inventory for a commit reachable from a branch."""
+    """Build a read-only artifact inventory for a commit reachable from a branch.
+
+    With no ``areas`` argument, return every area for backward compatibility.
+    Selecting plans also resolves their workflow attachments and, when enabled,
+    their matching pull requests.
+    """
+    available_areas = {
+        "bootstrap",
+        "entities",
+        "relationships",
+        "workflows",
+        "plans",
+        "changelogs",
+        "pull_requests",
+    }
+    selected_areas = set(areas) if areas else available_areas
+    unknown_areas = selected_areas - available_areas
+    if unknown_areas:
+        raise ArtifactStateError(
+            f"unknown artifact-state area(s): {', '.join(sorted(unknown_areas))}"
+        )
     root = Path(repo_root).resolve()
     commit = _git(root, "rev-parse", "--verify", f"{sha}^{{commit}}").strip()
     branch_commit = _git(root, "rev-parse", "--verify", f"{branch}^{{commit}}").strip()
@@ -47,18 +68,35 @@ def build_artifact_state(
         )
 
     paths = _git(root, "ls-tree", "-r", "--name-only", commit).splitlines()
-    bootstrap_path, bootstrap, bootstrap_commit_time = _load_bootstrap(
-        root, paths, commit
+    needs_bootstrap = bool(selected_areas & {"bootstrap", "entities", "relationships"})
+    bootstrap_path, bootstrap, bootstrap_commit_time = (
+        _load_bootstrap(root, paths, commit) if needs_bootstrap else (None, None, None)
     )
-    changelog_documents = _load_changelogs(root, paths, commit)
-    entities = _materialize_entities(
-        root, bootstrap, changelog_documents, bootstrap_commit_time
+    needs_changelogs = bool(
+        selected_areas & {"changelogs", "entities", "relationships"}
     )
-    relationships = _materialize_relationships(
-        root, bootstrap, changelog_documents, bootstrap_commit_time
+    changelog_documents = (
+        _load_changelogs(root, paths, commit) if needs_changelogs else []
     )
-    workflows = _load_workflows(root, paths, commit)
-    plans = _load_plans(root, paths, commit, workflows)
+    entities = (
+        _materialize_entities(
+            root, bootstrap, changelog_documents, bootstrap_commit_time
+        )
+        if "entities" in selected_areas
+        else []
+    )
+    relationships = (
+        _materialize_relationships(
+            root, bootstrap, changelog_documents, bootstrap_commit_time
+        )
+        if "relationships" in selected_areas
+        else []
+    )
+    needs_workflows = bool(selected_areas & {"workflows", "plans"})
+    workflows = _load_workflows(root, paths, commit) if needs_workflows else []
+    plans = (
+        _load_plans(root, paths, commit, workflows) if "plans" in selected_areas else []
+    )
 
     repository_name = repository or _github_repository(root)
     github_data: dict[str, Any] = {
@@ -69,7 +107,10 @@ def build_artifact_state(
         "error": None,
         "pull_requests": [],
     }
-    if include_github and repository_name:
+    should_load_github = include_github and bool(
+        selected_areas & {"plans", "pull_requests"}
+    )
+    if should_load_github and repository_name:
         github_data["pull_requests"], github_data["available"], github_data["error"] = (
             _load_pull_requests(repository_name)
         )
@@ -79,61 +120,79 @@ def build_artifact_state(
                 plan["pull_requests"] = matching
                 plan["pull_request_count"] = len(matching)
 
-    changelogs = [
-        {
-            "pr_number": document.pr_number,
-            "commit_sha": document.commit_sha,
-            "title": document.changelog.title,
-            "change_id": document.changelog.change_id,
-            "path": str(document.changelog_path.relative_to(root)),
-            "entities": [
-                {"id": item.id, "type": item.type, "action": item.action}
-                for item in document.changelog.entity_changes
-            ],
-            "entity_relationships": [
-                {
-                    "id": item.id,
-                    "source": item.source,
-                    "target": item.target,
-                    "relationship": item.relationship,
-                    "action": item.action,
-                }
-                for item in document.changelog.entity_relationship_changes
-            ],
-            "document": _read_yaml_at(
-                root, commit, str(document.changelog_path.relative_to(root))
-            ),
-        }
-        for document in changelog_documents
-    ]
-    return {
+    changelogs = (
+        [
+            {
+                "pr_number": document.pr_number,
+                "commit_sha": document.commit_sha,
+                "title": document.changelog.title,
+                "change_id": document.changelog.change_id,
+                "path": str(document.changelog_path.relative_to(root)),
+                "entities": [
+                    {"id": item.id, "type": item.type, "action": item.action}
+                    for item in document.changelog.entity_changes
+                ],
+                "entity_relationships": [
+                    {
+                        "id": item.id,
+                        "source": item.source,
+                        "target": item.target,
+                        "relationship": item.relationship,
+                        "action": item.action,
+                    }
+                    for item in document.changelog.entity_relationship_changes
+                ],
+                "document": _read_yaml_at(
+                    root, commit, str(document.changelog_path.relative_to(root))
+                ),
+            }
+            for document in changelog_documents
+        ]
+        if "changelogs" in selected_areas
+        else []
+    )
+    result: dict[str, Any] = {
         "schema": "https://powdrr.io/schemas/artifact-state-v1",
         "repository": repository_name,
         "branch": branch,
         "sha": commit,
-        "bootstrap": {
+        "selected_areas": sorted(selected_areas),
+    }
+    if "bootstrap" in selected_areas:
+        result["bootstrap"] = {
             "path": bootstrap_path,
             "commit_timestamp": bootstrap_commit_time,
             "present": bootstrap is not None,
             "document": dict(bootstrap) if bootstrap is not None else None,
-        },
-        "entities": entities,
-        "relationships": relationships,
-        "workflows": workflows,
-        "plans": plans,
-        "changelogs": changelogs,
-        "github": github_data,
-        "summary": {
-            "entity_count": len(entities),
-            "relationship_count": len(relationships),
-            "workflow_count": len(workflows),
-            "published_workflow_count": sum(
-                1 for workflow in workflows if workflow["published"]
-            ),
-            "plan_count": len(plans),
-            "changelog_count": len(changelogs),
-        },
-    }
+        }
+    if "entities" in selected_areas:
+        result["entities"] = entities
+    if "relationships" in selected_areas:
+        result["relationships"] = relationships
+    if "workflows" in selected_areas:
+        result["workflows"] = workflows
+    if "plans" in selected_areas:
+        result["plans"] = plans
+    if "changelogs" in selected_areas:
+        result["changelogs"] = changelogs
+    if "pull_requests" in selected_areas:
+        result["github"] = github_data
+    summary: dict[str, int] = {}
+    if "entities" in selected_areas:
+        summary["entity_count"] = len(entities)
+    if "relationships" in selected_areas:
+        summary["relationship_count"] = len(relationships)
+    if "workflows" in selected_areas:
+        summary["workflow_count"] = len(workflows)
+        summary["published_workflow_count"] = sum(
+            1 for workflow in workflows if workflow["published"]
+        )
+    if "plans" in selected_areas:
+        summary["plan_count"] = len(plans)
+    if "changelogs" in selected_areas:
+        summary["changelog_count"] = len(changelogs)
+    result["summary"] = summary
+    return result
 
 
 def _git(root: Path, *arguments: str) -> str:

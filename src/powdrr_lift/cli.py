@@ -999,6 +999,24 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Skip live GitHub pull request lookup.",
     )
+    for area in (
+        "bootstrap",
+        "entities",
+        "relationships",
+        "workflows",
+        "plans",
+        "changelogs",
+    ):
+        artifact_state_parser.add_argument(
+            f"--{area.replace('_', '-')}",
+            action="store_true",
+            help=f"Include the {area.replace('_', ' ')} area.",
+        )
+    artifact_state_parser.add_argument(
+        "--pull-requests",
+        action="store_true",
+        help="Include live GitHub pull request data.",
+    )
     artifact_state_parser.set_defaults(func=_run_artifact_state)
 
     current_state_parser = subparsers.add_parser(
@@ -4511,6 +4529,20 @@ def _run_codebase_state(args: argparse.Namespace) -> int:
 
 def _run_artifact_state(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
+    requested_areas = [
+        area
+        for area in (
+            "bootstrap",
+            "entities",
+            "relationships",
+            "workflows",
+            "plans",
+            "changelogs",
+        )
+        if getattr(args, area)
+    ]
+    if args.pull_requests:
+        requested_areas.append("pull_requests")
     try:
         report = build_artifact_state(
             repo_root,
@@ -4518,6 +4550,7 @@ def _run_artifact_state(args: argparse.Namespace) -> int:
             sha=args.sha,
             repository=args.repository,
             include_github=not args.no_github,
+            areas=requested_areas or None,
         )
     except ArtifactStateError as error:
         print(f"Could not build artifact state: {error}", file=sys.stderr)

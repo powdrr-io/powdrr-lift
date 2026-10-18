@@ -1,9 +1,9 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1016
-title: Report commit-pinned Powdrr artifact state
+title: Report commit-pinned Powdrr artifact state by area
 intent:
-  problem: Repository users cannot retrieve one complete view of plans, workflows, entities, and changelogs at a selected commit.
-  goal: Add a read-only CLI inventory that combines a Structrr bootstrap with later changelog changes and plan/workflow artifacts at a branch and SHA.
+  problem: Repository users cannot retrieve one complete view of Powdrr artifacts at a selected commit or request only the areas they need.
+  goal: Add a read-only CLI inventory that combines repository state at a branch and SHA, with independent selectors for bootstrap, entities, relationships, workflows, plans, changelogs, and pull requests.
 human-decisions: []
 structured_files: []
 files:
@@ -12,8 +12,8 @@ files:
   span:
     start_line: 1
     end_line: 680
-  summary: Build a commit-pinned artifact inventory
-  rationale: Read repository files and changelog history at the requested SHA, materialize entity lifecycle state, connect plans to workflows, and optionally attach live GitHub pull request metadata.
+  summary: Build a commit-pinned artifact inventory by selected area
+  rationale: Read only the repository artifact sections required by the selected areas while preserving plan workflow links and optional live GitHub pull request metadata.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
@@ -27,21 +27,21 @@ files:
     start_line: 977
     end_line: 1003
   summary: Add the artifact-state command options
-  rationale: Require branch and SHA inputs and allow selecting the local clone and GitHub repository.
+  rationale: Require branch and SHA inputs, allow selecting artifact areas, and configure the local clone and GitHub repository.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 4512
     end_line: 4528
   summary: Emit the artifact inventory as JSON
-  rationale: Return a machine-readable state report and surface revision-resolution errors.
+  rationale: Return a machine-readable report containing only requested areas and surface revision-resolution errors.
 - path: README.md
   type: modified
   span:
     start_line: 227
     end_line: 239
   summary: Document commit-pinned artifact inspection
-  rationale: Show how to request a repository artifact inventory and explain that GitHub pull request state is observed live.
+  rationale: Show how to request the full inventory or selected areas and explain that GitHub pull request state is observed live.
 entities:
 - id: artifact-state
   type: Command

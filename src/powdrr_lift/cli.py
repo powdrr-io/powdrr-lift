@@ -153,12 +153,7 @@ from powdrr_lift.workrr.ambiguity_review import (
     review_workflow_definition,
     review_workflow_definition_step,
 )
-from powdrr_lift.workrr.chat_agent import (
-    choose_workflow_provider,
-    download_local_qwen_model,
-    resolve_workflow_provider,
-)
-from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_tui import run_workflow_chat_tui
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttemptStore,
@@ -234,6 +229,7 @@ from powdrr_lift.workrr.human_task import (
     HumanTaskRunnerConfig,
     run_human_task,
 )
+from powdrr_lift.workrr.local_model import download_local_qwen_model
 from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
 from powdrr_lift.workrr.prompt_probe import (
     WorkflowPromptProbeError,
@@ -247,6 +243,7 @@ from powdrr_lift.workrr.provider_config import (
     default_llm_mappings,
     provider_definition,
 )
+from powdrr_lift.workrr.provider_runtime import resolve_workflow_provider
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
     resolve_provider_credentials,
@@ -280,6 +277,7 @@ from powdrr_lift.workrr.tuning import (
     save_workflow_tuning_report,
     tune_workflow,
 )
+from powdrr_lift.workrr.workflow_provider_selection import choose_workflow_provider
 
 run_workflow_chat = run_procedrr_workflow_chat
 

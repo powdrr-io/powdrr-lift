@@ -14,12 +14,12 @@ from typing import Any, TextIO, cast
 import laga
 
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_io import (
     _prompt_user,
     _verbose_json,
     _verbose_print,
 )
-from powdrr_lift.workrr.chat_selection import SkillChatConfig
 from powdrr_lift.workrr.execution_loop import _print_waiting_for_model
 from powdrr_lift.workrr.llm import (
     WorkflowLLMClient,
@@ -64,7 +64,7 @@ def _complete_json_with_model_fallback(
     model: str,
     parser: Callable[[dict[str, Any]], Any],
     repair_instructions: str,
-    config: SkillChatConfig,
+    config: WorkflowChatConfig,
     input_func: Callable[[], str],
     stdout: TextIO,
     stderr: TextIO,
@@ -165,7 +165,7 @@ def _complete_json_with_repair(
     model: str,
     parser: Callable[[dict[str, Any]], Any],
     repair_instructions: str,
-    config: SkillChatConfig,
+    config: WorkflowChatConfig,
     input_func: Callable[[], str],
     stdout: TextIO,
     stderr: TextIO,

@@ -19,13 +19,13 @@ from powdrr_lift.workrr.actions import (
     WorkflowEdit,
     WorkflowYamlOperation,
 )
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_context import (
     _load_workflow_context,
     _persist_workflow_context,
     _resolve_worktree_for_request,
 )
 from powdrr_lift.workrr.chat_io import _prompt_user
-from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
 from powdrr_lift.workrr.execution_state import _WorkflowExecutionState
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor

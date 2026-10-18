@@ -42,15 +42,15 @@ from powdrr_lift.workrr.chat_agent import (
     _ChatWorkflowExecutionStrategy,
     _workflow_action_signature,
     _WorkflowProgressDisplay,
-    resolve_workflow_provider,
 )
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_selection import (
-    SkillChatConfig,
     SkillChatSelection,
 )
 from powdrr_lift.workrr.execution_state import _WorkflowExecutionState
 from powdrr_lift.workrr.llm import WorkflowStepRunner
 from powdrr_lift.workrr.provider_config import DEFAULT_MODEL
+from powdrr_lift.workrr.provider_runtime import resolve_workflow_provider
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
     initial_model_for_provider,
@@ -572,7 +572,7 @@ def _run_scripted_skill(
         _validate_scripted_responses(responses)
     entry = SkillCatalogEntry(definition_path, skill)
     execution_client = client or _ScriptedWorkflowClient(responses)
-    config = SkillChatConfig(
+    config = WorkflowChatConfig(
         processes_dir=definition_path.parent,
         repo_root=worktree_root,
         provider=provider,

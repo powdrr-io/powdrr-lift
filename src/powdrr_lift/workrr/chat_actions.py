@@ -47,6 +47,7 @@ from powdrr_lift.workrr.action_validation import (
     _validate_structured_document_text,
     _worktree_relative_path,
 )
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_contract import (
     _file_edits_to_data,
     _normalize_structured_document_text,
@@ -54,7 +55,6 @@ from powdrr_lift.workrr.chat_contract import (
     _yaml_operation_to_data,
 )
 from powdrr_lift.workrr.chat_io import _prompt_user, _verbose_print
-from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
 from powdrr_lift.workrr.execution_loop import _execute_shell_tool
 from powdrr_lift.workrr.execution_state import (
     _ensure_execution_runtime,

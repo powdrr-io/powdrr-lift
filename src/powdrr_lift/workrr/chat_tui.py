@@ -18,7 +18,7 @@ from textual.events import Key, Resize
 from textual.widgets import Label, ListItem, ListView, TextArea
 
 from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
 
 run_workflow_chat = run_procedrr_workflow_chat

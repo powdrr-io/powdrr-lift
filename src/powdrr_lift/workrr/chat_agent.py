@@ -69,6 +69,7 @@ from powdrr_lift.workrr.action_validation import (
 from powdrr_lift.workrr.chat_actions import (
     _workflow_action_handlers,
 )
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_context import (
     _load_workflow_context,
     _persist_workflow_context,
@@ -90,7 +91,6 @@ from powdrr_lift.workrr.chat_io import (
     _write_agent_error,
 )
 from powdrr_lift.workrr.chat_selection import (
-    SkillChatConfig,
     SkillChatSelection,
     _active_llm_mappings,
     _build_selection_messages,
@@ -178,8 +178,6 @@ from powdrr_lift.workrr.provider_runtime import (
     WorkflowClientRegistry,
 )
 from powdrr_lift.workrr.providers import (
-    LOCAL_MODEL_PATTERN,
-    available_provider_names,
     initial_model_for_provider,
     provider_model_limits,
     resolve_llm_mapping,
@@ -196,7 +194,6 @@ from powdrr_lift.workrr.replay import (
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
 _MAX_EMPTY_QUESTION_REPROMPTS = 3
-_LOCAL_MODEL_REPOSITORY = "Qwen/Qwen2.5-Coder-14B-Instruct-GGUF"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_DOCUMENT_CONTEXT_LINES = 2000
@@ -245,7 +242,7 @@ class _ChatActionProgressStrategy(WorkflowActionProgressStrategy[SkillChatAction
 class _ChatWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     """Interactive adapter around the shared action-roundtrip driver."""
 
-    config: SkillChatConfig
+    config: WorkflowChatConfig
     selection: SkillChatSelection
     catalog: tuple[SkillCatalogEntry, ...]
     workflow_context: WorkflowContext | None
@@ -1835,7 +1832,7 @@ class _WorkflowProgressDisplay:
 
 
 def run_workflow_chat(
-    config: SkillChatConfig,
+    config: WorkflowChatConfig,
     *,
     input_func: Callable[[], str] = input,
     stdout: TextIO = sys.stdout,
@@ -1850,13 +1847,13 @@ def run_workflow_chat(
     error_log_root = resolve_project_root(configured_repo_root, configured_repo_root)
     project_root = configured_repo_root
     workflow_context = _load_workflow_context(project_root)
-    skills_dir = config.skills_dir
-    if not skills_dir.is_absolute():
-        skills_dir = configured_repo_root / skills_dir
+    processes_dir = config.processes_dir
+    if not processes_dir.is_absolute():
+        processes_dir = configured_repo_root / processes_dir
 
-    catalog = load_skill_catalog(skills_dir, stderr=stderr)
+    catalog = load_skill_catalog(processes_dir, stderr=stderr)
     if not catalog:
-        print(f"No skills found in {skills_dir}.", file=stderr)
+        print(f"No processes found in {processes_dir}.", file=stderr)
         return 1
 
     provider_roles = resolve_provider_roles(
@@ -1889,7 +1886,7 @@ def run_workflow_chat(
     _verbose_print(
         stderr,
         config.verbose,
-        f"Loaded {len(catalog)} skill(s) from {skills_dir}",
+        f"Loaded {len(catalog)} workflow(s) from {processes_dir}",
     )
     _verbose_print(stderr, config.verbose, f"Selected provider: {provider}")
     _verbose_print(stderr, config.verbose, f"Selected model: {current_model}")
@@ -1917,7 +1914,7 @@ def run_workflow_chat(
             error=error,
             context={
                 "request": user_request,
-                "skills_dir": str(skills_dir),
+                "processes_dir": str(processes_dir),
                 "available_skills": [
                     {
                         "name": entry.skill.name,
@@ -2799,101 +2796,6 @@ def _model_limits_for(provider: str, model: str) -> LLMModelLimits:
         model,
         local_context=resolve_local_model_context(),
     )
-
-
-def resolve_workflow_provider(
-    provider: str = "auto",
-    *,
-    normal_provider: str | None = None,
-) -> str:
-    """Resolve the normal provider using workflow-chat's provider policy."""
-    return resolve_provider_roles(
-        provider,
-        normal_provider=normal_provider,
-    ).normal
-
-
-def available_workflow_providers() -> tuple[str, ...]:
-    """Return API-backed providers that have usable credentials configured."""
-    return available_provider_names()
-
-
-def choose_workflow_provider(
-    *,
-    input_func: Callable[[], str] = input,
-    stdout: TextIO = sys.stdout,
-) -> str:
-    """Present configured API providers and return the user's selection."""
-    providers = available_workflow_providers()
-    if not providers:
-        raise PowdrrExecutionError(
-            "No workflow-chat providers are configured. Set an API key for at "
-            "least one supported provider before starting workflow-chat."
-        )
-    stdout.write("Available workflow-chat providers:\n")
-    for index, provider in enumerate(providers, start=1):
-        definition = provider_definition(provider)
-        stdout.write(f"  {index}. {definition.display_name} ({provider})\n")
-    stdout.write("Choose a provider by number or name: ")
-    stdout.flush()
-    while True:
-        answer = input_func().strip()
-        if answer.isdigit():
-            index = int(answer) - 1
-            if 0 <= index < len(providers):
-                stdout.write("\n")
-                return providers[index]
-        normalized = answer.casefold()
-        for provider in providers:
-            if normalized == provider.casefold():
-                stdout.write("\n")
-                return provider
-        stdout.write(
-            f"Choose a number from 1 to {len(providers)} or enter a provider name: "
-        )
-        stdout.flush()
-
-
-def download_local_qwen_model(model_cache_dir: Path) -> Path:
-    """Download the local Qwen GGUF shards into the configured cache."""
-    model_cache_dir.mkdir(parents=True, exist_ok=True)
-    cached_model_paths = sorted(model_cache_dir.glob(LOCAL_MODEL_PATTERN))
-    if _has_all_local_model_shards(cached_model_paths):
-        return cached_model_paths[0]
-    try:
-        from huggingface_hub import snapshot_download
-    except ImportError as exc:
-        raise PowdrrExecutionError(
-            "Automatic local model downloads require huggingface-hub."
-        ) from exc
-    try:
-        snapshot_directory = Path(
-            snapshot_download(
-                repo_id=_LOCAL_MODEL_REPOSITORY,
-                allow_patterns=[LOCAL_MODEL_PATTERN],
-                local_dir=str(model_cache_dir),
-            )
-        )
-    except Exception as exc:
-        raise PowdrrExecutionError(
-            "Could not download the Qwen Q5_K_M model from Hugging Face. "
-            f"Repository={_LOCAL_MODEL_REPOSITORY}, cache={model_cache_dir}. "
-            f"Underlying error: {type(exc).__name__}: {exc}"
-        ) from exc
-    model_paths = sorted(snapshot_directory.glob(LOCAL_MODEL_PATTERN))
-    if not _has_all_local_model_shards(model_paths):
-        raise PowdrrExecutionError(
-            "The Hugging Face Qwen repository did not provide all Q5_K_M GGUF shards."
-        )
-    return model_paths[0]
-
-
-def _has_all_local_model_shards(model_paths: Sequence[Path]) -> bool:
-    if not model_paths:
-        return False
-    match = re.search(r"-00001-of-(\d+)\.gguf$", model_paths[0].name)
-    expected_shards = int(match.group(1)) if match else 1
-    return len(model_paths) >= expected_shards
 
 
 def _split_system_message(

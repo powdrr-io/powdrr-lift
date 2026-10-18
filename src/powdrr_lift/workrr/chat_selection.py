@@ -15,6 +15,7 @@ from typing import Any
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.workrr.action_protocol import _optional_llm_type
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.context import WorkflowContext
 from powdrr_lift.workrr.prompting import (
     _available_work_item_documents,
@@ -23,7 +24,6 @@ from powdrr_lift.workrr.prompting import (
     _skill_step_to_data,
 )
 from powdrr_lift.workrr.provider_config import (
-    DEFAULT_MODEL,
     LLMModelMapping,
     LLMProviderRole,
     LLMProviderRoles,
@@ -58,36 +58,6 @@ class SkillChatSelection:
         return self.ready_to_execute
 
 
-@dataclass(frozen=True, slots=True)
-class WorkflowChatConfig:
-    processes_dir: Path
-    repo_root: Path | None = None
-    output_dir: Path | None = None
-    provider: str = "auto"
-    normal_provider: str | None = None
-    adversarial_provider: str | None = None
-    model: str = DEFAULT_MODEL
-    llm_mappings: tuple[tuple[str, LLMModelMapping], ...] = ()
-    api_key: str | None = None
-    base_url: str | None = None
-    max_turns: int = 8
-    max_stalled_roundtrips: int = 3
-    provider_retry_attempts: int = 3
-    provider_retry_delay_seconds: float = 30.0
-    verbose: bool = False
-    execution_id: str | None = None
-
-    @property
-    def skills_dir(self) -> Path:
-        """Temporary compatibility view for the retired chat interpreter."""
-        return self.processes_dir
-
-    @property
-    def templates_dir(self) -> Path:
-        return self.processes_dir
-
-
-SkillChatConfig = WorkflowChatConfig
 WorkflowChatResult = SkillChatResult
 WorkflowChatSelection = SkillChatSelection
 
@@ -312,7 +282,7 @@ def _selection_system_prompt() -> str:
 
 
 def _active_llm_mappings(
-    config: SkillChatConfig,
+    config: WorkflowChatConfig,
     provider_roles: LLMProviderRoles,
     role: LLMProviderRole,
 ) -> tuple[tuple[str, LLMModelMapping], ...]:

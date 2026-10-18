@@ -21,7 +21,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: specify-a-feature\ninputs:\n- name: pull-request-title\nwhen_to_use:\n- When\
@@ -65,10 +65,10 @@ steps:
       - id: prepare-pull-request\n  description: Run finish-pr-prep before creating the pull\
       \ request.\n  step_type: uses_process\n  llm_type: fast_iteration\n  details: >-\n   \
       \ Run finish-pr-prep after the intended specification artifacts are staged by\n    returning\
-      \ an task_run_process action for the listed finish-pr-prep skill. Do not\n    invoke it\
+      \ a task_run_process operation for the listed finish-pr-prep process. Do not\n    invoke it\
       \ through the internal CLI tool. If cleanup changes files, restage\n    only the validated\
       \ specification artifacts before continuing. Do not begin\n    implementation in this\
-      \ skill. Do not advance until the nested skill returns\n    both final_repository_state\
+      \ process. Do not advance until the nested process returns\n    both final_repository_state\
       \ and an accepted readiness_report. The readiness\n    report must include the current\
       \ staged-file scope and the complete results of\n    every validation obligation; do\
       \ not synthesize it from memory or treat a\n    successful repository-state check as\
@@ -79,8 +79,8 @@ steps:
       \ and pull-request title\n    `<pull-request-title>`. Pass a `files_to_publish` context\
       \ list containing\n    every validated specification document, along with the validated\n\
       \    specification documents, feature intent, and the accepted readiness_report.\n \
-      \   The nested skill must stage exactly that list. Do not begin implementation in\n\
-      \    this skill, and do not invoke it if readiness_report is missing or not\n    accepted.\n\
+      \   The nested process must stage exactly that list. Do not begin implementation in\n\
+      \    this process, and do not invoke it if readiness_report is missing or not\n    accepted.\n\
       \  uses_process:\n    process: create-pull-request"
     context:
     - user_request

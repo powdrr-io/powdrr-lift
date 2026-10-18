@@ -7,19 +7,12 @@ import re
 import subprocess
 import time
 from collections.abc import Callable, Mapping, Sequence
-from contextlib import nullcontext
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
-from functools import partial
 from pathlib import Path
 from typing import Any, TextIO
 
-from powdrr_lift.basedpyright_tools import (
-    BASEDPYRIGHT_STRUCTURE_TOOL,
-    BASEDPYRIGHT_SYMBOL_TOOL,
-    is_basedpyright_tool,
-)
-from powdrr_lift.builtin_tool_help import builtin_tool_help
+from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
 from powdrr_lift.core.spec_context import (
@@ -43,11 +36,6 @@ from powdrr_lift.pr_workflow_record import (
     pull_request_number,
     record_pull_request_workflow,
 )
-from powdrr_lift.process.action_catalog import step_actions
-from powdrr_lift.process.branching import select_branch_target
-from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.process.discovery import find_skill_by_name
-from powdrr_lift.process.step_behavior import behavior_for_step
 from powdrr_lift.process.tasks import (
     AgentRole,
     AssigneeType,
@@ -61,30 +49,13 @@ from powdrr_lift.workrr.action_operations import (
     _apply_file_edits,
     _apply_yaml_operations,
     _list_worktree_files,
-    _record_skill_pull_request,
     _resolve_pre_step_template,
-)
-from powdrr_lift.workrr.action_protocol import _parse_action_response
-from powdrr_lift.workrr.action_validation import (
-    _invalidate_deterministic_pre_step,
-    _step_index_by_id,
-    _validate_internal_command,
-    _validate_workflow_action_for_step,
-    _validate_workflow_action_outputs,
-    _validate_workflow_handoff,
-    _validation_gate_enabled,
-)
-from powdrr_lift.workrr.chat_agent import (
-    _build_step_execution_messages,
 )
 from powdrr_lift.workrr.error_logging import record_workflow_llm_error
 from powdrr_lift.workrr.execution_loop import (
     _execute_shell_tool,
-    _print_waiting_for_model,
-    _require_coding_loop_verification,
     _run_coding_loop_verification,
     _run_deterministic_pre_step,
-    _run_gate,
     _validate_coding_loop_action,
 )
 from powdrr_lift.workrr.git import (
@@ -103,7 +74,6 @@ from powdrr_lift.workrr.git import (
 from powdrr_lift.workrr.llm import (
     DEFAULT_MAX_ROUNDTRIPS,
     PowdrrExecutionError,
-    ProgrammerInvariantError,
     ProgressDecision,
     RepairContext,
     RepairDirective,
@@ -115,19 +85,8 @@ from powdrr_lift.workrr.llm import (
     WorkflowActionObservation,
     WorkflowActionOutcome,
     WorkflowActionProgressStrategy,
-    WorkflowActionRequest,
-    WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
     WorkflowLLMClient,
-    WorkflowStepRunner,
-    assert_material_repair_prompt,
-    build_clean_room_action_parameters_prompt,
-    build_clean_room_action_selection_prompt,
-    build_repair_prompt_manifest,
-    complete_json_with_timeout_retry,
-    complete_two_pass_action,
-    prompt_size_breakdown,
-    prune_execution_events,
     resolve_deterministic_repair,
     workflow_action_failure_signature,
     workflow_action_signature,
@@ -138,18 +97,13 @@ from powdrr_lift.workrr.observer import (
     ObserverDecision,
     observer_action_matches,
 )
+from powdrr_lift.workrr.operation_validation import validate_internal_command
 from powdrr_lift.workrr.paths import (
     resolve_project_root,
     resolve_worktree_file_path,
 )
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
-from powdrr_lift.workrr.prompting import (
-    _action_system_prompt,
-    _step_needs_prompt_catalog,
-    build_modular_action_system_prompt,
-    interaction_style_prompt,
-)
 from powdrr_lift.workrr.provider_config import (
     DEFAULT_LLM_TYPE,
     DEFAULT_MODEL,
@@ -158,11 +112,9 @@ from powdrr_lift.workrr.provider_config import (
 )
 from powdrr_lift.workrr.provider_runtime import (
     maybe_record_llm_exchanges,
-    model_limits_for,
     resolve_workflow_provider,
 )
 from powdrr_lift.workrr.providers import (
-    _estimate_message_tokens,
     build_provider_client,
     long_context_backup_for,
     resolve_llm_mapping,
@@ -387,18 +339,12 @@ class _WorkflowTaskDisplayClient:
 
 
 @dataclass(slots=True)
-class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
-    """Durable-task adapter for the shared action-roundtrip driver.
-
-    Its policy is intentionally limited to durable task state, publishing, and
-    human handoff. Requesting, parsing, retrying, failure thresholds, and
-    no-progress correction are all owned by ``WorkflowStepRunner``.
-    """
+class _TaskWorkflowExecutionStrategy:
+    """Durable task operation adapter called by the Procedrr evaluator."""
 
     config: WorkflowTaskAgentConfig
     workflow: WorkflowInstance
     task: WorkflowTask
-    skill_catalog: tuple[SkillCatalogEntry, ...]
     repo_root: Path
     error_log_root: Path
     client: WorkflowLLMClient
@@ -426,235 +372,6 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
     terminalized: bool = False
     terminal_exit_code: int | None = None
 
-    def next_request(self) -> WorkflowActionRequest | None:
-        if self.terminalized:
-            return None
-        while True:
-            selection_messages = None
-            selection_schema = None
-            parameter_messages_for = None
-            parameter_schema_for = None
-            stage_started = time.perf_counter()
-            messages = _build_task_messages(
-                self.workflow,
-                self.task,
-                self.events,
-                repo_root=self.repo_root,
-                skill_catalog=self.skill_catalog,
-                response_correction=self.response_correction,
-                compacted_context=self.compacted_context,
-                runtime_context=(
-                    self.runtime.prompt_context() if self.runtime is not None else None
-                ),
-                observer_intervention=self.observer_intervention,
-            )
-            self._record_prompt_timing("assemble_messages", stage_started)
-            if self.clean_room_repair_pending and not self.clean_room_repair_used:
-                self.clean_room_repair_pending = False
-                self.clean_room_repair_used = True
-                runtime_actions = (
-                    self.runtime.allowed_actions() if self.runtime is not None else ()
-                )
-                allowed_actions = tuple(runtime_actions or ())
-                recovery_context = {
-                    "task_id": self.task.task_id,
-                    "objective": self.task.description,
-                    "details": self.task.details,
-                    "input_state": self.task.input_state,
-                    "output_state_type": self.task.output_state_type,
-                    "allowed_actions": list(allowed_actions),
-                    "repair_context": self.repair_context().to_data(),
-                    "recent_failures": [
-                        {
-                            key: event.get(key)
-                            for key in ("kind", "action_kind", "tool", "error")
-                            if key in event
-                        }
-                        for event in self.events[-6:]
-                        if event.get("kind")
-                        in {
-                            "validation_error",
-                            "action_error",
-                            "tool_error",
-                            "no_progress",
-                        }
-                    ],
-                }
-                context_json = json.dumps(
-                    recovery_context, ensure_ascii=False, separators=(",", ":")
-                )
-                error_message = self.response_correction or (
-                    "The previous workflow strategy failed to make progress."
-                )
-                stage_started = time.perf_counter()
-                selection_messages, selection_schema, manifest = (
-                    build_clean_room_action_selection_prompt(
-                        context=context_json,
-                        error_message=error_message,
-                        allowed_actions=allowed_actions,
-                        model=self.model,
-                    )
-                )
-                self._record_prompt_timing("build_repair_prompt", stage_started)
-
-                def parameter_schema_for(selected_action: str) -> Mapping[str, Any]:
-                    return {
-                        "type": "object",
-                        "properties": {
-                            "action": {
-                                "type": "string",
-                                "enum": [selected_action],
-                            }
-                        },
-                        "required": ["action"],
-                        "additionalProperties": True,
-                    }
-
-                def _parameter_messages(
-                    selected_action: str,
-                    context: str = context_json,
-                    error: str = error_message,
-                    schema_for: Callable[
-                        [str], Mapping[str, Any]
-                    ] = parameter_schema_for,
-                    model: str = self.model,
-                ) -> list[dict[str, str]]:
-                    parameter_messages, _ = build_clean_room_action_parameters_prompt(
-                        context=context,
-                        error_message=error,
-                        selected_action=selected_action,
-                        response_schema=schema_for(selected_action),
-                        model=model,
-                    )
-                    return parameter_messages
-
-                parameter_messages_for = _parameter_messages
-                if self.repair_prompt_manifest is None:
-                    raise ProgrammerInvariantError(
-                        "Clean-room repair requested without a prior task prompt "
-                        "manifest.",
-                        error_code="repair_prompt_manifest_missing",
-                    )
-                assert_material_repair_prompt(self.repair_prompt_manifest, manifest)
-                self.events.append(
-                    {
-                        "kind": "repair_attempt",
-                        "stage": "clean_room_action_selection",
-                        "prompt_manifest": manifest.to_data(),
-                    }
-                )
-                self.repair_prompt_manifest = manifest
-                messages = selection_messages
-            else:
-                stage_started = time.perf_counter()
-                self.repair_prompt_manifest = build_repair_prompt_manifest(
-                    messages,
-                    profile="normal_full_context",
-                    source_sections=(
-                        "task",
-                        "workflow_context",
-                        "events",
-                        "runtime_state",
-                        "available_tools",
-                        "available_skills",
-                    ),
-                    history_policy="bounded",
-                    reasoning_mode="direct_action",
-                    model=self.model,
-                )
-                self._record_prompt_timing("build_repair_manifest", stage_started)
-            limits = model_limits_for(self.mapping_provider, self.model)
-            stage_started = time.perf_counter()
-            estimated_input_tokens = _estimate_message_tokens(messages)
-            self._record_prompt_timing("estimate_input_tokens", stage_started)
-            print(
-                f"Workflow task context: {estimated_input_tokens} estimated input "
-                f"tokens of {limits.context_window} allowed.",
-                file=self.stderr,
-                flush=True,
-            )
-            if self.config.verbose:
-                stage_started = time.perf_counter()
-                prompt_breakdown = json.dumps(
-                    prompt_size_breakdown(messages), indent=2, sort_keys=True
-                )
-                print(
-                    f"Workflow task prompt size breakdown:\n{prompt_breakdown}",
-                    file=self.stderr,
-                    flush=True,
-                )
-                self._record_prompt_timing("prompt_size_breakdown", stage_started)
-            compaction_threshold = _context_compaction_threshold(
-                limits.context_window,
-                self.config.context_compaction_threshold,
-            )
-            if (
-                estimated_input_tokens < compaction_threshold
-                and estimated_input_tokens + 1024 < limits.context_window
-            ):
-                _print_waiting_for_model(self.stderr, self.model)
-                request_action = None
-                if selection_messages is not None:
-                    assert selection_schema is not None
-                    assert parameter_messages_for is not None
-                    assert parameter_schema_for is not None
-                    request_action = partial(
-                        self._request_two_pass_action,
-                        selection_messages,
-                        selection_schema=selection_schema,
-                        parameter_messages_for=parameter_messages_for,
-                        parameter_schema_for=parameter_schema_for,
-                        allowed_actions=allowed_actions,
-                    )
-                return WorkflowActionRequest(
-                    client=self.client,
-                    messages=messages,
-                    parser=_parse_action_response,
-                    model=self.model,
-                    stderr=self.stderr,
-                    max_timeout_retries=self.config.max_timeout_retries,
-                    timeout_backoff_seconds=self.config.timeout_backoff_seconds,
-                    request_action=request_action,
-                )
-
-            print(
-                "Compacting workflow task context before the next LLM call: "
-                f"{estimated_input_tokens} estimated input tokens would exceed "
-                f"the {compaction_threshold}-token proactive threshold or the "
-                f"{limits.context_window}-token context window.",
-                file=self.stderr,
-                flush=True,
-            )
-            self.compacted_context, before_tokens, after_tokens = (
-                _compact_workflow_task_context(
-                    self.workflow,
-                    self.task,
-                    self.events,
-                    client=self.compaction_client,
-                    stderr=self.stderr,
-                    max_timeout_retries=self.config.max_timeout_retries,
-                    timeout_backoff_seconds=self.config.timeout_backoff_seconds,
-                )
-            )
-            if self.runtime is not None and self.compacted_context is not None:
-                self.compacted_context = self.runtime.compact_prompt_context(
-                    self.compacted_context
-                )
-            self.events.append(
-                {
-                    "kind": "context_compaction",
-                    "before_estimated_input_tokens": before_tokens,
-                    "after_estimated_input_tokens": after_tokens,
-                }
-            )
-            print(
-                "Compacted workflow task context: "
-                f"{before_tokens} -> {after_tokens} estimated input tokens.",
-                file=self.stderr,
-                flush=True,
-            )
-            self.response_correction = None
-
     def _record_prompt_timing(self, stage: str, started: float) -> None:
         """Attach prompt preparation timing to the workflow event stream."""
         self.events.append(
@@ -663,31 +380,6 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                 "stage": stage,
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
             }
-        )
-
-    def _request_two_pass_action(
-        self,
-        selection_messages: list[dict[str, str]],
-        *,
-        selection_schema: Mapping[str, Any],
-        parameter_messages_for: Callable[[str], list[dict[str, str]]],
-        parameter_schema_for: Callable[[str], Mapping[str, Any]],
-        allowed_actions: Sequence[str],
-    ) -> WorkflowAction:
-        return complete_two_pass_action(
-            self.client,
-            selection_messages=selection_messages,
-            selection_schema=selection_schema,
-            parameter_messages_for=parameter_messages_for,
-            parameter_schema_for=parameter_schema_for,
-            parser=_parse_action_response,
-            allowed_actions=allowed_actions,
-            model=self.model,
-            stderr=self.stderr,
-            max_timeout_retries=self.config.max_timeout_retries,
-            timeout_backoff_seconds=self.config.timeout_backoff_seconds,
-            fallback_client=self.repair_fallback_client,
-            fallback_model=self.repair_fallback_model,
         )
 
     def material_state(self, action: WorkflowAction) -> object:
@@ -1200,34 +892,6 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             return WorkflowActionOutcome()
         if action.kind == "prompt_user":
             return self._handoff(_prompt_user_handoff(action, self.task), "handoff")
-        if action.kind == "invoke_skill":
-            if action.skill_name is None:
-                raise PowdrrExecutionError(
-                    "invoke_skill action must include a skill name."
-                )
-            self.events.append(
-                {
-                    "kind": action.kind,
-                    "skill": action.skill_name,
-                    "result": _run_skill_for_agent(
-                        action.skill_name,
-                        catalog=self.skill_catalog,
-                        client=self.client,
-                        task=self.task,
-                        repo_root=self.repo_root,
-                        stdout=self.stdout,
-                        stderr=self.stderr,
-                        max_timeout_retries=self.config.max_timeout_retries,
-                        timeout_backoff_seconds=self.config.timeout_backoff_seconds,
-                        verbose=self.config.verbose,
-                        context=action.context,
-                        clean=action.clean,
-                        error_log_root=self.error_log_root,
-                        runtime=self.runtime,
-                    ),
-                }
-            )
-            return WorkflowActionOutcome()
         if action.kind == "invoke_tool":
             self._execute_tool(action)
             return WorkflowActionOutcome()
@@ -1282,10 +946,6 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             recommended_action = ObserverActionRecommendation(
                 kind="goto_step", step_id=decision.target_step_id
             )
-        if recommended_action is None and decision.target_skill_name:
-            recommended_action = ObserverActionRecommendation(
-                kind="invoke_skill", skill_name=decision.target_skill_name
-            )
         if recommended_action:
             self.observer_allowed_action = recommended_action
             if self.runtime is not None:
@@ -1298,22 +958,12 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
         self.observer_intervention = "Observer intervention\n" + "\n".join(
             f"- {item}" for item in guidance
         )
-        if decision.target_skill_name:
-            self.observer_intervention += (
-                "\n- If choosing invoke_skill, use "
-                f"skill={decision.target_skill_name!r}."
-            )
         if decision.verdict == "redirect" and decision.target_step_id:
             self.observer_intervention += (
                 "\n- Redirect ignored: durable workflow tasks do not expose "
-                "skill step ids."
+                "process step ids."
             )
         self.observer_rejected_action_signature = workflow_action_signature(action)
-        if decision.verdict == "redirect" and decision.target_skill_name:
-            try:
-                find_skill_by_name(self.skill_catalog, decision.target_skill_name)
-            except RuntimeError as error:
-                self.observer_intervention += f"\n- Skill redirect ignored: {error}"
         self.events.append(
             {
                 "kind": "observer_intervention",
@@ -1323,7 +973,6 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     asdict(recommended_action) if recommended_action else None
                 ),
                 "target_step_id": decision.target_step_id,
-                "target_skill_name": decision.target_skill_name,
                 "action": json.loads(workflow_action_signature(action)),
                 "material_progress": (
                     observation.made_progress if observation is not None else None
@@ -1345,7 +994,6 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
                     else None
                 ),
                 target_step_id=decision.target_step_id,
-                target_skill_name=decision.target_skill_name,
             )
         return observation is None
 
@@ -1411,7 +1059,7 @@ class _TaskWorkflowExecutionStrategy(WorkflowExecutionStrategy):
             }
         elif action.tool in {"shell", "internal"}:
             if action.tool == "internal" and action.parameters.get("help") is not True:
-                _validate_internal_command(action.parameters.get("command"))
+                validate_internal_command(action.parameters.get("command"))
             result = invoke_shell_capability(
                 {**action.parameters, "_tool_name": action.tool},
                 worktree_root=self.repo_root,
@@ -1818,10 +1466,7 @@ class _TaskProcedrrOperations:
             raise PowdrrExecutionError(
                 "task_run_process requires process_id and a bindings mapping"
             )
-        if self.task.actions_declared and not {
-            "task_run_process",
-            "invoke_skill",
-        }.intersection(self.task.actions):
+        if self.task.actions_declared and "task_run_process" not in self.task.actions:
             raise PowdrrExecutionError(
                 "task_run_process is not allowed by the task action contract"
             )
@@ -2076,9 +1721,6 @@ def run_workflow_task(
         print(f"Could not load Procedrr processes: {error}", file=stderr)
         return 1
     process_directory = process_catalog.get("durable-task").path.parent
-    # The old strategy type remains temporarily for shared action adapters, but
-    # the durable task path no longer loads or selects legacy skill definitions.
-    skill_catalog: tuple[SkillCatalogEntry, ...] = ()
     workflow = _select_workflow_instance(
         WorkflowInstance.from_directory(workflow_dir),
         configured_workflow_id,
@@ -2336,7 +1978,6 @@ def run_workflow_task(
             config=config,
             workflow=workflow,
             task=task,
-            skill_catalog=skill_catalog,
             repo_root=repo_root,
             error_log_root=dump_root,
             client=task_client,
@@ -3184,187 +2825,6 @@ def _delete_workflow_task_worktree(repo_root: Path, *, stderr: TextIO) -> None:
         )
 
 
-def _build_task_messages(
-    workflow: WorkflowInstance,
-    task: WorkflowTask,
-    events: list[dict[str, Any]],
-    *,
-    repo_root: Path | None = None,
-    response_correction: str | None = None,
-    compacted_context: dict[str, Any] | None = None,
-    runtime_context: dict[str, Any] | None = None,
-    skill_catalog: tuple[SkillCatalogEntry, ...] = (),
-    observer_intervention: str | None = None,
-) -> list[dict[str, str]]:
-    resolved_task_data = _resolve_task_prompt_data(task.to_data(), task.input_state)
-    context_data: dict[str, Any]
-    if compacted_context is None:
-        context_data = {
-            "task_context": _task_context_prompt_data(workflow, task),
-            "events": _task_events_for_prompt(events),
-        }
-        deterministic_pre_step = _deterministic_pre_step_prompt_data(events, task)
-        if deterministic_pre_step is not None:
-            context_data["deterministic_pre_step"] = deterministic_pre_step
-    else:
-        context_data = {"compacted_context": compacted_context}
-    if runtime_context is not None:
-        context_data["runtime_state"] = runtime_context
-    workflow_dir = str(workflow.directory)
-    if repo_root is not None:
-        try:
-            workflow_dir = str(workflow.directory.relative_to(repo_root))
-        except ValueError:
-            pass
-    available_skills: list[dict[str, Any]] = []
-    for entry in skill_catalog:
-        skill_data: dict[str, Any] = {"name": entry.skill.name}
-        if entry.skill.name in task.uses_processes:
-            skill_data["when_to_use"] = list(entry.skill.when_to_use)
-        available_skills.append(skill_data)
-    return [
-        {
-            "role": "system",
-            "content": _task_system_prompt(
-                task=task,
-                interaction_style=task.interaction_style,
-            ),
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                {
-                    "execution_mode": "process_workflow_task",
-                    "task": resolved_task_data,
-                    **context_data,
-                    "step_context": (
-                        [response_correction] if response_correction is not None else []
-                    ),
-                    **(
-                        {"observer_intervention": observer_intervention}
-                        if observer_intervention is not None
-                        else {}
-                    ),
-                    "workflow_dir": workflow_dir,
-                    "workflow_files": _workflow_file_names(workflow.directory),
-                    "available_tools": [
-                        {
-                            "name": tool,
-                            "description": (
-                                str(builtin_tool_help(tool)["summary"])
-                                + " Set parameters.help=true for the tool's "
-                                "conventional --help guidance, parameters, and "
-                                "examples."
-                            ),
-                        }
-                        for tool in (
-                            "shell",
-                            "internal",
-                            GIT_TOOL,
-                            GH_TOOL,
-                            "fuzzy-match",
-                            BASEDPYRIGHT_SYMBOL_TOOL,
-                            BASEDPYRIGHT_STRUCTURE_TOOL,
-                        )
-                    ],
-                    "available_skills": available_skills,
-                },
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ),
-        },
-    ]
-
-
-def _compact_workflow_task_context(
-    workflow: WorkflowInstance,
-    task: WorkflowTask,
-    events: list[dict[str, Any]],
-    *,
-    client: WorkflowLLMClient,
-    stderr: TextIO,
-    max_timeout_retries: int,
-    timeout_backoff_seconds: float,
-) -> tuple[dict[str, Any], int, int]:
-    resolved_task_data = _resolve_task_prompt_data(task.to_data(), task.input_state)
-    actionable_context = _task_events_for_prompt(events)
-    compaction_messages = [
-        {
-            "role": "system",
-            "content": (
-                "You are compacting context for a workflow task. Review the full "
-                "task and all current context, then preserve only the information "
-                "necessary for another LLM to perform this exact task. Preserve "
-                "specific paths, commands, requirements, decisions, constraints, "
-                "errors, and outputs that remain actionable. Do not invent or "
-                "execute anything. Return exactly one JSON object with a single "
-                "compacted_context key whose value is the necessary context."
-            ),
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                {
-                    "task": resolved_task_data,
-                    "task_description": resolved_task_data["description"],
-                    "task_details": resolved_task_data.get("details"),
-                    "current_context": {
-                        "task_context": _resolve_task_prompt_data(
-                            workflow.task_context(task.task_id), task.input_state
-                        ),
-                        "events": events,
-                        "latest_actionable": actionable_context,
-                    },
-                    "response_shape": {
-                        "compacted_context": (
-                            "Only context necessary to perform the full task"
-                        )
-                    },
-                },
-                ensure_ascii=False,
-                separators=(",", ":"),
-            ),
-        },
-    ]
-    before_tokens = _estimate_message_tokens(compaction_messages)
-    print(
-        "waiting for context compaction LLM response...",
-        file=stderr,
-        flush=True,
-    )
-    response = complete_json_with_timeout_retry(
-        client,
-        compaction_messages,
-        model="context-compaction",
-        stderr=stderr,
-        max_timeout_retries=max_timeout_retries,
-        timeout_backoff_seconds=timeout_backoff_seconds,
-    )
-    compacted_context = response.get("compacted_context")
-    if not isinstance(compacted_context, dict):
-        raise PowdrrExecutionError(
-            "Context compaction response must include a compacted_context object."
-        )
-    # The compaction model may summarize aggressively, but it must never be
-    # allowed to discard the latest repairable result or failure.
-    compacted_context = {
-        **compacted_context,
-        "latest_actionable": actionable_context,
-    }
-    after_tokens = _estimate_message_tokens(
-        [
-            {
-                "role": "user",
-                "content": json.dumps(
-                    {"task": task.to_data(), "compacted_context": compacted_context},
-                    ensure_ascii=False,
-                ),
-            }
-        ]
-    )
-    return compacted_context, before_tokens, after_tokens
-
-
 def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
     message = str(exc).casefold()
     return any(
@@ -3400,10 +2860,10 @@ def _nested_action_response_correction(
     rejected_action: str | None = None,
     required_outputs: Sequence[str] = (),
 ) -> str:
-    """Return actionable repair guidance for a nested skill response."""
+    """Return actionable repair guidance for a nested process response."""
     allowed = ", ".join((*allowed_actions, "next_step")) or "next_step"
     correction = (
-        f"The nested skill response was invalid: {error} "
+        f"The nested process response was invalid: {error} "
         "Return exactly one corrected JSON object for the current nested step. "
         f'The top-level "action" must be one of: {allowed}. '
         "Do not repeat the rejected action or its arguments. "
@@ -3449,7 +2909,7 @@ def _materialize_interview_input(
         "type": "any",
         "value": values,
         "produced_by": {"step_index": step_index, "action": "json_update"},
-        "scope": "skill",
+        "scope": "process",
     }
     return path
 
@@ -3632,123 +3092,6 @@ def _task_action_failure_reached(
     return True
 
 
-def _task_system_prompt(
-    *, task: WorkflowTask, interaction_style: str | None = None
-) -> str:
-    action_prompt = (
-        build_modular_action_system_prompt(
-            task,
-            step_actions=step_actions(task),
-            include_context=_step_needs_prompt_catalog(task, "context_types"),
-            include_skills=_step_needs_prompt_catalog(task, "skills"),
-            validation_gate_enabled=_validation_gate_enabled(task),
-            interaction_style=interaction_style,
-        )
-        if task.actions_declared
-        else _action_system_prompt()
-    )
-    early_termination_guidance = (
-        " Use `complete` only for an early workflow termination when no later task "
-        "should run, such as when the proposed PR is superseded."
-        if not task.actions_declared or "complete" in task.actions
-        else ""
-    )
-    return (
-        action_prompt
-        + "\nDurable workflow-task contract: this is one task that may contain "
-        "multiple actions. Use `next_step` when this task is finished: it persists "
-        "this task's declared output_state and advances the workflow to the next "
-        "task." + early_termination_guidance + " If this is "
-        "the final task, `next_step` completes the workflow after persisting its "
-        "output. For durable task completion, the result MUST be under "
-        "the top-level `output_state` field; never put it under `outputs`. "
-        "Use only the actions listed for this task, and only when an action "
-        "advances this task. Every builtin tool accepts "
-        "parameters.help = true without normal command arguments; this is the "
-        "tool's conventional --help option. Invoke that form when you need "
-        "detailed parameters, examples, or usage "
-        "guidance. A help response does not count as a successful task tool "
-        "invocation.\n" + interaction_style_prompt(interaction_style)
-    )
-
-
-def _workflow_file_names(workflow_dir: Path) -> list[str]:
-    return sorted(
-        path.name
-        for pattern in ("*.yaml", "*.yml", "*.json")
-        for path in workflow_dir.glob(pattern)
-        if path.is_file() and not path.name.endswith("-workflow.yaml")
-    )
-
-
-_TASK_PROMPT_EVENT_KEYS = (
-    "kind",
-    "action_kind",
-    "tool",
-    "skill",
-    "step_id",
-    "step_index",
-    "feature_id",
-    "types",
-    "keywords",
-    "file_path",
-    "operations",
-    "error",
-    "message",
-    "decisions_and_context",
-)
-
-
-def _task_context_prompt_data(
-    workflow: WorkflowInstance, task: WorkflowTask
-) -> dict[str, Any]:
-    """Return only durable context needed to continue the current task.
-
-    The workflow files and complete event log remain the source of truth. This
-    projection is deliberately smaller because it is sent on every LLM
-    roundtrip and upstream outputs are already the only cross-task values the
-    task can consume.
-    """
-    context = workflow.task_context(task.task_id)
-    return _resolve_task_prompt_data(
-        {
-            "input_state": context.get("input_state", {}),
-            "upstream_outputs": context.get("upstream_outputs", {}),
-        },
-        task.input_state,
-    )
-
-
-def _deterministic_pre_step_prompt_data(
-    events: Sequence[Mapping[str, Any]], task: WorkflowTask
-) -> dict[str, Any] | None:
-    """Make a deterministic pre-step authoritative even for sparse task files."""
-    event = next(
-        (
-            item
-            for item in reversed(events)
-            if item.get("kind") == "deterministic_pre_step"
-        ),
-        None,
-    )
-    if event is None:
-        return None
-    return {
-        "status": "already_completed",
-        "action": event.get("action"),
-        "output_state_type": task.output_state_type,
-        "result": event.get("result"),
-        "required_output_state": {task.output_state_type: event.get("result")},
-        "instructions": (
-            "This deterministic pre-step already ran. Its result is authoritative. "
-            "Do not search for, rediscover, reinterpret, or invoke it again. "
-            "The next action must be next_step with output_state exactly equal to "
-            "the required_output_state object shown here, including its typed "
-            "top-level key. Do not put the raw result directly in output_state."
-        ),
-    }
-
-
 def _run_task_deterministic_pre_step(
     task: WorkflowTask,
     *,
@@ -3784,7 +3127,7 @@ def _run_task_deterministic_pre_step(
                 handoff_records["work-item-name"] = {"value": value}
         _run_deterministic_pre_step(
             task,
-            skill_name="workflow-task",
+            process_id="workflow-task",
             worktree_root=repo_root,
             execution_events=events,
             execution_context=[],
@@ -3853,77 +3196,13 @@ def _run_task_deterministic_pre_step(
     return {task.output_state_type: result}, True
 
 
-def _task_event_metadata(event: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        key: event[key]
-        for key in _TASK_PROMPT_EVENT_KEYS
-        if key in event and event[key] not in (None, [], {}, "")
-    }
-
-
-def _task_event_has_failure(event: Mapping[str, Any]) -> bool:
-    if event.get("kind") in {
-        "action_error",
-        "tool_error",
-        "llm_response_error",
-        "no_progress",
-    }:
-        return True
-    if event.get("error"):
-        return True
-    result = event.get("result")
-    return isinstance(result, Mapping) and result.get("returncode", 0) != 0
-
-
-def _task_event_result_for_prompt(event: Mapping[str, Any]) -> Any:
-    compacted = prune_execution_events(
-        [{"kind": event.get("kind"), "result": event.get("result")}],
-        include_results=True,
+def _workflow_file_names(workflow_dir: Path) -> list[str]:
+    return sorted(
+        path.name
+        for pattern in ("*.yaml", "*.yml", "*.json")
+        for path in workflow_dir.glob(pattern)
+        if path.is_file() and not path.name.endswith("-workflow.yaml")
     )
-    return compacted[0].get("result") if compacted else None
-
-
-def _task_events_for_prompt(events: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """Build a compact event view without discarding durable execution data.
-
-    Action parameters and results can contain whole files or command output.
-    Older results are not useful once the next action has succeeded, while the
-    most recent result is still important for choosing the next action. Errors
-    remain attached to their event so a repair response has its cause.
-    """
-    prompt_events = [event for event in events if event.get("kind") != "prompt_timing"]
-    recent_events = prompt_events[-12:]
-    metadata = [_task_event_metadata(event) for event in recent_events]
-    latest_result_event: dict[str, Any] | None = None
-    latest_failure_event: dict[str, Any] | None = None
-    latest_failure_result: Any = None
-    for event in reversed(prompt_events):
-        if "result" in event:
-            if latest_result_event is None:
-                latest_result_event = _task_event_metadata(event)
-            if _task_event_has_failure(event) and latest_failure_event is None:
-                latest_failure_event = _task_event_metadata(event)
-                latest_failure_result = _task_event_result_for_prompt(event)
-        elif _task_event_has_failure(event) and latest_failure_event is None:
-            latest_failure_event = _task_event_metadata(event)
-        if latest_result_event is not None and latest_failure_event is not None:
-            break
-    prompt_data: dict[str, Any] = {"recent": metadata}
-    if latest_result_event is not None:
-        prompt_data["latest_result"] = {
-            "event": latest_result_event,
-            "value": _task_event_result_for_prompt(
-                next(event for event in reversed(events) if "result" in event)
-            ),
-        }
-    if latest_failure_event is not None:
-        prompt_data["latest_failure"] = {
-            "event": latest_failure_event,
-            "value": latest_failure_result,
-        }
-    if len(events) > len(recent_events):
-        prompt_data["omitted_event_count"] = len(events) - len(recent_events)
-    return prompt_data
 
 
 def _workflow_file_command_error(
@@ -3995,1064 +3274,6 @@ def _repair_workflow_file_command(
     return repaired_parameters
 
 
-@dataclass(slots=True)
-class _NestedSkillExecutionFrame:
-    skill: SkillCatalogEntry
-    step_index: int
-    clean_context: bool
-    parent_transcript: list[dict[str, str]]
-    parent_events: list[dict[str, Any]]
-    parent_context: list[str]
-    parent_handoff_records: dict[str, dict[str, Any]]
-
-
-@dataclass(slots=True)
-class _NestedSkillExecutionStrategy(WorkflowExecutionStrategy):
-    """Run a durable task's nested skill through the shared step runner."""
-
-    catalog: tuple[SkillCatalogEntry, ...]
-    client: WorkflowLLMClient
-    task: WorkflowTask
-    repo_root: Path
-    stdout: TextIO
-    stderr: TextIO
-    max_timeout_retries: int
-    timeout_backoff_seconds: float
-    verbose: bool
-    error_log_root: Path | None
-    transcript: list[dict[str, str]]
-    execution_events: list[dict[str, Any]]
-    execution_context: list[str]
-    handoff_records: dict[str, dict[str, Any]]
-    stack: list[_NestedSkillExecutionFrame]
-    current_skill: SkillCatalogEntry | None = None
-    current_step: Any = None
-    current_step_index: int = 0
-    driver: WorkflowStepRunner | None = None
-    runtime: ExecutionRuntime | None = None
-    response_correction: str | None = None
-    clean_room_repair_pending: bool = False
-    clean_room_repair_used: bool = False
-    repair_prompt_manifest: RepairPromptManifest | None = None
-    _repair_step_identity: tuple[str, int] | None = None
-    stalled_actions: dict[str, object] = field(default_factory=dict)
-
-    def _restore_completed_skill(self, frame: _NestedSkillExecutionFrame) -> None:
-        if frame.clean_context:
-            self.transcript = frame.parent_transcript
-            self.execution_events = frame.parent_events
-            self.execution_context = frame.parent_context
-            self.handoff_records = frame.parent_handoff_records
-
-    def next_request(self) -> WorkflowActionRequest | None:
-        while self.stack:
-            frame = self.stack[-1]
-            if frame.step_index >= len(frame.skill.skill.steps):
-                self.stack.pop()
-                self._restore_completed_skill(frame)
-                continue
-            self.current_skill = frame.skill
-            self.current_step_index = frame.step_index
-            self.current_step = frame.skill.skill.steps[frame.step_index]
-            repair_step_identity = (frame.skill.skill.name, frame.step_index)
-            if repair_step_identity != self._repair_step_identity:
-                self._repair_step_identity = repair_step_identity
-                self.response_correction = None
-                self.clean_room_repair_pending = False
-                self.clean_room_repair_used = False
-                self.repair_prompt_manifest = None
-                self.stalled_actions.clear()
-            step = self.current_step
-            step_behavior = behavior_for_step(step)
-            if self.runtime is not None:
-                self.runtime.install_step_scope(
-                    step_behavior.runtime_actions(getattr(step, "actions", ())),
-                    enforce_empty=getattr(step, "actions_declared", False),
-                )
-                self.runtime.set_action_contract(
-                    step_behavior.runtime_actions(getattr(step, "actions", ())),
-                    enforce_empty=getattr(step, "actions_declared", False),
-                )
-            if step_behavior.runs_branch:
-                target_step_id = select_branch_target(step.branch, self.handoff_records)
-                target_index = _step_index_by_id(frame.skill, target_step_id)
-                self.execution_events.append(
-                    {
-                        "kind": "goto_step",
-                        "skill": frame.skill.skill.name,
-                        "step_id": target_step_id,
-                        "target_step_index": target_index,
-                        "source": "branch",
-                    }
-                )
-                frame.step_index = target_index
-                continue
-            if step_behavior.runs_gate:
-                if step.gate is None:
-                    raise PowdrrExecutionError("gate steps require gate settings.")
-                if self.runtime is not None:
-                    self.runtime.install_step_scope(frozenset())
-                try:
-                    with (
-                        self.runtime.without_action_contract()
-                        if self.runtime is not None
-                        else nullcontext()
-                    ):
-                        passed = _run_gate(
-                            step,
-                            skill_name=frame.skill.skill.name,
-                            worktree_root=self.repo_root,
-                            execution_events=self.execution_events,
-                            execution_context=self.execution_context,
-                            handoff_records=self.handoff_records,
-                            step_index=frame.step_index,
-                            workflow_context=None,
-                            stdout=self.stdout,
-                            stderr=self.stderr,
-                            verbose=self.verbose,
-                            runtime=self.runtime,
-                        )
-                finally:
-                    if self.runtime is not None:
-                        self.runtime.install_step_scope(
-                            step_behavior.runtime_actions(step.actions),
-                            enforce_empty=step.actions_declared,
-                        )
-                target_index = frame.step_index + 1
-                if not passed:
-                    target_index = _step_index_by_id(frame.skill, step.gate.goto_step)
-                    _invalidate_deterministic_pre_step(
-                        self.execution_events,
-                        skill_name=frame.skill.skill.name,
-                        step_index=target_index,
-                    )
-                    self.execution_events.append(
-                        {
-                            "kind": "goto_step",
-                            "skill": frame.skill.skill.name,
-                            "step_id": step.gate.goto_step,
-                            "target_step_index": target_index,
-                            "source": "gate",
-                        }
-                    )
-                frame.step_index = target_index
-                continue
-            if not step_behavior.invokes_llm and step.pre_step is not None:
-                with (
-                    self.runtime.without_action_contract()
-                    if self.runtime is not None
-                    else nullcontext()
-                ):
-                    _run_deterministic_pre_step(
-                        step,
-                        skill_name=frame.skill.skill.name,
-                        worktree_root=self.repo_root,
-                        execution_events=self.execution_events,
-                        execution_context=self.execution_context,
-                        handoff_records=self.handoff_records,
-                        step_index=frame.step_index,
-                        workflow_context=None,
-                        stdout=self.stdout,
-                        stderr=self.stderr,
-                        verbose=self.verbose,
-                        runtime=self.runtime,
-                    )
-                frame.step_index += 1
-                continue
-            messages = _build_step_execution_messages(
-                selected_skill=frame.skill,
-                current_step=step,
-                current_step_index=frame.step_index,
-                transcript=self.transcript,
-                execution_events=self.execution_events,
-                execution_context=self.execution_context,
-                handoff_records=self.handoff_records,
-                current_file_path=None,
-                worktree_root=self.repo_root,
-                catalog=self.catalog,
-            )
-            selection_messages = None
-            selection_schema = None
-            parameter_messages_for = None
-            parameter_schema_for = None
-            allowed_actions = tuple(
-                (self.runtime.allowed_actions() or ())
-                if self.runtime is not None
-                else ()
-            )
-            if self.clean_room_repair_pending and not self.clean_room_repair_used:
-                self.clean_room_repair_pending = False
-                self.clean_room_repair_used = True
-                recovery_context = {
-                    "task_id": self.task.task_id,
-                    "skill": frame.skill.skill.name,
-                    "step_id": getattr(step, "id", None),
-                    "step_index": frame.step_index,
-                    "objective": getattr(step, "description", None),
-                    "allowed_actions": list(allowed_actions),
-                    "execution_context": list(self.execution_context[-8:]),
-                    "recent_failures": [
-                        {
-                            key: event.get(key)
-                            for key in ("kind", "action_kind", "tool", "error")
-                            if key in event
-                        }
-                        for event in self.execution_events[-8:]
-                        if event.get("kind")
-                        in {"llm_output_error", "action_error", "no_progress"}
-                    ],
-                }
-                context_json = json.dumps(
-                    recovery_context, ensure_ascii=False, separators=(",", ":")
-                )
-                error_message = self.response_correction or (
-                    "The previous nested workflow strategy failed to make progress."
-                )
-                selection_messages, selection_schema, manifest = (
-                    build_clean_room_action_selection_prompt(
-                        context=context_json,
-                        error_message=error_message,
-                        allowed_actions=allowed_actions,
-                        model="nested-skill",
-                    )
-                )
-
-                def parameter_schema_for(selected_action: str) -> Mapping[str, Any]:
-                    return {
-                        "type": "object",
-                        "properties": {
-                            "action": {"type": "string", "enum": [selected_action]}
-                        },
-                        "required": ["action"],
-                        "additionalProperties": True,
-                    }
-
-                def _parameter_messages(
-                    selected_action: str,
-                    context: str = context_json,
-                    error: str = error_message,
-                    schema_for: Callable[
-                        [str], Mapping[str, Any]
-                    ] = parameter_schema_for,
-                ) -> list[dict[str, str]]:
-                    parameter_messages, _ = build_clean_room_action_parameters_prompt(
-                        context=context,
-                        error_message=error,
-                        selected_action=selected_action,
-                        response_schema=schema_for(selected_action),
-                        model="nested-skill",
-                    )
-                    return parameter_messages
-
-                parameter_messages_for = _parameter_messages
-                if self.repair_prompt_manifest is None:
-                    self.repair_prompt_manifest = build_repair_prompt_manifest(
-                        messages,
-                        profile="normal_full_context",
-                        source_sections=("skill", "step", "transcript", "events"),
-                        history_policy="bounded",
-                        reasoning_mode="direct_action",
-                        model="nested-skill",
-                    )
-                assert_material_repair_prompt(self.repair_prompt_manifest, manifest)
-                self.repair_prompt_manifest = manifest
-                self.execution_events.append(
-                    {
-                        "kind": "repair_attempt",
-                        "stage": "clean_room_action_selection",
-                        "skill": frame.skill.skill.name,
-                        "step_id": getattr(step, "id", None),
-                        "prompt_manifest": manifest.to_data(),
-                    }
-                )
-                messages = selection_messages
-            else:
-                self.repair_prompt_manifest = build_repair_prompt_manifest(
-                    messages,
-                    profile="normal_full_context",
-                    source_sections=("skill", "step", "transcript", "events"),
-                    history_policy="bounded",
-                    reasoning_mode="direct_action",
-                    model="nested-skill",
-                )
-            request_action = None
-            if selection_messages is not None:
-                assert selection_schema is not None
-                assert parameter_messages_for is not None
-                assert parameter_schema_for is not None
-                request_action = partial(
-                    self._request_two_pass_action,
-                    selection_messages,
-                    selection_schema=selection_schema,
-                    parameter_messages_for=parameter_messages_for,
-                    parameter_schema_for=parameter_schema_for,
-                    allowed_actions=allowed_actions,
-                )
-            return WorkflowActionRequest(
-                client=self.client,
-                messages=messages,
-                parser=_parse_action_response,
-                model="nested-skill",
-                stderr=self.stderr,
-                max_timeout_retries=self.max_timeout_retries,
-                timeout_backoff_seconds=self.timeout_backoff_seconds,
-                request_action=request_action,
-            )
-        return None
-
-    def _request_two_pass_action(
-        self,
-        selection_messages: list[dict[str, str]],
-        *,
-        selection_schema: Mapping[str, Any],
-        parameter_messages_for: Callable[[str], list[dict[str, str]]],
-        parameter_schema_for: Callable[[str], Mapping[str, Any]],
-        allowed_actions: Sequence[str],
-    ) -> WorkflowAction:
-        return complete_two_pass_action(
-            self.client,
-            selection_messages=selection_messages,
-            selection_schema=selection_schema,
-            parameter_messages_for=parameter_messages_for,
-            parameter_schema_for=parameter_schema_for,
-            parser=_parse_action_response,
-            allowed_actions=allowed_actions,
-            model="nested-skill",
-            stderr=self.stderr,
-            max_timeout_retries=self.max_timeout_retries,
-            timeout_backoff_seconds=self.timeout_backoff_seconds,
-        )
-
-    def material_state(self, action: WorkflowAction) -> object:
-        if action.kind not in {"edit", "invoke_tool"}:
-            return None
-        paths = (
-            [group.file_path for group in action.file_edits]
-            if action.file_edits
-            else ([action.file_path] if action.file_path is not None else [])
-        )
-        return tuple(
-            (
-                file_path,
-                (
-                    resolve_worktree_file_path(file_path, self.repo_root).read_text(
-                        encoding="utf-8"
-                    )
-                    if resolve_worktree_file_path(file_path, self.repo_root).exists()
-                    else None
-                ),
-            )
-            for file_path in paths
-        )
-
-    def report_roundtrip(self, roundtrip: int, action: WorkflowAction) -> None:
-        if self.verbose:
-            print(
-                f"Nested skill LLM action:\n{workflow_action_signature(action)}",
-                file=self.stdout,
-                flush=True,
-            )
-        print(
-            f"Nested skill roundtrip {roundtrip}: {workflow_action_summary(action)}",
-            file=self.stdout,
-            flush=True,
-        )
-
-    def repair_context(self) -> RepairContext:
-        step = self.current_step
-        state = {
-            "skill": self.current_skill.skill.name if self.current_skill else None,
-            "step_id": getattr(step, "id", None),
-            "step_index": self.current_step_index,
-            "execution_events": self.execution_events[-8:],
-        }
-        fingerprint = hashlib.sha256(
-            json.dumps(state, sort_keys=True, default=str).encode()
-        ).hexdigest()
-        return RepairContext(
-            execution_id=self.task.task_id,
-            boundary_id=(
-                f"{self.current_skill.skill.name}:{self.current_step_index}"
-                if self.current_skill
-                else self.task.task_id
-            ),
-            objective=getattr(step, "description", None) or self.task.description,
-            deterministic_state=state,
-            allowed_actions=tuple(
-                (self.runtime.allowed_actions() or ())
-                if self.runtime is not None
-                else ()
-            ),
-            required_outputs=tuple(
-                output.name for output in getattr(step, "outputs", ())
-            ),
-            material_state_fingerprint=fingerprint,
-        )
-
-    def record_repair_directive(self, directive: RepairDirective) -> None:
-        self.execution_events.append(
-            {
-                "kind": "repair_attempt",
-                "stage": directive.stage.value,
-                "attempt": directive.attempt,
-                "reason": directive.reason,
-                "allowed_actions": list(directive.allowed_actions),
-                "prompt_profile": directive.prompt_profile,
-                "model_policy": directive.model_policy,
-                "failure_class": directive.failure_class.value,
-                "error_code": directive.error_code,
-                "target_signature": directive.target_signature,
-                "repair_context": self.repair_context().to_data(),
-            }
-        )
-
-    def record_no_progress(
-        self,
-        action: WorkflowAction,
-        observation: WorkflowActionObservation,
-    ) -> None:
-        action_signature = workflow_action_failure_signature(
-            action, signature=workflow_action_signature
-        )
-        self.stalled_actions[action_signature] = self.material_state(action)
-        self.execution_events.append(
-            {
-                "kind": "no_progress",
-                "skill": self.current_skill.skill.name if self.current_skill else None,
-                "action_kind": action.kind,
-                "action_signature": action_signature,
-                "message": observation.correction,
-            }
-        )
-        self.execution_context.append(
-            "The previous nested workflow action made no progress; choose "
-            "a different action or next_step."
-        )
-        self.response_correction = observation.correction
-        if not self.clean_room_repair_used:
-            self.clean_room_repair_pending = True
-
-    def record_response_error(
-        self,
-        error: RuntimeError,
-        payload: dict[str, Any] | None,
-    ) -> None:
-        if not _is_repairable_task_response_error(error):
-            raise error
-        if getattr(
-            self.current_step, "id", None
-        ) == "store-interview-input" and "Workflow edit action" in str(error):
-            path = _materialize_interview_input(
-                repo_root=self.repo_root,
-                step=self.current_step,
-                handoff_records=self.handoff_records,
-                step_index=self.current_step_index,
-            )
-            if path is not None:
-                self.execution_events.append(
-                    {
-                        "kind": "json_update",
-                        "skill": self.current_skill.skill.name
-                        if self.current_skill
-                        else None,
-                        "step_id": self.current_step.id,
-                        "step_index": self.current_step_index,
-                        "file_path": str(path.relative_to(self.repo_root)),
-                        "source": "deterministic_repair",
-                    }
-                )
-                self.execution_context.append(
-                    "A deterministic JSON update repaired the interview input. "
-                    "Do not return edit again; choose next_step."
-                )
-                return
-        correction = _nested_action_response_correction(
-            RuntimeError(str(error)),
-            allowed_actions=tuple(
-                getattr(self.current_step, "actions", ())
-                if self.current_step is not None
-                else ()
-            ),
-            required_outputs=tuple(
-                output.name for output in getattr(self.current_step, "outputs", ())
-            ),
-        )
-        if self.error_log_root is not None:
-            record_workflow_llm_error(
-                self.error_log_root,
-                execution_mode="process_workflow_task",
-                phase="nested_skill_llm_output_parse",
-                error=error,
-                context={
-                    "task_id": self.task.task_id,
-                    "skill_name": (
-                        self.current_skill.skill.name if self.current_skill else None
-                    ),
-                    "step_id": getattr(self.current_step, "id", None),
-                    "step_index": self.current_step_index,
-                },
-                llm_output=payload,
-                guidance=correction,
-            )
-        self.execution_events.append(
-            {
-                "kind": "llm_output_error",
-                "skill": self.current_skill.skill.name if self.current_skill else None,
-                "step_id": getattr(self.current_step, "id", None),
-                "step_index": self.current_step_index,
-                "error": str(error),
-                "llm_output": payload,
-                "guidance": correction,
-            }
-        )
-        self.execution_context.append(correction)
-        self.response_correction = correction
-        if not self.clean_room_repair_used:
-            self.clean_room_repair_pending = True
-        print(
-            f"Nested skill action response needs clean-room repair: {error}",
-            file=self.stderr,
-        )
-
-    def execute_action(self, action: WorkflowAction) -> WorkflowActionOutcome:
-        if self.current_skill is None or self.current_step is None:
-            raise PowdrrExecutionError("Nested skill action has no active step.")
-        frame = self.stack[-1]
-        step = self.current_step
-        _reject_repeated_stalled_action(
-            action,
-            self.stalled_actions,
-            self.material_state(action),
-        )
-        if (
-            action.kind == "next_step"
-            and not action.outputs
-            and isinstance(action.output_state, Mapping)
-            and step.outputs
-            and set(action.output_state).issubset(
-                {output.name for output in step.outputs}
-            )
-        ):
-            action = replace(action, outputs=dict(action.output_state))
-        if action.kind == "next_step":
-            _require_coding_loop_verification(
-                step,
-                self.execution_events,
-                worktree_root=self.repo_root,
-            )
-        _validate_workflow_action_for_step(action, step)
-        _validate_workflow_action_outputs(action, step)
-        if action.kind in {"complete", "next_step"}:
-            _record_task_action_outputs(
-                action, self.handoff_records, step, frame.step_index
-            )
-        if action.kind == "complete":
-            self.stack.pop()
-            self._restore_completed_skill(frame)
-            self.execution_events.append(
-                {"kind": action.kind, "skill": self.current_skill.skill.name}
-            )
-            return WorkflowActionOutcome()
-        if action.kind == "next_step":
-            if getattr(step, "id", None) == "store-interview-input" and any(
-                output.name == "interview_input" for output in step.outputs
-            ):
-                input_files = sorted(
-                    self.repo_root.glob("docs/proposals/*/design-interview-input.json")
-                )
-                if len(input_files) == 1:
-                    action = replace(
-                        action,
-                        outputs={
-                            "interview_input": json.loads(
-                                input_files[0].read_text(encoding="utf-8")
-                            )
-                        },
-                    )
-            next_step = (
-                frame.skill.skill.steps[frame.step_index + 1]
-                if frame.step_index + 1 < len(frame.skill.skill.steps)
-                else None
-            )
-            _validate_workflow_handoff(
-                step,
-                next_step,
-                self.handoff_records,
-                current_step_index=frame.step_index,
-            )
-            self.transcript = self.transcript[:1]
-            frame.step_index += 1
-            self.execution_events.append(
-                {"kind": action.kind, "skill": frame.skill.skill.name}
-            )
-            return WorkflowActionOutcome()
-        if action.kind == "goto_step":
-            target_index = _step_index_by_id(frame.skill, action.step_id)
-            frame.step_index = target_index
-            if action.decisions_and_context:
-                self.execution_context.append(action.decisions_and_context)
-            self.execution_events.append(
-                {
-                    "kind": action.kind,
-                    "skill": frame.skill.skill.name,
-                    "step_id": action.step_id,
-                    "target_step_index": target_index,
-                    "decisions_and_context": action.decisions_and_context,
-                }
-            )
-            return WorkflowActionOutcome()
-        if action.kind == "invoke_skill":
-            if action.skill_name is None:
-                raise PowdrrExecutionError(
-                    "invoke_skill action must include a skill name."
-                )
-            nested_skill = find_skill_by_name(self.catalog, action.skill_name)
-            if any(entry.skill.path == nested_skill.path for entry in self.stack):
-                raise PowdrrExecutionError(
-                    f"Recursive skill invocation is not allowed: {action.skill_name!r}."
-                )
-            nested_context = list(action.context)
-            if action.decisions_and_context is not None:
-                nested_context.append(action.decisions_and_context)
-            self.stack.append(
-                _NestedSkillExecutionFrame(
-                    skill=nested_skill,
-                    step_index=0,
-                    clean_context=action.clean,
-                    parent_transcript=list(self.transcript),
-                    parent_events=list(self.execution_events),
-                    parent_context=list(self.execution_context),
-                    parent_handoff_records=(
-                        dict(self.handoff_records)
-                        if action.clean
-                        else self.handoff_records
-                    ),
-                )
-            )
-            self.execution_events.append(
-                {"kind": action.kind, "skill": action.skill_name}
-            )
-            if action.clean:
-                self.transcript = []
-                self.execution_events = []
-                self.execution_context = nested_context
-                self.handoff_records = {}
-            else:
-                self.execution_context.extend(nested_context)
-            return WorkflowActionOutcome()
-        if action.kind == "gather_context":
-            report = invoke_repository_read(
-                "gather_context",
-                {
-                    "types": list(action.types),
-                    "feature_id": action.feature_id,
-                    "keywords": list(action.keywords),
-                },
-                worktree_root=self.repo_root,
-                executor=lambda _arguments: gather_specification_context(
-                    self.repo_root,
-                    types=list(action.types),
-                    feature_id=action.feature_id,
-                    keywords=list(action.keywords),
-                ),
-                runtime=self.runtime,
-            )
-            gathered_context = render_gather_context_report(report)
-            self.execution_events.append(
-                {
-                    "kind": action.kind,
-                    "step_index": frame.step_index,
-                    "result": json.loads(gathered_context),
-                }
-            )
-            self.transcript.append(
-                {"role": "user", "content": f"Gathered context:\n{gathered_context}"}
-            )
-            _record_task_action_outputs(
-                action, self.handoff_records, step, frame.step_index
-            )
-            return WorkflowActionOutcome()
-        if action.kind == "read_document":
-            self.execution_events.append(
-                {
-                    "kind": action.kind,
-                    "result": invoke_repository_read(
-                        "read_document",
-                        {
-                            "file_path": action.file_path,
-                            "start_line": action.start_line,
-                            "end_line": action.end_line,
-                        },
-                        worktree_root=self.repo_root,
-                        executor=lambda _arguments: _read_task_document(
-                            action, self.repo_root
-                        ),
-                        runtime=self.runtime,
-                    ),
-                }
-            )
-            _record_task_action_outputs(
-                action, self.handoff_records, step, frame.step_index
-            )
-            return WorkflowActionOutcome()
-        if action.kind == "edit":
-            self.execution_events.append(
-                {
-                    "kind": action.kind,
-                    "result": invoke_file_mutation(
-                        _task_edit_paths(action),
-                        worktree_root=self.repo_root,
-                        executor=lambda: _apply_task_edits(action, self.repo_root),
-                        runtime=self.runtime,
-                    ),
-                }
-            )
-            _record_task_action_outputs(
-                action, self.handoff_records, step, frame.step_index
-            )
-            verification = _run_coding_loop_verification(
-                step,
-                worktree_root=self.repo_root,
-                stdout=self.stdout,
-                stderr=self.stderr,
-                verbose=self.verbose,
-                runtime=self.runtime,
-            )
-            if verification is not None:
-                self.execution_events.append(
-                    {
-                        "kind": "coding_loop_verification",
-                        "step_index": frame.step_index,
-                        **verification,
-                    }
-                )
-                if verification["all_passed"]:
-                    completion_guidance = (
-                        "Automatic coding-loop verification passed all declared "
-                        "checks. The stopping conditions are satisfied; choose "
-                        "next_step now with the required output_state. Do not "
-                        "edit, reread files, or rerun verification."
-                    )
-                    self.execution_context.append(completion_guidance)
-                    self.transcript.append(
-                        {"role": "user", "content": completion_guidance}
-                    )
-            return WorkflowActionOutcome()
-        if action.kind == "invoke_tool":
-            if action.tool in {"shell", "internal"}:
-                if (
-                    action.tool == "internal"
-                    and action.parameters.get("help") is not True
-                ):
-                    _validate_internal_command(action.parameters.get("command"))
-                result = invoke_shell_capability(
-                    {**action.parameters, "_tool_name": action.tool},
-                    worktree_root=self.repo_root,
-                    executor=lambda parameters: _execute_shell_tool(
-                        dict(parameters),
-                        worktree_root=self.repo_root,
-                        stdout=self.stdout,
-                        stderr=self.stderr,
-                        verbose=self.verbose,
-                    ),
-                    runtime=self.runtime,
-                )
-            elif action.tool == ENRICH_TOOL:
-                result = invoke_intrinsic_capability(
-                    ENRICH_TOOL,
-                    action.parameters,
-                    worktree_root=self.repo_root,
-                    runtime=self.runtime,
-                )
-            elif action.tool == "fuzzy-match":
-                result = invoke_fuzzy_match_capability(
-                    action.parameters,
-                    worktree_root=self.repo_root,
-                    runtime=self.runtime,
-                )
-            elif is_basedpyright_tool(action.tool or ""):
-                result = invoke_basedpyright_capability(
-                    action.tool or "",
-                    action.parameters,
-                    worktree_root=self.repo_root,
-                    runtime=self.runtime,
-                )
-            else:
-                raise PowdrrExecutionError(
-                    f"Unsupported nested skill tool: {action.tool!r}"
-                )
-            if self.runtime is None:
-                raise PowdrrExecutionError(
-                    "Nested skill pull-request recording requires an execution "
-                    "runtime.",
-                    error_code="execution_runtime_required",
-                )
-            _record_skill_pull_request(
-                action,
-                self.repo_root,
-                frame.skill,
-                self.execution_events,
-                result,
-                step_index=frame.step_index,
-                runtime=self.runtime,
-            )
-            self.execution_events.append(
-                {
-                    "kind": action.kind,
-                    "tool": action.tool,
-                    "parameters": action.parameters,
-                    "result": result,
-                    "decisions_and_context": action.decisions_and_context,
-                    "step_index": frame.step_index,
-                }
-            )
-            _record_task_action_outputs(
-                action, self.handoff_records, step, frame.step_index
-            )
-            return WorkflowActionOutcome()
-        if action.kind == "prompt_user":
-            raise PowdrrExecutionError(
-                "Nested skills in agent workflows cannot prompt users."
-            )
-        raise PowdrrExecutionError(f"Unsupported nested skill action: {action.kind!r}")
-
-    def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
-        if (
-            getattr(self.current_step, "id", None) == "store-interview-input"
-            and action.kind == "edit"
-            and "Workflow edit action" in str(error)
-        ):
-            path = _materialize_interview_input(
-                repo_root=self.repo_root,
-                step=self.current_step,
-                handoff_records=self.handoff_records,
-                step_index=self.current_step_index,
-            )
-            if path is not None:
-                self.execution_events.append(
-                    {
-                        "kind": "json_update",
-                        "skill": self.current_skill.skill.name
-                        if self.current_skill
-                        else None,
-                        "step_id": self.current_step.id,
-                        "step_index": self.current_step_index,
-                        "file_path": str(path.relative_to(self.repo_root)),
-                        "source": "deterministic_repair",
-                    }
-                )
-                self.execution_context.append(
-                    "A deterministic JSON update repaired the interview input. "
-                    "Do not return edit again; choose next_step."
-                )
-                return
-        correction = _nested_action_response_correction(
-            RuntimeError(str(error)),
-            allowed_actions=tuple(
-                getattr(self.current_step, "actions", ())
-                if self.current_step is not None
-                else ()
-            ),
-            rejected_action=workflow_action_signature(action),
-            required_outputs=tuple(
-                output.name for output in getattr(self.current_step, "outputs", ())
-            ),
-        )
-        self.execution_events.append(
-            {
-                "kind": "action_error",
-                "skill": self.current_skill.skill.name if self.current_skill else None,
-                "step_id": getattr(self.current_step, "id", None),
-                "step_index": self.current_step_index,
-                "action": json.loads(workflow_action_signature(action)),
-                "error": str(error),
-                "guidance": correction,
-            }
-        )
-        self.execution_context.append(correction)
-        self.response_correction = correction
-        if not self.clean_room_repair_used:
-            self.clean_room_repair_pending = True
-        print(
-            "Nested skill action failed for "
-            f"{self.current_skill.skill.name if self.current_skill else '<unknown>'}/"
-            f"{getattr(self.current_step, 'id', '<unknown>')} "
-            f"({action.kind}): {error}; requesting clean-room repair.",
-            file=self.stderr,
-        )
-
-    def no_progress_threshold_exit_code(
-        self,
-        action: WorkflowAction,
-        observation: WorkflowActionObservation,
-    ) -> int | None:
-        _ = action, observation
-        if self.driver is not None:
-            self.driver.action_engine.reset_progress()
-        return None
-
-    def action_failure_exit_code(self, action: WorkflowAction) -> int | None:
-        _ = action
-        return 1
-
-    def coding_loop_exhausted(self, limit: int) -> int:
-        message = (
-            f"Coding loop for nested step {self.current_step.id!r} stopped after "
-            f"{limit} model iterations without a completion transition."
-        )
-        self.execution_events.append(
-            {
-                "kind": "coding_loop_exhausted",
-                "step_id": self.current_step.id,
-                "max_iterations": limit,
-                "message": message,
-            }
-        )
-        print(message, file=self.stderr, flush=True)
-        return 2
-
-    def observe_outcome(
-        self,
-        action: WorkflowAction,
-        observation: WorkflowActionObservation,
-        outcome: WorkflowActionOutcome,
-    ) -> WorkflowActionOutcome:
-        _ = action
-        if observation.correction is not None:
-            self.response_correction = observation.correction
-            if not self.clean_room_repair_used:
-                self.clean_room_repair_pending = True
-        return outcome
-
-    def exhausted_roundtrips_exit_code(self) -> int:
-        return 2
-
-
-def _run_skill_for_agent_with_shared_runner(
-    skill_name: str,
-    *,
-    catalog: tuple[SkillCatalogEntry, ...],
-    client: WorkflowLLMClient,
-    task: WorkflowTask,
-    repo_root: Path,
-    stdout: TextIO,
-    stderr: TextIO,
-    max_timeout_retries: int,
-    timeout_backoff_seconds: float,
-    verbose: bool = False,
-    context: tuple[str, ...] = (),
-    clean: bool = False,
-    error_log_root: Path | None = None,
-    runtime: ExecutionRuntime | None = None,
-    max_roundtrips: int = DEFAULT_MAX_ROUNDTRIPS,
-) -> dict[str, Any]:
-    selected_skill = find_skill_by_name(catalog, skill_name)
-    transcript = [] if clean else [{"role": "user", "content": task.description}]
-    execution_events: list[dict[str, Any]] = []
-    execution_context = list(context)
-    handoff_records: dict[str, dict[str, Any]] = {}
-    if isinstance(task.input_state, Mapping):
-        handoff_records.update(
-            {
-                str(name): {
-                    "name": str(name),
-                    "type": "string" if isinstance(value, str) else "any",
-                    "value": value,
-                    "produced_by": {"source": "task_context"},
-                    "source": "task_context",
-                    "scope": "skill",
-                }
-                for name, value in task.input_state.items()
-            }
-        )
-    if not clean:
-        resolved_task_data = _resolve_task_prompt_data(task.to_data(), task.input_state)
-        execution_context = [
-            (
-                "Task input: "
-                f"{json.dumps(resolved_task_data['input_state'], ensure_ascii=False)}"
-            ),
-            *execution_context,
-        ]
-    strategy = _NestedSkillExecutionStrategy(
-        catalog=catalog,
-        client=client,
-        task=task,
-        repo_root=repo_root,
-        stdout=stdout,
-        stderr=stderr,
-        max_timeout_retries=max_timeout_retries,
-        timeout_backoff_seconds=timeout_backoff_seconds,
-        verbose=verbose,
-        error_log_root=error_log_root,
-        transcript=transcript,
-        execution_events=execution_events,
-        execution_context=execution_context,
-        handoff_records=handoff_records,
-        stack=[
-            _NestedSkillExecutionFrame(
-                skill=selected_skill,
-                step_index=0,
-                clean_context=False,
-                parent_transcript=[],
-                parent_events=[],
-                parent_context=[],
-                parent_handoff_records={},
-            )
-        ],
-        runtime=runtime,
-    )
-    driver = WorkflowStepRunner(max_stalled_roundtrips=3, runtime=runtime)
-    strategy.driver = driver
-    exit_code = driver.run(
-        strategy,
-        max_roundtrips=max_roundtrips,
-        signature=workflow_action_signature,
-    )
-    if exit_code != 0:
-        raise PowdrrExecutionError(
-            f"Nested skill {skill_name!r} stopped with exit code {exit_code}."
-        )
-    return {"skill": skill_name, "events": strategy.execution_events}
-
-
-def _run_skill_for_agent(
-    skill_name: str,
-    *,
-    catalog: tuple[SkillCatalogEntry, ...],
-    client: WorkflowLLMClient,
-    task: WorkflowTask,
-    repo_root: Path,
-    stdout: TextIO,
-    stderr: TextIO,
-    max_timeout_retries: int,
-    timeout_backoff_seconds: float,
-    verbose: bool = False,
-    context: tuple[str, ...] = (),
-    clean: bool = False,
-    error_log_root: Path | None = None,
-    runtime: ExecutionRuntime | None = None,
-    max_roundtrips: int = DEFAULT_MAX_ROUNDTRIPS,
-) -> dict[str, Any]:
-    return _run_skill_for_agent_with_shared_runner(
-        skill_name,
-        catalog=catalog,
-        client=client,
-        task=task,
-        repo_root=repo_root,
-        stdout=stdout,
-        stderr=stderr,
-        max_timeout_retries=max_timeout_retries,
-        timeout_backoff_seconds=timeout_backoff_seconds,
-        verbose=verbose,
-        context=context,
-        clean=clean,
-        error_log_root=error_log_root,
-        runtime=runtime,
-        max_roundtrips=max_roundtrips,
-    )
-
-
 def _record_task_action_outputs(
     action: WorkflowAction,
     records: dict[str, dict[str, Any]],
@@ -5069,7 +3290,7 @@ def _record_task_action_outputs(
             "type": declaration.type if declaration is not None else "any",
             "value": value,
             "produced_by": {"step_index": step_index, "action": action.kind},
-            "scope": declaration.scope if declaration is not None else "skill",
+            "scope": declaration.scope if declaration is not None else "process",
         }
 
 

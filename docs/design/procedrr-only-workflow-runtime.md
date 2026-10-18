@@ -3,11 +3,9 @@
 ## Decision
 
 `workflow-chat` and the durable task agent execute validated Procedrr
-definitions only. The root `skill-definitions/` catalog and its validation CLI
-have been removed. The legacy parser, compiler, and interpreter code still
-exist for old scenario and internal tooling paths and must be removed before
-this migration is complete. Do not add legacy definitions or extend legacy
-execution.
+definitions only. The legacy definition catalog, parser, compiler, interpreter,
+and validation CLI have been removed. Do not add another workflow-definition
+format or execution path.
 
 This is a runtime migration, not a deletion of workflow chat or durable task
 processing. User interaction, durable workflow/task records, Git operations,
@@ -99,19 +97,11 @@ event journals and checkpoints, and resume after a human response.
 
 ### 4. Remove the old language and parallel interpreter
 
-Remaining cleanup before this migration is complete:
-
-- remove the legacy `Skill`/`SkillStep` schemas, parser/serializer,
-  validation, catalog, compiler, action/branch/liveness machinery, and
-  legacy scenario fixtures;
-- remove the old workflow-chat/task-agent step interpreters and their
-  definition-oriented CLI options/aliases;
-- remove legacy-only fixtures, tests, generated baselines, package-data
-  settings, and documentation; retain durable task/template modules that have
-  independent consumers;
-- update documentation to identify Procedrr as the sole process-definition
-  language and move still-useful historical plans to an explicitly archived
-  location or delete them when they have no remaining normative content.
+Status: complete. The legacy skill parser, catalog, compiler, action and branch
+machinery, action protocol, chat/task interpreters, and their dedicated tests
+are removed. The active CLI accepts Procedrr process catalogs and durable task
+documents only. Durable task and template contracts remain because they retain
+independent lifecycle and persistence responsibilities.
 
 ## Acceptance criteria
 
@@ -127,7 +117,7 @@ Remaining cleanup before this migration is complete:
 - No production imports, CLI paths, packaged files, test fixtures, or active
   docs refer to the removed skill language after the final migration change.
 - Full tests, format, lint, type checking, module-boundary checks, and Procedrr
-  definition validation pass before the final removal is merged.
+  definition validation pass before the migration is published.
 
 ## Removal evidence
 

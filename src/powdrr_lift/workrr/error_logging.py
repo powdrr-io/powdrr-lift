@@ -47,7 +47,7 @@ def record_workflow_llm_error(
 
     JSON Lines keeps each failure independently readable and appendable when
     multiple workflow agents share a repository. ``context`` should identify
-    the skill/task and active step; callers retain the complete prompt and
+    the process/task and active step; callers retain the complete prompt and
     execution history separately.
     """
     record: dict[str, Any] = {

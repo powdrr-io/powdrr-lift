@@ -23,7 +23,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: security-review\ninteraction_style: devils_advocate\nwhen_to_use:\n- When\
@@ -145,7 +145,7 @@ steps:
       \ gaps. If the vulnerable code is not changed, anchor to the\n    nearest relevant changed\
       \ line and explain why the current PR exposes or\n    worsens the risk. Do not post\
       \ generic OWASP summaries, praise, duplicates,\n    or speculative concerns. Do not\
-      \ approve, merge, close, label, or modify\n    code as part of this skill.\n  tool_invocations:\n\
+      \ approve, merge, close, label, or modify\n    code as part of this process.\n  tool_invocations:\n\
       \  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
       \    - --paginate\n  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
       \    - --method\n    - POST\n    - -f\n    - body=<finding>\n    - -f\n    - commit_id=<current-head-sha>\n\

@@ -30,12 +30,12 @@ workflow_template: execute-proposed-pr
 phase_type: publish_pr
 persona_id: engineering-manager
 step_type: governed
-details: 'The listed finish-pr-prep skill runs automatically because it is declared
-  in uses_skills. Do not return invoke_skill for it; doing so is recursive and will
-  be rejected. Do not independently edit, stage, commit, push, or create a pull request
-  here; the attached skill owns its validation operations. After the attached skill
-  returns, pass its complete evidence to the next workflow boundary with a separate
-  next_step action, for example: {"action":"next_step","output_state":{"pull-request-prep-state":{"checks":[],"files_to_publish":[]}},"decisions_and_context":"finish-pr-prep
+details: 'Run the finish-pr-prep Procedrr process declared by uses_processes. Do not
+  run its operations directly from this task. Do not independently edit, stage,
+  commit, push, or create a pull request here; the process owns its validation
+  operations. After the process returns, pass its complete evidence to the next
+  workflow boundary with a separate next_step action, for example:
+  {"action":"next_step","output_state":{"pull-request-prep-state":{"checks":[],"files_to_publish":[]}},"decisions_and_context":"finish-pr-prep
   completed with the recorded validation evidence."}
 
 
@@ -43,7 +43,7 @@ details: 'The listed finish-pr-prep skill runs automatically because it is decla
   name is ''interaction-file-log-core''. Use these values as search context and verify
   repository documents before deciding what they identify.'
 llm_type: fast_iteration
-uses_skills:
+uses_processes:
 - finish-pr-prep
 actions:
-- invoke_skill
+- task_run_process

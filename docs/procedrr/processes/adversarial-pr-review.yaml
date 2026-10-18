@@ -23,7 +23,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: adversarial-pr-review\ninteraction_style: devils_advocate\nadversarial: true\n\
@@ -118,7 +118,7 @@ steps:
       \ GitHub write access or inline anchoring fails, report the exact prepared\n    finding\
       \ and posting failure; never claim it was posted. Preserve the\n    adversarial provider\
       \ role through this final review action. Never merge the\n    PR or resolve review threads\
-      \ as part of this skill.\n  tool_invocations:\n  - tool: shell\n    command:\n    -\
+      \ as part of this process.\n  tool_invocations:\n  - tool: shell\n    command:\n    -\
       \ gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n    - --paginate"
     context:
     - user_request

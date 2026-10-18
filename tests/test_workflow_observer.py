@@ -37,9 +37,9 @@ class _Client:
 
 def _context() -> ObserverExecutionContext:
     return ObserverExecutionContext(
-        execution_mode="execute_selected_skill",
+        execution_mode="execute_selected_process",
         root_intent="Implement the requested feature.",
-        skill_or_workflow="start-implementing-feature",
+        process_or_workflow="start-implementing-feature",
         current_step_id="validate-specifications",
         current_step_intent="Validate every generated specification.",
         validation_state={"issue_count": 2},
@@ -50,10 +50,10 @@ def _context() -> ObserverExecutionContext:
 def _packet(tmp_path: Path) -> ObserverPacket:
     (tmp_path / "changed.txt").write_text("one", encoding="utf-8")
     return ObserverPacket(
-        execution_mode="execute_selected_skill",
+        execution_mode="execute_selected_process",
         trigger=ObserverTrigger("repeated_action", "Repeated without progress."),
         root_intent="Implement the requested feature.",
-        skill_or_workflow="start-implementing-feature",
+        process_or_workflow="start-implementing-feature",
         current_step_id="validate-specifications",
         current_step_intent="Validate every generated specification.",
         recent_actions=(ObserverActionSummary(2, "edit", False, "continue"),),
@@ -84,13 +84,13 @@ def test_observer_can_request_a_skill_transfer_and_receives_full_evidence() -> N
         **_decision_payload(),
         "verdict": "redirect",
         "target_step_id": "inspect",
-        "target_skill_name": "repair-skill",
+        "target_process_id": "repair-skill",
     }
 
     decision = parse_observer_decision(payload)
 
     assert decision.target_step_id == "inspect"
-    assert decision.target_skill_name == "repair-skill"
+    assert decision.target_process_id == "repair-skill"
 
 
 def test_observer_prompt_is_compact_and_includes_complete_example(
@@ -105,18 +105,18 @@ def test_observer_prompt_is_compact_and_includes_complete_example(
     assert len(messages[1]["content"]) < 3_000
 
 
-def test_observer_prompt_includes_skill_definition_and_error_state(
+def test_observer_prompt_includes_process_definition_and_error_state(
     tmp_path: Path,
 ) -> None:
     packet = replace(
         _packet(tmp_path),
-        skill_definition={"steps": [{"id": "inspect"}]},
+        process_definition={"steps": [{"id": "inspect"}]},
         error_state={"recent_errors": [{"message": "bad edit"}]},
     )
 
     messages = build_observer_messages(packet)
 
-    assert '"skill_definition"' in messages[1]["content"]
+    assert '"process_definition"' in messages[1]["content"]
     assert '"error_state"' in messages[1]["content"]
 
 

@@ -693,7 +693,7 @@ class ExecutionRuntime:
         material_progress: bool | None = None,
         target_action: str | None = None,
         target_step_id: str | None = None,
-        target_skill_name: str | None = None,
+        target_process_id: str | None = None,
     ) -> ExecutionState:
         """Persist an observer outcome in the authoritative execution stream."""
         if not verdict.strip() or not reason.strip() or not action_kind.strip():
@@ -712,7 +712,7 @@ class ExecutionRuntime:
                 "material_progress": material_progress,
                 "target_action": target_action,
                 "target_step_id": target_step_id,
-                "target_skill_name": target_skill_name,
+                "target_process_id": target_process_id,
             },
         )
 

@@ -12,11 +12,11 @@ from powdrr_lift.workrr.error_logging import (
 def test_record_workflow_llm_error_appends_analysis_ready_jsonl(tmp_path: Path) -> None:
     first_path = record_workflow_llm_error(
         tmp_path,
-        execution_mode="execute_selected_skill",
+        execution_mode="execute_selected_process",
         phase="llm_output_parse",
         error=ValueError("feature is not a valid option"),
         context={
-            "skill": {
+            "process": {
                 "name": "start-implementing-feature",
                 "step_index": 2,
                 "description": "Create the implementation PR.",
@@ -40,8 +40,8 @@ def test_record_workflow_llm_error_appends_analysis_ready_jsonl(tmp_path: Path) 
     ]
     assert len(records) == 2
     assert records[0]["schema_version"] == 1
-    assert records[0]["execution_mode"] == "execute_selected_skill"
-    assert records[0]["context"]["skill"]["name"] == ("start-implementing-feature")
+    assert records[0]["execution_mode"] == "execute_selected_process"
+    assert records[0]["context"]["process"]["name"] == ("start-implementing-feature")
     assert records[0]["llm_output"]["parameters"] == {}
     assert records[0]["guidance"].startswith("Use the declared")
     assert records[1]["phase"] == "action_validation_or_execution"

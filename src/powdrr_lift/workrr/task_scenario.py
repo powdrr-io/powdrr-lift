@@ -30,7 +30,10 @@ class WorkflowTaskScenarioError(ValueError):
 def _adapt_legacy_task_response(response: Mapping[str, Any]) -> dict[str, Any]:
     """Translate old scripted task fixtures to one Procedrr fragment step."""
     action = response.get("action")
-    if action in {"complete", "next_step"} and "output_state" in response:
+    if (
+        action in {"complete", "next_step", "task_complete"}
+        and "output_state" in response
+    ):
         return {
             "step_json": json.dumps(
                 {
@@ -38,7 +41,9 @@ def _adapt_legacy_task_response(response: Mapping[str, Any]) -> dict[str, Any]:
                         "tool": "task_complete",
                         "parameters": {
                             "output_state": response["output_state"],
-                            "terminate_workflow": False,
+                            "terminate_workflow": response.get(
+                                "terminate_workflow", False
+                            ),
                         },
                     }
                 }
@@ -63,7 +68,6 @@ def _adapt_legacy_task_response(response: Mapping[str, Any]) -> dict[str, Any]:
         "list_files": "list_files",
         "gather_context": "gather_context",
         "invoke_tool": "invoke_tool",
-        "invoke_skill": "task_run_process",
         "task_run_process": "task_run_process",
         "get-human-input": "task_handoff",
         "task_handoff": "task_handoff",
@@ -78,7 +82,7 @@ def _adapt_legacy_task_response(response: Mapping[str, Any]) -> dict[str, Any]:
         }
     elif tool == "task_run_process":
         parameters = {
-            "process_id": response.get("process_id", response.get("skill")),
+            "process_id": response.get("process_id"),
             "bindings": response.get("bindings", {}),
         }
     elif tool == "task_handoff":

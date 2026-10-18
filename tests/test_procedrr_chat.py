@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 from collections.abc import Mapping
+from io import StringIO
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
+from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_chat import (
     _operation_to_action,
     _select_process,
+    run_procedrr_workflow_chat,
 )
 from procedrr import ProcessCatalog
 
@@ -23,6 +29,20 @@ class _SelectingClient:
     ) -> dict[str, Any]:
         _ = (messages, response_schema)
         return dict(self.response)
+
+
+class _SelectingProvider:
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        _ = (messages, response_schema)
+        return {
+            "process_name": "echo-process",
+            "reason": "The request is handled by the scripted process.",
+        }
 
 
 def test_process_selector_returns_only_a_catalogued_process() -> None:
@@ -96,3 +116,58 @@ def test_chat_operation_adapter_converts_line_edits() -> None:
     assert len(action.edits) == 1
     assert action.edits[0].start_line == 4
     assert action.edits[0].text == "return 42"
+
+
+def test_chat_entrypoint_executes_a_catalogued_procedrr_process(
+    tmp_path: Path,
+) -> None:
+    process_dir = tmp_path / "processes"
+    process_dir.mkdir()
+    repo_root = tmp_path / ".worktrees" / "chat"
+    repo_root.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
+    source_process_dir = Path("docs/procedrr/processes")
+    shutil.copy(source_process_dir / "select-process.yaml", process_dir)
+    (process_dir / "echo-process.yaml").write_text(
+        """\
+version: 1
+name: echo-process
+description: Echo the request for the chat integration test.
+inputs:
+  - {name: user_request, type: string, required: true}
+  - {name: workflow_context, type: object, required: true}
+  - {name: language_labels, type: array, required: true}
+limits: {llm_activations: 1, tool_calls: 1, context_chars: 2000}
+steps:
+  - operation:
+      tool: respond
+      parameters: {text: "Done: ${user_request}"}
+      bind: response
+  - terminal: succeeded
+""",
+        encoding="utf-8",
+    )
+    client = WorkrrProcedrrClient(
+        _SelectingProvider(),  # type: ignore[arg-type]
+        process_directory=process_dir,
+        provider_retry_attempts=0,
+    )
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = run_procedrr_workflow_chat(
+        WorkflowChatConfig(
+            processes_dir=process_dir,
+            repo_root=repo_root,
+            provider="local",
+            execution_id="chat-integration",
+        ),
+        procedrr_client_factory=lambda _role: client,
+        input_func=lambda: "Inspect this fixture.",
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0, stderr.getvalue()
+    assert "Matched process: echo-process" in stdout.getvalue()
+    assert "Done: Inspect this fixture." in stdout.getvalue()

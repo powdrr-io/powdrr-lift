@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import cast
 
 from powdrr_lift.core.delivery_profile import PhaseType
-from powdrr_lift.process.model import SkillToolInvocation
+from powdrr_lift.process.task_step import ToolInvocation
 from powdrr_lift.process.tasks import TaskComplexity, WorkflowInstance
 from powdrr_lift.process.templates import (
     WorkflowTaskTemplate,
@@ -143,11 +143,11 @@ def test_workflow_template_validation_rejects_skill_and_pre_step_together() -> N
     report = build_workflow_template_validation_report(
         json.dumps(
             {
-                "when_to_use": ["When a workflow invokes a nested skill."],
-                "how_to_fill_this_out": ["Declare the nested skill."],
+                "when_to_use": ["When a workflow invokes a nested process."],
+                "how_to_fill_this_out": ["Declare the nested process."],
                 "task_templates": [
                     {
-                        "description": "Run the nested validation skill.",
+                        "description": "Run the nested validation process.",
                         "step_type": "governed",
                         "uses_processes": ["some-process"],
                         "pre_step": {
@@ -581,7 +581,7 @@ def test_instantiate_workflow_template_accepts_generic_input_values(
                 complexity=TaskComplexity.LOW,
                 input_state={"custom": "<custom-value>"},
                 tool_invocations=(
-                    SkillToolInvocation(
+                    ToolInvocation(
                         tool="shell",
                         command=("echo", "<custom-value>"),
                         cwd="<custom-value>",

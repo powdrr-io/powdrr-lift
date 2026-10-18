@@ -24,7 +24,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: dead-code-review\ninteraction_style: observational_review\nwhen_to_use:\n\
@@ -100,7 +100,7 @@ steps:
       \ the obsolete\n    code is not changed, and include its actual path and line in the\
       \ comment. Do\n    not post speculative cleanup, broad review summaries, praise, or\
       \ duplicate\n    comments. Do not approve, merge, close, label, or modify the pull request's\n\
-      \    code as part of this skill.\n  tool_invocations:\n  - tool: shell\n    command:\n\
+      \    code as part of this process.\n  tool_invocations:\n  - tool: shell\n    command:\n\
       \    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n    - --paginate\n\
       \  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
       \    - --method\n    - POST\n    - -f\n    - body=<finding>\n    - -f\n    - commit_id=<current-head-sha>\n\
@@ -115,7 +115,7 @@ steps:
       \ findings remain, report that\n    the review completed with zero findings and summarize\
       \ the evidence checked. If\n    GitHub write access or inline anchoring fails, report\
       \ the exact prepared finding\n    and the posting failure; never claim it was posted.\
-      \ Never merge the PR or\n    resolve review threads as part of this skill.\n  tool_invocations:\n\
+      \ Never merge the PR or\n    resolve review threads as part of this process.\n  tool_invocations:\n\
       \  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
       \    - --paginate"
     context:

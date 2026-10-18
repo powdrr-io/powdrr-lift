@@ -15,20 +15,13 @@ from powdrr_lift.pr_workflow_record import (
     pull_request_number,
     record_pull_request_workflow,
 )
-from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.workrr.action_validation import _command_items_for_validation
 from powdrr_lift.workrr.llm import (
     PowdrrExecutionError,
+    WorkflowAction,
+    WorkflowEdit,
+    WorkflowYamlOperation,
 )
-from powdrr_lift.workrr.llm import (
-    WorkflowAction as SkillChatAction,
-)
-from powdrr_lift.workrr.llm import (
-    WorkflowEdit as SkillChatEdit,
-)
-from powdrr_lift.workrr.llm import (
-    WorkflowYamlOperation as SkillChatYamlOperation,
-)
+from powdrr_lift.workrr.operation_validation import command_items_for_validation
 from powdrr_lift.workrr.paths import resolve_worktree_file_path
 
 _PRE_STEP_PLACEHOLDER = re.compile(r"<([^<>]+)>")
@@ -117,18 +110,18 @@ def _list_worktree_files(
     }
 
 
-def _record_skill_pull_request(
-    action: SkillChatAction,
+def _record_process_pull_request(
+    action: WorkflowAction,
     repo_root: Path,
-    skill: SkillCatalogEntry,
+    process: Any,
     events: Sequence[Mapping[str, Any]],
     tool_result: Mapping[str, Any],
     runtime: ExecutionRuntime,
-    root_skill: SkillCatalogEntry | None = None,
+    root_process: Any | None = None,
     step_index: int | None = None,
 ) -> None:
     command_value = action.parameters.get("command", tool_result.get("command"))
-    command = _command_items_for_validation(command_value)
+    command = command_items_for_validation(command_value)
     if not is_pull_request_create_command(command):
         return
     if tool_result.get("returncode") != 0:
@@ -150,7 +143,7 @@ def _record_skill_pull_request(
         "decisions_and_context": action.decisions_and_context,
         "step_index": step_index,
     }
-    record_skill = root_skill or skill
+    record_process = root_process or process
     with runtime.without_action_contract():
         branch_result = invoke_intrinsic_capability(
             GIT_TOOL,
@@ -169,18 +162,18 @@ def _record_skill_pull_request(
         branch=branch,
         base_branch="main",
         title="Agent-created pull request",
-        workflow_name=record_skill.skill.name,
-        workflow_path=str(record_skill.path),
-        steps=[step.to_data() for step in record_skill.skill.steps],
+        workflow_name=record_process.name,
+        workflow_path=str(record_process.path),
+        steps=[dict(step) for step in record_process.steps],
         events=[*events, event],
         explanation=(
-            "This record documents the selected skill steps and the tool calls "
+            "This record documents the selected process steps and the tool calls "
             "observed before the agent created the pull request."
         ),
     )
 
 
-def _apply_file_edits(current_text: str, edits: Sequence[SkillChatEdit]) -> str:
+def _apply_file_edits(current_text: str, edits: Sequence[WorkflowEdit]) -> str:
     lines = current_text.splitlines()
     for edit in sorted(edits, key=_edit_sort_key, reverse=True):
         start_index = edit.start_line - 1
@@ -218,7 +211,7 @@ def _apply_file_edits(current_text: str, edits: Sequence[SkillChatEdit]) -> str:
 def _apply_yaml_operations(
     path: Path,
     current_text: str,
-    operations: Sequence[SkillChatYamlOperation],
+    operations: Sequence[WorkflowYamlOperation],
 ) -> str:
     if path.suffix.lower() not in {".yaml", ".yml"}:
         raise _WorkflowYamlEditError(
@@ -397,6 +390,6 @@ def _apply_yaml_operations(
     )
 
 
-def _edit_sort_key(edit: SkillChatEdit) -> tuple[int, int]:
+def _edit_sort_key(edit: WorkflowEdit) -> tuple[int, int]:
     end_line = edit.end_line if edit.end_line is not None else edit.start_line
     return edit.start_line, end_line

@@ -21,7 +21,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: run-tests-and-fix\nwhen_to_use:\n- When implementation and generated tests\
@@ -127,7 +127,7 @@ steps:
       \ {type: object, additionalProperties: true}\n- id: rerun-all-tests\n  description:\
       \ Rerun the complete suite after applying the repair.\n  step_type: gate\n  inputs:\n\
       \  - name: applied_edit\n    type: any\n    required: true\n  llm_type: simple_task\n\
-      \  details: The deterministic rerun is authoritative. If it passes, complete the skill;\
+      \  details: The deterministic rerun is authoritative. If it passes, complete the process;\
       \ otherwise return to diagnose-test-results with the new result.\n  pre_step:\n    action:\
       \ invoke_tool\n    template:\n      tool: shell\n      command: [uv, run, --extra, dev,\
       \ pytest, -q]\n  outputs:\n  - name: test_tool_result\n    type: any\n    required_for_next_step:\

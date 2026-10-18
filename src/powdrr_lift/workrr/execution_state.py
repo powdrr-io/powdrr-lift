@@ -10,7 +10,15 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.execution.runtime import ExecutionRuntime
-from powdrr_lift.process.catalog import SkillCatalogEntry
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessExecutionReference:
+    """Definition identity and display steps for one Procedrr execution."""
+
+    name: str
+    path: Path
+    steps: tuple[Mapping[str, Any], ...]
 
 
 @dataclass(slots=True)
@@ -72,14 +80,14 @@ class _WorkflowExecutionState:
     and repair observe the same workflow facts.
     """
 
-    selected_skill: SkillCatalogEntry
+    selected_process: ProcessExecutionReference
     transcript: list[dict[str, str]]
     execution_events: list[dict[str, Any]]
     execution_context: list[str]
     step_index: int
     worktree_root: Path
     audit_events: list[dict[str, Any]] = field(default_factory=list)
-    root_skill: SkillCatalogEntry | None = None
+    root_process: ProcessExecutionReference | None = None
     error_log_root: Path = Path(".")
     handoff_records: dict[str, dict[str, Any]] = field(default_factory=dict)
     durable_facts: dict[str, dict[str, Any]] = field(default_factory=dict)
@@ -229,11 +237,11 @@ def _restore_step_worktree(
 def _begin_step_checkpoint(
     state: _WorkflowExecutionState,
     *,
-    skill: SkillCatalogEntry,
+    process: ProcessExecutionReference,
     step_index: int,
 ) -> None:
     state.step_checkpoint = _WorkflowStepCheckpoint(
-        identity=(str(skill.path), step_index),
+        identity=(str(process.path), step_index),
         transcript=list(state.transcript),
         execution_events=list(state.execution_events),
         execution_context=list(state.execution_context),

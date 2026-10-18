@@ -12,8 +12,12 @@ import pytest
 import yaml
 
 from powdrr_lift import parse_change_log, parse_validation_report
-from powdrr_lift.cli import _run_harbor_feature, _stage_generated_file, main
-from powdrr_lift.workrr.error_logging import record_workflow_llm_error
+from powdrr_lift.cli import (
+    _run_harbor_feature,
+    _stage_generated_file,
+    build_parser,
+    main,
+)
 from powdrr_lift.workrr.human_task import HumanTaskRunnerConfig
 from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig
 
@@ -492,84 +496,17 @@ def test_cli_llm_diff_reports_invalid_json(tmp_path: Path) -> None:
     assert "invalid JSON" in stderr.getvalue()
 
 
-def test_cli_workflow_replay_exports_and_renders_error_record(tmp_path: Path) -> None:
-    repo_root = _create_repo_with_feature_branch(tmp_path)
-    skill_path = repo_root / "skill-definitions" / "inspect.yaml"
-    skill_path.parent.mkdir()
-    skill_path.write_text(
-        """\
-name: inspect
-when_to_use:
-  - Inspect the repository.
-steps:
-  - id: inspect-files
-    description: Inspect files.
-    tool_invocations:
-      - tool: shell
-        command: [rg, --files]
-""",
-        encoding="utf-8",
-    )
-    error_log = record_workflow_llm_error(
-        repo_root,
-        execution_mode="execute_selected_skill",
-        phase="action_validation_or_execution",
-        error=RuntimeError("simulated failure"),
-        context={
-            "skill": {
-                "name": "inspect",
-                "path": str(skill_path),
-                "step_index": 0,
-                "step_id": "inspect-files",
-                "description": "Inspect files.",
-            },
-            "replay_state": {},
-        },
-        attempted_action={
-            "action": "invoke_tool",
-            "tool": "shell",
-            "parameters": {"command": ["rg", "--files"]},
-        },
-    )
-    assert error_log is not None
-    record_id = json.loads(error_log.read_text(encoding="utf-8"))["record_id"]
-    bundle_path = "workflow-evals/replays/inspect.yaml"
-
-    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
-        export_exit_code = main(
-            [
-                "workflow-replay",
-                "--error-log",
-                str(error_log),
-                "--record-id",
-                record_id,
-                "--output",
-                bundle_path,
-                "--repo-root",
-                str(repo_root),
-            ]
-        )
-
-    stdout = io.StringIO()
-    with redirect_stdout(stdout), redirect_stderr(io.StringIO()):
-        replay_exit_code = main(
-            [
-                "workflow-replay",
-                "--bundle",
-                bundle_path,
-                "--repo-root",
-                str(repo_root),
-                "--json",
-            ]
-        )
-
-    assert export_exit_code == 0
-    assert replay_exit_code == 0
-    assert (repo_root / bundle_path).is_file()
-    assert json.loads(stdout.getvalue())["response_validation"] == {
-        "valid": True,
-        "action": "invoke_tool",
+def test_definition_interpreter_commands_are_removed() -> None:
+    help_text = build_parser().format_help()
+    removed_commands = {
+        "workflow-replay",
+        "analyze-workflow-errors",
+        "review-workflow-ambiguity",
+        "probe-workflow-step",
+        "compare-workflow-definitions",
+        "tune-workflow",
     }
+    assert not any(command in help_text for command in removed_commands)
 
 
 def test_cli_repository_state_reports_staged_unstaged_and_untracked_files(

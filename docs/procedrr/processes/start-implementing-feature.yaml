@@ -23,7 +23,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: start-implementing-feature\ninputs:\n- name: canonical-feature-name\n- name:\
@@ -106,8 +106,8 @@ steps:
       \ docs/project_structure/project-structure.yaml\n  details: >-\n    The engine-owned\
       \ pre-step result is authoritative; do not reread it. If the\n    artifact exists, emit\
       \ one next_step action and reuse it. If it is missing,\n    emit one task_run_process action\
-      \ for the exact skill id\n    `bootstrap-code-structure`; after that action returns,\
-      \ emit next_step in the\n    following turn. The nested skill is project-wide\n    and\
+      \ for the exact process id\n    `bootstrap-code-structure`; after that action returns,\
+      \ emit next_step in the\n    following turn. The nested process is project-wide\n    and\
       \ must not ask for a feature or target module. Never invoke bootstrap\n    merely because\
       \ this step is present: the gate result is authoritative.\n- id: confirm-project-structure\n\
       \  description: Confirm the project-structure artifact is available.\n  actions: []\n\
@@ -118,7 +118,7 @@ steps:
       \      path: returncode\n      equals: 0\n    goto_step: bootstrap-project-structure\n\
       \    retry_context: >-\n      The project-structure artifact is not available in the\
       \ active worktree.\n      Rerun bootstrap-project-structure so the nested bootstrap\
-      \ skill can\n      create the artifact in the same worktree, then retry this gate.\n\
+      \ process can\n      create the artifact in the same worktree, then retry this gate.\n\
       - id: plan-proposed-prs\n  description: Plan the proposed PR implementation sequence.\n\
       \  actions: [invoke_tool, read_document]\n  step_type: governed\n  llm_type: high_reasoning\n\
       \  tool_invocations:\n  - tool: basedpyright-structure\n    operation: inspect_structure\n\
@@ -424,8 +424,8 @@ steps:
       \  completion:\n    required_outputs:\n    - final_repository_state\n    - readiness_report\n\
       \  details: >-\n    The preceding finish-pr-prep step has already produced the context\
       \ for this\n    handoff. Apply judgment only to whether its returned repository state\
-      \ and\n    readiness report are acceptable; do not invoke tools or the nested skill\n\
-      \    again. After the nested skill returns, explicitly publish both handoffs with\n\
+      \ and\n    readiness report are acceptable; do not invoke tools or the nested process\n\
+      \    again. After the nested process returns, explicitly publish both handoffs with\n\
       \    an `emit_outputs` action,\n    copying the exact values returned by the nested\
       \ process:\n    {\"action\":\"emit_outputs\",\"outputs\":{\"final_repository_state\":{\"\
       clean\":true,\"files\":[]},\"readiness_report\":{\"ready\":true,\"reasons\":[],\"satisfied_requirements\"\
@@ -452,7 +452,7 @@ steps:
       \ and pull-request title\n    `<pull-request-title>`. Pass files_to_publish containing\
       \ exactly every\n    validated file under docs/proposals/<feature-name>/ and docs/workflows/,\n\
       \    plus the validated planning artifacts and Feature Plan context. The nested\n  \
-      \  skill must stage exactly that list. Do not advance until it has committed,\n    pushed,\
+      \  process must stage exactly that list. Do not advance until it has committed,\n    pushed,\
       \ and created or updated a pull request successfully. Never claim a\n    PR is ready\
       \ without a returned PR URL.\n  uses_process:\n    process: create-pull-request\n- id: handoff-feature-pull-request\n\
       \  description: Hand the draft pull request to the user for review.\n  actions: [edit,\

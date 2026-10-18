@@ -453,14 +453,14 @@ def test_prompt_size_breakdown_reports_execution_mode_and_top_level_fields() -> 
         {"role": "system", "content": "rules"},
         {
             "role": "user",
-            "content": '{"execution_mode":"execute_selected_skill",'
+            "content": '{"execution_mode":"execute_selected_process",'
             '"current_step":{"description":"Inspect"},"events":[1,2,3]}',
         },
     ]
 
     breakdown = prompt_size_breakdown(messages)
 
-    assert breakdown["execution_mode"] == "execute_selected_skill"
+    assert breakdown["execution_mode"] == "execute_selected_process"
     assert breakdown["estimated_input_tokens"] > 0
     fields = breakdown["fields"]
     assert fields["system_prompt"] == 2

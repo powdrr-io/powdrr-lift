@@ -8,8 +8,7 @@ import sys
 from collections.abc import Callable, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, TextIO, cast
+from typing import Any, TextIO
 from uuid import uuid4
 
 from powdrr_lift.core import resolve_repo_root
@@ -26,7 +25,10 @@ from powdrr_lift.workrr.chat_context import (
     _resolve_worktree_for_request,
 )
 from powdrr_lift.workrr.chat_io import _prompt_user
-from powdrr_lift.workrr.execution_state import _WorkflowExecutionState
+from powdrr_lift.workrr.execution_state import (
+    ProcessExecutionReference,
+    _WorkflowExecutionState,
+)
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.provider_runtime import WorkflowClientRegistry
@@ -45,6 +47,7 @@ from procedrr_evaluator.runtime import (
 def run_procedrr_workflow_chat(
     config: WorkflowChatConfig,
     *,
+    procedrr_client_factory: Callable[[str], WorkrrProcedrrClient] | None = None,
     input_func: Callable[[], str] = input,
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
@@ -76,15 +79,24 @@ def run_procedrr_workflow_chat(
         normal_provider=config.normal_provider,
         adversarial_provider=config.adversarial_provider,
     )
-    client_registry = WorkflowClientRegistry(
-        api_key=config.api_key,
-        base_url=config.base_url,
-        project_root=configured_repo_root,
-        progress_stream=stderr,
+    client_registry = (
+        None
+        if procedrr_client_factory is not None
+        else WorkflowClientRegistry(
+            api_key=config.api_key,
+            base_url=config.base_url,
+            project_root=configured_repo_root,
+            progress_stream=stderr,
+        )
     )
     process_clients: dict[str, WorkrrProcedrrClient] = {}
 
     def procedrr_client(role: str) -> WorkrrProcedrrClient:
+        if procedrr_client_factory is not None:
+            if role not in process_clients:
+                process_clients[role] = procedrr_client_factory(role)
+            return process_clients[role]
+        assert client_registry is not None
         role_provider = provider_roles.provider_for(role)  # type: ignore[arg-type]
         role_model = initial_model_for_provider(role_provider, config.model)
         cache_key = f"{role_provider}:{role_model}"
@@ -127,18 +139,15 @@ def run_procedrr_workflow_chat(
 
     process_steps = process.document.get("steps", [])
     step_list = process_steps if isinstance(process_steps, list) else []
-    progress_steps = tuple(
-        SimpleNamespace(description=f"Procedrr process step {index + 1}")
-        for index, _ in enumerate(step_list)
-    )
-    selected_adapter = SimpleNamespace(
-        skill=SimpleNamespace(name=process.name, steps=progress_steps),
+    selected_process = ProcessExecutionReference(
+        name=process.name,
         path=process.path,
+        steps=tuple(dict(step) for step in step_list if isinstance(step, Mapping)),
     )
     worktree_root = _resolve_worktree_for_request(
         configured_repo_root,
         request=user_request,
-        selected_skill=cast(Any, selected_adapter),
+        selected_process=selected_process,
         context=workflow_context,
         input_func=input_func,
         stdout=stdout,
@@ -162,8 +171,8 @@ def run_procedrr_workflow_chat(
         source_ref=f"{execution_id}:user-request",
     )
     state = _WorkflowExecutionState(
-        selected_skill=cast(Any, selected_adapter),
-        root_skill=cast(Any, selected_adapter),
+        selected_process=selected_process,
+        root_process=selected_process,
         transcript=[{"role": "user", "content": user_request}],
         execution_events=[],
         audit_events=[],
@@ -235,8 +244,8 @@ def run_procedrr_workflow_chat(
         _write_manifest(manifest_path, manifest)
         if progress_callback is not None:
             progress_callback(
-                cast(Any, selected_adapter),
-                min(event.sequence, max(0, len(selected_adapter.skill.steps) - 1)),
+                selected_process,
+                min(event.sequence, max(0, len(selected_process.steps) - 1)),
                 event.kind,
                 None,
                 None,
@@ -259,7 +268,7 @@ def run_procedrr_workflow_chat(
         _persist_workflow_context(
             configured_repo_root,
             worktree_root,
-            skill_name=process.name,
+            process_id=process.name,
             request=user_request,
         )
         print(f"Procedrr process failed: {error}", file=stderr)
@@ -271,7 +280,7 @@ def run_procedrr_workflow_chat(
     _persist_workflow_context(
         configured_repo_root,
         worktree_root,
-        skill_name=process.name,
+        process_id=process.name,
         request=user_request,
     )
     if result.terminal_status is ProcessTerminalStatus.SUCCEEDED:

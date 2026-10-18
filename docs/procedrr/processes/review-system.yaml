@@ -21,7 +21,7 @@ steps:
     question: "Execute this named workflow for the supplied user request. Treat the embedded\
       \ workflow document as task-specific requirements and preserve its ordering, gates,\
       \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy task_run_process references with calls to matching declared Procedrr\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
       \ processes. Use only current bindings and evidence. Do not invent results or claim\
       \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
       ---\nname: review-system\ninputs:\n- name: work-item-name\ninteraction_style: observational_review\n\
@@ -35,7 +35,7 @@ steps:
       \ [edit, yaml_edit, file_management, read_document, complete]\n  step_type: governed\n\
       \  llm_type: high_reasoning\n  details: >-\n    Compare the gathered requirements and\
       \ approach against the new needs. If\n    the existing specification already covers\
-      \ them, end this skill by returning\n    the complete action, for example {\"action\"\
+      \ them, end this process by returning\n    the complete action, for example {\"action\"\
       :\"complete\",\"text\":\"The existing\n    system covers the new needs.\"}; otherwise\
       \ choose next_step and return {\"action\":\"next_step\"}.\n- id: generate-system\n \
       \ description: Deterministically generate the system specification template.\n  actions:\

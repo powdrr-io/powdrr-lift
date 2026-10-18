@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from powdrr_lift.process.model import SkillToolInvocation
+from powdrr_lift.process.task_step import ToolInvocation
 from powdrr_lift.process.tasks import (
     AgentRole,
     AssigneeType,
@@ -114,7 +114,7 @@ def test_workflow_task_round_trips_executable_step_fields() -> None:
         details="Use the approved design and preserve the recorded decisions.",
         llm_type="standard_reasoning",
         uses_processes=("review-context",),
-        tool_invocations=(SkillToolInvocation(tool="shell", command=("pytest", "-q")),),
+        tool_invocations=(ToolInvocation(tool="shell", command=("pytest", "-q")),),
     )
 
     parsed = workflow_task_from_json(workflow_task_to_json(task))

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from powdrr_lift.process.model import (
+from powdrr_lift.process.task_step import (
     CodingLoopSpec,
     CodingLoopVerification,
 )
@@ -79,7 +79,7 @@ def test_task_scenario_repairs_a_failed_procedrr_operation(tmp_path: Path) -> No
                 assignee_type=AssigneeType.AGENT,
                 assignee_role=AgentRole.ARCHITECT,
                 output_state_type="result",
-                actions=("edit", "complete"),
+                actions=("edit", "task_complete"),
             ),
         ),
     )
@@ -93,12 +93,15 @@ def test_task_scenario_repairs_a_failed_procedrr_operation(tmp_path: Path) -> No
                 "file_path": "missing.txt",
                 "edits": [{"kind": "replace", "start_line": 1, "text": "x"}],
             },
-            {"action": "complete", "output_state": {"result": {"ok": True}}},
+            {
+                "action": "task_complete",
+                "output_state": {"result": {"ok": True}},
+            },
         ],
         expected_output_state={"result": {"ok": True}},
     )
 
-    assert result["exit_code"] == 0
+    assert result["exit_code"] == 0, result["stderr"]
     assert result["output_matches"] is True
     assert len(result["exchanges"]) == 3
 

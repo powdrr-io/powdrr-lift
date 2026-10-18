@@ -16,8 +16,8 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.process.model import (
-    SkillStepPreStep,
+from powdrr_lift.process.task_step import (
+    TaskPreStep,
 )
 from powdrr_lift.process.tasks import (
     AgentRole,
@@ -41,7 +41,6 @@ from powdrr_lift.workrr.llm import (
 )
 from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
-    _build_task_messages,
     _build_workflow_client,
     _durable_task_action_output_state,
     _handle_exhausted_timeout,
@@ -49,8 +48,6 @@ from powdrr_lift.workrr.task_agent import (
     _publish_workflow_progress,
     _read_task_document,
     _select_ready_workflow_git_state,
-    _task_events_for_prompt,
-    _task_system_prompt,
     _validate_workflow_task_state,
     _workflow_file_command_error,
     run_workflow_task,
@@ -130,12 +127,12 @@ def _legacy_action_to_process_step(response: Mapping[str, Any]) -> dict[str, Any
         "invoke_tool": "invoke_tool",
     }
     tool = operations.get(str(action))
-    if action in {"invoke_skill", "task_run_process"}:
+    if action == "task_run_process":
         return {
             "operation": {
                 "tool": "task_run_process",
                 "parameters": {
-                    "process_id": response.get("process_id", response.get("skill")),
+                    "process_id": response.get("process_id"),
                     "bindings": response.get("bindings", {}),
                 },
                 "bind": "nested_process_result",
@@ -249,27 +246,6 @@ def test_next_step_requires_top_level_output_state() -> None:
 
     with pytest.raises(Exception, match="top-level.*output_state"):
         _durable_task_action_output_state(action)
-
-
-def test_explicit_task_prompt_contains_only_declared_action_guidance() -> None:
-    task = WorkflowTask(
-        task_id="scoped-task",
-        status=TaskStatus.OPEN,
-        upstream_task_ids=(),
-        dependent_state=(),
-        complexity=TaskComplexity.LOW,
-        input_state={},
-        description="Read one document.",
-        actions=("read_document",),
-    )
-
-    prompt = _task_system_prompt(task=task)
-
-    assert "- read_document:" in prompt
-    assert "- next_step:" in prompt
-    assert "- invoke_skill:" not in prompt
-    assert "- edit:" not in prompt
-    assert "Use `complete` only" not in prompt
 
 
 def test_select_ready_workflow_skips_workflow_with_incomplete_dependency(
@@ -566,7 +542,7 @@ def test_deterministic_gather_context_must_be_persisted_exactly(
                 assignee_role=AgentRole.ARCHITECT,
                 output_state_type="context-state",
                 step_type="invoke_tool",
-                pre_step=SkillStepPreStep(
+                pre_step=TaskPreStep(
                     action="gather_context",
                     template={
                         "feature_id": "<feature_id>",
@@ -658,134 +634,7 @@ def test_process_workflow_task_resolves_input_placeholders_before_llm(
     assert "input_state.proposed_pr" not in prompt
 
 
-def test_workflow_task_prompt_includes_task_interaction_style(
-    tmp_path: Path,
-) -> None:
-    task = WorkflowTask(
-        task_id="review-task",
-        status=TaskStatus.OPEN,
-        complexity=TaskComplexity.MEDIUM,
-        input_state={"scope": "the proposed change"},
-        description="Challenge the proposed change.",
-        interaction_style="observational_review",
-        assignee_type=AssigneeType.AGENT,
-        assignee_role=AgentRole.REVIEWER,
-    )
-    workflow = WorkflowInstance.create(tmp_path / "workflow", (task,))
-
-    messages = _build_task_messages(workflow, task, [], repo_root=tmp_path)
-
-    assert "Interaction style: observational_review." in messages[0]["content"]
-    assert (
-        "Separate observations, inferences, risks, and recommendations."
-        in (messages[0]["content"])
-    )
-    assert "Use `next_step` when this task is finished" in messages[0]["content"]
-    assert json.loads(messages[1]["content"])["task"]["interaction_style"] == (
-        "observational_review"
-    )
-
-
-def test_task_prompt_marks_deterministic_pre_step_as_authoritative(
-    tmp_path: Path,
-) -> None:
-    task = WorkflowTask(
-        task_id="context-task",
-        status=TaskStatus.OPEN,
-        complexity=TaskComplexity.HIGH,
-        input_state={"feature_id": "fixture-feature"},
-        description="Gather context about the proposed PR.",
-        output_state_type="proposed-pr-context-state",
-        assignee_type=AssigneeType.AGENT,
-        assignee_role=AgentRole.ARCHITECT,
-    )
-    workflow = WorkflowInstance.create(tmp_path / "workflow", (task,))
-
-    messages = _build_task_messages(
-        workflow,
-        task,
-        [
-            {
-                "kind": "deterministic_pre_step",
-                "action": "gather_context",
-                "result": {"matches": []},
-            }
-        ],
-        repo_root=tmp_path,
-    )
-
-    prompt = json.loads(messages[1]["content"])
-    assert prompt["deterministic_pre_step"]["status"] == "already_completed"
-    assert prompt["deterministic_pre_step"]["result"] == {"matches": []}
-    assert prompt["deterministic_pre_step"]["required_output_state"] == {
-        "proposed-pr-context-state": {"matches": []}
-    }
-    assert (
-        "Do not search for, rediscover, reinterpret"
-        in prompt["deterministic_pre_step"]["instructions"]
-    )
-
-
-def test_task_prompt_keeps_latest_result_without_repeating_old_results() -> None:
-    events: list[dict[str, Any]] = [
-        {
-            "kind": "invoke_tool",
-            "parameters": {"command": "cat a very large file"},
-            "result": {"stdout": "old output"},
-        },
-        {
-            "kind": "action_error",
-            "action_kind": "edit",
-            "error": "the requested range is outside the document",
-        },
-        {
-            "kind": "read_document",
-            "file_path": "docs/example.md",
-            "result": {"content": "current output"},
-        },
-    ]
-
-    prompt_events = _task_events_for_prompt(events)
-
-    assert prompt_events["recent"][0] == {
-        "kind": "invoke_tool",
-    }
-    assert prompt_events["recent"][1]["error"] == (
-        "the requested range is outside the document"
-    )
-    assert prompt_events["latest_result"]["value"] == {"content": "current output"}
-    assert "parameters" not in prompt_events["recent"][0]
-    assert "result" not in prompt_events["recent"][0]
-
-
-def test_task_prompt_preserves_latest_failed_result_separately() -> None:
-    prompt_events = _task_events_for_prompt(
-        [
-            {
-                "action": "invoke_tool",
-                "result": {"returncode": 2, "stderr": "validation failed"},
-            },
-            {"action": "next_step"},
-        ]
-    )
-
-    assert prompt_events["latest_failure"]["value"] == {
-        "returncode": 2,
-        "stderr": "validation failed",
-    }
-
-
-def test_task_prompt_bounds_event_metadata() -> None:
-    prompt_events = _task_events_for_prompt(
-        [{"kind": "read_document", "result": {"line": index}} for index in range(20)]
-    )
-
-    assert len(prompt_events["recent"]) == 12
-    assert prompt_events["omitted_event_count"] == 8
-    assert prompt_events["latest_result"]["value"] == {"line": 19}
-
-
-def test_process_workflow_task_runs_nested_skill_in_same_worktree(
+def test_process_workflow_task_runs_nested_process_in_same_worktree(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "nested.txt").write_text("before\n", encoding="utf-8")

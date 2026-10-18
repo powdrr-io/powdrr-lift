@@ -65,7 +65,7 @@ def test_pull_request_record_is_committed_and_accumulates_tool_calls(
     assert path == repo / "docs" / "prs" / "42.yaml"
     document = yaml.safe_load(path.read_text(encoding="utf-8"))
     assert document["pull_request"] == 42
-    assert document["workflow"]["skills"] == ["create-pull-request"]
+    assert document["workflow"]["processes"] == ["create-pull-request"]
     assert document["tool_calls"][0]["why"] == "Stage only approved files."
     assert (
         "Add workflow record for PR 42"
@@ -109,7 +109,7 @@ def test_pull_request_command_and_url_parsing() -> None:
     assert pull_request_number("no pull request") is None
 
 
-def test_pull_request_record_preserves_root_workflow_and_nested_skill_events(
+def test_pull_request_record_preserves_root_and_nested_processes(
     tmp_path: Path,
 ) -> None:
     repo = tmp_path / "repo"
@@ -134,10 +134,10 @@ def test_pull_request_record_preserves_root_workflow_and_nested_skill_events(
         base_branch="main",
         title="Example PR",
         workflow_name="specify-a-feature",
-        workflow_path="skill-definitions/specify-a-feature.yaml",
+        workflow_path="docs/procedrr/processes/specify-a-feature.yaml",
         steps=[{"id": "capture-goal", "description": "Capture the goal"}],
         events=[
-            {"kind": "invoke_skill", "skill": "review-system"},
+            {"kind": "task_run_process", "process_id": "review-system"},
             {
                 "kind": "invoke_tool",
                 "tool": "shell",
@@ -155,7 +155,7 @@ def test_pull_request_record_preserves_root_workflow_and_nested_skill_events(
     assert document["workflow"]["steps"] == [
         {"id": "capture-goal", "description": "Capture the goal"}
     ]
-    assert document["workflow"]["skills"] == [
+    assert document["workflow"]["processes"] == [
         "specify-a-feature",
         "review-system",
     ]

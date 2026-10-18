@@ -9,910 +9,6 @@ intent:
 human-decisions: []
 structured_files: []
 files:
-- path: docs/design/procedrr-external-contract-discovery.md
-  type: modified
-  span:
-    start_line: 56
-    end_line: 56
-  summary: Update Procedrr declaration paths
-  rationale: Keep active design guidance aligned with the processes directory.
-- path: docs/harbor/powdrr-agent.md
-  type: modified
-  span:
-    start_line: 10
-    end_line: 10
-  summary: Update the Procedrr process directory reference
-  rationale: Keep the Harbor agent guidance consistent with the runtime.
-- path: docs/plans/bounded-coding-worker-implementation-plan.md
-  type: modified
-  span:
-    start_line: 580
-    end_line: 580
-  summary: Update the Procedrr process directory reference
-  rationale: Keep active implementation guidance aligned with the renamed directory.
-- path: docs/plans/bounded-coding-worker-implementation-plan.md
-  type: modified
-  span:
-    start_line: 826
-    end_line: 826
-  summary: Update the Procedrr process directory reference
-  rationale: Keep active implementation guidance aligned with the renamed directory.
-- path: docs/plans/bounded-llm-instruction-compiler.md
-  type: modified
-  span:
-    start_line: 674
-    end_line: 674
-  summary: Update the Procedrr process directory reference
-  rationale: Keep active compiler guidance aligned with the renamed directory.
-- path: docs/plans/checkable-acceptance-criteria-implementation-handoff.md
-  type: modified
-  span:
-    start_line: 114
-    end_line: 114
-  summary: Update the Procedrr process directory reference
-  rationale: Keep active implementation guidance aligned with the renamed directory.
-- path: docs/plans/classifier-semantic-quality-handoff.md
-  type: modified
-  span:
-    start_line: 63
-    end_line: 63
-  summary: Update the Procedrr process directory reference
-  rationale: Keep active classifier guidance aligned with the renamed directory.
-- path: docs/plans/evidence-backed-prompt-contract-closure.md
-  type: modified
-  span:
-    start_line: 245
-    end_line: 245
-  summary: Update the Procedrr process directory reference
-  rationale: Keep active prompt guidance aligned with the renamed directory.
-- path: docs/plans/first-adopter-headless-implementation-plan.md
-  type: modified
-  span:
-    start_line: 64
-    end_line: 64
-  summary: Update the Procedrr process directory reference
-  rationale: Keep active implementation guidance aligned with the renamed directory.
-- path: docs/plans/intent-linked-verification-implementation-plan.md
-  type: modified
-  span:
-    start_line: 23
-    end_line: 23
-  summary: Update Procedrr process directory references
-  rationale: Keep active verification guidance aligned with the renamed directory.
-- path: docs/plans/intent-linked-verification-implementation-plan.md
-  type: modified
-  span:
-    start_line: 119
-    end_line: 119
-  summary: Update Procedrr process directory references
-  rationale: Keep active verification guidance aligned with the renamed directory.
-- path: docs/plans/intent-linked-verification-implementation-plan.md
-  type: modified
-  span:
-    start_line: 344
-    end_line: 344
-  summary: Update Procedrr process directory references
-  rationale: Keep active verification guidance aligned with the renamed directory.
-- path: docs/plans/intent-linked-verification-implementation-plan.md
-  type: modified
-  span:
-    start_line: 410
-    end_line: 410
-  summary: Update Procedrr process directory references
-  rationale: Keep active verification guidance aligned with the renamed directory.
-- path: docs/plans/intent-preserving-change-implementation-plan.md
-  type: modified
-  span:
-    start_line: 37
-    end_line: 37
-  summary: Update the Procedrr process directory reference
-  rationale: Keep active change guidance aligned with the renamed directory.
-- path: docs/plans/prompt-quality-recovery-implementation-handoff.md
-  type: modified
-  span:
-    start_line: 111
-    end_line: 111
-  summary: Update the Procedrr process directory reference
-  rationale: Keep active prompt guidance aligned with the renamed directory.
-- path: docs/plans/routing-classifier-jev-and-dedicated-model-handoff.md
-  type: modified
-  span:
-    start_line: 83
-    end_line: 83
-  summary: Update the Procedrr process directory reference
-  rationale: Keep active routing guidance aligned with the renamed directory.
-- path: pyproject.toml
-  type: modified
-  span:
-    start_line: 53
-    end_line: 53
-  summary: Package the Procedrr processes directory
-  rationale: Ensure installed packages use the renamed declaration location.
-- path: science/classifications/compare_jev_other_classifiers.py
-  type: modified
-  span:
-    start_line: 303
-    end_line: 303
-  summary: Update the process declaration path
-  rationale: Keep the classification script pointed at the current directory.
-- path: science/classifications/root_disposition/build_dataset.py
-  type: modified
-  span:
-    start_line: 577
-    end_line: 577
-  summary: Update the process declaration path
-  rationale: Keep dataset generation pointed at the current directory.
-- path: science/deepswe/acceptance_templates/production_analysis.py
-  type: modified
-  span:
-    start_line: 34
-    end_line: 34
-  summary: Update Procedrr process paths
-  rationale: Keep the acceptance template pointed at the current directory.
-- path: science/deepswe/acceptance_templates/production_analysis.py
-  type: modified
-  span:
-    start_line: 392
-    end_line: 392
-  summary: Update Procedrr process paths
-  rationale: Keep the acceptance template pointed at the current directory.
-- path: science/deepswe/acceptance_templates/production_analysis.py
-  type: modified
-  span:
-    start_line: 396
-    end_line: 396
-  summary: Update Procedrr process paths
-  rationale: Keep the acceptance template pointed at the current directory.
-- path: science/deepswe/acceptance_templates/production_analysis.py
-  type: modified
-  span:
-    start_line: 399
-    end_line: 401
-  summary: Update Procedrr process paths
-  rationale: Keep the acceptance template pointed at the current directory.
-- path: src/powdrr_lift/workrr/procedrr.py
-  type: modified
-  span:
-    start_line: 163
-    end_line: 163
-  summary: Rename the Procedrr directory parameter
-  rationale: Describe declarations as processes rather than legacy skills.
-- path: src/powdrr_lift/workrr/procedrr.py
-  type: modified
-  span:
-    start_line: 171
-    end_line: 171
-  summary: Rename the Procedrr directory parameter
-  rationale: Describe declarations as processes rather than legacy skills.
-- path: src/procedrr/__init__.py
-  type: modified
-  span:
-    start_line: 3
-    end_line: 8
-  summary: Export the process catalog API
-  rationale: Provide a public entry point for validated process loading.
-- path: src/procedrr/__init__.py
-  type: modified
-  span:
-    start_line: 72
-    end_line: 75
-  summary: Export the process catalog API
-  rationale: Provide a public entry point for validated process loading.
-- path: src/procedrr_evaluator/evaluator.py
-  type: modified
-  span:
-    start_line: 18
-    end_line: 18
-  summary: Stop evaluation at declared terminal nodes
-  rationale: Preserve process terminal outcomes within nested evaluation.
-- path: src/procedrr_evaluator/evaluator.py
-  type: modified
-  span:
-    start_line: 23
-    end_line: 24
-  summary: Stop evaluation at declared terminal nodes
-  rationale: Preserve process terminal outcomes within nested evaluation.
-- path: docs/procedrr/processes/finish-pr-prep.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 180
-  summary: Add the PR preparation process
-  rationale: Declare validation, repair, and restaging as a Procedrr process.
-- path: docs/procedrr/processes/handle-ad-hoc.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 47
-  summary: Add the ad hoc request process
-  rationale: Route requests through generated Procedrr fragments and PR preparation.
-- path: src/procedrr/parser.py
-  type: modified
-  span:
-    start_line: 20
-    end_line: 20
-  summary: Register the file management operation
-  rationale: Allow process declarations to use the chat file management adapter.
-- path: tests/test_external_contract_research.py
-  type: modified
-  span:
-    start_line: 32
-    end_line: 34
-  summary: Update the process directory test path
-  rationale: Keep tests aligned with the declaration rename.
-- path: tests/test_external_contract_research.py
-  type: modified
-  span:
-    start_line: 680
-    end_line: 680
-  summary: Update the process directory test path
-  rationale: Keep tests aligned with the declaration rename.
-- path: tests/test_external_contract_research.py
-  type: modified
-  span:
-    start_line: 682
-    end_line: 682
-  summary: Update the process directory test path
-  rationale: Keep tests aligned with the declaration rename.
-- path: tests/test_external_contract_research.py
-  type: modified
-  span:
-    start_line: 779
-    end_line: 779
-  summary: Update the process directory test path
-  rationale: Keep tests aligned with the declaration rename.
-- path: tests/test_external_contract_research.py
-  type: modified
-  span:
-    start_line: 784
-    end_line: 784
-  summary: Update the process directory test path
-  rationale: Keep tests aligned with the declaration rename.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 206
-    end_line: 206
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 312
-    end_line: 312
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 2285
-    end_line: 2285
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 2708
-    end_line: 2708
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 2958
-    end_line: 2958
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 3115
-    end_line: 3115
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 3791
-    end_line: 3796
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 3800
-    end_line: 3800
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 3802
-    end_line: 3802
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 3812
-    end_line: 3815
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 3818
-    end_line: 3818
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_feature_endpoint.py
-  type: modified
-  span:
-    start_line: 3829
-    end_line: 3830
-  summary: Exercise feature execution through the shared service
-  rationale: Verify process metadata and successful terminal outcomes.
-- path: tests/test_implement_feature_e2e.py
-  type: modified
-  span:
-    start_line: 886
-    end_line: 887
-  summary: Update the feature process path
-  rationale: Keep end-to-end coverage aligned with the declaration rename.
-- path: tests/test_procedrr.py
-  type: modified
-  span:
-    start_line: 607
-    end_line: 607
-  summary: Update catalog and process directory coverage
-  rationale: Verify the renamed declaration location.
-- path: tests/test_procedrr.py
-  type: modified
-  span:
-    start_line: 622
-    end_line: 622
-  summary: Update catalog and process directory coverage
-  rationale: Verify the renamed declaration location.
-- path: tests/test_procedrr.py
-  type: modified
-  span:
-    start_line: 649
-    end_line: 649
-  summary: Update catalog and process directory coverage
-  rationale: Verify the renamed declaration location.
-- path: tests/test_procedrr.py
-  type: modified
-  span:
-    start_line: 675
-    end_line: 675
-  summary: Update catalog and process directory coverage
-  rationale: Verify the renamed declaration location.
-- path: tests/test_procedrr.py
-  type: modified
-  span:
-    start_line: 758
-    end_line: 758
-  summary: Update catalog and process directory coverage
-  rationale: Verify the renamed declaration location.
-- path: tests/test_procedrr.py
-  type: modified
-  span:
-    start_line: 772
-    end_line: 772
-  summary: Update catalog and process directory coverage
-  rationale: Verify the renamed declaration location.
-- path: tests/test_procedrr_evaluator.py
-  type: modified
-  span:
-    start_line: 1073
-    end_line: 1073
-  summary: Cover terminal-node evaluation behavior
-  rationale: Ensure nested processes preserve their terminal semantics.
-- path: tests/test_procedrr_evaluator.py
-  type: modified
-  span:
-    start_line: 1137
-    end_line: 1137
-  summary: Cover terminal-node evaluation behavior
-  rationale: Ensure nested processes preserve their terminal semantics.
-- path: tests/test_procedrr_evaluator.py
-  type: modified
-  span:
-    start_line: 1223
-    end_line: 1223
-  summary: Cover terminal-node evaluation behavior
-  rationale: Ensure nested processes preserve their terminal semantics.
-- path: tests/test_procedrr_evaluator.py
-  type: modified
-  span:
-    start_line: 1417
-    end_line: 1417
-  summary: Cover terminal-node evaluation behavior
-  rationale: Ensure nested processes preserve their terminal semantics.
-- path: tests/test_procedrr_evaluator.py
-  type: modified
-  span:
-    start_line: 1536
-    end_line: 1536
-  summary: Cover terminal-node evaluation behavior
-  rationale: Ensure nested processes preserve their terminal semantics.
-- path: tests/test_procedrr_evaluator.py
-  type: modified
-  span:
-    start_line: 1590
-    end_line: 1590
-  summary: Cover terminal-node evaluation behavior
-  rationale: Ensure nested processes preserve their terminal semantics.
-- path: tests/test_procedrr_evaluator.py
-  type: modified
-  span:
-    start_line: 297
-    end_line: 357
-  summary: Cover called process recovery behavior
-  rationale: Verify nested processes use and restore their own recovery declarations.
-- path: tests/test_procedrr_migrated_workflows.py
-  type: added
-  span:
-    start_line: 1
-    end_line: 220
-  summary: Test the PR preparation and ad hoc processes
-  rationale: Verify process branching, validation retries, and nested calls.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 64
-    end_line: 64
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 107
-    end_line: 107
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 126
-    end_line: 126
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 156
-    end_line: 156
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 191
-    end_line: 191
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 225
-    end_line: 225
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 258
-    end_line: 258
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 278
-    end_line: 278
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 301
-    end_line: 301
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 314
-    end_line: 314
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: tests/test_workrr_procedrr.py
-  type: modified
-  span:
-    start_line: 326
-    end_line: 326
-  summary: Update the process directory adapter tests
-  rationale: Verify callers use process terminology and paths.
-- path: src/procedrr/catalog.py
-  type: added
-  span:
-    start_line: 1
-    end_line: 184
-  summary: Add validated process identity, typed inputs, and catalog loading
-  rationale: Give callers a stable source for process definitions and revisions.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 128
-    end_line: 128
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 141
-    end_line: 141
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 143
-    end_line: 143
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 518
-    end_line: 520
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 613
-    end_line: 625
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 623
-    end_line: 636
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 646
-    end_line: 646
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 656
-    end_line: 656
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 660
-    end_line: 662
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 664
-    end_line: 664
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 673
-    end_line: 674
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 686
-    end_line: 690
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 4795
-    end_line: 4795
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 4806
-    end_line: 4806
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 4882
-    end_line: 4882
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/feature_endpoint.py
-  type: modified
-  span:
-    start_line: 4893
-    end_line: 4893
-  summary: Route feature execution through the shared Procedrr service
-  rationale: Attach process identity and typed execution outcomes to feature runs.
-- path: src/powdrr_lift/workrr/procedrr_operations.py
-  type: added
-  span:
-    start_line: 1
-    end_line: 65
-  summary: Add shared authorized Procedrr operation dispatch
-  rationale: Restrict process operations to caller-provided handlers and validate declared internal command
-    inputs.
-- path: tests/test_workrr_procedrr_operations.py
-  type: added
-  span:
-    start_line: 1
-    end_line: 63
-  summary: Test Workrr operation authorization and validation
-  rationale: Protect caller-scoped dispatch and command schema enforcement.
-- path: docs/procedrr/processes/independent-skill-workflow-review.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 100
-  summary: Port independent workflow review into a typed Procedrr process
-  rationale: Preserve the independent adversarial review contract with explicit input/output schemas.
-- path: docs/procedrr/processes/address-review-comments.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 112
-  summary: Port address-review-comments workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/adversarial-pr-review.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 135
-  summary: Port adversarial-pr-review workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/bootstrap-code-structure.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 159
-  summary: Port bootstrap-code-structure workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/create-pull-request.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 152
-  summary: Port create-pull-request workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/dead-code-review.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 133
-  summary: Port dead-code-review workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/feature-functionality-review.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 127
-  summary: Port feature-functionality-review workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/feature-test-coverage-review.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 114
-  summary: Port feature-test-coverage-review workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/fix-ci-failures.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 132
-  summary: Port fix-ci-failures workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/fix-merge-conflicts.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 145
-  summary: Port fix-merge-conflicts workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/generate-fragment.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 126
-  summary: Port generate-fragment workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/review-architecture.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 93
-  summary: Port review-architecture workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/review-skill-workflow.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 168
-  summary: Port review-skill-workflow workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/review-system.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 92
-  summary: Port review-system workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/run-tests-and-fix.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 148
-  summary: Port run-tests-and-fix workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/security-review.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 178
-  summary: Port security-review workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/select-process.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 32
-  summary: Port select-process workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/spec-v1-design-review.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 316
-  summary: Port spec-v1-design-review workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/specify-a-feature.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 99
-  summary: Port specify-a-feature workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/specify-architecture.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 107
-  summary: Port specify-architecture workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/specify-implementation.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 104
-  summary: Port specify-implementation workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/specify-system.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 97
-  summary: Port specify-system workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: docs/procedrr/processes/start-implementing-feature.yaml
-  type: added
-  span:
-    start_line: 1
-    end_line: 478
-  summary: Port start-implementing-feature workflow to Procedrr
-  rationale: Make this supported workflow available from the Procedrr process catalog.
-- path: src/powdrr_lift/cli.py
-  type: modified
-  span:
-    start_line: 168
-    end_line: 168
-  summary: Route workflow chat CLI through Procedrr
-  rationale: Use a process directory option and execute selected processes through the shared runtime.
-- path: src/powdrr_lift/workrr/chat_tui.py
-  type: modified
-  span:
-    start_line: 21
-    end_line: 21
-  summary: Route the chat TUI through Procedrr
-  rationale: Keep interactive chat on the shared process execution service.
-- path: src/powdrr_lift/workrr/chat_tui.py
-  type: modified
-  span:
-    start_line: 22
-    end_line: 24
-  summary: Route the chat TUI through Procedrr
-  rationale: Keep interactive chat on the shared process execution service.
-- path: src/powdrr_lift/workrr/procedrr_chat.py
-  type: added
-  span:
-    start_line: 1
-    end_line: 682
-  summary: Add the Procedrr workflow chat runtime
-  rationale: Select catalogued processes and dispatch operations through Workrr authorization.
-- path: src/procedrr/parser.py
-  type: modified
-  span:
-    start_line: 25
-    end_line: 26
-  summary: Register chat-facing Procedrr operations
-  rationale: Validate prompt, response, and worktree snapshot operations.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3601
-    end_line: 3604
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3614
-    end_line: 3615
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3629
-    end_line: 3630
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3871
-    end_line: 3874
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3880
-    end_line: 3881
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3905
-    end_line: 3908
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3910
-    end_line: 3911
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
 - path: .github/workflows/ci.yml
   type: modified
   span:
@@ -1039,6 +135,13 @@ files:
     end_line: 844
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: docs/design/procedrr-external-contract-discovery.md
+  type: modified
+  span:
+    start_line: 56
+    end_line: 56
+  summary: Update Procedrr declaration paths
+  rationale: Keep active design guidance aligned with the processes directory.
 - path: docs/design/procedrr-only-workflow-runtime.md
   type: modified
   span:
@@ -1102,6 +205,13 @@ files:
     end_line: 9
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: docs/harbor/powdrr-agent.md
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Update the Procedrr process directory reference
+  rationale: Keep the Harbor agent guidance consistent with the runtime.
 - path: docs/plans/bootstrap-validation-discovery.md
   type: modified
   span:
@@ -1116,6 +226,55 @@ files:
     end_line: 645
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 580
+    end_line: 580
+  summary: Update the Procedrr process directory reference
+  rationale: Keep active implementation guidance aligned with the renamed directory.
+- path: docs/plans/bounded-coding-worker-implementation-plan.md
+  type: modified
+  span:
+    start_line: 826
+    end_line: 826
+  summary: Update the Procedrr process directory reference
+  rationale: Keep active implementation guidance aligned with the renamed directory.
+- path: docs/plans/bounded-llm-instruction-compiler.md
+  type: modified
+  span:
+    start_line: 674
+    end_line: 674
+  summary: Update the Procedrr process directory reference
+  rationale: Keep active compiler guidance aligned with the renamed directory.
+- path: docs/plans/checkable-acceptance-criteria-implementation-handoff.md
+  type: modified
+  span:
+    start_line: 114
+    end_line: 114
+  summary: Update the Procedrr process directory reference
+  rationale: Keep active implementation guidance aligned with the renamed directory.
+- path: docs/plans/classifier-semantic-quality-handoff.md
+  type: modified
+  span:
+    start_line: 63
+    end_line: 63
+  summary: Update the Procedrr process directory reference
+  rationale: Keep active classifier guidance aligned with the renamed directory.
+- path: docs/plans/evidence-backed-prompt-contract-closure.md
+  type: modified
+  span:
+    start_line: 245
+    end_line: 245
+  summary: Update the Procedrr process directory reference
+  rationale: Keep active prompt guidance aligned with the renamed directory.
+- path: docs/plans/first-adopter-headless-implementation-plan.md
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Update the Procedrr process directory reference
+  rationale: Keep active implementation guidance aligned with the renamed directory.
 - path: docs/plans/first-adopter-headless-implementation-plan.md
   type: modified
   span:
@@ -1130,6 +289,41 @@ files:
     end_line: 398
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: docs/plans/intent-linked-verification-implementation-plan.md
+  type: modified
+  span:
+    start_line: 23
+    end_line: 23
+  summary: Update Procedrr process directory references
+  rationale: Keep active verification guidance aligned with the renamed directory.
+- path: docs/plans/intent-linked-verification-implementation-plan.md
+  type: modified
+  span:
+    start_line: 119
+    end_line: 119
+  summary: Update Procedrr process directory references
+  rationale: Keep active verification guidance aligned with the renamed directory.
+- path: docs/plans/intent-linked-verification-implementation-plan.md
+  type: modified
+  span:
+    start_line: 344
+    end_line: 344
+  summary: Update Procedrr process directory references
+  rationale: Keep active verification guidance aligned with the renamed directory.
+- path: docs/plans/intent-linked-verification-implementation-plan.md
+  type: modified
+  span:
+    start_line: 410
+    end_line: 410
+  summary: Update Procedrr process directory references
+  rationale: Keep active verification guidance aligned with the renamed directory.
+- path: docs/plans/intent-preserving-change-implementation-plan.md
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Update the Procedrr process directory reference
+  rationale: Keep active change guidance aligned with the renamed directory.
 - path: docs/plans/llm-execution-language-safety-implementation.md
   type: modified
   span:
@@ -1137,6 +331,55 @@ files:
     end_line: 40
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: docs/plans/prompt-quality-recovery-implementation-handoff.md
+  type: modified
+  span:
+    start_line: 111
+    end_line: 111
+  summary: Update the Procedrr process directory reference
+  rationale: Keep active prompt guidance aligned with the renamed directory.
+- path: docs/plans/routing-classifier-jev-and-dedicated-model-handoff.md
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Update the Procedrr process directory reference
+  rationale: Keep active routing guidance aligned with the renamed directory.
+- path: docs/procedrr/processes/address-review-comments.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 112
+  summary: Port address-review-comments workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/adversarial-pr-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 135
+  summary: Port adversarial-pr-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/bootstrap-code-structure.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 159
+  summary: Port bootstrap-code-structure workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/create-pull-request.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 152
+  summary: Port create-pull-request workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/dead-code-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 133
+  summary: Port dead-code-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
 - path: docs/procedrr/processes/durable-task.yaml
   type: added
   span:
@@ -1144,6 +387,195 @@ files:
     end_line: 50
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: docs/procedrr/processes/feature-functionality-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 127
+  summary: Port feature-functionality-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/feature-test-coverage-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 114
+  summary: Port feature-test-coverage-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/finish-pr-prep.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 180
+  summary: Add the PR preparation process
+  rationale: Declare validation, repair, and restaging as a Procedrr process.
+- path: docs/procedrr/processes/fix-ci-failures.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 132
+  summary: Port fix-ci-failures workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/fix-merge-conflicts.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 145
+  summary: Port fix-merge-conflicts workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/generate-fragment.yaml
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 126
+  summary: Port generate-fragment workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/handle-ad-hoc.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 47
+  summary: Add the ad hoc request process
+  rationale: Route requests through generated Procedrr fragments and PR preparation.
+- path: docs/procedrr/processes/independent-skill-workflow-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 100
+  summary: Port independent workflow review into a typed Procedrr process
+  rationale: Preserve the independent adversarial review contract with explicit input/output schemas.
+- path: docs/procedrr/processes/review-architecture.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 93
+  summary: Port review-architecture workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/review-skill-workflow.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 168
+  summary: Port review-skill-workflow workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/review-system.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 92
+  summary: Port review-system workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/run-tests-and-fix.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 148
+  summary: Port run-tests-and-fix workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/security-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 178
+  summary: Port security-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/select-process.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 32
+  summary: Port select-process workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/spec-v1-design-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 316
+  summary: Port spec-v1-design-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/specify-a-feature.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 99
+  summary: Port specify-a-feature workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/specify-architecture.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 107
+  summary: Port specify-architecture workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/specify-implementation.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 104
+  summary: Port specify-implementation workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/specify-system.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 97
+  summary: Port specify-system workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 478
+  summary: Port start-implementing-feature workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: pyproject.toml
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Package the Procedrr processes directory
+  rationale: Ensure installed packages use the renamed declaration location.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span:
+    start_line: 303
+    end_line: 303
+  summary: Update the process declaration path
+  rationale: Keep the classification script pointed at the current directory.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span:
+    start_line: 577
+    end_line: 577
+  summary: Update the process declaration path
+  rationale: Keep dataset generation pointed at the current directory.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Update Procedrr process paths
+  rationale: Keep the acceptance template pointed at the current directory.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 392
+    end_line: 392
+  summary: Update Procedrr process paths
+  rationale: Keep the acceptance template pointed at the current directory.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 396
+    end_line: 396
+  summary: Update Procedrr process paths
+  rationale: Keep the acceptance template pointed at the current directory.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 399
+    end_line: 401
+  summary: Update Procedrr process paths
+  rationale: Keep the acceptance template pointed at the current directory.
 - path: scripts/live-implement-feature-smoke.py
   type: modified
   span:
@@ -1357,6 +789,13 @@ files:
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
+    start_line: 156
+    end_line: 156
+  summary: Route workflow chat CLI through Procedrr
+  rationale: Use a process directory option and execute selected processes through the shared runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
     start_line: 201
     end_line: 201
   summary: Migrate workflow behavior to Procedrr
@@ -1364,57 +803,64 @@ files:
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 237
-    end_line: 237
+    start_line: 232
+    end_line: 233
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 284
-    end_line: 285
+    start_line: 246
+    end_line: 246
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 1789
-    end_line: 1791
+    start_line: 280
+    end_line: 282
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 1793
-    end_line: 1795
+    start_line: 1787
+    end_line: 1789
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 1968
-    end_line: 1970
+    start_line: 1791
+    end_line: 1793
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 1972
-    end_line: 1973
+    start_line: 1966
+    end_line: 1968
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 1983
-    end_line: 1983
+    start_line: 1970
+    end_line: 1971
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 2022
-    end_line: 2022
+    start_line: 1981
+    end_line: 1981
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2020
+    end_line: 2020
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
@@ -1427,50 +873,50 @@ files:
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5593
-    end_line: 5595
+    start_line: 5591
+    end_line: 5593
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5597
-    end_line: 5615
+    start_line: 5595
+    end_line: 5613
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5617
-    end_line: 5619
+    start_line: 5615
+    end_line: 5617
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5621
-    end_line: 5623
+    start_line: 5619
+    end_line: 5621
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5625
-    end_line: 5628
+    start_line: 5623
+    end_line: 5626
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5630
-    end_line: 5631
+    start_line: 5628
+    end_line: 5629
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5633
-    end_line: 5639
+    start_line: 5631
+    end_line: 5637
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
@@ -1483,8 +929,8 @@ files:
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5929
-    end_line: 5929
+    start_line: 5927
+    end_line: 5927
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/core/delivery_profile.py
@@ -1781,11 +1227,25 @@ files:
     end_line: 1183
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 50
+    end_line: 50
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 57
+    end_line: 57
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/chat_agent.py
   type: modified
   span:
-    start_line: 93
-    end_line: 93
+    start_line: 72
+    end_line: 72
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/chat_agent.py
@@ -1798,17 +1258,66 @@ files:
 - path: src/powdrr_lift/workrr/chat_agent.py
   type: modified
   span:
-    start_line: 248
-    end_line: 248
+    start_line: 181
+    end_line: 182
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/chat_agent.py
   type: modified
   span:
-    start_line: 1838
-    end_line: 1838
+    start_line: 199
+    end_line: 199
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_agent.py
+  type: modified
+  span:
+    start_line: 1850
+    end_line: 1852
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_agent.py
+  type: modified
+  span:
+    start_line: 1854
+    end_line: 1854
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_agent.py
+  type: modified
+  span:
+    start_line: 1856
+    end_line: 1856
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_agent.py
+  type: modified
+  span:
+    start_line: 1889
+    end_line: 1889
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_agent.py
+  type: modified
+  span:
+    start_line: 1917
+    end_line: 1917
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_agent.py
+  type: modified
+  span:
+    start_line: 2804
+    end_line: 2898
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_config.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 28
+  summary: Add chat_config.py for Procedrr workflow execution
+  rationale: Provide the Procedrr process and task execution boundary required by the migration.
 - path: src/powdrr_lift/workrr/chat_selection.py
   type: modified
   span:
@@ -1826,6 +1335,20 @@ files:
 - path: src/powdrr_lift/workrr/chat_selection.py
   type: modified
   span:
+    start_line: 18
+    end_line: 18
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_selection.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_selection.py
+  type: modified
+  span:
     start_line: 35
     end_line: 58
   summary: Migrate workflow behavior to Procedrr
@@ -1833,24 +1356,157 @@ files:
 - path: src/powdrr_lift/workrr/chat_selection.py
   type: modified
   span:
-    start_line: 61
-    end_line: 90
+    start_line: 86
+    end_line: 86
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_selection.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 285
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_transport.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/chat_transport.py
   type: modified
   span:
     start_line: 22
-    end_line: 22
+    end_line: 25
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/chat_transport.py
   type: modified
   span:
-    start_line: 168
-    end_line: 168
+    start_line: 67
+    end_line: 67
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 24
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 128
+    end_line: 128
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 141
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 518
+    end_line: 520
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 613
+    end_line: 625
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 623
+    end_line: 636
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 646
+    end_line: 646
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 656
+    end_line: 656
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 660
+    end_line: 662
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 664
+    end_line: 664
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 673
+    end_line: 674
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 686
+    end_line: 690
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4795
+    end_line: 4795
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4806
+    end_line: 4806
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4882
+    end_line: 4882
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4893
+    end_line: 4893
+  summary: Route feature execution through the shared Procedrr service
+  rationale: Attach process identity and typed execution outcomes to feature runs.
 - path: src/powdrr_lift/workrr/feature_run.py
   type: modified
   span:
@@ -1935,6 +1591,27 @@ files:
     end_line: 334
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/local_model.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 59
+  summary: Add local_model.py for Procedrr workflow execution
+  rationale: Provide the Procedrr process and task execution boundary required by the migration.
+- path: src/powdrr_lift/workrr/procedrr.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 163
+  summary: Rename the Procedrr directory parameter
+  rationale: Describe declarations as processes rather than legacy skills.
+- path: src/powdrr_lift/workrr/procedrr.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 171
+  summary: Rename the Procedrr directory parameter
+  rationale: Describe declarations as processes rather than legacy skills.
 - path: src/powdrr_lift/workrr/procedrr.py
   type: modified
   span:
@@ -1956,6 +1633,48 @@ files:
     end_line: 381
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 682
+  summary: Add the Procedrr workflow chat runtime
+  rationale: Select catalogued processes and dispatch operations through Workrr authorization.
+- path: src/powdrr_lift/workrr/procedrr_operations.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 65
+  summary: Add shared authorized Procedrr operation dispatch
+  rationale: Restrict process operations to caller-provided handlers and validate declared internal command inputs.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 45
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 46
+    end_line: 46
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 48
+    end_line: 48
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/scenario.py
   type: modified
   span:
@@ -1966,7 +1685,7 @@ files:
 - path: src/powdrr_lift/workrr/scenario.py
   type: modified
   span:
-    start_line: 576
+    start_line: 575
     end_line: 576
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
@@ -2204,13 +1923,6 @@ files:
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 171
-    end_line: 181
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/task_scenario.py
-  type: modified
-  span:
     start_line: 172
     end_line: 179
   summary: Migrate workflow behavior to Procedrr
@@ -2241,6 +1953,13 @@ files:
   span:
     start_line: 237
     end_line: 238
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 181
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
@@ -2285,6 +2004,48 @@ files:
     end_line: 483
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/workflow_provider_selection.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 52
+  summary: Add workflow_provider_selection.py for Procedrr workflow execution
+  rationale: Provide the Procedrr process and task execution boundary required by the migration.
+- path: src/procedrr/__init__.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 8
+  summary: Export the process catalog API
+  rationale: Provide a public entry point for validated process loading.
+- path: src/procedrr/__init__.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 75
+  summary: Export the process catalog API
+  rationale: Provide a public entry point for validated process loading.
+- path: src/procedrr/catalog.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 184
+  summary: Add validated process identity, typed inputs, and catalog loading
+  rationale: Give callers a stable source for process definitions and revisions.
+- path: src/procedrr/parser.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Register the file management operation
+  rationale: Allow process declarations to use the chat file management adapter.
+- path: src/procedrr/parser.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 26
+  summary: Register chat-facing Procedrr operations
+  rationale: Validate prompt, response, and worktree snapshot operations.
 - path: src/procedrr/parser.py
   type: modified
   span:
@@ -2313,6 +2074,20 @@ files:
     end_line: 31
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Stop evaluation at declared terminal nodes
+  rationale: Preserve process terminal outcomes within nested evaluation.
+- path: src/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 24
+  summary: Stop evaluation at declared terminal nodes
+  rationale: Preserve process terminal outcomes within nested evaluation.
 - path: src/procedrr_evaluator/evaluator.py
   type: modified
   span:
@@ -2367,13 +2142,6 @@ files:
   span:
     start_line: 215
     end_line: 217
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/procedrr_evaluator/evaluator.py
-  type: modified
-  span:
-    start_line: 216
-    end_line: 219
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/procedrr_evaluator/evaluator.py
@@ -2442,6 +2210,13 @@ files:
 - path: src/procedrr_evaluator/evaluator.py
   type: modified
   span:
+    start_line: 216
+    end_line: 219
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
     start_line: 386
     end_line: 397
   summary: Migrate workflow behavior to Procedrr
@@ -2477,13 +2252,6 @@ files:
 - path: src/procedrr_evaluator/evaluator.py
   type: modified
   span:
-    start_line: 540
-    end_line: 541
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/procedrr_evaluator/evaluator.py
-  type: modified
-  span:
     start_line: 573
     end_line: 589
   summary: Migrate workflow behavior to Procedrr
@@ -2493,6 +2261,13 @@ files:
   span:
     start_line: 611
     end_line: 619
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 540
+    end_line: 541
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/procedrr_evaluator/evaluator.py
@@ -2670,6 +2445,174 @@ files:
     end_line: 94
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 34
+  summary: Update the process directory test path
+  rationale: Keep tests aligned with the declaration rename.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 680
+    end_line: 680
+  summary: Update the process directory test path
+  rationale: Keep tests aligned with the declaration rename.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 682
+    end_line: 682
+  summary: Update the process directory test path
+  rationale: Keep tests aligned with the declaration rename.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 779
+    end_line: 779
+  summary: Update the process directory test path
+  rationale: Keep tests aligned with the declaration rename.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 784
+    end_line: 784
+  summary: Update the process directory test path
+  rationale: Keep tests aligned with the declaration rename.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 206
+    end_line: 206
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 312
+    end_line: 312
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2285
+    end_line: 2285
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2708
+    end_line: 2708
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2958
+    end_line: 2958
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3115
+    end_line: 3115
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3791
+    end_line: 3796
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3800
+    end_line: 3800
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3802
+    end_line: 3802
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3812
+    end_line: 3815
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3818
+    end_line: 3818
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3829
+    end_line: 3830
+  summary: Exercise feature execution through the shared service
+  rationale: Verify process metadata and successful terminal outcomes.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 886
+    end_line: 887
+  summary: Update the feature process path
+  rationale: Keep end-to-end coverage aligned with the declaration rename.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 607
+    end_line: 607
+  summary: Update catalog and process directory coverage
+  rationale: Verify the renamed declaration location.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 622
+    end_line: 622
+  summary: Update catalog and process directory coverage
+  rationale: Verify the renamed declaration location.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 649
+    end_line: 649
+  summary: Update catalog and process directory coverage
+  rationale: Verify the renamed declaration location.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 675
+    end_line: 675
+  summary: Update catalog and process directory coverage
+  rationale: Verify the renamed declaration location.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 758
+    end_line: 758
+  summary: Update catalog and process directory coverage
+  rationale: Verify the renamed declaration location.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 772
+    end_line: 772
+  summary: Update catalog and process directory coverage
+  rationale: Verify the renamed declaration location.
 - path: tests/test_procedrr_chat.py
   type: added
   span:
@@ -2677,6 +2620,62 @@ files:
     end_line: 98
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 297
+    end_line: 357
+  summary: Cover called process recovery behavior
+  rationale: Verify nested processes use and restore their own recovery declarations.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 1073
+    end_line: 1073
+  summary: Cover terminal-node evaluation behavior
+  rationale: Ensure nested processes preserve their terminal semantics.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 1137
+    end_line: 1137
+  summary: Cover terminal-node evaluation behavior
+  rationale: Ensure nested processes preserve their terminal semantics.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 1223
+    end_line: 1223
+  summary: Cover terminal-node evaluation behavior
+  rationale: Ensure nested processes preserve their terminal semantics.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 1417
+    end_line: 1417
+  summary: Cover terminal-node evaluation behavior
+  rationale: Ensure nested processes preserve their terminal semantics.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 1536
+    end_line: 1536
+  summary: Cover terminal-node evaluation behavior
+  rationale: Ensure nested processes preserve their terminal semantics.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 1590
+    end_line: 1590
+  summary: Cover terminal-node evaluation behavior
+  rationale: Ensure nested processes preserve their terminal semantics.
+- path: tests/test_procedrr_migrated_workflows.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 220
+  summary: Test the PR preparation and ad hoc processes
+  rationale: Verify process branching, validation retries, and nested calls.
 - path: tests/test_procedrr_runtime.py
   type: added
   span:
@@ -2715,6 +2714,13 @@ files:
 - path: tests/test_skill_specification.py
   type: modified
   span:
+    start_line: 899
+    end_line: 907
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_skill_specification.py
+  type: modified
+  span:
     start_line: 871
     end_line: 872
   summary: Migrate workflow behavior to Procedrr
@@ -2743,13 +2749,6 @@ files:
 - path: tests/test_skill_specification.py
   type: modified
   span:
-    start_line: 899
-    end_line: 907
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_skill_specification.py
-  type: modified
-  span:
     start_line: 905
     end_line: 905
   summary: Migrate workflow behavior to Procedrr
@@ -2764,6 +2763,20 @@ files:
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
+    start_line: 104
+    end_line: 106
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 105
+    end_line: 105
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
     start_line: 122
     end_line: 122
   summary: Migrate workflow behavior to Procedrr
@@ -2771,288 +2784,358 @@ files:
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 2532
-    end_line: 2532
+    start_line: 157
+    end_line: 157
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 2579
-    end_line: 2579
+    start_line: 204
+    end_line: 207
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 3022
-    end_line: 3022
+    start_line: 2533
+    end_line: 2533
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 2580
+    end_line: 2580
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3023
+    end_line: 3023
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 3070
-    end_line: 3070
+    end_line: 3071
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 3125
-    end_line: 3125
+    end_line: 3126
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 3177
-    end_line: 3177
+    end_line: 3178
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 3603
-    end_line: 3603
+    start_line: 3601
+    end_line: 3604
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3604
+    end_line: 3604
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 3627
-    end_line: 3627
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+    start_line: 3615
+    end_line: 3616
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3628
+    end_line: 3628
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3630
+    end_line: 3631
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 3719
-    end_line: 3719
+    end_line: 3720
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 3817
-    end_line: 3817
+    end_line: 3818
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 3869
-    end_line: 3869
+    start_line: 3871
+    end_line: 3874
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3870
+    end_line: 3870
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3881
+    end_line: 3882
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3888
+    end_line: 3888
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 3887
-    end_line: 3887
+    start_line: 3905
+    end_line: 3908
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3900
+    end_line: 3900
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 3899
-    end_line: 3899
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+    start_line: 3911
+    end_line: 3912
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 3918
-    end_line: 3918
+    start_line: 3919
+    end_line: 3919
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 3988
-    end_line: 3988
+    end_line: 3989
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 4073
-    end_line: 4073
+    end_line: 4074
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 4263
-    end_line: 4263
+    start_line: 4264
+    end_line: 4264
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 4310
-    end_line: 4310
+    start_line: 4311
+    end_line: 4311
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 4352
-    end_line: 4352
+    start_line: 4353
+    end_line: 4353
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 4396
-    end_line: 4396
+    start_line: 4397
+    end_line: 4397
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 4439
-    end_line: 4439
+    start_line: 4440
+    end_line: 4440
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 4470
-    end_line: 4470
+    start_line: 4471
+    end_line: 4471
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 4507
-    end_line: 4507
+    start_line: 4508
+    end_line: 4508
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 4706
-    end_line: 4706
+    end_line: 4707
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 4924
-    end_line: 4924
+    end_line: 4925
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 5298
-    end_line: 5298
+    start_line: 5299
+    end_line: 5299
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 5530
-    end_line: 5530
+    start_line: 5531
+    end_line: 5531
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 5568
-    end_line: 5568
+    start_line: 5569
+    end_line: 5569
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 5676
-    end_line: 5676
+    end_line: 5677
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 5796
-    end_line: 5796
+    end_line: 5797
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 5883
-    end_line: 5883
+    end_line: 5884
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 5899
+    end_line: 5899
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 5971
-    end_line: 5971
+    end_line: 5972
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 6057
-    end_line: 6057
+    end_line: 6058
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 6139
-    end_line: 6139
+    end_line: 6140
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 6230
-    end_line: 6230
+    end_line: 6231
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 6327
-    end_line: 6327
+    end_line: 6328
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 6408
-    end_line: 6408
+    end_line: 6409
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 6481
-    end_line: 6481
+    end_line: 6482
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
-    start_line: 6631
-    end_line: 6635
+    start_line: 6632
+    end_line: 6636
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_agent.py
   type: modified
   span:
     start_line: 6757
-    end_line: 6757
+    end_line: 6758
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_ui.py
   type: modified
   span:
     start_line: 18
-    end_line: 18
+    end_line: 19
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_ui.py
@@ -3590,13 +3673,6 @@ files:
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 233
-    end_line: 233
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
     start_line: 329
     end_line: 339
   summary: Migrate workflow behavior to Procedrr
@@ -3625,6 +3701,13 @@ files:
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
+    start_line: 233
+    end_line: 233
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
     start_line: 368
     end_line: 368
   summary: Migrate workflow behavior to Procedrr
@@ -3648,13 +3731,6 @@ files:
   span:
     start_line: 638
     end_line: 638
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 639
-    end_line: 777
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
@@ -3751,8 +3827,8 @@ files:
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1171
-    end_line: 1277
+    start_line: 639
+    end_line: 777
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
@@ -3774,6 +3850,13 @@ files:
   span:
     start_line: 1329
     end_line: 1331
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1171
+    end_line: 1277
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
@@ -3926,13 +4009,6 @@ files:
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1840
-    end_line: 1841
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
     start_line: 1876
     end_line: 1876
   summary: Migrate workflow behavior to Procedrr
@@ -3949,6 +4025,13 @@ files:
   span:
     start_line: 1916
     end_line: 1917
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1840
+    end_line: 1841
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_scenario.py
@@ -4070,6 +4153,90 @@ files:
     end_line: 672
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 107
+    end_line: 107
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 126
+    end_line: 126
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 156
+    end_line: 156
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 191
+    end_line: 191
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 225
+    end_line: 225
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 258
+    end_line: 258
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 278
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 301
+    end_line: 301
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 314
+    end_line: 314
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 326
+    end_line: 326
+  summary: Update the process directory adapter tests
+  rationale: Verify callers use process terminology and paths.
+- path: tests/test_workrr_procedrr_operations.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 63
+  summary: Test Workrr operation authorization and validation
+  rationale: Protect caller-scoped dispatch and command schema enforcement.
 - path: workflow-evals/scenarios/execute-proposed-pr/human-handoff.yaml
   type: modified
   span:

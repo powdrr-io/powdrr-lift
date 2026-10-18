@@ -34,7 +34,7 @@ validation confirmation branch.
 
 ## Expected files
 
-- `skill-definitions/start-implementing-feature.yaml`
+- `docs/procedrr/processes/start-implementing-feature.yaml`
 - `src/powdrr_lift/process/model.py`
 - `src/powdrr_lift/core/pr_specification.py`
 - `src/powdrr_lift/workrr/llm.py`

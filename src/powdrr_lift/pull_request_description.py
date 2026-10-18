@@ -11,7 +11,7 @@ from powdrr_lift.errors import PowdrrExecutionError
 
 _COMMON_TEMPLATE: Final[str] = """# Pull Request Description
 
-Fill every section below with evidence from the current worktree, diff, skill
+Fill every section below with evidence from the current worktree, diff, process
 context, and validation results. Do not leave placeholders. If a section does
 not apply, write `Not applicable` and explain why. Never claim a check passed
 unless it actually ran.

@@ -7,14 +7,13 @@ import subprocess
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TextIO
+from typing import Any, TextIO
 
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.builtin_tools import invoke_intrinsic_capability
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL
-from powdrr_lift.process.catalog import SkillCatalogEntry
 from powdrr_lift.workrr.chat_io import _prompt_user, _verbose_print
 from powdrr_lift.workrr.context import WorkflowContext
 from powdrr_lift.workrr.paths import is_dedicated_worktree
@@ -62,8 +61,8 @@ def _load_workflow_context(project_root: Path) -> WorkflowContext | None:
         pr_url=payload.get("pr_url")
         if isinstance(payload.get("pr_url"), str)
         else None,
-        skill_name=payload.get("skill_name")
-        if isinstance(payload.get("skill_name"), str)
+        process_id=payload.get("process_id")
+        if isinstance(payload.get("process_id"), str)
         else None,
         request=payload.get("request")
         if isinstance(payload.get("request"), str)
@@ -75,7 +74,7 @@ def _persist_workflow_context(
     project_root: Path,
     worktree_root: Path,
     *,
-    skill_name: str,
+    process_id: str,
     request: str,
 ) -> None:
     if not (worktree_root / ".git").exists():
@@ -113,7 +112,7 @@ def _persist_workflow_context(
         branch_name=branch_name,
         pr_number=pr_number,
         pr_url=pr_url,
-        skill_name=skill_name,
+        process_id=process_id,
         request=request,
     )
     path = _workflow_context_path(project_root)
@@ -167,7 +166,7 @@ def _workflow_context_pr_is_closed(context: WorkflowContext | None) -> bool:
 
 def _worktree_reuse_decision(
     request: str,
-    selected_skill: SkillCatalogEntry,
+    selected_process: Any,
     context: WorkflowContext | None,
 ) -> bool | None:
     if not _can_reuse_workflow_context(context):
@@ -178,7 +177,7 @@ def _worktree_reuse_decision(
         for phrase in ("new worktree", "new branch", "new feature", "start over")
     ):
         return False
-    if selected_skill.skill.name in {"handle-ad-hoc", "address-review-comments"}:
+    if selected_process.name in {"handle-ad-hoc", "address-review-comments"}:
         return True
     if any(
         phrase in normalized
@@ -186,7 +185,7 @@ def _worktree_reuse_decision(
             "reuse",
             "same worktree",
             "same branch",
-            "previous skill",
+            "previous process",
             "the pr",
             "pull request",
             "review comment",
@@ -202,7 +201,7 @@ def _resolve_worktree_for_request(
     configured_repo_root: Path,
     *,
     request: str,
-    selected_skill: SkillCatalogEntry,
+    selected_process: Any,
     context: WorkflowContext | None,
     input_func: Callable[[], str],
     stdout: TextIO,
@@ -224,7 +223,7 @@ def _resolve_worktree_for_request(
             stderr=stderr,
             verbose=verbose,
         )
-    decision = _worktree_reuse_decision(request, selected_skill, context)
+    decision = _worktree_reuse_decision(request, selected_process, context)
     if decision is None:
         answer = _prompt_user(
             "A previous workflow worktree is available. Do you want to reuse it? ",

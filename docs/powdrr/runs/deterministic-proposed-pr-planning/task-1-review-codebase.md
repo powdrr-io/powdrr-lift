@@ -8,7 +8,7 @@ edited.
 
 ## Current system findings
 
-- `skill-definitions/start-implementing-feature.yaml` currently combines proposed
+- `docs/procedrr/processes/start-implementing-feature.yaml` currently combines proposed
   PR records and complete authoritative `section`/`id`/`action` triples in one
   `semantic_specification` output. The model therefore performs PR planning,
   effect transcription, and effect allocation in the same response.

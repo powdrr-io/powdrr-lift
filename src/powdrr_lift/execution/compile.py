@@ -8,7 +8,7 @@ from pathlib import Path
 from powdrr_lift.core.delivery_profile import DeliveryProfile, PersonaType, PhaseType
 from powdrr_lift.core.execution_plan import ExecutionPlan
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.process.model import SUPPORTED_STEP_ACTIONS
+from powdrr_lift.process.task_step import SUPPORTED_TASK_ACTIONS
 from powdrr_lift.process.tasks import (
     AgentRole,
     AssigneeType,
@@ -74,7 +74,7 @@ def compile_execution_plan(
                     action_kind=phase.value,
                     remediation="List each allowed action exactly once.",
                 )
-            unsupported = set(actions) - SUPPORTED_STEP_ACTIONS
+            unsupported = set(actions) - SUPPORTED_TASK_ACTIONS
             if unsupported:
                 names = ", ".join(sorted(unsupported))
                 raise PowdrrExecutionError(

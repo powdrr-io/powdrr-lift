@@ -14,7 +14,7 @@ class WorkflowContext:
     branch_name: str | None = None
     pr_number: int | None = None
     pr_url: str | None = None
-    skill_name: str | None = None
+    process_id: str | None = None
     request: str | None = None
 
     def to_data(self) -> dict[str, object]:
@@ -23,6 +23,6 @@ class WorkflowContext:
             "branch_name": self.branch_name,
             "pr_number": self.pr_number,
             "pr_url": self.pr_url,
-            "skill_name": self.skill_name,
+            "process_id": self.process_id,
             "request": self.request,
         }

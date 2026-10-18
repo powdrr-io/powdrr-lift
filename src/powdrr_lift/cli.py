@@ -2717,12 +2717,13 @@ def _run_plan(args: argparse.Namespace) -> int:
         )
         if callable(set_output_limit):
             set_output_limit(8192)
+        source_plan_relative = source_path.relative_to(repo_root).as_posix()
         rendered, plan = generate_execution_plan_yaml(
             source_plan=source_plan,
             plan_id=args.plan_id,
             client=planning_client,
+            source_document=source_plan_relative,
         )
-        source_plan_relative = source_path.relative_to(repo_root).as_posix()
         generated_files = write_execution_plan_artifacts(
             rendered_plan=rendered,
             plan=plan,

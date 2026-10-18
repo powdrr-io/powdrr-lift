@@ -115,6 +115,7 @@ class PlanWorkflowInstance:
 
     workflow_id: str
     template_id: str
+    dependencies: tuple[str, ...]
     parameters: dict[str, str]
 
 
@@ -130,6 +131,7 @@ def load_plan_workflow_instance(path: str | Path) -> PlanWorkflowInstance:
         "schema",
         "workflow_id",
         "template",
+        "dependencies",
         "parameters",
     }:
         raise PlanGenerationError("workflow definition has unknown or missing fields")
@@ -137,12 +139,25 @@ def load_plan_workflow_instance(path: str | Path) -> PlanWorkflowInstance:
         raise PlanGenerationError("workflow definition has an unsupported schema")
     workflow_id = data.get("workflow_id")
     template_id = data.get("template")
+    raw_dependencies = data.get("dependencies")
     parameters = data.get("parameters")
     if not isinstance(workflow_id, str) or not _SAFE_ID.fullmatch(workflow_id):
         raise PlanGenerationError("workflow_id must be a stable safe identifier")
     if template_id != PLAN_WORKFLOW_TEMPLATE:
         raise PlanGenerationError(
             f"unsupported plan workflow template: {template_id!r}"
+        )
+    if (
+        not isinstance(raw_dependencies, list)
+        or not all(
+            isinstance(dependency, str) and _SAFE_ID.fullmatch(dependency)
+            for dependency in raw_dependencies
+        )
+        or len(set(raw_dependencies)) != len(raw_dependencies)
+        or workflow_id in raw_dependencies
+    ):
+        raise PlanGenerationError(
+            "dependencies must be unique workflow IDs without self-dependencies"
         )
     if (
         not isinstance(parameters, Mapping)
@@ -162,6 +177,7 @@ def load_plan_workflow_instance(path: str | Path) -> PlanWorkflowInstance:
     return PlanWorkflowInstance(
         workflow_id,
         template_id,
+        tuple(raw_dependencies),
         {key: str(value) for key, value in parameters.items()},
     )
 
@@ -322,6 +338,7 @@ def generate_execution_plan_yaml(
     source_plan: str,
     plan_id: str,
     client: WorkflowLLMClient,
+    source_document: str | None = None,
 ) -> tuple[str, ReviewedExecutionPlan]:
     """Analyze source Markdown and compile a queue plan with workflow refs."""
     if not source_plan.strip():
@@ -332,6 +349,14 @@ def generate_execution_plan_yaml(
         )
     if not _SAFE_ID.fullmatch(plan_id):
         raise PlanGenerationError("plan_id must be a stable safe identifier")
+    if source_document is not None and (
+        not source_document.strip()
+        or Path(source_document).is_absolute()
+        or ".." in Path(source_document).parts
+    ):
+        raise PlanGenerationError(
+            "source_document must be a repository-relative path without traversal"
+        )
     response = complete_json(
         client,
         [
@@ -402,7 +427,10 @@ def generate_execution_plan_yaml(
                 "workflow_id": workflow_id,
             }
         )
-    document = {"schema": QUEUE_SCHEMA, "plan_id": plan_id, "items": items}
+    document: dict[str, Any] = {"schema": QUEUE_SCHEMA, "plan_id": plan_id}
+    if source_document is not None:
+        document["source_document"] = source_document
+    document["items"] = items
     rendered = yaml.safe_dump(
         document,
         allow_unicode=True,
@@ -472,6 +500,7 @@ def write_execution_plan_artifacts(
 
     generated_files: list[Path] = []
     created_files: list[Path] = []
+    workflow_ids = {item.item_id: item.workflow_id for item in plan.items}
     try:
         for item, workflow_file in destinations:
             workflow_file.parent.mkdir(parents=True, exist_ok=True)
@@ -479,6 +508,9 @@ def write_execution_plan_artifacts(
                 "schema": PLAN_WORKFLOW_SCHEMA,
                 "workflow_id": item.workflow_id,
                 "template": PLAN_WORKFLOW_TEMPLATE,
+                "dependencies": [
+                    workflow_ids[dependency] for dependency in item.dependencies
+                ],
                 "parameters": {
                     "proposed-pr-id": item.workflow_id,
                     "verification-command": verification_command,

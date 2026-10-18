@@ -1,0 +1,64 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1017
+title: Run plan tasks from durable worker runtime directories
+intent:
+  problem: The issue worker loads plan descriptor files as Procedrr task files, so a claimed plan issue fails before its task can execute.
+  goal: Instantiate each planned process workflow in the integration worktree and persist its worker state beside the generated tasks.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 14, end_line: 14}
+    summary: Remove the temporary-directory dependency from issue worker setup.
+    rationale: Store the generated runtime workflow in the integration worktree so it persists across task checkpoints.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 204, end_line: 204}
+    summary: Remove the unused integration branch helper import.
+    rationale: Use the branch returned when creating or reusing the workflow worktree.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2687, end_line: 2714}
+    summary: Instantiate plan tasks in a dedicated runtime directory in the integration worktree.
+    rationale: Keep generated Procedrr task files separate from the plan descriptor and available for execution.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2716, end_line: 2720}
+    summary: Save workflow Git state with the runtime directory path and plan dependencies.
+    rationale: Allow checkpoint and task discovery code to find the durable workflow state.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2722, end_line: 2739}
+    summary: Run the generated Procedrr task from its runtime directory.
+    rationale: Prevent plan descriptor YAML files from being interpreted as task files.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Import argument parsing helpers for the issue worker regression test.
+    rationale: Construct the CLI argument namespace required by the worker entry point.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Import a lightweight fake worker report type for the regression test.
+    rationale: Return a deterministic worker outcome without invoking GitHub or an agent.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 112, end_line: 114}
+    summary: Assert the generated plan workflow path exists before loading it.
+    rationale: Make the test's optional workflow path explicit to type checkers.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 136, end_line: 216}
+    summary: Verify plan issue execution uses the durable runtime directory and saves workflow state there.
+    rationale: Prevent regressions where plan descriptor files are mistaken for Procedrr task definitions.
+entities:
+  - id: plan-worker-runtime-directory-regression
+    type: Regression test
+    action: added
+entity_relationships: []
+invariants:
+  - id: plan-worker-uses-durable-runtime-files
+    description: Generated Procedrr task files and workflow state reside in a dedicated runtime directory in the integration worktree, separate from the plan descriptors.
+    action: added
+guidance: []

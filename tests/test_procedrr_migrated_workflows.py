@@ -62,6 +62,7 @@ def _handle_ad_hoc_executor(
             return {
                 "has_changes": has_changes,
                 "paths": ["src/app.py"] if has_changes else [],
+                "language_labels": ["python"] if has_changes else [],
             }
         if tool == "gather_context":
             return {"matches": []}

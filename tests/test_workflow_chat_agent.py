@@ -3598,10 +3598,6 @@ def test_cli_workflow_chat_wires_configuration(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    skills_dir = repo_root / "skill-definitions"
-    skills_dir.mkdir()
-    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
-
     captured: dict[str, object] = {"messages": []}
 
     def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
@@ -3615,8 +3611,8 @@ def test_cli_workflow_chat_wires_configuration(
             "workflow-chat",
             "--repo-root",
             str(repo_root),
-            "--skills-dir",
-            "skill-definitions",
+            "--processes-dir",
+            "procedrr-processes",
             "--output-dir",
             "generated",
             "--model",
@@ -3630,8 +3626,8 @@ def test_cli_workflow_chat_wires_configuration(
     config = captured["config"]
     assert isinstance(config, SkillChatConfig)
     assert config.repo_root == repo_root
-    assert config.skills_dir == Path("skill-definitions")
-    assert config.templates_dir == Path("skill-definitions")
+    assert config.skills_dir == Path("procedrr-processes")
+    assert config.templates_dir == Path("procedrr-processes")
     assert config.output_dir == Path("generated")
     assert config.model == "test-model"
     assert config.max_stalled_roundtrips == 5
@@ -3868,10 +3864,6 @@ def test_cli_workflow_chat_defaults_to_glm_5_2(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    skills_dir = repo_root / "skill-definitions"
-    skills_dir.mkdir()
-    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
-
     captured: dict[str, object] = {"messages": []}
 
     def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
@@ -3885,8 +3877,8 @@ def test_cli_workflow_chat_defaults_to_glm_5_2(
             "workflow-chat",
             "--repo-root",
             str(repo_root),
-            "--skills-dir",
-            "skill-definitions",
+            "--processes-dir",
+            "procedrr-processes",
         ]
     )
 
@@ -3902,10 +3894,6 @@ def test_cli_workflow_chat_wires_verbose_flag(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    skills_dir = repo_root / "skill-definitions"
-    skills_dir.mkdir()
-    save_skill(_build_skill(), skills_dir / "specify-a-feature.json")
-
     captured: dict[str, object] = {"messages": []}
 
     def _fake_run_workflow_chat(config: SkillChatConfig, **kwargs: object) -> int:
@@ -3919,8 +3907,8 @@ def test_cli_workflow_chat_wires_verbose_flag(
             "workflow-chat",
             "--repo-root",
             str(repo_root),
-            "--skills-dir",
-            "skill-definitions",
+            "--processes-dir",
+            "procedrr-processes",
             "--verbose",
         ]
     )

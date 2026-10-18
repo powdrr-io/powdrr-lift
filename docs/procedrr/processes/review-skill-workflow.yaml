@@ -1,0 +1,168 @@
+version: 1
+name: review-skill-workflow
+description: When the user wants to review or rewrite a skill definition for directive, concise,
+  consistently executable instructions. When the user wants to review a workflow definition
+  or generated workflow task sequence for excessive tool calls, hidden substeps, or ambiguous
+  instructions. When the review should produce an improved definition rather than only a prose
+  critique.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: review-skill-workflow\ninputs:\n- name: skill-definitions-or-workflow-root\n\
+      - name: target-name\n- name: target-definition\n- name: rewrite-context\n- name: accepted-rewrites\n\
+      - name: target-definition-path\n- name: staged-definition\n- name: files-to-publish\n\
+      - name: review-report\n- name: validation-result\nwhen_to_use:\n- When the user wants\
+      \ to review or rewrite a skill definition for directive,\n  concise, consistently executable\
+      \ instructions.\n- When the user wants to review a workflow definition or generated\
+      \ workflow task\n  sequence for excessive tool calls, hidden substeps, or ambiguous\
+      \ instructions.\n- When the review should produce an improved definition rather than\
+      \ only a prose\n  critique.\nsteps:\n- id: resolve-target\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  prompt_catalogs: [skills]\n\
+      \  description: Resolve and read the target definition.\n  llm_type: long_context\n\
+      \  details: >-\n    Select exactly one target from the user's explicit path or name.\
+      \ If the\n    user provides neither, ask them to identify the skill or workflow before\n\
+      \    using a tool. If the name is not an exact path, use fuzzy-match once to\n    locate\
+      \ candidates, then ask one specific question if more than one\n    candidate is plausible.\
+      \ Read the complete target definition with\n    read_document. Do not edit it during\
+      \ this step. Record its goal, inputs,\n    outputs, dependencies, steps or tasks, and\
+      \ existing validation\n    requirements.\n  tool_invocations:\n  - tool: fuzzy-match\n\
+      \    command:\n    - fuzzy-match\n    - <skill-definitions-or-workflow-root>\n    -\
+      \ -name\n    - <target-name>\n    - -type\n    - f\n    - -print\n- id: inventory-steps\n\
+      \  actions: [edit, yaml_edit, file_management, read_document]\n  step_type: governed\n\
+      \  description: Inventory every target step and its execution surface.\n  llm_type:\
+      \ standard_reasoning\n  details: >-\n    Read the `target_definition` input and build\
+      \ an inventory table with one row\n    for each target step or task. Preserve\n    source\
+      \ order and quote the description and English instructions in that\n    row. For each\
+      \ row count explicit\n    tool_invocations, uses_skill steps or nested workflow calls,\
+      \ and distinct action\n    clauses in the English instructions. Count an action clause\
+      \ whenever the\n    text tells the LLM to inspect, decide, edit, invoke, validate, record,\
+      \ ask,\n    or report; count conditional branches separately. Mark whether every tool\n\
+      \    call has a concrete purpose, complete arguments or placeholders, timing,\n    expected\
+      \ result, and failure or retry rule. Treat a tool command plus an\n    unmentioned follow-up\
+      \ command as separate calls. Do not infer missing\n    instructions from repository\
+      \ conventions.\n- id: score-steps\n  actions: [edit, yaml_edit, file_management, read_document]\n\
+      \  step_type: governed\n  description: Score directive quality and identify scope-preserving\
+      \ rewrites.\n  llm_type: high_reasoning\n  details: >-\n    Review each inventory row\
+      \ against four gates: tool economy, substep\n    economy, invocation specificity, and\
+      \ goal fidelity. Prefer zero tool calls\n    for reasoning-only steps and one tool call\
+      \ for an atomic operation. Flag\n    every step with more than one independent tool\
+      \ call, more than three action\n    clauses, vague verbs, mixed decisions and execution,\
+      \ repeated context,\n    missing inputs or outputs, implicit data handoffs between steps\
+      \ or skills,\n    unbounded retry language, or a tool call whose\n    arguments and\
+      \ success condition are not explicit. Distinguish a real\n    prerequisite from unnecessary\
+      \ orchestration. Do not remove a required\n    validation or evidence check merely to\
+      \ lower a count. For each finding,\n    state the smallest safe change and the requirement\
+      \ it preserves.\n- id: draft-rewrites\n  actions: [edit, yaml_edit, file_management,\
+      \ read_document]\n  step_type: governed\n  description: Draft concise, directive replacement\
+      \ steps.\n  llm_type: high_reasoning\n  details: >-\n    Rewrite only steps that fail\
+      \ a gate. Keep the original goal, required\n    evidence, dependencies, safety constraints,\
+      \ and output. Give each rewritten\n    step one observable outcome and at most one tool\
+      \ invocation. Use imperative\n    sentences with explicit inputs, exact command arguments\
+      \ or placeholders,\n    expected result, and one bounded correction rule. Favor explicit\n\
+      \    instructions on what data to pass between steps and skills. Move rationale and\n\
+      \    background out of execution instructions. Do not combine unrelated actions\n  \
+      \  into a single step and do not invent a tool, file, field, or dependency.\n    Present\
+      \ original text, proposed text, tool count, action-clause count, and\n    preserved\
+      \ requirements for every rewrite.\n- id: independent-review\n  actions: [edit, yaml_edit,\
+      \ file_management, read_document, invoke_skill]\n  step_type: governed\n  description:\
+      \ Obtain an independent adversarial completeness review.\n  llm_type: high_reasoning\n\
+      \  details: >-\n    Return this exact action shape to invoke the independent review:\n\
+      \    {\"action\":\"invoke_skill\",\"skill\":\"independent-skill-workflow-review\",\n\
+      \    \"provider_role\":\"adversarial\",\"clean\":true,\"context\":[\"<target goal>\"\
+      ,\n    \"<original step text>\",\"<proposed replacement text>\",\n    \"<preserved requirements>\"\
+      ,\"<inventory counts>\"],\n    \"decisions_and_context\":\"Compare the rewrite with\
+      \ the original.\"}.\n    Keep clean=true so the reviewer receives no inherited task\
+      \ or parent-skill\n    context. Pass the target goal, original step text, proposed replacement\n\
+      \    text, preserved-requirement list, and inventory counts from `rewrite_context`\n\
+      \    in the context array;\n    do not omit any of these entries or rely on inherited\
+      \ context.\n    Ask it to compare the rewrite with the original without seeing this\
+      \ skill's\n    findings or preferred answer. Require it to identify omitted goals,\n\
+      \    dependencies, safety checks, outputs, hidden tool calls, or instructions\n    that\
+      \ remain ambiguous. Do not edit the target while the independent review\n    is running.\n\
+      - id: reconcile-rewrites\n  actions: [edit, yaml_edit, file_management, read_document,\
+      \ goto_step]\n  step_type: governed\n  description: Reconcile feedback and iterate until\
+      \ the rewrite is complete.\n  llm_type: high_reasoning\n  details: >-\n    Compare the\
+      \ independent review with the original inventory. For each changed\n    step, invoke\
+      \ independent-review once and wait for its result. Restore every\n    requirement the\
+      \ independent reviewer proves was omitted, then shorten or\n    split the replacement\
+      \ without increasing unnecessary tool calls. Repeat the\n    independent review for\
+      \ any changed step; do not proceed while an actionable\n    omission or ambiguity remains.\
+      \ If a changed rewrite needs another\n    independent check, use goto_step with step_id\
+      \ `independent-review` and\n    return here after that check. Stop only when every changed\
+      \ step has zero or\n    one tool call, no more than three action clauses unless justified,\
+      \ explicit\n    invocation instructions, and a complete preserved-requirement list.\n\
+      - id: apply-and-publish\n  actions: [edit, yaml_edit, file_management, read_document]\n\
+      \  step_type: governed\n  description: Apply and validate the accepted definition.\n\
+      \  llm_type: fast_iteration\n  details: >-\n    Apply the accepted rewrites to the target\
+      \ definition with the appropriate\n    structured edit. Preserve unrelated steps and\
+      \ formatting. Validate the\n    complete skill or workflow definition once after editing.\
+      \ If validation\n    fails, correct the target and rerun validation only after a change;\
+      \ never\n    repeat the same validation command unchanged. Emit one structured\n   \
+      \ `apply_and_publish` output with fields `per_step_counts`,\n    `remaining_justified_exceptions`,\
+      \ `validation_result`, and `file_changed`.\n    Keep the changed definition, final review\
+      \ report, and validation\n    result in workflow context for the pull-request steps.\
+      \ Do not create or\n    update a pull request in this step.\n  outputs:\n  - name: apply_and_publish\n\
+      \    type: object\n    required_for_next_step: true\n    schema: {type: object, additionalProperties:\
+      \ true}\n\n- id: verify-target-change\n  actions: [invoke_tool]\n  step_type: governed\n\
+      \  description: Confirm the reviewed definition changed before preparing a pull request.\n\
+      \  llm_type: simple_task\n  details: >-\n    Invoke the declared shell command to list\
+      \ changes for the exact\n    `target_definition_path`. If the command returns no target\
+      \ path, the review produced no\n    file change; choose `complete` with a concise no-change\
+      \ result and do not\n    invoke staging, pull-request preparation, or pull-request creation.\
+      \ If the\n    target path is listed, set output_state.files_to_publish to that exact\
+      \ path and choose\n    `next_step` to continue. Do not treat an unchanged existing file\
+      \ as a\n    publishable artifact. Return\n    {\"action\":\"complete\",\"text\":\"No\
+      \ target definition changed.\"} when no\n    target path is listed, or {\"action\":\"\
+      next_step\"} when it is listed.\n  tool_invocations:\n  - tool: shell\n    command:\n\
+      \    - git\n    - diff\n    - --name-only\n    - --\n    - <target-definition-path>\n\
+      \n- id: stage-for-pull-request\n  step_type: invoke_tool\n  description: Stage the reviewed\
+      \ definition for pull-request preparation.\n  llm_type: simple_task\n  pre_step:\n \
+      \   action: invoke_tool\n    template:\n      tool: git\n      operation: add\n    \
+      \  paths: [<target-definition-path>]\n\n- id: finish-pull-request-prep\n  step_type:\
+      \ uses_skill\n  description: Run final pull-request preparation checks.\n  llm_type:\
+      \ simple_task\n  details: >-\n    Invoke `finish-pr-prep` with `staged_definition` and\
+      \ the\n    `apply_and_publish.validation_result`\n    result from `apply-and-publish`.\
+      \ Do not create or update a pull request in\n    this step; continue only when the nested\
+      \ skill confirms the final staged\n    scope and required checks are clean.\n  uses_skill:\n\
+      \    skill: finish-pr-prep\n\n- id: create-pull-request\n  step_type: uses_skill\n \
+      \ description: Create or update the pull request for the reviewed definition.\n  llm_type:\
+      \ simple_task\n  details: >-\n    Invoke `create-pull-request` with pr-kind `skill-workflow-review`,\
+      \ a commit\n    message of at most 72 characters, a title containing the target definition\n\
+      \    filename, and a Markdown description containing the review summary, changed\n \
+      \   files, and validation result. Pass the exact `files_to_publish`,\n    `review_report`,\
+      \ and `validation_result` inputs to the nested skill. Do not\n    report completion\
+      \ until it returns a pull-request URL. Never merge the PR\n    or push directly to main.\n\
+      \  uses_skill:\n    skill: create-pull-request"
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - invoke_tool
+    - read_document
+    - yaml_edit
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

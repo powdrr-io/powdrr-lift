@@ -1,0 +1,178 @@
+version: 1
+name: security-review
+description: When the user asks for a security review of a referenced pull request. When a
+  pull request changes authentication, authorization, data handling, dependencies, deployment,
+  integrations, or security-sensitive behavior. When security findings must be reported directly
+  on GitHub as inline pull-request comments.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: security-review\ninteraction_style: devils_advocate\nwhen_to_use:\n- When\
+      \ the user asks for a security review of a referenced pull request.\n- When a pull request\
+      \ changes authentication, authorization, data handling, dependencies, deployment, integrations,\
+      \ or security-sensitive behavior.\n- When security findings must be reported directly\
+      \ on GitHub as inline pull-request comments.\nsteps:\n- description: Discover the pull\
+      \ request, feature scope, and security-relevant change surface.\n  actions: [gather_context,\
+      \ invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n  prompt_catalogs:\
+      \ [context_types]\n  llm_type: long_context\n  details: >-\n    Inspect the referenced\
+      \ PR's title, body, labels, commits, complete diff,\n    changed files, review history,\
+      \ base/head SHA, and current state with the\n    connected GitHub repository. Identify\
+      \ the feature, system component, entry\n    points, data stores, external services,\
+      \ privileged operations, and related\n    proposed PRs. If a feature specification exists,\
+      \ resolve its ordered\n    proposed-PR list and use the feature definition, architecture,\
+      \ system,\n    implementation, and relevant previous PRs to establish scope. Invoke\
+      \ the\n    gather_context action for requirements, entities, entity-relationships,\n\
+      \    features, decisions, risks, and proposed_prs filtered by the feature id\n    when\
+      \ one is known. Treat structured repository specifications as\n    authoritative and\
+      \ record missing security context as a review gap.\n  tool_invocation_packages: [gh_readonly]\n\
+      - description: Build a threat model for the changed behavior.\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: high_reasoning\n\
+      \  details: >-\n    Use OWASP's methodology-neutral four questions: what are we working\
+      \ on,\n    what can go wrong, what are we going to do about it, and did we do a good\n\
+      \    job? Identify assets and their confidentiality, integrity, and availability\n \
+      \   needs; actors and trust levels; authentication subjects; authorization\n    boundaries;\
+      \ entry and exit points; data flows; storage; external\n    dependencies; and privileged\
+      \ operations. Enumerate abuse cases using\n    STRIDE or another explicit method, including\
+      \ unauthorized access,\n    impersonation, tampering, data disclosure, replay, resource\
+      \ exhaustion,\n    malicious configuration, and supply-chain compromise. Record assumptions,\n\
+      \    threats, existing controls, required mitigations, and evidence needed to\n    validate\
+      \ each mitigation. Do not assume an internal caller, hidden route,\n    trusted database,\
+      \ or successful input is safe without code or configuration\n    evidence.\n  tool_invocations:\n\
+      \  - tool: shell\n    command:\n    - rg\n    - -n\n    - -i\n    - \"auth|permission|role|scope|token|secret|password|credential|encrypt|decrypt|upload|download|deserialize|subprocess|shell|eval|exec|url|redirect|sql|query|template|cookie|session|cors|csrf|rate.limit|audit|log\"\
+      \n    - <changed-files-or-repository>\n- description: Review identity, access control,\
+      \ and session boundaries.\n  actions: [edit, yaml_edit, file_management, read_document]\n\
+      \  step_type: governed\n  llm_type: high_reasoning\n  details: >-\n    Check authentication\
+      \ flows, token and session lifecycle, password or key\n    handling, MFA or recovery\
+      \ behavior, issuer/audience/expiry/nonce checks,\n    logout and revocation, impersonation,\
+      \ replay resistance, and fail-closed\n    behavior. For every endpoint, command, job,\
+      \ resolver, file, object, and\n    administrative operation, verify server-side authorization\
+      \ at the actual\n    resource boundary, tenant isolation, least privilege, object ownership,\n\
+      \    role/scope checks, and protection against IDOR/BOLA and privilege\n    escalation.\
+      \ Check default identities, service accounts, background jobs,\n    webhooks, and internal\
+      \ APIs as attacker-reachable unless proven otherwise.\n    Require negative tests for\
+      \ unauthenticated, cross-user, cross-tenant, and\n    insufficient-privilege cases where\
+      \ applicable.\n- description: Review input, output, and execution safety.\n  actions:\
+      \ [edit, yaml_edit, file_management, read_document]\n  step_type: governed\n  llm_type:\
+      \ high_reasoning\n  details: >-\n    Trace every untrusted source, including HTTP parameters\
+      \ and headers,\n    cookies, files, URLs, messages, environment values, database content,\n\
+      \    generated content, and upstream API responses. Verify canonicalization,\n    allowlist\
+      \ validation, size and complexity limits, parser safety, type and\n    encoding handling,\
+      \ and rejection on validation failure. Check SQL/NoSQL,\n    OS-command, template, expression,\
+      \ path, LDAP, XML, regular-expression,\n    SSRF, header, CRLF, XSS, and deserialization\
+      \ injection boundaries. Verify\n    context-appropriate output encoding, safe redirects,\
+      \ safe file handling,\n    archive limits, and that error paths cannot turn data into\
+      \ executable\n    input. Look for unsafe dynamic evaluation, shell construction, format\n\
+      \    strings, and confused-deputy behavior.\n- description: Review cryptography, secrets,\
+      \ privacy, and data lifecycle.\n  actions: [edit, yaml_edit, file_management, read_document]\n\
+      \  step_type: governed\n  llm_type: high_reasoning\n  details: >-\n    Check that cryptography\
+      \ uses approved, authenticated algorithms and safe\n    key sizes, modes, randomness,\
+      \ key storage, rotation, separation, and\n    failure handling. Reject custom crypto,\
+      \ hard-coded keys, weak hashes,\n    plaintext credentials, tokens in URLs, and secrets\
+      \ in source, logs,\n    artifacts, fixtures, or error messages. Trace sensitive data\
+      \ at collection,\n    processing, transit, storage, caching, backup, export, and deletion.\
+      \ Check\n    minimization, tenant separation, retention, masking, access logging, TLS\n\
+      \    validation, certificate handling, and whether analytics or third-party\n    integrations\
+      \ receive more data than intended.\n- description: Review configuration, dependencies,\
+      \ and supply-chain controls.\n  actions: [invoke_tool, edit, yaml_edit, read_document]\n\
+      \  step_type: governed\n  llm_type: high_reasoning\n  details: >-\n    Check secure\
+      \ defaults, production configuration, debug behavior, CORS,\n    CSRF, security headers,\
+      \ cookie flags, TLS, error exposure, network\n    exposure, admin interfaces, feature\
+      \ flags, and fail-open behavior. Inspect\n    dependency manifests and lockfiles for\
+      \ new or changed packages, pinning,\n    provenance, transitive risk, vulnerable versions,\
+      \ install scripts, and\n    untrusted generated artifacts. Check CI workflows, action\
+      \ versions,\n    permissions, fork/PR secrets exposure, artifact publication, release\n\
+      \    signing, update mechanisms, and whether untrusted input can influence the\n   \
+      \ build or deployment. Do not mark a dependency safe solely because a scan\n    is green;\
+      \ assess how the code uses it.\n  tool_invocations:\n  - tool: shell\n    command:\n\
+      \    - git\n    - diff\n    - --name-only\n    - <base-sha>\n    - <head-sha>\n- description:\
+      \ Review resilience, observability, and security test evidence.\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: high_reasoning\n\
+      \  details: >-\n    Check denial-of-service surfaces: unbounded input, expensive parsing\
+      \ or\n    regexes, fan-out, concurrency, retries, queues, uploads, decompression,\n\
+      \    pagination, and rate limits. Check race conditions, replay, idempotency,\n    atomicity,\
+      \ quota enforcement, timeouts, cancellation, and resource cleanup.\n    Verify that\
+      \ security events are logged with useful non-sensitive context,\n    correlated, monitored,\
+      \ and protected from injection or tampering, while\n    secrets and personal data are\
+      \ not logged. Review security regression tests,\n    abuse-case tests, authorization\
+      \ matrix tests, dependency scans, static or\n    dynamic analysis, and deployment checks.\
+      \ A missing test is a finding when\n    the security control is otherwise unverified\
+      \ or the changed risk requires\n    a regression test.\n  tool_invocations:\n  - tool:\
+      \ ref\n    label: security\n  - tool: ref\n    label: security-review\n- description:\
+      \ Evaluate findings against current OWASP guidance and severity.\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: high_reasoning\n\
+      \  details: >-\n    Use OWASP ASVS 5.0.0 as the detailed verification baseline and cite\
+      \ the\n    versioned requirement when applicable. Use OWASP Top 10:2025 as a risk\n\
+      \    taxonomy, not as a completeness checklist: A01 Broken Access Control, A02\n   \
+      \ Security Misconfiguration, A03 Software Supply Chain Failures, A04\n    Cryptographic\
+      \ Failures, A05 Injection, A06 Insecure Design, A07\n    Authentication Failures, A08\
+      \ Software or Data Integrity Failures, A09\n    Security Logging and Alerting Failures,\
+      \ and A10 Mishandling of Exceptional\n    Conditions. For each candidate finding record\
+      \ evidence, attack precondition,\n    exploit path, impacted asset, confidentiality/integrity/availability\
+      \ or\n    privacy impact, likelihood, severity, and whether the current PR caused or\n\
+      \    exposed it. Do not report speculative concerns without a plausible path and\n \
+      \   local evidence. Avoid duplicate findings for one root cause.\n  tool_invocations:\n\
+      \  - tool: shell\n    command:\n    - curl\n    - -sS\n    - https://owasp.org/www-project-application-security-verification-standard/\n\
+      \  - tool: shell\n    command:\n    - curl\n    - -sS\n    - https://owasp.org/Top10/\n\
+      \  - tool: shell\n    command:\n    - curl\n    - -sS\n    - https://owasp.org/www-project-threat-modeling/\n\
+      - description: Post actionable security findings as inline pull-request comments.\n\
+      \  actions: [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n \
+      \ llm_type: simple_task\n  details: >-\n    Check existing unresolved review threads\
+      \ before posting. Post every\n    actionable finding directly to the PR as an inline\
+      \ comment anchored to the\n    smallest relevant changed line. Each comment must state\
+      \ severity, the\n    security property violated, concrete local evidence, a plausible\
+      \ attack\n    path and impact, and a specific remediation or test. Use blocking/high\n\
+      \    severity only for issues that can materially enable compromise, data loss,\n  \
+      \  privilege escalation, or unacceptable exposure; use lower severity for\n    defense-in-depth\
+      \ gaps. If the vulnerable code is not changed, anchor to the\n    nearest relevant changed\
+      \ line and explain why the current PR exposes or\n    worsens the risk. Do not post\
+      \ generic OWASP summaries, praise, duplicates,\n    or speculative concerns. Do not\
+      \ approve, merge, close, label, or modify\n    code as part of this skill.\n  tool_invocations:\n\
+      \  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --paginate\n  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --method\n    - POST\n    - -f\n    - body=<finding>\n    - -f\n    - commit_id=<current-head-sha>\n\
+      \    - -f\n    - path=<changed-file>\n    - -F\n    - line=<changed-line>\n    - -f\n\
+      \    - side=RIGHT\n- description: Verify the security review and report residual risk.\n\
+      \  actions: [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n \
+      \ llm_type: standard_reasoning\n  details: >-\n    Confirm every intended finding is\
+      \ posted to the current PR diff, each\n    anchor is valid, and no finding exists only\
+      \ in a draft or summary. Keep an\n    audit record of the scope, threat model, checklist\
+      \ coverage, evidence,\n    OWASP references, findings, unresolved assumptions, and residual\
+      \ risks.\n    Report the PR, number and severity of inline findings, checks performed,\n\
+      \    and any areas that could not be verified. If GitHub write access is\n    unavailable,\
+      \ do not claim completion; report the exact prepared findings\n    and posting failure.\n\
+      \  tool_invocations:\n  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --paginate"
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - gather_context
+    - invoke_tool
+    - read_document
+    - yaml_edit
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

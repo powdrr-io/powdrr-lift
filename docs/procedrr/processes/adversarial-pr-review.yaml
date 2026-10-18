@@ -1,0 +1,135 @@
+version: 1
+name: adversarial-pr-review
+description: When the user asks for an adversarial engineering review of a pull request. When
+  a pull request should be challenged for unnecessary frameworks, reduced readability, or
+  branching that is becoming difficult to reason about. When review findings must be reported
+  directly on GitHub as inline pull-request comments.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: adversarial-pr-review\ninteraction_style: devils_advocate\nadversarial: true\n\
+      when_to_use:\n- When the user asks for an adversarial engineering review of a pull request.\n\
+      - When a pull request should be challenged for unnecessary frameworks, reduced\n  readability,\
+      \ or branching that is becoming difficult to reason about.\n- When review findings must\
+      \ be reported directly on GitHub as inline pull-request\n  comments.\nsteps:\n- description:\
+      \ Discover the pull request and establish the exact change surface.\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: long_context\n\
+      \  details: >-\n    This is an adversarial review; the workflow selects its provider\
+      \ from the\n    top-level adversarial option. Inspect the referenced pull request's\
+      \ title,\n    body, labels, commits, complete diff,\n    changed files, base and head\
+      \ branches, head SHA, review history, and current\n    state. Read the complete diff\
+      \ and the surrounding implementations, callers,\n    tests, configuration, and documentation.\
+      \ Establish the PR's intended\n    behavior and constraints before challenging its design;\
+      \ adversarial means\n    rigorous and evidence-driven, not reflexively negative.\n \
+      \ tool_invocation_packages: [gh_readonly]\n  tool_invocations:\n  - tool: shell\n  \
+      \  command:\n    - git\n    - diff\n    - --name-status\n    - <base-sha>\n    - <head-sha>\n\
+      - description: Challenge framework and dependency choices.\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: high_reasoning\n\
+      \  details: >-\n    Act as a senior engineer educating a junior engineer on production-level\n\
+      \    design. For every new framework, library, abstraction layer, service, or\n    custom\
+      \ mechanism, search the repository and its existing dependencies for\n    an established\
+      \ solution that can meet the requirement. Challenge the new\n    choice when an existing\
+      \ framework or local pattern can do the job without\n    losing a clearly documented\
+      \ capability. Compare operational cost, security,\n    failure modes, maintenance burden,\
+      \ team familiarity, migration risk, and\n    testability. Do not demand reuse merely\
+      \ because two tools are superficially\n    similar: retain a new dependency when the\
+      \ PR demonstrates a material\n    capability gap or a justified boundary. Cite concrete\
+      \ repository evidence,\n    and do not report preference as a defect.\n  tool_invocations:\n\
+      \  - tool: shell\n    command:\n    - rg\n    - -n\n    - -i\n    - \"framework|library|dependency|adapter|client|router|parser|middleware|plugin\"\
+      \n    - <changed-files-or-repository>\n  - tool: shell\n    command:\n    - git\n  \
+      \  - diff\n    - <base-sha>\n    - <head-sha>\n    - --\n    - <changed-files>\n- description:\
+      \ Challenge readability and control-flow complexity.\n  actions: [invoke_tool, edit,\
+      \ yaml_edit, read_document]\n  step_type: governed\n  llm_type: high_reasoning\n  details:\
+      \ >-\n    Review all added and materially changed code for readability regressions:\n\
+      \    misleading names, dense expressions, hidden side effects, excessive\n    indirection,\
+      \ duplicated condition checks, clever abstractions, long methods,\n    and APIs whose\
+      \ usage is harder to understand than the behavior they replace.\n    Specifically trace\
+      \ every new if/elif/else, nested conditional, flag, early\n    return, exception branch,\
+      \ callback, and state transition. Challenge code\n    that creates spaghetti control\
+      \ flow or makes the happy path and failure\n    paths difficult to follow. Prefer a\
+      \ small number of explicit, cohesive\n    functions, guard clauses where they clarify\
+      \ the contract, and named\n    predicates or data-driven dispatch where they remove\
+      \ branching. Require\n    evidence from the changed code and its callers; do not flag\
+      \ subjective style\n    preferences, necessary domain branching, or complexity that\
+      \ the PR clearly\n    isolates and tests.\n  tool_invocations:\n  - tool: shell\n  \
+      \  command:\n    - rg\n    - -n\n    - \"if |elif |else:|match |case |try:|except |finally:|and\
+      \ |or \"\n    - <changed-files>\n  - tool: shell\n    command:\n    - git\n    - diff\n\
+      \    - <base-sha>\n    - <head-sha>\n    - --check\n- description: Validate findings\
+      \ and teach the production-level alternative.\n  actions: [invoke_tool, edit, yaml_edit,\
+      \ read_document]\n  step_type: governed\n  llm_type: high_reasoning\n  details: >-\n\
+      \    Validate each candidate against the complete diff, surrounding call sites,\n  \
+      \  existing framework capabilities, tests, configuration, and relevant history.\n  \
+      \  Keep a finding only when the current PR causes a concrete maintainability,\n    reliability,\
+      \ or delivery risk and a simpler production-level alternative is\n    available. For\
+      \ each finding record the changed file and smallest changed\n    line, the exact evidence,\
+      \ why the current choice is harmful, the existing\n    framework or design pattern that\
+      \ could work, and a focused remediation.\n    Write as a senior engineer coaching a\
+      \ junior: explain the principle and the\n    consequence so the author can learn, while\
+      \ remaining specific and respectful.\n    Consolidate comments with one root cause.\
+      \ Reject speculative redesign,\n    generic clean-code slogans, “I would write it differently”\
+      \ opinions, and\n    findings that are merely pre-existing or not introduced or worsened\
+      \ by the PR.\n  tool_invocations:\n  - tool: shell\n    command:\n    - git\n    - diff\n\
+      \    - <base-sha>\n    - <head-sha>\n  - tool: shell\n    command:\n    - rg\n    -\
+      \ --files-with-matches\n    - <existing-framework-or-pattern>\n    - <repository-paths>\n\
+      - description: Post actionable findings as inline pull-request comments.\n  actions:\
+      \ [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type:\
+      \ simple_task\n  details: >-\n    Check existing review threads and inline comments\
+      \ before posting. Post each\n    retained finding to the current PR as an inline comment\
+      \ anchored to the\n    smallest relevant changed line on the RIGHT side of the current\
+      \ head SHA.\n    Start each body with one of `Framework choice:`, `Readability:`, or\n\
+      \    `Control flow:`. State the concrete evidence, production impact, the\n    existing\
+      \ framework or simpler pattern to consider when applicable, and a\n    specific fix\
+      \ direction. Use a nearby changed line only when the problematic\n    code is not itself\
+      \ changed, and explain the actual location. Do not repeat\n    unresolved or resolved\
+      \ findings, post broad summaries or praise, approve,\n    merge, close, label, or modify\
+      \ the target PR. Keep the teaching tone\n    direct, respectful, and useful to a junior\
+      \ engineer learning production\n    practices.\n  tool_invocations:\n  - tool: shell\n\
+      \    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --paginate\n  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --method\n    - POST\n    - -f\n    - body=<finding>\n    - -f\n    - commit_id=<current-head-sha>\n\
+      \    - -f\n    - path=<changed-file>\n    - -F\n    - line=<changed-line>\n    - -f\n\
+      \    - side=RIGHT\n- description: Verify the adversarial review and report the result.\n\
+      \  actions: [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n \
+      \ llm_type: standard_reasoning\n  details: >-\n    Re-read the target PR's comments\
+      \ and verify every intended finding is\n    attached to the current head SHA, a changed\
+      \ file, and the intended line.\n    Report the PR, revisions, files and decisions examined,\
+      \ frameworks\n    challenged, readability and control-flow candidates, rejected speculative\n\
+      \    candidates, findings posted, and any residual design risk. If no actionable\n \
+      \   findings remain, report zero findings and summarize the evidence checked.\n    If\
+      \ GitHub write access or inline anchoring fails, report the exact prepared\n    finding\
+      \ and posting failure; never claim it was posted. Preserve the\n    adversarial provider\
+      \ role through this final review action. Never merge the\n    PR or resolve review threads\
+      \ as part of this skill.\n  tool_invocations:\n  - tool: shell\n    command:\n    -\
+      \ gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n    - --paginate"
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - invoke_tool
+    - read_document
+    - yaml_edit
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

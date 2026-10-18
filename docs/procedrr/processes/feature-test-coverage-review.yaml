@@ -1,0 +1,114 @@
+version: 1
+name: feature-test-coverage-review
+description: When the user asks for a test coverage review of a feature pull request. When
+  a pull request implements one or more proposed PRs from a feature definition and the requested
+  tests need to be reconciled with the implementation. When the review must report missing,
+  insufficient, or unjustified tests as inline pull-request comments.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: feature-test-coverage-review\nwhen_to_use:\n- When the user asks for a test\
+      \ coverage review of a feature pull request.\n- When a pull request implements one or\
+      \ more proposed PRs from a feature definition\n  and the requested tests need to be\
+      \ reconciled with the implementation.\n- When the review must report missing, insufficient,\
+      \ or unjustified tests as inline\n  pull-request comments.\nsteps:\n- description: Discover\
+      \ the referenced pull request and its feature relationship.\n  actions: [gather_context,\
+      \ invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: long_context\n\
+      \  details: >-\n    Inspect the referenced PR's title, body, labels, commits, changed\
+      \ files,\n    base and head branches, and review history using the connected GitHub\n\
+      \    repository. Locate the canonical feature definition and its ordered proposed\n\
+      \    PR specifications from the PR body, changelog entries, specification paths,\n \
+      \   commit messages, and changed files. Build a ledger containing the feature\n    definition,\
+      \ requested tests, proposed PRs in order, the current PR's state,\n    and the implementation\
+      \ and test files it changes. Treat structured feature\n    and proposed-PR metadata\
+      \ as authoritative. If the relationship is ambiguous,\n    prepare one inline finding\
+      \ on the nearest relevant changed line and do not\n    continue with an assumed feature.\n\
+      \  tool_invocation_packages: [gh_readonly]\n- description: Select the feature test scope\
+      \ for the current pull request.\n  actions: [edit, yaml_edit, file_management, read_document]\n\
+      \  step_type: governed\n  prompt_catalogs: [context_types]\n  llm_type: high_reasoning\n\
+      \  details: >-\n    Determine whether the current PR is intermediate or final in the\
+      \ ordered\n    proposed-PR plan. For an intermediate PR, review only the feature tests\n\
+      \    assigned to that proposed PR and its explicit dependencies. For a final PR,\n \
+      \   review the complete feature definition, every related proposed-PR\n    specification,\
+      \ and the landed implementation and test diffs. Use the\n    invoke the gather_context\
+      \ workflow action with the proposed-PR entity type\n    filtered by the canonical feature\
+      \ id:\n    {\"kind\":\"gather_context\",\"types\":[\"proposed_prs\"],\"keywords\":[\"\
+      <feature-id>\"]}.\n    Use the returned records to confirm scope and ordering rather\
+      \ than relying\n    only on PR prose. Record the exact requested\n    test cases, acceptance\
+      \ criteria that require tests, and validation commands.\n- description: Build the requested-test\
+      \ coverage matrix.\n  actions: [edit, yaml_edit, file_management, read_document]\n \
+      \ step_type: governed\n  llm_type: high_reasoning\n  details: >-\n    Read the feature\
+      \ definition and selected proposed-PR specifications, then\n    inspect the complete\
+      \ implementation and test diffs plus surrounding tests.\n    Build one row for every\
+      \ requested test, required test case, acceptance\n    criterion with testable behavior,\
+      \ and explicit edge or error case. For each\n    row record the source requirement,\
+      \ implementation evidence, exact test file\n    and test name or a precise reason it\
+      \ is absent, and status: covered,\n    partially covered, missing, contradicted, or\
+      \ not applicable. Confirm that\n    tests exercise behavior rather than merely increasing\
+      \ line coverage. Check\n    positive, negative, boundary, empty-state, compatibility,\
+      \ persistence,\n    authorization, integration, and regression cases whenever the feature\n\
+      \    contract requests them. Then inventory every changed or newly added test and\n\
+      \    map it to a feature requirement. Treat an extra test with no supported\n    requirement,\
+      \ acceptance criterion, regression, or necessary safety coverage\n    as an unjustified\
+      \ scope finding. Do not demand tests for behavior explicitly\n    outside the feature's\
+      \ scope. The matrix is the basis for findings.\n- description: Post every actionable\
+      \ test coverage finding inline.\n  actions: [invoke_tool, edit, yaml_edit, read_document]\n\
+      \  step_type: governed\n  llm_type: simple_task\n  details: >-\n    Check existing unresolved\
+      \ review threads before posting. Post each actionable\n    finding directly to the referenced\
+      \ PR as an inline comment anchored to the\n    smallest relevant changed line. Findings\
+      \ must identify the missing or\n    unjustified test, cite the feature or proposed-PR\
+      \ requirement, explain the\n    risk, and give a concise fix direction. Anchor missing-test\
+      \ findings to the\n    nearest changed implementation line or changed test area when\
+      \ no test line\n    exists, and explain that the anchor represents a coverage gap. Do\
+      \ not report\n    already-covered rows, do not duplicate an unresolved root cause, and\
+      \ do not\n    post a general summary instead of inline findings. Do not approve, merge,\n\
+      \    close, label, or modify code as part of this skill.\n  tool_invocations:\n  - tool:\
+      \ shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --paginate\n  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --method\n    - POST\n    - -f\n    - body=<finding>\n    - -f\n    - commit_id=<current-head-sha>\n\
+      \    - -f\n    - path=<changed-file>\n    - -F\n    - line=<changed-line>\n    - -f\n\
+      \    - side=RIGHT\n- description: Verify the posted coverage review and report the audit\
+      \ result.\n  actions: [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n\
+      \  llm_type: standard_reasoning\n  details: >-\n    Confirm that every intended finding\
+      \ exists on the target PR, is attached to\n    the current diff, and is not merely present\
+      \ in an unposted draft or summary.\n    Verify each posted comment's path, line, commit\
+      \ id, and body with the GitHub\n    API. Report the PR, intermediate or final review\
+      \ scope, requested-test row\n    count, covered and missing row counts, unjustified-extra-test\
+      \ count, and\n    inline findings posted. If GitHub write access is unavailable, do\
+      \ not claim\n    completion; report the exact prepared findings and posting failure.\n\
+      \  tool_invocations:\n  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --paginate"
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - gather_context
+    - invoke_tool
+    - read_document
+    - yaml_edit
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

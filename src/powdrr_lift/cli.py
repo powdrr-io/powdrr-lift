@@ -165,7 +165,6 @@ from powdrr_lift.workrr.chat_agent import (
     choose_workflow_provider,
     download_local_qwen_model,
     resolve_workflow_provider,
-    run_workflow_chat,
 )
 from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
 from powdrr_lift.workrr.chat_tui import run_workflow_chat_tui
@@ -244,6 +243,7 @@ from powdrr_lift.workrr.human_task import (
     HumanTaskRunnerConfig,
     run_human_task,
 )
+from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
 from powdrr_lift.workrr.prompt_probe import (
     WorkflowPromptProbeError,
     build_probe_client,
@@ -289,6 +289,8 @@ from powdrr_lift.workrr.tuning import (
     save_workflow_tuning_report,
     tune_workflow,
 )
+
+run_workflow_chat = run_procedrr_workflow_chat
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
@@ -2005,12 +2007,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Provider used for nested adversarial review skills.",
     )
     workflow_chat_parser.add_argument(
-        "--skills-dir",
-        "--templates-dir",
-        dest="skills_dir",
+        "--processes-dir",
+        dest="processes_dir",
+        metavar="PROCESSES_DIR",
         type=Path,
-        default=Path("skill-definitions"),
-        help="Directory containing skill JSON files.",
+        default=Path("docs/procedrr/processes"),
+        help="Directory containing validated Procedrr process definitions.",
     )
     workflow_chat_parser.add_argument(
         "--output-dir",
@@ -2020,7 +2022,7 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_chat_parser.add_argument(
         "--model",
         default="glm-5.2",
-        help="Model to use for template matching and task generation.",
+        help="Model to use for Procedrr process selection and execution.",
     )
     workflow_chat_parser.add_argument(
         "--api-key",
@@ -2059,7 +2061,7 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_chat_parser.add_argument(
         "--repo-root",
         type=Path,
-        help="Repository root to resolve the default templates directory.",
+        help="Repository root to resolve the default process directory.",
     )
     workflow_chat_parser.set_defaults(func=_run_workflow_chat)
 
@@ -5993,7 +5995,7 @@ def _run_download_qwen_model(args: argparse.Namespace) -> int:
 def _run_workflow_chat(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     config = WorkflowChatConfig(
-        skills_dir=args.skills_dir,
+        skills_dir=args.processes_dir,
         repo_root=repo_root,
         output_dir=args.output_dir,
         provider=args.provider,

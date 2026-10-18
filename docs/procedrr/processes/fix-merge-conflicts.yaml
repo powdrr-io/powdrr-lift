@@ -1,0 +1,145 @@
+version: 1
+name: fix-merge-conflicts
+description: When a referenced pull request cannot merge cleanly with its base branch. When
+  merge conflicts must be resolved using the intent and history of both branches. When the
+  resolved branch must be validated through the repository's PR-preparation workflow.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: fix-merge-conflicts\nwhen_to_use:\n- When a referenced pull request cannot\
+      \ merge cleanly with its base branch.\n- When merge conflicts must be resolved using\
+      \ the intent and history of both branches.\n- When the resolved branch must be validated\
+      \ through the repository's PR-preparation workflow.\nsteps:\n- description: Inspect\
+      \ the pull request and confirm its GitHub merge status.\n  actions: [gather_context,\
+      \ invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: simple_task\n\
+      \  details: >-\n    Resolve the repository and pull request from the user's reference.\
+      \ Confirm\n    GitHub authentication, identify the base branch, head branch, head SHA,\n\
+      \    mergeability, merge state, checks, review decision, and current PR files.\n   \
+      \ Confirm that the PR is open and actually has a merge conflict before\n    changing\
+      \ the worktree. Preserve unrelated local changes and do not merge,\n    close, or modify\
+      \ the PR metadata.\n  tool_invocation_packages: [gh_readonly]\n  tool_invocations:\n\
+      \  - tool: shell\n    command:\n    - gh\n    - auth\n    - status\n- description: Fetch\
+      \ the target branch and reproduce the merge conflict locally.\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: simple_task\n\
+      \  details: >-\n    Verify the current worktree and branch before fetching. Fetch the\
+      \ PR head\n    and the current base branch from origin, then run the repository's normal\n\
+      \    merge command to merge the base branch into the PR head branch. Use the\n    exact\
+      \ base branch from GitHub; do not merge an inferred or stale local\n    branch. Stop\
+      \ with the merge in progress when conflicts occur. If the merge\n    is already clean,\
+      \ inspect the result and report that no conflict fix is\n    needed instead of creating\
+      \ an unnecessary change.\n  tool_invocations:\n  - tool: internal\n    command:\n  \
+      \  - powdrr-lift\n    - repository-state\n  - tool: shell\n    command:\n    - git\n\
+      \    - fetch\n    - origin\n    - <base-branch>\n    - <head-branch>\n  - tool: shell\n\
+      \    command:\n    - git\n    - merge\n    - --no-edit\n    - origin/<base-branch>\n\
+      \  - tool: internal\n    command:\n    - powdrr-lift\n    - repository-state\n- description:\
+      \ Inventory each conflict and attribute the competing changes.\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: high_reasoning\n\
+      \  details: >-\n    Enumerate every unmerged path and conflict marker. For each conflict,\n\
+      \    identify the base version, the PR side, and the base-branch side. Use git\n   \
+      \ diff, diff3 context, log, blame, and pickaxe searches to determine who\n    introduced\
+      \ each competing change, which commit or PR it belongs to, and\n    what behavior or\
+      \ invariant each side is trying to preserve. Do not resolve\n    a conflict by choosing\
+      \ ours or theirs wholesale without understanding the\n    semantic intent. Record a\
+      \ conflict ledger with path, line range, both\n    changes, contributing commits, related\
+      \ PRs, and the intended merged result.\n  tool_invocations:\n  - tool: shell\n    command:\n\
+      \    - git\n    - diff\n    - --name-only\n    - --diff-filter=U\n  - tool: shell\n\
+      \    command:\n    - git\n    - diff\n    - --cc\n  - tool: shell\n    command:\n  \
+      \  - git\n    - blame\n    - --line-porcelain\n    - <conflicted-file>\n  - tool: shell\n\
+      \    command:\n    - git\n    - log\n    - --oneline\n    - --decorate\n    - --all\n\
+      \    - -- <conflicted-file>\n  - tool: shell\n    command:\n    - git\n    - log\n \
+      \   - --all\n    - -S\n    - <conflicting-symbol-or-text>\n    - --oneline\n- description:\
+      \ Gather the relevant pull-request and commit context for each side.\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  prompt_catalogs: [context_types]\n\
+      \  llm_type: long_context\n  details: >-\n    For every contributing commit or related\
+      \ PR in the conflict ledger, use\n    GitHub to read its title, body, changed files,\
+      \ commits, reviews, and\n    relevant inline comments. Compare the original PR intent\
+      \ with the base\n    branch changes and identify decisions, tests, migrations, compatibility\n\
+      \    constraints, and follow-up work that the merged result must retain. If a\n    commit\
+      \ has no PR, use its commit message, author, date, and diff as the\n    source of intent.\
+      \ Before querying GitHub for related PRs, invoke the\n    gather_context workflow action\
+      \ with the conflict ledger's known feature or\n    proposed-PR identifiers as keywords:\n\
+      \    {\"kind\":\"gather_context\",\"types\":[\"features\",\"proposed_prs\",\"decisions\"\
+      ,\"risks\"],\"keywords\":[\"<feature-or-proposed-pr-id>\"]}.\n    Use the returned structured\
+      \ records to discover related proposed PRs,\n    recorded decisions, risks, and feature\
+      \ intent, then use GitHub history to\n    fill in the commit-level details. Do not rely\
+      \ on line ownership alone to\n    infer behavior.\n  tool_invocation_packages: [gh_readonly]\n\
+      \  tool_invocations:\n  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/commits/<commit-sha>\n\
+      \  - tool: shell\n    command:\n    - gh\n    - search\n    - prs\n    - <related-pr-search>\n\
+      \    - --repo\n    - <owner>/<repo>\n    - --json\n    - number,title,state,url\n  -\
+      \ tool: gh\n    command:\n    - pr\n    - diff\n    - <related-pr-number>\n    - --patch\n\
+      - id: plan-resolutions\n  actions: [edit, yaml_edit, file_management, read_document]\n\
+      \  step_type: governed\n  description: Plan the semantic resolution before editing conflict\
+      \ markers.\n  llm_type: high_reasoning\n  details: >-\n    For each conflict, state\
+      \ the merged behavior in plain language and map it\n    to the contributing PR intent,\
+      \ current architecture, invariants, and\n    tests. Preserve compatible behavior from\
+      \ both sides where possible. When\n    the changes are incompatible, choose the behavior\
+      \ supported by the current\n    base-branch contract and the current PR's intent, and\
+      \ explain why the\n    alternative is not retained. Identify any required follow-up\
+      \ edits outside\n    the conflict hunk, test updates, generated-file regeneration, migration,\n\
+      \    or documentation change. Do not edit until every conflict has a plan; if\n    intent\
+      \ cannot be determined safely, ask one precise question.\n- id: verify-resolutions\n\
+      \  actions: [invoke_tool, edit, yaml_edit, read_document, goto_step]\n  step_type: governed\n\
+      \  description: Apply and verify the conflict resolutions.\n  llm_type: fast_iteration\n\
+      \  details: >-\n    Edit only the planned files and any directly required follow-up\
+      \ files.\n    Remove all conflict markers, preserve formatting and types, stage each\n\
+      \    resolved path, and inspect the staged diff and merge-tree result. Run\n    focused\
+      \ tests for every conflict area first, then run all validation\n    commands required\
+      \ by the repository's PR-preparation tool references. If a\n    test or check fails,\
+      \ return to the conflict ledger, determine whether the\n    failure is caused by the\
+      \ resolution, then use goto_step with step_id\n    `plan-resolutions` to update the\
+      \ conflict plan before returning here. Abort\n    or stop for user input rather than\
+      \ guessing if the merge would\n    discard behavior that cannot be reconciled. Return\n\
+      \    {\"action\":\"goto_step\",\"step_id\":\"plan-resolutions\"} when another plan is\
+      \ required.\n  tool_invocations:\n  - tool: shell\n    command:\n    - rg\n    - -n\n\
+      \    - \"^(<<<<<<<|=======|>>>>>>>)\"\n    - <repository>\n  - tool: shell\n    command:\n\
+      \    - git\n    - diff\n    - --cached\n    - --check\n  - tool: shell\n    command:\n\
+      \    - git\n    - diff\n    - --cached\n    - --stat\n  - tool: ref\n    label: pr-prep\n\
+      - description: Run the PR-preparation workflow on the resolved merge.\n  step_type:\
+      \ uses_skill\n  llm_type: simple_task\n  uses_skill:\n    skill: finish-pr-prep\n  details:\
+      \ >-\n    Invoke finish-pr-prep only after every conflict is resolved, all conflict\n\
+      \    markers are gone, the intended merge result is staged, and the focused\n    checks\
+      \ pass. Pass the conflict ledger, semantic resolution plan, changed\n    file set, and\
+      \ test evidence as context. Let finish-pr-prep discover the\n    canonical formatting,\
+      \ lint, type-check, and test commands. Do not push or\n    update the PR until finish-pr-prep\
+      \ reports the staged merge is ready.\n- description: Commit and push the resolved branch\
+      \ to the existing pull request.\n  step_type: uses_skill\n  llm_type: simple_task\n\
+      \  details: >-\n    Invoke create-pull-request with pr-kind `merge-conflict`, commit\
+      \ message\n    `Resolve merge conflicts`, and the existing pull-request reference and\n\
+      \    title. Pass a `files_to_publish` context list containing every resolved\n    file,\
+      \ along with the conflict ledger, and require one Conflict\n    Resolution row per conflicted\
+      \ file containing the competing intent,\n    selected resolution, and validation. Never\
+      \ create a second PR or merge it.\n  uses_skill:\n    skill: create-pull-request"
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - gather_context
+    - invoke_tool
+    - read_document
+    - yaml_edit
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

@@ -23,7 +23,7 @@ steps:
         requested changes. Do not create a worktree or expand the scope. If no
         file change is needed, produce a concise response and succeed.
       context: [user_request, workflow_context]
-      allowed_tools: [edit, yaml_edit, file_management, read_document, list_files]
+      allowed_tools: [edit, yaml_edit, file_management, read_document, list_files, prompt_user, respond]
       bind: ad_hoc_program
   - call:
       fragment: "${ad_hoc_program}"
@@ -42,6 +42,6 @@ steps:
               process: finish-pr-prep
               inputs:
                 files_to_publish: "${worktree_changes.paths}"
-                language_labels: "${language_labels}"
+                language_labels: "${worktree_changes.language_labels}"
               outputs: {pr_prep_results: validation_results}
           - terminal: succeeded

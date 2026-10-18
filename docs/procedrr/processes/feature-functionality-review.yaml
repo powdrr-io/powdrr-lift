@@ -1,0 +1,127 @@
+version: 1
+name: feature-functionality-review
+description: When the user asks for a functionality or completeness review of a referenced
+  pull request. When a pull request implements one or more proposed PRs from a feature specification.
+  When the review must report findings directly on GitHub as inline pull-request comments.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: feature-functionality-review\ninteraction_style: observational_review\nwhen_to_use:\n\
+      - When the user asks for a functionality or completeness review of a referenced pull\
+      \ request.\n- When a pull request implements one or more proposed PRs from a feature\
+      \ specification.\n- When the review must report findings directly on GitHub as inline\
+      \ pull-request comments.\nsteps:\n- description: Discover the referenced pull request\
+      \ and its feature relationship.\n  actions: [gather_context, invoke_tool, edit, yaml_edit,\
+      \ read_document]\n  step_type: governed\n  llm_type: long_context\n  details: >-\n \
+      \   Inspect the referenced PR's title, body, labels, commits, changed files,\n    review\
+      \ history, base branch, head branch, and current state using the\n    connected GitHub\
+      \ repository. Locate the feature identifier and the related\n    proposed PR identifiers\
+      \ from the PR body, changelog entries, specification\n    paths, commit messages, and\
+      \ changed files. Resolve the canonical feature\n    definition and the ordered proposed-PR\
+      \ list, then verify each candidate\n    against its specification and GitHub PR. Build\
+      \ a ledger containing the\n    feature, feature-definition documents, proposed PRs in\
+      \ order, each PR's\n    state, and the current PR's position. Treat structured metadata\
+      \ as\n    authoritative. If the relationship is ambiguous, prepare one inline\n    finding\
+      \ on the nearest relevant changed line explaining the missing\n    linkage and do not\
+      \ continue with an assumed feature.\n  tool_invocation_packages: [gh_readonly]\n- description:\
+      \ Decide whether the referenced PR is the final proposed PR.\n  actions: [edit, yaml_edit,\
+      \ file_management, read_document]\n  step_type: governed\n  prompt_catalogs: [context_types]\n\
+      \  llm_type: high_reasoning\n  details: >-\n    Treat the current PR as final only when\
+      \ the ordered feature plan identifies\n    it as the last proposed PR and the preceding\
+      \ proposed PRs are complete,\n    merged, or otherwise explicitly accounted for. Do\
+      \ not infer finality from\n    the title, merge order, PR size, or current implementation\
+      \ progress. For\n    an intermediate PR, select only the matching proposed-PR specification\
+      \ and\n    its contractual dependencies as the review scope. For a final PR, select\n\
+      \    the full feature definition, every related previous proposed-PR\n    specification,\
+      \ every related closed or merged PR, and the current proposed\n    PR as the review\
+      \ scope. After identifying the feature id, invoke the\n    gather_context workflow action\
+      \ with the proposed-PR entity type filtered by\n    that feature id: {\"kind\":\"gather_context\"\
+      ,\"types\":[\"proposed_prs\"],\"keywords\":[\"<feature-id>\"]}.\n    Use the returned\
+      \ records to determine the ordered proposed-PR set and\n    status rather than relying\
+      \ only on PR prose.\n- description: Review the current PR against the selected functionality\
+      \ scope.\n  actions: [edit, yaml_edit, file_management, read_document]\n  step_type:\
+      \ governed\n  llm_type: high_reasoning\n  details: >-\n    For an intermediate PR, compare\
+      \ the complete diff and surrounding code\n    against the matching proposed PR's intent,\
+      \ scope, required behavior,\n    acceptance criteria, dependencies, risks, and validation\
+      \ requirements.\n    Do not fail behavior explicitly assigned to a later proposed PR.\
+      \ For a\n    final PR, read the full feature definition and all related previous PR\n\
+      \    specifications and diffs, including relevant review discussions. Create a\n   \
+      \ point-by-point checklist covering every requirement, acceptance criterion,\n    edge\
+      \ case, interface, migration, integration, and required validation.\n    Trace each\
+      \ item to implementation and tests or other evidence. Check error\n    paths, empty\
+      \ states, compatibility, persistence, authorization,\n    observability, and documentation\
+      \ whenever the feature contract requires\n    them. Mark each item satisfied, partially\
+      \ satisfied, missing, contradicted,\n    or not applicable with a reason. Report only\
+      \ findings caused by the current\n    PR and avoid duplicate findings for one root cause.\
+      \ Construct a coverage\n    matrix with one row per requirement and acceptance criterion\
+      \ and require\n    every row to have a source, implementation evidence, validation evidence,\n\
+      \    and a status. Treat a missing row, missing evidence, or unexplained partial\n \
+      \   status as a review finding candidate. For a final PR, separately mark\n    every\
+      \ earlier proposed PR as reviewed and link its landed diff or an\n    explicit gap.\
+      \ This deterministic matrix is the basis for deciding whether\n    the feature is complete.\n\
+      - description: Post every actionable finding as an inline pull-request comment.\n  actions:\
+      \ [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type:\
+      \ simple_task\n  details: >-\n    Post each actionable finding directly to the referenced\
+      \ PR using the\n    connected GitHub review interface. Every finding must be an inline\
+      \ comment\n    anchored to the smallest relevant changed line. State what is wrong or\n\
+      \    missing, which feature or proposed-PR requirement it violates, the user or\n  \
+      \  system impact, and a concise fix direction when clear. If the relevant\n    code\
+      \ is not changed in the current PR, anchor the finding to the nearest\n    changed line\
+      \ in the same file or integration area and explain that it is a\n    feature-completeness\
+      \ gap exposed by this PR. Check existing unresolved\n    threads before posting and\
+      \ do not repeat an unresolved finding unless the\n    current diff leaves it unresolved\
+      \ or regresses it. Do not use a general\n    review summary as the only location for\
+      \ a finding. If an inline anchor is\n    rejected, use a valid nearby changed line and\
+      \ preserve the file and line\n    reference in the comment text. Do not approve, merge,\
+      \ close, label, or\n    modify code as part of this skill.\n  tool_invocations:\n  -\
+      \ tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --paginate\n  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --method\n    - POST\n    - -f\n    - body=<finding>\n    - -f\n    - commit_id=<current-head-sha>\n\
+      \    - -f\n    - path=<changed-file>\n    - -F\n    - line=<changed-line>\n    - -f\n\
+      \    - side=RIGHT\n- description: Verify the posted review and report the audit result.\n\
+      \  actions: [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n \
+      \ llm_type: standard_reasoning\n  details: >-\n    Confirm that every intended finding\
+      \ exists on the target PR, is attached\n    to the current diff, and is not merely present\
+      \ in an unposted draft or\n    summary. Keep an audit record of the feature graph, selected\
+      \ intermediate\n    or final review depth, checklist coverage, evidence examined, and\
+      \ comments\n    posted. Report the PR, review depth, and count of inline findings. If\n\
+      \    GitHub write access is unavailable, do not claim completion: report the\n    exact\
+      \ prepared findings and the posting failure. Verify posted comments\n    with `gh api\
+      \ repos/<owner>/<repo>/pulls/<number>/comments --paginate` and\n    confirm each finding's\
+      \ path, line, commit id, and body before reporting\n    completion.\n  tool_invocations:\n\
+      \  - tool: shell\n    command:\n    - gh\n    - api\n    - repos/<owner>/<repo>/pulls/<number>/comments\n\
+      \    - --paginate"
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - gather_context
+    - invoke_tool
+    - read_document
+    - yaml_edit
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

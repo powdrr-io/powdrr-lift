@@ -1,0 +1,32 @@
+version: 1
+name: select-process
+description: Select one supported Procedrr process for a user request.
+inputs:
+  - {name: user_request, type: string, required: true}
+  - {name: workflow_context, type: object, required: true}
+  - {name: available_processes, type: array, required: true}
+limits: {llm_activations: 1, tool_calls: 1, context_chars: 24000}
+steps:
+  - judge:
+      kind: classify_one
+      question: Which one declared process should handle this request?
+      subject: user_request
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Select only a process_id present in available_processes.
+        - Match the user's request and prior workflow context to process descriptions and use cases.
+        - Select handle-ad-hoc when no more specific process is a clear match.
+        - Do not select select-process.
+        - Do not answer the user or perform workflow operations in this selection.
+      context: [user_request, workflow_context, available_processes]
+      output:
+        name: route
+        schema:
+          type: object
+          required: [process_name, reason]
+          additionalProperties: false
+          properties:
+            process_name: {type: string, minLength: 1}
+            reason: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - terminal: succeeded

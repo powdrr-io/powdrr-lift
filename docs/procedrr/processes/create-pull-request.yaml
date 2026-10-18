@@ -1,0 +1,152 @@
+version: 1
+name: create-pull-request
+description: When validated staged changes must be committed, pushed, and published as a draft
+  pull request. When an existing pull request for the current branch must receive the prescribed
+  description and updated commit.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy invoke_skill references with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      name: create-pull-request\nwhen_to_use:\n- When validated staged changes must be committed,\
+      \ pushed, and published as a draft pull request.\n- When an existing pull request for\
+      \ the current branch must receive the prescribed description and updated commit.\ninputs:\n\
+      - name: feature-name\n- name: commit-message\n- name: populated-pr-description\n- name:\
+      \ files-to-publish\n- name: base-branch\nsteps:\n- description: Generate the pull request\
+      \ description template.\n  actions: []\n  step_type: invoke_tool\n  llm_type: simple_task\n\
+      \  pre_step:\n    action: invoke_tool\n    template:\n      tool: internal\n      command:\n\
+      \      - powdrr-lift\n      - pull-request-description\n      - --kind\n      - feature\n\
+      \  outputs:\n  - name: pull_request_description_template\n    type: any\n    required_for_next_step:\
+      \ true\n    schema: {type: object, additionalProperties: true}\n- description: Fill\
+      \ in the pull request description template.\n  actions: [edit, yaml_edit, file_management,\
+      \ read_document]\n  step_type: governed\n  llm_type: high_reasoning\n  details: >-\n\
+      \    Fill every section of the returned template using the validated work item,\n  \
+      \  changed files, decisions, review or CI evidence, and exact checks that were\n   \
+      \ actually run. Preserve useful existing pull request content when updating\n    an\
+      \ existing PR; do not discard sections that are not part of the generated\n    template.\
+      \ Include the problem and before/after behavior, scope and\n    non-goals, implementation\
+      \ details, compatibility impact, validation\n    commands and results, risks and mitigations,\
+      \ reviewer focus, follow-up, and\n    references. Include any kind-specific evidence\
+      \ requested by the template.\n    If a section does not apply, write Not applicable\
+      \ and why. Never leave a\n    placeholder or claim an unrun check passed. Keep the completed\
+      \ body in\n    workflow context and do not print it to the chat or status window.\n\
+      - description: Inspect repository state before staging the pull request.\n  actions:\
+      \ []\n  step_type: invoke_tool\n  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n\
+      \    template:\n      tool: shell\n      command: [git, status, --short]\n  outputs:\n\
+      \  - name: repository_status_before_staging\n    type: any\n    required_for_next_step:\
+      \ true\n    schema: {type: string}\n- id: remove-unintended-files\n  description: Remove\
+      \ unintended files before staging.\n  actions: [delete_file]\n  step_type: governed\n\
+      \  llm_type: simple_task\n  details: >-\n    Compare the captured repository status\
+      \ with `files_to_publish`. If an\n    untracked or modified path is not in `files_to_publish`,\
+      \ delete exactly one\n    such path with {\"action\":\"delete_file\",\"file_path\":\"\
+      path/to/file\"} and\n    verify the repository status before advancing. If no unintended\
+      \ path is\n    present, choose {\"action\":\"next_step\"}. Do not stage files in this\
+      \ step.\n  outputs:\n  - name: cleanup_result\n    type: string\n    required_for_next_step:\
+      \ false\n    schema: {type: string}\n- id: verify-clean-worktree\n  description: Confirm\
+      \ the worktree is clean after cleanup.\n  actions: []\n  step_type: gate\n  llm_type:\
+      \ simple_task\n  details: >-\n    The gate passes only when the worktree has no unstaged\
+      \ or untracked files.\n    Staged changes are allowed here because the next deterministic\
+      \ step verifies\n    the staged set against files_to_publish.\n  pre_step:\n    action:\
+      \ invoke_tool\n    template:\n      tool: shell\n      command:\n      - sh\n      -\
+      \ -c\n      - 'test -z \"$(git diff --name-only)$(git ls-files --others --exclude-standard)\"\
+      '\n  gate:\n    outcome: {path: returncode, equals: 0}\n    goto_step: remove-unintended-files\n\
+      \    retry_context: >-\n      The worktree has an unstaged or untracked path. Return\
+      \ to\n      remove-unintended-files and delete one unintended path with delete_file\n\
+      \      before retrying this gate. Staged paths are checked against\n      files_to_publish\
+      \ by the next step.\n- description: Stage the exact files that belong in the pull request.\n\
+      \  id: stage-exact-files\n  actions: [invoke_tool]\n  step_type: governed\n  llm_type:\
+      \ simple_task\n  details: >-\n    Invoke the intrinsic git tool exactly once with the\
+      \ authoritative\n    `files_to_publish` list. Use exactly\n    {\"action\":\"invoke_tool\"\
+      ,\"tool\":\"git\",\"parameters\":{\"operation\":\"add\",\"paths\":[\"path/to/file\"\
+      ]}}.\n    Do not use `git add .`, `git add --all`, or stage logs, caches, or unrelated\n\
+      \    files.\n  tool_invocation_packages: [git_readonly_and_additive]\n- description:\
+      \ Verify the staged pull request file set.\n  actions: []\n  step_type: invoke_tool\n\
+      \  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n    template:\n    \
+      \  tool: shell\n      command: [git, diff, --cached, --name-only]\n  outputs:\n  - name:\
+      \ staged_file_names\n    type: any\n    required_for_next_step: true\n    schema: {type:\
+      \ string}\n- description: Commit the validated changes.\n  actions: [invoke_tool, edit,\
+      \ yaml_edit, delete_file, read_document]\n  step_type: governed\n  llm_type: simple_task\n\
+      \  details: >-\n    Confirm with `git diff --cached --name-only` that the exact\n  \
+      \  `files_to_publish` list is staged. If any intended file is missing or any\n    unrelated\
+      \ file is staged, correct the staging before continuing. Commit\n    with `<commit-message>`,\
+      \ then verify the result. If the commit reports\n    \"nothing to commit\" and `git\
+      \ status --short` is empty, treat that as a\n    successful no-change outcome: an earlier\
+      \ action already committed the\n    exact state, so continue without creating an empty\
+      \ commit. If status shows\n    unstaged or untracked paths, stop and correct each one:\
+      \ stage an intended\n    path with the intrinsic git add action. For every unstaged\
+      \ or untracked path\n    that is not in `files_to_publish`, delete it with the dedicated\
+      \ delete\n    action before retrying. Use exactly\n    {\"action\":\"delete_file\",\"\
+      file_path\":\"path/to/unintended-file\"}\n    for each unintended path; never add an\
+      \ unintended file to the commit.\n    Rerun status, then retry the commit only after\
+      \ the worktree is clean or\n    the intended changes are staged. Do not push or invoke\
+      \ any GitHub command\n    in this step.\n  tool_invocations:\n  - tool: internal\n \
+      \   command:\n    - powdrr-lift\n    - repository-state\n  - tool: shell\n    command:\n\
+      \    - git\n    - commit\n    - -m\n    - <commit-message>\n- description: Push the\
+      \ committed changes.\n  actions: [invoke_tool, edit, yaml_edit, read_document]\n  step_type:\
+      \ governed\n  llm_type: simple_task\n  details: >-\n    Push the current feature branch\
+      \ with its upstream set. Verify that the\n    remote branch contains the committed `HEAD`\
+      \ before continuing. Do not\n    create or update a pull request in this step; leave\
+      \ the completed body in\n    workflow context for the next step.\n  tool_invocations:\n\
+      \  - tool: shell\n    command:\n    - git\n    - push\n    - -u\n    - origin\n    -\
+      \ HEAD\n- description: Create a draft pull request when none exists.\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: simple_task\n\
+      \  details: >-\n    First verify that the current branch has at least one committed\
+      \ change\n    relative to the exact base branch. If `git rev-list --count\n    <base-branch>..HEAD`\
+      \ is zero, do not invoke `gh pr create`: inspect\n    `git status`, stage the intended\
+      \ files, commit them, push the branch, and\n    retry this step. Uncommitted files alone\
+      \ are not sufficient for a pull\n    request. Confirm that the pushed `HEAD` contains\
+      \ every `files_to_publish`\n    path. Use this step only when no pull request exists\
+      \ for the current\n    branch.\n    Invoke the registered gh intrinsic with exactly\n\
+      \    {\"action\":\"invoke_tool\",\"tool\":\"gh\",\"parameters\":{\"operation\":\"pr_create\"\
+      ,\"title\":\"Add <feature-name> implementation workflow\",\"body\":\"<populated-pr-description>\"\
+      }}.\n    For this operation, provide only the title and body. The runtime determines\n\
+      \    the repository, current branch, base branch, and pull-request identity;\n    never\
+      \ provide `pr_reference`, `head`, or `base`.\n    The title must be the non-empty value\
+      \ `Add <feature-name> implementation\n    workflow`; never pass a placeholder or shell\
+      \ command array. Use the\n    completed body from the previous steps. Do not print the\
+      \ body, edit an\n    existing PR, or run any other tool.\n    Do not report completion\
+      \ until the command succeeds and its output includes\n    the pull request URL. Never\
+      \ merge the PR or push directly to main.\n  tool_invocation_packages: [gh_write]\n-\
+      \ description: Update the existing pull request.\n  actions: [invoke_tool, edit, yaml_edit,\
+      \ read_document]\n  step_type: governed\n  llm_type: simple_task\n  details: >-\n  \
+      \  Use this step only when a pull request already exists for the current\n    branch.\
+      \ Invoke the registered gh intrinsic with exactly\n    {\"action\":\"invoke_tool\",\"\
+      tool\":\"gh\",\"parameters\":{\"operation\":\"pr_edit\",\"title\":\"Add <feature-name>\
+      \ implementation workflow\",\"body\":\"<populated-pr-description>\"}}.\n    For this\
+      \ operation, provide only the title and body. The runtime resolves\n    the existing\
+      \ pull request from the current branch; never provide\n    `pr_reference`, `head`, or\
+      \ `base`, and never use a proposed PR id as a\n    GitHub pull-request reference.\n\
+      \    Do not print the body, create a second PR, or run any other tool. Do not\n    report\
+      \ completion until the command succeeds and its output\n    identifies the pull request.\
+      \ Never merge the PR or push directly to main.\n  tool_invocation_packages: [gh_write]"
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - invoke_tool
+    - read_document
+    - yaml_edit
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

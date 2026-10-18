@@ -11,7 +11,7 @@ inputs:
   - {name: fragment_available_bindings, type: array, required: true}
   - {name: fragment_allowed_tools, type: array, required: true}
   - {name: fragment_max_steps, type: integer, required: true}
-limits: {llm_activations: 65, tool_calls: 66, context_chars: 16000, context_value_chars: 8000}
+limits: {llm_activations: 130, tool_calls: 131, context_chars: 64000, context_value_chars: 16000}
 steps:
   - operation:
       tool: procedrr_fragment_start
@@ -22,7 +22,7 @@ steps:
         max_steps: "${fragment_max_steps}"
       bind: fragment_state
   - repeat:
-      max_iterations: 65
+      max_iterations: 128
       until: {subject: fragment_state.done, equals: true}
       body:
         - judge:
@@ -52,7 +52,15 @@ steps:
               - Use only tools listed in fragment_state.allowed_tools.
               - >-
                 A read_document operation uses {tool: read_document,
-                parameters: {file_path: PATH}, bind: NAME}.
+                parameters: {file_path: PATH, start_line: START, end_line: END}, bind: NAME}.
+              - >-
+                A prompt_user operation uses {tool: prompt_user, parameters:
+                {text: QUESTION}, bind: NAME}; use it only for a required
+                user decision or missing information.
+              - >-
+                A respond operation uses {tool: respond, parameters:
+                {text: FINAL_MESSAGE}} to show the completed workflow result to
+                the user. Use it once after all required work is complete.
               - >-
                 A model-facing line edit uses {tool: edit, parameters:
                 {operation: replace_lines, file_path: PATH, start_line: START,

@@ -22,6 +22,8 @@ KNOWN_TOOLS = frozenset(
         "read_document",
         "invoke_tool",
         "list_files",
+        "prompt_user",
+        "respond",
         "procedrr_fragment_start",
         "procedrr_fragment_apply_edit",
         "workflow_chat_snapshot",

@@ -1,0 +1,93 @@
+version: 1
+name: review-architecture
+description: When new needs may require updating the current architecture specification. When
+  the TUI should evaluate whether the architecture still fits the system needs.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: review-architecture\ninputs:\n- name: work-item-name\ninteraction_style:\
+      \ observational_review\nwhen_to_use:\n- When new needs may require updating the current\
+      \ architecture specification.\n- When the TUI should evaluate whether the architecture\
+      \ still fits the system needs.\nsteps:\n- description: Gather the entities, entity relationships,\
+      \ invariants, and guidance\n    context.\n  actions: [gather_context, edit, yaml_edit,\
+      \ file_management, read_document]\n  step_type: governed\n  prompt_catalogs: [context_types]\n\
+      \  llm_type: simple_task\n  details: >-\n    Use gather_context with exactly the types\
+      \ entities, entity-relationships,\n    invariants, and guidance to understand the current\
+      \ architecture model before\n    judging whether it needs to change. Do not use architecture\
+      \ or relationships\n    as context types; those are not valid catalog tokens.\n- description:\
+      \ Decide whether the current architecture specification needs to change.\n  actions:\
+      \ [edit, yaml_edit, file_management, read_document, complete]\n  step_type: governed\n\
+      \  llm_type: high_reasoning\n  details: >-\n    Compare the gathered entity model against\
+      \ the new needs. If the existing\n    specification already covers them, return the\
+      \ complete action, for example\n    {\"action\":\"complete\",\"text\":\"The existing\
+      \ architecture covers the new needs.\"};\n    otherwise choose next_step. Return {\"\
+      action\":\"next_step\"} in that case.\n- id: generate-architecture\n  description: Deterministically\
+      \ generate the architecture specification template.\n  actions: []\n  step_type: invoke_tool\n\
+      \  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n    template:\n    \
+      \  tool: internal\n      command:\n      - powdrr-lift\n      - architecture-specification\n\
+      \      - \"--work-item-name\"\n      - \"<work-item-name>\"\n      - \"--all-entity-types\"\
+      \n  outputs:\n  - name: architecture_specification_template\n    type: any\n    required_for_next_step:\
+      \ true\n    schema: {type: object, additionalProperties: true}\n- id: fill-architecture\n\
+      \  description: Fill the architecture specification with the required updates.\n  actions:\
+      \ [edit, yaml_edit, file_management, read_document]\n  step_type: governed\n  llm_type:\
+      \ high_reasoning\n  details: >-\n    Use yaml_edit for every YAML change. Include complete\
+      \ operations using\n    set_value paths or upsert_item section, id, and value fields.\
+      \ Do not use\n    invoke_tool for YAML edits.\n- id: evaluate-architecture\n  description:\
+      \ Deterministically evaluate the updated architecture specification.\n  actions: []\n\
+      \  step_type: invoke_tool\n  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n\
+      \    template:\n      tool: internal\n      command:\n      - powdrr-lift\n      - evaluate\n\
+      \      - docs/proposals/<work-item-name>/architecture-specification.yaml\n  outputs:\n\
+      \  - name: architecture_evaluation\n    type: any\n    required_for_next_step: true\n\
+      \    schema: {type: object, additionalProperties: true}\n- id: repair-architecture\n\
+      \  description: Repair every reported architecture specification issue.\n  actions:\
+      \ [edit, yaml_edit, file_management, read_document, goto_step]\n  step_type: governed\n\
+      \  llm_type: fast_iteration\n  details: >-\n    Use yaml_edit actions to fix every issue\
+      \ reported by evaluation. If there\n    are no issues, choose next_step without changing\
+      \ the file. Do not use\n    invoke_tool in this governed repair step; the next deterministic\
+      \ step reruns\n    the evaluator. If evaluation reports invalid YAML/structure or you\
+      \ are\n    stuck, restart generation with {\"action\":\"goto_step\",\"step_id\":\"generate-architecture\"\
+      }\n    instead of repeating the same repair. Otherwise return {\"action\":\"next_step\"\
+      }.\n- id: gate-architecture\n  description: Confirm that architecture evaluation reports\
+      \ zero issues.\n  actions: []\n  step_type: gate\n  llm_type: simple_task\n  details:\
+      \ The gate passes only when evaluation exits successfully with zero issues.\n  pre_step:\n\
+      \    action: invoke_tool\n    template:\n      tool: internal\n      command:\n    \
+      \  - powdrr-lift\n      - evaluate\n      - docs/proposals/<work-item-name>/architecture-specification.yaml\n\
+      \  gate:\n    outcome:\n      path: returncode\n      equals: 0\n    goto_step: evaluate-architecture\n\
+      \    retry_context: >-\n      The gate failed because evaluation still reports issues.\
+      \ Repair every\n      issue with yaml_edit, then let the deterministic evaluator run\
+      \ again."
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - gather_context
+    - read_document
+    - respond
+    - yaml_edit
+    - invoke_tool
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

@@ -61,11 +61,11 @@ Read these files before editing:
 | CLI | `src/powdrr_lift/cli.py`: `workrr-feature`, `harbor-feature`, `bootstrap-structrr` | Add the three adopter entry points and shared options. |
 | Agent/runtime lifecycle | Agent integration and shared runtime entry points | Make Git and worktree handling a built-in agent responsibility for every task. Support a local start ref and independent publishing; pass prepared candidate context into Procedrr. |
 | Feature orchestration | `src/powdrr_lift/workrr/feature_endpoint.py`: `FeatureEndpointConfig`, `run_feature_endpoint`, `run_feature_in_place` | Adapt the feature entry point to consume agent-prepared candidate context and return execution evidence. Keep Git lifecycle and publication out of Procedrr flows. |
-| Shared flow | `docs/procedrr/skill-definitions/implement-feature.yaml` and `design-interview.yaml` | Normative defaults currently depend on `benchmark_mode`. Separate the uncertainty policy from benchmark behavior. |
+| Shared flow | `docs/procedrr/processes/implement-feature.yaml` and `design-interview.yaml` | Normative defaults currently depend on `benchmark_mode`. Separate the uncertainty policy from benchmark behavior. |
 | Procedrr flow commands | `src/powdrr_lift/workrr/command_catalog.py` | Default validation, consistency updates, and `normative-assumptions.json` are coupled to benchmark mode. Move Git effects out of flow commands; keep workflow operations focused on evidence and gates. |
 | Typed defaults | `src/powdrr_lift/core/behavior_contract.py` | Reuse existing `validate_normative_assumptions`; add provenance without weakening the contract. |
 | Bootstrap | `src/powdrr_lift/structrr/bootstrap.py` | Generates and validates a snapshot but does not provide a complete isolated bootstrap-to-PR lifecycle. |
-| Existing bootstrap/publication skills | `skill-definitions/bootstrap-code-structure.yaml`, `create-pull-request.yaml` | Audit reusable discovery and publishing behavior; these older skills use a different artifact/flow contract from deterministic Structrr bootstrap. |
+| Existing bootstrap/publication skills | `docs/procedrr/processes/bootstrap-code-structure.yaml`, `create-pull-request.yaml` | Audit reusable discovery and publishing behavior; these older skills use a different artifact/flow contract from deterministic Structrr bootstrap. |
 | Taxonomy | `src/powdrr_lift/core/entity_taxonomy.py` | Default loading assumes a taxonomy file exists in the target repository. Fresh projects need a packaged default. |
 | Providers | `workrr/providers.py`, `provider_config.py`, `provider_runtime.py` | Credential resolution exists; resolution alone is not an authenticated access check. |
 | Coding adapters | `src/powdrr_lift/workrr/coding_agent.py` | Planning and coding can use different models, credentials, and executables. Check the actual selected routes. |
@@ -394,11 +394,8 @@ export UV_NO_SYNC=1
 rtk proxy "$VIRTUAL_ENV/bin/python" -m ruff format --check .
 rtk proxy "$VIRTUAL_ENV/bin/python" -m ruff check .
 rtk proxy "$VIRTUAL_ENV/bin/python" -m mypy src tests
-rtk proxy "$VIRTUAL_ENV/bin/python" -m powdrr_lift.cli validate-workflow-definitions \
-  skill-definitions templates --liveness \
-  --baseline .github/workflow-liveness-baseline.json \
-  --warning-budget .github/workflow-liveness-warning-budget.json \
-  --warning-report /tmp/first-adopter-workflow-warnings.json
+rtk proxy "$VIRTUAL_ENV/bin/python" -m powdrr_lift.cli validate-procedrr-processes \
+  docs/procedrr/processes
 rtk proxy "$VIRTUAL_ENV/bin/python" -m pytest -n auto \
   --cov=powdrr_lift --cov-branch --cov-report=term-missing tests
 rtk proxy "$VIRTUAL_ENV/bin/python" -m powdrr_lift.cli workflow-scenario-suite \

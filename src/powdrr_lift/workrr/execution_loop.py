@@ -10,7 +10,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shlex
+import shutil
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -42,80 +44,294 @@ from powdrr_lift.intrinsic_edit import APPLY_EDIT_TOOL, VALIDATE_EDIT_TOOL
 from powdrr_lift.intrinsic_enrich import ENRICH_TOOL
 from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL
 from powdrr_lift.workrr.action_operations import _resolve_pre_step_template
-from powdrr_lift.workrr.action_validation import (
-    _command_items_for_validation,
-    _record_runtime_readiness_from_pre_step,
-    _runtime_readiness_report,
-    _validate_internal_command,
-)
 from powdrr_lift.workrr.chat_io import _verbose_print
 from powdrr_lift.workrr.context import WorkflowContext
+from powdrr_lift.workrr.operation_validation import (
+    command_items_for_validation,
+    record_runtime_readiness_from_pre_step,
+    runtime_readiness_report,
+    validate_internal_command,
+)
 
 _INTERNAL_TOOL = "internal"
 
 
-def _chat_support(name: str) -> Any:
-    from powdrr_lift.workrr import chat_agent
-
-    return getattr(chat_agent, name)
+_RTK_BYPASS_COMMANDS = frozenset({"test"})
 
 
-def _support_call(name: str, *args: Any, **kwargs: Any) -> Any:
-    return _chat_support(name)(*args, **kwargs)
+def _extract_command_option(
+    command_items: Sequence[str], option_name: str
+) -> str | None:
+    for index, item in enumerate(command_items):
+        if item == option_name and index + 1 < len(command_items):
+            return command_items[index + 1]
+    return None
 
 
-def _empty_pull_request_error(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_empty_pull_request_error", *args, **kwargs)
+def _latest_deterministic_pre_step(
+    execution_events: Sequence[Mapping[str, Any]],
+    *,
+    process_id: str,
+    step_index: int,
+) -> Mapping[str, Any] | None:
+    for event in reversed(execution_events):
+        if (
+            event.get("kind") == "deterministic_pre_step"
+            and event.get("process_id") == process_id
+            and event.get("step_index") == step_index
+        ):
+            return event
+    return None
 
 
-def _normalize_noop_git_commit_result(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_normalize_noop_git_commit_result", *args, **kwargs)
+def _pre_step_context_values(
+    handoff_records: Mapping[str, Mapping[str, Any]],
+    workflow_context: WorkflowContext | None,
+    execution_events: Sequence[Mapping[str, Any]] = (),
+) -> dict[str, Any]:
+    values: dict[str, Any] = {}
+
+    def add(name: object, value: object, *, include_none: bool = False) -> None:
+        if not isinstance(name, str) or (value is None and not include_none):
+            return
+        normalized = re.sub(r"[-\s]+", "_", name.strip().lower())
+        if normalized:
+            values[normalized] = value
+
+    if workflow_context is not None:
+        for name, value in workflow_context.to_data().items():
+            add(name, value)
+    for name, record in handoff_records.items():
+        if isinstance(record, Mapping):
+            add(name, record.get("value"), include_none="value" in record)
+    for event in execution_events:
+        parameters = event.get("parameters")
+        if not isinstance(parameters, Mapping):
+            continue
+        command = parameters.get("command")
+        if not isinstance(command, Sequence) or isinstance(
+            command, (str, bytes, bytearray)
+        ):
+            continue
+        command_items = [item for item in command if isinstance(item, str)]
+        if "--work-item-name" in command_items:
+            option_index = command_items.index("--work-item-name")
+            if option_index + 1 < len(command_items):
+                add("work-item-name", command_items[option_index + 1])
+        for item in command_items:
+            proposal_prefix = "docs/proposals/"
+            if item.startswith(proposal_prefix):
+                proposal_name = item[len(proposal_prefix) :].split("/", 1)[0]
+                add("work-item-name", proposal_name)
+    return values
 
 
-def _required_shell_command_item(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_required_shell_command_item", *args, **kwargs)
+def _wire_previous_tool_output(
+    parameters: dict[str, Any],
+    execution_events: Sequence[Mapping[str, Any]],
+    handoff_records: Mapping[str, Mapping[str, Any]],
+) -> None:
+    reference = parameters.get("tool_output")
+    if isinstance(reference, Mapping) and reference.get("source") == "handoff":
+        name = reference.get("name")
+        record = handoff_records.get(name) if isinstance(name, str) else None
+        if record is None or "value" not in record:
+            raise PowdrrExecutionError(
+                "enrich tool_output handoff source requires a prior named output."
+            )
+        parameters["tool_output"] = record["value"]
+        return
+    if reference != {"source": "previous_tool_output"}:
+        return
+    previous = next(
+        (
+            event.get("result")
+            for event in reversed(execution_events)
+            if event.get("kind") == "deterministic_pre_step"
+            and isinstance(event.get("result"), Mapping)
+        ),
+        None,
+    )
+    if previous is None:
+        raise PowdrrExecutionError(
+            "enrich tool_output source previous_tool_output requires a prior "
+            "deterministic tool result."
+        )
+    parameters["tool_output"] = previous
 
 
-def _rtk_command_display(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_rtk_command_display", *args, **kwargs)
+def _is_authoritative_effect_command(command: object) -> bool:
+    command_items = command_items_for_validation(command)
+    return len(command_items) >= 2 and command_items[:2] == [
+        "powdrr-lift",
+        "authoritative-pr-effects",
+    ]
 
 
-def _wrap_argument_command(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_wrap_argument_command", *args, **kwargs)
+def _gate_outcome_matches(
+    result: Mapping[str, Any], outcome: Mapping[str, Any]
+) -> bool:
+    value: Any = result
+    for component in str(outcome["path"]).split("."):
+        if not isinstance(value, Mapping) or component not in value:
+            return False
+        value = value[component]
+    return value == outcome["equals"]
 
 
-def _wrap_shell_command(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_wrap_shell_command", *args, **kwargs)
+def _normalize_noop_git_commit_result(
+    process: subprocess.CompletedProcess[str],
+    command: str | Sequence[str],
+    worktree_root: Path,
+) -> subprocess.CompletedProcess[str]:
+    """Treat a clean-worktree empty commit as a successful no-op."""
+    command_items = shlex.split(command) if isinstance(command, str) else list(command)
+    if command_items[:2] != ["git", "commit"] or process.returncode == 0:
+        return process
+    combined_output = f"{process.stdout}\n{process.stderr}".lower()
+    if not any(
+        marker in combined_output
+        for marker in (
+            "nothing to commit",
+            "nothing added to commit",
+            "no changes added to commit",
+        )
+    ):
+        return process
+    status = subprocess.run(
+        ["git", "status", "--short"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if status.returncode != 0 or status.stdout.strip():
+        paths = [line[3:] for line in status.stdout.splitlines() if len(line) >= 4]
+        path_hint = ", ".join(paths) if paths else "the reported files"
+        guidance = (
+            "Commit was skipped because Git found no staged changes, but the "
+            f"worktree is not clean ({path_hint}). For each intended path, use "
+            "the intrinsic git add action, for example "
+            '{"action":"invoke_tool","tool":"git","parameters":'
+            '{"operation":"add","paths":["path/to/file"]}}. '
+            "For an unintended untracked file, delete it with the file-management "
+            "action or remove it explicitly, then rerun git status before retrying "
+            "the commit."
+        )
+        return subprocess.CompletedProcess(
+            process.args,
+            process.returncode,
+            stdout=process.stdout,
+            stderr=f"{process.stderr.rstrip()}\n{guidance}\n",
+        )
+    return subprocess.CompletedProcess(
+        process.args,
+        0,
+        stdout=f"{process.stdout}No changes to commit; existing HEAD retained.\n",
+        stderr=process.stderr,
+    )
 
 
-def _latest_deterministic_pre_step(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_latest_deterministic_pre_step", *args, **kwargs)
+def _empty_pull_request_error(
+    command: str | Sequence[str],
+    worktree_root: Path,
+) -> str | None:
+    """Prevent an avoidable GitHub error when a branch has no committed delta."""
+    if isinstance(command, str):
+        try:
+            command_items = shlex.split(command)
+        except ValueError:
+            return None
+    else:
+        command_items = list(command)
+    if command_items[:3] != ["gh", "pr", "create"]:
+        return None
+
+    base = "main"
+    for index, item in enumerate(command_items[:-1]):
+        if item == "--base":
+            base = command_items[index + 1]
+            break
+    ahead = subprocess.run(
+        ["git", "rev-list", "--count", f"{base}..HEAD"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if ahead.returncode != 0 or ahead.stdout.strip() != "0":
+        return None
+    status = subprocess.run(
+        ["git", "status", "--short"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    detail = (
+        "Uncommitted changes are present."
+        if status.stdout.strip()
+        else "There are no uncommitted changes either."
+    )
+    return (
+        f"Cannot create a pull request: no commits exist between {base} and HEAD. "
+        f"{detail} Stage the exact files_to_publish paths, commit them, push the "
+        "branch, and retry the pull-request creation step. Do not claim PR "
+        "creation succeeded until a PR URL is returned."
+    )
 
 
-def _pre_step_context_values(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_pre_step_context_values", *args, **kwargs)
+def _required_shell_command_item(value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise PowdrrExecutionError(
+            "Workflow invoke_tool action command items must be non-empty strings."
+        )
+    return value.strip()
 
 
-def _wire_previous_tool_output(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_wire_previous_tool_output", *args, **kwargs)
+def _wrap_shell_command(command: str) -> str:
+    """Run a shell tool command through rtk without wrapping it twice."""
+    if (
+        shutil.which("rtk") is None
+        or _shell_command_starts_with_rtk(command)
+        or _shell_command_is_unwrapped(command)
+    ):
+        return command
+    return f"rtk {command}"
 
 
-def _extract_command_option(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_extract_command_option", *args, **kwargs)
+def _rtk_command_display(command: str) -> str:
+    return _wrap_shell_command(command)
 
 
-def _is_authoritative_effect_command(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_is_authoritative_effect_command", *args, **kwargs)
+def _wrap_argument_command(command: list[str]) -> list[str]:
+    if shutil.which("rtk") is None or (
+        command and (command[0] == "rtk" or command[0] in _RTK_BYPASS_COMMANDS)
+    ):
+        return command
+    return ["rtk", *command]
 
 
-def _gate_outcome_matches(*args: Any, **kwargs: Any) -> Any:
-    return _support_call("_gate_outcome_matches", *args, **kwargs)
+def _shell_command_starts_with_rtk(command: str) -> bool:
+    try:
+        command_items = shlex.split(command)
+    except ValueError:
+        return False
+    return bool(command_items) and command_items[0] == "rtk"
+
+
+def _shell_command_is_unwrapped(command: str) -> bool:
+    try:
+        command_items = shlex.split(command)
+    except ValueError:
+        return False
+    return bool(command_items) and command_items[0] in _RTK_BYPASS_COMMANDS
 
 
 def _run_deterministic_pre_step(
     step: Any,
     *,
-    skill_name: str,
+    process_id: str,
     worktree_root: Path,
     execution_events: list[dict[str, Any]],
     execution_context: list[str],
@@ -138,7 +354,7 @@ def _run_deterministic_pre_step(
         )
     if not force and _latest_deterministic_pre_step(
         execution_events,
-        skill_name=skill_name,
+        process_id=process_id,
         step_index=step_index,
     ):
         return
@@ -194,7 +410,7 @@ def _run_deterministic_pre_step(
         elif tool == _INTERNAL_TOOL and _is_authoritative_effect_command(
             parameters.get("command")
         ):
-            command = _command_items_for_validation(parameters.get("command"))
+            command = command_items_for_validation(parameters.get("command"))
             work_item_name = _extract_command_option(command, "--work-item-name")
             if work_item_name is None:
                 raise PowdrrExecutionError(
@@ -212,7 +428,7 @@ def _run_deterministic_pre_step(
             )
         elif tool in {"shell", _INTERNAL_TOOL}:
             if tool == _INTERNAL_TOOL and parameters.get("help") is not True:
-                _validate_internal_command(parameters.get("command"))
+                validate_internal_command(parameters.get("command"))
             result = invoke_shell_capability(
                 {**parameters, "_tool_name": tool},
                 worktree_root=worktree_root,
@@ -243,7 +459,7 @@ def _run_deterministic_pre_step(
             )
         event = {
             "kind": "deterministic_pre_step",
-            "skill_name": skill_name,
+            "process_id": process_id,
             "step_type": step.step_type,
             "action": pre_step.action,
             "tool": tool,
@@ -252,11 +468,11 @@ def _run_deterministic_pre_step(
             "step_index": step_index,
         }
         execution_events.append(event)
-        _record_runtime_readiness_from_pre_step(step, runtime)
+        record_runtime_readiness_from_pre_step(step, runtime)
         if isinstance(handoff_records, dict):
             for output in step.outputs:
                 output_value = (
-                    _runtime_readiness_report(runtime)
+                    runtime_readiness_report(runtime)
                     if output.name == "readiness_report"
                     else result
                 )
@@ -316,7 +532,7 @@ def _run_deterministic_pre_step(
     result = json.loads(render_gather_context_report(gathered_context))
     event = {
         "kind": "deterministic_pre_step",
-        "skill_name": skill_name,
+        "process_id": process_id,
         "step_type": step.step_type,
         "action": pre_step.action,
         "template": template,
@@ -346,7 +562,7 @@ def _run_deterministic_pre_step(
 def _run_gate(
     step: Any,
     *,
-    skill_name: str,
+    process_id: str,
     worktree_root: Path,
     execution_events: list[dict[str, Any]],
     execution_context: list[str],
@@ -365,7 +581,7 @@ def _run_gate(
     before = len(execution_events)
     _run_deterministic_pre_step(
         step,
-        skill_name=skill_name,
+        process_id=process_id,
         worktree_root=worktree_root,
         execution_events=execution_events,
         execution_context=execution_context,
@@ -384,7 +600,7 @@ def _run_gate(
     passed = _gate_outcome_matches(event["result"], step.gate.outcome)
     gate_event = {
         "kind": "gate",
-        "skill_name": skill_name,
+        "process_id": process_id,
         "step_index": step_index,
         "passed": passed,
         "outcome": dict(step.gate.outcome),
@@ -394,7 +610,7 @@ def _run_gate(
     step_id = getattr(step, "id", None) or f"step-{step_index + 1}"
     status = "passed" if passed else "failed"
     print(
-        f"Workflow gate evaluation ({skill_name}/{step_id}): {status}\n"
+        f"Workflow gate evaluation ({process_id}/{step_id}): {status}\n"
         "Workflow gate result: "
         + json.dumps(event["result"], ensure_ascii=False, sort_keys=True),
         file=stderr,

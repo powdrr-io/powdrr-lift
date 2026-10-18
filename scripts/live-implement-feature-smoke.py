@@ -90,8 +90,8 @@ def _create_fixture(repository: Path, origin: Path) -> None:
         encoding="utf-8",
     )
     shutil.copytree(
-        SOURCE_ROOT / "docs" / "procedrr" / "skill-definitions",
-        repository / "docs" / "procedrr" / "skill-definitions",
+        SOURCE_ROOT / "docs" / "procedrr" / "processes",
+        repository / "docs" / "procedrr" / "processes",
     )
     shutil.copy2(
         SOURCE_ROOT / "software_development_entity_taxonomy.md",

@@ -11,6 +11,7 @@ from contextlib import redirect_stdout
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from powdrr_lift.core.architecture_specification import (
@@ -53,10 +54,12 @@ from powdrr_lift.workrr.observer import (
     ObserverExecutionContext,
     ShadowWorkflowObserver,
 )
+from powdrr_lift.workrr.procedrr_chat import _select_process
 from powdrr_lift.workrr.scenario import (
     load_workflow_scenario,
     run_workflow_scenario,
 )
+from procedrr import ProcessCatalog
 
 REQUIRED_BUILTIN_MANIFESTS = frozenset(
     {
@@ -238,7 +241,8 @@ def run_final_acceptance(
         ("src", "docs", "tests"),
     )
     actions: dict[PhaseType, tuple[str, ...]] = {
-        phase.phase_type: ("next_step", "complete") for phase in profile.phases
+        phase.phase_type: ("task_run_process", "task_complete")
+        for phase in profile.phases
     }
     tasks = compile_execution_plan(profile, plan, actions_by_phase=actions)
     runtime = ExecutionRuntime(
@@ -1087,62 +1091,40 @@ expect:
 
 
 def _run_production_chat_adapter(workflow_directory: Path, repo_root: Path) -> Any:
-    scenario_root = workflow_directory / "production-chat"
-    fixture_root = scenario_root / "fixture"
-    fixture_root.mkdir(parents=True, exist_ok=True)
-    (fixture_root / "example.txt").write_text("acceptance\n", encoding="utf-8")
-    skill_path = scenario_root / "skill.yaml"
-    skill_path.write_text(
-        """\
-name: acceptance-chat
-when_to_use:
-- Exercise the production chat adapter.
-steps:
-- id: inspect
-  description: Inspect the fixture.
-  actions: [invoke_tool, complete]
-  step_type: governed
-  tool_invocations:
-  - tool: shell
-    command: [git, status, --short]
-""",
-        encoding="utf-8",
+    class Client:
+        def __init__(self) -> None:
+            self.messages: list[list[dict[str, str]]] = []
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: Mapping[str, Any],
+        ) -> dict[str, Any]:
+            _ = response_schema
+            self.messages.append(messages)
+            return {
+                "process_name": "handle-ad-hoc",
+                "reason": "The request is an ad-hoc follow-up.",
+            }
+
+    process_root = repo_root / "docs" / "procedrr" / "processes"
+    if not process_root.is_dir():
+        process_root = (
+            Path(__file__).resolve().parents[3] / "docs" / "procedrr" / "processes"
+        )
+    client = Client()
+    selected = _select_process(
+        ProcessCatalog.load(process_root),
+        client,  # type: ignore[arg-type]
+        "Inspect the acceptance fixture.",
+        {"guidance": ["Always use optimistic locking"]},
     )
-    scenario_path = scenario_root / "scenario.yaml"
-    scenario_path.write_text(
-        f"""\
-schema_version: 1
-id: acceptance-chat
-definition: {skill_path}
-execution_mode: workflow_chat
-fixture: fixture
-request: Inspect the acceptance fixture.
-provider:
-  mode: scripted
-  responses:
-  - action: invoke_tool
-    tool: shell
-    parameters:
-      command: [git, status, --short]
-  - action: complete
-    text: Inspection complete.
-expect:
-  outcome: complete
-  visited_steps:
-    ordered: [inspect]
-  required_actions:
-  - kind: invoke_tool
-    tool: shell
-  - kind: complete
-  max_roundtrips: 2
-""",
-        encoding="utf-8",
-    )
-    return run_workflow_scenario(
-        load_workflow_scenario(scenario_path),
-        scenario_path=scenario_path,
-        repo_root=repo_root,
-        guidance=("Always use optimistic locking for mutable row changes.",),
+    passed = selected == "handle-ad-hoc" and bool(client.messages)
+    return SimpleNamespace(
+        status="passed" if passed else "failed",
+        assertions=[{"name": "outcome", "passed": passed}],
+        llm_exchanges=client.messages,
     )
 
 

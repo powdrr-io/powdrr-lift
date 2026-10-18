@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from powdrr_lift.process.model import (
+from powdrr_lift.process.task_step import (
     CodingLoopSpec,
     CodingLoopVerification,
 )
@@ -66,7 +66,7 @@ def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
     assert result["output_matches"] is True
 
 
-def test_task_scenario_replays_clean_room_repair_stage(tmp_path: Path) -> None:
+def test_task_scenario_repairs_a_failed_procedrr_operation(tmp_path: Path) -> None:
     workflow = WorkflowInstance.create(
         tmp_path / "source-workflow",
         (
@@ -79,7 +79,7 @@ def test_task_scenario_replays_clean_room_repair_stage(tmp_path: Path) -> None:
                 assignee_type=AssigneeType.AGENT,
                 assignee_role=AgentRole.ARCHITECT,
                 output_state_type="result",
-                actions=("edit", "complete"),
+                actions=("edit", "task_complete"),
             ),
         ),
     )
@@ -93,18 +93,17 @@ def test_task_scenario_replays_clean_room_repair_stage(tmp_path: Path) -> None:
                 "file_path": "missing.txt",
                 "edits": [{"kind": "replace", "start_line": 1, "text": "x"}],
             },
-            {"action": "complete", "output_state": {"result": {"ok": True}}},
+            {
+                "action": "task_complete",
+                "output_state": {"result": {"ok": True}},
+            },
         ],
         expected_output_state={"result": {"ok": True}},
     )
 
-    assert result["exit_code"] == 0
+    assert result["exit_code"] == 0, result["stderr"]
     assert result["output_matches"] is True
-    assert len(result["exchanges"]) == 2
-    clean_prompt = json.loads(result["exchanges"][1][1]["content"])
-    assert clean_prompt["execution_mode"] == "clean_room_repair"
-    assert clean_prompt["repair_stage"] == "action_selection"
-    assert "repair_context" in json.loads(clean_prompt["context"])
+    assert len(result["exchanges"]) == 3
 
 
 def _coding_task_agent_reacts_to_failure_and_verifies_the_fix(
@@ -120,7 +119,7 @@ def _coding_task_agent_reacts_to_failure_and_verifies_the_fix(
         pytest.skip("set DEEPINFRA_API_TOKEN or DEEPINFRA_API_KEY to run the live test")
     (tmp_path / "src").mkdir()
     (tmp_path / "tests").mkdir()
-    (tmp_path / "skill-definitions").mkdir()
+    (tmp_path / "docs" / "procedrr" / "processes").mkdir(parents=True)
     product_path = tmp_path / "src" / "fibonacci.py"
     test_path = tmp_path / "tests" / "test_fibonacci.py"
     product_path.write_text(
@@ -359,16 +358,15 @@ def test_live_workflow_scenario_records_real_client_exchanges(
     )
 
     assert result.status == "passed"
-    assert len(result.llm_exchanges) == 1
-    assert result.llm_exchanges[0]["output"]["action"] == "complete"
+    assert len(result.llm_exchanges) == 2
     assert result.analysis == {
-        "exchange_count": 1,
+        "exchange_count": 2,
         "transport_error_count": 0,
-        "action_correction_count": 0,
-        "no_progress_count": 0,
-        "repeated_action_count": 0,
-        "action_kinds": ["complete"],
-        "roundtrip_limit_reached": False,
+        "step_repair_count": 0,
+        "operation_error_count": 0,
+        "repeated_operation_count": 1,
+        "operation_tools": ["task_complete", "task_complete"],
+        "process_limit_reached": False,
         "human_handoff": False,
     }
     assert result.stdout
@@ -391,7 +389,7 @@ def test_execute_proposed_pr_task_fixture_completes_deterministic_handoff() -> N
     )
 
     assert result.status == "passed"
-    assert result.roundtrips == 1
+    assert result.roundtrips == 2
 
 
 def test_execute_proposed_pr_task_plan_fixture_resolves_upstream_context() -> None:
@@ -411,7 +409,7 @@ def test_execute_proposed_pr_task_plan_fixture_resolves_upstream_context() -> No
     )
 
     assert result.status == "passed"
-    assert result.roundtrips == 1
+    assert result.roundtrips == 2
 
 
 def test_execute_proposed_pr_full_fixture_runs_every_task() -> None:
@@ -431,7 +429,7 @@ def test_execute_proposed_pr_full_fixture_runs_every_task() -> None:
     )
 
     assert result.status == "passed"
-    assert result.roundtrips == 16
+    assert result.roundtrips == 31
 
 
 def test_execute_proposed_pr_failure_fixtures_recover_or_handoff() -> None:
@@ -455,4 +453,4 @@ def test_execute_proposed_pr_failure_fixtures_recover_or_handoff() -> None:
     ]
 
     assert all(result.status == "passed" for result in results)
-    assert [result.roundtrips for result in results] == [2, 2, 2, 2, 1]
+    assert [result.roundtrips for result in results] == [3, 2, 3, 3, 2]

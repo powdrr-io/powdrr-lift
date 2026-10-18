@@ -61,7 +61,7 @@ def test_procedrr_retries_http_429(
     provider = RateLimitedThenSuccess()
     client = WorkrrProcedrrClient(
         cast(Any, provider),
-        skills_dir=tmp_path,
+        process_directory=tmp_path,
         provider_retry_delay_seconds=2.0,
     )
     delays: list[float] = []
@@ -104,7 +104,7 @@ def test_procedrr_records_provider_retry_attempts_without_prompt_content(
     monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", lambda _: None)
     client = WorkrrProcedrrClient(
         cast(Any, FallbackWrapper()),
-        skills_dir=tmp_path,
+        process_directory=tmp_path,
         telemetry_sink=lambda record: events.append(dict(record)),
     )
 
@@ -123,7 +123,7 @@ def test_procedrr_records_provider_retry_attempts_without_prompt_content(
 
 def test_procedrr_uses_workrr_schema_repair_transport(tmp_path: Path) -> None:
     provider = RepairingClient([{}, {"complete": True}])
-    client = WorkrrProcedrrClient(provider, skills_dir=tmp_path)
+    client = WorkrrProcedrrClient(provider, process_directory=tmp_path)
 
     result = client.complete_json(
         [{"role": "user", "content": "judge this"}],
@@ -153,7 +153,7 @@ def test_procedrr_retries_transient_provider_failures_with_backoff(
     provider = FailingClient()
     client = WorkrrProcedrrClient(
         cast(Any, provider),
-        skills_dir=tmp_path,
+        process_directory=tmp_path,
         provider_retry_delay_seconds=2.0,
     )
     delays: list[float] = []
@@ -188,7 +188,7 @@ def test_procedrr_retries_empty_stream_provider_failures(
     provider = EmptyStreamThenSuccess()
     client = WorkrrProcedrrClient(
         cast(Any, provider),
-        skills_dir=tmp_path,
+        process_directory=tmp_path,
         provider_retry_delay_seconds=2.0,
     )
     delays: list[float] = []
@@ -222,7 +222,7 @@ def test_procedrr_retries_truncated_stream_provider_failures(
     provider = TruncatedStreamThenSuccess()
     client = WorkrrProcedrrClient(
         cast(Any, provider),
-        skills_dir=tmp_path,
+        process_directory=tmp_path,
         provider_retry_delay_seconds=2.0,
     )
     delays: list[float] = []
@@ -255,7 +255,7 @@ def test_procedrr_does_not_retry_explicit_provider_request_errors(
     provider = UnsupportedSchemaClient()
     client = WorkrrProcedrrClient(
         cast(Any, provider),
-        skills_dir=tmp_path,
+        process_directory=tmp_path,
         provider_retry_attempts=3,
     )
 
@@ -275,7 +275,7 @@ def test_procedrr_replays_completed_judge_without_provider_call(
     messages = [{"role": "user", "content": "judge this"}]
     client = WorkrrProcedrrClient(
         provider,
-        skills_dir=tmp_path,
+        process_directory=tmp_path,
         replay_responses={
             WorkrrProcedrrClient.replay_key(messages): {"complete": True}
         },
@@ -298,7 +298,7 @@ def test_procedrr_does_not_retry_non_transient_provider_failures(
             raise RuntimeError("invalid credentials")
 
     provider = FailingClient()
-    client = WorkrrProcedrrClient(cast(Any, provider), skills_dir=tmp_path)
+    client = WorkrrProcedrrClient(cast(Any, provider), process_directory=tmp_path)
 
     with pytest.raises(RuntimeError, match="invalid credentials"):
         client.complete_json(
@@ -311,7 +311,7 @@ def test_procedrr_does_not_retry_non_transient_provider_failures(
 
 def test_procedrr_requires_a_schema() -> None:
     provider = RepairingClient([{"complete": True}])
-    client = WorkrrProcedrrClient(provider, skills_dir=Path("."))
+    client = WorkrrProcedrrClient(provider, process_directory=Path("."))
 
     with pytest.raises(ProcedrrResponseError, match="output schema"):
         client.complete_json([{"role": "user", "content": "judge this"}])
@@ -323,7 +323,7 @@ def test_evaluator_can_be_constructed_with_workrr_transport(tmp_path: Path) -> N
     evaluator = Evaluator.with_workrr(
         RepairingClient([{"complete": True}]),
         lambda _tool, _parameters: None,
-        skills_dir=tmp_path,
+        process_directory=tmp_path,
     )
 
     assert evaluator.llm.__class__.__name__ == "WorkrrProcedrrClient"

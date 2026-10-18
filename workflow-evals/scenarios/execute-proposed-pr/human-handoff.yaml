@@ -6,7 +6,7 @@ task_id: execute-proposed-pr-human-task-001
 provider:
   mode: scripted
   responses:
-  - action: get-human-input
+  - action: task_handoff
     human_input:
       human_task:
         description: Choose the implementation variant.
@@ -14,6 +14,11 @@ provider:
         input_state: {options: [v1, v2]}
         output_state_type: human-decision-state
       incorporation_instructions: Use the human decision in the next implementation task.
+      follow_up_task:
+        description: Continue after the human implementation decision.
+        role: architect
+        input_state: {}
+        output_state_type: implementation-state
 expect:
   task_status: locked
   output_state: null

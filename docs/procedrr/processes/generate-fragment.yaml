@@ -1,0 +1,126 @@
+version: 1
+name: generate-fragment
+description: >-
+  Incrementally construct one validated Procedrr fragment. Each LLM activation
+  proposes exactly one append-only JSON edit; deterministic Procedrr operations
+  apply or reject it before the next activation.
+inputs:
+  - {name: fragment_name, type: string, required: true}
+  - {name: fragment_goal, type: string, required: true}
+  - {name: fragment_context, type: object, required: true}
+  - {name: fragment_available_bindings, type: array, required: true}
+  - {name: fragment_allowed_tools, type: array, required: true}
+  - {name: fragment_max_steps, type: integer, required: true}
+limits: {llm_activations: 130, tool_calls: 131, context_chars: 64000, context_value_chars: 16000}
+steps:
+  - operation:
+      tool: procedrr_fragment_start
+      parameters:
+        name: "${fragment_name}"
+        available_bindings: "${fragment_available_bindings}"
+        allowed_tools: "${fragment_allowed_tools}"
+        max_steps: "${fragment_max_steps}"
+      bind: fragment_state
+  - repeat:
+      max_iterations: 128
+      until: {subject: fragment_state.done, equals: true}
+      body:
+        - judge:
+            kind: construct_one
+            question: What one JSON-encoded Procedrr step should be appended at /steps/-?
+            subject: fragment_state.diagnostic
+            prompt_system: >-
+              You extend a validated Procedrr program by exactly one semantic
+              step. Return only the declared JSON object. Do not emit reasoning,
+              prose, markdown, multiple edits, or an entire program. A valid
+              completion response is
+              {"step_json":"{\"terminal\":\"succeeded\"}"}.
+            instructions:
+              - Use fragment_goal as the objective and fragment_context only as evidence.
+              - Inspect fragment_state.fragment and append the single next necessary step.
+              - Steps in the draft have not executed; do not assume a read_document binding is available while generating later steps.
+              - If required source is not in fragment_context, append read_document first, then append a judge that uses the runtime read binding to choose the exact edit.
+              - Never invent start/end positions for a source that has not been supplied during generation.
+              - >-
+                A runtime source edit should be represented as three steps:
+                read_document, one judge returning file_path/start/end/new_text,
+                and an edit operation whose fields reference that judge binding.
+              - The edit judge must include both the source binding and fragment_goal (or the specific acceptance condition) in its context, and its instructions must state the exact requested behavior to implement. A source-only judge is invalid because it cannot select a semantic change.
+              - Return the step encoded as JSON in the single step_json string field.
+              - The decoded step must contain exactly one control key.
+              - Allowed control keys are operation, judge, gate, attempt, repeat, branch, for_each, worklist, call, and terminal.
+              - Use only tools listed in fragment_state.allowed_tools.
+              - >-
+                A read_document operation uses {tool: read_document,
+                parameters: {file_path: PATH, start_line: START, end_line: END}, bind: NAME}.
+              - >-
+                A prompt_user operation uses {tool: prompt_user, parameters:
+                {text: QUESTION}, bind: NAME}; use it only for a required
+                user decision or missing information.
+              - >-
+                A respond operation uses {tool: respond, parameters:
+                {text: FINAL_MESSAGE}} to show the completed workflow result to
+                the user. Use it once after all required work is complete.
+              - >-
+                A model-facing line edit uses {tool: edit, parameters:
+                {operation: replace_lines, file_path: PATH, start_line: START,
+                end_line: END, replacement: REPLACEMENT}, bind: NAME}.
+              - >-
+                An edit start/end range is one-based inclusive line numbers:
+                start 1/end 1 means exactly the first line, and start must be
+                less than or equal to end.
+              - The runtime edit judge must return non-empty file_path, integer start/end, and non-empty replacement. If the requested behavior is already present, append terminal succeeded instead of an empty edit.
+              - A runtime edit judge uses an object schema with exactly file_path, start, end, and new_text properties; the following edit references those properties.
+              - Decide the semantic change from the feature description and the supplied source, not merely a formatting change. The replacement must visibly implement the requested behavior. Never return the unchanged source, a whitespace-only variation, planning prose, comments about assumptions, or instructions for a future edit.
+              - >-
+                A complete runtime edit judge must use this exact shape (replace
+                names and question text, but keep every field):
+                {"judge":{"question":"Decide the exact edit implementing fragment_goal using the source binding.","subject":"hello_source","prompt_system":"Return only the declared JSON object.","instructions":["Return one exact semantic edit and include fragment_goal and hello_source in context."],"context":["fragment_goal","hello_source"],"output":{"name":"hello_edit_decision","schema":{"type":"object","required":["file_path","start","end","new_text"],"additionalProperties":false,"properties":{"file_path":{"type":"string","minLength":1},"start":{"type":"integer","minimum":1},"end":{"type":"integer","minimum":1},"new_text":{"type":"string","minLength":1}}}},"validation":{"kind":"json_schema"}}}
+              - >-
+                Do not invent condition, then, else, prompt, schema, source,
+                or subject-object fields; they are not Procedrr judge fields.
+              - >-
+                Every value read from a prior binding must use
+                {type: reference, value: binding_name.property}. Constants must
+                use {type: literal, value: CONSTANT}. Never encode a binding as
+                a bare string.
+              - >-
+                The canonical edit following the example judge is:
+                {"operation":{"tool":"edit","parameters":{"operation":"replace_lines","file_path":{"type":"reference","value":"hello_edit_decision.file_path"},"start_line":{"type":"reference","value":"hello_edit_decision.start"},"end_line":{"type":"reference","value":"hello_edit_decision.end"},"replacement":{"type":"reference","value":"hello_edit_decision.new_text"}},"bind":"hello_edit_result"}}
+              - >-
+                An internal operation uses {tool: internal, parameters:
+                {command: [PARTS...]}, bind: NAME}.
+              - Bind every operation result that a later step needs.
+              - Refer only to declared fragment inputs or bindings produced by earlier fragment steps.
+              - >-
+                When the goal is completely implemented and the fragment needs
+                no more steps, append {terminal: succeeded}.
+            prompt_rules:
+              - when: {binding: fragment_state.accepted, equals: false}
+                instructions:
+                  - Correct only fragment_state.diagnostic and do not repeat a rejected edit fingerprint.
+              - when: {binding: fragment_state.diagnostic.code, equals: repeated_fragment_step}
+                instructions:
+                  - The prior step is already in the draft; append terminal succeeded when the goal is met, or append one distinct validation/read step. Never emit that same step again.
+            context: [fragment_goal, fragment_context, fragment_state]
+            output:
+              name: fragment_edit
+              schema:
+                type: object
+                required: [step_json]
+                additionalProperties: false
+                properties:
+                  step_json:
+                    type: string
+                    minLength: 2
+                    maxLength: 4000
+                    pattern: '^\{.*\}$'
+            validation: {kind: json_schema}
+        - operation:
+            tool: procedrr_fragment_apply_edit
+            parameters:
+              state: "${fragment_state}"
+              step_json: "${fragment_edit.step_json}"
+              evidence: "${fragment_context}"
+            bind: fragment_state
+  - terminal: succeeded

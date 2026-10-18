@@ -14,15 +14,15 @@ from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
 )
-from powdrr_lift.process.model import (
-    SUPPORTED_INTERACTION_STYLES,
-    SUPPORTED_STEP_TYPES,
+from powdrr_lift.process.task_step import (
+    SUPPORTED_TASK_INTERACTION_STYLES,
+    SUPPORTED_TASK_STEP_TYPES,
     CodingLoopSpec,
     CodingLoopVerification,
-    SkillStepGate,
-    SkillStepPreStep,
-    SkillToolInvocation,
-    skill_step_from_data,
+    TaskGate,
+    TaskPreStep,
+    ToolInvocation,
+    task_execution_settings_from_data,
 )
 from powdrr_lift.process.tasks import (
     AgentRole,
@@ -75,8 +75,8 @@ class WorkflowTaskTemplate:
     details: str | None = None
     llm_type: str | None = None
     interaction_style: str | None = None
-    uses_skills: tuple[str, ...] = field(default_factory=tuple)
-    tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
+    uses_processes: tuple[str, ...] = field(default_factory=tuple)
+    tool_invocations: tuple[ToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     actions: tuple[str, ...] = field(default_factory=tuple)
     actions_declared: bool = False
@@ -84,8 +84,8 @@ class WorkflowTaskTemplate:
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     generation: WorkflowTaskTemplateGeneration | None = None
     step_type: str = "governed"
-    pre_step: SkillStepPreStep | None = None
-    gate: SkillStepGate | None = None
+    pre_step: TaskPreStep | None = None
+    gate: TaskGate | None = None
     coding_loop: CodingLoopSpec | None = None
     phase_type: PhaseType | None = None
     persona_id: str | None = None
@@ -114,7 +114,7 @@ class WorkflowTaskTemplate:
             "details": self.details,
             "llm_type": self.llm_type,
             "interaction_style": self.interaction_style,
-            "uses_skills": list(self.uses_skills),
+            "uses_processes": list(self.uses_processes),
             "tool_invocations": [
                 invocation.to_data() for invocation in self.tool_invocations
             ],
@@ -368,7 +368,7 @@ def instantiate_workflow_template(
             ),
             llm_type=task_template.llm_type,
             interaction_style=task_template.interaction_style,
-            uses_skills=task_template.uses_skills,
+            uses_processes=task_template.uses_processes,
             tool_invocations=tuple(
                 _substitute_tool_invocation(invocation, explicit_substitutions)
                 for invocation in task_template.tool_invocations
@@ -489,10 +489,10 @@ def _substitute_coding_loop(
 
 
 def _substitute_tool_invocation(
-    invocation: SkillToolInvocation,
+    invocation: ToolInvocation,
     substitutions: Mapping[str, str],
-) -> SkillToolInvocation:
-    return SkillToolInvocation(
+) -> ToolInvocation:
+    return ToolInvocation(
         tool=invocation.tool,
         operation=invocation.operation,
         command=tuple(
@@ -691,7 +691,7 @@ def build_workflow_template_validation_report(
                 "details",
                 "llm_type",
                 "interaction_style",
-                "uses_skills",
+                "uses_processes",
                 "tool_invocations",
                 "prompt_catalogs",
                 "actions",
@@ -734,7 +734,7 @@ def build_workflow_template_validation_report(
             )
 
         step_type = raw_task_template_mapping.get("step_type", "governed")
-        if not isinstance(step_type, str) or step_type not in SUPPORTED_STEP_TYPES:
+        if not isinstance(step_type, str) or step_type not in SUPPORTED_TASK_STEP_TYPES:
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="invalid_step_type_value",
@@ -748,32 +748,32 @@ def build_workflow_template_validation_report(
         interaction_style = raw_task_template_mapping.get("interaction_style")
         if interaction_style is not None and (
             not isinstance(interaction_style, str)
-            or interaction_style.strip() not in SUPPORTED_INTERACTION_STYLES
+            or interaction_style.strip() not in SUPPORTED_TASK_INTERACTION_STYLES
         ):
             issues.append(
                 WorkflowTemplateValidationIssue(
                     code="invalid_interaction_style",
                     message=(
                         "Workflow task template interaction_style must be one of: "
-                        + ", ".join(sorted(SUPPORTED_INTERACTION_STYLES))
+                        + ", ".join(sorted(SUPPORTED_TASK_INTERACTION_STYLES))
                         + "."
                     ),
                     path=_child_path(task_template_path, "interaction_style"),
                 )
             )
         pre_step = raw_task_template_mapping.get("pre_step")
-        uses_skills = raw_task_template_mapping.get("uses_skills")
+        uses_processes = raw_task_template_mapping.get("uses_processes")
         if (
             pre_step is not None
-            and isinstance(uses_skills, Sequence)
-            and not isinstance(uses_skills, (str, bytes, bytearray))
-            and uses_skills
+            and isinstance(uses_processes, Sequence)
+            and not isinstance(uses_processes, (str, bytes, bytearray))
+            and uses_processes
         ):
             issues.append(
                 WorkflowTemplateValidationIssue(
-                    code="uses_skills_with_pre_step",
+                    code="uses_processes_with_pre_step",
                     message=(
-                        "Workflow task templates must use either uses_skills or "
+                        "Workflow task templates must use either uses_processes or "
                         "pre_step, not both."
                     ),
                     path=_child_path(task_template_path, "pre_step"),
@@ -1157,9 +1157,11 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         _required_string(data, "assignee_type"),
         _required_string(data, "assignee_role"),
     )
-    step = skill_step_from_data(data)
-    uses_skills = (
-        _required_string_sequence(data, "uses_skills") if "uses_skills" in data else ()
+    step = task_execution_settings_from_data(data)
+    uses_processes = (
+        _required_string_sequence(data, "uses_processes")
+        if "uses_processes" in data
+        else ()
     )
     output_state_type = _required_string(data, "output_state_type")
     dependent_state = _required_string_sequence(data, "dependent_state")
@@ -1178,7 +1180,7 @@ def _parse_task_template(raw_task_template: object) -> WorkflowTaskTemplate:
         details=step.details,
         llm_type=step.llm_type,
         interaction_style=step.interaction_style,
-        uses_skills=uses_skills,
+        uses_processes=uses_processes,
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
         actions=step.actions,

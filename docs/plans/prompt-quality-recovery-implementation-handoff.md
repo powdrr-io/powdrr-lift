@@ -108,7 +108,7 @@ Paths are relative to `src/powdrr_lift/` unless otherwise specified.
 
 | File or symbol | Current behavior / required use |
 | --- | --- |
-| `docs/procedrr/skill-definitions/design-interview.yaml` | Contains generation, review, and repair contracts. Both criterion generation and repair currently require JSON object strings. Source interpretation evidence/reason pairs are loose strings. |
+| `docs/procedrr/processes/design-interview.yaml` | Contains generation, review, and repair contracts. Both criterion generation and repair currently require JSON object strings. Source interpretation evidence/reason pairs are loose strings. |
 | `workrr/acceptance_criterion_compiler.py`: `prepare_acceptance_criteria`, `bind_acceptance_criteria`, `_decode_object`, `_bind_criterion` | Prepares requests, parses encoded objects, binds indexes, and computes IDs. Already accepts mappings inside `_decode_object`. Preserve local membership/duplicate checks. |
 | Same module: `prepare_acceptance_criterion_reviews`, `bind_acceptance_criterion_reviews`, `prepare_acceptance_criterion_repairs`, `bind_acceptance_criterion_repairs` | Reuse existing assertion review and two repair rounds; change generation and repair consistently. |
 | `workrr/semantic_contract_compiler.py`: `CLASSIFIER_DEFINITIONS`, `prepare_source_semantic_decisions`, `prepare_dependent_source_semantic_decisions`, `_containing_source_sentence` | Routing/disposition prompts and source context. Currently containing-sentence context may be absent for an unsplit sentence and does not supply the preceding feature-setting sentence. |

@@ -34,7 +34,7 @@ second orchestration stack beside them.
   outputs that are not in single-decision normal form.
 - `src/procedrr_evaluator/evaluator.py` owns deterministic operation execution,
   judge invocation, state binding, worklists, branches, and limits.
-- `docs/procedrr/skill-definitions/implement-feature.yaml` is the production
+- `docs/procedrr/processes/implement-feature.yaml` is the production
   high-level flow used by the Workrr feature endpoint.
 
 ### Workrr and OpenCode

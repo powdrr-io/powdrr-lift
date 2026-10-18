@@ -40,7 +40,7 @@ Resolve symbols by name if line numbers or file layout have changed.
 | `workrr/coding_agent_validation.py::ValidationRunner` | Runs argv at repository root and removes `VIRTUAL_ENV` | Execute the recorded directory, environment, shell, and prerequisite graph |
 | `workrr/verification_provider.py::PytestVerificationProvider.inventory` | Imports pytest into Powdrr and changes process-wide cwd | Collect in a subprocess using the target environment |
 | `workrr/feature_endpoint.py::_ensure_current_baseline` | Checks section versions and optional snapshot digest | Also check validation inputs and companion artifact freshness |
-| `skill-definitions/bootstrap-code-structure.yaml` | Reuses an existing artifact immediately; requires successful tool invocations | Check freshness; distinguish invocation confirmation from validation success |
+| `docs/procedrr/processes/bootstrap-code-structure.yaml` | Reuses an existing artifact immediately; requires successful tool invocations | Check freshness; distinguish invocation confirmation from validation success |
 
 An end-to-end trial on cachetools exposed a concrete evidence integration
 failure: tox profiles currently put raw paths such as `tox.ini` and
@@ -642,7 +642,7 @@ rtk proxy "$VIRTUAL_ENV/bin/python" -m pytest -n auto --cov=powdrr_lift --cov-br
 rtk proxy "$VIRTUAL_ENV/bin/python" -m ruff format --check .
 rtk proxy "$VIRTUAL_ENV/bin/python" -m ruff check .
 rtk proxy "$VIRTUAL_ENV/bin/python" -m mypy src tests
-rtk proxy "$VIRTUAL_ENV/bin/python" -m powdrr_lift.cli validate-workflow-definitions skill-definitions templates --liveness --baseline .github/workflow-liveness-baseline.json --warning-budget .github/workflow-liveness-warning-budget.json --warning-report /tmp/bootstrap-workflow-liveness.json
+rtk proxy "$VIRTUAL_ENV/bin/python" -m powdrr_lift.cli validate-procedrr-processes docs/procedrr/processes
 rtk proxy ./scripts/run-deterministic-workflow-suite.sh
 ```
 

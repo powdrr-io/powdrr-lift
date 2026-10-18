@@ -1,0 +1,50 @@
+version: 1
+name: durable-task
+description: >-
+  Execute one claimed durable workflow task through Procedrr, preserving its task
+  record and routing authorized operations through the task agent adapter.
+inputs:
+  - name: task_context
+    type: object
+    required: true
+limits:
+  llm_activations: 120
+  tool_calls: 240
+  context_chars: 24000
+  context_value_chars: 12000
+steps:
+  - specialize:
+      process: generate-fragment
+      max_steps: 96
+      question: >-
+        Complete the claimed durable task described in task_context. Preserve
+        the exact deterministic pre-step result whenever it is required. Treat its
+        description, details, input state, output state type, and declared
+        actions as the task contract. Use only its declared authorized actions.
+        Make progress one operation at a time. If human judgment or information
+        is required, issue task_handoff with a clear question and concise
+        continuation instructions, then wait for the resumed process. Finish
+        successfully with exactly one task_complete operation whose output_state
+        matches the declared output_state_type. If task_context declares a
+        deterministic_output_state_required value, pass that exact value to
+        task_complete without summarizing or changing it. Do not claim
+        completion before the required work and validation are complete.
+      context: [task_context]
+      allowed_tools:
+        - internal
+        - edit
+        - yaml_edit
+        - file_management
+        - read_document
+        - list_files
+        - invoke_tool
+        - gather_context
+        - task_complete
+        - task_handoff
+        - task_run_process
+        - respond
+      bind: task_program
+  - call:
+      fragment: "${task_program}"
+      max_steps: 96
+  - terminal: succeeded

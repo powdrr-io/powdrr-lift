@@ -1,0 +1,99 @@
+version: 1
+name: specify-a-feature
+description: When the user needs a concrete feature plan. When the flow must gather context
+  and drive implementation.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: specify-a-feature\ninputs:\n- name: pull-request-title\nwhen_to_use:\n- When\
+      \ the user needs a concrete feature plan.\n- When the flow must gather context and drive\
+      \ implementation.\nsteps:\n- id: capture-feature-name\n  description: Capture the feature\
+      \ name.\n  actions: [edit, yaml_edit, file_management, read_document]\n  step_type:\
+      \ governed\n  llm_type: high_reasoning\n  details: >-\n    Choose a stable kebab-case\
+      \ feature name and reuse this exact name as the\n    work-item name for every generated\
+      \ document. If the name is clear from the\n    request, choose it directly. Otherwise\
+      \ ask the user with a prompt_user\n    action, for example:\n    {\"action\":\"prompt_user\"\
+      ,\"text\":\"What short kebab-case name should identify this feature in its specification\
+      \ files?\"}\n    This step declares the required output work_item_name. When the name\
+      \ is\n    clear, advance only with an outputs object containing that exact field, for\n\
+      \    example:\n    {\"action\":\"next_step\",\"outputs\":{\"work_item_name\":\"interaction-file-log\"\
+      },\"decisions_and_context\":\"Captured the feature name.\"}\n  outputs:\n  - name: work_item_name\n\
+      \    type: string\n    required_for_next_step: true\n    schema: {type: string}\n- id:\
+      \ capture-feature-context\n  description: Capture the feature goal and success criteria.\n\
+      \  actions: []\n  step_type: predicated\n  completion:\n    required_outputs: [feature_description]\n\
+      \  llm_type: high_reasoning\n  details: >-\n    Parse the request and conversation for\
+      \ the named feature's outcomes, edge\n    cases, tests, constraints, and any other details\
+      \ needed for a properly\n    detailed plan. Use your best judgment to identify what\
+      \ is still missing.\n    If the request already provides a detail, retain it without\
+      \ asking again.\n    Otherwise ask one focused question with a prompt_user action; repeat\
+      \ this\n    step after each answer until the plan has enough context. Then emit_outputs\n\
+      \    with feature_description containing the complete feature request and any\n    confirmed\
+      \ answers, for example:\n    {\"action\":\"emit_outputs\",\"outputs\":{\"feature_description\"\
+      :\"...\"}}\n  outputs:\n  - name: feature_description\n    type: string\n    required_for_next_step:\
+      \ true\n    schema: {type: string, minLength: 1}\n- id: conduct-design-interview\n \
+      \ description: Run the deterministic design interview and generate the validated proposal.\n\
+      \  step_type: uses_process\n  llm_type: high_reasoning\n  details: >-\n    Invoke design-interview\
+      \ through this typed uses_process step. It owns all\n    repository-context gathering,\
+      \ interview outputs, proposal generation, and\n    deterministic validation. Do not\
+      \ invoke specify-system,\n    specify-architecture, or specify-implementation separately.\n\
+      \  uses_process:\n    process: design-interview\n    inputs:\n    - name: work_item_name\n\
+      \      ref: work_item_name\n      schema: {type: string, minLength: 1}\n    - name:\
+      \ feature_description\n      ref: feature_description\n      schema: {type: string,\
+      \ minLength: 1}\n- id: stage-specification-artifacts\n  description: Stage the validated\
+      \ design-interview proposal for pull request preparation.\n  step_type: invoke_tool\n\
+      \  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n    template:\n    \
+      \  tool: git\n      operation: add\n      paths: [docs/proposals/<work-item-name>]\n\
+      - id: prepare-pull-request\n  description: Run finish-pr-prep before creating the pull\
+      \ request.\n  step_type: uses_process\n  llm_type: fast_iteration\n  details: >-\n   \
+      \ Run finish-pr-prep after the intended specification artifacts are staged by\n    returning\
+      \ a task_run_process operation for the listed finish-pr-prep process. Do not\n    invoke it\
+      \ through the internal CLI tool. If cleanup changes files, restage\n    only the validated\
+      \ specification artifacts before continuing. Do not begin\n    implementation in this\
+      \ process. Do not advance until the nested process returns\n    both final_repository_state\
+      \ and an accepted readiness_report. The readiness\n    report must include the current\
+      \ staged-file scope and the complete results of\n    every validation obligation; do\
+      \ not synthesize it from memory or treat a\n    successful repository-state check as\
+      \ a substitute.\n  uses_process:\n    process: finish-pr-prep\n- id: create-feature-pull-request\n\
+      \  description: Create or update the pull request for the validated feature proposal.\n\
+      \  step_type: uses_process\n  llm_type: simple_task\n  details: >-\n    Invoke create-pull-request\
+      \ with pr-kind `feature`, commit message `Add\n    <work-item-name> feature specification`,\
+      \ and pull-request title\n    `<pull-request-title>`. Pass a `files_to_publish` context\
+      \ list containing\n    every validated specification document, along with the validated\n\
+      \    specification documents, feature intent, and the accepted readiness_report.\n \
+      \   The nested process must stage exactly that list. Do not begin implementation in\n\
+      \    this process, and do not invoke it if readiness_report is missing or not\n    accepted.\n\
+      \  uses_process:\n    process: create-pull-request"
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - read_document
+    - yaml_edit
+    - invoke_tool
+    - prompt_user
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

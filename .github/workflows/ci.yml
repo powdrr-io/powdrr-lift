@@ -56,16 +56,8 @@ jobs:
       - name: Run type checker
         run: uv run mypy src tests
 
-      - name: Statically compile workflow definitions
-        run: uv run powdrr-lift validate-workflow-definitions skill-definitions templates --liveness --baseline .github/workflow-liveness-baseline.json --warning-budget .github/workflow-liveness-warning-budget.json --warning-report workflow-liveness-warning-report.json
-
-      - name: Upload workflow liveness warning report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: workflow-liveness-warning-report
-          path: workflow-liveness-warning-report.json
-          if-no-files-found: ignore
+      - name: Validate Procedrr process catalog
+        run: uv run powdrr-lift validate-procedrr-processes docs/procedrr/processes
 
       - name: Run tests
         run: uv run pytest -n auto --cov=powdrr_lift --cov-branch --cov-report=term-missing --cov-report=xml tests
@@ -87,36 +79,4 @@ jobs:
         with:
           name: deterministic-workflow-suite-report
           path: workflow-scenario-suite-report.json
-          if-no-files-found: ignore
-
-      - name: Tune changed workflow definitions
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_REF: origin/${{ github.base_ref }}
-        run: |
-          git fetch origin "${{ github.base_ref }}" --depth=1
-          git diff --name-only "$BASE_REF...HEAD" -- skill-definitions templates \
-            | while IFS= read -r definition; do
-                [ -n "$definition" ] || continue
-                slug="$(basename "$definition" .yaml)"
-                set --
-                for replay in "workflow-evals/replays/$slug"/*.yaml; do
-                  [ -f "$replay" ] && set -- "$@" --replay "$replay"
-                done
-                for scenario in "workflow-evals/scenarios/$slug"/*.yaml; do
-                  [ -f "$scenario" ] && set -- "$@" --scenario "$scenario"
-                done
-                [ "$#" -gt 0 ] || continue
-                mkdir -p workflow-tuning-reports
-                uv run powdrr-lift tune-workflow --definition "$definition" \
-                  --baseline-ref "$BASE_REF" \
-                  --report "workflow-tuning-reports/$slug.json" "$@"
-              done
-
-      - name: Upload workflow tuning reports
-        if: always() && github.event_name == 'pull_request'
-        uses: actions/upload-artifact@v4
-        with:
-          name: workflow-tuning-reports
-          path: workflow-tuning-reports
           if-no-files-found: ignore

@@ -82,10 +82,11 @@ step adds its decisions and execution events to the context available to the nex
 
 ### 3. Constrain every action
 
-Checked-in skills define the ordered steps, allowed tools, expected outputs, and validation
-gates. The runtime checks actions against the active step, resolves dependencies, and
-stops on repeated failures or stalled progress. Work happens in a dedicated worktree and
-branch, so an agent cannot quietly turn a focused request into uncontrolled changes.
+Checked-in Procedrr processes define decision boundaries, authorized operations, expected
+outputs, and validation gates. The evaluator checks each operation against the active
+process and stops on repeated failures or stalled progress. Work happens in a dedicated
+worktree and branch, so an agent cannot quietly turn a focused request into uncontrolled
+changes.
 
 ### 4. Prove the result and preserve the why
 
@@ -115,7 +116,7 @@ the ability to say no.
 ## What you get
 
 * Human-guided workflow chat for ambiguous or high-leverage work.
-* Autonomous skill flows that compose planning, implementation, validation, and review.
+* Autonomous process flows that compose planning, implementation, validation, and review.
 * Structured specifications and changelogs that preserve intent across revisions.
 * Targeted context, edit, blame, and entity views grounded in repository state.
 * Worktree-isolated changes, explicit progress, and durable execution summaries.
@@ -126,7 +127,7 @@ the ability to say no.
 The next-stage platform design is captured in
 [`docs/design/agent-platform-expansion.md`](docs/design/agent-platform-expansion.md).
 It describes the specification families, synthesis workflows, review flows,
-and context endpoints that will extend the current skill platform.
+and context endpoints that will extend the current process platform.
 
 The proposed service boundary is detailed in
 [`docs/plans/hosted-instruction-compiler.md`](docs/plans/hosted-instruction-compiler.md).
@@ -278,12 +279,11 @@ and response to disk.
 
 ### Workflow chat
 
-Use the terminal workflow chat agent to match a request against the checked-in
-workflow templates, ask follow-up questions, and generate a validated task
-directory.
+Use the terminal workflow chat agent to select a checked-in Procedrr process,
+ask follow-up questions, and run its authorized operations.
 
 ```bash
-powdrr-lift workflow-chat --repo-root . --templates-dir templates --output-dir docs/workflows/implement-a-feature
+powdrr-lift workflow-chat --repo-root . --processes-dir docs/procedrr/processes
 ```
 
 Durable tasks can be processed with `process-workflow-task`. Its `auto` default
@@ -368,7 +368,7 @@ continue to handle Command shortcuts itself; use `Ctrl+C`, `Ctrl+X`, and
   execution on Apple Silicon. Set `POWDRR_LOCAL_MODEL_CONTEXT` to adjust it
   for a machine with more or less available memory.
 - z.ai uses the OpenAI-compatible endpoint `https://api.z.ai/api/paas/v4/`.
-- Workflow skill steps and every routing/action response carry an `llm_type`
+- Procedrr judge activations and every operation response carry an `llm_type`
   descriptor. The default mapping routes `high_reasoning` to `glm-5.2`,
   `standard_reasoning` to `glm-4.7`, `simple_task` and `fast_iteration` to
   `Qwen/Qwen2.5-Coder-14B-Instruct`, `long_context` to `glm-5.2`, and
@@ -381,34 +381,17 @@ continue to handle Command shortcuts itself; use `Ctrl+C`, `Ctrl+X`, and
 - If you omit `--output-dir`, the generated task set is written to a temporary
   directory and summarized on stdout.
 
-### Skill flows
+### Procedrr processes
 
-Skills are reusable workflow definitions. They are checked in as YAML
-files under `skill-definitions/` and can be selected by workflow chat, composed
-as nested skills by another skill, or used as the definition behind durable
-agent-workflow tasks. Every invocation resolves a worktree context first: it
-reuses the current dedicated worktree when one exists and creates one when the
-invocation starts from the primary checkout.
+Reusable workflow definitions live as validated Procedrr processes in
+[docs/procedrr/processes/](docs/procedrr/processes/). Workflow chat, feature
+execution, and durable workflow tasks use this process catalog for planning,
+implementation, validation, review, and nested process calls.
 
-- Use `when_to_use` to describe the situations where the skill applies.
-- Use `steps` to list the ordered actions to follow.
-- A step can reference one other skill with `step_type: uses_skill`; the
-  referenced skill runs in
-  the same worktree before the parent step continues.
-- The skill loader can validate a directory of skills and ensure every
-  referenced skill exists.
-
-Browse the current [workflow-chat definitions](skill-definitions/) for planning,
-implementation, validation, and review flows. The shared Procedrr processes used
-by feature implementation live in
-[docs/procedrr/skill-definitions/](docs/procedrr/skill-definitions/) and are included
-in the installed package.
-
-From a repository checkout, validate the workflow-chat definitions and templates
-with:
+From a repository checkout, validate the process catalog with:
 
 ```bash
-powdrr-lift validate-workflow-definitions skill-definitions templates
+powdrr-lift validate-procedrr-processes docs/procedrr/processes
 ```
 
 For local DeepSWE runs, follow [the benchmark instructions](BENCHMARKS.md).

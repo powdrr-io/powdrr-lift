@@ -31,7 +31,7 @@ from .cli import DEFAULT_MODEL, _client
 from .common import HERE, Recorder, digest, generation_input, load_json, write_json
 from .generation import generate, load_catalog, save_generation
 
-DESIGN_FLOW = HERE.parents[2] / "docs/procedrr/skill-definitions/design-interview.yaml"
+DESIGN_FLOW = HERE.parents[2] / "docs/procedrr/processes/design-interview.yaml"
 MAX_PARALLEL = 8
 
 
@@ -389,14 +389,16 @@ def main(argv: list[str] | None = None) -> int:
         raise RuntimeError("JEV API key is required; router fallback is disabled")
     judges = load_production_judges()
     planning_client = _client(args.planning_provider, args.planning_model, 120, 12288)
-    skills_dir = DESIGN_FLOW.parent
+    process_directory = DESIGN_FLOW.parent
     jev_client = JevPromptAdapter(
         WorkrrProcedrrClient(
             JevSemanticClassifierClient(planning_client, fail_closed=True),
-            skills_dir=skills_dir,
+            process_directory=process_directory,
         )
     )
-    split_client = WorkrrProcedrrClient(planning_client, skills_dir=skills_dir)
+    split_client = WorkrrProcedrrClient(
+        planning_client, process_directory=process_directory
+    )
     matching_client = _client(args.planning_provider, args.matching_model, 120, 12288)
     catalog = load_catalog(HERE / "catalog.json")
     failures: list[dict[str, str]] = []

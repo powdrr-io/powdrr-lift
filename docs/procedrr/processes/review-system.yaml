@@ -1,0 +1,92 @@
+version: 1
+name: review-system
+description: When new needs may require updating the current system specification. When the
+  TUI should evaluate whether the system requirements and approach still fit.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: review-system\ninputs:\n- name: work-item-name\ninteraction_style: observational_review\n\
+      when_to_use:\n- When new needs may require updating the current system specification.\n\
+      - When the TUI should evaluate whether the system requirements and approach still\n\
+      \  fit.\nsteps:\n- description: Gather the requirements and approach context.\n  actions:\
+      \ [edit, yaml_edit, file_management, read_document]\n  step_type: governed\n  prompt_catalogs:\
+      \ [context_types]\n  llm_type: simple_task\n  details: Use the requirements and approach\
+      \ context to understand the new needs before\n    judging the system specification.\n\
+      - description: Decide whether the current system specification needs to change.\n  actions:\
+      \ [edit, yaml_edit, file_management, read_document, complete]\n  step_type: governed\n\
+      \  llm_type: high_reasoning\n  details: >-\n    Compare the gathered requirements and\
+      \ approach against the new needs. If\n    the existing specification already covers\
+      \ them, end this process by returning\n    the complete action, for example {\"action\"\
+      :\"complete\",\"text\":\"The existing\n    system covers the new needs.\"}; otherwise\
+      \ choose next_step and return {\"action\":\"next_step\"}.\n- id: generate-system\n \
+      \ description: Deterministically generate the system specification template.\n  actions:\
+      \ []\n  step_type: invoke_tool\n  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n\
+      \    template:\n      tool: internal\n      command:\n      - powdrr-lift\n      - system-specification\n\
+      \      - \"--work-item-name\"\n      - \"<work-item-name>\"\n  outputs:\n  - name: system_specification_template\n\
+      \    type: any\n    required_for_next_step: true\n    schema: {type: object, additionalProperties:\
+      \ true}\n- id: fill-system\n  description: Fill the system requirements and approach\
+      \ sections.\n  actions: [edit, yaml_edit, file_management, read_document]\n  step_type:\
+      \ governed\n  llm_type: standard_reasoning\n  details: >-\n    Use yaml_edit for every\
+      \ YAML change. Include complete operations using\n    set_value paths or upsert_item\
+      \ section, id, and value fields. Do not use\n    invoke_tool for YAML edits.\n- id:\
+      \ evaluate-system\n  description: Deterministically evaluate the updated system specification.\n\
+      \  actions: []\n  step_type: invoke_tool\n  llm_type: simple_task\n  pre_step:\n   \
+      \ action: invoke_tool\n    template:\n      tool: internal\n      command:\n      -\
+      \ powdrr-lift\n      - evaluate\n      - docs/proposals/<work-item-name>/system-specification.yaml\n\
+      \  outputs:\n  - name: system_evaluation\n    type: any\n    required_for_next_step:\
+      \ true\n    schema: {type: object, additionalProperties: true}\n- id: repair-system\n\
+      \  description: Repair every reported system specification issue.\n  actions: [edit,\
+      \ yaml_edit, file_management, read_document, goto_step]\n  step_type: governed\n  llm_type:\
+      \ fast_iteration\n  details: >-\n    Use yaml_edit actions to fix every issue reported\
+      \ by evaluation. If there\n    are no issues, choose next_step without changing the\
+      \ file. Use only\n    set_value, upsert_item, and remove_item operations; never use\
+      \ remove or\n    replace. Use remove_item only for an existing item id from the current\n\
+      \    document. Template comments and boilerplate are removed as a side effect of\n \
+      \   any valid yaml_edit rewrite; do not treat comments as list items. Do not use\n \
+      \   invoke_tool in this governed repair step; the next deterministic step reruns\n \
+      \   the evaluator. If evaluation reports invalid YAML/structure or you are\n    stuck,\
+      \ restart generation with {\"action\":\"goto_step\",\"step_id\":\"generate-system\"\
+      }\n    instead of repeating the same repair. Otherwise return {\"action\":\"next_step\"\
+      }.\n- id: gate-system\n  description: Confirm that system evaluation reports zero issues.\n\
+      \  actions: []\n  step_type: gate\n  llm_type: simple_task\n  details: The gate passes\
+      \ only when evaluation exits successfully with zero issues.\n  pre_step:\n    action:\
+      \ invoke_tool\n    template:\n      tool: internal\n      command:\n      - powdrr-lift\n\
+      \      - evaluate\n      - docs/proposals/<work-item-name>/system-specification.yaml\n\
+      \  gate:\n    outcome:\n      path: returncode\n      equals: 0\n    goto_step: evaluate-system\n\
+      \    retry_context: >-\n      The gate failed because evaluation still reports issues.\
+      \ Repair every\n      issue with yaml_edit, then let the deterministic evaluator run\
+      \ again."
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - read_document
+    - respond
+    - yaml_edit
+    - invoke_tool
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

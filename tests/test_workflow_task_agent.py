@@ -9,18 +9,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
 )
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.process.model import (
-    Skill,
-    SkillStep,
-    SkillStepPreStep,
-    SkillToolInvocation,
-    save_skill,
+from powdrr_lift.process.task_step import (
+    TaskPreStep,
 )
 from powdrr_lift.process.tasks import (
     AgentRole,
@@ -32,9 +29,6 @@ from powdrr_lift.process.tasks import (
     WorkflowTask,
 )
 from powdrr_lift.workrr import task_agent
-from powdrr_lift.workrr.chat_agent import (
-    LLMModelLimits,
-)
 from powdrr_lift.workrr.git import (
     WorkflowGitInconsistency,
     WorkflowGitState,
@@ -45,10 +39,8 @@ from powdrr_lift.workrr.llm import (
     WorkflowLLMHTTPError,
     complete_json_with_timeout_retry,
 )
-from powdrr_lift.workrr.prompting import _action_system_prompt
 from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
-    _build_task_messages,
     _build_workflow_client,
     _durable_task_action_output_state,
     _handle_exhausted_timeout,
@@ -56,8 +48,6 @@ from powdrr_lift.workrr.task_agent import (
     _publish_workflow_progress,
     _read_task_document,
     _select_ready_workflow_git_state,
-    _task_events_for_prompt,
-    _task_system_prompt,
     _validate_workflow_task_state,
     _workflow_file_command_error,
     run_workflow_task,
@@ -66,12 +56,122 @@ from powdrr_lift.workrr.task_agent import (
 
 class _FakeClient:
     def __init__(self, responses: list[dict[str, object]]) -> None:
-        self.responses = iter(responses)
+        self.responses = list(responses)
+        self.response_index = 0
         self.messages: list[list[dict[str, str]]] = []
 
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
         self.messages.append(messages)
-        return next(self.responses)
+        if self.response_index >= len(self.responses):
+            # Legacy action-shaped fixtures are adapted to the procedural
+            # fragment protocol. Once the scripted actions are consumed, the
+            # fragment is complete and the builder appends its terminal step.
+            return {"step_json": json.dumps({"terminal": "succeeded"})}
+        response = self.responses[self.response_index]
+        self.response_index += 1
+        if "action" in response:
+            step = _legacy_action_to_process_step(response)
+            if (
+                response.get("action") in {"complete", "next_step"}
+                and "output_state" in response
+            ):
+                self.responses.insert(
+                    self.response_index,
+                    {"step_json": json.dumps({"terminal": "succeeded"})},
+                )
+            return {"step_json": json.dumps(step)}
+        return response
+
+
+def _legacy_action_to_process_step(response: Mapping[str, Any]) -> dict[str, Any]:
+    action = response.get("action")
+    if action in {"complete", "next_step"}:
+        if "output_state" not in response:
+            return {
+                "operation": {
+                    "tool": "respond",
+                    "parameters": {"text": response.get("text", "")},
+                }
+            }
+        return {
+            "operation": {
+                "tool": "task_complete",
+                "parameters": {
+                    "output_state": response["output_state"],
+                    "terminate_workflow": False,
+                    "text": response.get("text", ""),
+                },
+            }
+        }
+    if action in {"get-human-input", "prompt_user"}:
+        return {
+            "operation": {
+                "tool": "task_handoff",
+                "parameters": {
+                    "human_input": response.get("human_input"),
+                    "question": response.get(
+                        "text", "Please provide the required input."
+                    ),
+                    "continuation_instructions": "Use the human response to continue.",
+                },
+                "bind": "handoff_result",
+            }
+        }
+    operations = {
+        "edit": "edit",
+        "yaml_edit": "yaml_edit",
+        "file_management": "file_management",
+        "read_document": "read_document",
+        "list_files": "list_files",
+        "gather_context": "gather_context",
+        "invoke_tool": "invoke_tool",
+    }
+    tool = operations.get(str(action))
+    if action == "task_run_process":
+        return {
+            "operation": {
+                "tool": "task_run_process",
+                "parameters": {
+                    "process_id": response.get("process_id"),
+                    "bindings": response.get("bindings", {}),
+                },
+                "bind": "nested_process_result",
+            }
+        }
+    if tool is None:
+        return {"terminal": "succeeded"}
+    if tool == "invoke_tool":
+        parameters = {
+            "tool": response.get("tool"),
+            "parameters": response.get("parameters", {}),
+        }
+    elif tool == "edit":
+        parameters = {
+            "file_path": response.get("file_path"),
+            "edits": response.get("edits", []),
+        }
+    else:
+        parameters = {key: value for key, value in response.items() if key != "action"}
+    operation: dict[str, Any] = {"tool": tool, "parameters": parameters}
+    if response.get("capture_as"):
+        operation["bind"] = response["capture_as"]
+    return {"operation": operation}
+
+
+class _ProcedrrFragmentClient:
+    def __init__(self, steps: list[dict[str, Any]]) -> None:
+        self.steps = iter(steps)
+        self.messages: list[list[dict[str, str]]] = []
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, object]:
+        self.messages.append(messages)
+        step = next(self.steps)
+        return {"step_json": json.dumps(step)}
 
 
 def test_repeated_stalled_task_action_requires_material_change() -> None:
@@ -121,32 +221,31 @@ def _workflow(tmp_path: Path) -> WorkflowInstance:
     )
 
 
+def _write_procedrr_process(
+    tmp_path: Path,
+    name: str,
+    steps: list[dict[str, Any]],
+    *,
+    inputs: list[dict[str, Any]] | None = None,
+    outputs: dict[str, Any] | None = None,
+) -> Path:
+    directory = tmp_path / "docs" / "procedrr" / "processes"
+    directory.mkdir(parents=True, exist_ok=True)
+    process: dict[str, Any] = {"version": 1, "name": name, "steps": steps}
+    if inputs is not None:
+        process["inputs"] = inputs
+    if outputs is not None:
+        process["outputs"] = outputs
+    path = directory / f"{name}.yaml"
+    path.write_text(yaml.safe_dump(process, sort_keys=False), encoding="utf-8")
+    return path
+
+
 def test_next_step_requires_top_level_output_state() -> None:
     action = WorkflowAction(kind="next_step", outputs={"result": "claimed"})
 
     with pytest.raises(Exception, match="top-level.*output_state"):
         _durable_task_action_output_state(action)
-
-
-def test_explicit_task_prompt_contains_only_declared_action_guidance() -> None:
-    task = WorkflowTask(
-        task_id="scoped-task",
-        status=TaskStatus.OPEN,
-        upstream_task_ids=(),
-        dependent_state=(),
-        complexity=TaskComplexity.LOW,
-        input_state={},
-        description="Read one document.",
-        actions=("read_document",),
-    )
-
-    prompt = _task_system_prompt(task=task)
-
-    assert "- read_document:" in prompt
-    assert "- next_step:" in prompt
-    assert "- invoke_skill:" not in prompt
-    assert "- edit:" not in prompt
-    assert "Use `complete` only" not in prompt
 
 
 def test_select_ready_workflow_skips_workflow_with_incomplete_dependency(
@@ -203,7 +302,17 @@ def test_process_workflow_task_completes_claimed_agent_task(
     verbose: bool,
 ) -> None:
     workflow = _workflow(tmp_path)
-    client = _FakeClient([{"action": "complete", "output_state": {"version": "v2"}}])
+    client = _ProcedrrFragmentClient(
+        [
+            {
+                "operation": {
+                    "tool": "task_complete",
+                    "parameters": {"output_state": {"version": "v2"}},
+                }
+            },
+            {"terminal": "succeeded"},
+        ]
+    )
     stderr = io.StringIO()
     stdout = io.StringIO()
 
@@ -218,26 +327,189 @@ def test_process_workflow_task_completes_claimed_agent_task(
         stderr=stderr,
     )
 
-    assert exit_code == 0
+    assert exit_code == 0, stderr.getvalue()
     completed = WorkflowInstance.from_directory(workflow.directory).tasks[0]
     assert completed.status is TaskStatus.COMPLETED
     assert completed.output_state == {"version": "v2"}
-    prompt = client.messages[0][1]["content"]
-    assert client.messages[0][0]["content"].startswith(_action_system_prompt())
-    assert (
-        "Use `next_step` when this task is finished" in client.messages[0][0]["content"]
+    prompt = "\n".join(
+        message["content"] for messages in client.messages for message in messages
     )
-    assert '"execution_mode":"process_workflow_task"' in prompt
-    assert json.loads(prompt)["workflow_dir"] == "workflow"
+    assert "Complete the claimed durable task" in prompt
+    assert "task_complete" in prompt
+    assert "Choose an API version." in prompt
     assert str(tmp_path) not in prompt
-    assert "\n" not in prompt
     displayed = stderr.getvalue()
     assert ("Workflow task LLM input:" in displayed) is verbose
     assert ("Workflow task LLM output:" in displayed) is verbose
-    assert ('"action": "complete"' in displayed) is verbose
+    assert ('"step_json"' in displayed) is verbose
     assert "received streamed LLM data" not in displayed
-    assert ("Workflow task LLM action:" in stdout.getvalue()) is verbose
-    assert "Workflow task roundtrip 1: complete" in stdout.getvalue()
+    assert "Completed workflow task: agent-task" in stdout.getvalue()
+
+
+def test_procedrr_task_handoff_persists_and_resumes_checkpoint(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    client = _ProcedrrFragmentClient(
+        [
+            {
+                "operation": {
+                    "tool": "task_handoff",
+                    "parameters": {
+                        "question": "Choose v1 or v2.",
+                        "continuation_instructions": "Implement the selected version.",
+                    },
+                    "bind": "handoff_result",
+                }
+            },
+            {
+                "operation": {
+                    "tool": "task_complete",
+                    "parameters": {"output_state": {"version": "v2"}},
+                }
+            },
+            {"terminal": "succeeded"},
+        ]
+    )
+    config = WorkflowTaskAgentConfig(
+        workflow_dir=workflow.directory,
+        repo_root=tmp_path,
+    )
+
+    first_exit = run_workflow_task(
+        config,
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+    paused = WorkflowInstance.from_directory(workflow.directory)
+    original = next(task for task in paused.tasks if task.task_id == "agent-task")
+    human = next(
+        task for task in paused.tasks if task.assignee_type is AssigneeType.HUMAN
+    )
+    follow_up = next(
+        task
+        for task in paused.tasks
+        if task.assignee_type is AssigneeType.AGENT and task.task_id != "agent-task"
+    )
+
+    assert first_exit == 0
+    assert original.status is TaskStatus.LOCKED
+    assert follow_up.process_id == "durable-task"
+    assert follow_up.process_checkpoint is not None
+    assert (
+        follow_up.input_state["human_response"]
+        == f"{human.task_id}.{human.output_state_type}"
+    )
+
+    paused.complete_task(human.task_id, {"decision": "v2"})
+    resumed_client = _ProcedrrFragmentClient([])
+    second_exit = run_workflow_task(
+        config,
+        client=resumed_client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+    completed = WorkflowInstance.from_directory(workflow.directory)
+
+    assert second_exit == 0
+    assert not resumed_client.messages
+    assert all(
+        task.status is TaskStatus.COMPLETED
+        for task in completed.tasks
+        if task.assignee_type is not AssigneeType.HUMAN or task.task_id == human.task_id
+    )
+    assert next(
+        task for task in completed.tasks if task.task_id == "agent-task"
+    ).output_state == {"version": "v2"}
+
+
+def test_procedrr_task_dispatches_file_edits_through_task_authorization(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    (tmp_path / "notes.txt").write_text("draft\n", encoding="utf-8")
+    client = _ProcedrrFragmentClient(
+        [
+            {
+                "operation": {
+                    "tool": "edit",
+                    "parameters": {
+                        "operation": "replace_lines",
+                        "file_path": "notes.txt",
+                        "start_line": 1,
+                        "end_line": 1,
+                        "replacement": "approved\n",
+                    },
+                    "bind": "edit_result",
+                }
+            },
+            {
+                "operation": {
+                    "tool": "task_complete",
+                    "parameters": {"output_state": {"updated": True}},
+                }
+            },
+            {"terminal": "succeeded"},
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    assert (tmp_path / "notes.txt").read_text(encoding="utf-8") == "approved\n"
+    assert WorkflowInstance.from_directory(workflow.directory).tasks[
+        0
+    ].output_state == {"updated": True}
+
+
+def test_procedrr_task_cannot_use_an_operation_outside_declared_actions(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    task = replace(workflow.tasks[0], actions=("read_document",))
+    workflow.update_task(task)
+    (tmp_path / "notes.txt").write_text("draft\n", encoding="utf-8")
+    client = _ProcedrrFragmentClient(
+        [
+            {
+                "operation": {
+                    "tool": "edit",
+                    "parameters": {
+                        "operation": "replace_lines",
+                        "file_path": "notes.txt",
+                        "start_line": 1,
+                        "end_line": 1,
+                        "replacement": "unauthorized\n",
+                    },
+                }
+            },
+            {"terminal": "succeeded"},
+        ]
+    )
+    stderr = io.StringIO()
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 1
+    assert "not allowed by the active step contract" in stderr.getvalue()
+    assert (tmp_path / "notes.txt").read_text(encoding="utf-8") == "draft\n"
 
 
 def test_deterministic_gather_context_must_be_persisted_exactly(
@@ -270,7 +542,7 @@ def test_deterministic_gather_context_must_be_persisted_exactly(
                 assignee_role=AgentRole.ARCHITECT,
                 output_state_type="context-state",
                 step_type="invoke_tool",
-                pre_step=SkillStepPreStep(
+                pre_step=TaskPreStep(
                     action="gather_context",
                     template={
                         "feature_id": "<feature_id>",
@@ -307,8 +579,8 @@ def test_deterministic_gather_context_must_be_persisted_exactly(
     )
 
     assert exit_code == 0
-    assert len(client.messages) == 2
-    assert "exact deterministic pre-step result" in client.messages[1][1]["content"]
+    persisted = WorkflowInstance.from_directory(workflow.directory)
+    assert persisted.tasks[0].output_state == {"context-state": expected_context}
 
 
 def test_process_workflow_task_resolves_input_placeholders_before_llm(
@@ -339,6 +611,7 @@ def test_process_workflow_task_resolves_input_placeholders_before_llm(
         ),
     )
     client = _FakeClient([{"action": "complete", "output_state": {"ok": True}}])
+    stderr = io.StringIO()
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
@@ -347,11 +620,13 @@ def test_process_workflow_task_resolves_input_placeholders_before_llm(
         ),
         client=client,
         stdout=io.StringIO(),
-        stderr=io.StringIO(),
+        stderr=stderr,
     )
 
-    assert exit_code == 0
-    prompt = client.messages[0][1]["content"]
+    assert exit_code == 0, stderr.getvalue()
+    prompt = "\n".join(
+        message["content"] for messages in client.messages for message in messages
+    )
     assert "docs/proposals/interaction-file-logging/" in prompt
     assert "pr-interaction-capture-17" in prompt
     assert "<work-item-name>" not in prompt
@@ -359,150 +634,33 @@ def test_process_workflow_task_resolves_input_placeholders_before_llm(
     assert "input_state.proposed_pr" not in prompt
 
 
-def test_workflow_task_prompt_includes_task_interaction_style(
+def test_process_workflow_task_runs_nested_process_in_same_worktree(
     tmp_path: Path,
 ) -> None:
-    task = WorkflowTask(
-        task_id="review-task",
-        status=TaskStatus.OPEN,
-        complexity=TaskComplexity.MEDIUM,
-        input_state={"scope": "the proposed change"},
-        description="Challenge the proposed change.",
-        interaction_style="observational_review",
-        assignee_type=AssigneeType.AGENT,
-        assignee_role=AgentRole.REVIEWER,
-    )
-    workflow = WorkflowInstance.create(tmp_path / "workflow", (task,))
-
-    messages = _build_task_messages(workflow, task, [], repo_root=tmp_path)
-
-    assert "Interaction style: observational_review." in messages[0]["content"]
-    assert (
-        "Separate observations, inferences, risks, and recommendations."
-        in (messages[0]["content"])
-    )
-    assert "Use `next_step` when this task is finished" in messages[0]["content"]
-    assert json.loads(messages[1]["content"])["task"]["interaction_style"] == (
-        "observational_review"
-    )
-
-
-def test_task_prompt_marks_deterministic_pre_step_as_authoritative(
-    tmp_path: Path,
-) -> None:
-    task = WorkflowTask(
-        task_id="context-task",
-        status=TaskStatus.OPEN,
-        complexity=TaskComplexity.HIGH,
-        input_state={"feature_id": "fixture-feature"},
-        description="Gather context about the proposed PR.",
-        output_state_type="proposed-pr-context-state",
-        assignee_type=AssigneeType.AGENT,
-        assignee_role=AgentRole.ARCHITECT,
-    )
-    workflow = WorkflowInstance.create(tmp_path / "workflow", (task,))
-
-    messages = _build_task_messages(
-        workflow,
-        task,
+    (tmp_path / "nested.txt").write_text("before\n", encoding="utf-8")
+    _write_procedrr_process(
+        tmp_path,
+        "nested-process",
         [
             {
-                "kind": "deterministic_pre_step",
-                "action": "gather_context",
-                "result": {"matches": []},
+                "operation": {
+                    "tool": "edit",
+                    "parameters": {
+                        "operation": "replace_lines",
+                        "file_path": "nested.txt",
+                        "start_line": 1,
+                        "end_line": 1,
+                        "replacement": "after\n",
+                    },
+                }
             }
         ],
-        repo_root=tmp_path,
-    )
-
-    prompt = json.loads(messages[1]["content"])
-    assert prompt["deterministic_pre_step"]["status"] == "already_completed"
-    assert prompt["deterministic_pre_step"]["result"] == {"matches": []}
-    assert prompt["deterministic_pre_step"]["required_output_state"] == {
-        "proposed-pr-context-state": {"matches": []}
-    }
-    assert (
-        "Do not search for, rediscover, reinterpret"
-        in prompt["deterministic_pre_step"]["instructions"]
-    )
-
-
-def test_task_prompt_keeps_latest_result_without_repeating_old_results() -> None:
-    events: list[dict[str, Any]] = [
-        {
-            "kind": "invoke_tool",
-            "parameters": {"command": "cat a very large file"},
-            "result": {"stdout": "old output"},
-        },
-        {
-            "kind": "action_error",
-            "action_kind": "edit",
-            "error": "the requested range is outside the document",
-        },
-        {
-            "kind": "read_document",
-            "file_path": "docs/example.md",
-            "result": {"content": "current output"},
-        },
-    ]
-
-    prompt_events = _task_events_for_prompt(events)
-
-    assert prompt_events["recent"][0] == {
-        "kind": "invoke_tool",
-    }
-    assert prompt_events["recent"][1]["error"] == (
-        "the requested range is outside the document"
-    )
-    assert prompt_events["latest_result"]["value"] == {"content": "current output"}
-    assert "parameters" not in prompt_events["recent"][0]
-    assert "result" not in prompt_events["recent"][0]
-
-
-def test_task_prompt_preserves_latest_failed_result_separately() -> None:
-    prompt_events = _task_events_for_prompt(
-        [
-            {
-                "action": "invoke_tool",
-                "result": {"returncode": 2, "stderr": "validation failed"},
-            },
-            {"action": "next_step"},
-        ]
-    )
-
-    assert prompt_events["latest_failure"]["value"] == {
-        "returncode": 2,
-        "stderr": "validation failed",
-    }
-
-
-def test_task_prompt_bounds_event_metadata() -> None:
-    prompt_events = _task_events_for_prompt(
-        [{"kind": "read_document", "result": {"line": index}} for index in range(20)]
-    )
-
-    assert len(prompt_events["recent"]) == 12
-    assert prompt_events["omitted_event_count"] == 8
-    assert prompt_events["latest_result"]["value"] == {"line": 19}
-
-
-def test_process_workflow_task_runs_nested_skill_in_same_worktree(
-    tmp_path: Path,
-) -> None:
-    skills_dir = tmp_path / "skill-definitions"
-    save_skill(
-        Skill(
-            name="nested-skill",
-            when_to_use=("Run nested work.",),
-            steps=(SkillStep(description="Perform nested work."),),
-        ),
-        skills_dir / "nested-skill.yaml",
     )
     workflow = _workflow(tmp_path)
+    workflow.update_task(replace(workflow.tasks[0], uses_processes=("nested-process",)))
     client = _FakeClient(
         [
-            {"action": "invoke_skill", "skill": "nested-skill"},
-            {"action": "complete", "text": "Nested work complete."},
+            {"action": "task_run_process", "process_id": "nested-process"},
             {"action": "complete", "output_state": {"ok": True}},
         ]
     )
@@ -521,34 +679,33 @@ def test_process_workflow_task_runs_nested_skill_in_same_worktree(
     assert WorkflowInstance.from_directory(workflow.directory).tasks[
         0
     ].output_state == {"ok": True}
+    assert (tmp_path / "nested.txt").read_text(encoding="utf-8") == "after\n"
     assert len(client.messages) == 3
 
 
 def test_nested_atomic_tool_step_advances_without_llm_confirmation(
     tmp_path: Path,
 ) -> None:
-    skills_dir = tmp_path / "skill-definitions"
-    save_skill(
-        Skill(
-            name="nested-skill",
-            when_to_use=("Run nested work.",),
-            steps=(
-                SkillStep(
-                    description="Run the deterministic nested command.",
-                    step_type="invoke_tool",
-                    pre_step=SkillStepPreStep(
-                        action="invoke_tool",
-                        template={"tool": "shell", "command": ["printf", "nested"]},
-                    ),
-                ),
-            ),
-        ),
-        skills_dir / "nested-skill.yaml",
+    _write_procedrr_process(
+        tmp_path,
+        "nested-process",
+        [
+            {
+                "operation": {
+                    "tool": "invoke_tool",
+                    "parameters": {
+                        "tool": "shell",
+                        "parameters": {"command": ["printf", "nested"]},
+                    },
+                }
+            }
+        ],
     )
     workflow = _workflow(tmp_path)
+    workflow.update_task(replace(workflow.tasks[0], uses_processes=("nested-process",)))
     client = _FakeClient(
         [
-            {"action": "invoke_skill", "skill": "nested-skill"},
+            {"action": "task_run_process", "process_id": "nested-process"},
             {"action": "complete", "output_state": {"ok": True}},
         ]
     )
@@ -564,7 +721,7 @@ def test_nested_atomic_tool_step_advances_without_llm_confirmation(
     )
 
     assert exit_code == 0
-    assert len(client.messages) == 2
+    assert len(client.messages) == 3
     assert WorkflowInstance.from_directory(workflow.directory).tasks[
         0
     ].output_state == {"ok": True}
@@ -574,35 +731,26 @@ def test_process_workflow_task_propagates_verbose_to_nested_tools(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    skills_dir = tmp_path / "skill-definitions"
-    save_skill(
-        Skill(
-            name="nested-skill",
-            when_to_use=("Run nested work.",),
-            steps=(
-                SkillStep(
-                    description="Run nested command.",
-                    tool_invocations=(
-                        SkillToolInvocation(
-                            tool="shell",
-                            command=("printf", "nested"),
-                        ),
-                    ),
-                ),
-            ),
-        ),
-        skills_dir / "nested-skill.yaml",
+    _write_procedrr_process(
+        tmp_path,
+        "nested-process",
+        [
+            {
+                "operation": {
+                    "tool": "invoke_tool",
+                    "parameters": {
+                        "tool": "shell",
+                        "parameters": {"command": ["printf", "nested"]},
+                    },
+                }
+            }
+        ],
     )
     workflow = _workflow(tmp_path)
+    workflow.update_task(replace(workflow.tasks[0], uses_processes=("nested-process",)))
     client = _FakeClient(
         [
-            {"action": "invoke_skill", "skill": "nested-skill"},
-            {
-                "action": "invoke_tool",
-                "tool": "shell",
-                "parameters": {"command": "printf nested"},
-            },
-            {"action": "complete", "text": "Nested work complete."},
+            {"action": "task_run_process", "process_id": "nested-process"},
             {"action": "complete", "output_state": {"ok": True}},
         ]
     )
@@ -634,145 +782,6 @@ def test_process_workflow_task_propagates_verbose_to_nested_tools(
 
     assert exit_code == 0
     assert observed_verbose == [True]
-
-
-def test_nested_skill_repairs_malformed_edit_action_in_place(
-    tmp_path: Path,
-) -> None:
-    skills_dir = tmp_path / "skill-definitions"
-    save_skill(
-        Skill(
-            name="nested-skill",
-            when_to_use=("Run nested work.",),
-            steps=(SkillStep(description="Perform nested work."),),
-        ),
-        skills_dir / "nested-skill.yaml",
-    )
-    workflow = _workflow(tmp_path)
-    client = _FakeClient(
-        [
-            {"action": "invoke_skill", "skill": "nested-skill"},
-            {
-                "action": "edit",
-                "file_path": "notes.txt",
-                "edits": [
-                    {
-                        "action": {"operation": "replace"},
-                        "start_line": 1,
-                        "end_line": 1,
-                        "text": "invalid",
-                    }
-                ],
-            },
-            {"action": "complete", "text": "Nested work complete."},
-            {"action": "complete", "output_state": {"ok": True}},
-        ]
-    )
-    stderr = io.StringIO()
-
-    exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(
-            workflow_dir=workflow.directory,
-            repo_root=tmp_path,
-        ),
-        client=client,
-        stdout=io.StringIO(),
-        stderr=stderr,
-    )
-
-    assert exit_code == 0
-    assert len(client.messages) == 4
-    assert (
-        "Workflow edit action edit kind must be a string"
-        in client.messages[2][1]["content"]
-    )
-    assert "Nested skill action response needs clean-room repair" in stderr.getvalue()
-    assert '"execution_mode":"clean_room_repair"' in client.messages[2][1]["content"]
-    error_records = [
-        json.loads(line)
-        for line in (tmp_path / "workflow-llm-errors.jsonl").read_text().splitlines()
-    ]
-    assert error_records[-1]["phase"] == "nested_skill_llm_output_parse"
-    assert error_records[-1]["context"]["skill_name"] == "nested-skill"
-
-
-def test_process_workflow_task_passes_clean_nested_skill_context_between_skills(
-    tmp_path: Path,
-) -> None:
-    skills_dir = tmp_path / "skill-definitions"
-    save_skill(
-        Skill(
-            name="review-skill",
-            when_to_use=("Review a skill.",),
-            steps=(SkillStep(description="Delegate the independent review."),),
-        ),
-        skills_dir / "review-skill.yaml",
-    )
-    save_skill(
-        Skill(
-            name="independent-review",
-            when_to_use=("Review supplied material.",),
-            steps=(SkillStep(description="Review the supplied material."),),
-        ),
-        skills_dir / "independent-review.yaml",
-    )
-    workflow = _workflow(tmp_path)
-    client = _FakeClient(
-        [
-            {
-                "action": "invoke_skill",
-                "skill": "review-skill",
-                "clean": True,
-                "context": [
-                    "Target skill: review-skill-workflow",
-                    "Original step: obtain an independent review",
-                    "Proposed step: invoke the adversarial reviewer with context",
-                ],
-            },
-            {
-                "action": "invoke_skill",
-                "skill": "independent-review",
-                "provider_role": "adversarial",
-                "clean": True,
-                "context": [
-                    "Target skill: review-skill-workflow",
-                    "Original step: obtain an independent review",
-                    "Proposed step: invoke the adversarial reviewer with context",
-                ],
-            },
-            {"action": "complete", "text": "Independent review complete."},
-            {"action": "complete", "text": "Review complete."},
-            {"action": "complete", "output_state": {"ok": True}},
-        ]
-    )
-
-    exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(
-            workflow_dir=workflow.directory,
-            repo_root=tmp_path,
-        ),
-        client=client,
-        stdout=io.StringIO(),
-        stderr=io.StringIO(),
-    )
-
-    assert exit_code == 0
-    review_prompt = json.loads(client.messages[1][1]["content"])
-    assert review_prompt["step_context"] == [
-        "Target skill: review-skill-workflow",
-        "Original step: obtain an independent review",
-        "Proposed step: invoke the adversarial reviewer with context",
-    ]
-    assert review_prompt["transcript"] == []
-    assert review_prompt["execution_events"] == []
-    nested_prompt = json.loads(client.messages[2][1]["content"])
-    assert nested_prompt["selected_skill"]["name"] == "independent-review"
-    assert nested_prompt["step_context"] == [
-        "Target skill: review-skill-workflow",
-        "Original step: obtain an independent review",
-        "Proposed step: invoke the adversarial reviewer with context",
-    ]
-    assert nested_prompt["transcript"] == []
 
 
 def test_process_workflow_task_uses_workflow_integration_worktree(
@@ -1054,7 +1063,7 @@ def test_process_workflow_task_persists_output_for_downstream_claim(
         "claim agent-task",
         "next_step agent-task",
         "claim next-task",
-        "terminate next-task",
+        "next_step next-task",
     ]
     assert checkpoints == [
         ("agent-task", "state", {"plan": ["step"]}, "d" * 40),
@@ -1149,7 +1158,18 @@ def test_process_workflow_task_repairs_invalid_json_response(
                 raise RuntimeError(
                     "OpenAI response content was not valid JSON: Expecting value"
                 )
-            return {"action": "complete", "output_state": {"version": "v2"}}
+            if self.calls == 2:
+                return {
+                    "step_json": json.dumps(
+                        {
+                            "operation": {
+                                "tool": "task_complete",
+                                "parameters": {"output_state": {"version": "v2"}},
+                            }
+                        }
+                    )
+                }
+            return {"step_json": json.dumps({"terminal": "succeeded"})}
 
     client = _InvalidThenCompleteClient()
     stderr = io.StringIO()
@@ -1164,124 +1184,12 @@ def test_process_workflow_task_repairs_invalid_json_response(
     )
 
     assert exit_code == 0
-    assert client.calls == 2
-    assert "response needs repair" in stderr.getvalue()
-    assert "<no parsed response; client error:" in stderr.getvalue()
-    assert "response_correction" not in client.messages[1][1]["content"]
-    assert "Expecting value" in client.messages[1][1]["content"]
-    assert "not valid JSON" in client.messages[1][1]["content"]
-    assert '"execution_mode":"clean_room_repair"' in client.messages[1][1]["content"]
-    assert '"events"' not in client.messages[1][1]["content"]
+    assert client.calls == 3
+    assert "The previous response was invalid" in client.messages[1][-1]["content"]
+    assert "Expecting value" in client.messages[1][-1]["content"]
     assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
         TaskStatus.COMPLETED
     )
-
-
-def test_process_workflow_task_compacts_context_before_exceeding_model_limit(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workflow = _workflow(tmp_path)
-    client = _FakeClient(
-        [
-            {"compacted_context": {"necessary": ["keep this"]}},
-            {"action": "complete", "output_state": {"version": "v2"}},
-        ]
-    )
-
-    def _estimate(messages: list[dict[str, str]]) -> int:
-        if "compacting context" in messages[0]["content"]:
-            return 10
-        if len(messages) == 1:
-            return 10
-        payload = json.loads(messages[1]["content"])
-        return 10 if "compacted_context" in payload else 100
-
-    monkeypatch.setattr(
-        "powdrr_lift.workrr.task_agent._estimate_message_tokens",
-        _estimate,
-    )
-    limit_calls = 0
-
-    def _limits(*_args: object, **_kwargs: object) -> LLMModelLimits:
-        nonlocal limit_calls
-        limit_calls += 1
-        return LLMModelLimits(
-            context_window=50 if limit_calls == 1 else 50_000,
-            max_output_tokens=50,
-        )
-
-    monkeypatch.setattr("powdrr_lift.workrr.task_agent.model_limits_for", _limits)
-    stderr = io.StringIO()
-
-    exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(
-            workflow_dir=workflow.directory,
-            repo_root=tmp_path,
-        ),
-        client=client,
-        stdout=io.StringIO(),
-        stderr=stderr,
-    )
-
-    assert exit_code == 0
-    assert len(client.messages) == 2
-    compaction_prompt = json.loads(client.messages[0][1]["content"])
-    assert compaction_prompt["task_description"] == "Choose an API version."
-    assert compaction_prompt["task_details"] is None
-    compacted_prompt = json.loads(client.messages[1][1]["content"])
-    assert compacted_prompt["compacted_context"]["necessary"] == ["keep this"]
-    assert "latest_actionable" in compacted_prompt["compacted_context"]
-    status = stderr.getvalue()
-    assert "Compacting workflow task context" in status
-    assert "waiting for context compaction LLM response" in status
-    assert "Compacted workflow task context" in status
-
-
-def test_process_workflow_task_compacts_at_proactive_threshold(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    workflow = _workflow(tmp_path)
-    client = _FakeClient(
-        [
-            {"compacted_context": {"necessary": ["keep this"]}},
-            {"action": "complete", "output_state": {"version": "v2"}},
-        ]
-    )
-
-    def _estimate(messages: list[dict[str, str]]) -> int:
-        if "compacting context" in messages[0]["content"]:
-            return 10
-        if len(messages) == 1:
-            return 10
-        payload = json.loads(messages[1]["content"])
-        return 10 if "compacted_context" in payload else 4_000
-
-    monkeypatch.setattr(
-        "powdrr_lift.workrr.task_agent._estimate_message_tokens", _estimate
-    )
-    monkeypatch.setattr(
-        "powdrr_lift.workrr.task_agent.model_limits_for",
-        lambda *_args, **_kwargs: LLMModelLimits(
-            context_window=5_000,
-            max_output_tokens=500,
-        ),
-    )
-
-    exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(
-            workflow_dir=workflow.directory,
-            repo_root=tmp_path,
-            context_compaction_threshold=0.75,
-        ),
-        client=client,
-        stdout=io.StringIO(),
-        stderr=io.StringIO(),
-    )
-
-    assert exit_code == 0
-    assert len(client.messages) == 2
 
 
 def test_process_workflow_task_retries_llm_timeouts_with_backoff(
@@ -1299,7 +1207,18 @@ def test_process_workflow_task_retries_llm_timeouts_with_backoff(
         calls += 1
         if calls < 3:
             raise RuntimeError("OpenAI-compatible request timed out")
-        return {"action": "complete", "output_state": {"version": "v2"}}
+        if calls == 3:
+            return {
+                "step_json": json.dumps(
+                    {
+                        "operation": {
+                            "tool": "task_complete",
+                            "parameters": {"output_state": {"version": "v2"}},
+                        }
+                    }
+                )
+            }
+        return {"step_json": json.dumps({"terminal": "succeeded"})}
 
     client.complete_json = _complete  # type: ignore[method-assign]
     monkeypatch.setattr("powdrr_lift.workrr.llm.time.sleep", sleeps.append)
@@ -1318,9 +1237,9 @@ def test_process_workflow_task_retries_llm_timeouts_with_backoff(
     )
 
     assert exit_code == 0
-    assert calls == 3
+    assert calls == 4
     assert sleeps == [1.5, 3.0]
-    assert stderr.getvalue().count("retrying in") == 2
+    assert len(client.messages) == 4
 
 
 def test_process_workflow_task_retries_provider_overload_with_backoff(
@@ -1342,7 +1261,18 @@ def test_process_workflow_task_retries_provider_overload_with_backoff(
                 429,
                 '{"error":{"code":"engine_overloaded"}}',
             )
-        return {"action": "complete", "output_state": {"version": "v2"}}
+        if calls == 3:
+            return {
+                "step_json": json.dumps(
+                    {
+                        "operation": {
+                            "tool": "task_complete",
+                            "parameters": {"output_state": {"version": "v2"}},
+                        }
+                    }
+                )
+            }
+        return {"step_json": json.dumps({"terminal": "succeeded"})}
 
     client.complete_json = _complete  # type: ignore[method-assign]
     monkeypatch.setattr("powdrr_lift.workrr.llm.time.sleep", sleeps.append)
@@ -1361,9 +1291,9 @@ def test_process_workflow_task_retries_provider_overload_with_backoff(
     )
 
     assert exit_code == 0
-    assert calls == 3
+    assert calls == 4
     assert sleeps == [1.5, 3.0]
-    assert stderr.getvalue().count("provider is overloaded") == 2
+    assert len(client.messages) == 4
 
 
 def test_workflow_retries_dropped_provider_connection(
@@ -1425,7 +1355,7 @@ def test_exhausted_timeout_keeps_workflow_worktree_for_resume(
     assert deleted == []
 
 
-def test_process_workflow_task_prints_invalid_response_before_repair(
+def test_process_workflow_task_repairs_invalid_fragment_step(
     tmp_path: Path,
 ) -> None:
     workflow = _workflow(tmp_path)
@@ -1437,7 +1367,7 @@ def test_process_workflow_task_prints_invalid_response_before_repair(
         ),
         client=_FakeClient(
             [
-                {"action": None, "diagnostic": "inspect me"},
+                {"step_json": "not-json"},
                 {"action": "complete", "output_state": {"version": "v2"}},
             ]
         ),
@@ -1446,13 +1376,14 @@ def test_process_workflow_task_prints_invalid_response_before_repair(
     )
 
     assert exit_code == 0
-    output = stderr.getvalue()
-    assert "Workflow task LLM response requiring repair:" in output
-    assert '"action": null' in output
-    assert '"diagnostic": "inspect me"' in output
+    assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
+        TaskStatus.COMPLETED
+    )
 
 
-def test_process_workflow_task_supports_fuzzy_match_tool(tmp_path: Path) -> None:
+def test_process_workflow_task_supports_fuzzy_match_tool(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workflow = _workflow(tmp_path)
     (tmp_path / "candidate-spec.yaml").write_text("name: candidate\n", encoding="utf-8")
     client = _FakeClient(
@@ -1475,6 +1406,16 @@ def test_process_workflow_task_supports_fuzzy_match_tool(tmp_path: Path) -> None
             {"action": "complete", "output_state": {"found": True}},
         ]
     )
+    commands: list[list[str]] = []
+    original_fuzzy_match = task_agent.invoke_fuzzy_match_capability
+
+    def capture_command(parameters: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+        command = parameters.get("command")
+        if isinstance(command, list):
+            commands.append([str(part) for part in command])
+        return original_fuzzy_match(parameters, **kwargs)
+
+    monkeypatch.setattr(task_agent, "invoke_fuzzy_match_capability", capture_command)
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
@@ -1487,13 +1428,13 @@ def test_process_workflow_task_supports_fuzzy_match_tool(tmp_path: Path) -> None
     )
 
     assert exit_code == 0
-    assert "fuzzy-match" in client.messages[0][1]["content"]
-    assert "candidate-spec.yaml" in client.messages[1][1]["content"]
-    assert "available_tools" in client.messages[0][1]["content"]
+    assert commands == [
+        ["fuzzy-match", ".", "-name", "candidate", "-type", "f", "-print"]
+    ]
 
 
-def test_process_workflow_task_repairs_fuzzy_match_tool_error(
-    tmp_path: Path,
+def test_process_workflow_task_can_continue_after_tool_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workflow = _workflow(tmp_path)
     (tmp_path / "candidate-spec.yaml").write_text("name: candidate\n", encoding="utf-8")
@@ -1521,6 +1462,16 @@ def test_process_workflow_task_repairs_fuzzy_match_tool_error(
             {"action": "complete", "output_state": {"found": True}},
         ]
     )
+    commands: list[list[str]] = []
+    original_fuzzy_match = task_agent.invoke_fuzzy_match_capability
+
+    def capture_command(parameters: dict[str, Any], **kwargs: Any) -> dict[str, Any]:
+        command = parameters.get("command")
+        if isinstance(command, list):
+            commands.append([str(part) for part in command])
+        return original_fuzzy_match(parameters, **kwargs)
+
+    monkeypatch.setattr(task_agent, "invoke_fuzzy_match_capability", capture_command)
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
@@ -1533,15 +1484,11 @@ def test_process_workflow_task_repairs_fuzzy_match_tool_error(
     )
 
     assert exit_code == 0
-    assert len(client.messages) == 3
-    correction = "\n".join(
-        message["content"]
-        for message in client.messages[1]
-        if message["role"] == "user"
-    )
-    assert "fuzzy-match requires -name <query>" in correction
-    assert "corrected JSON action" in correction
-    assert "tool_error" in correction
+    assert len(client.messages) == 4
+    assert commands == [
+        ["fuzzy-match", "."],
+        ["fuzzy-match", ".", "-name", "candidate", "-type", "f"],
+    ]
 
 
 def test_process_workflow_task_repairs_invalid_edit_line_number(
@@ -1576,17 +1523,18 @@ def test_process_workflow_task_repairs_invalid_edit_line_number(
     )
 
     assert exit_code == 0
-    assert len(client.messages) == 2
+    assert len(client.messages) == 3
     correction = "\n".join(
         message["content"]
         for message in client.messages[1]
         if message["role"] == "user"
     )
-    assert "positive integer" in correction
-    assert "complete JSON object" in correction
+    assert "rejected_fingerprints" in correction
 
 
-def test_process_workflow_task_supports_gather_context_action(tmp_path: Path) -> None:
+def test_process_workflow_task_supports_gather_context_action(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workflow = _workflow(tmp_path)
     specs = tmp_path / "docs" / "specs" / "example"
     specs.mkdir(parents=True)
@@ -1604,6 +1552,16 @@ def test_process_workflow_task_supports_gather_context_action(tmp_path: Path) ->
             {"action": "complete", "output_state": {"found": True}},
         ]
     )
+    gathered: list[dict[str, Any]] = []
+    original_gather_context = task_agent.gather_specification_context
+
+    def capture_gather_context(root: Path, **kwargs: Any) -> Any:
+        gathered.append(kwargs)
+        return original_gather_context(root, **kwargs)
+
+    monkeypatch.setattr(
+        task_agent, "gather_specification_context", capture_gather_context
+    )
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
@@ -1616,8 +1574,17 @@ def test_process_workflow_task_supports_gather_context_action(tmp_path: Path) ->
     )
 
     assert exit_code == 0
-    assert "example-pr" in client.messages[1][1]["content"]
-    assert "gather_context" in client.messages[0][0]["content"]
+    assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
+        TaskStatus.COMPLETED
+    )
+    assert gathered == [
+        {
+            "types": ["proposed_prs"],
+            "keywords": ["example-pr"],
+            "filters": {},
+            "feature_id": None,
+        }
+    ]
 
 
 def test_process_workflow_task_can_advance_after_empty_gather_context(
@@ -1673,7 +1640,7 @@ def test_process_workflow_task_repairs_read_document_range_error(
     )
 
     assert exit_code == 0
-    assert len(client.messages) == 2
+    assert len(client.messages) == 3
 
 
 def test_read_task_document_clamps_end_line_to_document_length(
@@ -1764,6 +1731,7 @@ def test_read_task_document_accepts_zero_to_max_lines_range(
 
 def test_missing_read_document_is_recoverable_and_lists_exact_files(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     workflow = _workflow(tmp_path)
     source_directory = tmp_path / "src" / "pkg"
@@ -1785,6 +1753,15 @@ def test_missing_read_document_is_recoverable_and_lists_exact_files(
             {"action": "complete", "output_state": {"read": True}},
         ]
     )
+    listed_files: list[list[str]] = []
+    original_list_worktree_files = task_agent._list_worktree_files
+
+    def capture_list_files(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        result = original_list_worktree_files(*args, **kwargs)
+        listed_files.append(list(result["files"]))
+        return result
+
+    monkeypatch.setattr(task_agent, "_list_worktree_files", capture_list_files)
 
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(workflow_dir=workflow.directory, repo_root=tmp_path),
@@ -1794,10 +1771,8 @@ def test_missing_read_document_is_recoverable_and_lists_exact_files(
     )
 
     assert exit_code == 0
-    assert len(client.messages) == 3
-    assert "actual.py" in str(client.messages[1])
-    assert "do not retry that same path" in str(client.messages[1])
-    assert "list_files" in str(client.messages[1])
+    assert len(client.messages) == 4
+    assert listed_files == [["src/pkg/actual.py"]]
 
 
 def test_list_worktree_files_supports_recursive_glob(tmp_path: Path) -> None:
@@ -1846,8 +1821,6 @@ def test_process_workflow_task_repairs_guessed_workflow_filename_suffix(
     assert "Corrected malformed workflow filename suffix" in stderr.getvalue()
     assert "Rejected workflow shell command" not in stderr.getvalue()
     assert "agent-task.yaml" in stdout.getvalue()
-    assert "workflow_files" in client.messages[0][1]["content"]
-    assert "agent-task.yaml" in client.messages[0][1]["content"]
     assert WorkflowInstance.from_directory(workflow.directory).tasks[0].status is (
         TaskStatus.COMPLETED
     )

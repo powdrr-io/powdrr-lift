@@ -1,5 +1,11 @@
 """A small, total control plane for bounded LLM-assisted procedures."""
 
+from procedrr.catalog import (
+    ProcessCatalog,
+    ProcessCatalogError,
+    ProcessDefinition,
+    ProcessIdentity,
+)
 from procedrr.command_catalog import (
     CommandCatalog,
     CommandCatalogError,
@@ -63,6 +69,10 @@ __all__ = [
     "MatchCase",
     "MatchNode",
     "OperationNode",
+    "ProcessCatalog",
+    "ProcessCatalogError",
+    "ProcessDefinition",
+    "ProcessIdentity",
     "PromptRule",
     "ParallelNode",
     "ProofStatus",

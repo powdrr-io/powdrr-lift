@@ -5,16 +5,16 @@ when_to_use:
 how_to_fill_this_out:
 - Provide the GitHub pull request identifier through the pull-request-id template value.
 - Keep the tasks in this order. Each review must finish before the next review starts.
-- Each nested review skill must post its findings as inline comments on the referenced pull request.
+- Each nested review process must post its findings as inline comments on the referenced pull request.
 task_templates:
 - description: Review feature functionality and completeness
-  actions: [invoke_skill]
+  actions: [task_run_process]
   step_type: governed
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
   llm_type: fast_iteration
-  uses_skills:
+  uses_processes:
   - feature-functionality-review
   input_state:
     pull_request: <pull-request-id>
@@ -30,13 +30,13 @@ task_templates:
   dependent_state:
   - functionality-review-complete
 - description: Review feature test coverage
-  actions: [invoke_skill]
+  actions: [task_run_process]
   step_type: governed
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
   llm_type: fast_iteration
-  uses_skills:
+  uses_processes:
   - feature-test-coverage-review
   input_state:
     pull_request: <pull-request-id>
@@ -53,13 +53,13 @@ task_templates:
   dependent_state:
   - test-coverage-review-complete
 - description: Review pull request security
-  actions: [invoke_skill]
+  actions: [task_run_process]
   step_type: governed
   complexity: high
   assignee_type: agent
   assignee_role: reviewer
   llm_type: fast_iteration
-  uses_skills:
+  uses_processes:
   - security-review
   input_state:
     pull_request: <pull-request-id>

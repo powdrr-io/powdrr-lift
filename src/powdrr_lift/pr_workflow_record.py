@@ -109,7 +109,7 @@ def _record_data(
         "workflow": {
             "name": workflow_name,
             "path": workflow_path,
-            "skills": _skills(workflow_name, events),
+            "processes": _processes(workflow_name, events),
             "steps": [dict(step) for step in steps],
         },
         "tool_calls": _tool_calls(events),
@@ -137,15 +137,15 @@ def _tool_calls(events: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     return calls
 
 
-def _skills(
+def _processes(
     workflow_name: str | None,
     events: Sequence[Mapping[str, Any]],
 ) -> list[str]:
     names = [workflow_name] if workflow_name else []
     names.extend(
-        str(event["skill"])
+        str(event["process_id"])
         for event in events
-        if event.get("kind") == "invoke_skill" and event.get("skill")
+        if event.get("kind") == "task_run_process" and event.get("process_id")
     )
     return list(dict.fromkeys(names))
 

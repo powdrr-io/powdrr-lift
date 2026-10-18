@@ -604,7 +604,7 @@ def test_fragment_builder_rejects_edit_not_grounded_in_source_context() -> None:
 def test_checked_in_generate_fragment_definition_is_single_decision() -> None:
     from pathlib import Path
 
-    source = Path("docs/procedrr/skill-definitions/generate-fragment.yaml").read_text()
+    source = Path("docs/procedrr/processes/generate-fragment.yaml").read_text()
     document = parse_and_validate(source)
 
     assert document["name"] == "generate-fragment"
@@ -619,7 +619,7 @@ def test_checked_in_generate_fragment_definition_is_single_decision() -> None:
 def test_checked_in_design_interview_definition_parses() -> None:
     from pathlib import Path
 
-    source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    source = Path("docs/procedrr/processes/design-interview.yaml").read_text()
     document = parse_and_validate(source)
     judge_providers: dict[str, list[str]] = {"classify_one": [], "construct_one": []}
 
@@ -646,7 +646,7 @@ def test_design_interview_has_no_behavioral_contract_result_stage() -> None:
     from pathlib import Path
 
     document = parse_and_validate(
-        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+        Path("docs/procedrr/processes/design-interview.yaml").read_text()
     )
     schemas: list[dict[str, Any]] = []
 
@@ -672,7 +672,7 @@ def test_design_interview_has_no_behavioral_contract_result_stage() -> None:
 def test_design_interview_uses_single_field_source_classification() -> None:
     from pathlib import Path
 
-    source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    source = Path("docs/procedrr/processes/design-interview.yaml").read_text()
     document = parse_and_validate(source)
     atomicity_body = document["steps"][1]["for_each"]["body"]
     atomicity_judge = atomicity_body[0]["judge"]
@@ -755,7 +755,7 @@ def test_design_interview_has_no_acceptance_criteria_compiler_stage() -> None:
     from procedrr import parse_and_validate
 
     document = parse_and_validate(
-        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+        Path("docs/procedrr/processes/design-interview.yaml").read_text()
     )
     operation_names = [
         step.get("operation", {}).get("command", [None])[0]
@@ -769,7 +769,7 @@ def test_design_interview_has_no_acceptance_criteria_compiler_stage() -> None:
 def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:
     from pathlib import Path
 
-    source = Path("docs/procedrr/skill-definitions/implement-feature.yaml").read_text()
+    source = Path("docs/procedrr/processes/implement-feature.yaml").read_text()
     document = parse_and_validate(source)
 
     assert document["name"] == "implement-feature"

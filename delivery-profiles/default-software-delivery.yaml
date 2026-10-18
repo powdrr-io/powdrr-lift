@@ -6,21 +6,21 @@ personas:
     model_profile: architecture
     prompt_catalogs:
       - architect-responsibilities
-    skill_references:
+    process_references:
       - specify-feature
   - persona_id: engineering-manager
     persona_type: engineering_manager
     model_profile: planning
     prompt_catalogs:
       - engineering-manager-responsibilities
-    skill_references:
+    process_references:
       - start-implementing-feature
   - persona_id: engineer
     persona_type: engineer
     model_profile: implementation
     prompt_catalogs:
       - engineer-responsibilities
-    skill_references:
+    process_references:
       - execute-proposed-pr
   - persona_id: specification-reviewer
     persona_type: specification_reviewer
@@ -32,8 +32,8 @@ personas:
     model_profile: review
     prompt_catalogs:
       - code-reviewer-responsibilities
-    skill_references:
-      - review-proposed-pr
+    process_references:
+      - review-system
 phases:
   - phase_type: intake
     persona_id: architect

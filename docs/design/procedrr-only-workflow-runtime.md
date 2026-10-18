@@ -2,11 +2,10 @@
 
 ## Decision
 
-`workflow-chat` and the durable task agent will execute Procedrr definitions
-only. The legacy `skill-definitions/` language, its parser/compiler, and the
-second step-control implementation are migration inputs, not a supported
-runtime format. Do not add new legacy definitions or extend legacy execution
-while this migration is in progress.
+`workflow-chat` and the durable task agent execute validated Procedrr
+definitions only. The legacy definition catalog, parser, compiler, interpreter,
+and validation CLI have been removed. Do not add another workflow-definition
+format or execution path.
 
 This is a runtime migration, not a deletion of workflow chat or durable task
 processing. User interaction, durable workflow/task records, Git operations,
@@ -17,18 +16,17 @@ progression.
 ## Current boundary
 
 - The feature endpoint already parses and evaluates declarations under
-  `docs/procedrr/skill-definitions/` with `procedrr` and
+  `docs/procedrr/processes/` with `procedrr` and
   `procedrr_evaluator`.
-- `workflow-chat` still loads `skill-definitions/` through
-  `powdrr_lift.process.model` and runs its own step/action interpreter.
-- The durable task agent also loads those skills and implements parallel
-  branch, action, prompt, retry, and progression logic. Workflow task documents
-  and task persistence are separate contracts and are not themselves the old
-  skill language.
-- Procedrr's evaluator currently runs a complete declaration and returns
-  bindings/events. The chat and durable-task integrations must preserve their
-  respective persistence, suspension/resumption, event recording, and tool
-  authorization contracts when adopting it.
+- `workflow-chat` loads the validated Procedrr catalog and runs processes
+  through the shared `ProcedrrExecutionService`; Workrr continues to own the
+  user-facing conversation, worktree context, and operation authorization.
+- The durable task agent loads the same Procedrr catalog and executes through
+  the shared service. Workflow task documents retain their independent
+  dependency, assignment, claim, and completion contracts.
+- Procedrr persists resumable evaluator checkpoints. Durable task manifests and
+  event journals retain the process fingerprint, checkpoint, and event cursor
+  across human handoffs.
 
 ## Target architecture
 
@@ -71,41 +69,39 @@ progression.
 
 ### 2. Migrate workflow chat
 
+Status: migrated. Chat selects from the validated process catalog and runs the
+selected process through the shared service. Every supported root workflow has
+a catalogued Procedrr counterpart, the old root definitions have been removed,
+and the active CLI no longer exposes the legacy validation commands.
+
 - Replace legacy skill discovery and selection output with the Procedrr
   catalog and declared process inputs.
 - Run the selected process through the shared runtime; retain the chat UI and
   existing repository/tool authorization.
 - Port supported user questions, nested process calls, and terminal outcomes
   to explicit Procedrr operations/control nodes.
-- Convert each still-supported root `skill-definitions/` workflow to a
-  Procedrr definition and add behavior-equivalent scenario/replay coverage.
+- Keep deterministic scenarios aligned with Procedrr operation and terminal
+  events; legacy scenario fixtures remain part of the removal work.
 
 ### 3. Migrate durable task execution
 
-- Change the task-to-process reference to a validated Procedrr process ID and
-  typed bindings; preserve the task document's independent dependency,
-  assignment, claim, and completion semantics.
-- Delegate task execution to the shared runtime and persist/resume its
-  evaluator state with the durable task record.
-- Verify retries, stale worktree checks, human handoffs, nested work, and
-  cancellation at the task/runtime boundary.
+Status: migrated. Durable tasks execute the declared Procedrr process, persist
+event journals and checkpoints, and resume after a human response.
+
+- Task records identify a validated process ID and preserve independent
+  dependency, assignment, claim, and completion semantics.
+- The shared runtime persists and resumes evaluator state with the durable
+  task record.
+- Deterministic scenarios cover retries, stale worktree checks, human handoffs,
+  nested work, and task completion.
 
 ### 4. Remove the old language and parallel interpreter
 
-Only after both callers use Procedrr exclusively and their existing behaviors
-have migration coverage:
-
-- remove the legacy `Skill`/`SkillStep` schemas, parser/serializer,
-  validation, catalog, compiler, action/branch/liveness machinery, and
-  `skill-definitions/` YAML/JSON files;
-- remove the old workflow-chat/task-agent step interpreters and their
-  definition-oriented CLI options/aliases;
-- remove legacy-only fixtures, tests, generated baselines, package-data
-  settings, and documentation; retain durable task/template modules that have
-  independent consumers;
-- update documentation to identify Procedrr as the sole process-definition
-  language and move still-useful historical plans to an explicitly archived
-  location or delete them when they have no remaining normative content.
+Status: complete. The legacy skill parser, catalog, compiler, action and branch
+machinery, action protocol, chat/task interpreters, and their dedicated tests
+are removed. The active CLI accepts Procedrr process catalogs and durable task
+documents only. Durable task and template contracts remain because they retain
+independent lifecycle and persistence responsibilities.
 
 ## Acceptance criteria
 
@@ -121,7 +117,7 @@ have migration coverage:
 - No production imports, CLI paths, packaged files, test fixtures, or active
   docs refer to the removed skill language after the final migration change.
 - Full tests, format, lint, type checking, module-boundary checks, and Procedrr
-  definition validation pass before the final removal is merged.
+  definition validation pass before the migration is published.
 
 ## Removal evidence
 

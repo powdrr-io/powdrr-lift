@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import cast
 
 from powdrr_lift.core.delivery_profile import PhaseType
-from powdrr_lift.process.model import SkillToolInvocation
+from powdrr_lift.process.task_step import ToolInvocation
 from powdrr_lift.process.tasks import TaskComplexity, WorkflowInstance
 from powdrr_lift.process.templates import (
     WorkflowTaskTemplate,
@@ -143,13 +143,13 @@ def test_workflow_template_validation_rejects_skill_and_pre_step_together() -> N
     report = build_workflow_template_validation_report(
         json.dumps(
             {
-                "when_to_use": ["When a workflow invokes a nested skill."],
-                "how_to_fill_this_out": ["Declare the nested skill."],
+                "when_to_use": ["When a workflow invokes a nested process."],
+                "how_to_fill_this_out": ["Declare the nested process."],
                 "task_templates": [
                     {
-                        "description": "Run the nested validation skill.",
+                        "description": "Run the nested validation process.",
                         "step_type": "governed",
-                        "uses_skills": ["some-skill"],
+                        "uses_processes": ["some-process"],
                         "pre_step": {
                             "action": "invoke_tool",
                             "template": {"tool": "shell", "command": ["true"]},
@@ -162,7 +162,7 @@ def test_workflow_template_validation_rejects_skill_and_pre_step_together() -> N
 
     assert report.validation_successful is False
     issue_codes = [issue.code for issue in report.issues]
-    assert "uses_skills_with_pre_step" in issue_codes
+    assert "uses_processes_with_pre_step" in issue_codes
     assert "unexpected_pre_step" in issue_codes
 
 
@@ -426,7 +426,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     )
     assert "basedpyright-structure" in (template.task_templates[1].details or "")
     assert "basedpyright-symbol" in (template.task_templates[1].details or "")
-    assert template.task_templates[2].uses_skills == ()
+    assert template.task_templates[2].uses_processes == ()
     assert template.task_templates[2].step_type == "coding_loop"
     assert template.task_templates[2].actions == (
         "invoke_tool",
@@ -450,7 +450,7 @@ def test_execute_proposed_pr_workflow_template_file_is_checked_in() -> None:
     assert template.task_templates[9].input_state["scope_review"] == (
         "<upstream-task-8>.final-scope-review-state"
     )
-    assert template.task_templates[12].uses_skills == ("finish-pr-prep",)
+    assert template.task_templates[12].uses_processes == ("finish-pr-prep",)
     assert template.task_templates[12].input_state["staged_changes"] == (
         "<upstream-task-11>.staged-pull-request-state"
     )
@@ -581,7 +581,7 @@ def test_instantiate_workflow_template_accepts_generic_input_values(
                 complexity=TaskComplexity.LOW,
                 input_state={"custom": "<custom-value>"},
                 tool_invocations=(
-                    SkillToolInvocation(
+                    ToolInvocation(
                         tool="shell",
                         command=("echo", "<custom-value>"),
                         cwd="<custom-value>",
@@ -669,7 +669,7 @@ def test_fully_review_pr_template_runs_reviews_sequentially(
     )
 
     template = load_workflow_template(template_path)
-    assert [task.uses_skills for task in template.task_templates] == [
+    assert [task.uses_processes for task in template.task_templates] == [
         ("feature-functionality-review",),
         ("feature-test-coverage-review",),
         ("security-review",),

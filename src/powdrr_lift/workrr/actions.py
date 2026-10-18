@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal
+from typing import Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,7 +42,6 @@ class WorkflowAction:
 
     kind: str
     tool: str | None = None
-    skill_name: str | None = None
     step_id: str | None = None
     file_path: str | None = None
     destination_path: str | None = None
@@ -66,7 +65,4 @@ class WorkflowAction:
     filters: dict[str, object] = field(default_factory=dict)
     decisions_and_context: str | None = None
     llm_type: str | None = None
-    provider_role: Literal["normal", "adversarial"] | None = None
-    clean: bool = False
-    context: tuple[str, ...] = field(default_factory=tuple)
     human_input: dict[str, Any] | None = None

@@ -31,7 +31,7 @@ def test_unbounded_phase_reader_waits_for_process_exit(tmp_path: Path) -> None:
 def test_agent_feature_run_prompts_agent_then_executes_generated_workflows(
     tmp_path: Path,
 ) -> None:
-    _write_skill_fixtures(tmp_path)
+    _write_process_fixtures(tmp_path)
     workflow_root = tmp_path / "docs/workflows/interaction-file-log"
     workflow_root.mkdir(parents=True)
     (workflow_root / "interaction-file-log-core-task-001.yaml").write_text(
@@ -67,7 +67,7 @@ def test_agent_feature_run_prompts_agent_then_executes_generated_workflows(
 
 
 def test_agent_feature_run_stops_after_specification_failure(tmp_path: Path) -> None:
-    _write_skill_fixtures(tmp_path)
+    _write_process_fixtures(tmp_path)
     calls: list[list[str]] = []
 
     def failing_runner(
@@ -86,10 +86,10 @@ def test_agent_feature_run_stops_after_specification_failure(tmp_path: Path) -> 
     assert result.phases[0]["name"] == "specify-a-feature"
 
 
-def _write_skill_fixtures(repo_root: Path) -> None:
-    skills = repo_root / "skill-definitions"
-    skills.mkdir()
+def _write_process_fixtures(repo_root: Path) -> None:
+    processes = repo_root / "docs" / "procedrr" / "processes"
+    processes.mkdir(parents=True)
     for name in ("specify-a-feature", "start-implementing-feature"):
-        (skills / f"{name}.yaml").write_text(
-            f"name: {name}\nsteps: []\n", encoding="utf-8"
+        (processes / f"{name}.yaml").write_text(
+            f"version: 1\nname: {name}\nsteps: []\n", encoding="utf-8"
         )

@@ -146,12 +146,9 @@ def test_core_does_not_reexport_process_language() -> None:
     from powdrr_lift import core
 
     process_names = {
-        "Skill",
-        "SkillDocument",
         "WorkflowTask",
         "WorkflowInstance",
         "WorkflowTemplate",
-        "load_skill",
         "load_workflow_task_document",
         "load_workflow_template",
     }

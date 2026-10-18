@@ -1,0 +1,148 @@
+version: 1
+name: run-tests-and-fix
+description: When implementation and generated tests are present and the complete test suite
+  must pass. When test failures require a structured repair followed by deterministic reruns.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: run-tests-and-fix\nwhen_to_use:\n- When implementation and generated tests\
+      \ are present and the complete test suite must pass.\n- When test failures require a\
+      \ structured repair followed by deterministic reruns.\nsteps:\n- id: run-all-tests\n\
+      \  description: Run the complete test suite and preserve its raw tool result.\n  step_type:\
+      \ invoke_tool\n  llm_type: simple_task\n  outputs:\n  - name: test_tool_result\n   \
+      \ type: any\n    required_for_next_step: true\n    schema: {type: object, additionalProperties:\
+      \ true}\n  pre_step:\n    action: invoke_tool\n    template:\n      tool: shell\n  \
+      \    command: [uv, run, --extra, dev, pytest, -q]\n- id: enrich-test-results\n  description:\
+      \ Convert the raw test result into structured failure data.\n  step_type: invoke_tool\n\
+      \  inputs:\n  - name: test_tool_result\n    type: any\n    required: true\n  llm_type:\
+      \ simple_task\n  pre_step:\n    action: invoke_tool\n    template:\n      tool: enrich\n\
+      \      format: pytest\n      tool_output: {source: handoff, name: test_tool_result}\n\
+      \  outputs:\n  - name: enriched_test_result\n    type: any\n    required_for_next_step:\
+      \ true\n    schema: {type: object, additionalProperties: true}\n- id: diagnose-test-results\n\
+      \  description: Produce a traceback-supported diagnosis from structured test results.\n\
+      \  step_type: governed\n  inputs:\n  - name: enriched_test_result\n    type: any\n \
+      \   required: true\n  llm_type: high_reasoning\n  details: >-\n    Consume only enriched_test_result.\
+      \ Identify every failing test and its exact\n    root cause. List only approved source\
+      \ or test files that require changes.\n    Return next_step with test_diagnosis containing\
+      \ classification, failing_tests,\n    and root_causes; each root cause must contain\
+      \ cause, files_to_change, and\n    repair_strategy. Return {\"action\":\"next_step\"\
+      ,\"outputs\":{\"test_diagnosis\":{}}}.\n    Do not edit files in this step and do not\
+      \ run commands.\n  outputs:\n  - name: test_diagnosis\n    type: any\n    required_for_next_step:\
+      \ true\n    schema: {type: object, additionalProperties: true}\n- id: produce-repair-edit\n\
+      \  description: Produce one deferred edit for all diagnosed failures.\n  step_type:\
+      \ predicated\n  completion:\n    required_outputs: [repair_edit]\n    required_actions:\n\
+      \      - action: read_document\n        targets_from: test_diagnosis.root_causes[*].files_to_change\n\
+      \        match_field: file_path\n  inputs:\n  - name: test_diagnosis\n    type: any\n\
+      \    required: true\n  llm_type: standard_reasoning\n  details: >-\n    Use test_diagnosis\
+      \ as the diagnosis input. You may and must use\n    read_document for every file in\
+      \ root_causes[*].files_to_change before composing\n    the output. Produce one complete\
+      \ deferred edit in the required output named\n    repair_edit; do not apply it yet.\
+      \ Derive\n    exact ranges from the returned numbered lines. The edit must be a complete\n\
+      \    canonical action object, never a partial edit or prose. Use this exact shape:\n\
+      \    {\"action\":\"emit_outputs\",\"outputs\":{\"repair_edit\":{\"action\":\"edit\"\
+      ,\"file_edits\":[{\"file_path\":\"src/example.py\",\"edits\":[{\"kind\":\"replace\"\
+      ,\"start_line\":12,\"end_line\":14,\"text\":\"corrected implementation\"}]}]}}}\n  \
+      \  Every inner kind is the string add, remove, or replace. Never use line_number,\n\
+      \    content, or an object in kind. Include every required file in one file_edits\n\
+      \    array. Do not guess line 1, use traceback line numbers as edit ranges, or\n   \
+      \ claim the repair is applied. Edit line numbers are 1-based: start_line and\n    end_line\
+      \ must be positive integers (1 or greater), never 0; end_line must be\n    greater than\
+      \ or equal to start_line. Return outputs.repair_edit in the same\n    JSON action object\
+      \ as the final action, for example:\n    {\"action\":\"emit_outputs\",\"outputs\":{\"\
+      repair_edit\":{\"action\":\"edit\",\n    \"file_edits\":[{\"file_path\":\"src/example.py\"\
+      ,\"edits\":[{\"kind\":\"replace\",\"start_line\":12,\"end_line\":14,\"text\":\"corrected\
+      \ implementation\"}]}]}}}. Do not return next_step; the runtime advances after\n   \
+      \ repair_edit is present.\n    If no repair is needed, emit an edit object with an empty\
+      \ file_edits array\n    and explain why in decisions_and_context.\n  outputs:\n  - name:\
+      \ repair_edit\n    type: object\n    schema: &deferred_edit_schema\n      type: object\n\
+      \      required: [action, file_edits]\n      additionalProperties: false\n      properties:\n\
+      \        action: {type: string, enum: [edit]}\n        file_edits:\n          type:\
+      \ array\n          items:\n            type: object\n            required: [file_path,\
+      \ edits]\n            additionalProperties: false\n            properties:\n       \
+      \       file_path: {type: string, minLength: 1}\n              edits:\n            \
+      \    type: array\n                minItems: 1\n                items:\n            \
+      \      type: object\n                  required: [kind, start_line, end_line]\n    \
+      \              additionalProperties: false\n                  properties:\n        \
+      \            kind: {type: string, enum: [add, remove, replace]}\n                  \
+      \  start_line: {type: integer}\n                    end_line: {type: integer}\n    \
+      \                text: {type: string}\n    required_for_next_step: true\n  actions:\
+      \ [read_document]\n- id: validate-repair-edit\n  description: Validate the deferred\
+      \ edit without changing files.\n  step_type: invoke_tool\n  inputs:\n  - name: repair_edit\n\
+      \    type: any\n    required: true\n  llm_type: simple_task\n  pre_step:\n    action:\
+      \ invoke_tool\n    template:\n      tool: validate_edit\n      edit: <repair_edit>\n\
+      \  outputs:\n  - name: edit_validation\n    type: any\n    required_for_next_step: true\n\
+      \    schema: {type: object, additionalProperties: true}\n- id: repair-invalid-edit\n\
+      \  description: Correct the deferred edit using deterministic validation feedback.\n\
+      \  step_type: predicated\n  completion:\n    required_outputs: [repair_edit]\n    required_actions:\n\
+      \      - action: read_document\n        targets_from: test_diagnosis.root_causes[*].files_to_change\n\
+      \        match_field: file_path\n  inputs:\n  - name: repair_edit\n    type: any\n \
+      \   required: true\n  - name: edit_validation\n    type: any\n    required: true\n \
+      \ llm_type: standard_reasoning\n  actions: [read_document]\n  details: >-\n    Use the\
+      \ repair_edit and edit_validation handoffs. If edit_validation has\n    returncode 0,\
+      \ return the exact same repair_edit unchanged. If it failed,\n    correct only the reported\
+      \ validation issue and emit a new\n    repair_edit. Re-read any target file needed to\
+      \ determine exact in-bounds\n    lines. The output must remain one complete canonical\
+      \ edit action object;\n    never use line_number or content, and never apply files in\
+      \ this step.\n    Return it in the top-level outputs object with an emit_outputs action,\
+      \ for\n    example: {\"action\":\"emit_outputs\",\"outputs\":{\"repair_edit\":{\"action\"\
+      :\"edit\",\n    \"file_edits\":[{\"file_path\":\"src/example.py\",\"edits\":[{\"kind\"\
+      :\"replace\",\"start_line\":12,\"end_line\":14,\"text\":\"corrected implementation\"\
+      }]}]}}}. Do not return next_step; the runtime advances after\n    repair_edit is present.\
+      \ The value must be the full corrected object, not a\n    prose description. The top-level\
+      \ action is exactly the example above; the\n    nested edit is not a separate returned\
+      \ action.\n  outputs:\n  - name: repair_edit\n    type: object\n    schema: *deferred_edit_schema\n\
+      \    required_for_next_step: true\n- id: validate-repair-edit-gate\n  description: Require\
+      \ the corrected deferred edit to pass validation.\n  step_type: gate\n  inputs:\n  -\
+      \ name: repair_edit\n    type: any\n    required: true\n  llm_type: simple_task\n  details:\
+      \ The deterministic validator is authoritative; do not apply files in this gate.\n \
+      \ pre_step:\n    action: invoke_tool\n    template:\n      tool: validate_edit\n   \
+      \   edit: <repair_edit>\n  gate:\n    outcome: {path: returncode, equals: 0}\n    goto_step:\
+      \ repair-invalid-edit\n    retry_context: >-\n      The corrected repair_edit is still\
+      \ invalid. Use the new validation result,\n      re-read every target file, and return\
+      \ a materially corrected canonical edit.\n      Do not repeat the invalid output or\
+      \ apply any edit until validation passes.\n- id: apply-repair-edit\n  description: Apply\
+      \ the validated deferred edit.\n  step_type: invoke_tool\n  inputs:\n  - name: repair_edit\n\
+      \    type: any\n    required: true\n  llm_type: simple_task\n  pre_step:\n    action:\
+      \ invoke_tool\n    template:\n      tool: apply_edit\n      edit: <repair_edit>\n  outputs:\n\
+      \  - name: applied_edit\n    type: any\n    required_for_next_step: true\n    schema:\
+      \ {type: object, additionalProperties: true}\n- id: rerun-all-tests\n  description:\
+      \ Rerun the complete suite after applying the repair.\n  step_type: gate\n  inputs:\n\
+      \  - name: applied_edit\n    type: any\n    required: true\n  llm_type: simple_task\n\
+      \  details: The deterministic rerun is authoritative. If it passes, complete the process;\
+      \ otherwise return to diagnose-test-results with the new result.\n  pre_step:\n    action:\
+      \ invoke_tool\n    template:\n      tool: shell\n      command: [uv, run, --extra, dev,\
+      \ pytest, -q]\n  outputs:\n  - name: test_tool_result\n    type: any\n    required_for_next_step:\
+      \ true\n    schema: {type: object, additionalProperties: true}\n  gate:\n    outcome:\
+      \ {path: returncode, equals: 0}\n    goto_step: enrich-test-results\n    retry_context:\
+      \ The repaired suite still fails; diagnose the new result and produce a different deferred\
+      \ edit."
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - read_document
+    - invoke_tool
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

@@ -1,0 +1,112 @@
+version: 1
+name: address-review-comments
+description: When an existing pull request has review comments that must be addressed. When
+  review feedback may require both implementation changes and updates to the feature's v1
+  specifications. When the addressed changes must be validated and pushed back to the existing
+  pull request.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: address-review-comments\nwhen_to_use:\n- When an existing pull request has\
+      \ review comments that must be addressed.\n- When review feedback may require both implementation\
+      \ changes and updates to the\n  feature's v1 specifications.\n- When the addressed changes\
+      \ must be validated and pushed back to the existing\n  pull request.\nsteps:\n- description:\
+      \ Inspect the pull request and collect its review comments.\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type: long_context\n\
+      \  details: >-\n    Resolve the current pull request from the worktree branch and inspect\
+      \ its\n    title, body, feature and proposed-PR references, changed files, commits,\n\
+      \    review history, unresolved review threads, and inline comments. Use the\n    thread-aware\
+      \ review API so resolved, outdated, and current comments can be\n    distinguished.\
+      \ Build a comment ledger with one entry per actionable comment,\n    including its file\
+      \ and line anchor, requested outcome, and relationship to\n    the feature definition\
+      \ and proposed-PR specification. Do not duplicate a\n    root cause or act on informational,\
+      \ resolved, or outdated feedback.\n  tool_invocation_packages: [gh_readonly]\n  tool_invocations:\n\
+      \  - tool: shell\n    command:\n    - gh\n    - api\n    - graphql\n    - -f\n    -\
+      \ query=<review-thread-query>\n- id: classify-comments\n  actions: [edit, yaml_edit,\
+      \ file_management, read_document]\n  step_type: governed\n  description: Classify each\
+      \ comment against the feature contract.\n  llm_type: high_reasoning\n  details: >-\n\
+      \    For every actionable comment, read the relevant feature definition and\n    proposed-PR\
+      \ specification before deciding what to change. Record whether\n    the comment is an\
+      \ implementation correction, a test or validation correction,\n    documentation-only\
+      \ feedback, or a change to feature design, entities,\n    relationships, decisions,\
+      \ intent, acceptance criteria, scope, risks, or\n    proposed-PR sequencing. Treat structured\
+      \ v1 specification data as the\n    contract and preserve existing ids and relationships\
+      \ unless the feedback\n    explicitly changes them. If a comment conflicts with the\
+      \ feature contract\n    or another comment, identify the conflict and resolve it from\
+      \ the most\n    authoritative specification rather than silently guessing.\n- id: update-specifications\n\
+      \  actions: [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n \
+      \ description: Update the v1 specification for design-level feedback.\n  llm_type: standard_reasoning\n\
+      \  details: >-\n    For each comment classified as a design-level change, generate or\
+      \ reuse the\n    appropriate v1 specification template in docs/proposals/<work-item-name>/\
+      \ using\n    the repository's powdrr-lift template command, then fill the template with\n\
+      \    the approved change while preserving the existing specification content.\n    Use\
+      \ system-specification for system entities and intent, architecture-\n    specification\
+      \ for entities and relationships, implementation-specification\n    for implementation\
+      \ decisions, and pr-specification for proposed-PR intent,\n    acceptance criteria,\
+      \ tests, outcomes, non-goals, or risks. Validate every\n    changed specification with\
+      \ its matching evaluate-* command before treating\n    the comment as addressed. Do\
+      \ not create a specification for an\n    implementation-only or test-only correction.\n\
+      \  tool_invocations:\n  - tool: internal\n    command:\n    - powdrr-lift\n    - <specification-template-command>\n\
+      \    - --work-item-name\n    - <work-item-name>\n  - tool: internal\n    command:\n\
+      \    - powdrr-lift\n    - <evaluate-specification-command>\n    - --work-item-name\n\
+      \    - <work-item-name>\n- id: implement-corrections\n  actions: [invoke_tool, edit,\
+      \ yaml_edit, read_document, goto_step]\n  step_type: governed\n  description: Implement\
+      \ and test every actionable review correction.\n  llm_type: high_reasoning\n  details:\
+      \ >-\n    Apply the requested code, test, documentation, and specification changes in\n\
+      \    the current worktree. Keep each edit traceable to its comment ledger entry,\n \
+      \   update or add tests required by the revised feature contract, and avoid\n    unrelated\
+      \ cleanup. Re-read the changed files and diff against the PR so that\n    every actionable\
+      \ comment is either addressed or explicitly recorded as\n    blocked with its reason.\
+      \ If a correction or test fails, use goto_step with\n    step_id `implement-corrections`\
+      \ after fixing the cause and continue until\n    every actionable comment is addressed.\
+      \ Stage only the intended files after\n    the changes are complete; do not create a\
+      \ new pull request for this workflow.\n  tool_invocations:\n  - tool: shell\n    command:\n\
+      \    - git\n    - diff\n    - --check\n  - tool: internal\n    command:\n    - powdrr-lift\n\
+      \    - repository-state\n- id: validate-corrections\n  step_type: uses_process\n  description:\
+      \ Run finish-pr-prep on the final staged changes.\n  llm_type: fast_iteration\n  details:\
+      \ >-\n    Invoke finish-pr-prep after all implementation, test, documentation, and\n\
+      \    v1 specification files are staged. If validation or cleanup changes files,\n  \
+      \  inspect the edits, restage only the intended files, and rerun finish-pr-prep\n  \
+      \  until the final staged state is clean. Do not push while any required check\n   \
+      \ is failing.\n  uses_process:\n    process: finish-pr-prep\n- description: Commit and push\
+      \ the addressed changes to the existing pull request.\n  step_type: uses_process\n  llm_type:\
+      \ simple_task\n  details: >-\n    Invoke create-pull-request with pr-kind `review-comments`,\
+      \ commit message\n    `Address pull request review comments`, and the existing pull-request\n\
+      \    reference and title. Pass a `files_to_publish` context list containing\n    every\
+      \ intended changed file, along with the review ledger, and require one\n    Review Feedback\
+      \ Addressed row per actionable comment. Resolve each review\n    thread only after its\
+      \ requested change is present and pushed. Never merge\n    the pull request or push\
+      \ directly to main.\n  uses_process:\n    process: create-pull-request"
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - invoke_tool
+    - read_document
+    - yaml_edit
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

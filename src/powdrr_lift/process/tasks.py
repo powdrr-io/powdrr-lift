@@ -14,14 +14,14 @@ from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
 )
-from powdrr_lift.process.model import (
-    SUPPORTED_INTERACTION_STYLES,
-    SUPPORTED_STEP_TYPES,
+from powdrr_lift.process.task_step import (
+    SUPPORTED_TASK_INTERACTION_STYLES,
+    SUPPORTED_TASK_STEP_TYPES,
     CodingLoopSpec,
-    SkillStepGate,
-    SkillStepPreStep,
-    SkillToolInvocation,
-    skill_step_from_data,
+    TaskGate,
+    TaskPreStep,
+    ToolInvocation,
+    task_execution_settings_from_data,
 )
 
 
@@ -85,8 +85,8 @@ class WorkflowTask:
     details: str | None = None
     llm_type: str | None = None
     interaction_style: str | None = None
-    uses_skills: tuple[str, ...] = field(default_factory=tuple)
-    tool_invocations: tuple[SkillToolInvocation, ...] = field(default_factory=tuple)
+    uses_processes: tuple[str, ...] = field(default_factory=tuple)
+    tool_invocations: tuple[ToolInvocation, ...] = field(default_factory=tuple)
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
     actions: tuple[str, ...] = field(default_factory=tuple)
     actions_declared: bool = False
@@ -94,12 +94,14 @@ class WorkflowTask:
     upstream_task_ids: tuple[str, ...] = field(default_factory=tuple)
     dependent_state: tuple[str, ...] = field(default_factory=tuple)
     step_type: str = "governed"
-    pre_step: SkillStepPreStep | None = None
-    gate: SkillStepGate | None = None
+    pre_step: TaskPreStep | None = None
+    gate: TaskGate | None = None
     coding_loop: CodingLoopSpec | None = None
     workflow_template: str | None = None
     phase_type: PhaseType | None = None
     persona_id: str | None = None
+    process_id: str | None = None
+    process_checkpoint: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.actions:
@@ -131,7 +133,7 @@ class WorkflowTask:
             "details": self.details,
             "llm_type": self.llm_type,
             "interaction_style": self.interaction_style,
-            "uses_skills": list(self.uses_skills),
+            "uses_processes": list(self.uses_processes),
             "tool_invocations": [
                 invocation.to_data() for invocation in self.tool_invocations
             ],
@@ -154,6 +156,10 @@ class WorkflowTask:
             data["phase_type"] = self.phase_type.value
         if self.persona_id is not None:
             data["persona_id"] = self.persona_id
+        if self.process_id is not None:
+            data["process_id"] = self.process_id
+        if self.process_checkpoint is not None:
+            data["process_checkpoint"] = dict(self.process_checkpoint)
         data.update({key: value for key, value in step_data.items() if value})
         if self.actions_declared and not self.actions:
             data["actions"] = []
@@ -258,10 +264,19 @@ class WorkflowInstance:
             task,
             status=TaskStatus.COMPLETED,
             output_state=output_state,
+            process_checkpoint=None,
         )
         save_workflow_task(completed_task, self.directory / f"{task_id}.yaml")
         self._tasks[task_id] = completed_task
         return completed_task
+
+    def update_task(self, task: WorkflowTask) -> WorkflowTask:
+        """Persist task metadata changes without changing its lifecycle status."""
+        if task.task_id not in self._tasks:
+            raise KeyError(f"Unknown workflow task: {task.task_id}")
+        save_workflow_task(task, self.directory / f"{task.task_id}.yaml")
+        self._tasks[task.task_id] = task
+        return task
 
     def terminate_workflow(
         self, task_id: str, output_state: Any = None
@@ -281,6 +296,7 @@ class WorkflowInstance:
             task,
             status=TaskStatus.COMPLETED,
             output_state=output_state,
+            process_checkpoint=None,
         )
         save_workflow_task(terminated_task, self.directory / f"{task_id}.yaml")
         self._tasks[task_id] = terminated_task
@@ -290,7 +306,11 @@ class WorkflowInstance:
                 TaskStatus.LOCKED,
             }:
                 continue
-            closed_task = replace(candidate, status=TaskStatus.CLOSED)
+            closed_task = replace(
+                candidate,
+                status=TaskStatus.CLOSED,
+                process_checkpoint=None,
+            )
             save_workflow_task(
                 closed_task, self.directory / f"{candidate.task_id}.yaml"
             )
@@ -387,13 +407,19 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
     if "input_state" not in data:
         raise ValueError("Workflow task entries must include input_state.")
     assignee_type, assignee_role = _required_assignee(data)
-    step = skill_step_from_data(data)
-    uses_skills = (
-        _required_string_sequence(data, "uses_skills") if "uses_skills" in data else ()
+    step = task_execution_settings_from_data(data)
+    uses_processes = (
+        _required_string_sequence(data, "uses_processes")
+        if "uses_processes" in data
+        else ()
     )
     output_state_type = _required_string(data, "output_state_type")
     phase_type = _optional_phase_type(data.get("phase_type"))
     persona_id = _optional_persona_id(data.get("persona_id"))
+    process_id = _optional_string(data.get("process_id"))
+    process_checkpoint = data.get("process_checkpoint")
+    if process_checkpoint is not None and not isinstance(process_checkpoint, Mapping):
+        raise ValueError("Workflow task process_checkpoint must be a mapping.")
 
     return WorkflowTask(
         task_id=task_id,
@@ -407,7 +433,7 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         details=step.details,
         llm_type=step.llm_type,
         interaction_style=step.interaction_style,
-        uses_skills=uses_skills,
+        uses_processes=uses_processes,
         tool_invocations=step.tool_invocations,
         prompt_catalogs=step.prompt_catalogs,
         actions=step.actions,
@@ -422,6 +448,10 @@ def workflow_task_from_data(data: Mapping[str, Any]) -> WorkflowTask:
         dependent_state=dependent_state,
         phase_type=phase_type,
         persona_id=persona_id,
+        process_id=process_id,
+        process_checkpoint=(
+            dict(process_checkpoint) if process_checkpoint is not None else None
+        ),
     )
 
 
@@ -615,7 +645,7 @@ def build_workflow_task_validation_report(
             "details",
             "llm_type",
             "interaction_style",
-            "uses_skills",
+            "uses_processes",
             "tool_invocations",
             "prompt_catalogs",
             "actions",
@@ -625,6 +655,8 @@ def build_workflow_task_validation_report(
             "workflow_template",
             "phase_type",
             "persona_id",
+            "process_id",
+            "process_checkpoint",
         },
         issues,
         path=_format_path(source_path) or "",
@@ -653,8 +685,31 @@ def build_workflow_task_validation_report(
             )
         )
 
+    raw_process_id = raw_task.get("process_id")
+    if raw_process_id is not None and (
+        not isinstance(raw_process_id, str) or not raw_process_id.strip()
+    ):
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="invalid_process_id",
+                message="process_id must be a non-empty string when provided.",
+                path=_format_child_path(source_path, "process_id"),
+            )
+        )
+    raw_process_checkpoint = raw_task.get("process_checkpoint")
+    if raw_process_checkpoint is not None and not isinstance(
+        raw_process_checkpoint, Mapping
+    ):
+        issues.append(
+            WorkflowTaskValidationIssue(
+                code="invalid_process_checkpoint",
+                message="process_checkpoint must be a mapping when provided.",
+                path=_format_child_path(source_path, "process_checkpoint"),
+            )
+        )
+
     step_type = raw_task.get("step_type", "governed")
-    if not isinstance(step_type, str) or step_type not in SUPPORTED_STEP_TYPES:
+    if not isinstance(step_type, str) or step_type not in SUPPORTED_TASK_STEP_TYPES:
         issues.append(
             WorkflowTaskValidationIssue(
                 code="invalid_step_type_value",
@@ -668,14 +723,14 @@ def build_workflow_task_validation_report(
     interaction_style = raw_task.get("interaction_style")
     if interaction_style is not None and (
         not isinstance(interaction_style, str)
-        or interaction_style.strip() not in SUPPORTED_INTERACTION_STYLES
+        or interaction_style.strip() not in SUPPORTED_TASK_INTERACTION_STYLES
     ):
         issues.append(
             WorkflowTaskValidationIssue(
                 code="invalid_interaction_style",
                 message=(
                     "Workflow task interaction_style must be one of: "
-                    + ", ".join(sorted(SUPPORTED_INTERACTION_STYLES))
+                    + ", ".join(sorted(SUPPORTED_TASK_INTERACTION_STYLES))
                     + "."
                 ),
                 path=_format_child_path(source_path, "interaction_style"),

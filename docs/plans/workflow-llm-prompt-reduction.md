@@ -224,14 +224,14 @@ Add workflow tests that verify:
 
 ## Priority 3: make capability descriptions conditional
 
-### 13. Include available skills only when needed
+### 13. Include available processes only when needed
 
-The complete skill catalog is unnecessary for most steps. Include it only when:
+The complete process catalog is unnecessary for most steps. Include it only when:
 
-- the current step permits `invoke_skill`; or
-- the model is recovering from an invalid `invoke_skill` action.
+- the current process can invoke `task_run_process`; or
+- the model is recovering from an invalid process invocation.
 
-Otherwise omit the catalog or provide only skill names.
+Otherwise omit the catalog or provide only process names.
 
 ### 14. Include context types only for context-gathering steps
 
@@ -255,7 +255,7 @@ Shorten the always-present action prompt to the core rules:
 - use the supplied action schema.
 
 Move detailed instructions and examples into conditional sections for complex
-actions such as `gather_context`, `yaml_edit`, `invoke_skill`, and
+operations such as `gather_context`, `yaml_edit`, `task_run_process`, and
 `read_document`. The parser remains the final validation authority.
 
 ## Priority 4: reduce incidental metadata

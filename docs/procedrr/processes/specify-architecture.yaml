@@ -1,0 +1,107 @@
+version: 1
+name: specify-architecture
+description: When the work item already has requirements and approach and needs an architecture
+  specification. When the TUI should guide the user through a synchronous architecture flow.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: specify-architecture\ninputs:\n- name: work-item-name\n- name: allowed-type\n\
+      when_to_use:\n- When the work item already has requirements and approach and needs an\
+      \ architecture\n  specification.\n- When the TUI should guide the user through a synchronous\
+      \ architecture flow.\nsteps:\n- id: review-system-context\n  description: Review the\
+      \ system context first.\n  step_type: uses_process\n  llm_type: high_reasoning\n  details:\
+      \ Use the system review flow to confirm the requirements, approach, and current\n  \
+      \  constraints.\n  uses_process:\n    process: review-system\n- id: generate-architecture\n\
+      \  description: Generate the architecture specification template.\n  actions: []\n \
+      \ step_type: invoke_tool\n  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n\
+      \    template:\n      tool: internal\n      command:\n      - powdrr-lift\n      - architecture-specification\n\
+      \      - \"--work-item-name\"\n      - \"<work-item-name>\"\n      - \"--all-entity-types\"\
+      \n  outputs:\n  - name: architecture_specification_template\n    type: any\n    required_for_next_step:\
+      \ true\n    schema: {type: object, additionalProperties: true}\n- id: fill-architecture\n\
+      \  description: Fill out entities, relationships, invariants, and guidance using only\n\
+      \    the allowed entity types.\n  actions: [edit, yaml_edit, file_management, read_document]\n\
+      \  step_type: governed\n  llm_type: high_reasoning\n  details: >-\n    Use the yaml_edit\
+      \ action for every YAML change. Its shape is\n    {\"action\":\"yaml_edit\",\"file_path\"\
+      :\"docs/proposals/<work-item-name>/architecture-specification.yaml\",\"operations\"\
+      :[{\"op\":\"upsert_item\",\"section\":\"entities\",\"id\":\"entity-id\",\"value\":{\"\
+      type\":\"<allowed-type>\",\"name\":\"...\",\"description\":\"...\"}},{\"op\":\"upsert_item\"\
+      ,\"section\":\"relationships\",\"id\":\"relationship-id\",\"value\":{\"source\":\"entity-id\"\
+      ,\"target\":\"entity-id\",\"relationship\":\"...\"}},{\"op\":\"upsert_item\",\"section\"\
+      :\"invariants\",\"id\":\"invariant-id\",\"value\":{\"description\":\"...\",\"entity_ids\"\
+      :[\"entity-id\"]}}]}. Use set_value with a JSON path array for scalar or top-level list\
+      \ fields. Keep references explicit and make sure every invariant or guidance item points\
+      \ at listed entities or relationships.\n  \n- id: evaluate-architecture\n  description:\
+      \ Deterministically evaluate the filled architecture specification.\n  actions: []\n\
+      \  step_type: invoke_tool\n  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n\
+      \    template:\n      tool: internal\n      command:\n      - powdrr-lift\n      - evaluate\n\
+      \      - docs/proposals/<work-item-name>/architecture-specification.yaml\n  outputs:\n\
+      \  - name: architecture_evaluation\n    type: any\n    required_for_next_step: true\n\
+      \    schema: {type: object, additionalProperties: true}\n- id: repair-architecture\n\
+      \  description: Use yaml_edit to fix every issue reported by the architecture evaluator.\n\
+      \  actions: [edit, yaml_edit, file_management, read_document, goto_step]\n  step_type:\
+      \ governed\n  llm_type: fast_iteration\n  details: >-\n    Review only the latest deterministic\
+      \ evaluator result and correct every\n    reported issue with one or more yaml_edit\
+      \ actions. Do not reuse an older LLM\n    explanation after the evaluator has rerun.\
+      \ Each yaml_edit action must include the\n    YAML file_path and a non-empty operations\
+      \ array. Use set_value with a JSON\n    path array for scalar or top-level list changes;\
+      \ use upsert_item with section,\n    id, and a complete value mapping for entity, relationship,\
+      \ invariant, or\n    guidance entries. For entity_type_not_allowed, use the evaluator's\
+      \ exact\n    allowed_entity_types list and edit only entities[].type. Entity type values\n\
+      \    are independent from relationship source and target fields: source and target\n\
+      \    must remain entity ids, never type names such as Source file. Matching is\n   \
+      \ case-insensitive for validation, but prefer the exact spelling from the\n    allowed\
+      \ list. Never alternate between two type values, repair a different\n    entity, or\
+      \ change a value that already matches the latest allowed list. After\n    applying the\
+      \ edit, choose next_step and let deterministic evaluation verify\n    it; do not claim\
+      \ that the edit passed validation yourself. For example: {\"action\":\"yaml_edit\",\"\
+      file_path\":\"docs/proposals/<work-item-name>/architecture-specification.yaml\",\"operations\"\
+      :[{\"op\":\"set_value\",\"path\":[\"id\"],\"value\":\"architecture-id\"},{\"op\":\"\
+      upsert_item\",\"section\":\"entities\",\"id\":\"entity-id\",\"value\":{\"type\":\"Service\"\
+      ,\"name\":\"Example\",\"description\":\"...\"}}]}. Do not use edit or rewrite the YAML\
+      \ as prose. If there are no issues, choose next_step without changing the file and return\
+      \ {\"action\":\"next_step\"}. If the evaluator reports invalid YAML/structure or you\
+      \ are stuck, restart generation with {\"action\":\"goto_step\",\"step_id\":\"generate-architecture\"\
+      }; do not keep repeating the same repair. The generator will overwrite unreadable content\
+      \ and merge valid existing fields back into the restored template.\n- id: gate-architecture\n\
+      \  description: Confirm that architecture evaluation reports zero issues.\n  actions:\
+      \ []\n  step_type: gate\n  llm_type: simple_task\n  details: The gate passes only when\
+      \ the evaluator exits successfully with zero issues.\n  pre_step:\n    action: invoke_tool\n\
+      \    template:\n      tool: internal\n      command:\n      - powdrr-lift\n      - evaluate\n\
+      \      - docs/proposals/<work-item-name>/architecture-specification.yaml\n  gate:\n\
+      \    outcome:\n      path: returncode\n      equals: 0\n    goto_step: evaluate-architecture\n\
+      \    retry_context: >-\n      The gate failed because architecture evaluation still\
+      \ reports issues.\n      Inspect the latest evaluator result, use yaml_edit to fix every\
+      \ issue, and\n      then allow the deterministic evaluate-architecture step to run again."
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - read_document
+    - yaml_edit
+    - invoke_tool
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

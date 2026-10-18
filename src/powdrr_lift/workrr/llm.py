@@ -622,7 +622,6 @@ def constrain_action_response_schema(
         "yaml_edit": {"file_path", "operations"},
         "file_management": {"operation", "file_path", "destination_path"},
         "delete_file": {"file_path"},
-        "invoke_skill": {"skill", "provider_role", "clean", "context"},
         "invoke_tool": {"tool", "parameters"},
         "read_document": {"file_path", "start_line", "end_line"},
         "list_files": {"directory", "pattern", "recursive"},
@@ -824,9 +823,9 @@ def _boundary_id(strategy: Any) -> str:
     task_id = getattr(getattr(strategy, "task", None), "task_id", None)
     if task_id is not None:
         return f"task:{task_id}:{getattr(strategy, 'current_step_index', None)}"
-    skill = getattr(strategy, "selected_skill", None)
+    process = getattr(strategy, "selected_process", None)
     return (
-        f"skill:{getattr(skill, 'path', '<unknown>')}:"
+        f"process:{getattr(process, 'path', '<unknown>')}:"
         f"{getattr(strategy, 'current_step_index', None)}"
     )
 
@@ -1458,7 +1457,6 @@ def workflow_action_target_signature(action: object) -> str:
             getattr(edit, "file_path", "") for edit in getattr(action, "file_edits", ())
         ),
         "tool": getattr(action, "tool", None),
-        "skill_name": getattr(action, "skill_name", None),
         "step_id": getattr(action, "step_id", None),
         "destination_path": getattr(action, "destination_path", None),
         "file_operation": getattr(action, "file_operation", None),
@@ -1488,7 +1486,6 @@ def workflow_action_summary(action: object) -> str:
             f"{getattr(action, 'file_operation', None)} "
             f"{getattr(action, 'file_path', None)}"
         ),
-        "invoke_skill": getattr(action, "skill_name", None),
         "goto_step": getattr(action, "step_id", None),
         "invoke_tool": getattr(action, "tool", None),
         "read_document": getattr(action, "file_path", None),

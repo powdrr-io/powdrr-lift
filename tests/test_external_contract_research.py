@@ -29,9 +29,9 @@ from procedrr_evaluator import Evaluator
 
 
 def test_external_contract_research_procedure_is_valid() -> None:
-    source = Path(
-        "docs/procedrr/skill-definitions/resolve-external-contracts.yaml"
-    ).read_text(encoding="utf-8")
+    source = Path("docs/procedrr/processes/resolve-external-contracts.yaml").read_text(
+        encoding="utf-8"
+    )
 
     parse_and_validate(source, command_catalog=feature_command_catalog())
 
@@ -677,9 +677,9 @@ def test_external_research_gate_and_evidence_control_model_calls(
 ) -> None:
     from powdrr_lift.workrr import jev_classifier
 
-    skills_dir = Path("docs/procedrr/skill-definitions")
+    process_directory = Path("docs/procedrr/processes")
     document = parse_and_validate(
-        (skills_dir / "resolve-external-contracts.yaml").read_text(),
+        (process_directory / "resolve-external-contracts.yaml").read_text(),
         command_catalog=feature_command_catalog(),
     )
     # Exercise the real workflow through claim binding; later assessment and
@@ -776,12 +776,12 @@ def test_external_research_gate_and_evidence_control_model_calls(
 
     planning = Planning()
     evaluator = Evaluator(
-        WorkrrProcedrrClient(planning, skills_dir=skills_dir),
+        WorkrrProcedrrClient(planning, process_directory=process_directory),
         execute,
         judge_clients={
             "jev": WorkrrProcedrrClient(
                 JevSemanticClassifierClient(planning, api_key="test-key"),
-                skills_dir=skills_dir,
+                process_directory=process_directory,
             ),
         },
         command_catalog=feature_command_catalog(),

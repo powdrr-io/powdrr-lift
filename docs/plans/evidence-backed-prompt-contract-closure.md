@@ -242,7 +242,7 @@ editing. The prompt artifact remains independently capturable without Pier.
    design and scenario consistency review, compile the repository evidence
    snapshot and closure record for that same design revision. Procedrr gates
    the record before `compile_code_task_plan` in
-   `docs/procedrr/skill-definitions/implement-feature.yaml`.
+   `docs/procedrr/processes/implement-feature.yaml`.
 2. Put typed closure schemas, candidate selection, bounded question
    preparation, and validation in Procedrr. Reuse the existing semantic
    inventory and language adapters to supply captured Git-tree facts through

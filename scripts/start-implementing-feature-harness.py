@@ -228,7 +228,7 @@ def _seed_feature_from_history(repo_root: Path, feature_name: str) -> bool:
 
 
 def _mirror_local_code_changes(source_root: Path, destination_root: Path) -> None:
-    """Copy the caller's tracked code/skill edits into an isolated run tree."""
+    """Copy the caller's tracked code/process edits into an isolated run tree."""
     changed = subprocess.run(
         [
             "git",
@@ -236,7 +236,7 @@ def _mirror_local_code_changes(source_root: Path, destination_root: Path) -> Non
             "--name-only",
             "HEAD",
             "--",
-            "skill-definitions",
+            "docs/procedrr/processes",
             "src",
             "scripts",
         ],

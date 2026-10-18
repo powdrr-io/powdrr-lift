@@ -294,6 +294,67 @@ steps:
     assert calls == [{"command": ["record_feature", "Add a greeting"]}]
 
 
+def test_called_process_uses_its_own_recovery_declarations(tmp_path: Path) -> None:
+    from procedrr import parse_and_validate
+
+    (tmp_path / "recoverable-child.yaml").write_text(
+        """\
+version: 1
+name: recoverable-child
+outputs: {result: {type: object}}
+steps:
+  - attempt:
+      id: child-validation
+      max_attempts: 2
+      body:
+        - operation:
+            tool: internal
+            parameters: {command: [check]}
+            bind: result
+        - gate:
+            subject: result.passed
+            equals: true
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {recovery: child-repair, resume: child-validation}
+  - terminal: succeeded
+recoveries:
+  child-repair:
+    steps:
+      - operation:
+          tool: internal
+          parameters: {command: [repair]}
+""",
+        encoding="utf-8",
+    )
+    document = parse_and_validate(
+        """\
+version: 1
+name: recovery-parent
+steps:
+  - call:
+      process: recoverable-child
+      inputs: {}
+      outputs: {child_result: result}
+  - terminal: succeeded
+"""
+    )
+    calls: list[str] = []
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        command = str(parameters["command"][0])
+        calls.append(command)
+        if command == "check":
+            return {"passed": calls.count("check") > 1}
+        return {"repaired": True}
+
+    result = Evaluator(FakeLLM(), execute, process_directory=tmp_path).evaluate(
+        document
+    )
+
+    assert result.bindings["child_result"] == {"passed": True}
+    assert calls == ["check", "repair", "check"]
+
+
 def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
     llm = FakeLLM()
     calls: list[tuple[str, dict[str, Any]]] = []
@@ -1009,7 +1070,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 }
             return {"ok": True}
 
-    source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    source = Path("docs/procedrr/processes/design-interview.yaml").read_text()
     from procedrr import parse_and_validate
 
     document = parse_and_validate(source)
@@ -1073,7 +1134,7 @@ def test_live_parallel_atomicity_matches_serial_judgments(tmp_path: Path) -> Non
         },
     ]
     production = parse_and_validate(
-        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+        Path("docs/procedrr/processes/design-interview.yaml").read_text()
     )
     loop = copy.deepcopy(production["steps"][1]["for_each"])
     loop["snapshot"]["name"] = "atomicity_clauses"
@@ -1159,7 +1220,7 @@ def test_live_design_interview_decomposes_compound_state_data_lifecycle(
         return runtime.dispatch(command[0], list(command), parameters)
 
     document = parse_and_validate(
-        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+        Path("docs/procedrr/processes/design-interview.yaml").read_text()
     )
     result = Evaluator(llm, execute).evaluate(
         document,
@@ -1353,9 +1414,7 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
         "    assert result.stdout.splitlines() == ['Hello, World', 'Here I Am']\n",
         encoding="utf-8",
     )
-    source = Path(
-        "docs/procedrr/skill-definitions/execute-proposed-pr.yaml"
-    ).read_text()
+    source = Path("docs/procedrr/processes/execute-proposed-pr.yaml").read_text()
     from procedrr import parse_and_validate
 
     document = parse_and_validate(source)
@@ -1474,7 +1533,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
         "powdrr_lift.workrr.prompt_probe"
     ).build_probe_client
     document = parse_and_validate(
-        Path("docs/procedrr/skill-definitions/execute-proposed-pr.yaml").read_text()
+        Path("docs/procedrr/processes/execute-proposed-pr.yaml").read_text()
     )
     llm = build_probe_client(
         provider="deepinfra-cheap",
@@ -1528,7 +1587,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
             execute,
             available_paths=lambda: ["hello.py", "test_hello.py"],
         ),
-        skills_dir=tmp_path,
+        process_directory=tmp_path,
     ).evaluate(
         document,
         {

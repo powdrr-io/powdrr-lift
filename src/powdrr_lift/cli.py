@@ -122,14 +122,6 @@ from powdrr_lift.openai_proxy import (
 from powdrr_lift.openai_proxy import (
     serve as serve_openai_proxy,
 )
-from powdrr_lift.process.compiler import (
-    analyze_workflow_definition,
-    analyze_workflow_definitions,
-    apply_liveness_baseline,
-    apply_warning_budget,
-    warning_report_data,
-)
-from powdrr_lift.process.model import validate_skill_directory
 from powdrr_lift.process.tasks import (
     HumanRole,
     save_workflow_task,
@@ -161,18 +153,7 @@ from powdrr_lift.structrr.verification_health import (
     VerificationPolicyMode,
     audit_verification_health,
 )
-from powdrr_lift.workrr.ambiguity_review import (
-    WorkflowAmbiguityReviewError,
-    review_workflow_definition,
-    review_workflow_definition_step,
-)
-from powdrr_lift.workrr.chat_agent import (
-    choose_workflow_provider,
-    download_local_qwen_model,
-    resolve_workflow_provider,
-    run_workflow_chat,
-)
-from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_tui import run_workflow_chat_tui
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttemptStore,
@@ -199,21 +180,9 @@ from powdrr_lift.workrr.deepswe_design_evaluation import (
     evaluate_deepswe_design,
     evaluate_deepswe_worker_prompt,
 )
-from powdrr_lift.workrr.definition_comparison import (
-    WorkflowComparisonError,
-    compare_workflow_definitions,
-)
-from powdrr_lift.workrr.definition_prompts import render_skill_prompt_snapshots
 from powdrr_lift.workrr.differential_verification import (
     classify_differential_result,
     detect_verifier_changes,
-)
-from powdrr_lift.workrr.error_analysis import (
-    WorkflowErrorAnalysisError,
-    cluster_workflow_errors,
-    load_workflow_error_records,
-    promote_replay_candidates,
-    workflow_error_analysis_data,
 )
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
@@ -259,30 +228,17 @@ from powdrr_lift.workrr.human_task import (
     HumanTaskRunnerConfig,
     run_human_task,
 )
-from powdrr_lift.workrr.prompt_probe import (
-    WorkflowPromptProbeError,
-    build_probe_client,
-    build_workflow_prompt_probe,
-    probe_workflow_step,
-    resolve_probe_model,
-)
+from powdrr_lift.workrr.local_model import download_local_qwen_model
+from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
 from powdrr_lift.workrr.provider_config import (
     ALL_PROVIDERS,
     default_llm_mappings,
     provider_definition,
 )
+from powdrr_lift.workrr.provider_runtime import resolve_workflow_provider
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
     resolve_provider_credentials,
-)
-from powdrr_lift.workrr.replay import (
-    WorkflowReplayError,
-    load_error_record,
-    load_workflow_replay_bundle,
-    render_skill_replay,
-    render_skill_replay_corpus,
-    replay_bundle_from_error_record,
-    save_workflow_replay_bundle,
 )
 from powdrr_lift.workrr.repository_subject_binding import (
     replay_subject_binding_events,
@@ -299,11 +255,9 @@ from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
     run_workflow_task,
 )
-from powdrr_lift.workrr.tuning import (
-    WorkflowTuningError,
-    save_workflow_tuning_report,
-    tune_workflow,
-)
+from powdrr_lift.workrr.workflow_provider_selection import choose_workflow_provider
+
+run_workflow_chat = run_procedrr_workflow_chat
 
 _WORKFLOW_FILE_ADDED_EVENT_PREFIX = "[powdrr-file-added] "
 
@@ -1273,12 +1227,12 @@ def build_parser() -> argparse.ArgumentParser:
     start_planning_feature_parser.add_argument(
         "--work-item-name",
         required=True,
-        help="Work item name used to fill the skill instructions.",
+        help="Work item name used to fill the planning instructions.",
     )
     start_planning_feature_parser.add_argument(
         "--repo-root",
         type=Path,
-        help="Repository root to use when reading the planning skill.",
+        help="Repository root to use when reading the planning instructions.",
     )
     start_planning_feature_parser.set_defaults(func=_run_start_planning_feature)
 
@@ -1483,61 +1437,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     llm_diff_parser.set_defaults(func=_run_llm_diff)
 
-    workflow_replay_parser = subparsers.add_parser(
-        "workflow-replay",
-        aliases=["workflow_replay"],
-        help=(
-            "Export one workflow LLM error as a replay bundle or render and "
-            "validate a bundle without invoking tools or an LLM."
-        ),
-    )
-    replay_source = workflow_replay_parser.add_mutually_exclusive_group(required=True)
-    replay_source.add_argument(
-        "--bundle",
-        type=Path,
-        help="Existing YAML or JSON replay bundle to render and validate.",
-    )
-    replay_source.add_argument(
-        "--directory",
-        type=Path,
-        help="Directory of replay bundles to render and validate as a corpus.",
-    )
-    replay_source.add_argument(
-        "--error-log",
-        type=Path,
-        help="Workflow LLM JSONL error log containing the record to export.",
-    )
-    workflow_replay_parser.add_argument(
-        "--record-id",
-        help="Stable error record id to export; required with --error-log.",
-    )
-    workflow_replay_parser.add_argument(
-        "--output",
-        type=Path,
-        help="Replay bundle output path; required with --error-log.",
-    )
-    workflow_replay_parser.add_argument(
-        "--definition",
-        type=Path,
-        help="Optional candidate skill definition used when rendering a bundle.",
-    )
-    workflow_replay_parser.add_argument(
-        "--repo-root",
-        type=Path,
-        help="Repository root used to resolve bundle and definition paths.",
-    )
-    workflow_replay_parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Print the complete replay result as JSON.",
-    )
-    workflow_replay_parser.set_defaults(func=_run_workflow_replay)
-
     workflow_scenario_parser = subparsers.add_parser(
         "workflow-scenario",
         aliases=["workflow_scenario"],
         help=(
-            "Run a scripted workflow skill scenario in an isolated temporary "
+            "Run a scripted Procedrr process or durable-task scenario in an "
+            "isolated temporary "
             "Git repository."
         ),
     )
@@ -1833,185 +1738,13 @@ def build_parser() -> argparse.ArgumentParser:
     extract_responses_parser.add_argument("--output", required=True, type=Path)
     extract_responses_parser.set_defaults(func=_extract_workflow_responses)
 
-    definition_validation_parser = subparsers.add_parser(
-        "validate-workflow-definition",
-        aliases=["validate_workflow_definition"],
-        help=(
-            "Run schema and deterministic confusion checks for a skill or "
-            "workflow template."
-        ),
+    procedrr_validation_parser = subparsers.add_parser(
+        "validate-procedrr-processes",
+        help="Validate every Procedrr process in one or more process directories.",
     )
-    definition_validation_parser.add_argument("definition", type=Path)
-    definition_validation_parser.add_argument("--json", action="store_true")
-    definition_validation_parser.add_argument(
-        "--liveness", action="store_true", help="Enable static liveness diagnostics."
-    )
-    definition_validation_parser.add_argument("--baseline", type=Path)
-    definition_validation_parser.set_defaults(func=_run_validate_workflow_definition)
-
-    definitions_validation_parser = subparsers.add_parser(
-        "validate-workflow-definitions",
-        aliases=["validate_workflow_definitions"],
-        help="Statically compile all skills and workflow templates under the paths.",
-    )
-    definitions_validation_parser.add_argument("paths", nargs="+", type=Path)
-    definitions_validation_parser.add_argument("--json", action="store_true")
-    definitions_validation_parser.add_argument(
-        "--liveness", action="store_true", help="Enable static liveness diagnostics."
-    )
-    definitions_validation_parser.add_argument("--baseline", type=Path)
-    definitions_validation_parser.add_argument("--warning-budget", type=Path)
-    definitions_validation_parser.add_argument("--warning-report", type=Path)
-    definitions_validation_parser.set_defaults(func=_run_validate_workflow_definitions)
-
-    prompt_snapshot_parser = subparsers.add_parser(
-        "render-workflow-prompts",
-        aliases=["render_workflow_prompts"],
-        help="Render normalized production prompt snapshots for every skill step.",
-    )
-    prompt_snapshot_parser.add_argument("--definition", required=True, type=Path)
-    prompt_snapshot_parser.add_argument("--output-dir", required=True, type=Path)
-    prompt_snapshot_parser.add_argument("--repo-root", type=Path)
-    prompt_snapshot_parser.set_defaults(func=_run_render_workflow_prompts)
-
-    error_analysis_parser = subparsers.add_parser(
-        "analyze-workflow-errors",
-        aliases=["analyze_workflow_errors"],
-        help="Cluster workflow LLM errors and optionally promote replay candidates.",
-    )
-    error_analysis_parser.add_argument(
-        "--error-log",
-        type=Path,
-        action="append",
-        required=True,
-        help="Workflow LLM error JSONL file; repeat to analyze multiple logs.",
-    )
-    error_analysis_parser.add_argument("--repo-root", type=Path)
-    error_analysis_parser.add_argument(
-        "--replay-output-dir",
-        type=Path,
-        help="Optional destination for representative draft replay bundles.",
-    )
-    error_analysis_parser.add_argument(
-        "--limit", type=int, help="Maximum ranked clusters to promote."
-    )
-    error_analysis_parser.add_argument("--json", action="store_true")
-    error_analysis_parser.set_defaults(func=_run_analyze_workflow_errors)
-
-    ambiguity_review_parser = subparsers.add_parser(
-        "review-workflow-ambiguity",
-        aliases=["review_workflow_ambiguity"],
-        help=(
-            "Request an advisory high-reasoning ambiguity review of one or all "
-            "definition steps."
-        ),
-    )
-    ambiguity_review_parser.add_argument("--definition", required=True, type=Path)
-    step_selector = ambiguity_review_parser.add_mutually_exclusive_group(required=False)
-    step_selector.add_argument("--step-id")
-    step_selector.add_argument("--step-index", type=int)
-    step_selector.add_argument(
-        "--all-steps",
-        action="store_true",
-        help="Review every step with one isolated judgment prompt per step.",
-    )
-    ambiguity_review_parser.add_argument("--repo-root", type=Path)
-    ambiguity_review_parser.add_argument(
-        "--provider", default="auto", choices=ALL_PROVIDERS + ("auto",)
-    )
-    ambiguity_review_parser.add_argument("--model")
-    ambiguity_review_parser.add_argument("--api-key")
-    ambiguity_review_parser.add_argument("--base-url")
-    ambiguity_review_parser.add_argument("--json", action="store_true")
-    ambiguity_review_parser.add_argument(
-        "--fail-on-findings",
-        action="store_true",
-        help="Exit non-zero when any review reports ambiguity or missing information.",
-    )
-    ambiguity_review_parser.set_defaults(func=_run_review_workflow_ambiguity)
-
-    prompt_probe_parser = subparsers.add_parser(
-        "probe-workflow-step",
-        aliases=["probe_workflow_step"],
-        help=(
-            "Build the production prompt for one skill or workflow step, call the "
-            "LLM, and validate its action without executing it."
-        ),
-    )
-    prompt_probe_parser.add_argument("--definition", required=True, type=Path)
-    prompt_probe_selector = prompt_probe_parser.add_mutually_exclusive_group(
-        required=True
-    )
-    prompt_probe_selector.add_argument("--step-id")
-    prompt_probe_selector.add_argument("--step-index", type=int)
-    prompt_probe_parser.add_argument(
-        "--root-intent", default="Probe this workflow step."
-    )
-    prompt_probe_parser.add_argument("--repo-root", type=Path)
-    prompt_probe_parser.add_argument(
-        "--provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
-    )
-    prompt_probe_parser.add_argument("--model")
-    prompt_probe_parser.add_argument("--api-key")
-    prompt_probe_parser.add_argument("--base-url")
-    prompt_probe_parser.add_argument("--samples", type=int, default=1)
-    prompt_probe_parser.add_argument("--timeout-retries", type=int, default=0)
-    prompt_probe_parser.add_argument("--timeout-backoff", type=float, default=0)
-    prompt_probe_parser.add_argument("--include-prompt", action="store_true")
-    prompt_probe_parser.add_argument("--json", action="store_true")
-    prompt_probe_parser.set_defaults(func=_run_probe_workflow_step)
-
-    comparison_parser = subparsers.add_parser(
-        "compare-workflow-definitions",
-        aliases=["compare_workflow_definitions"],
-        help=(
-            "Compare explicit deterministic replay and scenario cases against a "
-            "baseline Git ref."
-        ),
-    )
-    comparison_parser.add_argument(
-        "--baseline-ref", required=True, help="Git ref containing the baseline."
-    )
-    comparison_parser.add_argument(
-        "--replay",
-        type=Path,
-        action="append",
-        help="Replay bundle to run on both baseline and candidate; repeatable.",
-    )
-    comparison_parser.add_argument(
-        "--scenario",
-        type=Path,
-        action="append",
-        help="Scripted scenario to run on both baseline and candidate; repeatable.",
-    )
-    comparison_parser.add_argument("--repo-root", type=Path)
-    comparison_parser.add_argument("--max-roundtrip-increase", type=int, default=0)
-    comparison_parser.add_argument("--max-prompt-user-increase", type=int, default=0)
-    comparison_parser.add_argument(
-        "--max-repeated-action-increase", type=int, default=0
-    )
-    comparison_parser.add_argument("--json", action="store_true")
-    comparison_parser.set_defaults(func=_run_compare_workflow_definitions)
-
-    tune_parser = subparsers.add_parser(
-        "tune-workflow",
-        aliases=["tune_workflow"],
-        help="Run deterministic workflow validation, comparison, and reporting.",
-    )
-    tune_parser.add_argument("--definition", required=True, type=Path)
-    tune_parser.add_argument(
-        "--baseline-ref", help="Optional baseline Git ref; defaults to merge-base."
-    )
-    tune_parser.add_argument("--replay", type=Path, action="append")
-    tune_parser.add_argument("--scenario", type=Path, action="append")
-    tune_parser.add_argument("--report", required=True, type=Path)
-    tune_parser.add_argument("--snapshot-output-dir", type=Path)
-    tune_parser.add_argument("--repo-root", type=Path)
-    tune_parser.add_argument("--max-roundtrip-increase", type=int, default=0)
-    tune_parser.add_argument("--max-prompt-user-increase", type=int, default=0)
-    tune_parser.add_argument("--max-repeated-action-increase", type=int, default=0)
-    tune_parser.add_argument("--json", action="store_true")
-    tune_parser.set_defaults(func=_run_tune_workflow)
+    procedrr_validation_parser.add_argument("paths", nargs="+", type=Path)
+    procedrr_validation_parser.add_argument("--json", action="store_true")
+    procedrr_validation_parser.set_defaults(func=_run_validate_procedrr_processes)
 
     download_qwen_parser = subparsers.add_parser(
         "download-qwen-model",
@@ -2042,15 +1775,15 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_chat_parser.add_argument(
         "--adversarial-provider",
         choices=ALL_PROVIDERS,
-        help="Provider used for nested adversarial review skills.",
+        help="Provider used for nested adversarial review processes.",
     )
     workflow_chat_parser.add_argument(
-        "--skills-dir",
-        "--templates-dir",
-        dest="skills_dir",
+        "--processes-dir",
+        dest="processes_dir",
+        metavar="PROCESSES_DIR",
         type=Path,
-        default=Path("skill-definitions"),
-        help="Directory containing skill JSON files.",
+        default=Path("docs/procedrr/processes"),
+        help="Directory containing validated Procedrr process definitions.",
     )
     workflow_chat_parser.add_argument(
         "--output-dir",
@@ -2060,7 +1793,7 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_chat_parser.add_argument(
         "--model",
         default="glm-5.2",
-        help="Model to use for template matching and task generation.",
+        help="Model to use for Procedrr process selection and execution.",
     )
     workflow_chat_parser.add_argument(
         "--api-key",
@@ -2099,7 +1832,7 @@ def build_parser() -> argparse.ArgumentParser:
     workflow_chat_parser.add_argument(
         "--repo-root",
         type=Path,
-        help="Repository root to resolve the default templates directory.",
+        help="Repository root to resolve the default process directory.",
     )
     workflow_chat_parser.set_defaults(func=_run_workflow_chat)
 
@@ -4178,21 +3911,6 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
             overall_success = False
             continue
 
-        if relative_path.parts[:1] == ("skill-definitions",) and path.suffix in {
-            ".yaml",
-            ".yml",
-            ".json",
-        }:
-            skill_directory = repo_root / "skill-definitions"
-            if skill_directory not in validated_groups:
-                add_result(
-                    validator="validate_skill_directory",
-                    paths=[skill_directory],
-                    report_text=validate_skill_directory(skill_directory),
-                )
-                validated_groups.add(skill_directory)
-            continue
-
         if (
             relative_path.parts[:2] == ("docs", "workflows")
             and path.name.endswith((".yaml", ".yml", ".json"))
@@ -5154,80 +4872,6 @@ def _run_llm_diff(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_workflow_replay(args: argparse.Namespace) -> int:
-    repo_root = resolve_repo_root(args.repo_root)
-    try:
-        if args.error_log is not None:
-            if not args.record_id:
-                raise WorkflowReplayError("--record-id is required with --error-log.")
-            if args.output is None:
-                raise WorkflowReplayError("--output is required with --error-log.")
-            error_log_path = (
-                args.error_log
-                if args.error_log.is_absolute()
-                else repo_root / args.error_log
-            )
-            record = load_error_record(error_log_path, args.record_id)
-            bundle = replay_bundle_from_error_record(record, repo_root=repo_root)
-            output_path = (
-                args.output if args.output.is_absolute() else repo_root / args.output
-            )
-            saved_path = save_workflow_replay_bundle(output_path, bundle)
-            result: dict[str, Any] = {
-                "status": "exported",
-                "bundle": str(saved_path),
-                "bundle_id": bundle["id"],
-            }
-        elif args.directory is not None:
-            directory = (
-                args.directory
-                if args.directory.is_absolute()
-                else repo_root / args.directory
-            )
-            result = render_skill_replay_corpus(
-                directory,
-                repo_root=repo_root,
-                definition_path=args.definition,
-            )
-            result["status"] = "corpus"
-        else:
-            assert args.bundle is not None
-            bundle_path = (
-                args.bundle if args.bundle.is_absolute() else repo_root / args.bundle
-            )
-            bundle = load_workflow_replay_bundle(bundle_path)
-            result = render_skill_replay(
-                bundle,
-                repo_root=repo_root,
-                definition_path=args.definition,
-            )
-            result["status"] = "rendered"
-    except WorkflowReplayError as exc:
-        print(f"Workflow replay failed: {exc}", file=sys.stderr)
-        return 1
-
-    if args.json:
-        print(json.dumps(result, indent=2, ensure_ascii=False))
-    elif result["status"] == "exported":
-        print(f"Exported workflow replay bundle: {result['bundle']}")
-    elif result["status"] == "corpus":
-        print(
-            f"Validated replay corpus: {result['passed']} passed, "
-            f"{result['failed']} failed."
-        )
-        if result["failed"]:
-            return 1
-    else:
-        validation = result["response_validation"]
-        step_label = result["step"]["id"] or result["step"]["index"]
-        print(f"Rendered workflow replay {result['bundle_id']} for step {step_label}.")
-        if validation["valid"]:
-            print(f"Recorded response is valid: {validation['action']}")
-        else:
-            print(f"Recorded response is invalid: {validation['error']}")
-    return 0
-
-
 def _run_workflow_scenario(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     scenario_path = (
@@ -5904,54 +5548,53 @@ def _extract_workflow_responses(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_validate_workflow_definition(args: argparse.Namespace) -> int:
-    report = analyze_workflow_definition(args.definition)
-    data = report.to_data()
-    if args.json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-    else:
-        status = "valid" if report.validation_successful else "invalid"
-        stream = sys.stdout if report.validation_successful else sys.stderr
-        print(f"Workflow definition {status}: {report.definition}", file=stream)
-        for issue in report.issues:
-            print(
-                f"{issue.path}: {issue.code}: {issue.message}",
-                file=sys.stderr if issue.severity == "error" else sys.stdout,
+def _run_validate_procedrr_processes(args: argparse.Namespace) -> int:
+    from procedrr import ProcessCatalog
+    from procedrr.catalog import ProcessCatalogError
+
+    results: list[dict[str, Any]] = []
+    for directory in args.paths:
+        try:
+            catalog = ProcessCatalog.load(directory)
+        except (OSError, ProcessCatalogError, ValueError) as error:
+            results.append(
+                {
+                    "directory": str(directory),
+                    "validation_successful": False,
+                    "error": str(error),
+                }
             )
-    return 0 if report.validation_successful else 1
-
-
-def _run_validate_workflow_definitions(args: argparse.Namespace) -> int:
-    report = analyze_workflow_definitions(args.paths)
-    report = apply_liveness_baseline(report, args.baseline)
-    report = apply_warning_budget(report, args.warning_budget)
-    if args.warning_report is not None:
-        args.warning_report.parent.mkdir(parents=True, exist_ok=True)
-        args.warning_report.write_text(
-            json.dumps(warning_report_data(report), indent=2, ensure_ascii=False)
-            + "\n",
-            encoding="utf-8",
+            continue
+        results.append(
+            {
+                "directory": str(directory),
+                "processes": [process.name for process in catalog.list()],
+                "validation_successful": True,
+            }
         )
+    successful = bool(results) and all(
+        result["validation_successful"] for result in results
+    )
     if args.json:
-        print(json.dumps(report.to_data(), indent=2, ensure_ascii=False))
+        print(
+            json.dumps(
+                {"validation_successful": successful, "results": results}, indent=2
+            )
+        )
     else:
-        for definition_report in report.reports:
-            status = "valid" if definition_report.validation_successful else "invalid"
-            stream = (
-                sys.stdout if definition_report.validation_successful else sys.stderr
-            )
-            print(
-                f"Workflow definition {status}: {definition_report.definition}",
-                file=stream,
-            )
-            for issue in definition_report.issues:
+        for result in results:
+            if result["validation_successful"]:
                 print(
-                    f"{issue.path}: {issue.code}: {issue.message}",
-                    file=(sys.stderr if issue.severity == "error" else sys.stdout),
+                    f"Validated {len(result['processes'])} Procedrr processes in "
+                    f"{result['directory']}"
                 )
-        if not report.reports:
-            print("No workflow definitions found.", file=sys.stderr)
-    return 0 if report.validation_successful and report.reports else 1
+            else:
+                print(
+                    f"Invalid Procedrr process directory {result['directory']}: "
+                    f"{result['error']}",
+                    file=sys.stderr,
+                )
+    return 0 if successful else 1
 
 
 def _run_validate_delivery_profile(args: argparse.Namespace) -> int:
@@ -5970,264 +5613,6 @@ def _run_validate_delivery_profile(args: argparse.Namespace) -> int:
         for issue in report.issues:
             print(f"{issue.path}: {issue.code}: {issue.message}", file=sys.stderr)
     return 0 if report.validation_successful else 1
-
-
-def _run_render_workflow_prompts(args: argparse.Namespace) -> int:
-    paths = render_skill_prompt_snapshots(
-        args.definition,
-        output_dir=args.output_dir,
-        repo_root=args.repo_root,
-    )
-    for path in paths:
-        print(path)
-    return 0
-
-
-def _run_analyze_workflow_errors(args: argparse.Namespace) -> int:
-    repo_root = resolve_repo_root(args.repo_root)
-    error_paths = tuple(
-        path if path.is_absolute() else repo_root / path for path in args.error_log
-    )
-    try:
-        records = load_workflow_error_records(error_paths)
-        clusters = cluster_workflow_errors(records)
-        candidates: Sequence[Mapping[str, Any]] = ()
-        if args.replay_output_dir is not None:
-            output_dir = (
-                args.replay_output_dir
-                if args.replay_output_dir.is_absolute()
-                else repo_root / args.replay_output_dir
-            )
-            candidates = promote_replay_candidates(
-                clusters,
-                repo_root=repo_root,
-                output_dir=output_dir,
-                limit=args.limit,
-            )
-    except WorkflowErrorAnalysisError as exc:
-        print(f"Workflow error analysis failed: {exc}", file=sys.stderr)
-        return 1
-    data = workflow_error_analysis_data(
-        clusters, record_count=len(records), candidates=candidates
-    )
-    if args.json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-    else:
-        print(f"Workflow errors: {len(records)} records in {len(clusters)} clusters")
-        for cluster in clusters:
-            location = " / ".join(
-                value
-                for value in (cluster.skill_or_task, cluster.step, cluster.action)
-                if value
-            )
-            print(
-                f"{cluster.count}x (rank {cluster.rank}) {location or '<unknown>'}: "
-                f"{cluster.error_summary or cluster.error_type or 'unknown error'}"
-            )
-    return 0
-
-
-def _run_review_workflow_ambiguity(args: argparse.Namespace) -> int:
-    repo_root = resolve_repo_root(args.repo_root)
-    definition_path = (
-        args.definition
-        if args.definition.is_absolute()
-        else repo_root / args.definition
-    )
-    try:
-        requested_provider = resolve_workflow_provider(args.provider)
-        mapping = default_llm_mappings(requested_provider)["high_reasoning"]
-        provider = mapping.provider
-        model = args.model or mapping.model
-        credentials = resolve_provider_credentials(
-            provider, args.api_key, args.base_url
-        )
-        client = build_workflow_client(
-            credentials,
-            model=model,
-            model_cache_dir=repo_root / ".powdrr" / "models",
-            progress_stream=sys.stderr,
-        )
-        reviews = (
-            review_workflow_definition(client, definition_path)
-            if args.all_steps
-            else (
-                review_workflow_definition_step(
-                    client,
-                    definition_path,
-                    step_id=args.step_id,
-                    step_index=args.step_index,
-                ),
-            )
-        )
-    except (KeyError, RuntimeError, WorkflowAmbiguityReviewError) as exc:
-        print(f"Workflow ambiguity review failed: {exc}", file=sys.stderr)
-        return 1
-    data = (
-        {"reviews": [review.to_data() for review in reviews]}
-        if args.all_steps
-        else reviews[0].to_data()
-    )
-    if args.json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-    else:
-        for review in reviews:
-            print(
-                f"Ambiguity review: {review.definition} step "
-                f"{review.step_id or review.step_index} "
-                f"(confidence {review.confidence:.2f})"
-            )
-            for field in ("missing_information", "conflicts", "ambiguous_phrases"):
-                values = getattr(review, field)
-                if values:
-                    print(f"{field}: {', '.join(values)}")
-    if args.fail_on_findings and any(
-        review.missing_information or review.conflicts or review.ambiguous_phrases
-        for review in reviews
-    ):
-        return 1
-    return 0
-
-
-def _run_probe_workflow_step(args: argparse.Namespace) -> int:
-    repo_root = resolve_repo_root(args.repo_root)
-    definition = (
-        args.definition
-        if args.definition.is_absolute()
-        else repo_root / args.definition
-    )
-    try:
-        probe = build_workflow_prompt_probe(
-            definition,
-            repo_root=repo_root,
-            root_intent=args.root_intent,
-            step_id=args.step_id,
-            step_index=args.step_index,
-        )
-        provider, model, llm_type = resolve_probe_model(
-            probe,
-            provider=args.provider,
-            model_override=args.model,
-        )
-        client = build_probe_client(
-            provider=args.provider,
-            model=model,
-            api_key=args.api_key,
-            base_url=args.base_url,
-            repo_root=repo_root,
-            progress_stream=sys.stderr,
-        )
-        results = probe_workflow_step(
-            client,
-            probe,
-            samples=args.samples,
-            model=model,
-            stderr=sys.stderr,
-            max_timeout_retries=args.timeout_retries,
-            timeout_backoff_seconds=args.timeout_backoff,
-            include_prompt=args.include_prompt,
-        )
-    except (KeyError, RuntimeError, WorkflowPromptProbeError) as exc:
-        print(f"Workflow prompt probe failed: {exc}", file=sys.stderr)
-        return 1
-    data = {
-        "probe": {
-            "definition": str(probe.definition),
-            "definition_kind": probe.definition_kind,
-            "step_index": probe.step_index,
-            "step_id": probe.step_id,
-            "llm_type": llm_type,
-            "provider": provider,
-            "model": model,
-            "requires_llm": probe.requires_llm,
-            "deterministic_result": probe.deterministic_result,
-            "prompt_sha256": probe.prompt_sha256,
-            "response_schema": probe.response_schema,
-            **({"messages": probe.messages} if args.include_prompt else {}),
-        },
-        "samples": [result.to_data(include_prompt=False) for result in results],
-        "valid": all(result.valid for result in results),
-    }
-    if args.json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-    else:
-        status = "valid" if data["valid"] else "invalid"
-        print(
-            f"Workflow prompt probe {status}: {probe.definition} "
-            f"{probe.definition_kind} step {probe.step_id or probe.step_index}"
-        )
-        for result in results:
-            if result.valid:
-                action = result.action or {}
-                print(f"  sample {result.sample}: valid ({action.get('kind')})")
-            else:
-                print(
-                    f"  sample {result.sample}: invalid "
-                    f"({result.error_code}): {result.error}"
-                )
-    return 0 if data["valid"] else 1
-
-
-def _run_compare_workflow_definitions(args: argparse.Namespace) -> int:
-    repo_root = resolve_repo_root(args.repo_root)
-    thresholds = {
-        "roundtrips": args.max_roundtrip_increase,
-        "prompt_user_actions": args.max_prompt_user_increase,
-        "repeated_actions": args.max_repeated_action_increase,
-    }
-    try:
-        report = compare_workflow_definitions(
-            repo_root=repo_root,
-            baseline_ref=args.baseline_ref,
-            replay_paths=args.replay or (),
-            scenario_paths=args.scenario or (),
-            thresholds=thresholds,
-        )
-    except WorkflowComparisonError as exc:
-        print(f"Workflow comparison failed: {exc}", file=sys.stderr)
-        return 1
-    data = report.to_data()
-    if args.json:
-        print(json.dumps(data, indent=2, ensure_ascii=False))
-    else:
-        print(
-            f"Workflow comparison against {report.baseline_ref}: "
-            f"{'passed' if report.passed else 'regressed'}"
-        )
-        for item in report.regressions:
-            print(f"Regression: {item}", file=sys.stderr)
-        for item in report.improvements:
-            print(f"Improvement: {item}")
-    return 0 if report.passed else 1
-
-
-def _run_tune_workflow(args: argparse.Namespace) -> int:
-    repo_root = resolve_repo_root(args.repo_root)
-    report_path = args.report if args.report.is_absolute() else repo_root / args.report
-    try:
-        report = tune_workflow(
-            definition=args.definition,
-            repo_root=repo_root,
-            baseline_ref=args.baseline_ref,
-            replay_paths=args.replay or (),
-            scenario_paths=args.scenario or (),
-            thresholds={
-                "roundtrips": args.max_roundtrip_increase,
-                "prompt_user_actions": args.max_prompt_user_increase,
-                "repeated_actions": args.max_repeated_action_increase,
-            },
-            snapshot_output_dir=args.snapshot_output_dir,
-        )
-        save_workflow_tuning_report(report_path, report)
-    except WorkflowTuningError as exc:
-        print(f"Workflow tuning failed: {exc}", file=sys.stderr)
-        return 1
-    if args.json:
-        print(json.dumps(report, indent=2, ensure_ascii=False))
-    else:
-        print(f"Workflow tuning {report['status']}: {report['definition']}")
-        print(f"Report: {report_path}")
-    return 0 if report["status"] == "passed" else 1
 
 
 def _read_llm_exchange(path: Path) -> object:
@@ -6252,7 +5637,7 @@ def _run_download_qwen_model(args: argparse.Namespace) -> int:
 def _run_workflow_chat(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     config = WorkflowChatConfig(
-        skills_dir=args.skills_dir,
+        processes_dir=args.processes_dir,
         repo_root=repo_root,
         output_dir=args.output_dir,
         provider=args.provider,

@@ -17,9 +17,11 @@ from textual.containers import Horizontal, ScrollableContainer
 from textual.events import Key, Resize
 from textual.widgets import Label, ListItem, ListView, TextArea
 
-from powdrr_lift.process.catalog import SkillCatalogEntry
-from powdrr_lift.workrr.chat_agent import run_workflow_chat
-from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
+from powdrr_lift.workrr.execution_state import ProcessExecutionReference
+from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
+
+run_workflow_chat = run_procedrr_workflow_chat
 
 _EMPTY_HUMAN_INPUT_WARNING = "WARNING: received empty response but need human input"
 _USER_RESPONSE_SEPARATOR = "-" * 40
@@ -263,7 +265,7 @@ class WorkflowChatApp(App[None]):
         self._message_history_chars = 0
         self._current_status = _POWDRR_AGENT_BANNER
         self._initial_prompt_visible = False
-        self._active_skill_path: tuple[str, ...] = ()
+        self._active_process_path: tuple[str, ...] = ()
         self._added_files: list[str] = []
 
     def compose(self) -> ComposeResult:
@@ -538,65 +540,69 @@ class WorkflowChatApp(App[None]):
 
     def _progress_update(
         self,
-        skill: SkillCatalogEntry,
+        process: ProcessExecutionReference,
         current_step_index: int,
         status: str,
-        parent_skill: SkillCatalogEntry | None = None,
+        parent_process: ProcessExecutionReference | None = None,
         parent_step_index: int | None = None,
     ) -> None:
         self._record_output("progress", status)
         self.call_from_thread(
             self._apply_progress,
-            skill,
+            process,
             current_step_index,
             status,
-            parent_skill,
+            parent_process,
             parent_step_index,
         )
 
     def _apply_progress(
         self,
-        skill: SkillCatalogEntry,
+        process: ProcessExecutionReference,
         current_step_index: int,
         status: str,
-        parent_skill: SkillCatalogEntry | None = None,
+        parent_process: ProcessExecutionReference | None = None,
         parent_step_index: int | None = None,
     ) -> None:
         steps = self.query_one("#steps", ListView)
-        if current_step_index >= len(skill.skill.steps):
+        if current_step_index >= len(process.steps):
             steps.clear()
             steps.set_class(False, "has-content")
             steps.border_title = ""
-            self._active_skill_path = ()
+            self._active_process_path = ()
             self._set_status(status)
             if self._response is not None:
                 self._response.disabled = False
                 self._response.focus()
             return
-        nested_parent_skill = parent_skill
+        nested_parent_process = parent_process
         nested_parent_step_index = parent_step_index
         nested = (
-            nested_parent_skill is not None and nested_parent_step_index is not None
+            nested_parent_process is not None and nested_parent_step_index is not None
         )
-        skill_path = self._resolve_skill_path(skill, parent_skill)
-        steps.border_title = " > ".join(skill_path)
-        visible_indices = _visible_step_indices(
-            len(skill.skill.steps), current_step_index
-        )
+        process_path = self._resolve_process_path(process, parent_process)
+        steps.border_title = " > ".join(process_path)
+        visible_indices = _visible_step_indices(len(process.steps), current_step_index)
         steps.clear()
         if nested:
-            assert nested_parent_skill is not None
+            assert nested_parent_process is not None
             assert nested_parent_step_index is not None
-            parent_step = nested_parent_skill.skill.steps[nested_parent_step_index]
+            parent_step = nested_parent_process.steps[nested_parent_step_index]
             steps.mount(
                 ListItem(
-                    Label(f"{nested_parent_step_index + 1}. {parent_step.description}")
+                    Label(
+                        f"{nested_parent_step_index + 1}. "
+                        f"{parent_step.get('description', 'Process step')}"
+                    )
                 ),
                 ListItem(Label("-------")),
             )
         items = [
             ListItem(
-                Label(f"{step_index + 1}. {skill.skill.steps[step_index].description}")
+                Label(
+                    f"{step_index + 1}. "
+                    f"{process.steps[step_index].get('description', 'Process step')}"
+                )
             )
             for step_index in visible_indices
         ]
@@ -613,27 +619,27 @@ class WorkflowChatApp(App[None]):
             self._response.disabled = False
             self._response.focus()
 
-    def _resolve_skill_path(
+    def _resolve_process_path(
         self,
-        skill: SkillCatalogEntry,
-        parent_skill: SkillCatalogEntry | None,
+        process: ProcessExecutionReference,
+        parent_process: ProcessExecutionReference | None,
     ) -> tuple[str, ...]:
-        skill_name = skill.skill.name
-        if skill_name in self._active_skill_path:
-            path = self._active_skill_path[
-                : self._active_skill_path.index(skill_name) + 1
+        process_name = process.name
+        if process_name in self._active_process_path:
+            path = self._active_process_path[
+                : self._active_process_path.index(process_name) + 1
             ]
-        elif parent_skill is not None:
-            parent_name = parent_skill.skill.name
-            if parent_name in self._active_skill_path:
-                path = self._active_skill_path[
-                    : self._active_skill_path.index(parent_name) + 1
-                ] + (skill_name,)
+        elif parent_process is not None:
+            parent_name = parent_process.name
+            if parent_name in self._active_process_path:
+                path = self._active_process_path[
+                    : self._active_process_path.index(parent_name) + 1
+                ] + (process_name,)
             else:
-                path = (parent_name, skill_name)
+                path = (parent_name, process_name)
         else:
-            path = (skill_name,)
-        self._active_skill_path = path
+            path = (process_name,)
+        self._active_process_path = path
         return path
 
     def _output_prompt(self, prompt: str) -> None:
@@ -766,7 +772,7 @@ class WorkflowChatApp(App[None]):
 
     def _finish(self) -> None:
         if self._exit_code == 0:
-            # The agent emits the skill-specific completion status through the
+            # The agent emits the process-specific completion status through the
             # progress callback; preserve that wording in the final UI state.
             self._set_status(self._current_status)
             if self._response is not None:

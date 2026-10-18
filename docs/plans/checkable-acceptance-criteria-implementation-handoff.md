@@ -111,7 +111,7 @@ label its revision; do not reconstruct the old prompt from memory.
 | `core/behavior_contract.py` | Introduce criterion quality and typed acceptance structures; change rendering. |
 | `core/semantic_faithfulness.py` | Review assertion-level additions; distinguish illustrative setup from required behavior; repair overflow locally. |
 | `workrr/command_catalog.py` | Register, prepare, bind, persist, and connect new stages; replace false resolved fallbacks. |
-| `docs/procedrr/skill-definitions/design-interview.yaml` | Change actual atomicity, scenario-generation, review, and repair workflow contracts. |
+| `docs/procedrr/processes/design-interview.yaml` | Change actual atomicity, scenario-generation, review, and repair workflow contracts. |
 | `core/implementation_packet.py`, `workrr/coding_agent.py` | Carry grouped requirements and criteria into the exact worker prompt. |
 | `workrr/semantic_prompt_cases.py`, `workrr/semantic_prompt_variants.py` | Extend existing case validation and replay; keep variants with parents in one split. |
 | `workrr/deepswe_design_evaluation.py` | Score generated prompt claims separately from reference-only desired outcomes. |

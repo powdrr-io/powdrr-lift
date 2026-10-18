@@ -577,7 +577,7 @@ Before Harbor completion or PR creation:
 
 ## Procedrr flow changes
 
-Update `docs/procedrr/skill-definitions/implement-feature.yaml` while preserving
+Update `docs/procedrr/processes/implement-feature.yaml` while preserving
 single-decision normal form.
 
 ### Replace coding iteration with one invocation
@@ -823,7 +823,7 @@ Expected touchpoints:
 - `src/powdrr_lift/workrr/coding_agent.py`;
 - `src/powdrr_lift/workrr/feature_endpoint.py`;
 - `src/powdrr_lift/integrations/harbor/powdrr_agent.py`;
-- `docs/procedrr/skill-definitions/implement-feature.yaml`;
+- `docs/procedrr/processes/implement-feature.yaml`;
 - `tests/test_coding_agent.py`;
 - `tests/test_feature_endpoint.py`; and
 - Harbor integration tests.

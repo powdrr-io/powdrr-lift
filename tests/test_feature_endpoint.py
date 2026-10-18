@@ -203,7 +203,7 @@ def test_product_flow_starts_with_shared_design_interview() -> None:
         Path(__file__).parents[1]
         / "docs"
         / "procedrr"
-        / "skill-definitions"
+        / "processes"
         / "implement-feature.yaml"
     )
     flow = yaml.safe_load(flow_path.read_text(encoding="utf-8"))
@@ -309,7 +309,7 @@ def test_procedrr_replay_loader_preserves_completed_judge_results(
 def test_worker_prompt_capture_trims_real_implement_feature_at_worker_boundary() -> (
     None
 ):
-    source = Path("docs/procedrr/skill-definitions/implement-feature.yaml").read_text(
+    source = Path("docs/procedrr/processes/implement-feature.yaml").read_text(
         encoding="utf-8"
     )
 
@@ -2282,7 +2282,7 @@ def test_endpoint_refreshes_stale_baseline_from_validated_bootstrap(
 
 
 def test_feature_flow_is_shared_and_validated() -> None:
-    path = Path("docs/procedrr/skill-definitions/implement-feature.yaml")
+    path = Path("docs/procedrr/processes/implement-feature.yaml")
 
     validated = _validate_procedrr_flow(Path.cwd())
 
@@ -2705,7 +2705,7 @@ def test_code_agent_phase_revalidates_correction_against_accepted_proposal_id(
     baseline_path = tmp_path / "docs/structrr/current/baseline.yaml"
     plan_path = tmp_path / "docs/proposals/task/structrr-diff.yaml"
     obligations_path = tmp_path / "feature-obligations.json"
-    procedrr_path = tmp_path / "docs/procedrr/skill-definitions/implement-feature.yaml"
+    procedrr_path = tmp_path / "docs/procedrr/processes/implement-feature.yaml"
     proposal_id = "accepted-task-proposal"
     accepted_proposal = compile_proposal_revision(
         proposal_id,
@@ -2955,7 +2955,7 @@ def test_feature_flow_falls_back_to_source_tree_for_external_target(
         Path(__file__).resolve().parents[1]
         / "docs"
         / "procedrr"
-        / "skill-definitions"
+        / "processes"
         / "implement-feature.yaml"
     )
 
@@ -3112,7 +3112,7 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
 ) -> None:
     """Exercise the clause-to-obligation design pipeline."""
     flow = parse_and_validate(
-        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+        Path("docs/procedrr/processes/design-interview.yaml").read_text()
     )
 
     class PlanningLLM:
@@ -3788,12 +3788,18 @@ def test_benchmark_mode_selects_normative_defaults_automatically(
     flow_path = tmp_path / "design-interview.yaml"
     flow_path.write_text("steps: []\n", encoding="utf-8")
 
-    class SuccessfulEvaluator:
+    class SuccessfulCatalog:
+        @classmethod
+        def from_document(cls, *_: Any, **__: Any) -> SuccessfulCatalog:
+            return cls()
+
+    class SuccessfulExecutionService:
         def __init__(self, *_: Any, **__: Any) -> None:
             pass
 
-        def evaluate(self, _flow: Any, inputs: Mapping[str, Any]) -> None:
+        def execute(self, _process_id: str, inputs: Mapping[str, Any]) -> Any:
             observed.update(inputs)
+            return SimpleNamespace(terminal_status=SimpleNamespace(value="succeeded"))
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.feature_endpoint._validate_procedrr_flow",
@@ -3804,8 +3810,12 @@ def test_benchmark_mode_selects_normative_defaults_automatically(
         lambda source: source,
     )
     monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.ProcessCatalog",
+        SuccessfulCatalog,
+    )
+    monkeypatch.setattr(
         "powdrr_lift.workrr.feature_endpoint.parse_and_validate",
-        lambda *args, **kwargs: object(),
+        lambda *args, **kwargs: {"name": "design-interview"},
     )
     monkeypatch.setattr(
         "powdrr_lift.workrr.feature_endpoint._bootstrap_validation_profiles",
@@ -3816,7 +3826,8 @@ def test_benchmark_mode_selects_normative_defaults_automatically(
         lambda: SimpleNamespace(inventory=lambda *args: ()),
     )
     monkeypatch.setattr(
-        "powdrr_lift.workrr.feature_endpoint.Evaluator", SuccessfulEvaluator
+        "powdrr_lift.workrr.feature_endpoint.ProcedrrExecutionService",
+        SuccessfulExecutionService,
     )
 
     _execute_procedrr_flow(

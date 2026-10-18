@@ -1,0 +1,132 @@
+version: 1
+name: fix-ci-failures
+description: When a pull request has one or more failing continuous-integration checks. When
+  CI logs must be reproduced locally and fixed before updating the pull request. When the
+  fix should finish with the repository's PR-preparation workflow and a pushed PR branch.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: fix-ci-failures\nwhen_to_use:\n- When a pull request has one or more failing\
+      \ continuous-integration checks.\n- When CI logs must be reproduced locally and fixed\
+      \ before updating the pull request.\n- When the fix should finish with the repository's\
+      \ PR-preparation workflow and a pushed PR branch.\nsteps:\n- id: inspect-ci\n  actions:\
+      \ [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n  description:\
+      \ Resolve the pull request and inspect its failing GitHub Actions checks.\n  llm_type:\
+      \ simple_task\n  details: >-\n    Resolve the repository and pull request from the user's\
+      \ reference. Confirm\n    GitHub authentication and inspect only GitHub Actions checks;\
+      \ report\n    external-provider checks without attempting to fix them. Identify every\n\
+      \    failing or cancelled check, its workflow run and job, the head SHA, and the\n \
+      \   exact failing command. Preserve the PR's current branch and scope.\n  tool_invocation_packages:\
+      \ [gh_readonly]\n  tool_invocations:\n  - tool: shell\n    command:\n    - gh\n    -\
+      \ auth\n    - status\n  - tool: shell\n    command:\n    - gh\n    - run\n    - view\n\
+      \    - <run-id>\n    - --json\n    - name,workflowName,conclusion,status,url,event,headBranch,headSha\n\
+      \  - tool: shell\n    command:\n    - gh\n    - run\n    - view\n    - <run-id>\n  \
+      \  - --log-failed\n- id: extract-failures\n  actions: [invoke_tool, edit, yaml_edit,\
+      \ read_document]\n  step_type: governed\n  description: Extract a structured failure\
+      \ record from each CI log.\n  llm_type: high_reasoning\n  details: >-\n    Fetch the\
+      \ failed job logs with gh and parse them into a failure matrix.\n    For each failure\
+      \ record the check, run and job identifiers, failed command,\n    test or source location,\
+      \ exception or assertion, relevant environment\n    detail, and the first actionable\
+      \ stack frame. Separate root failures from\n    cascading failures and ignore cleanup\
+      \ warnings, deprecation notices, and\n    unrelated passing output. Do not edit code\
+      \ until every failure in the run\n    has either a reproduction command or an explicit\
+      \ reason it cannot be\n    reproduced.\n  tool_invocations:\n  - tool: shell\n    command:\n\
+      \    - gh\n    - run\n    - view\n    - <run-id>\n    - --log\n  - tool: shell\n   \
+      \ command:\n    - rg\n    - -n\n    - -C\n    - \"4\"\n    - <failure-signature>\n \
+      \   - <relevant-files-or-log>\n- id: reproduce-failures\n  actions: [invoke_tool, edit,\
+      \ yaml_edit, read_document]\n  step_type: governed\n  description: Reproduce every root\
+      \ failure locally using the CI command.\n  llm_type: fast_iteration\n  details: >-\n\
+      \    First use the returned `pr-prep` tool references and their `templates` and\n  \
+      \  `how_to_use` fields to select the repository's canonical command for the\n    failed\
+      \ test or check. Run that command with the same relevant options and\n    working-tree\
+      \ commit whenever possible. Prefer the narrowest command that reproduces each root failure,\n\
+      \    then run the complete failing CI step after a fix. Record whether each\n    failure\
+      \ reproduces locally. If it reproduces, treat the local output as\n    the primary debugging\
+      \ evidence before researching solutions. If it does\n    not reproduce, compare Python/runtime,\
+      \ dependency lock, OS, environment,\n    generated files, and repository state before\
+      \ changing code; do not weaken\n    a test merely because the local run is green.\n\
+      \  tool_invocations:\n  - tool: ref\n    label: pr-prep\n- id: research-solutions\n\
+      \  actions: [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n \
+      \ description: Search Stack Overflow for evidence-backed solutions.\n  llm_type: standard_reasoning\n\
+      \  details: >-\n    For each distinct root failure, search Stack Overflow using the\
+      \ exact\n    exception, assertion, tool error, and a short framework or library context.\n\
+      \    Prefer highly relevant answers with reproducible explanations and note the\n  \
+      \  question and answer URLs, proposed cause, assumptions, and version\n    constraints.\
+      \ Treat search results as hypotheses, not authority. Reject\n    suggestions that only\
+      \ suppress the failure, skip the test, loosen an\n    assertion, or change behavior\
+      \ without satisfying the PR intent. If no\n    relevant answer exists, record that and\
+      \ continue with repository evidence.\n  tool_invocations:\n  - tool: shell\n    command:\n\
+      \    - curl\n    - -sS\n    - --get\n    - https://api.stackexchange.com/2.3/search/advanced\n\
+      \    - --data-urlencode\n    - site=stackoverflow\n    - --data-urlencode\n    - q=<failure-signature>\n\
+      \    - --data-urlencode\n    - order=desc\n    - --data-urlencode\n    - sort=relevance\n\
+      \    - --data-urlencode\n    - filter=withbody\n- id: implement-fix\n  actions: [edit,\
+      \ yaml_edit, file_management, read_document]\n  step_type: governed\n  description:\
+      \ Map candidate solutions to the local codebase and implement the fix.\n  llm_type:\
+      \ high_reasoning\n  details: >-\n    For every selected Stack Overflow suggestion, identify\
+      \ the exact local\n    module, test, configuration, dependency, or workflow step to\
+      \ which it\n    applies. Compare the suggestion with the local code, repository guidance,\n\
+      \    feature intent, and the failure matrix. Apply only the smallest justified\n   \
+      \ edit that fixes the root cause without hiding failures or expanding scope.\n    If\
+      \ the failure reproduced locally, first rerun that reproduction after the\n    edit.\
+      \ If it did not reproduce, use the closest deterministic local check\n    and explain\
+      \ the CI-only assumptions being addressed. Keep each edit\n    traceable to a failure\
+      \ record and preserve unrelated user changes.\n- id: verify-failures\n  actions: [invoke_tool,\
+      \ edit, yaml_edit, read_document, goto_step]\n  step_type: governed\n  description:\
+      \ Iterate until the failures are fixed and regression checks pass.\n  llm_type: fast_iteration\n\
+      \  details: >-\n    Use the returned `pr-prep` tool references to rerun the canonical\
+      \ commands\n    for the previously failing checks after each edit. When they pass,\n\
+      \    rerun the complete affected CI steps and the repository checks required by\n  \
+      \  the final PR-preparation workflow. If a new failure appears, add it to the\n    failure\
+      \ matrix, reproduce it, then use goto_step with step_id\n    `implement-fix` to repeat\
+      \ the diagnosis-to-fix loop. Use goto_step with\n    step_id `reproduce-failures` when\
+      \ the fix needs another local reproduction.\n    Do not continue while a root failure\
+      \ remains unexplained, a required check fails,\n    or the proposed fix only masks the\
+      \ original behavior.\n  tool_invocations:\n  - tool: ref\n    label: pr-prep\n- description:\
+      \ Run the PR-preparation workflow on the final change set.\n  step_type: uses_process\n\
+      \  llm_type: simple_task\n  uses_process:\n    process: finish-pr-prep\n  details: >-\n\
+      \    Invoke finish-pr-prep after the final fix is complete. Pass it the intended\n \
+      \   staged file set and all validation evidence from this workflow. Allow it to\n  \
+      \  discover and run the repository's required formatting, lint, type-check,\n    and\
+      \ test commands. Do not push or update the PR until finish-pr-prep\n    reports that\
+      \ the staged change set is ready.\n- description: Commit and push the fixed branch to\
+      \ the existing pull request.\n  step_type: uses_process\n  llm_type: simple_task\n  details:\
+      \ >-\n    Invoke create-pull-request with pr-kind `ci-fix`, commit message `Fix CI\n\
+      \    failures`, and the existing pull-request reference and title. Pass a\n    `files_to_publish`\
+      \ context list containing every intended fix/test file,\n    along with the failure\
+      \ matrix, root cause, reproduction, fix, post-fix validation, and\n    Stack Overflow\
+      \ references as context. Require the CI Failure section and\n    verify the pushed head\
+      \ changed. Never claim remote CI is green before\n    GitHub reports a successful run.\n\
+      \  uses_process:\n    process: create-pull-request"
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - invoke_tool
+    - read_document
+    - yaml_edit
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

@@ -1,0 +1,97 @@
+version: 1
+name: specify-system
+description: When you need to define the system requirements and implementation approach for
+  a work item. When the TUI should guide the user through a synchronous requirements-and-approach
+  flow.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 260
+  tool_calls: 260
+  context_chars: 60000
+  context_value_chars: 16000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 120
+    question: "Execute this named workflow for the supplied user request. Treat the embedded\
+      \ workflow document as task-specific requirements and preserve its ordering, gates,\
+      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
+      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
+      \ processes. Use only current bindings and evidence. Do not invent results or claim\
+      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
+      ---\nname: specify-system\ninputs:\n- name: work-item-name\nwhen_to_use:\n- When you\
+      \ need to define the system requirements and implementation approach for\n  a work item.\n\
+      - When the TUI should guide the user through a synchronous requirements-and-approach\n\
+      \  flow.\nsteps:\n- id: capture-system-context\n  description: Ask for the work item\
+      \ name and the minimum context needed to draft\n    the requirements and approach.\n\
+      \  actions: [edit, yaml_edit, file_management, read_document]\n  step_type: governed\n\
+      \  llm_type: high_reasoning\n  details: Collect just enough context to make the template\
+      \ specific without overloading\n    the user with questions.\n- id: generate-system\n\
+      \  description: Generate the system specification template.\n  actions: []\n  step_type:\
+      \ invoke_tool\n  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n    template:\n\
+      \      tool: internal\n      command:\n      - powdrr-lift\n      - system-specification\n\
+      \      - \"--work-item-name\"\n      - \"<work-item-name>\"\n  outputs:\n  - name: system_specification_template\n\
+      \    type: any\n    required_for_next_step: true\n    schema: {type: object, additionalProperties:\
+      \ true}\n- id: fill-system\n  description: Fill out the requirements and approach sections\
+      \ with concise, testable\n    statements.\n  actions: [edit, yaml_edit, file_management,\
+      \ read_document]\n  step_type: governed\n  llm_type: standard_reasoning\n  details:\
+      \ >-\n    Use the yaml_edit action for every YAML change. Its shape is\n    {\"action\"\
+      :\"yaml_edit\",\"file_path\":\"docs/proposals/<work-item-name>/system-specification.yaml\"\
+      ,\"operations\":[{\"op\":\"set_value\",\"path\":[\"id\"],\"value\":\"system-id\"},{\"\
+      op\":\"upsert_item\",\"section\":\"requirements\",\"id\":\"requirement-id\",\"value\"\
+      :{\"description\":\"...\",\"state\":\"added\"}},{\"op\":\"upsert_item\",\"section\"\
+      :\"approach\",\"id\":\"approach-id\",\"value\":{\"description\":\"...\",\"state\":\"\
+      added\"}}]}. Use set_value with a JSON path array for scalar or top-level list fields,\
+      \ and upsert_item with section, id, and a complete value mapping for list entries. Keep\
+      \ each statement concrete enough that it can be validated against the work item without\
+      \ interpretation.\n- id: evaluate-system\n  description: Deterministically evaluate\
+      \ the filled system specification.\n  actions: []\n  step_type: invoke_tool\n  llm_type:\
+      \ simple_task\n  pre_step:\n    action: invoke_tool\n    template:\n      tool: internal\n\
+      \      command:\n      - powdrr-lift\n      - evaluate\n      - docs/proposals/<work-item-name>/system-specification.yaml\n\
+      \  outputs:\n  - name: system_evaluation\n    type: any\n    required_for_next_step:\
+      \ true\n    schema: {type: object, additionalProperties: true}\n- id: repair-system\n\
+      \  description: Use yaml_edit to fix every issue reported by the system evaluator.\n\
+      \  actions: [edit, yaml_edit, file_management, read_document, goto_step]\n  step_type:\
+      \ governed\n  llm_type: fast_iteration\n  details: >-\n    Review the deterministic\
+      \ evaluator result and correct every reported issue\n    with yaml_edit actions. Each\
+      \ action must include the YAML file_path and a\n    non-empty operations array. Use\
+      \ set_value with a JSON path array for scalar\n    or top-level list changes; use upsert_item\
+      \ with section, id, and a complete\n    value mapping for requirements or approach entries.\
+      \ For example: {\"action\":\"yaml_edit\",\"file_path\":\"docs/proposals/<work-item-name>/system-specification.yaml\"\
+      ,\"operations\":[{\"op\":\"set_value\",\"path\":[\"id\"],\"value\":\"system-id\"},{\"\
+      op\":\"upsert_item\",\"section\":\"requirements\",\"id\":\"requirement-id\",\"value\"\
+      :{\"description\":\"...\",\"state\":\"added\"}}]}. Do not use edit or rewrite the YAML\
+      \ as prose. If there are no issues, choose next_step without changing the file and return\
+      \ {\"action\":\"next_step\"}. If the evaluator reports invalid YAML/structure or you\
+      \ are stuck, restart generation with {\"action\":\"goto_step\",\"step_id\":\"generate-system\"\
+      }; do not keep repeating the same repair. The generator will overwrite unreadable content\
+      \ and merge valid existing fields back into the restored template.\n- id: gate-system\n\
+      \  description: Confirm that system evaluation reports zero issues.\n  actions: []\n\
+      \  step_type: gate\n  llm_type: simple_task\n  details: The gate passes only when the\
+      \ evaluator exits successfully with zero issues.\n  pre_step:\n    action: invoke_tool\n\
+      \    template:\n      tool: internal\n      command:\n      - powdrr-lift\n      - evaluate\n\
+      \      - docs/proposals/<work-item-name>/system-specification.yaml\n  gate:\n    outcome:\n\
+      \      path: returncode\n      equals: 0\n    goto_step: evaluate-system\n    retry_context:\
+      \ >-\n      The gate failed because system evaluation still reports issues. Inspect\
+      \ the\n      latest evaluator result, use yaml_edit to fix every issue, and then allow\n\
+      \      the deterministic evaluate-system step to run again."
+    context:
+    - user_request
+    - workflow_context
+    allowed_tools:
+    - edit
+    - file_management
+    - read_document
+    - yaml_edit
+    - invoke_tool
+    bind: workflow_program
+- call:
+    fragment: ${workflow_program}
+    max_steps: 120
+- terminal: succeeded

@@ -39,33 +39,28 @@ from powdrr_lift.workrr.action_operations import (
     _apply_file_edits,
     _apply_yaml_operations,
     _list_worktree_files,
-    _record_skill_pull_request,
+    _record_process_pull_request,
 )
-from powdrr_lift.workrr.action_validation import (
-    _command_items_for_validation,
-    _validate_internal_command,
-    _validate_structured_document_text,
-    _worktree_relative_path,
+from powdrr_lift.workrr.chat_action_serialization import (
+    file_edits_to_data,
+    normalize_structured_document_text,
+    resolve_generated_file_path_from_command,
+    yaml_operation_to_data,
 )
-from powdrr_lift.workrr.chat_contract import (
-    _file_edits_to_data,
-    _normalize_structured_document_text,
-    _resolve_generated_file_path_from_command,
-    _yaml_operation_to_data,
-)
+from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_io import _prompt_user, _verbose_print
-from powdrr_lift.workrr.chat_selection import WorkflowChatConfig
 from powdrr_lift.workrr.execution_loop import _execute_shell_tool
 from powdrr_lift.workrr.execution_state import (
     _ensure_execution_runtime,
     _record_durable_fact,
     _WorkflowExecutionState,
 )
-from powdrr_lift.workrr.llm import (
-    WorkflowAction as SkillChatAction,
-)
-from powdrr_lift.workrr.llm import (
-    WorkflowFileEdits as SkillChatFileEdits,
+from powdrr_lift.workrr.llm import WorkflowAction, WorkflowFileEdits
+from powdrr_lift.workrr.operation_validation import (
+    command_items_for_validation,
+    validate_internal_command,
+    validate_structured_document_text,
+    worktree_relative_path,
 )
 from powdrr_lift.workrr.paths import resolve_worktree_file_path
 
@@ -73,21 +68,11 @@ _INTERNAL_TOOL = "internal"
 _MAX_DOCUMENT_CONTEXT_LINES = 2000
 
 
-def _chat_support(name: str) -> Any:
-    from powdrr_lift.workrr import chat_agent
-
-    return getattr(chat_agent, name)
-
-
-def _support_call(name: str, *args: Any, **kwargs: Any) -> Any:
-    return _chat_support(name)(*args, **kwargs)
-
-
 def _workflow_action_handlers() -> dict[
     str,
     Callable[
         [
-            SkillChatAction,
+            WorkflowAction,
             _WorkflowExecutionState,
             TextIO,
             TextIO,
@@ -114,7 +99,7 @@ def _workflow_action_handlers() -> dict[
 
 
 def _handle_workflow_action_complete(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,
@@ -144,7 +129,7 @@ def _handle_workflow_action_complete(
 
 
 def _handle_workflow_action_edit(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,
@@ -157,7 +142,7 @@ def _handle_workflow_action_edit(
     if not file_edits:
         if action.file_path is None:
             raise PowdrrExecutionError("Workflow edit action must include file_path.")
-        file_edits = (SkillChatFileEdits(action.file_path, action.edits),)
+        file_edits = (WorkflowFileEdits(action.file_path, action.edits),)
 
     pending_writes: list[tuple[Path, str]] = []
     results: list[dict[str, Any]] = []
@@ -171,8 +156,8 @@ def _handle_workflow_action_edit(
             current_text = target_path.read_text(encoding="utf-8")
         state.current_file_path = target_path
         updated_text = _apply_file_edits(current_text, file_edit.edits)
-        updated_text = _normalize_structured_document_text(target_path, updated_text)
-        _validate_structured_document_text(target_path, updated_text)
+        updated_text = normalize_structured_document_text(target_path, updated_text)
+        validate_structured_document_text(target_path, updated_text)
         pending_writes.append((target_path, updated_text))
         results.append(
             {
@@ -183,7 +168,7 @@ def _handle_workflow_action_edit(
 
     invoke_file_mutation(
         tuple(
-            _worktree_relative_path(target_path, state.worktree_root)
+            worktree_relative_path(target_path, state.worktree_root)
             for target_path, _updated_text in pending_writes
         ),
         worktree_root=state.worktree_root,
@@ -193,7 +178,7 @@ def _handle_workflow_action_edit(
     if state.file_added_callback is not None:
         state.file_added_callback(
             tuple(
-                _worktree_relative_path(target_path, state.worktree_root)
+                worktree_relative_path(target_path, state.worktree_root)
                 for target_path, _updated_text in pending_writes
             )
         )
@@ -208,7 +193,7 @@ def _handle_workflow_action_edit(
         )
     action_data = {
         "kind": action.kind,
-        "file_edits": [_file_edits_to_data(group) for group in file_edits],
+        "file_edits": [file_edits_to_data(group) for group in file_edits],
     }
     state.transcript.append(
         {
@@ -225,7 +210,7 @@ def _handle_workflow_action_edit(
     state.execution_events.append(
         {
             "kind": action.kind,
-            "file_edits": [_file_edits_to_data(group) for group in file_edits],
+            "file_edits": [file_edits_to_data(group) for group in file_edits],
             "result": results,
             "decisions_and_context": action.decisions_and_context,
             "step_index": state.step_index,
@@ -248,7 +233,7 @@ def _write_pending_file_mutations(pending_writes: Sequence[tuple[Path, str]]) ->
 
 
 def _handle_workflow_action_yaml_edit(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,
@@ -275,7 +260,7 @@ def _handle_workflow_action_yaml_edit(
         current_text,
         action.yaml_operations,
     )
-    _validate_structured_document_text(target_path, updated_text)
+    validate_structured_document_text(target_path, updated_text)
     invoke_file_mutation(
         (action.file_path,),
         worktree_root=state.worktree_root,
@@ -284,7 +269,7 @@ def _handle_workflow_action_yaml_edit(
     )
     if state.file_added_callback is not None:
         state.file_added_callback(
-            (_worktree_relative_path(target_path, state.worktree_root),)
+            (worktree_relative_path(target_path, state.worktree_root),)
         )
     state.fuzzy_match_cache.clear()
 
@@ -299,7 +284,7 @@ def _handle_workflow_action_yaml_edit(
         "kind": action.kind,
         "file_path": action.file_path,
         "operations": [
-            _yaml_operation_to_data(operation) for operation in action.yaml_operations
+            yaml_operation_to_data(operation) for operation in action.yaml_operations
         ],
     }
     result = {
@@ -332,7 +317,7 @@ def _handle_workflow_action_yaml_edit(
 
 
 def _handle_workflow_action_file_management(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,
@@ -412,7 +397,7 @@ def _handle_workflow_action_file_management(
 
 
 def _handle_workflow_action_read_document(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,
@@ -540,7 +525,7 @@ def _handle_workflow_action_read_document(
 
 
 def _handle_workflow_action_list_files(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,
@@ -592,7 +577,7 @@ def _handle_workflow_action_list_files(
 
 
 def _handle_workflow_action_next_step(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,
@@ -622,7 +607,7 @@ def _handle_workflow_action_next_step(
 
 
 def _handle_workflow_action_emit_outputs(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,
@@ -642,7 +627,7 @@ def _handle_workflow_action_emit_outputs(
 
 
 def _handle_workflow_action_prompt_user(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,
@@ -684,7 +669,7 @@ def _handle_workflow_action_prompt_user(
 
 
 def _handle_workflow_action_invoke_tool(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,
@@ -722,11 +707,11 @@ def _handle_workflow_action_invoke_tool(
         )
     elif action.tool in {"shell", _INTERNAL_TOOL}:
         if action.tool == _INTERNAL_TOOL and action.parameters.get("help") is not True:
-            _validate_internal_command(action.parameters.get("command"))
+            validate_internal_command(action.parameters.get("command"))
         command_items = (
             []
             if action.parameters.get("help") is True
-            else _command_items_for_validation(action.parameters.get("command"))
+            else command_items_for_validation(action.parameters.get("command"))
         )
         tool_result = invoke_shell_capability(
             {**action.parameters, "_tool_name": action.tool},
@@ -787,7 +772,7 @@ def _handle_workflow_action_invoke_tool(
                 state.file_added_callback(added_paths)
     if action.tool in {"shell", GH_TOOL}:
         _record_chat_pull_request(action, state, tool_result)
-    inferred_path = _resolve_generated_file_path_from_command(
+    inferred_path = resolve_generated_file_path_from_command(
         action.parameters.get("command"),
         worktree_root=state.worktree_root,
     )
@@ -837,17 +822,17 @@ def _handle_workflow_action_invoke_tool(
 
 
 def _record_chat_pull_request(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     tool_result: Mapping[str, Any],
 ) -> None:
-    _record_skill_pull_request(
+    _record_process_pull_request(
         action,
         state.worktree_root,
-        state.selected_skill,
+        state.selected_process,
         state.audit_events,
         tool_result,
-        root_skill=state.root_skill or state.selected_skill,
+        root_process=state.root_process or state.selected_process,
         step_index=state.step_index,
         runtime=_ensure_execution_runtime(state),
     )
@@ -878,7 +863,7 @@ def _execute_fuzzy_match_tool(
 
 
 def _handle_workflow_action_gather_context(
-    action: SkillChatAction,
+    action: WorkflowAction,
     state: _WorkflowExecutionState,
     stdout: TextIO,
     stderr: TextIO,

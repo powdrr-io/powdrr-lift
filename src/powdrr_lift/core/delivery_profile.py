@@ -117,7 +117,7 @@ class PersonaDefinition:
     persona_type: PersonaType
     model_profile: str
     prompt_catalogs: tuple[str, ...] = field(default_factory=tuple)
-    skill_references: tuple[str, ...] = field(default_factory=tuple)
+    process_references: tuple[str, ...] = field(default_factory=tuple)
     step_budget: int | None = None
 
     def to_data(self) -> dict[str, Any]:
@@ -128,8 +128,8 @@ class PersonaDefinition:
         }
         if self.prompt_catalogs:
             data["prompt_catalogs"] = list(self.prompt_catalogs)
-        if self.skill_references:
-            data["skill_references"] = list(self.skill_references)
+        if self.process_references:
+            data["process_references"] = list(self.process_references)
         if self.step_budget is not None:
             data["step_budget"] = self.step_budget
         return data
@@ -424,8 +424,8 @@ def _parse_persona(data: Mapping[str, Any]) -> PersonaDefinition:
         prompt_catalogs=_required_identifier_sequence(
             data, "prompt_catalogs", optional=True
         ),
-        skill_references=_required_identifier_sequence(
-            data, "skill_references", optional=True
+        process_references=_required_identifier_sequence(
+            data, "process_references", optional=True
         ),
         step_budget=_optional_positive_int(data, "step_budget"),
     )
@@ -484,7 +484,7 @@ def _validate_persona(
             "persona_type",
             "model_profile",
             "prompt_catalogs",
-            "skill_references",
+            "process_references",
             "step_budget",
         },
         issues,
@@ -504,8 +504,8 @@ def _validate_persona(
     prompt_catalogs = _validate_identifier_sequence(
         data, "prompt_catalogs", issues, source_path, path
     )
-    skill_references = _validate_identifier_sequence(
-        data, "skill_references", issues, source_path, path
+    process_references = _validate_identifier_sequence(
+        data, "process_references", issues, source_path, path
     )
     step_budget = data.get("step_budget")
     if step_budget is not None and (
@@ -528,7 +528,7 @@ def _validate_persona(
         persona_type,
         model_profile,
         prompt_catalogs,
-        skill_references,
+        process_references,
         step_budget,
     )
 

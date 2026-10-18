@@ -160,7 +160,7 @@ class WorkrrProcedrrClient:
         self,
         client: WorkflowLLMClient,
         *,
-        skills_dir: Path,
+        process_directory: Path,
         max_retries: int = 3,
         provider_retry_attempts: int = 3,
         provider_retry_delay_seconds: float = 1.0,
@@ -168,7 +168,7 @@ class WorkrrProcedrrClient:
         telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> None:
         self._client = client
-        self._skills_dir = skills_dir
+        self._process_directory = process_directory
         self._max_retries = max_retries
         self._provider_retry_attempts = provider_retry_attempts
         self._provider_retry_delay_seconds = provider_retry_delay_seconds
@@ -190,9 +190,14 @@ class WorkrrProcedrrClient:
         for attempt in range(self._provider_retry_attempts + 1):
             started = time.monotonic()
             try:
-                result = cast(Any, self._client).complete_json(
-                    messages, response_schema=response_schema
-                )
+                try:
+                    result = cast(Any, self._client).complete_json(
+                        messages, response_schema=response_schema
+                    )
+                except TypeError as error:
+                    if "response_schema" not in str(error):
+                        raise
+                    result = self._client.complete_json(messages)
                 self._record_provider_attempt(
                     trace_id, attempt, started, outcome="succeeded"
                 )
@@ -330,6 +335,10 @@ class WorkrrProcedrrClient:
                 return parse(payload)
             except JsonSchemaError as exc:
                 last_error = str(exc)
+            except Exception as exc:
+                if not _is_invalid_json_response(exc):
+                    raise
+                last_error = str(exc)
         raise ProcedrrResponseError(
             "Workrr exhausted structured repair for a procedrr judge: " + last_error
         )
@@ -362,6 +371,12 @@ def _is_retryable_provider_failure(error: Exception) -> bool:
             "streaming response ended before a completion marker",
         )
     )
+
+
+def _is_invalid_json_response(error: Exception) -> bool:
+    """Recognize parse failures that can be repaired against the same schema."""
+    message = str(error).casefold()
+    return "not valid json" in message or "invalid json" in message
 
 
 __all__ = [

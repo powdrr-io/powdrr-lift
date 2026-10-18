@@ -249,6 +249,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueClient,
     GitHubIssueQueueError,
     ReviewedExecutionPlan,
+    TaskCheckpointCallback,
     find_plan_issues,
     load_reviewed_plan_at_commit,
     publish_plan_issues,
@@ -2886,6 +2887,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
         _worker_id: str,
         item: Any,
         plan: ReviewedExecutionPlan,
+        checkpoint_callback: TaskCheckpointCallback,
     ) -> int:
         if workflow_path.is_dir():
             workflow_dir = workflow_path
@@ -2974,6 +2976,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                         max_roundtrips=args.max_roundtrips,
                         context_compaction_threshold=args.context_compaction_threshold,
                         verbose=args.verbose,
+                        task_checkpoint_callback=checkpoint_callback,
                     ),
                     stdout=sys.stdout,
                     stderr=sys.stderr,
@@ -2989,6 +2992,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 max_roundtrips=args.max_roundtrips,
                 context_compaction_threshold=args.context_compaction_threshold,
                 verbose=args.verbose,
+                task_checkpoint_callback=checkpoint_callback,
             ),
             stdout=sys.stdout,
             stderr=sys.stderr,

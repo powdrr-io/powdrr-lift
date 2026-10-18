@@ -102,6 +102,14 @@ when all prerequisite issues are closed, then selects the lowest-numbered
 eligible item, marks it `claimed`, and invokes the existing
 `process-workflow-task` runtime for the workflow named by the pinned plan.
 
+When a workflow task finishes, the worker first commits and pushes its workflow
+state, then appends a `Powdrr task checkpoint` comment to that item's issue. The
+comment contains the plan, item, workflow, and task IDs; the declared output
+state type and value; and the commit SHA containing the persisted workflow
+state. These comments form a task-by-task history alongside the issue's queue
+labels and claim/final-status comments. They are scoped to one issue; plan-level
+dependencies continue to determine when an item becomes eligible to run.
+
 `powdrr-lift list-plan-issues` reads the pinned plan and GitHub issue pointers,
 then prints one result per plan item with its issue number, URL, state, and
 labels. Items without a published issue appear in `missing_item_ids`; the

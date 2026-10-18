@@ -632,13 +632,6 @@ files:
     end_line: 153
   summary: Add typed execution events and terminal results
   rationale: Define the shared execution contract for caller integrations.
-- path: tests/test_procedrr_runtime.py
-  type: added
-  span:
-    start_line: 1
-    end_line: 122
-  summary: Test typed process loading and execution results
-  rationale: Protect catalog validation and runtime event identity.
 - path: src/powdrr_lift/workrr/feature_endpoint.py
   type: modified
   span:
@@ -766,6 +759,21 @@ files:
     end_line: 63
   summary: Test Workrr operation authorization and validation
   rationale: Protect caller-scoped dispatch and command schema enforcement.
+- path: docs/procedrr/processes/independent-skill-workflow-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 100
+  summary: Port independent workflow review into a typed Procedrr process
+  rationale: Preserve the independent adversarial review contract with explicit input/output
+    schemas.
+- path: tests/test_procedrr_runtime.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 179
+  summary: Test typed process loading and execution results
+  rationale: Protect catalog validation and runtime event identity.
 entities:
 - id: procedrr-process-catalog
   type: Module

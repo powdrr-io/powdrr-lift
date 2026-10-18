@@ -321,16 +321,44 @@ files:
   type: modified
   span:
     start_line: 397
-    end_line: 403
-  summary: Stop evaluation at declared terminal nodes
-  rationale: Preserve process terminal outcomes within nested evaluation.
+    end_line: 413
+  summary: Resolve recovery declarations inside called processes
+  rationale: Let nested Procedrr processes recover using their own declarations.
 - path: src/procedrr_evaluator/evaluator.py
   type: modified
   span:
-    start_line: 425
-    end_line: 429
-  summary: Stop evaluation at declared terminal nodes
-  rationale: Preserve process terminal outcomes within nested evaluation.
+    start_line: 435
+    end_line: 439
+  summary: Restore parent recovery context after a process call
+  rationale: Keep nested recovery state scoped to the called process.
+- path: docs/procedrr/processes/finish-pr-prep.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 180
+  summary: Add the PR preparation process
+  rationale: Declare validation, repair, and restaging as a Procedrr process.
+- path: docs/procedrr/processes/handle-ad-hoc.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 47
+  summary: Add the ad hoc request process
+  rationale: Route requests through generated Procedrr fragments and PR preparation.
+- path: src/procedrr/parser.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Register the file management operation
+  rationale: Allow process declarations to use the chat file management adapter.
+- path: src/procedrr/parser.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 28
+  summary: Register workflow chat snapshot operations
+  rationale: Allow the ad hoc process to inspect whether it changed the worktree.
 - path: tests/test_external_contract_research.py
   type: modified
   span:
@@ -502,45 +530,59 @@ files:
 - path: tests/test_procedrr_evaluator.py
   type: modified
   span:
-    start_line: 1012
-    end_line: 1012
+    start_line: 1073
+    end_line: 1073
   summary: Cover terminal-node evaluation behavior
   rationale: Ensure nested processes preserve their terminal semantics.
 - path: tests/test_procedrr_evaluator.py
   type: modified
   span:
-    start_line: 1076
-    end_line: 1076
+    start_line: 1137
+    end_line: 1137
   summary: Cover terminal-node evaluation behavior
   rationale: Ensure nested processes preserve their terminal semantics.
 - path: tests/test_procedrr_evaluator.py
   type: modified
   span:
-    start_line: 1162
-    end_line: 1162
+    start_line: 1223
+    end_line: 1223
   summary: Cover terminal-node evaluation behavior
   rationale: Ensure nested processes preserve their terminal semantics.
 - path: tests/test_procedrr_evaluator.py
   type: modified
   span:
-    start_line: 1356
-    end_line: 1356
+    start_line: 1417
+    end_line: 1417
   summary: Cover terminal-node evaluation behavior
   rationale: Ensure nested processes preserve their terminal semantics.
 - path: tests/test_procedrr_evaluator.py
   type: modified
   span:
-    start_line: 1475
-    end_line: 1475
+    start_line: 1536
+    end_line: 1536
   summary: Cover terminal-node evaluation behavior
   rationale: Ensure nested processes preserve their terminal semantics.
 - path: tests/test_procedrr_evaluator.py
   type: modified
   span:
-    start_line: 1529
-    end_line: 1529
+    start_line: 1590
+    end_line: 1590
   summary: Cover terminal-node evaluation behavior
   rationale: Ensure nested processes preserve their terminal semantics.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 297
+    end_line: 357
+  summary: Cover called process recovery behavior
+  rationale: Verify nested processes use and restore their own recovery declarations.
+- path: tests/test_procedrr_migrated_workflows.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 219
+  summary: Test the PR preparation and ad hoc processes
+  rationale: Verify process branching, validation retries, and nested calls.
 - path: tests/test_workrr_procedrr.py
   type: modified
   span:

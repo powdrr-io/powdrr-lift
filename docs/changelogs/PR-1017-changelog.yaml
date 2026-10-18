@@ -52,6 +52,46 @@ files:
     span: {start_line: 136, end_line: 216}
     summary: Verify plan issue execution uses the durable runtime directory and saves workflow state there.
     rationale: Prevent regressions where plan descriptor files are mistaken for Procedrr task definitions.
+  - path: src/powdrr_lift/builtin_tool_help.py
+    type: modified
+    span: {start_line: 61, end_line: 64}
+    summary: Document the bounded Git operations exposed by the built-in Git tool.
+    rationale: Make the supported HEAD read operation discoverable to workflow agents.
+  - path: src/powdrr_lift/execution/builtin_tools.py
+    type: modified
+    span: {start_line: 69, end_line: 69}
+    summary: Allow the intrinsic repository adapter to validate HEAD reads.
+    rationale: Permit checkpoint code to request the current commit through the bounded Git interface.
+  - path: src/powdrr_lift/intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 186, end_line: 187}
+    summary: Translate the HEAD operation to `git rev-parse HEAD`.
+    rationale: Give workflow checkpoints the current commit identifier through an allowlisted operation.
+  - path: src/powdrr_lift/intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 219, end_line: 219}
+    summary: Permit the bounded `rev-parse` command in the intrinsic Git executor.
+    rationale: Execute the supported HEAD lookup while keeping other Git commands restricted.
+  - path: src/powdrr_lift/process/task_step.py
+    type: modified
+    span: {start_line: 57, end_line: 57}
+    summary: Add HEAD reads to the task process read-only Git tool package.
+    rationale: Make the operation available to generated workflow tasks.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2720, end_line: 2721}
+    summary: Map checkpoint commit lookups to the structured HEAD operation.
+    rationale: Keep task-agent Git access within the intrinsic repository boundary.
+  - path: tests/test_intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Import the internal Git operation translator for regression coverage.
+    rationale: Verify task-agent checkpoint commands map to the supported intrinsic operation.
+  - path: tests/test_intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 21, end_line: 25}
+    summary: Assert HEAD lookups map to the bounded intrinsic Git command.
+    rationale: Prevent checkpoint failures from unsupported `rev-parse HEAD` operations.
 entities:
   - id: plan-worker-runtime-directory-regression
     type: Regression test

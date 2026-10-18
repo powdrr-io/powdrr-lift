@@ -17,9 +17,13 @@ steps:
     question: >-
       Execute this proposed-PR workflow for the claimed durable task in
       task_context. Preserve this order. First call the `execute-proposed-pr`
-      Procedrr process, passing task_context as its task_context input. Wait
-      for its result; do not claim implementation or completeness without the
-      returned evidence. Next run the repository's formatting, lint, type, and
+      Procedrr process with `process_id` set to `execute-proposed-pr` and a
+      `bindings` mapping that passes the current `task_context` binding under
+      the nested process input named `task_context`. In the operation JSON,
+      encode that as `{"bindings":{"task_context":{"type":"reference",
+      "value":"task_context"}}}`. Wait for its result; do not claim
+      implementation or completeness without the returned evidence. Next run
+      the repository's formatting, lint, type, and
       other validation commands that apply to the changed files. Read validation
       commands from repository tool context and the proposed-PR context; do not
       assume a command passed without its result. Review the complete diff for

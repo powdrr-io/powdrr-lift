@@ -656,7 +656,11 @@ def cleanup_workflow_run(
         )
         removed.extend(interrupted["removed"])
         errors.extend(interrupted["errors"])
-        if not errors:
+        first_claim_reopened = any(
+            item.startswith("reopened-first-claim-task:")
+            for item in interrupted["removed"]
+        )
+        if not errors and not first_claim_reopened:
             recovery = _restore_workflow_git_state(
                 state_report,
                 integration_worktree,
@@ -879,6 +883,7 @@ def _restore_interrupted_workflow_checkpoint(
 
     checkpoints: list[str] = []
     errors: list[str] = []
+    first_claim_tasks: list[tuple[Path, str]] = []
     for task in locked_tasks:
         task_path_value = task.get("path")
         task_id = task.get("task_id", "<unknown>")
@@ -933,14 +938,85 @@ def _restore_interrupted_workflow_checkpoint(
                 checkpoint = parent.stdout.strip()
                 break
         if checkpoint is None:
-            errors.append(
-                f"task:{task_id}: could not identify the last consistent checkpoint"
+            current = _git(
+                integration_worktree,
+                ["show", f"HEAD:{relative_path}"],
             )
+            try:
+                current_data = yaml.safe_load(current.stdout)
+            except yaml.YAMLError:
+                current_data = None
+            if (
+                not isinstance(current_data, dict)
+                or current_data.get("status") != "locked"
+            ):
+                errors.append(
+                    f"task:{task_id}: could not identify the last consistent checkpoint"
+                )
+                continue
+            first_claim_tasks.append((relative_path, task_id))
         else:
             checkpoints.append(checkpoint)
 
-    if errors or not checkpoints:
+    if errors or (not checkpoints and not first_claim_tasks):
         return {"removed": [], "errors": errors}
+    if not checkpoints:
+        for relative_path, _task_id in first_claim_tasks:
+            task_path = integration_worktree / relative_path
+            task_data = yaml.safe_load(task_path.read_text(encoding="utf-8"))
+            if not isinstance(task_data, dict):
+                return {
+                    "removed": [],
+                    "errors": [f"task file {relative_path} is not a YAML object"],
+                }
+            task_data["status"] = "open"
+            task_path.write_text(
+                yaml.safe_dump(task_data, sort_keys=False),
+                encoding="utf-8",
+            )
+        staged = _git(
+            integration_worktree,
+            ["add", "--", *(str(path) for path, _ in first_claim_tasks)],
+        )
+        if staged.returncode != 0:
+            return {
+                "removed": [],
+                "errors": [
+                    "integration-worktree: could not stage reopened first task: "
+                    + staged.stderr.strip()
+                ],
+            }
+        commit = _git(
+            integration_worktree,
+            ["commit", "-m", "Recover interrupted first workflow claim"],
+        )
+        if commit.returncode != 0:
+            return {
+                "removed": [],
+                "errors": [
+                    "integration-worktree: could not save reopened first task: "
+                    + commit.stderr.strip()
+                ],
+            }
+        checkpoint = _run_git(integration_worktree, ["rev-parse", "HEAD"])
+        push = _git(
+            integration_worktree,
+            ["push", "--force-with-lease", "origin", report["integration_branch"]],
+        )
+        if push.returncode != 0:
+            return {
+                "removed": [],
+                "errors": [
+                    "integration-branch: could not publish reopened first task: "
+                    + push.stderr.strip()
+                ],
+            }
+        return {
+            "removed": [
+                f"reopened-first-claim-task:{report['integration_branch']}:{checkpoint}"
+            ],
+            "errors": [],
+        }
     checkpoint = checkpoints[0]
     reset = _git(integration_worktree, ["reset", "--hard", checkpoint])
     if reset.returncode != 0:

@@ -807,6 +807,11 @@ files:
     end_line: 456
   summary: Cover Procedrr workflow processes and instantiation
   rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: pyproject.toml
+  type: modified
+  span: {start_line: 54, end_line: 54}
+  summary: Remove package data for the deleted templates directory
+  rationale: Keep wheel builds from referencing a directory removed by the Procedrr port.
 entities:
 - id: execute-proposed-pr-workflow
   type: Workflow

@@ -92,6 +92,26 @@ files:
     span: {start_line: 21, end_line: 25}
     summary: Assert HEAD lookups map to the bounded intrinsic Git command.
     rationale: Prevent checkpoint failures from unsupported `rev-parse HEAD` operations.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 652, end_line: 653}
+    summary: Run interrupted task checkpoint recovery before restoring workflow files.
+    rationale: Return a task from locked to its last consistent state before retrying a worker.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 655, end_line: 655}
+    summary: Record the reset task checkpoint recovery result.
+    rationale: Include checkpoint rollback in the workflow recovery report.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 657, end_line: 666}
+    summary: Restore generated workflow files after rolling back interrupted task state.
+    rationale: Preserve the initial workflow definition while clearing only interrupted progress.
+  - path: tests/test_workflow_git.py
+    type: modified
+    span: {start_line: 334, end_line: 416}
+    summary: Verify recovery restores a remotely published locked task to its pending checkpoint.
+    rationale: Prevent stale locks from permanently blocking a retried workflow task.
 entities:
   - id: plan-worker-runtime-directory-regression
     type: Regression test

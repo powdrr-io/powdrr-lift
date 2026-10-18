@@ -1,0 +1,854 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1014
+title: Port reusable workflow templates to Procedrr
+intent:
+  problem: The reusable proposed-PR and full-review workflows still live in legacy
+    task-template files, and callers depend on those definitions.
+  goal: Move both workflows into the Procedrr process catalog, run proposed-PR work
+    as durable process-backed tasks, and remove the legacy template files.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 43
+    end_line: 45
+  summary: Document process-backed plan workflows
+  rationale: Keep the plan contract and example aligned with the Procedrr process
+    worker.
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 50
+    end_line: 52
+  summary: Document process-backed plan workflows
+  rationale: Keep the plan contract and example aligned with the Procedrr process
+    worker.
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 61
+    end_line: 61
+  summary: Document process-backed plan workflows
+  rationale: Keep the plan contract and example aligned with the Procedrr process
+    worker.
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 63
+    end_line: 63
+  summary: Document process-backed plan workflows
+  rationale: Keep the plan contract and example aligned with the Procedrr process
+    worker.
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 66
+    end_line: 78
+  summary: Document process-backed plan workflows
+  rationale: Keep the plan contract and example aligned with the Procedrr process
+    worker.
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 81
+    end_line: 83
+  summary: Document process-backed plan workflows
+  rationale: Keep the plan contract and example aligned with the Procedrr process
+    worker.
+- path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 50
+  summary: Add the durable proposed-PR process wrapper
+  rationale: Preserve workflow checkpoints while delegating execution and preparation
+    to Procedrr.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 13
+    end_line: 16
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 23
+    end_line: 32
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 50
+    end_line: 50
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 61
+    end_line: 61
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 126
+    end_line: 126
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 152
+    end_line: 152
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 163
+    end_line: 163
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 246
+    end_line: 246
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 299
+    end_line: 299
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 310
+    end_line: 310
+  summary: Accept durable task context in proposed-PR execution
+  rationale: Run planning and implementation from the reviewed process task context.
+- path: docs/procedrr/processes/fully-review-pr.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 46
+  summary: Add sequential full-PR review process
+  rationale: Run functionality, test coverage, and security reviews in order.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Instantiate feature workflows through Procedrr
+  rationale: Make the feature-planning process invoke the process-backed workflow.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 258
+    end_line: 258
+  summary: Instantiate feature workflows through Procedrr
+  rationale: Make the feature-planning process invoke the process-backed workflow.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 260
+    end_line: 260
+  summary: Instantiate feature workflows through Procedrr
+  rationale: Make the feature-planning process invoke the process-backed workflow.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 264
+    end_line: 264
+  summary: Instantiate feature workflows through Procedrr
+  rationale: Make the feature-planning process invoke the process-backed workflow.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 268
+    end_line: 268
+  summary: Instantiate feature workflows through Procedrr
+  rationale: Make the feature-planning process invoke the process-backed workflow.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 275
+    end_line: 275
+  summary: Instantiate feature workflows through Procedrr
+  rationale: Make the feature-planning process invoke the process-backed workflow.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 288
+    end_line: 289
+  summary: Instantiate feature workflows through Procedrr
+  rationale: Make the feature-planning process invoke the process-backed workflow.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 317
+    end_line: 317
+  summary: Instantiate feature workflows through Procedrr
+  rationale: Make the feature-planning process invoke the process-backed workflow.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 320
+    end_line: 321
+  summary: Instantiate feature workflows through Procedrr
+  rationale: Make the feature-planning process invoke the process-backed workflow.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 338
+    end_line: 338
+  summary: Instantiate feature workflows through Procedrr
+  rationale: Make the feature-planning process invoke the process-backed workflow.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 127
+    end_line: 127
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 130
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 134
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1860
+    end_line: 1870
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2633
+    end_line: 2633
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2646
+    end_line: 2649
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2642
+    end_line: 2676
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2754
+    end_line: 2773
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2777
+    end_line: 2796
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2813
+    end_line: 2825
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2828
+    end_line: 2829
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2833
+    end_line: 2835
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2841
+    end_line: 2841
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2845
+    end_line: 2859
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2907
+    end_line: 2927
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2961
+    end_line: 2961
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3944
+    end_line: 3962
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 4018
+    end_line: 4034
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 4036
+    end_line: 4036
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 4038
+    end_line: 4038
+  summary: Instantiate durable Procedrr process tasks
+  rationale: Support process inputs, plan worker execution, and validate process changes
+    and template removal.
+- path: src/powdrr_lift/process/templates.py
+  type: modified
+  span:
+    start_line: 417
+    end_line: 496
+  summary: Create durable tasks from Procedrr processes
+  rationale: Validate process inputs and persist a process-backed workflow task.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 30
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 114
+    end_line: 114
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 117
+    end_line: 117
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 119
+    end_line: 119
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 133
+    end_line: 133
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 135
+    end_line: 135
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 141
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 146
+    end_line: 147
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 160
+    end_line: 170
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 173
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 175
+    end_line: 195
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 198
+    end_line: 198
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 200
+    end_line: 200
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 329
+    end_line: 329
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 475
+    end_line: 475
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 529
+    end_line: 529
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 533
+    end_line: 546
+  summary: Generate process-backed plan workflow descriptors
+  rationale: Record the process ID and complete reviewed item inputs in schema v2.
+- path: templates/execute-proposed-pr.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 413
+  summary: Remove legacy proposed-PR workflow template
+  rationale: Use the Procedrr process catalog as the source of reusable execution
+    behavior.
+- path: templates/fully-review-pr.yaml
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 77
+  summary: Remove legacy full-review workflow template
+  rationale: Use the sequential Procedrr review process instead.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 95
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 99
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 106
+    end_line: 106
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 118
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 120
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 124
+    end_line: 124
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 126
+    end_line: 131
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 135
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 137
+    end_line: 146
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 264
+    end_line: 266
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 269
+    end_line: 269
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 271
+    end_line: 286
+  summary: Cover process-backed plan descriptors
+  rationale: Verify schema v2 inputs and durable process task creation.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 67
+  summary: Cover process descriptors in issue worker tests
+  rationale: Exercise worker behavior with process IDs and structured inputs.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 505
+    end_line: 509
+  summary: Cover process descriptors in issue worker tests
+  rationale: Exercise worker behavior with process IDs and structured inputs.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 572
+    end_line: 576
+  summary: Cover process descriptors in issue worker tests
+  rationale: Exercise worker behavior with process IDs and structured inputs.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 578
+    end_line: 582
+  summary: Cover process descriptors in issue worker tests
+  rationale: Exercise worker behavior with process IDs and structured inputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 1456
+    end_line: 1466
+  summary: Supply task context to proposed-PR process tests
+  rationale: Keep process evaluation aligned with durable task inputs.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 1602
+    end_line: 1612
+  summary: Supply task context to proposed-PR process tests
+  rationale: Keep process evaluation aligned with durable task inputs.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 318
+    end_line: 318
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 321
+    end_line: 346
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 485
+    end_line: 485
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 352
+    end_line: 355
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 358
+    end_line: 358
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 361
+    end_line: 361
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 363
+    end_line: 363
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 365
+    end_line: 368
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 520
+    end_line: 520
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 373
+    end_line: 376
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 527
+    end_line: 527
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 548
+    end_line: 581
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 437
+    end_line: 438
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 440
+    end_line: 445
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 447
+    end_line: 456
+  summary: Cover Procedrr workflow processes and instantiation
+  rationale: Verify sequential reviews and creation of process-backed durable tasks.
+entities:
+- id: execute-proposed-pr-workflow
+  type: Workflow
+  action: added
+- id: fully-review-pr
+  type: Workflow
+  action: added
+- id: execute-proposed-pr
+  type: Workflow
+  action: added
+- id: instantiate-procedrr-process-workflow
+  type: Function
+  action: added
+- id: plan-workflow-instance-v2
+  type: Configuration file
+  action: added
+entity_relationships:
+- id: proposed-pr-workflow-delegates-to-execution-process
+  type: invokes
+  source: execute-proposed-pr-workflow
+  target: execute-proposed-pr
+  action: added
+  description: The durable process wrapper delegates implementation to the reusable
+    Procedrr execution process.
+- id: issue-plan-worker-materializes-procedrr-workflow
+  type: creates
+  source: instantiate-procedrr-process-workflow
+  target: execute-proposed-pr-workflow
+  action: added
+  description: The worker creates a durable task whose process ID and inputs come
+    from the reviewed plan descriptor.
+invariants:
+- id: plan-item-context-remains-authoritative
+  description: Generated process workflow inputs preserve the pinned plan item objective,
+    scope, acceptance criteria, dependencies, and verification command.
+  action: added
+- id: durable-process-inputs-are-validated
+  description: A durable process task is created only when the selected catalog process
+    accepts its task context.
+  action: added
+guidance:
+- id: review-process-inputs-with-plan
+  description: Review the process ID and complete process inputs together with each
+    generated plan item before publishing issues.
+  action: added

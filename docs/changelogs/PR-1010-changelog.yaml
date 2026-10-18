@@ -121,6 +121,13 @@ files:
     end_line: 36
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: docs/archive/legacy-workflow-language/llm-execution-language-safety-implementation.md
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 1194
+  summary: Update llm-execution-language-safety-implementation.md for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
 - path: docs/archive/legacy-workflow-language/static-workflow-liveness-analysis.md
   type: renamed
   span:
@@ -146,63 +153,70 @@ files:
   type: modified
   span:
     start_line: 5
-    end_line: 10
+    end_line: 8
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: docs/design/procedrr-only-workflow-runtime.md
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: docs/design/procedrr-only-workflow-runtime.md
   type: modified
   span:
     start_line: 21
-    end_line: 21
+    end_line: 29
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: docs/design/procedrr-only-workflow-runtime.md
   type: modified
   span:
-    start_line: 23
-    end_line: 31
+    start_line: 72
+    end_line: 76
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: docs/design/procedrr-only-workflow-runtime.md
   type: modified
   span:
-    start_line: 74
-    end_line: 78
+    start_line: 83
+    end_line: 84
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: docs/design/procedrr-only-workflow-runtime.md
   type: modified
   span:
-    start_line: 85
-    end_line: 86
+    start_line: 88
+    end_line: 96
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: docs/design/procedrr-only-workflow-runtime.md
   type: modified
   span:
-    start_line: 90
-    end_line: 98
+    start_line: 100
+    end_line: 104
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: docs/design/procedrr-only-workflow-runtime.md
   type: modified
   span:
-    start_line: 102
-    end_line: 102
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: docs/design/procedrr-only-workflow-runtime.md
-  type: modified
-  span:
-    start_line: 106
-    end_line: 106
+    start_line: 120
+    end_line: 120
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: docs/design/single-decision-feature-development.md
   type: modified
   span:
-    start_line: 8
-    end_line: 9
+    start_line: 6
+    end_line: 7
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: docs/design/single-decision-feature-development.md
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: docs/harbor/powdrr-agent.md
@@ -324,13 +338,6 @@ files:
     end_line: 37
   summary: Update the Procedrr process directory reference
   rationale: Keep active change guidance aligned with the renamed directory.
-- path: docs/plans/llm-execution-language-safety-implementation.md
-  type: modified
-  span:
-    start_line: 39
-    end_line: 40
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: docs/plans/prompt-quality-recovery-implementation-handoff.md
   type: modified
   span:
@@ -345,6 +352,55 @@ files:
     end_line: 83
   summary: Update the Procedrr process directory reference
   rationale: Keep active routing guidance aligned with the renamed directory.
+- path: docs/plans/workflow-llm-prompt-reduction.md
+  type: modified
+  span:
+    start_line: 227
+    end_line: 227
+  summary: Update workflow-llm-prompt-reduction.md for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/plans/workflow-llm-prompt-reduction.md
+  type: modified
+  span:
+    start_line: 229
+    end_line: 229
+  summary: Update workflow-llm-prompt-reduction.md for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/plans/workflow-llm-prompt-reduction.md
+  type: modified
+  span:
+    start_line: 231
+    end_line: 232
+  summary: Update workflow-llm-prompt-reduction.md for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/plans/workflow-llm-prompt-reduction.md
+  type: modified
+  span:
+    start_line: 234
+    end_line: 234
+  summary: Update workflow-llm-prompt-reduction.md for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/plans/workflow-llm-prompt-reduction.md
+  type: modified
+  span:
+    start_line: 258
+    end_line: 258
+  summary: Update workflow-llm-prompt-reduction.md for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/powdrr/runs/deterministic-proposed-pr-planning/task-1-review-codebase.md
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Update task-1-review-codebase.md for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/powdrr/runs/deterministic-proposed-pr-planning/task-3-implementation.md
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Update task-3-implementation.md for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
 - path: docs/procedrr/processes/address-review-comments.yaml
   type: added
   span:
@@ -454,7 +510,7 @@ files:
   type: added
   span:
     start_line: 1
-    end_line: 168
+    end_line: 178
   summary: Port review-skill-workflow workflow to Procedrr
   rationale: Make this supported workflow available from the Procedrr process catalog.
 - path: docs/procedrr/processes/review-system.yaml
@@ -527,6 +583,48 @@ files:
     end_line: 478
   summary: Port start-implementing-feature workflow to Procedrr
   rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/workflows/interaction-file-log/interaction-file-log-core-task-013.yaml
+  type: modified
+  span:
+    start_line: 33
+    end_line: 38
+  summary: Update interaction-file-log-core-task-013.yaml for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/workflows/interaction-file-log/interaction-file-log-core-task-013.yaml
+  type: modified
+  span:
+    start_line: 46
+    end_line: 46
+  summary: Update interaction-file-log-core-task-013.yaml for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/workflows/interaction-file-log/interaction-file-log-core-task-013.yaml
+  type: modified
+  span:
+    start_line: 49
+    end_line: 49
+  summary: Update interaction-file-log-core-task-013.yaml for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/workflows/interaction-file-log/interaction-file-log-integration-task-013.yaml
+  type: modified
+  span:
+    start_line: 33
+    end_line: 38
+  summary: Update interaction-file-log-integration-task-013.yaml for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/workflows/interaction-file-log/interaction-file-log-integration-task-013.yaml
+  type: modified
+  span:
+    start_line: 46
+    end_line: 46
+  summary: Update interaction-file-log-integration-task-013.yaml for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: docs/workflows/interaction-file-log/interaction-file-log-integration-task-013.yaml
+  type: modified
+  span:
+    start_line: 49
+    end_line: 49
+  summary: Update interaction-file-log-integration-task-013.yaml for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
 - path: pyproject.toml
   type: modified
   span:
@@ -779,6 +877,13 @@ files:
     end_line: 915
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/builtin_tool_help.py
+  type: modified
+  span:
+    start_line: 154
+    end_line: 155
+  summary: Update builtin_tool_help.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
@@ -789,78 +894,127 @@ files:
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 156
-    end_line: 156
+    start_line: 151
+    end_line: 151
   summary: Route workflow chat CLI through Procedrr
   rationale: Use a process directory option and execute selected processes through the shared runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 201
+    start_line: 197
     end_line: 201
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 232
-    end_line: 233
+    start_line: 206
+    end_line: 212
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 246
-    end_line: 246
+    start_line: 216
+    end_line: 217
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 280
-    end_line: 282
+    start_line: 223
+    end_line: 223
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 1787
-    end_line: 1789
+    start_line: 263
+    end_line: 271
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 1791
-    end_line: 1793
+    start_line: 243
+    end_line: 245
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 1966
-    end_line: 1968
+    start_line: 1190
+    end_line: 1190
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 1970
-    end_line: 1971
+    start_line: 1195
+    end_line: 1195
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 1981
-    end_line: 1981
+    start_line: 1446
+    end_line: 1495
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 2020
-    end_line: 2020
+    start_line: 1404
+    end_line: 1405
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1701
+    end_line: 1703
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1705
+    end_line: 1707
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1738
+    end_line: 1738
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1741
+    end_line: 1743
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1745
+    end_line: 1746
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1756
+    end_line: 1756
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1795
+    end_line: 1795
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
@@ -873,64 +1027,71 @@ files:
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5591
-    end_line: 5593
+    start_line: 4898
+    end_line: 4971
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5595
-    end_line: 5613
+    start_line: 5292
+    end_line: 5294
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5615
-    end_line: 5617
+    start_line: 5296
+    end_line: 5314
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5619
-    end_line: 5621
+    start_line: 5316
+    end_line: 5318
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5623
-    end_line: 5626
+    start_line: 5320
+    end_line: 5322
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5628
-    end_line: 5629
+    start_line: 5324
+    end_line: 5332
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5631
-    end_line: 5637
+    start_line: 5334
+    end_line: 5336
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5338
+    end_line: 5338
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
     start_line: 5716
-    end_line: 5726
+    end_line: 5973
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 5927
-    end_line: 5927
+    start_line: 5381
+    end_line: 5381
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/core/delivery_profile.py
@@ -1010,6 +1171,48 @@ files:
     end_line: 196
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Update acceptance.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 57
+    end_line: 57
+  summary: Update acceptance.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 62
+  summary: Update acceptance.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 244
+    end_line: 245
+  summary: Update acceptance.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 1094
+    end_line: 1127
+  summary: Update acceptance.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/execution/compile.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/execution/compile.py
   type: modified
   span:
@@ -1027,36 +1230,155 @@ files:
 - path: src/powdrr_lift/execution/compile.py
   type: modified
   span:
+    start_line: 77
+    end_line: 77
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/execution/compile.py
+  type: modified
+  span:
     start_line: 119
     end_line: 119
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/process/compiler.py
+- path: src/powdrr_lift/execution/runtime.py
   type: modified
   span:
-    start_line: 176
-    end_line: 195
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/process/compiler.py
+    start_line: 696
+    end_line: 696
+  summary: Update runtime.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/execution/runtime.py
   type: modified
   span:
-    start_line: 1002
-    end_line: 1113
+    start_line: 715
+    end_line: 715
+  summary: Update runtime.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/pr_workflow_record.py
+  type: modified
+  span:
+    start_line: 112
+    end_line: 112
+  summary: Update pr_workflow_record.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/pr_workflow_record.py
+  type: modified
+  span:
+    start_line: 140
+    end_line: 140
+  summary: Update pr_workflow_record.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/pr_workflow_record.py
+  type: modified
+  span:
+    start_line: 146
+    end_line: 146
+  summary: Update pr_workflow_record.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/pr_workflow_record.py
+  type: modified
+  span:
+    start_line: 148
+    end_line: 148
+  summary: Update pr_workflow_record.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/__init__.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Update __init__.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/action_catalog.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 221
+  summary: Remove legacy action_catalog.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/process/branching.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 32
+  summary: Remove legacy branching.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/process/catalog.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 19
+  summary: Remove legacy catalog.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/process/compiler.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 1834
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/discovery.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 65
+  summary: Remove legacy discovery.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/process/liveness.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 679
+  summary: Remove legacy liveness.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
 - path: src/powdrr_lift/process/model.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 3281
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/step_behavior.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 104
+  summary: Remove legacy step_behavior.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/process/task_step.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 418
+  summary: Add task_step.py for Procedrr workflow execution
+  rationale: Provide the Procedrr process and task execution boundary required by the migration.
+- path: src/powdrr_lift/process/tasks.py
   type: modified
   span:
-    start_line: 111
-    end_line: 111
+    start_line: 17
+    end_line: 19
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/tasks.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 24
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/process/tasks.py
   type: modified
   span:
     start_line: 88
-    end_line: 88
+    end_line: 89
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/tasks.py
+  type: modified
+  span:
+    start_line: 97
+    end_line: 98
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/process/tasks.py
@@ -1111,7 +1433,7 @@ files:
 - path: src/powdrr_lift/process/tasks.py
   type: modified
   span:
-    start_line: 411
+    start_line: 410
     end_line: 414
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
@@ -1157,11 +1479,53 @@ files:
     end_line: 710
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/tasks.py
+  type: modified
+  span:
+    start_line: 712
+    end_line: 712
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/tasks.py
+  type: modified
+  span:
+    start_line: 726
+    end_line: 726
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/tasks.py
+  type: modified
+  span:
+    start_line: 733
+    end_line: 733
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/templates.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 19
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/templates.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 25
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/process/templates.py
   type: modified
   span:
     start_line: 78
-    end_line: 78
+    end_line: 79
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/templates.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 88
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/process/templates.py
@@ -1181,8 +1545,43 @@ files:
 - path: src/powdrr_lift/process/templates.py
   type: modified
   span:
+    start_line: 492
+    end_line: 492
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/templates.py
+  type: modified
+  span:
+    start_line: 494
+    end_line: 495
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/templates.py
+  type: modified
+  span:
     start_line: 694
     end_line: 694
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/templates.py
+  type: modified
+  span:
+    start_line: 737
+    end_line: 737
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/templates.py
+  type: modified
+  span:
+    start_line: 751
+    end_line: 751
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/process/templates.py
+  type: modified
+  span:
+    start_line: 758
+    end_line: 758
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/process/templates.py
@@ -1216,7 +1615,7 @@ files:
 - path: src/powdrr_lift/process/templates.py
   type: modified
   span:
-    start_line: 1161
+    start_line: 1160
     end_line: 1164
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
@@ -1227,6 +1626,167 @@ files:
     end_line: 1183
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/pull_request_description.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Update pull_request_description.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 19
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 22
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 114
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 116
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 120
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 124
+    end_line: 124
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 146
+    end_line: 146
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 165
+    end_line: 167
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 170
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 176
+    end_line: 176
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 214
+    end_line: 214
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_operations.py
+  type: modified
+  span:
+    start_line: 393
+    end_line: 393
+  summary: Update action_operations.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/action_protocol.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 1027
+  summary: Remove legacy action_protocol.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/workrr/action_validation.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 1785
+  summary: Remove legacy action_validation.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/workrr/actions.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Update actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/actions.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 45
+  summary: Update actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/actions.py
+  type: modified
+  span:
+    start_line: 69
+    end_line: 71
+  summary: Update actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/ambiguity_review.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 373
+  summary: Remove legacy ambiguity_review.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/workrr/chat_action_serialization.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 137
+  summary: Add chat_action_serialization.py for Procedrr workflow execution
+  rationale: Provide the Procedrr process and task execution boundary required by the migration.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 42
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 44
+    end_line: 48
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
@@ -1241,74 +1801,221 @@ files:
     end_line: 57
   summary: Update chat_actions.py for Procedrr workflow execution
   rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_agent.py
+- path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
-    start_line: 72
-    end_line: 72
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_agent.py
+    start_line: 58
+    end_line: 63
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
-    start_line: 94
-    end_line: 94
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_agent.py
+    start_line: 76
+    end_line: 85
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 75
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 102
+    end_line: 102
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 132
+    end_line: 132
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 145
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 159
+    end_line: 160
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 171
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
     start_line: 181
-    end_line: 182
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_agent.py
+    end_line: 181
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
-    start_line: 199
-    end_line: 199
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_agent.py
+    start_line: 196
+    end_line: 196
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
-    start_line: 1850
-    end_line: 1852
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_agent.py
+    start_line: 213
+    end_line: 213
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
-    start_line: 1854
-    end_line: 1854
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_agent.py
+    start_line: 236
+    end_line: 236
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
-    start_line: 1856
-    end_line: 1856
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_agent.py
+    start_line: 263
+    end_line: 263
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
-    start_line: 1889
-    end_line: 1889
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_agent.py
+    start_line: 272
+    end_line: 272
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
-    start_line: 1917
-    end_line: 1917
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_agent.py
+    start_line: 287
+    end_line: 287
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
   type: modified
   span:
-    start_line: 2804
-    end_line: 2898
+    start_line: 320
+    end_line: 320
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 400
+    end_line: 400
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 528
+    end_line: 528
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 580
+    end_line: 580
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 610
+    end_line: 610
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 630
+    end_line: 630
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 672
+    end_line: 672
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 710
+    end_line: 710
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 714
+    end_line: 714
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 775
+    end_line: 775
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 825
+    end_line: 825
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 829
+    end_line: 829
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 832
+    end_line: 832
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 835
+    end_line: 835
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 866
+    end_line: 866
+  summary: Update chat_actions.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_agent.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 2926
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/chat_config.py
@@ -1318,83 +2025,552 @@ files:
     end_line: 28
   summary: Add chat_config.py for Procedrr workflow execution
   rationale: Provide the Procedrr process and task execution boundary required by the migration.
-- path: src/powdrr_lift/workrr/chat_selection.py
+- path: src/powdrr_lift/workrr/chat_context.py
   type: modified
   span:
-    start_line: 1
-    end_line: 1
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_selection.py
-  type: modified
-  span:
-    start_line: 3
-    end_line: 3
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_selection.py
-  type: modified
-  span:
-    start_line: 18
-    end_line: 18
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_selection.py
-  type: modified
-  span:
-    start_line: 27
-    end_line: 27
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_selection.py
-  type: modified
-  span:
-    start_line: 35
-    end_line: 58
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_selection.py
-  type: modified
-  span:
-    start_line: 86
-    end_line: 86
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_selection.py
-  type: modified
-  span:
-    start_line: 285
-    end_line: 285
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_transport.py
+    start_line: 10
+    end_line: 10
+  summary: Update chat_context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_context.py
   type: modified
   span:
     start_line: 17
     end_line: 17
+  summary: Update chat_context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 65
+  summary: Update chat_context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 77
+  summary: Update chat_context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 115
+    end_line: 115
+  summary: Update chat_context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 169
+    end_line: 169
+  summary: Update chat_context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 180
+    end_line: 180
+  summary: Update chat_context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 188
+    end_line: 188
+  summary: Update chat_context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 204
+    end_line: 204
+  summary: Update chat_context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 226
+    end_line: 226
+  summary: Update chat_context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/chat_contract.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 980
+  summary: Remove legacy chat_contract.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/workrr/chat_selection.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 339
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/chat_transport.py
-  type: modified
+  type: deleted
   span:
-    start_line: 22
-    end_line: 25
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/chat_transport.py
-  type: modified
-  span:
-    start_line: 67
-    end_line: 67
+    start_line: 1
+    end_line: 835
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/chat_tui.py
   type: modified
   span:
-    start_line: 21
+    start_line: 20
     end_line: 24
   summary: Route the chat TUI through Procedrr
   rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 268
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 543
+    end_line: 543
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 546
+    end_line: 546
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 552
+    end_line: 552
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 555
+    end_line: 555
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 561
+    end_line: 561
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 564
+    end_line: 564
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 568
+    end_line: 568
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 572
+    end_line: 572
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 578
+    end_line: 578
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 581
+    end_line: 581
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 583
+    end_line: 585
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 588
+    end_line: 588
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 590
+    end_line: 590
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 593
+    end_line: 596
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 602
+    end_line: 605
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 622
+    end_line: 622
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 624
+    end_line: 625
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 627
+    end_line: 630
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 632
+    end_line: 637
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 639
+    end_line: 639
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 641
+    end_line: 642
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 775
+    end_line: 775
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/context.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Update context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/context.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Update context.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/definition_comparison.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 388
+  summary: Remove legacy definition_comparison.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/workrr/definition_prompts.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 136
+  summary: Remove legacy definition_prompts.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/workrr/error_analysis.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 256
+  summary: Remove legacy error_analysis.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/workrr/error_logging.py
+  type: modified
+  span:
+    start_line: 50
+    end_line: 50
+  summary: Update error_logging.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 50
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 49
+    end_line: 54
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 59
+    end_line: 59
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 68
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 71
+    end_line: 84
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 160
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 168
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 179
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 182
+    end_line: 232
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 235
+    end_line: 281
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 284
+    end_line: 289
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 292
+    end_line: 300
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 303
+    end_line: 304
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 307
+    end_line: 312
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 315
+    end_line: 320
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 323
+    end_line: 328
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 334
+    end_line: 334
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 357
+    end_line: 357
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 413
+    end_line: 413
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 431
+    end_line: 431
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 462
+    end_line: 462
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 471
+    end_line: 471
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 475
+    end_line: 475
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 535
+    end_line: 535
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 565
+    end_line: 565
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 584
+    end_line: 584
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 603
+    end_line: 603
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 613
+    end_line: 613
+  summary: Update execution_loop.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_state.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 21
+  summary: Update execution_state.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_state.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Update execution_state.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_state.py
+  type: modified
+  span:
+    start_line: 90
+    end_line: 90
+  summary: Update execution_state.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_state.py
+  type: modified
+  span:
+    start_line: 240
+    end_line: 240
+  summary: Update execution_state.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/execution_state.py
+  type: modified
+  span:
+    start_line: 244
+    end_line: 244
+  summary: Update execution_state.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/feature_endpoint.py
   type: modified
   span:
@@ -1591,12 +2767,208 @@ files:
     end_line: 334
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/llm.py
+  type: modified
+  span:
+    start_line: 625
+    end_line: 625
+  summary: Update llm.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/llm.py
+  type: modified
+  span:
+    start_line: 826
+    end_line: 826
+  summary: Update llm.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/llm.py
+  type: modified
+  span:
+    start_line: 828
+    end_line: 828
+  summary: Update llm.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/llm.py
+  type: modified
+  span:
+    start_line: 1461
+    end_line: 1461
+  summary: Update llm.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/llm.py
+  type: modified
+  span:
+    start_line: 1491
+    end_line: 1491
+  summary: Update llm.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/local_model.py
   type: added
   span:
     start_line: 1
     end_line: 59
   summary: Add local_model.py for Procedrr workflow execution
+  rationale: Provide the Procedrr process and task execution boundary required by the migration.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 116
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 119
+    end_line: 119
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 130
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 139
+    end_line: 139
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 150
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 175
+    end_line: 175
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 201
+    end_line: 201
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 203
+    end_line: 203
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 234
+    end_line: 234
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 240
+    end_line: 241
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 248
+    end_line: 248
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 250
+    end_line: 251
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 280
+    end_line: 280
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 286
+    end_line: 286
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 295
+    end_line: 295
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 303
+    end_line: 306
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 312
+    end_line: 312
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 317
+    end_line: 318
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 326
+    end_line: 326
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 750
+    end_line: 750
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 755
+    end_line: 755
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/observer.py
+  type: modified
+  span:
+    start_line: 864
+    end_line: 864
+  summary: Update observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/operation_validation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 124
+  summary: Add operation_validation.py for Procedrr workflow execution
   rationale: Provide the Procedrr process and task execution boundary required by the migration.
 - path: src/powdrr_lift/workrr/procedrr.py
   type: modified
@@ -1637,7 +3009,7 @@ files:
   type: added
   span:
     start_line: 1
-    end_line: 682
+    end_line: 691
   summary: Add the Procedrr workflow chat runtime
   rationale: Select catalogued processes and dispatch operations through Workrr authorization.
 - path: src/powdrr_lift/workrr/procedrr_operations.py
@@ -1647,74 +3019,319 @@ files:
     end_line: 65
   summary: Add shared authorized Procedrr operation dispatch
   rationale: Restrict process operations to caller-provided handlers and validate declared internal command inputs.
+- path: src/powdrr_lift/workrr/prompt_probe.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 493
+  summary: Remove legacy prompt_probe.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/workrr/prompting.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 1405
+  summary: Remove legacy prompting.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: src/powdrr_lift/workrr/replay.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 712
+  summary: Remove legacy replay.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
 - path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 36
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 59
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 151
+    end_line: 165
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 139
+    end_line: 139
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 221
+    end_line: 226
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 198
+    end_line: 200
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 221
+    end_line: 222
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 294
+    end_line: 294
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 729
+    end_line: 880
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 956
+    end_line: 959
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 986
+    end_line: 986
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 439
+    end_line: 439
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 476
+    end_line: 476
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 488
+    end_line: 490
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 516
+    end_line: 517
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 1130
+    end_line: 1132
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 521
+    end_line: 521
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 541
+    end_line: 541
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 543
+    end_line: 543
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 556
+    end_line: 557
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 1177
+    end_line: 1204
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 570
+    end_line: 570
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 590
+    end_line: 590
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 599
+    end_line: 599
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 602
+    end_line: 602
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 1313
+    end_line: 1340
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 666
+    end_line: 666
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 1473
+    end_line: 1478
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
     start_line: 45
-    end_line: 45
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/scenario.py
-  type: modified
-  span:
-    start_line: 46
-    end_line: 46
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/scenario.py
-  type: modified
-  span:
-    start_line: 48
-    end_line: 48
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/scenario.py
-  type: modified
-  span:
-    start_line: 53
-    end_line: 53
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/scenario.py
-  type: modified
-  span:
-    start_line: 259
-    end_line: 261
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/scenario.py
-  type: modified
-  span:
-    start_line: 575
-    end_line: 576
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/scenario.py
-  type: modified
-  span:
-    start_line: 1039
-    end_line: 1041
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/task_agent.py
-  type: modified
-  span:
-    start_line: 12
-    end_line: 12
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/task_agent.py
-  type: modified
-  span:
-    start_line: 49
     end_line: 49
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
+    start_line: 63
+    end_line: 63
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 66
+    end_line: 78
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 83
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 86
+    end_line: 86
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 105
+    end_line: 105
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 117
+    end_line: 118
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
     start_line: 121
-    end_line: 121
+    end_line: 130
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
@@ -1727,225 +3344,386 @@ files:
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 145
-    end_line: 146
+    start_line: 100
+    end_line: 100
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 172
-    end_line: 178
+    start_line: 105
+    end_line: 106
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 286
-    end_line: 286
+    start_line: 162
+    end_line: 162
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 716
-    end_line: 716
+    start_line: 166
+    end_line: 166
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 727
-    end_line: 727
+    start_line: 124
+    end_line: 130
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 1701
-    end_line: 2009
+    start_line: 238
+    end_line: 238
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2073
-    end_line: 2081
+    start_line: 342
+    end_line: 343
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2213
-    end_line: 2217
+    start_line: 394
+    end_line: 394
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2323
-    end_line: 2333
+    start_line: 422
+    end_line: 650
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2350
-    end_line: 2350
+    start_line: 661
+    end_line: 685
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2356
-    end_line: 2406
+    start_line: 408
+    end_line: 408
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2408
-    end_line: 2443
+    start_line: 419
+    end_line: 419
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2445
-    end_line: 2491
+    start_line: 1196
+    end_line: 1223
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2493
-    end_line: 2498
+    start_line: 1278
+    end_line: 1281
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2500
-    end_line: 2500
+    start_line: 1294
+    end_line: 1298
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2502
-    end_line: 2504
+    start_line: 964
+    end_line: 964
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2506
-    end_line: 2513
+    start_line: 1305
+    end_line: 1309
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2515
-    end_line: 2525
+    start_line: 1319
+    end_line: 1319
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2545
-    end_line: 2570
+    start_line: 1341
+    end_line: 1341
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 2897
-    end_line: 2897
+    start_line: 1062
+    end_line: 1062
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 3222
-    end_line: 3222
+    start_line: 1349
+    end_line: 1654
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 5223
-    end_line: 5230
+    start_line: 1718
+    end_line: 1723
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_agent.py
   type: modified
   span:
-    start_line: 5236
-    end_line: 5236
+    start_line: 1855
+    end_line: 1859
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1965
+    end_line: 1975
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2007
+    end_line: 2007
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1991
+    end_line: 1991
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1997
+    end_line: 2079
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2029
+    end_line: 2105
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2082
+    end_line: 2139
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2141
+    end_line: 2141
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2143
+    end_line: 2145
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2147
+    end_line: 2154
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2156
+    end_line: 2166
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2186
+    end_line: 2211
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2538
+    end_line: 2538
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2757
+    end_line: 2937
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2863
+    end_line: 2863
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2866
+    end_line: 2866
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2912
+    end_line: 2912
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3205
+    end_line: 3321
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3130
+    end_line: 3130
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3199
+    end_line: 3204
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3453
+    end_line: 3496
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3568
+    end_line: 4625
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3293
+    end_line: 3293
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3444
+    end_line: 3451
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3457
+    end_line: 3457
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
     start_line: 30
-    end_line: 101
+    end_line: 105
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 130
-    end_line: 131
+    start_line: 134
+    end_line: 135
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 136
-    end_line: 136
+    start_line: 140
+    end_line: 140
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 160
-    end_line: 160
+    start_line: 164
+    end_line: 164
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 166
-    end_line: 168
+    start_line: 170
+    end_line: 172
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 172
-    end_line: 179
+    start_line: 176
+    end_line: 183
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 185
-    end_line: 185
+    start_line: 189
+    end_line: 189
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 230
-    end_line: 231
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/task_scenario.py
-  type: modified
-  span:
-    start_line: 233
-    end_line: 234
+    start_line: 234
+    end_line: 235
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
@@ -1958,6 +3736,13 @@ files:
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
+    start_line: 241
+    end_line: 242
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
     start_line: 171
     end_line: 181
   summary: Migrate workflow behavior to Procedrr
@@ -1965,45 +3750,52 @@ files:
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 299
-    end_line: 299
+    start_line: 303
+    end_line: 303
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 327
-    end_line: 327
+    start_line: 331
+    end_line: 331
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 445
-    end_line: 462
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/task_scenario.py
-  type: modified
-  span:
-    start_line: 464
-    end_line: 464
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: src/powdrr_lift/workrr/task_scenario.py
-  type: modified
-  span:
-    start_line: 466
+    start_line: 449
     end_line: 466
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: src/powdrr_lift/workrr/task_scenario.py
   type: modified
   span:
-    start_line: 472
-    end_line: 483
+    start_line: 468
+    end_line: 468
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 470
+    end_line: 470
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 476
+    end_line: 487
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: src/powdrr_lift/workrr/tuning.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 154
+  summary: Remove legacy tuning.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
 - path: src/powdrr_lift/workrr/workflow_provider_selection.py
   type: added
   span:
@@ -2445,6 +4237,27 @@ files:
     end_line: 94
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 20
+  summary: Update test_cli.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 499
+    end_line: 507
+  summary: Update test_cli.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 509
+    end_line: 509
+  summary: Update test_cli.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
 - path: tests/test_external_contract_research.py
   type: modified
   span:
@@ -2571,6 +4384,55 @@ files:
     end_line: 887
   summary: Update the feature process path
   rationale: Keep end-to-end coverage aligned with the declaration rename.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span:
+    start_line: 149
+    end_line: 150
+  summary: Update test_module_boundaries.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span:
+    start_line: 154
+    end_line: 154
+  summary: Update test_module_boundaries.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_pr_workflow_record.py
+  type: modified
+  span:
+    start_line: 68
+    end_line: 68
+  summary: Update test_pr_workflow_record.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_pr_workflow_record.py
+  type: modified
+  span:
+    start_line: 112
+    end_line: 112
+  summary: Update test_pr_workflow_record.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_pr_workflow_record.py
+  type: modified
+  span:
+    start_line: 137
+    end_line: 137
+  summary: Update test_pr_workflow_record.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_pr_workflow_record.py
+  type: modified
+  span:
+    start_line: 140
+    end_line: 140
+  summary: Update test_pr_workflow_record.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_pr_workflow_record.py
+  type: modified
+  span:
+    start_line: 158
+    end_line: 158
+  summary: Update test_pr_workflow_record.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
 - path: tests/test_procedrr.py
   type: modified
   span:
@@ -2617,7 +4479,7 @@ files:
   type: added
   span:
     start_line: 1
-    end_line: 98
+    end_line: 173
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_procedrr_evaluator.py
@@ -2684,936 +4546,250 @@ files:
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_skill_specification.py
-  type: modified
+  type: deleted
   span:
-    start_line: 382
-    end_line: 382
+    start_line: 1
+    end_line: 1808
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_skill_specification.py
-  type: modified
+- path: tests/test_workflow_action_contract.py
+  type: deleted
   span:
-    start_line: 384
-    end_line: 384
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_skill_specification.py
-  type: modified
+    start_line: 1
+    end_line: 43
+  summary: Remove legacy test_workflow_action_contract.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: tests/test_workflow_ambiguity_review.py
+  type: deleted
   span:
-    start_line: 389
-    end_line: 389
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_skill_specification.py
-  type: modified
-  span:
-    start_line: 391
-    end_line: 391
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_skill_specification.py
-  type: modified
-  span:
-    start_line: 899
-    end_line: 907
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_skill_specification.py
-  type: modified
-  span:
-    start_line: 871
-    end_line: 872
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_skill_specification.py
-  type: modified
-  span:
-    start_line: 874
-    end_line: 875
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_skill_specification.py
-  type: modified
-  span:
-    start_line: 877
-    end_line: 878
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_skill_specification.py
-  type: modified
-  span:
-    start_line: 880
-    end_line: 880
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_skill_specification.py
-  type: modified
-  span:
-    start_line: 905
-    end_line: 905
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+    start_line: 1
+    end_line: 151
+  summary: Remove legacy test_workflow_ambiguity_review.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
 - path: tests/test_workflow_chat_agent.py
-  type: modified
+  type: deleted
   span:
-    start_line: 51
-    end_line: 51
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 104
-    end_line: 106
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 105
-    end_line: 105
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 122
-    end_line: 122
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 157
-    end_line: 157
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 204
-    end_line: 207
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 2533
-    end_line: 2533
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 2580
-    end_line: 2580
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3023
-    end_line: 3023
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3070
-    end_line: 3071
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3125
-    end_line: 3126
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3177
-    end_line: 3178
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3601
-    end_line: 3604
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3604
-    end_line: 3604
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3615
-    end_line: 3616
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3628
-    end_line: 3628
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3630
-    end_line: 3631
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3719
-    end_line: 3720
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3817
-    end_line: 3818
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3871
-    end_line: 3874
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3870
-    end_line: 3870
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3881
-    end_line: 3882
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3888
-    end_line: 3888
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3905
-    end_line: 3908
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3900
-    end_line: 3900
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3911
-    end_line: 3912
-  summary: Update CLI tests for the process directory option
-  rationale: Verify workflow chat uses the Procedrr command interface.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3919
-    end_line: 3919
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 3988
-    end_line: 3989
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 4073
-    end_line: 4074
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 4264
-    end_line: 4264
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 4311
-    end_line: 4311
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 4353
-    end_line: 4353
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 4397
-    end_line: 4397
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 4440
-    end_line: 4440
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 4471
-    end_line: 4471
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 4508
-    end_line: 4508
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 4706
-    end_line: 4707
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 4924
-    end_line: 4925
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 5299
-    end_line: 5299
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 5531
-    end_line: 5531
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 5569
-    end_line: 5569
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 5676
-    end_line: 5677
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 5796
-    end_line: 5797
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 5883
-    end_line: 5884
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 5899
-    end_line: 5899
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 5971
-    end_line: 5972
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 6057
-    end_line: 6058
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 6139
-    end_line: 6140
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 6230
-    end_line: 6231
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 6327
-    end_line: 6328
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 6408
-    end_line: 6409
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 6481
-    end_line: 6482
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 6632
-    end_line: 6636
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_agent.py
-  type: modified
-  span:
-    start_line: 6757
-    end_line: 6758
+    start_line: 1
+    end_line: 7831
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_chat_ui.py
-  type: modified
+  type: deleted
   span:
-    start_line: 18
-    end_line: 19
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 37
-    end_line: 47
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 51
-    end_line: 51
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 63
-    end_line: 65
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 82
-    end_line: 82
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 96
-    end_line: 98
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 115
-    end_line: 117
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 135
-    end_line: 137
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 154
-    end_line: 156
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 183
-    end_line: 185
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 198
-    end_line: 200
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 209
-    end_line: 211
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 227
-    end_line: 229
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 249
-    end_line: 251
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 275
-    end_line: 277
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 300
-    end_line: 302
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 333
-    end_line: 335
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 357
-    end_line: 359
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 374
-    end_line: 376
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 397
-    end_line: 399
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 417
-    end_line: 419
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 436
-    end_line: 438
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 470
-    end_line: 472
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 511
-    end_line: 513
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 536
-    end_line: 538
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 565
-    end_line: 567
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 604
-    end_line: 606
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 643
-    end_line: 645
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 682
-    end_line: 684
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 706
-    end_line: 708
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 729
-    end_line: 731
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 748
-    end_line: 750
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 777
-    end_line: 779
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 794
-    end_line: 796
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 817
-    end_line: 819
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 850
-    end_line: 852
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 874
-    end_line: 876
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 906
-    end_line: 908
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 948
-    end_line: 950
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 972
-    end_line: 974
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1000
-    end_line: 1002
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1021
-    end_line: 1023
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1041
-    end_line: 1043
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1062
-    end_line: 1064
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1089
-    end_line: 1091
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1114
-    end_line: 1116
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1145
-    end_line: 1147
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1192
-    end_line: 1194
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1211
-    end_line: 1213
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1231
-    end_line: 1233
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1249
-    end_line: 1251
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1267
-    end_line: 1269
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1303
-    end_line: 1305
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1329
-    end_line: 1331
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_chat_ui.py
-  type: modified
-  span:
-    start_line: 1358
-    end_line: 1360
+    start_line: 1
+    end_line: 1263
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_definition_analysis.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 806
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_definition_comparison.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 164
+  summary: Remove legacy test_workflow_definition_comparison.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: tests/test_workflow_error_analysis.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 103
+  summary: Remove legacy test_workflow_error_analysis.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: tests/test_workflow_error_logging.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Update test_workflow_error_logging.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_error_logging.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Update test_workflow_error_logging.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_error_logging.py
+  type: modified
+  span:
+    start_line: 43
+    end_line: 44
+  summary: Update test_workflow_error_logging.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 456
+    end_line: 456
+  summary: Update test_workflow_llm.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 463
+    end_line: 463
+  summary: Update test_workflow_llm.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_observer.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 40
+  summary: Update test_workflow_observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_observer.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 42
+  summary: Update test_workflow_observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_observer.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Update test_workflow_observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_observer.py
+  type: modified
+  span:
+    start_line: 56
+    end_line: 56
+  summary: Update test_workflow_observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_observer.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Update test_workflow_observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_observer.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 93
+  summary: Update test_workflow_observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_observer.py
+  type: modified
+  span:
+    start_line: 108
+    end_line: 108
+  summary: Update test_workflow_observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_observer.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 113
+  summary: Update test_workflow_observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_observer.py
+  type: modified
+  span:
+    start_line: 119
+    end_line: 119
+  summary: Update test_workflow_observer.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_prompt_probe.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 244
+  summary: Remove legacy test_workflow_prompt_probe.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: tests/test_workflow_replay.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 399
+  summary: Remove legacy test_workflow_replay.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
+- path: tests/test_workflow_scenario.py
   type: modified
   span:
     start_line: 4
     end_line: 4
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
+  summary: Update test_workflow_scenario.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_scenario.py
   type: modified
   span:
-    start_line: 8
-    end_line: 9
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
+    start_line: 15
+    end_line: 15
+  summary: Update test_workflow_scenario.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_scenario.py
   type: modified
   span:
-    start_line: 313
-    end_line: 313
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
+    start_line: 71
+    end_line: 73
+  summary: Update test_workflow_scenario.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_scenario.py
   type: modified
   span:
-    start_line: 332
-    end_line: 332
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
+    start_line: 87
+    end_line: 87
+  summary: Update test_workflow_scenario.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_scenario.py
   type: modified
   span:
-    start_line: 334
-    end_line: 335
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
+    start_line: 140
+    end_line: 376
+  summary: Update test_workflow_scenario.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_scenario.py
   type: modified
   span:
-    start_line: 337
-    end_line: 338
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
+    start_line: 148
+    end_line: 150
+  summary: Update test_workflow_scenario.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_scenario.py
   type: modified
   span:
-    start_line: 378
-    end_line: 378
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
+    start_line: 155
+    end_line: 157
+  summary: Update test_workflow_scenario.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_scenario.py
   type: modified
   span:
-    start_line: 386
-    end_line: 386
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
+    start_line: 169
+    end_line: 169
+  summary: Update test_workflow_scenario.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_scenario.py
   type: modified
   span:
-    start_line: 388
-    end_line: 389
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
+    start_line: 172
+    end_line: 174
+  summary: Update test_workflow_scenario.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_scenario.py
   type: modified
   span:
-    start_line: 391
-    end_line: 392
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
-  type: modified
+    start_line: 183
+    end_line: 183
+  summary: Update test_workflow_scenario.py for Procedrr workflow execution
+  rationale: Keep chat, durable tasks, and process records aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_step_behavior.py
+  type: deleted
   span:
-    start_line: 589
-    end_line: 589
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
-  type: modified
-  span:
-    start_line: 606
-    end_line: 606
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
-  type: modified
-  span:
-    start_line: 608
-    end_line: 609
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_definition_analysis.py
-  type: modified
-  span:
-    start_line: 611
-    end_line: 612
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+    start_line: 1
+    end_line: 31
+  summary: Remove legacy test_workflow_step_behavior.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
@@ -3626,13 +4802,6 @@ files:
   span:
     start_line: 19
     end_line: 20
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 22
-    end_line: 23
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
@@ -3652,50 +4821,71 @@ files:
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 62
-    end_line: 63
+    start_line: 51
+    end_line: 51
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 68
-    end_line: 177
+    start_line: 59
+    end_line: 60
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 227
-    end_line: 246
+    start_line: 59
+    end_line: 60
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 329
+    start_line: 65
+    end_line: 174
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 224
+    end_line: 243
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 131
+    end_line: 151
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 305
+    end_line: 315
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 330
+    end_line: 330
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 334
+    end_line: 335
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 337
     end_line: 339
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 354
-    end_line: 354
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 358
-    end_line: 359
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 361
-    end_line: 363
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
@@ -3708,120 +4898,148 @@ files:
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 368
-    end_line: 368
+    start_line: 344
+    end_line: 344
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 370
-    end_line: 536
+    start_line: 346
+    end_line: 512
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 606
-    end_line: 607
+    start_line: 545
+    end_line: 545
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 638
-    end_line: 638
+    start_line: 582
+    end_line: 583
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 647
-    end_line: 647
+    start_line: 614
+    end_line: 614
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 650
-    end_line: 653
+    start_line: 623
+    end_line: 623
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 791
-    end_line: 808
+    start_line: 626
+    end_line: 629
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 811
-    end_line: 811
+    start_line: 637
+    end_line: 637
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 814
-    end_line: 814
+    start_line: 640
+    end_line: 643
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 833
-    end_line: 833
+    start_line: 646
+    end_line: 655
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 840
-    end_line: 853
+    start_line: 415
+    end_line: 499
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 856
-    end_line: 856
+    start_line: 660
+    end_line: 660
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 859
-    end_line: 859
+    start_line: 663
+    end_line: 663
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 875
-    end_line: 875
+    start_line: 682
+    end_line: 682
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 885
-    end_line: 898
+    start_line: 689
+    end_line: 702
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 901
-    end_line: 901
+    start_line: 705
+    end_line: 705
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 904
-    end_line: 904
+    start_line: 708
+    end_line: 708
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 724
+    end_line: 724
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 734
+    end_line: 747
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 750
+    end_line: 750
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 753
+    end_line: 753
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
@@ -3834,22 +5052,22 @@ files:
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1212
-    end_line: 1212
+    start_line: 1061
+    end_line: 1061
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1303
-    end_line: 1314
+    start_line: 1152
+    end_line: 1163
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1329
-    end_line: 1331
+    start_line: 1178
+    end_line: 1180
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
@@ -3862,63 +5080,119 @@ files:
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1352
-    end_line: 1363
+    start_line: 1201
+    end_line: 1212
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1382
-    end_line: 1382
+    start_line: 1231
+    end_line: 1231
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1384
-    end_line: 1384
+    start_line: 1233
+    end_line: 1233
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1406
-    end_line: 1417
+    start_line: 1255
+    end_line: 1266
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1436
-    end_line: 1436
+    start_line: 1285
+    end_line: 1285
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1438
-    end_line: 1438
+    start_line: 1287
+    end_line: 1287
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1500
-    end_line: 1500
+    start_line: 1349
+    end_line: 1349
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1512
-    end_line: 1512
+    start_line: 1361
+    end_line: 1361
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1521
+    start_line: 1370
+    end_line: 1372
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1375
+    end_line: 1377
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1400
+    end_line: 1409
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1422
+    end_line: 1424
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1427
+    end_line: 1428
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1456
+    end_line: 1465
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1478
+    end_line: 1482
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1517
+    end_line: 1517
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 1523
     end_line: 1523
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
@@ -3932,99 +5206,43 @@ files:
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1551
-    end_line: 1560
+    start_line: 1546
+    end_line: 1555
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1573
-    end_line: 1575
+    start_line: 1568
+    end_line: 1578
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1578
-    end_line: 1579
+    start_line: 1634
+    end_line: 1634
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1607
-    end_line: 1616
+    start_line: 1725
+    end_line: 1725
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1629
-    end_line: 1633
+    start_line: 1747
+    end_line: 1755
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
   type: modified
   span:
-    start_line: 1668
-    end_line: 1668
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 1674
-    end_line: 1674
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 1677
-    end_line: 1679
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 1697
-    end_line: 1706
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 1719
-    end_line: 1729
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 1785
-    end_line: 1785
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 1876
-    end_line: 1876
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 1898
-    end_line: 1906
-  summary: Migrate workflow behavior to Procedrr
-  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
-- path: tests/test_workflow_task_agent.py
-  type: modified
-  span:
-    start_line: 1916
-    end_line: 1917
+    start_line: 1765
+    end_line: 1766
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_agent.py
@@ -4037,6 +5255,13 @@ files:
 - path: tests/test_workflow_task_scenario.py
   type: modified
   span:
+    start_line: 11
+    end_line: 11
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
     start_line: 69
     end_line: 69
   summary: Migrate workflow behavior to Procedrr
@@ -4044,71 +5269,99 @@ files:
 - path: tests/test_workflow_task_scenario.py
   type: modified
   span:
-    start_line: 103
-    end_line: 103
+    start_line: 82
+    end_line: 82
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_scenario.py
   type: modified
   span:
-    start_line: 119
-    end_line: 119
+    start_line: 96
+    end_line: 99
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_scenario.py
   type: modified
   span:
-    start_line: 358
-    end_line: 358
+    start_line: 104
+    end_line: 104
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_scenario.py
   type: modified
   span:
-    start_line: 360
-    end_line: 360
+    start_line: 106
+    end_line: 106
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_scenario.py
   type: modified
   span:
-    start_line: 362
-    end_line: 366
+    start_line: 122
+    end_line: 122
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_scenario.py
   type: modified
   span:
-    start_line: 389
-    end_line: 389
+    start_line: 361
+    end_line: 361
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_scenario.py
   type: modified
   span:
-    start_line: 409
-    end_line: 409
+    start_line: 363
+    end_line: 363
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_scenario.py
   type: modified
   span:
-    start_line: 429
-    end_line: 429
+    start_line: 365
+    end_line: 369
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_scenario.py
   type: modified
   span:
-    start_line: 453
-    end_line: 453
+    start_line: 392
+    end_line: 392
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 412
+    end_line: 412
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 432
+    end_line: 432
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 456
+    end_line: 456
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_task_specification.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_specification.py
   type: modified
   span:
     start_line: 116
-    end_line: 116
+    end_line: 117
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_task_specification.py
@@ -4116,6 +5369,27 @@ files:
   span:
     start_line: 128
     end_line: 157
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 146
+    end_line: 147
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 150
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
 - path: tests/test_workflow_template_specification.py
@@ -4149,10 +5423,24 @@ files:
 - path: tests/test_workflow_template_specification.py
   type: modified
   span:
+    start_line: 584
+    end_line: 584
+  summary: Migrate workflow behavior to Procedrr
+  rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
     start_line: 672
     end_line: 672
   summary: Migrate workflow behavior to Procedrr
   rationale: Keep the documented and executable workflow behavior aligned with the shared Procedrr runtime.
+- path: tests/test_workflow_tuning.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 80
+  summary: Remove legacy test_workflow_tuning.py
+  rationale: Remove the parallel skill-definition runtime and its obsolete coverage.
 - path: tests/test_workrr_procedrr.py
   type: modified
   span:

@@ -45,7 +45,7 @@ steps:
                 A runtime source edit should be represented as three steps:
                 read_document, one judge returning file_path/start/end/new_text,
                 and an edit operation whose fields reference that judge binding.
-              - The edit judge must include both the source binding and fragment_goal (or the specific acceptance condition) in its context, and its instructions must state the exact requested behavior to implement. A source-only judge is invalid because it cannot select a semantic change.
+              - The edit judge must include both the source binding and a declared fragment input that carries the relevant requirement in its context. Its instructions must state the exact requested behavior to implement. Do not use fragment_goal as a binding unless it appears in fragment_state.fragment.inputs. A source-only judge is invalid because it cannot select a semantic change.
               - Return the step encoded as JSON in the single step_json string field.
               - The decoded step must contain exactly one control key.
               - Allowed control keys are operation, judge, gate, attempt, repeat, branch, for_each, worklist, call, and terminal.
@@ -75,7 +75,7 @@ steps:
               - >-
                 A complete runtime edit judge must use this exact shape (replace
                 names and question text, but keep every field):
-                {"judge":{"question":"Decide the exact edit implementing fragment_goal using the source binding.","subject":"hello_source","prompt_system":"Return only the declared JSON object.","instructions":["Return one exact semantic edit and include fragment_goal and hello_source in context."],"context":["fragment_goal","hello_source"],"output":{"name":"hello_edit_decision","schema":{"type":"object","required":["file_path","start","end","new_text"],"additionalProperties":false,"properties":{"file_path":{"type":"string","minLength":1},"start":{"type":"integer","minimum":1},"end":{"type":"integer","minimum":1},"new_text":{"type":"string","minLength":1}}}},"validation":{"kind":"json_schema"}}}
+                {"judge":{"question":"Decide the exact edit implementing the requirement in requirement_binding using the source binding.","subject":"hello_source","prompt_system":"Return only the declared JSON object.","instructions":["Return one exact semantic edit implementing the requirement in requirement_binding, and include requirement_binding and hello_source in context."],"context":["requirement_binding","hello_source"],"output":{"name":"hello_edit_decision","schema":{"type":"object","required":["file_path","start","end","new_text"],"additionalProperties":false,"properties":{"file_path":{"type":"string","minLength":1},"start":{"type":"integer","minimum":1},"end":{"type":"integer","minimum":1},"new_text":{"type":"string","minLength":1}}}},"validation":{"kind":"json_schema"}}}
               - >-
                 Do not invent condition, then, else, prompt, schema, source,
                 or subject-object fields; they are not Procedrr judge fields.

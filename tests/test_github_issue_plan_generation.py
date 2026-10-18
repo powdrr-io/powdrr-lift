@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -89,6 +90,61 @@ def test_generated_plan_records_source_document() -> None:
 
     assert "source_document: docs/plans/proposal.md" in rendered
     assert plan.source_document == "docs/plans/proposal.md"
+
+
+def test_generated_plan_resolves_procedrr_backed_task_template(tmp_path: Path) -> None:
+    from powdrr_lift.process.templates import instantiate_workflow_template
+
+    rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement the feature.",
+        plan_id="procedrr-template-v1",
+        client=FakePlanningClient({"items": [_item("foundation")]}),
+    )
+    assert plan.items[0].workflow_file is not None
+    write_execution_plan_artifacts(
+        rendered_plan=rendered,
+        plan=plan,
+        output_path=tmp_path / "docs/plans/procedrr-template-v1.yaml",
+        repo_root=tmp_path,
+        verification_command="scripts/verify-all.sh",
+    )
+    workflow_file = tmp_path / plan.items[0].workflow_file
+    instance = load_plan_workflow_instance(workflow_file)
+
+    template_path = cli._resolve_plan_workflow_template(instance.template_id)
+    workflow_dir, tasks = instantiate_workflow_template(
+        template_path=template_path,
+        work_item_name=instance.workflow_id,
+        workflow_instance_name=instance.workflow_id,
+        output_root=tmp_path / "workflows",
+        template_values=instance.parameters,
+    )
+
+    assert template_path == (
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
+    )
+    assert workflow_dir.name == instance.workflow_id
+    assert tasks[0].input_state["proposed_pr"] == instance.workflow_id
+    assert tasks[2].coding_loop is not None
+    assert tasks[2].coding_loop.verification[0].command == "scripts/verify-all.sh"
+
+
+def test_plan_template_resolver_finds_wheel_data_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package_template = (
+        Path(__file__).resolve().parents[1] / "templates" / "execute-proposed-pr.yaml"
+    )
+    installed_template = tmp_path / package_template.name
+    shutil.copyfile(package_template, installed_template)
+    monkeypatch.setattr(
+        cli, "__file__", str(tmp_path / "site-packages/powdrr_lift/cli.py")
+    )
+    monkeypatch.setattr(cli.sys, "prefix", str(tmp_path))
+
+    assert cli._resolve_plan_workflow_template("execute-proposed-pr") == (
+        installed_template
+    )
 
 
 @pytest.mark.parametrize(

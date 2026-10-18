@@ -1,0 +1,25 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1012
+title: Resolve packaged Procedrr plan templates
+intent:
+  problem: Generated plan workflows could not resolve their task template from an installed package.
+  goal: Resolve plan templates in editable checkouts and installed packages, and verify generated plan references instantiate the Procedrr-backed task template.
+human-decisions: []
+structured_files: []
+files:
+- path: pyproject.toml
+  type: modified
+  summary: Package workflow task templates
+  rationale: Make the plan worker's template source available after wheel installation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  summary: Resolve plan task templates
+  rationale: Support both repository checkouts and installed package data with template identity validation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  summary: Verify plan template resolution
+  rationale: Exercise generated plan descriptors through template instantiation and the installed-package lookup path.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  summary: Validate Procedrr references
+  rationale: Ensure processes referenced by the execute-proposed-pr task template exist in the Procedrr catalog.

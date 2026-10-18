@@ -2630,11 +2630,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 raise PlanGenerationError(
                     "workflow definition ID does not match its plan item"
                 )
-            template_path = (
-                Path(__file__).resolve().parents[2]
-                / "templates"
-                / f"{instance.template_id}.yaml"
-            )
+            template_path = _resolve_plan_workflow_template(instance.template_id)
             with tempfile.TemporaryDirectory(
                 prefix=f"powdrr-{workflow_id}-"
             ) as temporary_root:
@@ -2753,6 +2749,26 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
         )
     )
     return 0 if report.outcome in {"no_eligible_work", "awaiting_review"} else 1
+
+
+def _resolve_plan_workflow_template(template_id: str) -> Path:
+    """Resolve a plan's task-template from a checkout or an installed wheel."""
+    relative_path = Path("templates") / f"{template_id}.yaml"
+    candidates = (
+        Path(__file__).resolve().parents[2] / relative_path,
+        Path(sys.prefix) / f"{template_id}.yaml",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            template = load_workflow_template(candidate)
+            if template.id != template_id:
+                raise PlanGenerationError(
+                    f"plan workflow template ID does not match {template_id!r}"
+                )
+            return candidate
+    raise PlanGenerationError(
+        f"could not find packaged task template for plan workflow {template_id!r}"
+    )
 
 
 def _run_pull_request_description(args: argparse.Namespace) -> int:

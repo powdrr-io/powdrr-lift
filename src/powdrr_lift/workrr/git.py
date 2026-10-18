@@ -649,13 +649,21 @@ def cleanup_workflow_run(
                 )
     elif integration_worktree.is_dir():
         state_report = {**state_report, "workflow_git_state": state_data}
-        recovery = _restore_workflow_git_state(
+        interrupted = _restore_interrupted_workflow_checkpoint(
+            repo_root_path,
             state_report,
             integration_worktree,
-            proposed_pr_id,
         )
-        removed.extend(recovery["removed"])
-        errors.extend(recovery["errors"])
+        removed.extend(interrupted["removed"])
+        errors.extend(interrupted["errors"])
+        if not errors:
+            recovery = _restore_workflow_git_state(
+                state_report,
+                integration_worktree,
+                proposed_pr_id,
+            )
+            removed.extend(recovery["removed"])
+            errors.extend(recovery["errors"])
 
     for pull_request in state_report.get("pull_requests", []):
         if pull_request.get("state") != "OPEN":

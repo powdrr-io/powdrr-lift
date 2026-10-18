@@ -331,6 +331,89 @@ def test_inspection_and_cleanup_preserve_integration_checkpoint(tmp_path: Path) 
     )
 
 
+def test_cleanup_restores_a_task_locked_by_an_interrupted_worker(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    remote = tmp_path / "remote.git"
+    subprocess.run(
+        ["git", "init", "--bare", str(remote)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    _git(tmp_path, "remote", "add", "origin", str(remote))
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "initial")
+    integration_worktree, integration_branch = create_workflow_worktree(
+        tmp_path, "feature-locked"
+    )
+    workflow_dir = integration_worktree / "docs" / "workflows" / "feature-locked"
+    workflow_dir.mkdir(parents=True)
+    state = WorkflowGitState(
+        proposed_pr_id="feature-locked",
+        base_branch="main",
+        integration_branch=integration_branch,
+        workflow_relative_directory="docs/workflows/feature-locked",
+    )
+    save_workflow_git_state(workflow_dir, state)
+    task_file = workflow_dir / "task-001.json"
+    task_file.write_text('{"task_id": "task-001", "status": "pending"}\n')
+    _git(integration_worktree, "add", "docs/workflows/feature-locked")
+    _git(integration_worktree, "commit", "-m", "initialize workflow")
+    initial_checkpoint = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=integration_worktree,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    _git(
+        integration_worktree,
+        "push",
+        "--set-upstream",
+        "origin",
+        integration_branch,
+    )
+    claim_workflow_task(tmp_path, state, "task-001")
+    task_file.write_text('{"task_id": "task-001", "status": "locked"}\n')
+    _git(integration_worktree, "add", "docs/workflows/feature-locked/task-001.json")
+    _git(integration_worktree, "commit", "-m", "claim task")
+    _git(integration_worktree, "push")
+
+    report = inspect_workflow_run(tmp_path, "feature-locked")
+    assert report["tasks"][0]["status"] == "locked"
+
+    cleaned = cleanup_workflow_run(tmp_path, "feature-locked", report=report)
+
+    assert cleaned["errors"] == []
+    assert '{"task_id": "task-001", "status": "pending"}' in task_file.read_text()
+    remote_head = subprocess.run(
+        ["git", "--git-dir", str(remote), "rev-parse", integration_branch],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert remote_head == initial_checkpoint
+    assert (
+        not subprocess.run(
+            [
+                "git",
+                "show-ref",
+                "--verify",
+                "refs/agents/claims/feature-locked/task-001",
+            ],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+        ).returncode
+        == 0
+    )
+
+
 def test_cleanup_removes_integration_artifacts_when_metadata_is_missing(
     tmp_path: Path,
 ) -> None:

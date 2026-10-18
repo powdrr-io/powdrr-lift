@@ -302,6 +302,9 @@ def test_publisher_creates_minimal_pointer_issues_and_is_idempotent() -> None:
     assert second.created_issue_numbers == ()
     assert second.existing_issue_numbers == (100, 101)
     assert client.labels_ensured
+    assert QUEUE_LABELS["ready"] in client.issues[0].labels
+    assert QUEUE_LABELS["blocked_on_dependency"] in client.issues[1].labels
+    assert QUEUE_LABELS["ready"] not in client.issues[1].labels
     pointer = parse_issue_pointer(client.issues[0].body)
     assert pointer == {
         "plan_id": "feature-v1",
@@ -353,6 +356,8 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) 
     assert first.item_id == "base"
     assert executed == ["base"]
     assert QUEUE_LABELS["awaiting_review"] in client.issues[0].labels
+    assert QUEUE_LABELS["blocked_on_dependency"] in client.issues[1].labels
+    assert QUEUE_LABELS["ready"] not in client.issues[1].labels
 
     waiting = run_worker_once(
         client=client,  # type: ignore[arg-type]
@@ -379,9 +384,39 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) 
         run_task=run_task,
         plan_loader=load_plan,
     )
+
     assert second.outcome == "awaiting_review"
     assert second.item_id == "followup"
     assert executed == ["base", "followup"]
+    assert QUEUE_LABELS["awaiting_review"] in client.issues[1].labels
+
+
+def test_publisher_reconciles_old_ready_issues_with_plan_dependencies() -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    client.issues[1] = QueueIssue(
+        client.issues[1].number,
+        client.issues[1].title,
+        client.issues[1].body,
+        client.issues[1].state,
+        (QUEUE_LABELS["ready"], _plan_label("feature-v1")),
+        client.issues[1].url,
+    )
+
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+
+    assert QUEUE_LABELS["blocked_on_dependency"] in client.issues[1].labels
+    assert QUEUE_LABELS["ready"] not in client.issues[1].labels
 
 
 def test_worker_accepts_one_file_workflow_definition(tmp_path: Path) -> None:

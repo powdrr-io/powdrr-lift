@@ -26,6 +26,7 @@ QUEUE_LABELS = {
     "ready": "powdrr:ready",
     "claimed": "powdrr:claimed",
     "awaiting_review": "powdrr:awaiting-review",
+    "blocked_on_dependency": "powdrr:blocked-on-dependency",
     "blocked": "powdrr:blocked",
 }
 _MARKER_START = "<!-- powdrr-queue-item:v1 "
@@ -380,13 +381,41 @@ def publish_plan_issues(
                 )
             reused.append(issue.number)
             continue
+        status = "ready" if not item.dependencies else "blocked_on_dependency"
         created_issue = client.create_issue(
             title=f"Powdrr work item: {plan.plan_id}/{item.item_id}",
             body=body,
-            labels=(QUEUE_LABELS["ready"], plan_label),
+            labels=(QUEUE_LABELS[status], plan_label),
         )
         created.append(created_issue.number)
         existing[key] = created_issue
+    by_number = {issue.number: issue for issue in existing.values()}
+    for item in plan.items:
+        issue = existing[(plan.plan_id, item.item_id)]
+        if issue.state != "open":
+            continue
+        current_statuses = {
+            QUEUE_LABELS["ready"],
+            QUEUE_LABELS["blocked_on_dependency"],
+        }
+        if not current_statuses.intersection(issue.labels):
+            continue
+        dependencies_closed = all(
+            _dependency_is_closed(existing.get((plan.plan_id, dependency)), by_number)
+            for dependency in item.dependencies
+        )
+        status = "ready" if dependencies_closed else "blocked_on_dependency"
+        labels = _replace_queue_status(issue.labels, status)
+        if labels != issue.labels:
+            client.update_issue(issue, labels=labels)
+            existing[(plan.plan_id, item.item_id)] = QueueIssue(
+                issue.number,
+                issue.title,
+                issue.body,
+                issue.state,
+                labels,
+                issue.url,
+            )
     return PublishReport(plan.plan_id, plan_commit, tuple(created), tuple(reused))
 
 
@@ -442,6 +471,11 @@ def run_worker_once(
     """Claim and execute the first ready item whose dependencies are closed."""
     root = Path(repo_root).resolve()
     with _worker_lock(root):
+        _promote_unblocked_issues(
+            client=client,
+            repo_root=root,
+            plan_loader=plan_loader,
+        )
         issues = client.list_issues(labels=(QUEUE_LABELS["ready"],), state="open")
         plan_issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
         for issue in sorted(issues, key=lambda value: value.number):
@@ -487,6 +521,10 @@ def run_worker_once(
                 )
             ]
             if unmet:
+                client.update_issue(
+                    issue,
+                    labels=_replace_queue_status(issue.labels, "blocked_on_dependency"),
+                )
                 continue
             issue = next(
                 value
@@ -547,6 +585,67 @@ def run_worker_once(
             client.add_comment(issue, note)
             return WorkerReport(outcome, issue.number, item.item_id, detail)
     return WorkerReport("no_eligible_work")
+
+
+def _promote_unblocked_issues(
+    *,
+    client: GitHubIssueClient,
+    repo_root: Path,
+    plan_loader: Callable[..., ReviewedExecutionPlan],
+) -> None:
+    """Make dependency-blocked work ready after all prerequisite issues close."""
+    blocked = client.list_issues(
+        labels=(QUEUE_LABELS["blocked_on_dependency"],), state="open"
+    )
+    loaded_plans: dict[tuple[str, str, str], ReviewedExecutionPlan] = {}
+    issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
+    for issue in sorted(blocked, key=lambda value: value.number):
+        if (
+            QUEUE_LABELS["blocked_on_dependency"] not in issue.labels
+            or issue.state != "open"
+        ):
+            continue
+        pointer = parse_issue_pointer(issue.body)
+        if pointer is None:
+            continue
+        plan_key = (
+            pointer["plan_id"],
+            pointer["plan_path"],
+            pointer["plan_commit"],
+        )
+        plan = loaded_plans.get(plan_key)
+        if plan is None:
+            plan = plan_loader(
+                pointer["plan_path"], pointer["plan_commit"], repo_root=repo_root
+            )
+            loaded_plans[plan_key] = plan
+        if plan.plan_id != pointer["plan_id"]:
+            continue
+        item = next(
+            (
+                candidate
+                for candidate in plan.items
+                if candidate.item_id == pointer["item_id"]
+            ),
+            None,
+        )
+        if item is None:
+            continue
+        indexed = issue_indexes.get(plan.plan_id)
+        if indexed is None:
+            indexed = _plan_issue_index(
+                client.list_issues(labels=(_plan_label(plan.plan_id),))
+            )
+            issue_indexes[plan.plan_id] = indexed
+        by_number = {value.number: value for value in indexed.values()}
+        if all(
+            _dependency_is_closed(indexed.get((plan.plan_id, dependency)), by_number)
+            for dependency in item.dependencies
+        ):
+            client.update_issue(
+                issue,
+                labels=_replace_queue_status(issue.labels, "ready"),
+            )
 
 
 def parse_issue_pointer(body: str) -> dict[str, str] | None:
@@ -806,6 +905,7 @@ def _label_color(status: str) -> str:
         "ready": "0E8A16",
         "claimed": "1D76DB",
         "awaiting_review": "FBCA04",
+        "blocked_on_dependency": "D4C5F9",
         "blocked": "D93F0B",
     }[status]
 

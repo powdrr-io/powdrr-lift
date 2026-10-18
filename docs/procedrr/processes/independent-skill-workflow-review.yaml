@@ -1,0 +1,100 @@
+version: 1
+name: independent-skill-workflow-review
+description: >-
+  Independently reconstruct an original workflow step's requirements and judge
+  whether its proposed rewrite preserves them.
+inputs:
+  - {name: target_goal, type: string, required: true}
+  - {name: original_step_text, type: string, required: true}
+  - {name: proposed_replacement, type: string, required: true}
+  - {name: preserved_requirements, type: array, required: true}
+  - {name: inventory_counts, type: object, required: true}
+outputs:
+  independent_review:
+    type: object
+    required: [complete, findings, requirements_checked]
+    additionalProperties: false
+    properties:
+      complete: {type: boolean}
+      findings:
+        type: array
+        items:
+          type: object
+          required: [judgment, directive, original_requirement]
+          additionalProperties: false
+          properties:
+            judgment: {type: string, minLength: 1}
+            directive: {type: string, minLength: 1}
+            original_requirement: {type: string, minLength: 1}
+      requirements_checked: {type: array, items: {type: string, minLength: 1}}
+steps:
+  - judge:
+      kind: construct_one
+      provider: adversarial
+      question: What behavior does the original workflow step require?
+      subject: original_step_text
+      prompt_system: >-
+        Reconstruct the original step's required behavior before judging the
+        proposed rewrite. Return only the declared JSON object. Do not use any
+        findings or conclusions from a parent review.
+      instructions:
+        - Use target_goal, original_step_text, proposed_replacement, preserved_requirements, and inventory_counts as the complete review packet.
+        - Identify required behavior, dependencies, inputs, outputs, safety checks, validation conditions, tool arguments, failure rules, and implicit handoffs.
+        - Cite exact original wording for each reconstructed requirement.
+        - Do not propose improvements merely because the replacement uses different wording.
+      context: [target_goal, original_step_text, proposed_replacement, preserved_requirements, inventory_counts]
+      output:
+        name: reconstructed_requirements
+        schema:
+          type: object
+          required: [requirements]
+          additionalProperties: false
+          properties:
+            requirements:
+              type: array
+              items:
+                type: object
+                required: [requirement, original_evidence]
+                additionalProperties: false
+                properties:
+                  requirement: {type: string, minLength: 1}
+                  original_evidence: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - judge:
+      kind: construct_one
+      provider: adversarial
+      question: Which requirements does the proposed rewrite omit or leave ambiguous?
+      subject: proposed_replacement
+      prompt_system: >-
+        Compare the rewrite with the reconstructed original requirements without
+        bias. Return only the declared JSON object. Do not edit the target.
+      instructions:
+        - Report one finding per omitted goal, dependency, input, output, safety check, validation condition, tool argument, failure rule, hidden action, or implicit data handoff.
+        - Each finding must contain both a judgment and the smallest concrete correction.
+        - Cite the original requirement for every finding.
+        - Flag any proposed step that permits multiple tool calls, more than three independent action clauses, or an ambiguous success condition.
+        - If the rewrite is complete, state that explicitly and list the requirements checked.
+      context: [target_goal, original_step_text, proposed_replacement, preserved_requirements, inventory_counts, reconstructed_requirements]
+      output:
+        name: independent_review
+        schema:
+          type: object
+          required: [complete, findings, requirements_checked]
+          additionalProperties: false
+          properties:
+            complete: {type: boolean}
+            findings:
+              type: array
+              items:
+                type: object
+                required: [judgment, directive, original_requirement]
+                additionalProperties: false
+                properties:
+                  judgment: {type: string, minLength: 1}
+                  directive: {type: string, minLength: 1}
+                  original_requirement: {type: string, minLength: 1}
+            requirements_checked:
+              type: array
+              items: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - terminal: succeeded

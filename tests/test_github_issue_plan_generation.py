@@ -133,7 +133,14 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
     source = tmp_path / "proposal.md"
     source.write_text("# Proposal\nAdd a foundation and integration.", encoding="utf-8")
     staged: list[Any] = []
-    client = FakePlanningClient({"items": [_item("foundation")]})
+    client = FakePlanningClient(
+        {
+            "items": [
+                _item("foundation"),
+                _item("integration", dependencies=["foundation"]),
+            ]
+        }
+    )
 
     monkeypatch.setattr(cli, "resolve_repo_root", lambda _path: tmp_path)
     monkeypatch.setattr(cli, "resolve_workflow_provider", lambda value: value)
@@ -179,9 +186,13 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
 
     output = tmp_path / "docs/plans/proposal-v1-execution-plan.yaml"
     workflow_file = tmp_path / "docs/workflows/proposal-v1/proposal-v1-foundation.yaml"
+    dependent_workflow_file = (
+        tmp_path / "docs/workflows/proposal-v1/proposal-v1-integration.yaml"
+    )
     assert status == 0
     assert output.is_file()
     assert workflow_file.is_file()
+    assert dependent_workflow_file.is_file()
     workflow_definition = workflow_file.read_text(encoding="utf-8")
     assert "template: execute-proposed-pr" in workflow_definition
     assert "proposed-pr-id: proposal-v1-foundation" in workflow_definition
@@ -189,18 +200,21 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
     instance = load_plan_workflow_instance(workflow_file)
     assert instance.workflow_id == "proposal-v1-foundation"
     assert instance.template_id == "execute-proposed-pr"
+    assert instance.dependencies == ()
     assert instance.parameters == {
         "proposed-pr-id": "proposal-v1-foundation",
         "verification-command": "scripts/verify-all.sh",
     }
     assert not list((tmp_path / "docs/workflows/proposal-v1").glob("*-task-*.yaml"))
-    assert len(staged) == 2
+    dependent_instance = load_plan_workflow_instance(dependent_workflow_file)
+    assert dependent_instance.dependencies == ("proposal-v1-foundation",)
+    assert len(staged) == 3
     assert publications[0]["repo_root"] == tmp_path
     assert publications[0]["generated_files"] == tuple(staged)
     assert publications[0]["source_plan_path"] == "proposal.md"
-    assert set(staged) == {output, workflow_file}
+    assert set(staged) == {output, workflow_file, dependent_workflow_file}
     response = capsys.readouterr().out
-    assert '"workflow_count": 1' in response
+    assert '"workflow_count": 2' in response
     assert '"pull_request_url": "https://github.com/example/repo/pull/42"' in response
     assert '"status": "pull_request_opened"' in response
     assert '"published_issues": false' in response

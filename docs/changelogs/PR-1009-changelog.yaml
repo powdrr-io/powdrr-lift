@@ -1,0 +1,193 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1009
+title: Keep plan issues aligned with their dependency frontier
+intent:
+  problem: Plan publication marks every work item ready even when its prerequisites are still open, so GitHub issue state hides the reviewed dependency graph.
+  goal: Publish only dependency-free items as ready and promote dependent items after prerequisite issues close.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Add a distinct queue label for work blocked on plan dependencies.
+    rationale: Keep dependency waits distinguishable from execution failures that need human retry.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 384, end_line: 384}
+    summary: Assign new issues their initial status from plan dependencies.
+    rationale: Keep dependent work out of the ready queue until prerequisites close.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 388, end_line: 388}
+    summary: Apply the dependency-derived status label when creating a GitHub issue.
+    rationale: Publish a visible ready frontier that reflects the reviewed plan.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 392, end_line: 418}
+    summary: Reconcile existing ready and dependency-blocked issues against closed prerequisites.
+    rationale: Make issue status reflect the reviewed plan's currently executable frontier.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 474, end_line: 478}
+    summary: Refresh dependency-blocked issue statuses before selecting worker tasks.
+    rationale: Advance eligible work whenever the worker runs.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 524, end_line: 527}
+    summary: Move stale ready issues with unmet prerequisites into dependency-blocked state.
+    rationale: Prevent execution with unmet dependencies while migrating older queue issues.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 629, end_line: 689}
+    summary: Promote dependency-blocked items after all prerequisite issues close.
+    rationale: Advance the queue as work is accepted while preventing execution with unmet dependencies.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 947, end_line: 947}
+    summary: Assign a GitHub color to the dependency-blocked label.
+    rationale: Ensure the new queue state label is created consistently.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 562, end_line: 600}
+    summary: Validate workflow dependencies against the pinned execution plan before running.
+    rationale: Prevent a workflow whose declared prerequisites differ from its reviewed plan from executing.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 118, end_line: 118}
+    summary: Expose prerequisite workflow IDs on loaded workflow instances.
+    rationale: Make per-workflow dependencies part of the validated configuration.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 134, end_line: 134}
+    summary: Require the workflow dependency field in generated workflow descriptors.
+    rationale: Reject workflow files that omit their declared prerequisites.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 142, end_line: 142}
+    summary: Read prerequisite workflow IDs from the descriptor.
+    rationale: Validate and return the dependencies stored with each workflow.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 150, end_line: 161}
+    summary: Validate workflow dependency identifiers and reject duplicates or self-dependencies.
+    rationale: Ensure dependency declarations are valid before worker execution.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 180, end_line: 180}
+    summary: Preserve validated dependencies on the workflow instance model.
+    rationale: Let the worker compare descriptor dependencies with the reviewed plan.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 491, end_line: 491}
+    summary: Map plan item IDs to their generated workflow IDs.
+    rationale: Translate plan dependency references into workflow dependency references.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 499, end_line: 501}
+    summary: Write each item's prerequisite workflow IDs into its generated descriptor.
+    rationale: Make dependencies visible in each workflow file.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 305, end_line: 307}
+    summary: Assert only dependency-free work starts ready.
+    rationale: Verify initial publication exposes the plan's dependency frontier.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 359, end_line: 360}
+    summary: Assert a dependent issue stays blocked while its prerequisite remains open.
+    rationale: Prevent dependent work from appearing ready prematurely.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 387, end_line: 387}
+    summary: Add spacing before the migration regression test.
+    rationale: Keep the related queue behavior tests grouped clearly.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 391, end_line: 419}
+    summary: Cover promotion after closure and migration of old ready issues.
+    rationale: Prevent the publisher and worker from exposing or executing dependent work too early.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 425, end_line: 434}
+    summary: Update a workflow file fixture to include the required schema and dependency list.
+    rationale: Exercise the explicit workflow dependency contract.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 488, end_line: 571}
+    summary: Verify the worker blocks a workflow whose declared dependencies disagree with the plan.
+    rationale: Ensure inconsistent workflow configuration cannot start execution.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 136, end_line: 143}
+    summary: Generate a plan with a dependent workflow in the CLI test.
+    rationale: Verify dependency propagation during artifact generation.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 189, end_line: 191}
+    summary: Identify the generated dependent workflow fixture.
+    rationale: Assert the workflow artifact is written alongside the plan.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 195, end_line: 195}
+    summary: Assert the dependent workflow artifact exists.
+    rationale: Protect generation of a workflow for each plan item.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 203, end_line: 203}
+    summary: Assert root workflow dependency list is empty.
+    rationale: Distinguish root workflow configuration from dependent workflow configuration.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 209, end_line: 211}
+    summary: Assert the dependent workflow names its prerequisite workflow.
+    rationale: Verify dependencies are recorded in the workflow file itself.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 215, end_line: 215}
+    summary: Include the additional workflow in the staged artifact set.
+    rationale: Keep the plan PR's generated file inventory complete.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 217, end_line: 217}
+    summary: Assert the CLI reports both generated workflows.
+    rationale: Keep the plan command's workflow count accurate.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 12, end_line: 14}
+    summary: Document dependency-blocked issue state.
+    rationale: Describe how reviewers and operators can interpret the queue labels.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 40, end_line: 45}
+    summary: Describe dependency data as part of generated workflow instances.
+    rationale: Explain how the plan and each workflow configuration stay aligned.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 54, end_line: 66}
+    summary: Show an integration workflow with an explicit prerequisite workflow ID.
+    rationale: Make the dependency representation reviewable in the generated workflow file.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 86, end_line: 100}
+    summary: Document explicit dependencies in each workflow instance.
+    rationale: Explain how workflow configuration carries and validates prerequisite workflow IDs.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 124, end_line: 127}
+    summary: Document that dependent work stays blocked until prerequisite issues close.
+    rationale: Give operators the correct queue status expectations.
+invariants:
+  - id: only-satisfied-dependency-frontier-is-ready
+    description: Open plan issues with unmet dependencies carry the dependency-blocked label rather than the ready label.
+    action: added
+  - id: dependency-promotion-waits-for-closure
+    description: A dependency-blocked issue becomes ready only after every prerequisite issue is closed.
+    action: added
+  - id: execution-failure-blocks-remain-manual
+    description: Dependency refresh does not change generic blocked issues created by failed execution.
+    action: added
+guidance:
+  - id: close-prerequisite-after-merge
+    description: Close a plan issue only after the corresponding implementation PR has merged so dependent work can become ready.
+    action: added

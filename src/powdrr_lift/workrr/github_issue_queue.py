@@ -51,6 +51,7 @@ class PlannedWorkItem:
 class ReviewedExecutionPlan:
     plan_id: str
     items: tuple[PlannedWorkItem, ...]
+    source_document: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -714,9 +715,22 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
         raise GitHubIssueQueueError(f"invalid plan YAML: {error}") from error
     if not isinstance(data, Mapping) or data.get("schema") != QUEUE_SCHEMA:
         raise GitHubIssueQueueError(f"plan schema must be {QUEUE_SCHEMA!r}")
-    if set(data) != {"schema", "plan_id", "items"}:
+    if set(data) not in (
+        {"schema", "plan_id", "items"},
+        {"schema", "plan_id", "source_document", "items"},
+    ):
         raise GitHubIssueQueueError("plan has unknown or missing top-level fields")
     plan_id = data.get("plan_id")
+    source_document = data.get("source_document")
+    if source_document is not None and (
+        not isinstance(source_document, str)
+        or not source_document.strip()
+        or Path(source_document).is_absolute()
+        or ".." in Path(source_document).parts
+    ):
+        raise GitHubIssueQueueError(
+            "source_document must be a repository-relative path without traversal"
+        )
     raw_items = data.get("items")
     if not isinstance(plan_id, str) or not _safe_id(plan_id):
         raise GitHubIssueQueueError("plan_id must be a stable safe identifier")
@@ -794,7 +808,7 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             )
     if _has_dependency_cycle(items):
         raise GitHubIssueQueueError("plan dependencies must be acyclic")
-    return ReviewedExecutionPlan(plan_id, tuple(items))
+    return ReviewedExecutionPlan(plan_id, tuple(items), source_document)
 
 
 def _required_text(raw: Mapping[str, Any], key: str, field: str) -> str:

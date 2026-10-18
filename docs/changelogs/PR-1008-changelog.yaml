@@ -1,0 +1,204 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1008
+title: Persist workflow task checkpoints on GitHub issues
+intent:
+  problem: GitHub issue workers recorded claim and final status comments but did not record intermediate completed workflow task state on the issue.
+  goal: Append a structured issue comment after each workflow task is durably committed and pushed, linking its output state to the corresponding commit.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 33, end_line: 33}
+    summary: Add the stable marker used to recognize checkpoint comments.
+    rationale: Let issue history distinguish task checkpoint records from status comments.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 91, end_line: 106}
+    summary: Define a typed workflow task checkpoint and callback contract.
+    rationale: Carry task output and its persisted commit to the issue-specific checkpoint writer.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 456, end_line: 466}
+    summary: Require worker task runners to accept a checkpoint callback.
+    rationale: Connect task completion to the issue selected by the queue.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 553, end_line: 563}
+    summary: Pass a callback bound to the claimed issue and plan item into the workflow runner.
+    rationale: Keep each checkpoint attached to the correct issue and workflow.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 589, end_line: 645}
+    summary: Render and persist readable structured checkpoint comments.
+    rationale: Record plan and task identity, exact output state, and its commit SHA.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 280, end_line: 280}
+    summary: Add an optional callback for completed workflow task checkpoints.
+    rationale: Let issue-driven workflows publish task boundaries without changing other workflow callers.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1048, end_line: 1048}
+    summary: Capture the commit returned after persisting a completed next_step task.
+    rationale: Identify the workflow revision associated with the task output.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1058, end_line: 1064}
+    summary: Publish the committed task output after next_step.
+    rationale: Ensure the issue comment refers to workflow state that has already been pushed.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1251, end_line: 1251}
+    summary: Capture the commit returned after persisting early workflow termination.
+    rationale: Identify the workflow revision associated with early completion output.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1261, end_line: 1267}
+    summary: Publish early workflow termination output as a checkpoint.
+    rationale: Preserve the final task state for early workflow completion.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2286, end_line: 2286}
+    summary: Return a commit SHA from workflow progress publication.
+    rationale: Bind issue checkpoints to the durable workflow commit.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2296, end_line: 2296}
+    summary: Return no commit when workflow progress is not published from a Git worktree.
+    rationale: Avoid fabricating a revision for non-Git executions.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2305, end_line: 2305}
+    summary: Return no commit when there is no remote workflow state to publish.
+    rationale: Avoid attaching a nonexistent remote revision to checkpoints.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2347, end_line: 2347}
+    summary: Resolve the workflow commit after pushing task state.
+    rationale: Record the exact revision that reached the remote.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2350, end_line: 2350}
+    summary: Return the pushed commit when workflow progress does not open a PR.
+    rationale: Make task checkpoints available in issue-driven execution.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2374, end_line: 2374}
+    summary: Return the pushed commit when updating an existing progress PR.
+    rationale: Keep checkpoint references consistent across publication paths.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2407, end_line: 2407}
+    summary: Return the pushed commit after creating a progress PR.
+    rationale: Expose the durable task revision to the checkpoint writer.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 252, end_line: 252}
+    summary: Import the issue checkpoint callback contract.
+    rationale: Wire the queue's checkpoint publisher into workflow execution.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2889, end_line: 2889}
+    summary: Accept the active issue checkpoint callback in the worker task runner.
+    rationale: Route completed workflow tasks to their issue.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2978, end_line: 2978}
+    summary: Pass the checkpoint callback to template-instantiated workflows.
+    rationale: Preserve checkpoints for generated workflow instances.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2994, end_line: 2994}
+    summary: Pass the checkpoint callback to checked-in workflow directories.
+    rationale: Preserve checkpoints for existing workflow definitions.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 82, end_line: 89}
+    summary: Document per-task issue comments and their relationship to queue state and plan dependencies.
+    rationale: Explain where operators can inspect durable workflow task output.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 17, end_line: 18}
+    summary: Import the checkpoint record and callback contract for queue tests.
+    rationale: Keep fake worker runners aligned with the typed callback behavior.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 24, end_line: 24}
+    summary: Import the checkpoint comment renderer.
+    rationale: Test the user-visible issue comment format.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 344, end_line: 344}
+    summary: Update the dependency-gate test runner to accept checkpoint callbacks.
+    rationale: Keep dependency eligibility coverage aligned with the queue callback contract.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 432, end_line: 432}
+    summary: Update the file-based workflow test runner to accept checkpoint callbacks.
+    rationale: Keep file workflow coverage aligned with the queue callback contract.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 465, end_line: 474}
+    summary: Name the failing task runner used by the blocked-item test.
+    rationale: Preserve a typed runner signature with the new callback parameter.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 479, end_line: 479}
+    summary: Use the typed failing runner in the blocked-item test.
+    rationale: Retain failure-state coverage after adding task checkpoints.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 484, end_line: 562}
+    summary: Verify the worker appends the structured checkpoint to the selected issue.
+    rationale: Protect issue identity, checkpoint schema, output state, and commit reference.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1000, end_line: 1000}
+    summary: Capture task checkpoint callbacks in the workflow persistence test.
+    rationale: Assert that every completed task produces a checkpoint event.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1012, end_line: 1012}
+    summary: Return a synthetic published commit from the progress publisher fixture.
+    rationale: Verify that the checkpoint receives the persisted workflow revision.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1017, end_line: 1017}
+    summary: Return the synthetic commit from the publisher fixture.
+    rationale: Supply durable revision evidence to the callback assertion.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1034, end_line: 1036}
+    summary: Register a callback for completed workflow tasks.
+    rationale: Exercise task-state publication in the workflow runner.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1059, end_line: 1062}
+    summary: Verify task output callbacks run after each persisted task transition.
+    rationale: Ensure normal and early completion both publish the exact declared output state.
+entities:
+  - id: github-issue-workflow-task-checkpoint
+    type: Class
+    action: added
+  - id: task-checkpoint-comment-publisher
+    type: Function
+    action: added
+  - id: workflow-task-checkpoint-callback
+    type: Function
+    action: added
+  - id: issue-task-checkpoint-regressions
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: persisted-task-state-is-published-to-issue
+    type: invokes
+    source: workflow-task-checkpoint-callback
+    target: task-checkpoint-comment-publisher
+    action: added
+    description: Workflow task completion invokes the issue-specific publisher after the workflow commit is pushed.
+invariants:
+  - id: issue-checkpoint-follows-persisted-workflow-state
+    description: A task checkpoint comment is posted only after the corresponding workflow state commit has been pushed, and records that commit SHA with the task output state.
+    action: added
+guidance: []

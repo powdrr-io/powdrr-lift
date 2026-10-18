@@ -29,6 +29,7 @@ from powdrr_lift.agent_feature import (
     DEFAULT_FEATURE_TIMEOUT_SECONDS,
     run_agent_feature_task,
 )
+from powdrr_lift.artifact_state import ArtifactStateError, build_artifact_state
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
     architecture_specification_default_output_path,
@@ -972,6 +973,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root to use when running git commands.",
     )
     codebase_state_parser.set_defaults(func=_run_codebase_state)
+
+    artifact_state_parser = subparsers.add_parser(
+        "artifact-state",
+        aliases=["artifact_state"],
+        help="Report Powdrr plans, workflows, entities, and changelogs at a commit.",
+    )
+    artifact_state_parser.add_argument(
+        "--branch", required=True, help="Branch that contains the requested commit."
+    )
+    artifact_state_parser.add_argument(
+        "--sha", required=True, help="Commit whose repository state should be read."
+    )
+    artifact_state_parser.add_argument(
+        "--repository",
+        help="GitHub repository in owner/name form; inferred from origin when omitted.",
+    )
+    artifact_state_parser.add_argument(
+        "--repo-root",
+        type=Path,
+        help="Local clone to inspect; defaults to the current Git repository.",
+    )
+    artifact_state_parser.add_argument(
+        "--no-github",
+        action="store_true",
+        help="Skip live GitHub pull request lookup.",
+    )
+    artifact_state_parser.set_defaults(func=_run_artifact_state)
 
     current_state_parser = subparsers.add_parser(
         "synthesize-current-state",
@@ -4478,6 +4506,23 @@ def _run_codebase_state(args: argparse.Namespace) -> int:
     else:
         print(f"Wrote codebase state to {output_path}")
 
+    return 0
+
+
+def _run_artifact_state(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    try:
+        report = build_artifact_state(
+            repo_root,
+            branch=args.branch,
+            sha=args.sha,
+            repository=args.repository,
+            include_github=not args.no_github,
+        )
+    except ArtifactStateError as error:
+        print(f"Could not build artifact state: {error}", file=sys.stderr)
+        return 1
+    print(json.dumps(report, sort_keys=True))
     return 0
 
 

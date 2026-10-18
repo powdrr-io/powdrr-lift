@@ -986,16 +986,16 @@ def _restore_interrupted_workflow_checkpoint(
                     + staged.stderr.strip()
                 ],
             }
-        commit = _git(
+        commit_result = _git(
             integration_worktree,
             ["commit", "-m", "Recover interrupted first workflow claim"],
         )
-        if commit.returncode != 0:
+        if commit_result.returncode != 0:
             return {
                 "removed": [],
                 "errors": [
                     "integration-worktree: could not save reopened first task: "
-                    + commit.stderr.strip()
+                    + commit_result.stderr.strip()
                 ],
             }
         checkpoint = _run_git(integration_worktree, ["rev-parse", "HEAD"])

@@ -41,8 +41,9 @@ class PlannedWorkItem:
     scope: tuple[str, ...]
     acceptance_criteria: tuple[str, ...]
     dependencies: tuple[str, ...]
-    workflow_directory: str
+    workflow_directory: str | None
     workflow_id: str
+    workflow_file: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -435,7 +436,7 @@ def run_worker_once(
     client: GitHubIssueClient,
     repo_root: str | Path,
     worker_id: str,
-    run_task: Callable[[Path, str, str], int],
+    run_task: Callable[[Path, str, str, PlannedWorkItem, ReviewedExecutionPlan], int],
     plan_loader: Callable[..., ReviewedExecutionPlan] = load_reviewed_plan_at_commit,
 ) -> WorkerReport:
     """Claim and execute the first ready item whose dependencies are closed."""
@@ -501,20 +502,29 @@ def run_worker_once(
                 labels=_replace_queue_status(issue.labels, "claimed"),
             )
             client.add_comment(issue, f"Powdrr worker {worker_id} claimed this item.")
-            workflow_dir = (root / item.workflow_directory).resolve()
+            workflow_reference = item.workflow_file or item.workflow_directory
+            assert workflow_reference is not None
+            workflow_path = (root / workflow_reference).resolve()
             detail: str | None = None
-            if not workflow_dir.is_relative_to(root) or not workflow_dir.is_dir():
+            expected_kind_exists = (
+                workflow_path.is_file()
+                if item.workflow_file is not None
+                else workflow_path.is_dir()
+            )
+            if not workflow_path.is_relative_to(root) or not expected_kind_exists:
                 client.update_issue(
                     issue,
                     labels=_replace_queue_status(
                         _replace_queue_status(issue.labels, "claimed"), "blocked"
                     ),
                 )
-                detail = f"workflow directory is missing: {item.workflow_directory}"
+                detail = f"workflow definition is missing: {workflow_reference}"
                 client.add_comment(issue, f"Powdrr worker blocked this item: {detail}.")
                 return WorkerReport("blocked", issue.number, item.item_id, detail)
             try:
-                return_code = run_task(workflow_dir, item.workflow_id, worker_id)
+                return_code = run_task(
+                    workflow_path, item.workflow_id, worker_id, item, plan
+                )
             except Exception as error:
                 return_code = 1
                 detail = f"{type(error).__name__}: {error}"
@@ -579,27 +589,37 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
         field = f"items[{index}]"
         if not isinstance(raw, Mapping):
             raise GitHubIssueQueueError(f"{field} must be a mapping")
-        if set(raw) != {
+        common_fields = {
             "id",
             "title",
             "objective",
             "scope",
             "acceptance_criteria",
             "dependencies",
-            "workflow_directory",
             "workflow_id",
-        }:
+        }
+        if set(raw) not in (
+            common_fields | {"workflow_directory"},
+            common_fields | {"workflow_file"},
+        ):
             raise GitHubIssueQueueError(f"{field} has unknown or missing fields")
         item_id = raw.get("id")
         workflow_dir = raw.get("workflow_directory")
+        workflow_file = raw.get("workflow_file")
         workflow_id = raw.get("workflow_id")
         if not isinstance(item_id, str) or not _safe_id(item_id):
             raise GitHubIssueQueueError(f"{field}.id must be a stable safe identifier")
-        if not isinstance(workflow_dir, str) or not workflow_dir:
-            raise GitHubIssueQueueError(f"{field}.workflow_directory is required")
-        if Path(workflow_dir).is_absolute() or ".." in Path(workflow_dir).parts:
+        workflow_reference = (
+            workflow_file if workflow_file is not None else workflow_dir
+        )
+        if not isinstance(workflow_reference, str) or not workflow_reference:
+            raise GitHubIssueQueueError(f"{field}.workflow_file is required")
+        if (
+            Path(workflow_reference).is_absolute()
+            or ".." in Path(workflow_reference).parts
+        ):
             raise GitHubIssueQueueError(
-                f"{field}.workflow_directory must stay in the repository"
+                f"{field}.workflow_file must stay in the repository"
             )
         if not isinstance(workflow_id, str) or not _safe_id(workflow_id):
             raise GitHubIssueQueueError(
@@ -612,8 +632,9 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             scope=_string_list(raw, "scope", field),
             acceptance_criteria=_string_list(raw, "acceptance_criteria", field),
             dependencies=_string_list(raw, "dependencies", field, allow_empty=True),
-            workflow_directory=workflow_dir,
+            workflow_directory=workflow_dir if isinstance(workflow_dir, str) else None,
             workflow_id=workflow_id,
+            workflow_file=workflow_file if isinstance(workflow_file, str) else None,
         )
         if not item.scope or not item.acceptance_criteria:
             raise GitHubIssueQueueError(

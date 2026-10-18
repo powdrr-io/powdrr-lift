@@ -11,6 +11,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
@@ -129,7 +130,11 @@ from powdrr_lift.process.compiler import (
     warning_report_data,
 )
 from powdrr_lift.process.model import validate_skill_directory
-from powdrr_lift.process.tasks import HumanRole, validate_workflow_task_directory
+from powdrr_lift.process.tasks import (
+    HumanRole,
+    save_workflow_task,
+    validate_workflow_task_directory,
+)
 from powdrr_lift.process.templates import (
     instantiate_workflow_template,
     instantiated_workflow_relationships,
@@ -227,6 +232,7 @@ from powdrr_lift.workrr.git import (
     commit_and_push_workflow_initialization,
     create_workflow_worktree,
     inspect_workflow_run,
+    integration_branch_name,
     resolve_git_repository_root,
     save_workflow_git_state,
     slugify_workflow_id,
@@ -235,12 +241,14 @@ from powdrr_lift.workrr.git import (
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanGenerationError,
     generate_execution_plan_yaml,
+    load_plan_workflow_instance,
     publish_execution_plan_pull_request,
     write_execution_plan_artifacts,
 )
 from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueClient,
     GitHubIssueQueueError,
+    ReviewedExecutionPlan,
     find_plan_issues,
     load_reviewed_plan_at_commit,
     publish_plan_issues,
@@ -2713,19 +2721,12 @@ def _run_plan(args: argparse.Namespace) -> int:
             plan_id=args.plan_id,
             client=planning_client,
         )
-        template_path = (
-            Path(__file__).resolve().parents[2]
-            / "templates"
-            / "execute-proposed-pr.yaml"
-        )
         source_plan_relative = source_path.relative_to(repo_root).as_posix()
         generated_files = write_execution_plan_artifacts(
             rendered_plan=rendered,
             plan=plan,
             output_path=output_path,
             repo_root=repo_root,
-            source_plan_path=source_plan_relative,
-            template_path=template_path,
             verification_command=args.verification_command,
         )
         for generated_file in generated_files:
@@ -2878,7 +2879,104 @@ def _run_list_plan_issues(args: argparse.Namespace) -> int:
 def _run_github_issue_worker(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
 
-    def run_task(workflow_dir: Path, workflow_id: str, _worker_id: str) -> int:
+    def run_task(
+        workflow_path: Path,
+        workflow_id: str,
+        _worker_id: str,
+        item: Any,
+        plan: ReviewedExecutionPlan,
+    ) -> int:
+        if workflow_path.is_dir():
+            workflow_dir = workflow_path
+        else:
+            instance = load_plan_workflow_instance(workflow_path)
+            if instance.workflow_id != workflow_id:
+                raise PlanGenerationError(
+                    "workflow definition ID does not match its plan item"
+                )
+            template_path = (
+                Path(__file__).resolve().parents[2]
+                / "templates"
+                / f"{instance.template_id}.yaml"
+            )
+            with tempfile.TemporaryDirectory(
+                prefix=f"powdrr-{workflow_id}-"
+            ) as temporary_root:
+                workflow_dir, tasks = instantiate_workflow_template(
+                    template_path=template_path,
+                    work_item_name=workflow_id,
+                    workflow_instance_name=workflow_id,
+                    output_root=Path(temporary_root),
+                    template_values=instance.parameters,
+                )
+                context = {
+                    "plan_id": plan.plan_id,
+                    "item_id": item.item_id,
+                    "title": item.title,
+                    "objective": item.objective,
+                    "scope": list(item.scope),
+                    "acceptance_criteria": list(item.acceptance_criteria),
+                    "dependencies": list(item.dependencies),
+                }
+                first_task = replace(
+                    tasks[0],
+                    input_state={
+                        **tasks[0].input_state,
+                        "structured_pr_context": context,
+                    },
+                    details=(
+                        "Use input_state.structured_pr_context as the authoritative "
+                        "proposed PR context. Do not run proposal discovery or alter "
+                        "the item meaning. Return exactly one next_step action, "
+                        "copying the complete input object into "
+                        "output_state.proposed-pr-context-state, for example: "
+                        '{"action":"next_step","output_state":'
+                        '{"proposed-pr-context-state":'
+                        f"{json.dumps(context, ensure_ascii=False)}"
+                        '}},"decisions_and_context":"Recorded the reviewed plan item."}'
+                    ),
+                    actions=(),
+                    actions_declared=True,
+                    step_type="governed",
+                    pre_step=None,
+                )
+                save_workflow_task(
+                    first_task, workflow_dir / f"{first_task.task_id}.yaml"
+                )
+                save_workflow_git_state(
+                    workflow_dir,
+                    WorkflowGitState(
+                        proposed_pr_id=workflow_id,
+                        base_branch="main",
+                        integration_branch=integration_branch_name(workflow_id),
+                        workflow_relative_directory=(
+                            Path(item.workflow_file).parent.as_posix()
+                            if item.workflow_file is not None
+                            else ""
+                        ),
+                        depends_on_workflows=tuple(
+                            planned.workflow_id
+                            for dependency in item.dependencies
+                            for planned in plan.items
+                            if planned.item_id == dependency
+                        ),
+                    ),
+                )
+                return run_workflow_task(
+                    WorkflowTaskAgentConfig(
+                        workflow_dir=workflow_dir,
+                        repo_root=repo_root,
+                        provider=args.provider,
+                        workflow_id=workflow_id,
+                        api_key=args.api_key,
+                        base_url=args.base_url,
+                        max_roundtrips=args.max_roundtrips,
+                        context_compaction_threshold=args.context_compaction_threshold,
+                        verbose=args.verbose,
+                    ),
+                    stdout=sys.stdout,
+                    stderr=sys.stderr,
+                )
         return run_workflow_task(
             WorkflowTaskAgentConfig(
                 workflow_dir=workflow_dir,

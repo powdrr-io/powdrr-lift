@@ -5,28 +5,16 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import shutil
 import subprocess
-import tempfile
 import uuid
 from collections.abc import Mapping
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from powdrr_lift.process.tasks import (
-    build_workflow_task_directory_validation_report,
-    save_workflow_task,
-)
-from powdrr_lift.process.templates import instantiate_workflow_template
-from powdrr_lift.workrr.git import (
-    WorkflowGitState,
-    integration_branch_name,
-    save_workflow_git_state,
-    slugify_workflow_id,
-)
+from powdrr_lift.workrr.git import slugify_workflow_id
 from powdrr_lift.workrr.github_issue_queue import (
     QUEUE_SCHEMA,
     GitHubIssueQueueError,
@@ -38,6 +26,8 @@ from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
 
 MAX_SOURCE_PLAN_CHARS = 500_000
 MAX_PLAN_ITEMS = 100
+PLAN_WORKFLOW_SCHEMA = "https://powdrr.io/schemas/plan-workflow-instance-v1"
+PLAN_WORKFLOW_TEMPLATE = "execute-proposed-pr"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 
 PLAN_ITEMS_RESPONSE_SCHEMA: dict[str, Any] = {
@@ -117,6 +107,63 @@ class PlanPullRequest:
     base_branch: str
     commit_sha: str
     pull_request_url: str
+
+
+@dataclass(frozen=True, slots=True)
+class PlanWorkflowInstance:
+    """A compact reference to a packaged workflow template and its parameters."""
+
+    workflow_id: str
+    template_id: str
+    parameters: dict[str, str]
+
+
+def load_plan_workflow_instance(path: str | Path) -> PlanWorkflowInstance:
+    """Load and validate a generated plan workflow descriptor."""
+    try:
+        data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        raise PlanGenerationError(
+            f"could not read workflow definition: {error}"
+        ) from error
+    if not isinstance(data, Mapping) or set(data) != {
+        "schema",
+        "workflow_id",
+        "template",
+        "parameters",
+    }:
+        raise PlanGenerationError("workflow definition has unknown or missing fields")
+    if data.get("schema") != PLAN_WORKFLOW_SCHEMA:
+        raise PlanGenerationError("workflow definition has an unsupported schema")
+    workflow_id = data.get("workflow_id")
+    template_id = data.get("template")
+    parameters = data.get("parameters")
+    if not isinstance(workflow_id, str) or not _SAFE_ID.fullmatch(workflow_id):
+        raise PlanGenerationError("workflow_id must be a stable safe identifier")
+    if template_id != PLAN_WORKFLOW_TEMPLATE:
+        raise PlanGenerationError(
+            f"unsupported plan workflow template: {template_id!r}"
+        )
+    if (
+        not isinstance(parameters, Mapping)
+        or set(parameters)
+        != {
+            "proposed-pr-id",
+            "verification-command",
+        }
+        or not all(isinstance(value, str) for value in parameters.values())
+    ):
+        raise PlanGenerationError("workflow parameters have unknown or missing fields")
+    if parameters.get("proposed-pr-id") != workflow_id:
+        raise PlanGenerationError("proposed-pr-id must match workflow_id")
+    verification_command = parameters.get("verification-command")
+    if not isinstance(verification_command, str) or not verification_command.strip():
+        raise PlanGenerationError("verification-command must not be empty")
+    return PlanWorkflowInstance(
+        workflow_id,
+        template_id,
+        {key: str(value) for key, value in parameters.items()},
+    )
 
 
 def publish_execution_plan_pull_request(
@@ -349,8 +396,8 @@ def generate_execution_plan_yaml(
         items.append(
             {
                 **dict(item),
-                "workflow_directory": (
-                    Path("docs") / "workflows" / plan_slug / workflow_id
+                "workflow_file": (
+                    Path("docs") / "workflows" / plan_slug / f"{workflow_id}.yaml"
                 ).as_posix(),
                 "workflow_id": workflow_id,
             }
@@ -376,17 +423,11 @@ def write_execution_plan_artifacts(
     plan: ReviewedExecutionPlan,
     output_path: Path,
     repo_root: Path,
-    source_plan_path: str,
-    template_path: Path,
     verification_command: str,
 ) -> tuple[Path, ...]:
-    """Write the queue plan and its per-item context/workflow documents."""
+    """Write the queue plan and one compact template reference per work item."""
     if not verification_command.strip():
         raise PlanGenerationError("verification_command must not be empty")
-    if not template_path.is_file():
-        raise PlanGenerationError(
-            f"built-in PR workflow template is missing: {template_path}"
-        )
     output_path = output_path.resolve()
     repo_root = repo_root.resolve()
     try:
@@ -401,177 +442,61 @@ def write_execution_plan_artifacts(
             "so the reviewed plan is not overwritten."
         )
 
-    plan_slug = slugify_workflow_id(plan.plan_id)
-    workflow_ids_by_item = {item.item_id: item.workflow_id for item in plan.items}
-    destinations: list[tuple[PlannedWorkItem, str, Path, Path]] = []
+    destinations: list[tuple[PlannedWorkItem, Path]] = []
     for item in plan.items:
-        workflow_id = item.workflow_id
-        workflow_directory = (repo_root / item.workflow_directory).resolve()
-        proposal_directory = (repo_root / "docs" / "proposals" / workflow_id).resolve()
-        for path in (workflow_directory, proposal_directory):
-            try:
-                path.relative_to(repo_root)
-            except ValueError as error:
-                raise PlanGenerationError(
-                    "generated workflow paths must stay inside the repository"
-                ) from error
-            if path.exists():
-                raise FileExistsError(
-                    f"Generated plan artifact already exists: {path}; choose a new "
-                    "plan id or remove the existing artifact explicitly."
-                )
-            if (
-                output_path == path
-                or output_path.is_relative_to(path)
-                or path.is_relative_to(output_path)
-            ):
-                raise PlanGenerationError(
-                    "output plan path overlaps a generated workflow or proposal path"
-                )
-        destinations.append((item, workflow_id, workflow_directory, proposal_directory))
+        if item.workflow_file is None:
+            raise PlanGenerationError(
+                f"plan item {item.item_id!r} has no workflow file reference"
+            )
+        workflow_file = (repo_root / item.workflow_file).resolve()
+        try:
+            workflow_file.relative_to(repo_root)
+        except ValueError as error:
+            raise PlanGenerationError(
+                "generated workflow paths must stay inside the repository"
+            ) from error
+        if workflow_file.exists():
+            raise FileExistsError(
+                f"Generated plan artifact already exists: {workflow_file}; choose a "
+                "new plan id or remove the existing artifact explicitly."
+            )
+        if (
+            output_path == workflow_file
+            or workflow_file.is_relative_to(output_path)
+            or output_path.is_relative_to(workflow_file)
+        ):
+            raise PlanGenerationError(
+                "output plan path overlaps a generated workflow path"
+            )
+        destinations.append((item, workflow_file))
 
     generated_files: list[Path] = []
-    created_directories: list[Path] = []
     created_files: list[Path] = []
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        with tempfile.TemporaryDirectory(
-            prefix="powdrr-plan-artifacts-", dir=repo_root
-        ) as temporary_directory:
-            temporary_root = Path(temporary_directory)
-            for (
-                item,
-                workflow_id,
-                _workflow_directory,
-                _proposal_directory,
-            ) in destinations:
-                temporary_workflow_root = temporary_root / "workflows" / plan_slug
-                temporary_directory_path, tasks = instantiate_workflow_template(
-                    template_path=template_path,
-                    work_item_name=workflow_id,
-                    workflow_instance_name=workflow_id,
-                    output_root=temporary_workflow_root,
-                    template_values={
-                        "proposed-pr-id": workflow_id,
-                        "verification-command": verification_command,
-                    },
-                )
-                context = {
-                    "plan_id": plan.plan_id,
-                    "item_id": item.item_id,
-                    "title": item.title,
-                    "objective": item.objective,
-                    "scope": list(item.scope),
-                    "acceptance_criteria": list(item.acceptance_criteria),
-                    "dependencies": list(item.dependencies),
-                    "source_plan": source_plan_path,
-                }
-                first_task = replace(
-                    tasks[0],
-                    input_state={
-                        **tasks[0].input_state,
-                        "structured_pr_context": context,
-                        "plan_item_document": (
-                            f"docs/proposals/{workflow_id}/plan-item.yaml"
-                        ),
-                    },
-                    details=(
-                        "Use input_state.structured_pr_context as the authoritative "
-                        "proposed PR context. Do not run proposal discovery or alter "
-                        "the item meaning. Return exactly one next_step action, "
-                        "copying the complete input object into "
-                        "output_state.proposed-pr-context-state, for example: "
-                        '{"action":"next_step","output_state":'
-                        '{"proposed-pr-context-state":'
-                        f"{json.dumps(context, ensure_ascii=False)}"
-                        '},"decisions_and_context":"Recorded the reviewed plan item."}'
-                    ),
-                    actions=(),
-                    actions_declared=True,
-                    step_type="governed",
-                    pre_step=None,
-                )
-                save_workflow_task(
-                    first_task,
-                    temporary_directory_path / f"{first_task.task_id}.yaml",
-                )
-                save_workflow_git_state(
-                    temporary_directory_path,
-                    WorkflowGitState(
-                        proposed_pr_id=workflow_id,
-                        base_branch="main",
-                        integration_branch=integration_branch_name(workflow_id),
-                        workflow_relative_directory=item.workflow_directory,
-                        depends_on_workflows=tuple(
-                            workflow_ids_by_item[dependency]
-                            for dependency in item.dependencies
-                        ),
-                    ),
-                )
-                report = build_workflow_task_directory_validation_report(
-                    temporary_directory_path
-                )
-                if not report.validation_successful:
-                    details = "; ".join(issue.message for issue in report.issues)
-                    raise PlanGenerationError(
-                        f"generated workflow {workflow_id!r} failed validation: "
-                        f"{details}"
-                    )
+        for item, workflow_file in destinations:
+            workflow_file.parent.mkdir(parents=True, exist_ok=True)
+            definition = {
+                "schema": PLAN_WORKFLOW_SCHEMA,
+                "workflow_id": item.workflow_id,
+                "template": PLAN_WORKFLOW_TEMPLATE,
+                "parameters": {
+                    "proposed-pr-id": item.workflow_id,
+                    "verification-command": verification_command,
+                },
+            }
+            workflow_file.write_text(
+                yaml.safe_dump(definition, sort_keys=False), encoding="utf-8"
+            )
+            created_files.append(workflow_file)
+            generated_files.append(workflow_file)
 
-                staged_proposal_directory = temporary_root / "proposals" / workflow_id
-                staged_proposal_directory.mkdir(parents=True, exist_ok=True)
-                proposal_document = {
-                    "plan_id": context["plan_id"],
-                    "item_id": context["item_id"],
-                    "title": context["title"],
-                    "objective": context["objective"],
-                    "scope": context["scope"],
-                    "acceptance_criteria": context["acceptance_criteria"],
-                    "dependencies": context["dependencies"],
-                    "source_plan": context["source_plan"],
-                }
-                (staged_proposal_directory / "plan-item.yaml").write_text(
-                    yaml.safe_dump(proposal_document, sort_keys=False),
-                    encoding="utf-8",
-                )
-
-                workflow_files = tuple(sorted(temporary_directory_path.glob("*.yaml")))
-                if not workflow_files:
-                    raise PlanGenerationError(
-                        f"generated workflow {workflow_id!r} contains no task files"
-                    )
-
-            for (
-                _item,
-                workflow_id,
-                workflow_directory,
-                proposal_directory,
-            ) in destinations:
-                staged_workflow_directory = (
-                    temporary_root / "workflows" / plan_slug / workflow_id
-                )
-                workflow_directory.parent.mkdir(parents=True, exist_ok=True)
-                created_directories.append(workflow_directory)
-                shutil.copytree(staged_workflow_directory, workflow_directory)
-                generated_files.extend(sorted(workflow_directory.glob("*.yaml")))
-
-                staged_proposal = (
-                    temporary_root / "proposals" / workflow_id / "plan-item.yaml"
-                )
-                proposal_directory.mkdir(parents=True, exist_ok=False)
-                created_directories.append(proposal_directory)
-                proposal_path = proposal_directory / staged_proposal.name
-                shutil.copy2(staged_proposal, proposal_path)
-                generated_files.append(proposal_path)
-
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         created_files.append(output_path)
         output_path.write_text(rendered_plan, encoding="utf-8")
         generated_files.insert(0, output_path)
     except Exception:
         for path in reversed(created_files):
             path.unlink(missing_ok=True)
-        for path in reversed(created_directories):
-            shutil.rmtree(path, ignore_errors=True)
         raise
 
     return tuple(generated_files)

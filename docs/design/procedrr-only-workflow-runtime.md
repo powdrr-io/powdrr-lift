@@ -19,16 +19,18 @@ progression.
 - The feature endpoint already parses and evaluates declarations under
   `docs/procedrr/processes/` with `procedrr` and
   `procedrr_evaluator`.
-- `workflow-chat` still loads `skill-definitions/` through
-  `powdrr_lift.process.model` and runs its own step/action interpreter.
+- `workflow-chat` loads the validated Procedrr catalog and runs processes
+  through the shared `ProcedrrExecutionService`; Workrr continues to own the
+  user-facing conversation, worktree context, and operation authorization.
 - The durable task agent also loads those skills and implements parallel
   branch, action, prompt, retry, and progression logic. Workflow task documents
   and task persistence are separate contracts and are not themselves the old
   skill language.
 - Procedrr's evaluator currently runs a complete declaration and returns
-  bindings/events. The chat and durable-task integrations must preserve their
-  respective persistence, suspension/resumption, event recording, and tool
-  authorization contracts when adopting it.
+  bindings/events. Chat records a process manifest and event journal, but the
+  evaluator does not yet expose resumable state. Durable-task adoption must
+  preserve task persistence, suspension/resumption, event recording, and tool
+  authorization contracts.
 
 ## Target architecture
 
@@ -71,6 +73,12 @@ progression.
 
 ### 2. Migrate workflow chat
 
+Status: implemented in the current migration PR. Chat selects from the
+validated process catalog and runs the selected process through the shared
+service. Supported root workflow definitions have Procedrr process
+counterparts; behavior-equivalent scenario/replay coverage remains part of
+completion criteria.
+
 - Replace legacy skill discovery and selection output with the Procedrr
   catalog and declared process inputs.
 - Run the selected process through the shared runtime; retain the chat UI and
@@ -81,6 +89,8 @@ progression.
   Procedrr definition and add behavior-equivalent scenario/replay coverage.
 
 ### 3. Migrate durable task execution
+
+Status: not yet implemented. This remains the next runtime migration phase.
 
 - Change the task-to-process reference to a validated Procedrr process ID and
   typed bindings; preserve the task document's independent dependency,

@@ -14,11 +14,14 @@ from powdrr_lift.workrr.github_issue_queue import (
     PlannedWorkItem,
     QueueIssue,
     ReviewedExecutionPlan,
+    TaskCheckpoint,
+    TaskCheckpointCallback,
     _parse_plan,
     _plan_label,
     find_plan_issues,
     parse_issue_pointer,
     publish_plan_issues,
+    render_task_checkpoint_comment,
     run_worker_once,
 )
 
@@ -338,6 +341,7 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) 
         _worker_id: str,
         _item: PlannedWorkItem,
         _plan: ReviewedExecutionPlan,
+        _checkpoint: TaskCheckpointCallback,
     ) -> int:
         executed.append(workflow_id)
         return 0
@@ -425,6 +429,7 @@ def test_worker_accepts_one_file_workflow_definition(tmp_path: Path) -> None:
         _worker_id: str,
         _item: PlannedWorkItem,
         _plan: ReviewedExecutionPlan,
+        _checkpoint: TaskCheckpointCallback,
     ) -> int:
         observed.append(path)
         return 0
@@ -457,12 +462,101 @@ def test_worker_marks_failed_execution_blocked(tmp_path: Path) -> None:
         assert Path(repo_root) == tmp_path
         return plan()
 
+    def fail_task(
+        _directory: Path,
+        _workflow_id: str,
+        _worker_id: str,
+        _item: PlannedWorkItem,
+        _plan: ReviewedExecutionPlan,
+        _checkpoint: TaskCheckpointCallback,
+    ) -> int:
+        return 1
+
     report = run_worker_once(
         client=client,  # type: ignore[arg-type]
         repo_root=tmp_path,
         worker_id="worker-a",
-        run_task=lambda _directory, _workflow_id, _worker_id, _item, _plan: 1,
+        run_task=fail_task,
         plan_loader=load_plan,
     )
     assert report.outcome == "blocked"
     assert QUEUE_LABELS["blocked"] in client.issues[0].labels
+
+
+def test_worker_persists_task_checkpoint_as_issue_comment(tmp_path: Path) -> None:
+    (tmp_path / "docs/workflows/base").mkdir(parents=True)
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+
+    def load_plan(
+        _path: str, _commit: str, *, repo_root: str | Path
+    ) -> ReviewedExecutionPlan:
+        assert Path(repo_root) == tmp_path
+        return plan()
+
+    def run_task(
+        _directory: Path,
+        _workflow_id: str,
+        _worker_id: str,
+        _item: PlannedWorkItem,
+        _plan: ReviewedExecutionPlan,
+        checkpoint: TaskCheckpointCallback,
+    ) -> int:
+        checkpoint(
+            "base-task-02",
+            "implementation-state",
+            {"files": ["a.py"]},
+            "b" * 40,
+        )
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-a",
+        run_task=run_task,
+        plan_loader=load_plan,
+    )
+
+    assert report.outcome == "awaiting_review"
+    issue_comments = [
+        body for issue_number, body in client.comments if issue_number == 100
+    ]
+    checkpoint_body = next(
+        body for body in issue_comments if "powdrr-task-checkpoint" in body
+    )
+    payload = json.loads(checkpoint_body.split("```json\n", 1)[1].split("\n```", 1)[0])
+    assert payload == {
+        "commit_sha": "b" * 40,
+        "item_id": "base",
+        "output_state": {"files": ["a.py"]},
+        "output_state_type": "implementation-state",
+        "plan_id": "feature-v1",
+        "schema": "https://powdrr.io/schemas/github-issue-task-checkpoint-v1",
+        "status": "completed",
+        "task_id": "base-task-02",
+        "workflow_id": "base",
+    }
+
+
+def test_task_checkpoint_comment_is_readable_and_structured() -> None:
+    body = render_task_checkpoint_comment(
+        TaskCheckpoint(
+            plan_id="plan-v1",
+            item_id="PR-02",
+            workflow_id="plan-pr-02",
+            task_id="plan-pr-02-task-03",
+            output_state_type="validation-state",
+            output_state={"tests": "passed"},
+            commit_sha="c" * 40,
+        )
+    )
+
+    assert body.startswith("### Powdrr task checkpoint\n")
+    assert "<!-- powdrr-task-checkpoint:v1 -->" in body
+    assert '"task_id": "plan-pr-02-task-03"' in body

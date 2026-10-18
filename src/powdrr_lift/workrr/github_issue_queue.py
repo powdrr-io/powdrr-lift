@@ -30,6 +30,7 @@ QUEUE_LABELS = {
 }
 _MARKER_START = "<!-- powdrr-queue-item:v1 "
 _MARKER_END = " -->"
+_TASK_CHECKPOINT_START = "<!-- powdrr-task-checkpoint:v1 -->"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 
 
@@ -85,6 +86,22 @@ class WorkerReport:
     issue_number: int | None = None
     item_id: str | None = None
     detail: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TaskCheckpoint:
+    """Structured, append-only record of one completed workflow task."""
+
+    plan_id: str
+    item_id: str
+    workflow_id: str
+    task_id: str
+    output_state_type: str
+    output_state: Any
+    commit_sha: str | None = None
+
+
+TaskCheckpointCallback = Callable[[str, str, Any, str | None], None]
 
 
 class GitHubIssueQueueError(RuntimeError):
@@ -436,7 +453,17 @@ def run_worker_once(
     client: GitHubIssueClient,
     repo_root: str | Path,
     worker_id: str,
-    run_task: Callable[[Path, str, str, PlannedWorkItem, ReviewedExecutionPlan], int],
+    run_task: Callable[
+        [
+            Path,
+            str,
+            str,
+            PlannedWorkItem,
+            ReviewedExecutionPlan,
+            TaskCheckpointCallback,
+        ],
+        int,
+    ],
     plan_loader: Callable[..., ReviewedExecutionPlan] = load_reviewed_plan_at_commit,
 ) -> WorkerReport:
     """Claim and execute the first ready item whose dependencies are closed."""
@@ -523,7 +550,17 @@ def run_worker_once(
                 return WorkerReport("blocked", issue.number, item.item_id, detail)
             try:
                 return_code = run_task(
-                    workflow_path, item.workflow_id, worker_id, item, plan
+                    workflow_path,
+                    item.workflow_id,
+                    worker_id,
+                    item,
+                    plan,
+                    _task_checkpoint_callback(
+                        client=client,
+                        issue=issue,
+                        plan=plan,
+                        item=item,
+                    ),
                 )
             except Exception as error:
                 return_code = 1
@@ -547,6 +584,63 @@ def run_worker_once(
             client.add_comment(issue, note)
             return WorkerReport(outcome, issue.number, item.item_id, detail)
     return WorkerReport("no_eligible_work")
+
+
+def render_task_checkpoint_comment(checkpoint: TaskCheckpoint) -> str:
+    """Render a readable GitHub comment with machine-readable checkpoint data."""
+    payload = {
+        "schema": "https://powdrr.io/schemas/github-issue-task-checkpoint-v1",
+        "plan_id": checkpoint.plan_id,
+        "item_id": checkpoint.item_id,
+        "workflow_id": checkpoint.workflow_id,
+        "task_id": checkpoint.task_id,
+        "status": "completed",
+        "output_state_type": checkpoint.output_state_type,
+        "output_state": checkpoint.output_state,
+        "commit_sha": checkpoint.commit_sha,
+    }
+    return (
+        "### Powdrr task checkpoint\n\n"
+        f"{_TASK_CHECKPOINT_START}\n"
+        "```json\n"
+        f"{json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True)}\n"
+        "```"
+    )
+
+
+def _task_checkpoint_callback(
+    *,
+    client: GitHubIssueClient,
+    issue: QueueIssue,
+    plan: ReviewedExecutionPlan,
+    item: PlannedWorkItem,
+) -> TaskCheckpointCallback:
+    def persist(
+        task_id: str,
+        output_state_type: str,
+        output_state: Any,
+        commit_sha: str | None,
+        *,
+        target_issue: QueueIssue = issue,
+        target_plan: ReviewedExecutionPlan = plan,
+        target_item: PlannedWorkItem = item,
+    ) -> None:
+        client.add_comment(
+            target_issue,
+            render_task_checkpoint_comment(
+                TaskCheckpoint(
+                    plan_id=target_plan.plan_id,
+                    item_id=target_item.item_id,
+                    workflow_id=target_item.workflow_id,
+                    task_id=task_id,
+                    output_state_type=output_state_type,
+                    output_state=output_state,
+                    commit_sha=commit_sha,
+                )
+            ),
+        )
+
+    return persist
 
 
 def parse_issue_pointer(body: str) -> dict[str, str] | None:

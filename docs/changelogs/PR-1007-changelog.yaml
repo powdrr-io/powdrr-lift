@@ -1,0 +1,504 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1007
+title: Generate compact template-based plan workflows
+intent:
+  problem: Plan generation expands the same packaged workflow into many task files
+    for every proposed PR, duplicating the workflow definition in each plan review.
+  goal: Keep one parameterized workflow definition per plan item and have the issue
+    worker instantiate the packaged template when executing it.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Update the plan worker contract for compact template-based workflow files.
+  rationale: Keep the documented review artifacts and runtime behavior aligned with
+    plan generation.
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 33
+    end_line: 33
+  summary: Update the plan worker contract for compact template-based workflow files.
+  rationale: Keep the documented review artifacts and runtime behavior aligned with
+    plan generation.
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 38
+    end_line: 49
+  summary: Update the plan worker contract for compact template-based workflow files.
+  rationale: Keep the documented review artifacts and runtime behavior aligned with
+    plan generation.
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 53
+    end_line: 54
+  summary: Update the plan worker contract for compact template-based workflow files.
+  rationale: Keep the documented review artifacts and runtime behavior aligned with
+    plan generation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Generate compact workflow descriptors and instantiate their packaged template
+    in the issue worker.
+  rationale: Connect the plan output format to runtime execution without committing
+    expanded task files.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 133
+    end_line: 137
+  summary: Generate compact workflow descriptors and instantiate their packaged template
+    in the issue worker.
+  rationale: Connect the plan output format to runtime execution without committing
+    expanded task files.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 235
+    end_line: 235
+  summary: Generate compact workflow descriptors and instantiate their packaged template
+    in the issue worker.
+  rationale: Connect the plan output format to runtime execution without committing
+    expanded task files.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 244
+    end_line: 244
+  summary: Generate compact workflow descriptors and instantiate their packaged template
+    in the issue worker.
+  rationale: Connect the plan output format to runtime execution without committing
+    expanded task files.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 251
+    end_line: 251
+  summary: Generate compact workflow descriptors and instantiate their packaged template
+    in the issue worker.
+  rationale: Connect the plan output format to runtime execution without committing
+    expanded task files.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2882
+    end_line: 2979
+  summary: Generate compact workflow descriptors and instantiate their packaged template
+    in the issue worker.
+  rationale: Connect the plan output format to runtime execution without committing
+    expanded task files.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 30
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 112
+    end_line: 168
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 399
+    end_line: 400
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 428
+    end_line: 428
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 445
+    end_line: 445
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 447
+    end_line: 471
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 476
+    end_line: 491
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 493
+    end_line: 493
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 44
+    end_line: 44
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 46
+    end_line: 46
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 439
+    end_line: 439
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 505
+    end_line: 507
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 509
+    end_line: 514
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 521
+    end_line: 521
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 525
+    end_line: 527
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 592
+    end_line: 592
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 600
+    end_line: 604
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 608
+    end_line: 608
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 612
+    end_line: 620
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 622
+    end_line: 622
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 635
+    end_line: 635
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 637
+    end_line: 637
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 69
+    end_line: 70
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 73
+    end_line: 74
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 181
+    end_line: 181
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 184
+    end_line: 194
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 196
+    end_line: 197
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 201
+    end_line: 201
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 406
+    end_line: 409
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 335
+    end_line: 341
+  summary: Cover issue-worker execution with a single workflow definition file.
+  rationale: Protect the new plan-to-worker handoff.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 387
+    end_line: 443
+  summary: Cover issue-worker execution with a single workflow definition file.
+  rationale: Protect the new plan-to-worker handoff.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 464
+    end_line: 464
+  summary: Cover issue-worker execution with a single workflow definition file.
+  rationale: Protect the new plan-to-worker handoff.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2716
+    end_line: 2720
+  summary: Generate compact workflow descriptors and instantiate their packaged template
+    in the issue worker.
+  rationale: Connect the plan output format to runtime execution without committing
+    expanded task files.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2727
+    end_line: 2728
+  summary: Generate compact workflow descriptors and instantiate their packaged template
+    in the issue worker.
+  rationale: Connect the plan output format to runtime execution without committing
+    expanded task files.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 379
+    end_line: 380
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 386
+    end_line: 389
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 434
+    end_line: 434
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 436
+    end_line: 436
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 573
+    end_line: 574
+  summary: Generate and validate one template-referencing workflow descriptor per
+    plan item.
+  rationale: Keep generated artifacts limited to template parameters and the reviewed
+    execution plan.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 589
+    end_line: 589
+  summary: Allow the queue worker to resolve single-file workflow definitions.
+  rationale: Support compact plan artifacts while preserving existing directory-based
+    plans.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 431
+    end_line: 433
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 441
+    end_line: 442
+  summary: Cover compact workflow descriptor generation and validation.
+  rationale: Ensure planning writes one parameterized template reference per item.
+entities:
+- id: plan-workflow-template-instance
+  type: Class
+  action: added
+- id: load-plan-workflow-instance
+  type: Function
+  action: added
+- id: compact-plan-workflow-generation-regression
+  type: Regression test
+  action: added
+entity_relationships: []
+invariants:
+- id: plan-workflow-files-reference-packaged-templates
+  description: Each generated plan workflow file contains one supported template reference
+    and only the parameters required by that template; the reviewed plan remains the
+    source for item context.
+  action: added
+guidance: []

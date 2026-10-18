@@ -338,6 +338,7 @@ def generate_execution_plan_yaml(
     source_plan: str,
     plan_id: str,
     client: WorkflowLLMClient,
+    source_document: str | None = None,
 ) -> tuple[str, ReviewedExecutionPlan]:
     """Analyze source Markdown and compile a queue plan with workflow refs."""
     if not source_plan.strip():
@@ -348,6 +349,14 @@ def generate_execution_plan_yaml(
         )
     if not _SAFE_ID.fullmatch(plan_id):
         raise PlanGenerationError("plan_id must be a stable safe identifier")
+    if source_document is not None and (
+        not source_document.strip()
+        or Path(source_document).is_absolute()
+        or ".." in Path(source_document).parts
+    ):
+        raise PlanGenerationError(
+            "source_document must be a repository-relative path without traversal"
+        )
     response = complete_json(
         client,
         [
@@ -418,7 +427,10 @@ def generate_execution_plan_yaml(
                 "workflow_id": workflow_id,
             }
         )
-    document = {"schema": QUEUE_SCHEMA, "plan_id": plan_id, "items": items}
+    document: dict[str, Any] = {"schema": QUEUE_SCHEMA, "plan_id": plan_id}
+    if source_document is not None:
+        document["source_document"] = source_document
+    document["items"] = items
     rendered = yaml.safe_dump(
         document,
         allow_unicode=True,

@@ -147,6 +147,45 @@ items:
         _parse_plan(text)
 
 
+def test_plan_validation_preserves_source_document_reference() -> None:
+    text = """
+schema: https://powdrr.io/schemas/github-issue-execution-plan-v1
+plan_id: feature-v1
+source_document: docs/plans/proposal.md
+items:
+  - id: first
+    title: First
+    objective: Do the first thing.
+    scope: [src/first.py]
+    acceptance_criteria: [The first thing works.]
+    dependencies: []
+    workflow_file: docs/workflows/feature/first.yaml
+    workflow_id: feature-first
+"""
+
+    assert _parse_plan(text).source_document == "docs/plans/proposal.md"
+
+
+def test_plan_validation_rejects_source_document_traversal() -> None:
+    text = """
+schema: https://powdrr.io/schemas/github-issue-execution-plan-v1
+plan_id: feature-v1
+source_document: ../proposal.md
+items:
+  - id: first
+    title: First
+    objective: Do the first thing.
+    scope: [src/first.py]
+    acceptance_criteria: [The first thing works.]
+    dependencies: []
+    workflow_file: docs/workflows/feature/first.yaml
+    workflow_id: feature-first
+"""
+
+    with pytest.raises(GitHubIssueQueueError, match="source_document"):
+        _parse_plan(text)
+
+
 def test_github_issue_client_paginates_and_ignores_pull_requests() -> None:
     def run(
         arguments: list[str], **_kwargs: object

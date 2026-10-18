@@ -18,6 +18,7 @@ accepted and merged. Do not copy objective or acceptance text into issue bodies.
 ```yaml
 schema: https://powdrr.io/schemas/github-issue-execution-plan-v1
 plan_id: feature-key-v1
+source_document: docs/plans/feature-proposal.md
 items:
   - id: foundational-change
     title: Foundational change
@@ -35,7 +36,9 @@ plan and form an acyclic graph. Publish only after the plan review PR merges;
 the publisher pins each issue to that merge commit.
 
 `powdrr-lift plan` analyzes a Markdown proposal and writes a candidate document
-using this schema. For every item, it writes one small workflow definition at
+using this schema. The top-level `source_document` field records the
+repository-relative path to the Markdown proposal, keeping the generated plan
+discoverably linked to its source. For every item, it writes one small workflow definition at
 `docs/workflows/<plan-id>/<workflow-id>.yaml`. The definition names the packaged
 `execute-proposed-pr` template and records its parameters, such as the proposed
 PR ID and verification command. Each workflow definition also lists prerequisite

@@ -79,6 +79,18 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     )
 
 
+def test_generated_plan_records_source_document() -> None:
+    rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nDo the work.",
+        plan_id="local-attestation-v1",
+        client=FakePlanningClient({"items": [_item("foundation")]}),
+        source_document="docs/plans/proposal.md",
+    )
+
+    assert "source_document: docs/plans/proposal.md" in rendered
+    assert plan.source_document == "docs/plans/proposal.md"
+
+
 @pytest.mark.parametrize(
     "response, message",
     [
@@ -212,6 +224,7 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
     assert publications[0]["repo_root"] == tmp_path
     assert publications[0]["generated_files"] == tuple(staged)
     assert publications[0]["source_plan_path"] == "proposal.md"
+    assert "source_document: proposal.md" in output.read_text(encoding="utf-8")
     assert set(staged) == {output, workflow_file, dependent_workflow_file}
     response = capsys.readouterr().out
     assert '"workflow_count": 2' in response

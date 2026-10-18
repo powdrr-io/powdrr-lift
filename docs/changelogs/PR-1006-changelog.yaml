@@ -69,9 +69,9 @@ files:
     rationale: Preserve the pre-coding artifact reference in the final receipt.
   - path: src/powdrr_lift/workrr/probe_repair.py
     type: added
-    span: {start_line: 1, end_line: 356}
+    span: {start_line: 1, end_line: 371}
     summary: Generate one targeted probe revision from its exact source clause and validate changed claims against readiness and scenario-claim faithfulness.
-    rationale: Prevent cross-clause details in revisions, ignore inherited claims during the delta recheck, record rejected or unavailable checks, and fail open to original scenarios.
+    rationale: Prevent cross-clause details, review only changed claims, normalize resolved faithfulness responses, record rejected or unavailable checks, and fail open to original scenarios.
   - path: tests/test_implement_feature_e2e.py
     type: modified
     span: {start_line: 593, end_line: 618}
@@ -104,7 +104,7 @@ files:
     rationale: Verify MiniSWE receives the accepted revision rather than the weak source restatement.
   - path: tests/test_probe_repair.py
     type: added
-    span: {start_line: 1, end_line: 217}
+    span: {start_line: 1, end_line: 245}
     summary: Cover successful, rejected, malformed-response, and canonicalized-scenario faithfulness outcomes.
     rationale: Protect fail-open behavior, ensure only faithfulness-accepted revisions replace the original probe, and allow safe rechecks after pipeline canonicalization.
 entities:

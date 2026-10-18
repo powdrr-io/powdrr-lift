@@ -321,7 +321,10 @@ def _check_revised_scenario_faithfulness(
                             "semantic contract. Use entailed only when the source "
                             "supports the claim, contradicted when it conflicts, "
                             "and not_stated when the source does not decide it. "
-                            "Do not use common practice or implementation guesses."
+                            "Do not use common practice or implementation guesses. "
+                            "For resolved results, set reason_code to null. Use "
+                            "unresolved with a null value and a reason code only "
+                            "when the source cannot be classified."
                         ),
                     },
                     {
@@ -335,11 +338,23 @@ def _check_revised_scenario_faithfulness(
                 ],
                 response_schema=CLAIM_REVIEW_RESPONSE_SCHEMA,
             )
-            results = response.get("results")
-            if not isinstance(results, list) or not all(
-                isinstance(item, Mapping) for item in results
+            raw_results = response.get("results")
+            if not isinstance(raw_results, list) or not all(
+                isinstance(item, Mapping) for item in raw_results
             ):
                 raise ValueError("faithfulness response has no results array")
+            results = [
+                {
+                    "status": item.get("status"),
+                    "value": item.get("value"),
+                    "reason_code": (
+                        None
+                        if item.get("status") == "resolved"
+                        else item.get("reason_code")
+                    ),
+                }
+                for item in raw_results
+            ]
         else:
             results = []
         outcome = finalize_scenario_claim_reviews(plan, results, benchmark_mode=True)

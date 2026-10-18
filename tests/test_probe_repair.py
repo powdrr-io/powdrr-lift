@@ -175,10 +175,35 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
     monkeypatch.setattr(probe_repair, "PartialSemanticContract", Contract)
 
     reviewed_scenarios: list[Mapping[str, Any]] = []
+    finalized_results: list[Mapping[str, Any]] = []
+
+    class FaithfulnessClient:
+        def complete_json(
+            self,
+            _: list[dict[str, str]],
+            *,
+            response_schema: Mapping[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            assert response_schema is not None
+            return {
+                "results": [
+                    {
+                        "status": "resolved",
+                        "value": "entailed",
+                        "reason_code": "supported_by_source",
+                    }
+                ]
+            }
 
     def prepare(_: Any, *, scenario: Mapping[str, Any], **__: Any) -> dict[str, Any]:
         reviewed_scenarios.append(scenario)
-        return {"requests": []}
+        return {"requests": [{"claim_id": "claim-1"}]}
+
+    def finalize(
+        _: Mapping[str, Any], results: list[Mapping[str, Any]], **__: Any
+    ) -> dict[str, Any]:
+        finalized_results.extend(results)
+        return {"accepted": True}
 
     monkeypatch.setattr(
         probe_repair,
@@ -188,7 +213,7 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
     monkeypatch.setattr(
         probe_repair,
         "finalize_scenario_claim_reviews",
-        lambda *_args, **_kwargs: {"accepted": True},
+        finalize,
     )
 
     accepted, review = probe_repair._check_revised_scenario_faithfulness(
@@ -207,11 +232,14 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
         },
         contract_directory=tmp_path,
         ledger_clauses=(),
-        client=None,
+        client=FaithfulnessClient(),
     )
 
     assert accepted is True
     assert review["status"] == "accepted"
     assert reviewed_scenarios == [
         {"scenario_id": "instruction-001", "then": "Revised supported claim."}
+    ]
+    assert finalized_results == [
+        {"status": "resolved", "value": "entailed", "reason_code": None}
     ]

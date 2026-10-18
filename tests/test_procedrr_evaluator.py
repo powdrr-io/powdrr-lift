@@ -1009,7 +1009,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 }
             return {"ok": True}
 
-    source = Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+    source = Path("docs/procedrr/processes/design-interview.yaml").read_text()
     from procedrr import parse_and_validate
 
     document = parse_and_validate(source)
@@ -1073,7 +1073,7 @@ def test_live_parallel_atomicity_matches_serial_judgments(tmp_path: Path) -> Non
         },
     ]
     production = parse_and_validate(
-        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+        Path("docs/procedrr/processes/design-interview.yaml").read_text()
     )
     loop = copy.deepcopy(production["steps"][1]["for_each"])
     loop["snapshot"]["name"] = "atomicity_clauses"
@@ -1159,7 +1159,7 @@ def test_live_design_interview_decomposes_compound_state_data_lifecycle(
         return runtime.dispatch(command[0], list(command), parameters)
 
     document = parse_and_validate(
-        Path("docs/procedrr/skill-definitions/design-interview.yaml").read_text()
+        Path("docs/procedrr/processes/design-interview.yaml").read_text()
     )
     result = Evaluator(llm, execute).evaluate(
         document,
@@ -1353,9 +1353,7 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
         "    assert result.stdout.splitlines() == ['Hello, World', 'Here I Am']\n",
         encoding="utf-8",
     )
-    source = Path(
-        "docs/procedrr/skill-definitions/execute-proposed-pr.yaml"
-    ).read_text()
+    source = Path("docs/procedrr/processes/execute-proposed-pr.yaml").read_text()
     from procedrr import parse_and_validate
 
     document = parse_and_validate(source)
@@ -1474,7 +1472,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
         "powdrr_lift.workrr.prompt_probe"
     ).build_probe_client
     document = parse_and_validate(
-        Path("docs/procedrr/skill-definitions/execute-proposed-pr.yaml").read_text()
+        Path("docs/procedrr/processes/execute-proposed-pr.yaml").read_text()
     )
     llm = build_probe_client(
         provider="deepinfra-cheap",
@@ -1528,7 +1526,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
             execute,
             available_paths=lambda: ["hello.py", "test_hello.py"],
         ),
-        skills_dir=tmp_path,
+        process_directory=tmp_path,
     ).evaluate(
         document,
         {

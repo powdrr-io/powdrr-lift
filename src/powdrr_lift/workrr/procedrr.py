@@ -160,7 +160,7 @@ class WorkrrProcedrrClient:
         self,
         client: WorkflowLLMClient,
         *,
-        skills_dir: Path,
+        process_directory: Path,
         max_retries: int = 3,
         provider_retry_attempts: int = 3,
         provider_retry_delay_seconds: float = 1.0,
@@ -168,7 +168,7 @@ class WorkrrProcedrrClient:
         telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None,
     ) -> None:
         self._client = client
-        self._skills_dir = skills_dir
+        self._process_directory = process_directory
         self._max_retries = max_retries
         self._provider_retry_attempts = provider_retry_attempts
         self._provider_retry_delay_seconds = provider_retry_delay_seconds

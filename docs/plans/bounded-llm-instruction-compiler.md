@@ -671,7 +671,7 @@ Powdrr owns the obligation identity and evidence binding.
 ## Procedrr flow redesign
 
 Replace the planning portion of
-`docs/procedrr/skill-definitions/implement-feature.yaml` with the following
+`docs/procedrr/processes/implement-feature.yaml` with the following
 logical sequence. Exact operation names may change, but each operation must
 have one responsibility and a typed return contract.
 

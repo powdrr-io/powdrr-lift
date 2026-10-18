@@ -574,7 +574,7 @@ def main() -> int:
         )
         task_client = WorkrrProcedrrClient(
             workflow_client,
-            skills_dir=ROOT_DIR / "docs/procedrr/skill-definitions",
+            process_directory=ROOT_DIR / "docs/procedrr/processes",
         )
         try:
             result = _label_task(

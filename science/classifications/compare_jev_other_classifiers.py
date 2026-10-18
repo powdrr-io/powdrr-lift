@@ -300,7 +300,7 @@ def main() -> int:
             model_cache_dir=ROOT / ".powdrr" / "models",
             progress_stream=None,
         ),
-        skills_dir=ROOT / "docs/procedrr/skill-definitions",
+        process_directory=ROOT / "docs/procedrr/processes",
     )
     heldout_families = set(
         json.loads(HOLDOUT_FAMILIES.read_text(encoding="utf-8"))["source_family_ids"]

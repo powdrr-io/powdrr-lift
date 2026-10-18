@@ -7,7 +7,7 @@ distribution, so the adapter does not require a checkout or `PYTHONPATH`.
 It passes Harbor's task instruction to Powdrr's `implement-feature` Procedrr
 flow. Planning, implementation, validation, completeness review, scope review,
 and repair remain defined by
-`docs/procedrr/skill-definitions/implement-feature.yaml`.
+`docs/procedrr/processes/implement-feature.yaml`.
 
 The adapter runs the flow in the current Harbor checkout. It does not create a
 nested worktree, fetch a branch, push, or open a pull request. The shared flow

@@ -20,7 +20,7 @@ The resulting system supports forward-only development: a change can add or deli
 
 The implementation must build on, rather than replace, these facilities already on `main`:
 
-- `docs/procedrr/skill-definitions/implement-feature.yaml` decomposes feature text sentence by sentence, compiles feature obligations, reviews the proposal before implementation, validates after implementation, repairs worker findings, and performs a content-addressed post-implementation intent review.
+- `docs/procedrr/processes/implement-feature.yaml` decomposes feature text sentence by sentence, compiles feature obligations, reviews the proposal before implementation, validates after implementation, repairs worker findings, and performs a content-addressed post-implementation intent review.
 - `src/powdrr_lift/workrr/feature_endpoint.py` prepares proposal and post-implementation evidence fingerprints.
 - `src/powdrr_lift/structrr/gate_compiler.py` supports evidence requirements and content fingerprints.
 - `src/powdrr_lift/structrr/intent.py` stores intent captured through existing runtime paths.
@@ -116,7 +116,7 @@ applicability:
   mode: affected_closure
 protected_inputs:
   - powdrr_lift/transcript/**
-  - docs/procedrr/skill-definitions/**
+  - docs/procedrr/processes/**
 status: active
 ```
 
@@ -341,7 +341,7 @@ Expected touchpoints:
 - `src/powdrr_lift/structrr/gate_compiler.py` for evidence decisions;
 - `src/powdrr_lift/workrr/feature_endpoint.py` for flow actions and work-order assembly;
 - `src/powdrr_lift/workrr/coding_agent.py` only if its typed work-order envelope must carry obligations;
-- `docs/procedrr/skill-definitions/implement-feature.yaml` and its flow-definition tests.
+- `docs/procedrr/processes/implement-feature.yaml` and its flow-definition tests.
 
 Tests:
 
@@ -407,7 +407,7 @@ Expected touchpoints:
 
 - a new `src/powdrr_lift/workrr/evidence_reconciliation.py`;
 - `src/powdrr_lift/workrr/feature_endpoint.py` for issue collection and loop state;
-- `docs/procedrr/skill-definitions/implement-feature.yaml` for ordering and gate conditions;
+- `docs/procedrr/processes/implement-feature.yaml` for ordering and gate conditions;
 - `tests/test_feature_endpoint.py` plus flow and end-to-end repair fixtures.
 
 Tests:

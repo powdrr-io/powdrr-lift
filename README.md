@@ -398,7 +398,7 @@ invocation starts from the primary checkout.
 Browse the current [workflow-chat definitions](skill-definitions/) for planning,
 implementation, validation, and review flows. The shared Procedrr processes used
 by feature implementation live in
-[docs/procedrr/skill-definitions/](docs/procedrr/skill-definitions/) and are included
+[docs/procedrr/processes/](docs/procedrr/processes/) and are included
 in the installed package.
 
 From a repository checkout, validate the workflow-chat definitions and templates

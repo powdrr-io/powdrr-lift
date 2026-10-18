@@ -53,7 +53,7 @@ task.
 ## Placement and ownership
 
 Add a reusable Procedrr subprocedure, tentatively `resolve-external-contracts`,
-to `docs/procedrr/skill-definitions/`. `implement-feature` calls it after the
+to `docs/procedrr/processes/`. `implement-feature` calls it after the
 initial instruction decomposition and base-repository snapshot, and before
 the final feature design, verification obligations, code-task plan, and worker
 prompt are committed. This requires a distinct provisional design followed by

@@ -137,9 +137,9 @@ from powdrr_lift.workrr.verification_evidence import VerificationEvidenceRunner
 from powdrr_lift.workrr.verification_provider import (
     default_verification_provider_registry,
 )
-from procedrr import parse_and_validate
-from procedrr_evaluator import Evaluator
+from procedrr import ProcessCatalog, parse_and_validate
 from procedrr_evaluator.evaluator import EvaluationError
+from procedrr_evaluator.runtime import ProcedrrExecutionService
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -514,6 +514,9 @@ def _execute_procedrr_flow(
             benchmark_gate_warnings.append(dict(event_data))
         record = {
             "record_type": "procedrr.step",
+            "sequence": event.sequence,
+            "process_id": event.identity.process_id,
+            "process_fingerprint": event.identity.fingerprint,
             "kind": event.kind,
             "path": event.path,
             **event_data,
@@ -638,7 +641,7 @@ def _execute_procedrr_flow(
         flow_directory = flow_path.parent
         planning_client = WorkrrProcedrrClient(
             config.planning_client,
-            skills_dir=flow_directory,
+            process_directory=flow_directory,
             replay_responses=replay_responses,
             telemetry_sink=record_provider_attempt,
         )
@@ -648,14 +651,15 @@ def _execute_procedrr_flow(
         else:
             classifier_judge_client = WorkrrProcedrrClient(
                 classifier_client,
-                skills_dir=flow_directory,
+                process_directory=flow_directory,
                 replay_responses=replay_responses,
                 telemetry_sink=record_provider_attempt,
             )
-        evaluator = Evaluator(
+        process_catalog = ProcessCatalog.from_document(flow_path, flow)
+        execution_service = ProcedrrExecutionService(
+            process_catalog,
             planning_client,
             execute,
-            process_directory=flow_directory,
             judge_clients={
                 "planning": planning_client,
                 "jev": classifier_judge_client,
@@ -664,8 +668,8 @@ def _execute_procedrr_flow(
             event_sink=record_procedrr_event,
         )
         state["probe_generation_client"] = planning_client
-        evaluator.evaluate(
-            flow,
+        execution_result = execution_service.execute(
+            str(flow["name"]),
             {
                 "feature_description": config.feature_description,
                 "work_item_name": config.work_item_name,
@@ -677,6 +681,11 @@ def _execute_procedrr_flow(
                 ),
             },
         )
+        if execution_result.terminal_status.value != "succeeded":
+            raise EvaluationError(
+                "Procedrr process terminated with status "
+                f"{execution_result.terminal_status.value}"
+            )
     except EvaluationError as error:
         failure = RunFailure(
             RunFailureStage.PLANNING,
@@ -4781,7 +4790,7 @@ def _apply_flow_yaml_edit(
 
 def _validate_procedrr_flow(worktree: Path) -> Path:
     repository_path = (
-        worktree / "docs" / "procedrr" / "skill-definitions" / "implement-feature.yaml"
+        worktree / "docs" / "procedrr" / "processes" / "implement-feature.yaml"
     )
     path = repository_path
     if not path.is_file():
@@ -4792,7 +4801,7 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
             Path(__file__).resolve().parents[3]
             / "docs"
             / "procedrr"
-            / "skill-definitions"
+            / "processes"
             / "implement-feature.yaml"
         )
         path = next(
@@ -4868,7 +4877,7 @@ def _worker_prompt_capture_flow_source(source: str) -> str:
 
 def _validate_design_interview_flow(worktree: Path) -> Path:
     repository_path = (
-        worktree / "docs" / "procedrr" / "skill-definitions" / "design-interview.yaml"
+        worktree / "docs" / "procedrr" / "processes" / "design-interview.yaml"
     )
     path = repository_path
     if not path.is_file():
@@ -4879,7 +4888,7 @@ def _validate_design_interview_flow(worktree: Path) -> Path:
             Path(__file__).resolve().parents[3]
             / "docs"
             / "procedrr"
-            / "skill-definitions"
+            / "processes"
             / "design-interview.yaml"
         )
         path = next(

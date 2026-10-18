@@ -15,12 +15,13 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from jsonschema import ValidationError as JsonSchemaError
 from jsonschema import validate as validate_json
 
-from powdrr_lift.workrr.protocol import WorkflowLLMClient
+if TYPE_CHECKING:
+    from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
 _REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_.-]*)\}")
 
@@ -35,6 +36,14 @@ class ValidationGateError(EvaluationError):
     def __init__(self, evidence: Any) -> None:
         self.evidence = evidence
         super().__init__("validation gate failed")
+
+
+class _TerminalReached(Exception):
+    """Stop the current process after a declared terminal control node."""
+
+    def __init__(self, status: str) -> None:
+        self.status = status
+        super().__init__(status)
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,9 +95,7 @@ class Evaluator:
         self.llm = llm
         self.operation_executor = operation_executor
         self.judge_clients = dict(judge_clients or {})
-        self.process_directory = process_directory or Path(
-            "docs/procedrr/skill-definitions"
-        )
+        self.process_directory = process_directory or Path("docs/procedrr/processes")
         self.command_catalog = command_catalog
         self.event_sink = event_sink
         self._schemas_by_state: dict[int, dict[str, Mapping[str, Any]]] = {}
@@ -99,7 +106,7 @@ class Evaluator:
         client: WorkflowLLMClient,
         operation_executor: OperationExecutor,
         *,
-        skills_dir: Path,
+        process_directory: Path,
         max_retries: int = 3,
     ) -> Evaluator:
         """Construct an evaluator using Workrr's structured repair boundary."""
@@ -108,11 +115,11 @@ class Evaluator:
         return cls(
             WorkrrProcedrrClient(
                 client,
-                skills_dir=skills_dir,
+                process_directory=process_directory,
                 max_retries=max_retries,
             ),
             operation_executor,
-            process_directory=Path("docs/procedrr/skill-definitions"),
+            process_directory=Path("docs/procedrr/processes"),
         )
 
     def evaluate(
@@ -128,6 +135,8 @@ class Evaluator:
         limits = document.get("limits", {})
         try:
             self._steps(document["steps"], state, events, usage, limits, "steps")
+        except _TerminalReached:
+            pass
         except (KeyError, TypeError, ValueError, JsonSchemaError) as exc:
             raise EvaluationError(str(exc)) from exc
         return EvaluationResult(
@@ -184,9 +193,11 @@ class Evaluator:
             elif "branch" in step:
                 self._branch(step["branch"], state, events, usage, limits, step_path)
             elif "terminal" in step:
+                status = str(step["terminal"])
                 events.append(
-                    EvaluationEvent("terminal", step_path, {"status": step["terminal"]})
+                    EvaluationEvent("terminal", step_path, {"status": status})
                 )
+                raise _TerminalReached(status)
             elif "gate" in step:
                 self._gate(step["gate"], state, events, step_path)
             else:
@@ -231,14 +242,18 @@ class Evaluator:
             "fragment_max_steps": maximum,
         }
         generator_usage = {"llm": 0, "tools": 0}
-        self._steps(
-            process["steps"],
-            generator_state,
-            events,
-            generator_usage,
-            process.get("limits", {}),
-            f"{path}.subprocess[{process_name}]",
-        )
+        try:
+            self._steps(
+                process["steps"],
+                generator_state,
+                events,
+                generator_usage,
+                process.get("limits", {}),
+                f"{path}.subprocess[{process_name}]",
+            )
+        except _TerminalReached as terminal:
+            if terminal.status != "succeeded":
+                raise
         fragment_state = generator_state.get("fragment_state")
         fragment = (
             fragment_state.get("fragment")
@@ -297,9 +312,13 @@ class Evaluator:
         maximum = declaration.get("max_steps", len(fragment["steps"]))
         if not isinstance(maximum, int) or len(fragment["steps"]) > maximum:
             raise EvaluationError(f"{path}.call.fragment exceeds its step bound")
-        self._steps(
-            fragment["steps"], state, events, usage, limits, f"{path}.call.body"
-        )
+        try:
+            self._steps(
+                fragment["steps"], state, events, usage, limits, f"{path}.call.body"
+            )
+        except _TerminalReached as terminal:
+            if terminal.status != "succeeded":
+                raise
 
     def _call_process(
         self,
@@ -375,7 +394,13 @@ class Evaluator:
         steps = process.get("steps")
         if not isinstance(steps, list):
             raise EvaluationError(f"{path}.call process has no steps")
-        self._steps(steps, child_state, events, usage, child_limits, f"{path}.call")
+        terminal_status = "succeeded"
+        try:
+            self._steps(steps, child_state, events, usage, child_limits, f"{path}.call")
+        except _TerminalReached as terminal:
+            terminal_status = terminal.status
+            if terminal_status != "succeeded":
+                raise
         for parent_name, child_reference in outputs.items():
             if not isinstance(parent_name, str) or not isinstance(child_reference, str):
                 raise EvaluationError(
@@ -397,7 +422,11 @@ class Evaluator:
             EvaluationEvent(
                 "process",
                 path,
-                {"name": process_name, "outputs": list(outputs)},
+                {
+                    "name": process_name,
+                    "outputs": list(outputs),
+                    "terminal_status": terminal_status,
+                },
             )
         )
 

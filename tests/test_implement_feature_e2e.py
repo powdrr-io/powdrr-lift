@@ -883,8 +883,8 @@ def _fixture_repo(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     shutil.copytree(
-        REPOSITORY_ROOT / "docs" / "procedrr" / "skill-definitions",
-        repo / "docs" / "procedrr" / "skill-definitions",
+        REPOSITORY_ROOT / "docs" / "procedrr" / "processes",
+        repo / "docs" / "procedrr" / "processes",
     )
     shutil.copy2(
         REPOSITORY_ROOT / "software_development_entity_taxonomy.md",

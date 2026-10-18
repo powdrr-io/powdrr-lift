@@ -17,7 +17,7 @@ progression.
 ## Current boundary
 
 - The feature endpoint already parses and evaluates declarations under
-  `docs/procedrr/skill-definitions/` with `procedrr` and
+  `docs/procedrr/processes/` with `procedrr` and
   `procedrr_evaluator`.
 - `workflow-chat` still loads `skill-definitions/` through
   `powdrr_lift.process.model` and runs its own step/action interpreter.

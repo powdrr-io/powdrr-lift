@@ -60,6 +60,7 @@ def test_generate_postrun_probes_excludes_unresolved_scenarios() -> None:
     ("source", "expected_error"),
     [
         ("def test_not_a_probe():\n    assert True\n", "test_probe_"),
+        ("def test_probe_broken():\n    assert True\n  assert False\n", "valid Python"),
         (
             "import subprocess\ndef test_probe_side_effect():\n    assert True\n",
             "disallowed system module",

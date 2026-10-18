@@ -659,6 +659,34 @@ class WeakProbePlanningClient(ProbeEnabledPlanningClient):
         return response
 
 
+class InvalidSyntaxProbePlanningClient(ProbeEnabledPlanningClient):
+    """Return malformed Python so the pipeline's probe failure path is exercised."""
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        required = set((response_schema or {}).get("required", ()))
+        if required == {"probes"}:
+            return {
+                "probes": [
+                    {
+                        "probe_id": "invalid-python",
+                        "scenario_id": "scenario:instruction-001",
+                        "oracle_basis": "The probe generator response is malformed.",
+                        "test_source": (
+                            "def test_probe_invalid():\n"
+                            "    assert True\n"
+                            "  assert False\n"
+                        ),
+                    }
+                ]
+            }
+        return super().complete_json(messages, response_schema=response_schema)
+
+
 class RepairProbePlanningClient(ProbeEnabledPlanningClient):
     """Generate a probe that forces the post-coding repair path once."""
 
@@ -1061,6 +1089,53 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
             capture_output=True,
             text=True,
         ).stdout
+    )
+
+
+def test_implement_feature_records_invalid_generated_probe_and_continues(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description=(
+                "Add a second greeting to hello_world.py. Keep the existing "
+                "Hello, world! output first and print Hello from Powdrr! second."
+            ),
+            work_item_name="hello-world-invalid-generated-probe",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
+            code_agent="opencode",
+            opencode_executable=str(fake_opencode),
+            opencode_model="deterministic-test-model",
+            open_pr=False,
+            push_changes=False,
+            planning_client=InvalidSyntaxProbePlanningClient(),
+        )
+    )
+
+    assert result.status == "completed", (
+        result.failure.message if result.failure else None
+    )
+    assert result.review["postrun_probe_generation"]["status"] == "unavailable"
+    assert (
+        "generated probe is not valid Python"
+        in result.review["postrun_probe_generation"]["error"]
+    )
+    suite_path = Path(result.review["postrun_probe_generation"]["suite_path"])
+    suite = json.loads(suite_path.read_text(encoding="utf-8"))
+    assert suite["probes"] == []
+    assert suite["generation_status"] == "unavailable"
+    assert (repo / "hello_world.py").read_text(encoding="utf-8") == (
+        'print("Hello, world!")\nprint("Hello from Powdrr!")\n'
     )
 
 

@@ -355,8 +355,8 @@ files:
 - path: src/procedrr/parser.py
   type: modified
   span:
-    start_line: 27
-    end_line: 28
+    start_line: 29
+    end_line: 30
   summary: Register workflow chat snapshot operations
   rationale: Allow the ad hoc process to inspect whether it changed the worktree.
 - path: tests/test_external_contract_research.py
@@ -580,7 +580,7 @@ files:
   type: added
   span:
     start_line: 1
-    end_line: 219
+    end_line: 220
   summary: Test the PR preparation and ad hoc processes
   rationale: Verify process branching, validation retries, and nested calls.
 - path: tests/test_workrr_procedrr.py
@@ -816,6 +816,300 @@ files:
     end_line: 179
   summary: Test typed process loading and execution results
   rationale: Protect catalog validation and runtime event identity.
+- path: docs/procedrr/processes/address-review-comments.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 112
+  summary: Port address-review-comments workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/adversarial-pr-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 135
+  summary: Port adversarial-pr-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/bootstrap-code-structure.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 159
+  summary: Port bootstrap-code-structure workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/create-pull-request.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 152
+  summary: Port create-pull-request workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/dead-code-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 133
+  summary: Port dead-code-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/feature-functionality-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 127
+  summary: Port feature-functionality-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/feature-test-coverage-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 114
+  summary: Port feature-test-coverage-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/fix-ci-failures.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 132
+  summary: Port fix-ci-failures workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/fix-merge-conflicts.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 145
+  summary: Port fix-merge-conflicts workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/generate-fragment.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 126
+  summary: Port generate-fragment workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/review-architecture.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 93
+  summary: Port review-architecture workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/review-skill-workflow.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 168
+  summary: Port review-skill-workflow workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/review-system.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 92
+  summary: Port review-system workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/run-tests-and-fix.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 148
+  summary: Port run-tests-and-fix workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/security-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 178
+  summary: Port security-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/select-process.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 32
+  summary: Port select-process workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/spec-v1-design-review.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 316
+  summary: Port spec-v1-design-review workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/specify-a-feature.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 99
+  summary: Port specify-a-feature workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/specify-architecture.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 107
+  summary: Port specify-architecture workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/specify-implementation.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 104
+  summary: Port specify-implementation workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/specify-system.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 97
+  summary: Port specify-system workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 478
+  summary: Port start-implementing-feature workflow to Procedrr
+  rationale: Make this supported workflow available from the Procedrr process catalog.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 168
+    end_line: 168
+  summary: Route workflow chat CLI through Procedrr
+  rationale: Use a process directory option and execute selected processes through the shared runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 246
+    end_line: 246
+  summary: Route workflow chat CLI through Procedrr
+  rationale: Use a process directory option and execute selected processes through the shared runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 293
+    end_line: 294
+  summary: Route workflow chat CLI through Procedrr
+  rationale: Use a process directory option and execute selected processes through the shared runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2010
+    end_line: 2012
+  summary: Route workflow chat CLI through Procedrr
+  rationale: Use a process directory option and execute selected processes through the shared runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2014
+    end_line: 2015
+  summary: Route workflow chat CLI through Procedrr
+  rationale: Use a process directory option and execute selected processes through the shared runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2025
+    end_line: 2025
+  summary: Route workflow chat CLI through Procedrr
+  rationale: Use a process directory option and execute selected processes through the shared runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2064
+    end_line: 2064
+  summary: Route workflow chat CLI through Procedrr
+  rationale: Use a process directory option and execute selected processes through the shared runtime.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5998
+    end_line: 5998
+  summary: Route workflow chat CLI through Procedrr
+  rationale: Use a process directory option and execute selected processes through the shared runtime.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 24
+  summary: Route the chat TUI through Procedrr
+  rationale: Keep interactive chat on the shared process execution service.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 682
+  summary: Add the Procedrr workflow chat runtime
+  rationale: Select catalogued processes and dispatch operations through Workrr authorization.
+- path: src/procedrr/parser.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 26
+  summary: Register chat-facing Procedrr operations
+  rationale: Validate prompt, response, and worktree snapshot operations.
+- path: tests/test_procedrr_chat.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 80
+  summary: Test Procedrr chat selection and operation adaptation
+  rationale: Verify catalog-constrained routing and operation conversion.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3601
+    end_line: 3604
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3614
+    end_line: 3615
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3629
+    end_line: 3630
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3871
+    end_line: 3874
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3880
+    end_line: 3881
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3905
+    end_line: 3908
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
+- path: tests/test_workflow_chat_agent.py
+  type: modified
+  span:
+    start_line: 3910
+    end_line: 3911
+  summary: Update CLI tests for the process directory option
+  rationale: Verify workflow chat uses the Procedrr command interface.
 entities:
 - id: procedrr-process-catalog
   type: Module

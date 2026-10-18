@@ -656,11 +656,7 @@ def cleanup_workflow_run(
         )
         removed.extend(interrupted["removed"])
         errors.extend(interrupted["errors"])
-        first_claim_reopened = any(
-            item.startswith("reopened-first-claim-task:")
-            for item in interrupted["removed"]
-        )
-        if not errors and not first_claim_reopened:
+        if not errors and not interrupted["removed"]:
             recovery = _restore_workflow_git_state(
                 state_report,
                 integration_worktree,

@@ -1472,6 +1472,16 @@ class _TaskProcedrrOperations:
         return {
             "continue_running": outcome.continue_running,
             "events": observed,
+            "result": next(
+                (
+                    event["result"]
+                    for event in reversed(observed)
+                    if event.get("kind") == action.kind
+                    and event.get("tool") == action.tool
+                    and "result" in event
+                ),
+                None,
+            ),
         }
 
     def _run_nested_process(self, parameters: Mapping[str, Any]) -> dict[str, Any]:

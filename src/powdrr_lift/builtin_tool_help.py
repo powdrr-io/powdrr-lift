@@ -58,7 +58,10 @@ _HELP: dict[str, dict[str, Any]] = {
             "files. Structured operations keep repository mutations explicit."
         ),
         "parameters": {
-            "operation": "One of status, add, or move.",
+            "operation": (
+                "One of status, remote, branch_current, head, default_branch, "
+                "show_ref, switch, switch_create, commit, push, add, move, or rename."
+            ),
             "paths": "Relative paths for add.",
             "source": "Relative source path for move.",
             "destination": "Relative destination path for move.",

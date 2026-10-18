@@ -54,6 +54,7 @@ _TOOL_PACKAGES: dict[str, tuple[dict[str, Any], ...]] = {
             "status",
             "remote",
             "branch_current",
+            "head",
             "default_branch",
             "show_ref",
         )

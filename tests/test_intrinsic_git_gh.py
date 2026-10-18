@@ -10,6 +10,7 @@ from powdrr_lift.intrinsic_git_gh import (
     execute_intrinsic_git_gh_tool,
     intrinsic_command,
 )
+from powdrr_lift.workrr.task_agent import _git_operation_parameters
 
 
 def test_git_intrinsic_operations_have_expected_commands() -> None:
@@ -17,6 +18,11 @@ def test_git_intrinsic_operations_have_expected_commands() -> None:
         "status",
         "--short",
     ]
+    assert intrinsic_command({"operation": "head"}, tool="git") == [
+        "rev-parse",
+        "HEAD",
+    ]
+    assert _git_operation_parameters(["rev-parse", "HEAD"]) == {"operation": "head"}
     assert intrinsic_command(
         {"operation": "add", "paths": ["docs/a.yaml", "docs/b.yaml"]},
         tool="git",

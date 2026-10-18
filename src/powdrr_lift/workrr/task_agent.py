@@ -2717,6 +2717,8 @@ def _git_operation_parameters(arguments: list[str]) -> dict[str, Any]:
         return {"operation": "remote"}
     if arguments == ["branch", "--show-current"]:
         return {"operation": "branch_current"}
+    if arguments == ["rev-parse", "HEAD"]:
+        return {"operation": "head"}
     if arguments[:2] == ["symbolic-ref", "--short"]:
         return {"operation": "default_branch"}
     if arguments[:2] == ["show-ref", "--verify"]:

@@ -167,6 +167,21 @@ files:
     span: {start_line: 688, end_line: 725}
     summary: Verify nested Procedrr operations expose command results as bindings.
     rationale: Prevent validation and repair steps from failing to read operation outputs.
+  - path: docs/procedrr/processes/generate-fragment.yaml
+    type: modified
+    span: {start_line: 48, end_line: 48}
+    summary: Require edit judges to use a declared fragment input for requirement context.
+    rationale: Prevent generated fragments from referencing unavailable fragment_goal bindings.
+  - path: docs/procedrr/processes/generate-fragment.yaml
+    type: modified
+    span: {start_line: 78, end_line: 78}
+    summary: Update the canonical edit-judge example to use a requirement binding.
+    rationale: Show valid declared-binding context in generated source-edit judges.
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 617, end_line: 618}
+    summary: Assert generate-fragment guidance uses declared requirement bindings.
+    rationale: Keep the generic fragment prompt aligned with fragment validation rules.
 entities:
   - id: plan-worker-runtime-directory-regression
     type: Regression test

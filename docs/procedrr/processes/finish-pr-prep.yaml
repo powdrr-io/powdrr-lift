@@ -10,7 +10,7 @@ outputs:
   validation_results:
     type: array
     items: {type: object}
-limits: {llm_activations: 24, tool_calls: 100, context_chars: 20000, context_value_chars: 8000}
+limits: {context_chars: 20000, context_value_chars: 8000}
 steps:
   - operation:
       tool: invoke_tool

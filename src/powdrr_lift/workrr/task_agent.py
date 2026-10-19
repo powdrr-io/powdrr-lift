@@ -16,6 +16,11 @@ from typing import Any, TextIO
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
+from powdrr_lift.core.execution_plan import ExecutionUnit
+from powdrr_lift.core.implementation_packet import (
+    ImplementationPacket,
+    RepositoryContextPacket,
+)
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
@@ -53,15 +58,20 @@ from powdrr_lift.workrr.action_operations import (
     _resolve_pre_step_template,
 )
 from powdrr_lift.workrr.coding_agent import (
+    DEFAULT_CODING_AGENT_TIMEOUT_SECONDS,
+    DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
     CodingAgentAttemptStore,
+    CodingAgentRecoveryDecision,
     CodingAgentRunner,
     ImplementationRequest,
     OpenCodePermissionPolicy,
     build_coding_agent_provider,
+    run_coding_agent_recovery,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
+    ValidationProfile,
     ValidationReportStatus,
-    ValidationRunner,
+    execute_coding_agent_attempt,
     parse_validation_profile,
 )
 from powdrr_lift.workrr.error_logging import record_workflow_llm_error
@@ -251,8 +261,10 @@ class WorkflowTaskAgentConfig:
     opencode_model: str | None = None
     minisweagent_executable: str = "mini"
     minisweagent_model: str | None = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
-    coding_agent_timeout_seconds: float = 1800.0
-    coding_agent_validation_timeout_seconds: float = 1800.0
+    coding_agent_timeout_seconds: float = DEFAULT_CODING_AGENT_TIMEOUT_SECONDS
+    coding_agent_validation_timeout_seconds: float = (
+        DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS
+    )
     allow_unmanaged_git: bool = False
     run_deterministic_invoke_tool_pre_steps: bool = False
     guidance: tuple[str, ...] = ()
@@ -275,32 +287,79 @@ def _issue_worker_string_list(value: object) -> tuple[str, ...]:
     return tuple(item.strip() for item in value)
 
 
-def _issue_worker_implementation_prompt(
-    objective: str,
-    scope: Sequence[str],
-    steps: Sequence[str],
-    criteria: Sequence[str],
-) -> str:
-    prompt_lines = [
-        "Implement this reviewed proposed PR in the current repository.",
-        "Make the actual product and test changes; do not return a plan, "
-        "review summary, or placeholder implementation.",
-        "Follow the implementation steps in order and satisfy every "
-        "acceptance criterion.",
-        "Do not edit workflow state or durable task files.",
-        "Do not run git add, git commit, git push, change branches, or invoke "
-        "GitHub commands. Leave product edits in the worktree; finish-pr-prep "
-        "and create-pull-request own staging, committing, and publication.",
-        "Objective:",
-        objective,
-        "Scope:",
-        *(f"- {value}" for value in scope),
-        "Implementation steps:",
-        *(f"- {value}" for value in steps),
-        "Acceptance criteria:",
-        *(f"- {value}" for value in criteria),
-    ]
-    return "\n".join(prompt_lines)
+def _issue_worker_implementation_request(
+    proposed: Mapping[str, Any], *, workflow_id: str, base_commit: str
+) -> tuple[ImplementationRequest, ValidationProfile]:
+    """Compile reviewed issue fields into the benchmark worker request shape."""
+    objective = str(proposed.get("objective", "")).strip()
+    if not objective:
+        raise PowdrrExecutionError("proposed PR objective must not be empty")
+    steps = _issue_worker_string_list(proposed.get("implementation_steps"))
+    scope = _issue_worker_string_list(proposed.get("scope"))
+    criteria = _issue_worker_string_list(proposed.get("acceptance_criteria"))
+    if not steps or not scope or not criteria:
+        raise PowdrrExecutionError(
+            "proposed PR must declare implementation_steps, scope, and "
+            "acceptance_criteria"
+        )
+    verification_command = proposed.get("verification_command")
+    if not isinstance(verification_command, str) or not verification_command.strip():
+        raise PowdrrExecutionError("proposed PR must declare a verification_command")
+    try:
+        validation_profile = parse_validation_profile(f"verify={verification_command}")
+    except ValueError as error:
+        raise PowdrrExecutionError(str(error)) from error
+
+    item_id = str(proposed.get("item_id", workflow_id)).strip() or workflow_id
+    plan_id = str(proposed.get("plan_id", "")).strip()
+    source_refs = (f"{plan_id}/{item_id}" if plan_id else item_id,)
+    path_changes = tuple(
+        {"id": f"step-{index:02d}", "description": step}
+        for index, step in enumerate(steps, start=1)
+    )
+    unit = ExecutionUnit(
+        unit_id=workflow_id,
+        objective=objective,
+        paths=scope,
+        validation_profiles=(validation_profile.name,),
+        acceptance_criteria=criteria,
+        planned_additions=path_changes,
+        must_preserve=criteria,
+        non_goals=("Do not implement product changes outside the reviewed scope.",),
+        source_refs=source_refs,
+    )
+    packet = ImplementationPacket(
+        objective=objective,
+        obligations=steps,
+        required_tests=tuple({"description": item} for item in criteria),
+        repository=RepositoryContextPacket(
+            allowed_paths=scope,
+            validation_profiles=(validation_profile.name,),
+        ),
+    )
+    plan_data = {
+        "workflow_id": workflow_id,
+        "item_id": item_id,
+        "plan_id": plan_id,
+        "objective": objective,
+        "scope": scope,
+        "implementation_steps": steps,
+        "acceptance_criteria": criteria,
+        "verification_command": verification_command,
+    }
+    fingerprint = hashlib.sha256(
+        json.dumps(plan_data, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    request = ImplementationRequest.from_execution_unit(
+        unit,
+        request_id=f"{workflow_id}-implementation",
+        base_commit=base_commit,
+        plan_fingerprint=fingerprint,
+        context_refs=source_refs,
+        allowed_commands=(verification_command,),
+        implementation_packet=packet,
+    )
+    return replace(request, allow_existing_changes=True), validation_profile
 
 
 def _implementation_paths_against_base(repo_root: Path) -> tuple[str, ...]:
@@ -1296,40 +1355,9 @@ class _TaskWorkflowExecutionStrategy:
             raise PowdrrExecutionError(
                 "coding-agent requires proposed_pr_context in task input"
             )
-        objective = str(proposed.get("objective", "")).strip()
-        if not objective:
-            raise PowdrrExecutionError("proposed PR objective must not be empty")
-        steps = _issue_worker_string_list(proposed.get("implementation_steps"))
-        scope = _issue_worker_string_list(proposed.get("scope"))
-        criteria = _issue_worker_string_list(proposed.get("acceptance_criteria"))
-        verification_command = proposed.get("verification_command")
-        if (
-            not isinstance(verification_command, str)
-            or not verification_command.strip()
-        ):
-            raise PowdrrExecutionError(
-                "proposed PR must declare a verification_command"
-            )
-        try:
-            validation_profile = parse_validation_profile(
-                f"verify={verification_command}"
-            )
-        except ValueError as error:
-            raise PowdrrExecutionError(str(error)) from error
         workflow_id = str(self.task.input_state.get("proposed_pr_id", ""))
-        plan_data = {
-            "workflow_id": workflow_id,
-            "objective": objective,
-            "scope": scope,
-            "implementation_steps": steps,
-            "acceptance_criteria": criteria,
-            "verification_command": verification_command,
-        }
-        fingerprint = hashlib.sha256(
-            json.dumps(plan_data, sort_keys=True).encode("utf-8")
-        ).hexdigest()
-        request_id = f"{workflow_id}-implementation"
-        attempt_id = f"{request_id}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
+        if not workflow_id.strip():
+            raise PowdrrExecutionError("proposed PR ID must not be empty")
         base_commit = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=self.repo_root,
@@ -1337,19 +1365,8 @@ class _TaskWorkflowExecutionStrategy:
             text=True,
             check=True,
         ).stdout.strip()
-        request = ImplementationRequest(
-            request_id=request_id,
-            objective=objective,
-            prompt=_issue_worker_implementation_prompt(
-                objective, scope, steps, criteria
-            ),
-            base_commit=base_commit,
-            plan_fingerprint=fingerprint,
-            allowed_paths=(".",),
-            acceptance_criteria=criteria,
-            validation_profiles=(validation_profile.name,),
-            allowed_commands=(verification_command,),
-            allow_existing_changes=True,
+        request, validation_profile = _issue_worker_implementation_request(
+            proposed, workflow_id=workflow_id, base_commit=base_commit
         )
         store_root = (
             Path(tempfile.gettempdir()) / "powdrr-lift-issue-worker" / workflow_id
@@ -1368,33 +1385,107 @@ class _TaskWorkflowExecutionStrategy:
             provider=provider,
             store=CodingAgentAttemptStore(store_root),
         )
-        attempt = runner.run(
-            request,
-            worktree_root=self.repo_root,
-            attempt_id=attempt_id,
-        )
-        validation = ValidationRunner(
-            {validation_profile.name: validation_profile},
-            timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
-        ).run(request, attempt, worktree_root=self.repo_root)
-        runner.store.save_validation_report(validation)
-        implementation_paths = tuple(
-            sorted(
-                set(attempt.changed_paths)
-                | set(_implementation_paths_against_base(self.repo_root))
+
+        def run_attempt(
+            attempt_number: int, recovery_issue: Mapping[str, Any] | None
+        ) -> dict[str, Any]:
+            attempt_request = request
+            if recovery_issue is not None:
+                attempt_request = replace(
+                    request,
+                    prompt=(
+                        request.repair_prompt(recovery_issue)
+                        + "\n\nReviewed implementation steps:\n"
+                        + "\n".join(
+                            f"- {step.get('description', step)}"
+                            for step in request.planned_additions
+                        )
+                    ),
+                    allow_existing_changes=True,
+                )
+            attempt_id = (
+                f"{request.request_id}-attempt-{attempt_number:02d}-"
+                f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
             )
-        )
-        result = {
-            "passed": (
+            execution = execute_coding_agent_attempt(
+                runner,
+                attempt_request,
+                worktree_root=self.repo_root,
+                attempt_id=attempt_id,
+                profiles={validation_profile.name: validation_profile},
+                validation_timeout_seconds=(
+                    self.config.coding_agent_validation_timeout_seconds
+                ),
+            )
+            attempt = execution.attempt
+            validation = execution.validation
+            diff_check = execution.diff_check
+            implementation_paths = tuple(
+                sorted(
+                    set(attempt.changed_paths)
+                    | set(_implementation_paths_against_base(self.repo_root))
+                )
+            )
+            passed = (
                 attempt.status.value == "completed"
                 and bool(implementation_paths)
+                and diff_check.returncode == 0
                 and validation.status is ValidationReportStatus.PASSED
-            ),
-            "attempt_id": attempt.attempt_id,
-            "status": attempt.status.value,
-            "changed_paths": list(implementation_paths),
-            "validation": validation.to_data(),
-            "error": attempt.error,
+            )
+            return {
+                "attempt": attempt.to_data(),
+                "validation": validation.to_data(),
+                "diff_check": {
+                    "returncode": diff_check.returncode,
+                    "stdout": diff_check.stdout,
+                    "stderr": diff_check.stderr,
+                },
+                "changed_paths": list(implementation_paths),
+                "passed": passed,
+            }
+
+        def evaluate_attempt(
+            record: Mapping[str, Any],
+        ) -> CodingAgentRecoveryDecision:
+            attempt_data = record.get("attempt")
+            if not isinstance(attempt_data, Mapping):
+                return CodingAgentRecoveryDecision(passed=False, terminal=True)
+            if record.get("passed") is True:
+                return CodingAgentRecoveryDecision(passed=True)
+            if attempt_data.get("status") == "policy_denied":
+                return CodingAgentRecoveryDecision(passed=False, terminal=True)
+            return CodingAgentRecoveryDecision(
+                passed=False,
+                issue={
+                    "category": "coding_attempt_incomplete",
+                    "status": attempt_data.get("status"),
+                    "error": attempt_data.get("error"),
+                    "changed_paths": record.get("changed_paths", []),
+                    "validation": record.get("validation"),
+                    "diff_check": record.get("diff_check"),
+                    "instruction": (
+                        "Continue the reviewed implementation in the current worktree. "
+                        "Inspect and preserve useful edits, repair the reported "
+                        "validation failures, and satisfy every acceptance criterion. "
+                        "Do not re-plan unrelated work."
+                    ),
+                },
+            )
+
+        recovery = run_coding_agent_recovery(run_attempt, evaluate_attempt)
+        attempt_records = list(recovery.attempts)
+
+        final_attempt = attempt_records[-1]
+        attempt_data = final_attempt["attempt"]
+        result = {
+            "passed": bool(final_attempt["passed"]),
+            "attempt_id": attempt_data["attempt_id"],
+            "status": attempt_data["status"],
+            "changed_paths": final_attempt["changed_paths"],
+            "validation": final_attempt["validation"],
+            "error": attempt_data.get("error"),
+            "attempts": attempt_records,
+            "continuations": len(attempt_records) - 1,
         }
         self.events.append({"kind": "coding_agent", "result": result})
         return result

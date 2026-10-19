@@ -3,11 +3,12 @@ from __future__ import annotations
 import io
 import json
 import subprocess
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -48,7 +49,7 @@ from powdrr_lift.workrr.task_agent import (
     _durable_task_action_output_state,
     _handle_exhausted_timeout,
     _implementation_paths_against_base,
-    _issue_worker_implementation_prompt,
+    _issue_worker_implementation_request,
     _list_worktree_files,
     _publish_workflow_progress,
     _read_task_document,
@@ -103,19 +104,141 @@ def test_implementation_paths_include_committed_work_and_exclude_runtime_state(
     )
 
 
-def test_issue_worker_implementation_prompt_leaves_git_publication_to_workflow() -> (
-    None
-):
-    prompt = _issue_worker_implementation_prompt(
-        "Implement a feature",
-        ("src/feature.py",),
-        ("Add the implementation.",),
-        ("The feature works.",),
+def test_issue_worker_compiles_the_benchmark_implementation_request() -> None:
+    request, validation = _issue_worker_implementation_request(
+        {
+            "plan_id": "feature-v1",
+            "item_id": "feature-v1-pr-01",
+            "objective": "Implement the feature.",
+            "scope": ["src/feature.py"],
+            "implementation_steps": ["Add the parser."],
+            "acceptance_criteria": ["Valid input is parsed."],
+            "verification_command": f"{sys.executable} verify.py",
+        },
+        workflow_id="feature-v1-pr-01",
+        base_commit="a" * 40,
     )
 
-    assert "Do not run git add, git commit, git push, change branches" in prompt
-    assert "Leave product edits in the worktree" in prompt
-    assert "finish-pr-prep and create-pull-request own staging" in prompt
+    assert request.allowed_paths == ("src/feature.py",)
+    assert request.validation_profiles == ("verify",)
+    assert request.allowed_commands == (f"{sys.executable} verify.py",)
+    assert request.implementation_packet is not None
+    assert request.implementation_packet.repository.allowed_paths == ("src/feature.py",)
+    assert "Add the parser." in request.prompt
+    assert "Valid input is parsed." in request.prompt
+    assert "Do not create branches, commits, pull requests" in request.prompt
+    assert request.allow_existing_changes is True
+    assert validation.command == (sys.executable, "verify.py")
+
+
+def test_issue_worker_continues_after_nontrivial_validation_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "README.md").write_text("initial\n", encoding="utf-8")
+    (tmp_path / "verify.py").write_text(
+        "from pathlib import Path\n"
+        "assert 'value = 42' in Path('src/feature.py').read_text()\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "initial",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    task = replace(
+        _workflow(tmp_path).tasks[0],
+        input_state={
+            "proposed_pr_id": "feature-v1-pr-01",
+            "proposed_pr_context": {
+                "plan_id": "feature-v1",
+                "item_id": "feature-v1-pr-01",
+                "objective": "Implement the feature value.",
+                "scope": ["src"],
+                "implementation_steps": ["Set the feature value to 42."],
+                "acceptance_criteria": ["The feature value equals 42."],
+                "verification_command": f"{sys.executable} verify.py",
+            },
+        },
+    )
+    workflow = WorkflowInstance.from_directory(tmp_path / "workflow")
+    provider_requests: list[Any] = []
+    provider_timeouts: list[float] = []
+
+    class NontrivialProvider:
+        provider_name = "test-provider"
+
+        def run(
+            self,
+            request: Any,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            del attempt_id
+            provider_requests.append(request)
+            source = worktree_root / "src" / "feature.py"
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                "value = 1\n" if len(provider_requests) == 1 else "value = 42\n",
+                encoding="utf-8",
+            )
+            return subprocess.CompletedProcess(["fake-agent"], 0, "done\n", "")
+
+    def build_provider(*_args: Any, **kwargs: Any) -> NontrivialProvider:
+        provider_timeouts.append(kwargs["timeout_seconds"])
+        return NontrivialProvider()
+
+    monkeypatch.setattr(task_agent, "build_coding_agent_provider", build_provider)
+    monkeypatch.setattr(task_agent.tempfile, "gettempdir", lambda: str(tmp_path))
+    config = WorkflowTaskAgentConfig(
+        workflow_dir=workflow.directory,
+        repo_root=tmp_path,
+        code_agent="minisweagent",
+        coding_agent_timeout_seconds=1800.0,
+        coding_agent_validation_timeout_seconds=1800.0,
+    )
+    strategy = task_agent._TaskWorkflowExecutionStrategy(
+        config=config,
+        workflow=workflow,
+        task=task,
+        repo_root=tmp_path,
+        error_log_root=tmp_path,
+        client=cast(Any, None),
+        compaction_client=cast(Any, None),
+        model="test-model",
+        mapping_provider="test-provider",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        action_engine=cast(Any, None),
+        events=[],
+        repair_fallback_client=None,
+        repair_fallback_model=None,
+    )
+
+    result = strategy._run_coding_agent()
+
+    assert result["passed"] is True
+    assert result["continuations"] == 1
+    assert len(result["attempts"]) == 2
+    assert result["attempts"][0]["validation"]["status"] == "failed"
+    assert result["attempts"][1]["validation"]["status"] == "passed"
+    assert "Observed issue:" in provider_requests[1].prompt
+    assert "validation" in provider_requests[1].prompt
+    assert "Set the feature value to 42." in provider_requests[1].prompt
+    assert provider_timeouts == [1800.0]
 
 
 def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:

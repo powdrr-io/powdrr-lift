@@ -8,7 +8,7 @@ outputs:
     type: string
     minLength: 1
     pattern: ^https?://[^ ]+/pull/[0-9]+$
-limits: {llm_activations: 32, tool_calls: 120, context_chars: 60000, context_value_chars: 16000}
+limits: {context_chars: 60000, context_value_chars: 16000}
 steps:
   - call:
       process: execute-proposed-pr
@@ -19,7 +19,7 @@ steps:
   - gate:
       subject: implementation_result.passed
       equals: true
-      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {terminal: failed}
   - judge:
       kind: construct_one
       question: Which repository validation labels apply to the implementation files?

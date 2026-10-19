@@ -88,8 +88,11 @@ from powdrr_lift.structrr.verification_obligations import (
 from powdrr_lift.workrr.actualization import reconcile_actualization
 from powdrr_lift.workrr.candidate_checkpoint import checkpoint_candidate_changes
 from powdrr_lift.workrr.coding_agent import (
+    DEFAULT_CODING_AGENT_TIMEOUT_SECONDS,
+    DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
     CodingAgentAttempt,
     CodingAgentAttemptStore,
+    CodingAgentRecoveryDecision,
     CodingAgentRunner,
     CodingAgentStatus,
     ImplementationRequest,
@@ -97,6 +100,7 @@ from powdrr_lift.workrr.coding_agent import (
     OpenCodePermissionPolicy,
     OpenCodeProvider,
     build_coding_agent_provider,
+    run_coding_agent_recovery,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
@@ -105,6 +109,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationResult,
     ValidationResultStatus,
     ValidationRunner,
+    execute_coding_agent_attempt,
 )
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
@@ -178,6 +183,10 @@ class FeatureEndpointConfig:
     prepared_worktree: Path | None = None
     prepared_branch: str | None = None
     agent_managed_git: bool = False
+    coding_agent_timeout_seconds: float = DEFAULT_CODING_AGENT_TIMEOUT_SECONDS
+    coding_agent_validation_timeout_seconds: float = (
+        DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -2777,7 +2786,7 @@ def _run_code_agent_phase(
                 opencode_model=config.opencode_model,
                 minisweagent_executable=config.minisweagent_executable,
                 minisweagent_model=config.minisweagent_model,
-                timeout_seconds=300.0,
+                timeout_seconds=config.coding_agent_timeout_seconds,
                 diagnostics_root=output_root / config.code_agent,
                 permission_policy=OpenCodePermissionPolicy(
                     _allowed_validation_commands(state["validation_profiles"])
@@ -2962,7 +2971,13 @@ def _run_code_agent_phase(
         before_state_fingerprint = _worktree_state_fingerprint(runner, worktree)
         attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
         state["opencode_attempt_number"] = attempt_number
-        attempt = coding_runner.run(
+        validation_profiles = {
+            profile.name: ValidationProfile(profile.name, tuple(profile.command))
+            for profile in state.get("validation_profiles", ())
+            if isinstance(profile, DiscoveredValidationProfile)
+        }
+        execution = execute_coding_agent_attempt(
+            coding_runner,
             request,
             worktree_root=worktree,
             attempt_id=(
@@ -2970,7 +2985,12 @@ def _run_code_agent_phase(
                 if repair_mode
                 else f"{slug}-{unit.unit_id}-attempt-{attempt_number}"
             ),
+            profiles=validation_profiles,
+            validation_timeout_seconds=config.coding_agent_validation_timeout_seconds,
         )
+        attempt = execution.attempt
+        state["coding_validation_report"] = execution.validation
+        state["coding_validation_diff_check"] = execution.diff_check
         requests.append(request)
         attempts.append(attempt)
         checkpoint = _operation_checkpoint(
@@ -3873,7 +3893,11 @@ def _allowed_validation_commands(
 
 
 def _run_validation_profile(
-    parameters: Mapping[str, Any], *, worktree: Path, state: dict[str, Any]
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    state: dict[str, Any],
+    timeout_seconds: float = DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     profile = parameters.get("profile")
     if not isinstance(profile, Mapping):
@@ -3891,9 +3915,10 @@ def _run_validation_profile(
     # resolves every declared profile and returns a multi-result report for
     # this single-profile operation.
     request = replace(state["request"], validation_profiles=(name,))
-    report = ValidationRunner({name: ValidationProfile(name, tuple(command))}).run(
-        request, state["attempt"], worktree_root=worktree
-    )
+    report = ValidationRunner(
+        {name: ValidationProfile(name, tuple(command))},
+        timeout_seconds=timeout_seconds,
+    ).run(request, state["attempt"], worktree_root=worktree)
     if len(report.results) != 1:
         raise PowdrrExecutionError(
             f"validation profile {name!r} did not produce one result"
@@ -6604,18 +6629,20 @@ def _run_code_task_agent(
     # repair request. Passing only `repair_request` to _run_code_agent_phase
     # loses the baseline, plan, obligations, and proposal receipt bindings.
     state["code_task_agent_parameters"] = dict(forwarded)
+
     # A provider timeout is not a completed coding task.  It also must not
     # discard useful partial edits: the next session needs to inspect the
     # current tree and continue from the actual failure.  Keep this recovery
     # local to the coding-task operation so Procedrr can still make one
     # bounded decision about the resulting receipt.
-    attempt_results: list[dict[str, Any]] = []
-    recovery_issue: Mapping[str, Any] | None = None
-    for continuation in range(3):
+    def run_attempt(
+        attempt_number: int, recovery_issue: Mapping[str, Any] | None
+    ) -> dict[str, Any]:
+        del attempt_number
         current_parameters = dict(forwarded)
         if recovery_issue is not None:
             current_parameters["repair_issue"] = dict(recovery_issue)
-        result = _run_code_agent_phase(
+        return _run_code_agent_phase(
             config,
             runner=runner,
             worktree=worktree,
@@ -6625,16 +6652,26 @@ def _run_code_task_agent(
             state=state,
             parameters=current_parameters,
         )
-        attempt_results.append(result)
+
+    def evaluate_attempt(
+        result: dict[str, Any],
+    ) -> CodingAgentRecoveryDecision:
         if getattr(config, "capture_worker_prompts_only", False):
-            return {**result, "continuations": continuation}
+            return CodingAgentRecoveryDecision(passed=True, terminal=True)
         attempt = result.get("attempt")
         checkpoints = state.get("operation_checkpoints", ())
         checkpoint = checkpoints[-1] if checkpoints else None
-        focused_validation = _run_code_task_focused_validation(state, worktree=worktree)
+        focused_validation = _run_code_task_focused_validation(
+            state,
+            worktree=worktree,
+            timeout_seconds=getattr(
+                config,
+                "coding_agent_validation_timeout_seconds",
+                DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
+            ),
+        )
         if focused_validation is not None:
             result = {**result, "coding_validation": focused_validation}
-            attempt_results[-1] = result
         no_op = (
             isinstance(checkpoint, Mapping)
             and checkpoint.get("passed") is not True
@@ -6660,7 +6697,8 @@ def _run_code_task_agent(
                 state["operation_checkpoints"] = checkpoint_list
             checkpoint = skipped_checkpoint
             result = {**result, "no_op": True}
-            attempt_results[-1] = result
+        latest_result.clear()
+        latest_result.update(result)
         if (
             isinstance(attempt, Mapping)
             and attempt.get("status") == CodingAgentStatus.COMPLETED.value
@@ -6672,48 +6710,46 @@ def _run_code_task_agent(
                 == ValidationReportStatus.PASSED.value
             )
         ):
-            return {
-                **result,
-                "attempts": [
-                    attempt
-                    for item in attempt_results
-                    for attempt in item.get("attempts", [])
-                    if isinstance(attempt, Mapping)
-                ],
-                "continuations": continuation,
-            }
+            return CodingAgentRecoveryDecision(passed=True)
         if not isinstance(attempt, Mapping):
-            break
+            return CodingAgentRecoveryDecision(passed=False, terminal=True)
         if attempt.get("status") == CodingAgentStatus.POLICY_DENIED.value:
-            break
-        recovery_issue = {
-            "category": "coding_attempt_incomplete",
-            "status": attempt.get("status"),
-            "error": attempt.get("error"),
-            "changed_paths": attempt.get("changed_paths", []),
-            "validation": focused_validation,
-            "instruction": (
-                "Continue the existing implementation from the current worktree. "
-                "Inspect what the previous session changed, preserve correct edits, "
-                "and finish the requested task. Do not restart or re-plan "
-                "unrelated work."
-            ),
-        }
-    final = attempt_results[-1]
+            return CodingAgentRecoveryDecision(passed=False, terminal=True)
+        return CodingAgentRecoveryDecision(
+            passed=False,
+            issue={
+                "category": "coding_attempt_incomplete",
+                "status": attempt.get("status"),
+                "error": attempt.get("error"),
+                "changed_paths": attempt.get("changed_paths", []),
+                "validation": focused_validation,
+                "instruction": (
+                    "Continue the existing implementation from the current worktree. "
+                    "Inspect what the previous session changed, preserve correct "
+                    "edits, "
+                    "and finish the requested task. Do not restart or re-plan "
+                    "unrelated work."
+                ),
+            },
+        )
+
+    latest_result: dict[str, Any] = {}
+    recovery = run_coding_agent_recovery(run_attempt, evaluate_attempt)
+    final = latest_result or cast(dict[str, Any], recovery.attempts[-1])
     return {
         **final,
         "attempts": [
             attempt
-            for item in attempt_results
+            for item in recovery.attempts
             for attempt in item.get("attempts", [])
             if isinstance(attempt, Mapping)
         ],
-        "continuations": len(attempt_results) - 1,
+        "continuations": recovery.continuations,
     }
 
 
 def _run_code_task_focused_validation(
-    state: Mapping[str, Any], *, worktree: Path
+    state: Mapping[str, Any], *, worktree: Path, timeout_seconds: float
 ) -> dict[str, Any] | None:
     """Validate a completed coding attempt before accepting its task receipt."""
     request = state.get("request")
@@ -6725,6 +6761,12 @@ def _run_code_task_focused_validation(
         or not isinstance(profiles, Sequence)
     ):
         return None
+    cached_report = state.get("coding_validation_report")
+    if (
+        isinstance(cached_report, ValidationReport)
+        and cached_report.attempt_id == attempt.attempt_id
+    ):
+        return cached_report.to_data()
     discovered = {
         profile.name: ValidationProfile(profile.name, tuple(profile.command))
         for profile in profiles
@@ -6732,7 +6774,9 @@ def _run_code_task_focused_validation(
     }
     if not discovered:
         return None
-    report = ValidationRunner(discovered).run(request, attempt, worktree_root=worktree)
+    report = ValidationRunner(discovered, timeout_seconds=timeout_seconds).run(
+        request, attempt, worktree_root=worktree
+    )
     attempt_store = state.get("attempt_store")
     if isinstance(attempt_store, CodingAgentAttemptStore):
         attempt_store.save_validation_report(report)

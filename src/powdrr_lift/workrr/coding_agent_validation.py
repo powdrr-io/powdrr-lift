@@ -14,6 +14,7 @@ from typing import Any
 
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
+    CodingAgentRunner,
     CodingAgentStatus,
     ImplementationRequest,
 )
@@ -122,6 +123,40 @@ class ValidationReport:
             "error": self.error,
             "failures": failures,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class CodingAgentExecutionResult:
+    """One shared coding, local validation, and whitespace-check execution."""
+
+    attempt: CodingAgentAttempt
+    validation: ValidationReport
+    diff_check: subprocess.CompletedProcess[str]
+
+
+def execute_coding_agent_attempt(
+    runner: CodingAgentRunner,
+    request: ImplementationRequest,
+    *,
+    worktree_root: Path,
+    attempt_id: str,
+    profiles: Mapping[str, ValidationProfile],
+    validation_timeout_seconds: float,
+) -> CodingAgentExecutionResult:
+    """Run one agent attempt and its common local validation gates."""
+    attempt = runner.run(request, worktree_root=worktree_root, attempt_id=attempt_id)
+    validation = ValidationRunner(
+        profiles, timeout_seconds=validation_timeout_seconds
+    ).run(request, attempt, worktree_root=worktree_root)
+    runner.store.save_validation_report(validation)
+    diff_check = subprocess.run(
+        ["git", "diff", "--check"],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return CodingAgentExecutionResult(attempt, validation, diff_check)
 
 
 def normalize_failure(

@@ -1428,13 +1428,9 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
                 command, cwd=tmp_path, capture_output=True, text=True
             )
             return {
-                "continue_running": True,
-                "events": [],
-                "result": {
-                    "returncode": completed.returncode,
-                    "stdout": completed.stdout,
-                    "stderr": completed.stderr,
-                },
+                "returncode": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
             }
         if tool == "gather_context":
             return {

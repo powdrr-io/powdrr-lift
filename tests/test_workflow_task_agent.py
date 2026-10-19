@@ -719,8 +719,7 @@ def test_nested_procedrr_operation_returns_action_result_binding() -> None:
         {"command": ["echo", "verified"]},
     )
 
-    assert output["result"] == result
-    assert output["events"] == strategy.events
+    assert output == result
 
 
 def test_nested_atomic_tool_step_advances_without_llm_confirmation(

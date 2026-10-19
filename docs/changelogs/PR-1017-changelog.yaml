@@ -145,13 +145,13 @@ files:
   - path: docs/procedrr/processes/execute-proposed-pr.yaml
     type: modified
     span: {start_line: 108, end_line: 108}
-    summary: Read validation return codes from the nested operation result binding.
+    summary: Read validation return codes from the direct operation result binding.
     rationale: Let the plan worker branch on the actual validation command exit code.
   - path: tests/test_procedrr_evaluator.py
     type: modified
     span: {start_line: 1431, end_line: 1437}
-    summary: Model wrapped command results in the proposed-PR workflow integration test.
-    rationale: Match the result shape exposed by the durable task worker adapter.
+    summary: Exercise direct command result bindings in the proposed-PR workflow integration test.
+    rationale: Keep the shared process test aligned with the durable task worker result shape.
   - path: tests/test_workflow_template_specification.py
     type: modified
     span: {start_line: 330, end_line: 331}
@@ -160,8 +160,8 @@ files:
   - path: src/powdrr_lift/workrr/task_agent.py
     type: modified
     span: {start_line: 1475, end_line: 1484}
-    summary: Return the latest nested tool result alongside its execution events.
-    rationale: Let Procedrr processes inspect command return codes and other outputs through result bindings.
+    summary: Return the raw result from nested tool operations.
+    rationale: Keep Procedrr operation bindings consistent with direct tool results so callers can inspect command outputs.
   - path: tests/test_workflow_task_agent.py
     type: modified
     span: {start_line: 9, end_line: 9}
@@ -175,8 +175,8 @@ files:
   - path: tests/test_workflow_task_agent.py
     type: modified
     span: {start_line: 688, end_line: 725}
-    summary: Verify nested Procedrr operations expose command results as bindings.
-    rationale: Prevent validation and repair steps from failing to read operation outputs.
+    summary: Verify nested Procedrr operations bind the raw command result.
+    rationale: Keep worker operation bindings aligned with the Procedrr process result shape.
   - path: docs/procedrr/processes/generate-fragment.yaml
     type: modified
     span: {start_line: 48, end_line: 48}

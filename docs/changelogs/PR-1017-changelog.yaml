@@ -132,6 +132,11 @@ files:
     span: {start_line: 959, end_line: 1015}
     summary: Reopen and publish a first-claim task as open when no earlier snapshot exists.
     rationale: Clear the durable lock without discarding the generated workflow definition.
+  - path: src/powdrr_lift/workrr/action_operations.py
+    type: modified
+    span: {start_line: 193, end_line: 195}
+    summary: Allow a line-one replacement to create a previously missing file.
+    rationale: Let generated workflow fragments create new files through the existing edit operation.
   - path: tests/test_workflow_git.py
     type: modified
     span: {start_line: 334, end_line: 481}
@@ -207,6 +212,21 @@ files:
     span: {start_line: 688, end_line: 724}
     summary: Verify nested Procedrr operations bind the raw command result.
     rationale: Keep worker operation bindings aligned with the Procedrr process result shape.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 33, end_line: 33}
+    summary: Import the line edit value used by the new-file regression test.
+    rationale: Construct the same edit value passed by Procedrr operations.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 47, end_line: 47}
+    summary: Import the task edit application helper for new-file coverage.
+    rationale: Exercise the task agent's normal file edit implementation.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 61, end_line: 82}
+    summary: Verify a line-one edit creates a missing file and its parent directories.
+    rationale: Prevent generated plan tasks from failing when they create new repository files.
   - path: docs/procedrr/processes/generate-fragment.yaml
     type: modified
     span: {start_line: 48, end_line: 48}

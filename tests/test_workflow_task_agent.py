@@ -30,6 +30,7 @@ from powdrr_lift.process.tasks import (
     WorkflowTask,
 )
 from powdrr_lift.workrr import task_agent
+from powdrr_lift.workrr.actions import WorkflowEdit
 from powdrr_lift.workrr.git import (
     WorkflowGitInconsistency,
     WorkflowGitState,
@@ -43,6 +44,7 @@ from powdrr_lift.workrr.llm import (
 from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
     _build_workflow_client,
+    _apply_task_edits,
     _durable_task_action_output_state,
     _handle_exhausted_timeout,
     _list_worktree_files,
@@ -54,6 +56,28 @@ from powdrr_lift.workrr.task_agent import (
     _workflow_file_command_error,
     run_workflow_task,
 )
+
+
+def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:
+    action = WorkflowAction(
+        kind="edit",
+        file_path="attestation/scripts/verify-all.sh",
+        edits=(
+            WorkflowEdit(
+                "replace_lines",
+                start_line=1,
+                end_line=1,
+                text="#!/usr/bin/env bash\necho verified",
+            ),
+        ),
+    )
+
+    _apply_task_edits(action, tmp_path)
+
+    created = tmp_path / "attestation" / "scripts" / "verify-all.sh"
+    assert created.read_text(encoding="utf-8") == (
+        "#!/usr/bin/env bash\necho verified\n"
+    )
 
 
 class _FakeClient:

@@ -275,6 +275,34 @@ def _issue_worker_string_list(value: object) -> tuple[str, ...]:
     return tuple(item.strip() for item in value)
 
 
+def _issue_worker_implementation_prompt(
+    objective: str,
+    scope: Sequence[str],
+    steps: Sequence[str],
+    criteria: Sequence[str],
+) -> str:
+    prompt_lines = [
+        "Implement this reviewed proposed PR in the current repository.",
+        "Make the actual product and test changes; do not return a plan, "
+        "review summary, or placeholder implementation.",
+        "Follow the implementation steps in order and satisfy every "
+        "acceptance criterion.",
+        "Do not edit workflow state or durable task files.",
+        "Do not run git add, git commit, git push, change branches, or invoke "
+        "GitHub commands. Leave product edits in the worktree; finish-pr-prep "
+        "and create-pull-request own staging, committing, and publication.",
+        "Objective:",
+        objective,
+        "Scope:",
+        *(f"- {value}" for value in scope),
+        "Implementation steps:",
+        *(f"- {value}" for value in steps),
+        "Acceptance criteria:",
+        *(f"- {value}" for value in criteria),
+    ]
+    return "\n".join(prompt_lines)
+
+
 def _implementation_paths_against_base(repo_root: Path) -> tuple[str, ...]:
     """Find candidate implementation files already present on this work branch.
 
@@ -1308,26 +1336,12 @@ class _TaskWorkflowExecutionStrategy:
             text=True,
             check=True,
         ).stdout.strip()
-        prompt_lines = [
-            "Implement this reviewed proposed PR in the current repository.",
-            "Make the actual product and test changes; do not return a plan, "
-            "review summary, or placeholder implementation.",
-            "Follow the implementation steps in order and satisfy every "
-            "acceptance criterion.",
-            "Do not edit workflow state or durable task files.",
-            "Objective:",
-            objective,
-            "Scope:",
-            *(f"- {value}" for value in scope),
-            "Implementation steps:",
-            *(f"- {value}" for value in steps),
-            "Acceptance criteria:",
-            *(f"- {value}" for value in criteria),
-        ]
         request = ImplementationRequest(
             request_id=request_id,
             objective=objective,
-            prompt="\n".join(prompt_lines),
+            prompt=_issue_worker_implementation_prompt(
+                objective, scope, steps, criteria
+            ),
             base_commit=base_commit,
             plan_fingerprint=fingerprint,
             allowed_paths=(".",),

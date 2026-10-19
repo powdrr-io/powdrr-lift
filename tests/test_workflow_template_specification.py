@@ -341,6 +341,26 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
 
 
+def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files() -> (
+    None
+):
+    from procedrr import ProcessCatalog
+
+    process = (
+        ProcessCatalog.load(
+            Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+        )
+        .get("create-pull-request")
+        .document
+    )
+    question = process["steps"][0]["specialize"]["question"]
+
+    assert "Do not delete or edit files outside `files_to_publish`" in question
+    assert "committed_file_names" in question
+    assert "already committed relative to `<base-branch>`" in question
+    assert "delete exactly one" not in question
+
+
 def test_instantiate_procedrr_process_workflow_creates_task(tmp_path: Path) -> None:
     process_directory = Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
     inputs = {

@@ -11,8 +11,12 @@ from procedrr_evaluator.runtime import ProcedrrExecutionService
 class SequenceLLM:
     def __init__(self, responses: list[dict[str, Any]]) -> None:
         self.responses = list(responses)
+        self.messages: list[list[dict[str, str]]] = []
 
-    def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:
+    def complete_json(
+        self, messages: list[dict[str, str]], **__: Any
+    ) -> dict[str, Any]:
+        self.messages.append(messages)
         return self.responses.pop(0)
 
 
@@ -119,7 +123,8 @@ def test_handle_ad_hoc_runs_finish_pr_prep_for_changed_files() -> None:
     assert calls == [
         ("shell", {"command": ["git", "status", "--short"]}),
         ("git", {"operation": "add", "paths": ["src/app.py"]}),
-        ("shell", {"command": ["git", "diff", "--cached", "--stat"]}),
+        ("shell", {"command": ["git", "diff", "--cached", "--name-only"]}),
+        ("shell", {"command": ["git", "diff", "--name-only", "main...HEAD"]}),
     ]
 
 
@@ -151,12 +156,63 @@ def test_finish_pr_prep_runs_every_discovered_validation_tool() -> None:
     assert calls[:3] == [
         ("shell", {"command": ["git", "status", "--short"]}),
         ("git", {"operation": "add", "paths": ["src/app.py"]}),
-        ("shell", {"command": ["git", "diff", "--cached", "--stat"]}),
+        ("shell", {"command": ["git", "diff", "--cached", "--name-only"]}),
     ]
+    assert calls[3] == (
+        "shell",
+        {"command": ["git", "diff", "--name-only", "main...HEAD"]},
+    )
     assert [call for call in calls if call[1].get("command") == "ruff check ."] == [
         ("shell", {"command": "ruff check ."})
     ]
     assert result.bindings["validation_results"][0]["result"]["returncode"] == 0
+
+
+def test_finish_pr_prep_accepts_files_already_committed_on_feature_branch() -> None:
+    repository_root = Path(__file__).resolve().parents[1]
+    catalog = ProcessCatalog.load(repository_root / "docs/procedrr/processes")
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def invoke_tool(parameters: Any) -> dict[str, Any]:
+        tool = parameters["tool"]
+        tool_parameters = dict(parameters["parameters"])
+        calls.append((tool, tool_parameters))
+        if tool == "shell" and tool_parameters["command"] == [
+            "git",
+            "diff",
+            "--name-only",
+            "main...HEAD",
+        ]:
+            return {"returncode": 0, "stdout": "src/app.py\n", "stderr": ""}
+        if tool == "shell" and tool_parameters["command"] == [
+            "git",
+            "diff",
+            "--cached",
+            "--name-only",
+        ]:
+            return {"returncode": 0, "stdout": "", "stderr": ""}
+        return {"returncode": 0, "stdout": "passed", "stderr": ""}
+
+    llm = SequenceLLM(_scope_and_label_responses())
+    result = ProcedrrExecutionService(
+        catalog,
+        llm,
+        lambda tool, parameters: (
+            invoke_tool(parameters) if tool == "invoke_tool" else _tool_catalog()
+        ),
+    ).execute(
+        "finish-pr-prep",
+        {"files_to_publish": ["src/app.py"], "language_labels": ["python"]},
+    )
+
+    assert result.terminal_status.value == "succeeded"
+    assert calls[1] == (
+        "git",
+        {"operation": "add", "paths": ["src/app.py"]},
+    )
+    scope_prompt = llm.messages[0][1]["content"]
+    assert "committed_file_names" in scope_prompt
+    assert "src/app.py" in scope_prompt
 
 
 def test_finish_pr_prep_repairs_then_reruns_all_validations() -> None:

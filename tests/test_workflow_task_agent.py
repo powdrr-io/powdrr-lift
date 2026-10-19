@@ -48,6 +48,7 @@ from powdrr_lift.workrr.task_agent import (
     _durable_task_action_output_state,
     _handle_exhausted_timeout,
     _implementation_paths_against_base,
+    _issue_worker_implementation_prompt,
     _list_worktree_files,
     _publish_workflow_progress,
     _read_task_document,
@@ -100,6 +101,21 @@ def test_implementation_paths_include_committed_work_and_exclude_runtime_state(
         "src/implementation.py",
         "src/untracked.py",
     )
+
+
+def test_issue_worker_implementation_prompt_leaves_git_publication_to_workflow() -> (
+    None
+):
+    prompt = _issue_worker_implementation_prompt(
+        "Implement a feature",
+        ("src/feature.py",),
+        ("Add the implementation.",),
+        ("The feature works.",),
+    )
+
+    assert "Do not run git add, git commit, git push, change branches" in prompt
+    assert "Leave product edits in the worktree" in prompt
+    assert "finish-pr-prep and create-pull-request own staging" in prompt
 
 
 def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:

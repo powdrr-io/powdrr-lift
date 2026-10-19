@@ -24,6 +24,9 @@ items:
     title: Foundational change
     objective: Add the reusable foundation.
     scope: [src/foundation, tests/test_foundation.py]
+    implementation_steps:
+      - Implement the parser for the reviewed configuration contract.
+      - Add focused tests for valid input and malformed fields.
     acceptance_criteria: [Foundation behavior is covered by focused tests.]
     dependencies: []
     workflow_file: docs/workflows/feature-key/foundational-change.yaml
@@ -36,7 +39,12 @@ plan and form an acyclic graph. Publish only after the plan review PR merges;
 the publisher pins each issue to that merge commit.
 
 `powdrr-lift plan` analyzes a Markdown proposal and writes a candidate document
-using this schema. The top-level `source_document` field records the
+using this schema. Each item also carries a bounded `implementation_steps`
+list (up to eight concrete code or test changes) so the worker receives the
+reviewed execution outline instead of reconstructing the intended slice from
+the objective alone. The generator targets at most five scope entries per item
+and splits broad work into dependent, independently verifiable PRs. The
+top-level `source_document` field records the
 repository-relative path to the Markdown proposal, keeping the generated plan
 discoverably linked to its source. For every item, it writes one small workflow definition at
 `docs/workflows/<plan-id>/<workflow-id>.yaml`. The definition names the packaged
@@ -77,14 +85,20 @@ inputs:
     title: Add end-to-end attestation
     objective: Add an end-to-end validation attestation.
     scope: [attestation scripts]
+    implementation_steps:
+      - Implement the verifier behavior for the reviewed envelope.
+      - Add focused valid and invalid envelope tests.
     acceptance_criteria: [The attestation verifies all required checks.]
     dependencies: [local-validation-attestation-v1-pr-01]
     verification_command: bash attestation/scripts/verify-all.sh
 ```
 
 The process input includes the repository validation command and reviewed plan
-item. The task receives that context from the pinned plan; it does not rediscover
-or reinterpret the proposal.
+item. Its implementation planner maps each implementation step to concrete
+repository-relative files and expected results. The implementation fragment
+must carry out those mapped actions, and its completeness check accounts for
+every reviewed step. The task receives that context from the pinned plan; it
+does not rediscover or reinterpret the proposal.
 
 ```sh
 powdrr-lift plan \

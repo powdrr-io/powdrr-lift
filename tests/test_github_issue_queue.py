@@ -206,6 +206,26 @@ items:
     assert _parse_plan(text).source_document == "docs/plans/proposal.md"
 
 
+def test_plan_validation_enforces_bounds_on_new_implementation_steps() -> None:
+    text = """
+schema: https://powdrr.io/schemas/github-issue-execution-plan-v1
+plan_id: feature-v1
+items:
+  - id: first
+    title: First
+    objective: Do the first thing.
+    scope: [one, two, three, four, five, six]
+    implementation_steps: [Implement the behavior.]
+    acceptance_criteria: [The first thing works.]
+    dependencies: []
+    workflow_file: docs/workflows/feature/first.yaml
+    workflow_id: feature-first
+"""
+
+    with pytest.raises(GitHubIssueQueueError, match="bounded scope"):
+        _parse_plan(text)
+
+
 def test_plan_validation_rejects_source_document_traversal() -> None:
     text = """
 schema: https://powdrr.io/schemas/github-issue-execution-plan-v1

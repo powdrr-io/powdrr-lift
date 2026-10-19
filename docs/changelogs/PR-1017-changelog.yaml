@@ -79,7 +79,7 @@ files:
     rationale: Make the operation available to generated workflow tasks.
   - path: src/powdrr_lift/workrr/task_agent.py
     type: modified
-    span: {start_line: 2730, end_line: 2731}
+    span: {start_line: 2726, end_line: 2727}
     summary: Map checkpoint commit lookups to the structured HEAD operation.
     rationale: Keep task-agent Git access within the intrinsic repository boundary.
   - path: tests/test_intrinsic_git_gh.py

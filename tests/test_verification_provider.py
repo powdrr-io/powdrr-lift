@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -9,6 +10,7 @@ from powdrr_lift.workrr.verification_provider import (
     ProviderExecutionResult,
     ProviderInventory,
     PytestVerificationProvider,
+    StestrVerificationProvider,
     VerificationProviderRegistry,
     VerificationProviderRequest,
     default_verification_provider_registry,
@@ -93,6 +95,51 @@ def test_pytest_provider_executes_exact_selector(
 
     assert result.status == "passed"
     assert result.returncode == 0
+
+
+def test_stestr_provider_collects_and_executes_exact_selector(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    profile = DiscoveredValidationProfile(
+        "stestr", ("stestr", "run", "--concurrency", "1"), "test"
+    )
+    calls: list[tuple[str, ...]] = []
+
+    def fake_run(
+        command: Sequence[str], **_kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(tuple(command))
+        output = (
+            "tests.test_one.TestOne.test_first\n" if command[1] == "list" else "ok\n"
+        )
+        return subprocess.CompletedProcess(command, 0, output, "")
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.verification_provider.subprocess.run", fake_run
+    )
+    provider = StestrVerificationProvider()
+
+    inventory = provider.inventory(tmp_path, profile)
+    result = provider.execute(
+        VerificationProviderRequest(
+            "stestr",
+            "tests.test_one.TestOne.test_first",
+            "stestr",
+            tmp_path,
+            command=profile.command,
+        )
+    )
+
+    assert inventory.selectors == ("tests.test_one.TestOne.test_first",)
+    assert calls[0] == ("stestr", "list")
+    assert calls[1] == (
+        "stestr",
+        "run",
+        "--concurrency",
+        "1",
+        "tests.test_one.TestOne.test_first",
+    )
+    assert result.status == "passed"
 
 
 def test_match_selector_requires_exact_provider_profile_and_node_id() -> None:

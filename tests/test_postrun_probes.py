@@ -6,7 +6,6 @@ from typing import Any
 
 import pytest
 
-from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.postrun_probes import (
     PostRunProbe,
     generate_postrun_probes,
@@ -33,7 +32,9 @@ def test_generate_postrun_probes_excludes_unresolved_scenarios() -> None:
                     "probe_id": "probe-1",
                     "scenario_id": "scenario-1",
                     "oracle_basis": "The instruction explicitly requires this result.",
-                    "test_source": "def test_probe_result():\n    assert 2 + 2 == 4\n",
+                    "test_source": (
+                        "def test_probe_result():\n    assert sum((2, 2)) == 4\n"
+                    ),
                 }
             ]
         }
@@ -62,15 +63,19 @@ def test_generate_postrun_probes_excludes_unresolved_scenarios() -> None:
         ("def test_not_a_probe():\n    assert True\n", "test_probe_"),
         ("def test_probe_broken():\n    assert True\n  assert False\n", "valid Python"),
         (
-            "import subprocess\ndef test_probe_side_effect():\n    assert True\n",
+            "import subprocess\n"
+            "def test_probe_side_effect():\n    assert sum((1,)) == 1\n",
             "disallowed system module",
         ),
         (
             "from pathlib import Path\n"
-            "def test_probe_side_effect():\n    assert True\n",
+            "def test_probe_side_effect():\n    assert sum((1,)) == 1\n",
             "disallowed system module",
         ),
-        ("def test_probe_bad():\n    open('file', 'w')\n", "disallowed function"),
+        (
+            "def test_probe_bad():\n    assert open('file', 'w')\n",
+            "disallowed function",
+        ),
     ],
 )
 def test_generate_postrun_probes_rejects_unsafe_or_malformed_source(
@@ -100,33 +105,26 @@ def test_generate_postrun_probes_rejects_unsafe_or_malformed_source(
 def test_run_postrun_probes_executes_each_probe_and_returns_repair_findings(
     tmp_path: Path,
 ) -> None:
-    profiles = (
-        DiscoveredValidationProfile(
-            name="pytest",
-            command=(sys.executable, "-m", "pytest", "-q"),
-            source="unit test",
-            provider_name="pytest",
-        ),
-    )
     probes = (
         PostRunProbe(
             "good",
             "scenario-good",
             "explicit",
-            "def test_probe_good():\n    assert 2 + 2 == 4\n",
+            "def test_probe_good():\n    assert sum((2, 2)) == 4\n",
         ),
         PostRunProbe(
             "bad",
             "scenario-bad",
             "explicit",
-            "def test_probe_bad():\n    assert 2 + 2 == 5\n",
+            "def test_probe_bad():\n    assert sum((2, 2)) == 5\n",
         ),
     )
 
-    results = run_postrun_probes(probes, root=tmp_path, profiles=profiles)
+    results = run_postrun_probes(probes, root=tmp_path, profiles=())
 
     assert [item.status for item in results] == ["passed", "failed"]
+    assert all(item.command[0] == sys.executable for item in results)
     failures = probe_failures([item.to_data() for item in results])
     assert len(failures) == 1
     assert failures[0]["scenario_id"] == "scenario-bad"
-    assert "assert 2 + 2 == 5" in failures[0]["reason"]
+    assert "assert sum((2, 2)) == 5" in failures[0]["reason"]

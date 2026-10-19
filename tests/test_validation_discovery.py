@@ -63,6 +63,33 @@ def test_explicit_validation_command_is_used_when_no_tooling_is_detected(
     assert profiles[0].command == ("python", "-m", "pytest")
 
 
+def test_discovers_stestr_profile_from_repository_configuration(tmp_path: Path) -> None:
+    (tmp_path / ".stestr.conf").write_text(
+        "[DEFAULT]\ntest_path=bandit\n", encoding="utf-8"
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+
+    stestr = next(profile for profile in profiles if profile.name == "stestr")
+    assert stestr.command == ("stestr", "run", "--concurrency", "1")
+    assert stestr.provider == "stestr"
+    assert stestr.evidence == (".stestr.conf",)
+
+
+def test_discovers_stestr_from_ci_command(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows"
+    workflow.mkdir(parents=True)
+    (workflow / "ci.yml").write_text(
+        "jobs:\n  test:\n    steps:\n      - run: stestr run --concurrency 1\n",
+        encoding="utf-8",
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+
+    stestr = next(profile for profile in profiles if profile.provider == "stestr")
+    assert stestr.command == ("stestr", "run", "--concurrency", "1")
+
+
 def test_ignores_unresolved_ci_templates_for_local_validation_command(
     tmp_path: Path,
 ) -> None:

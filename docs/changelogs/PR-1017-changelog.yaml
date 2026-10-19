@@ -142,6 +142,11 @@ files:
     span: {start_line: 20, end_line: 26}
     summary: Instruct the outer plan workflow to pass task_context through nested process bindings.
     rationale: Ensure execute-proposed-pr receives its required task_context input.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 108, end_line: 108}
+    summary: Read validation return codes from the nested operation result binding.
+    rationale: Let the plan worker branch on the actual validation command exit code.
   - path: tests/test_workflow_template_specification.py
     type: modified
     span: {start_line: 330, end_line: 331}

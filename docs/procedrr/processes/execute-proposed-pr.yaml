@@ -105,7 +105,7 @@ steps:
       collect: {binding: repair_actions, mode: list, value: repair_action}
       body:
         - branch:
-            subject: validation_record.result.returncode
+            subject: validation_record.result.result.returncode
             cases:
               0: []
             default:

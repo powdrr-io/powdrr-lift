@@ -1,0 +1,33 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1022
+title: Plan prompt grading and benchmark feedback
+intent:
+  problem: Prompt evaluation can report criterion coverage, but it lacks a standardized final score and a linked view of how prompt findings compare with benchmark validation outcomes.
+  goal: Specify an auditable prompt score and a post-benchmark comparison that distinguishes prompt, rubric, worker, and infrastructure shortcomings.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/prompt-grader-and-benchmark-feedback-plan.md
+    type: added
+    span: {start_line: 1, end_line: 391}
+    summary: Specify the prompt grader score, evidence report, benchmark comparison, staged implementation, and validation strategy.
+    rationale: Give implementation work a reviewable contract for measuring generated prompts and learning from benchmark outcomes.
+entities:
+  - id: prompt-grader-and-benchmark-feedback-plan
+    type: Design doc
+    action: added
+entity_relationships: []
+invariants:
+  - id: prompt-score-and-benchmark-outcome-remain-separate
+    description: Prompt evaluation score and benchmark validation outcome are distinct measurements and are never blended into one score.
+    action: added
+  - id: critical-prompt-criteria-gate-the-score
+    description: A missing, contradicted, or unresolved critical prompt criterion fails the prompt gate regardless of aggregate score.
+    action: added
+  - id: benchmark-failures-are-mapped-to-declared-criteria
+    description: Benchmark validation outcomes are compared to prompt criteria only through stable declared mappings, with infrastructure failures and unrun checks reported separately.
+    action: added
+guidance:
+  - id: use-benchmark-shortcomings-as-reviewed-eval-cases
+    description: Preserve human-reviewed benchmark shortcomings with evidence as versioned regression cases before using them to change prompt generation or rubrics.
+    action: added

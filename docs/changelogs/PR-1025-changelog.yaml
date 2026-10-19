@@ -1,0 +1,84 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1025
+title: Add scored prompt evaluation reports
+intent:
+  problem: Prompt evaluations expose weighted coverage and criterion findings but do not provide a versioned 0–100 score, dimension breakdown, or distinct evaluation-error gate.
+  goal: Produce reproducible prompt scores with auditable findings and distinguish prompt shortcomings from judge/evidence failures.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 36, end_line: 47}
+    summary: Define the versioned prompt-score contract, dimensions, weights, and verdict set.
+    rationale: Make score calculation rules explicit and stable for reports and historical comparisons.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 427, end_line: 580}
+    summary: Emit v2 prompt reports with dimension-tagged findings, scoring parameters, gate, verdict counts, and evaluation errors.
+    rationale: Tie the final score and detailed findings to the exact captured prompts and rubric.
+  - path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 583, end_line: 735}
+    summary: Calculate weighted prompt and dimension scores and classify judge/evidence protocol failures.
+    rationale: Keep deterministic score results reproducible and prevent judge failures from appearing as prompt passes.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 5693, end_line: 5701}
+    summary: Print prompt score, gate, critical failure count, and evaluation error count.
+    rationale: Surface the final evaluation result directly when the command completes.
+  - path: tests/test_deepswe_design_evaluation.py
+    type: modified
+    span: {start_line: 13, end_line: 621}
+    summary: Test weighted score math, dimension summaries, critical gating, evaluation errors, evidence quotes, rubric compatibility, and report fingerprint reproducibility.
+    rationale: Verify the score contract against supported, missing, ambiguous, contradictory, and failed-judge cases.
+  - path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+    type: modified
+    span: {start_line: 1, end_line: 200}
+    summary: Assign a score dimension to each state-data prompt criterion.
+    rationale: Make the report's criterion-level breakdown useful for the existing state-data evaluation.
+  - path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+    type: modified
+    span: {start_line: 1, end_line: 101}
+    summary: Assign a score dimension to each duration-encoding prompt criterion.
+    rationale: Make the report's criterion-level breakdown useful for the existing duration evaluation.
+  - path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+    type: modified
+    span: {start_line: 1, end_line: 87}
+    summary: Assign a score dimension to each JSONPath prompt criterion.
+    rationale: Make the report's criterion-level breakdown useful for the existing JSONPath evaluation.
+  - path: docs/evaluations/deepswe-design-evaluation.md
+    type: modified
+    span: {start_line: 100, end_line: 115}
+    summary: Document the prompt-score formula, dimension scores, and gate/error meanings.
+    rationale: Let report readers interpret numeric scores without confusing evaluation failures with prompt defects.
+  - path: docs/evaluations/semantic-prompt-baseline-2026-10-04/README.md
+    type: modified
+    span: {start_line: 25, end_line: 30}
+    summary: Record the arithmetic v2 score interpretation for historical all-supported captures.
+    rationale: Keep historical v1 report artifacts unchanged while making their score comparable.
+entities:
+  - id: worker-prompt-evaluation-report
+    type: Configuration file
+    action: modified
+  - id: prompt-score-summary-function
+    type: Function
+    action: added
+  - id: prompt-score-contract-tests
+    type: Regression test
+    action: added
+entity_relationships: []
+invariants:
+  - id: prompt-score-is-reproducible-from-findings
+    description: The versioned score is calculated only from criterion verdicts and declared importance weights, and its parameters are recorded in the report.
+    action: added
+  - id: critical-prompt-findings-fail-the-gate
+    description: Any critical criterion not supported fails the prompt gate regardless of aggregate score.
+    action: added
+  - id: evaluator-failures-are-distinct-from-prompt-findings
+    description: Judge and evidence-protocol failures are recorded as evaluation errors and produce an error gate rather than a prompt pass.
+    action: added
+guidance:
+  - id: preserve-score-schema-and-dimension-labels
+    description: Update scoring weights or dimension definitions only through a versioned scoring contract, and keep dimension assignments on rubric criteria.
+    action: added

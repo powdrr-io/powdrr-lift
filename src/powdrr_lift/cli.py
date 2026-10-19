@@ -5690,9 +5690,10 @@ def _run_deepswe_prompt_evaluation(args: argparse.Namespace) -> int:
         summary = report["summary"]
         print(
             f"DeepSWE worker-prompt evaluation {report['task_id']}: "
+            f"score {summary['prompt_score']}/100; gate {summary['gate']}; "
             f"{summary['supported_count']}/{summary['criterion_count']} supported; "
-            f"weighted coverage {summary['weighted_coverage']:.1%}; "
-            f"critical failures {len(summary['critical_failures'])}."
+            f"critical failures {len(summary['critical_failures'])}; "
+            f"evaluation errors {len(summary['evaluation_errors'])}."
         )
         print(f"Report: {report_path}")
     return 0 if report["summary"]["passed"] else 1

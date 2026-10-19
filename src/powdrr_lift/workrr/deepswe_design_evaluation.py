@@ -33,6 +33,18 @@ _JUDGE_SCHEMA: dict[str, Any] = {
     },
 }
 
+_PROMPT_SCORE_CONTRACT = "prompt-score-v1"
+_PROMPT_DIMENSIONS = (
+    "coverage",
+    "faithfulness",
+    "grounding",
+    "actionability",
+    "consistency_scope",
+    "clarity",
+)
+_PROMPT_IMPORTANCE_WEIGHTS = {"critical": 3, "important": 1}
+_PROMPT_VERDICTS = ("supported", "missing", "contradicted", "ambiguous")
+
 
 class DesignJudge(Protocol):
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
@@ -412,6 +424,7 @@ def evaluate_deepswe_worker_prompt(
         raise DeepSWEEvaluationError("rubric has no evaluation criteria")
     findings: list[dict[str, Any]] = []
     seen_criteria: set[str] = set()
+    judge_calls = 0
     for criterion in criteria:
         if not isinstance(criterion, Mapping):
             raise DeepSWEEvaluationError("rubric criterion is malformed")
@@ -419,15 +432,17 @@ def evaluate_deepswe_worker_prompt(
         excerpt = criterion.get("instruction_excerpt")
         expected_behavior = criterion.get("expected_behavior")
         importance = criterion.get("importance")
+        dimension = criterion.get("dimension", "coverage")
         if (
             not isinstance(criterion_id, str)
             or criterion_id in seen_criteria
             or not isinstance(excerpt, str)
             or not isinstance(expected_behavior, str)
             or importance not in {"critical", "important"}
+            or dimension not in _PROMPT_DIMENSIONS
         ):
             raise DeepSWEEvaluationError(
-                "rubric criterion has invalid identity or fields"
+                "rubric criterion has invalid identity, importance, or dimension"
             )
         seen_criteria.add(criterion_id)
         if excerpt not in instruction:
@@ -473,6 +488,7 @@ def evaluate_deepswe_worker_prompt(
                 ),
             }
         else:
+            judge_calls += 1
             decision = _judge_worker_prompt_criterion(
                 judge,
                 criterion_id=criterion_id,
@@ -493,23 +509,27 @@ def evaluate_deepswe_worker_prompt(
                 "reason": (
                     "Judge evidence quote was not present in a captured worker prompt."
                 ),
+                "evaluation_error": "judge_evidence_quote_not_in_prompt",
             }
         elif (
             prompt_expectation == "present"
-            and decision["decision"] == "supported"
+            and decision["decision"] in {"supported", "contradicted"}
             and not quote
         ):
             decision = {
                 "decision": "ambiguous",
                 "evidence_quote": "",
                 "reason": (
-                    "Judge marked the criterion supported without a prompt quote."
+                    "Judge returned a positive or contradictory verdict "
+                    "without a prompt quote."
                 ),
+                "evaluation_error": "judge_evidence_quote_missing",
             }
         findings.append(
             {
                 "criterion_id": criterion_id,
                 "importance": importance,
+                "dimension": dimension,
                 "instruction_excerpt": excerpt,
                 "solution_symbols": symbols,
                 "reference_solution_evidence": _solution_evidence(
@@ -523,15 +543,16 @@ def evaluate_deepswe_worker_prompt(
             }
         )
 
-    weights = {"critical": 3, "important": 1}
-    total_weight = sum(weights[item["importance"]] for item in findings)
-    supported_weight = sum(
-        weights[item["importance"]]
-        for item in findings
-        if item["decision"] == "supported"
-    )
+    score_summary = _summarize_prompt_findings(findings)
     report: dict[str, Any] = {
-        "schema_version": "deepswe-worker-prompt-evaluation-v1",
+        "schema_version": "deepswe-worker-prompt-evaluation-v2",
+        "scoring_contract": _PROMPT_SCORE_CONTRACT,
+        "scoring_parameters": {
+            "importance_weights": dict(_PROMPT_IMPORTANCE_WEIGHTS),
+            "supported_verdict": "supported",
+            "score_scale": 100,
+            "rounding": "nearest_integer",
+        },
         "task_id": task_id,
         "judge_id": judge_id,
         "worker_prompts": [
@@ -552,28 +573,77 @@ def evaluate_deepswe_worker_prompt(
             "instruction_ledger": _sha256(ledger_path),
             "prompt_index": _sha256(prompt_index_path),
         },
-        "summary": {
-            "criterion_count": len(findings),
-            "judge_calls": len(findings),
-            "supported_count": sum(
-                item["decision"] == "supported" for item in findings
-            ),
-            "critical_failures": [
-                item["criterion_id"]
-                for item in findings
-                if item["importance"] == "critical" and item["decision"] != "supported"
-            ],
-            "weighted_coverage": round(supported_weight / total_weight, 4),
-            "passed": all(
-                item["decision"] == "supported"
-                for item in findings
-                if item["importance"] == "critical"
-            ),
-        },
+        "summary": {"judge_calls": judge_calls, **score_summary},
         "findings": findings,
     }
     report["fingerprint"] = _content_fingerprint(report)
     return report
+
+
+def _summarize_prompt_findings(
+    findings: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Calculate the versioned prompt score and its criterion-level gate."""
+    total_weight = sum(
+        _PROMPT_IMPORTANCE_WEIGHTS[item["importance"]] for item in findings
+    )
+    supported_weight = sum(
+        _PROMPT_IMPORTANCE_WEIGHTS[item["importance"]]
+        for item in findings
+        if item["decision"] == "supported"
+    )
+    dimension_scores: dict[str, Any] = {}
+    for dimension in _PROMPT_DIMENSIONS:
+        dimension_findings = [
+            item for item in findings if item["dimension"] == dimension
+        ]
+        if not dimension_findings:
+            continue
+        dimension_total = sum(
+            _PROMPT_IMPORTANCE_WEIGHTS[item["importance"]]
+            for item in dimension_findings
+        )
+        dimension_supported = sum(
+            _PROMPT_IMPORTANCE_WEIGHTS[item["importance"]]
+            for item in dimension_findings
+            if item["decision"] == "supported"
+        )
+        dimension_scores[dimension] = {
+            "criterion_count": len(dimension_findings),
+            "supported_count": sum(
+                item["decision"] == "supported" for item in dimension_findings
+            ),
+            "weighted_coverage": round(dimension_supported / dimension_total, 4),
+            "score": round(100 * dimension_supported / dimension_total),
+        }
+
+    verdict_counts = {
+        verdict: sum(item["decision"] == verdict for item in findings)
+        for verdict in _PROMPT_VERDICTS
+    }
+    critical_failures = [
+        item["criterion_id"]
+        for item in findings
+        if item["importance"] == "critical" and item["decision"] != "supported"
+    ]
+    evaluation_errors = [
+        {"criterion_id": item["criterion_id"], "code": item["evaluation_error"]}
+        for item in findings
+        if item.get("evaluation_error")
+    ]
+    gate = "error" if evaluation_errors else "fail" if critical_failures else "pass"
+    return {
+        "criterion_count": len(findings),
+        "supported_count": verdict_counts["supported"],
+        "verdict_counts": verdict_counts,
+        "critical_failures": critical_failures,
+        "weighted_coverage": round(supported_weight / total_weight, 4),
+        "prompt_score": round(100 * supported_weight / total_weight),
+        "dimension_scores": dimension_scores,
+        "evaluation_errors": evaluation_errors,
+        "gate": gate,
+        "passed": gate == "pass",
+    }
 
 
 def _judge_worker_prompt_criterion(
@@ -638,12 +708,14 @@ def _judge_worker_prompt_criterion(
             "decision": "ambiguous",
             "evidence_quote": "",
             "reason": f"Judge call failed: {type(error).__name__}: {error}",
+            "evaluation_error": "judge_call_failed",
         }
     if not isinstance(result, Mapping):
         return {
             "decision": "ambiguous",
             "evidence_quote": "",
             "reason": "Judge returned a non-object response.",
+            "evaluation_error": "judge_response_not_object",
         }
     decision = result.get("decision")
     quote = result.get("evidence_quote")
@@ -658,6 +730,7 @@ def _judge_worker_prompt_criterion(
             "decision": "ambiguous",
             "evidence_quote": "",
             "reason": "Judge response did not match the required evaluation schema.",
+            "evaluation_error": "judge_response_schema_invalid",
         }
     return {"decision": decision, "evidence_quote": quote, "reason": reason}
 

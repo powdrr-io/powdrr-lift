@@ -54,6 +54,24 @@ class DeepSWEEvaluationError(ValueError):
     """A task reference, run artifact, or judge response is invalid."""
 
 
+def _case_input_path(
+    case_path: Path,
+    case: Mapping[str, Any],
+    field: str,
+    *,
+    required: bool = False,
+) -> Path | None:
+    value = case.get(field)
+    if value is None and not required:
+        return None
+    if not isinstance(value, str) or not value:
+        raise DeepSWEEvaluationError(f"prompt eval case field {field!r} must be a path")
+    path = Path(value)
+    if not path.is_absolute():
+        path = case_path.parent / path
+    return path.resolve()
+
+
 def evaluate_deepswe_design(
     *,
     task_dir: Path,
@@ -307,62 +325,93 @@ def evaluate_deepswe_design(
 
 def evaluate_deepswe_worker_prompt(
     *,
-    task_dir: Path,
+    task_dir: Path | None = None,
+    case_path: Path | None = None,
     run_dir: Path,
     judge: DesignJudge,
     rubric_path: Path = DEFAULT_STATE_DATA_RUBRIC,
     judge_id: str | None = None,
 ) -> dict[str, Any]:
-    """Grade provider-ready worker prompts against one DeepSWE task's references."""
-    task_dir = task_dir.resolve()
+    """Grade captured worker prompts for a DeepSWE task or generic eval case."""
     run_dir = run_dir.resolve()
     rubric_path = rubric_path.resolve()
-    instruction_path = task_dir / "instruction.md"
-    metadata_path = task_dir / "task.toml"
-    solution_path = task_dir / "solution" / "solution.patch"
-    verifier_path = task_dir / "tests" / "test.patch"
+    if (task_dir is None) == (case_path is None):
+        raise DeepSWEEvaluationError("provide exactly one of task_dir or case_path")
+    generic_case = case_path is not None
+    if generic_case:
+        assert case_path is not None
+        case_path = case_path.resolve()
+        case = _read_json(case_path)
+        if case.get("schema_version") != "prompt-eval-case-v1":
+            raise DeepSWEEvaluationError("unsupported prompt evaluation case")
+        task_id = case.get("case_id")
+        instruction_path = _case_input_path(
+            case_path, case, "instruction_path", required=True
+        )
+        solution_path = _case_input_path(case_path, case, "solution_patch_path")
+        verifier_path = _case_input_path(case_path, case, "verifier_patch_path")
+        if not isinstance(task_id, str) or not task_id:
+            raise DeepSWEEvaluationError("prompt eval case must have a case_id")
+    else:
+        assert task_dir is not None
+        task_dir = task_dir.resolve()
+        instruction_path = task_dir / "instruction.md"
+        metadata_path = task_dir / "task.toml"
+        solution_path = task_dir / "solution" / "solution.patch"
+        verifier_path = task_dir / "tests" / "test.patch"
+    assert instruction_path is not None
     run_metadata_path = run_dir / "run-metadata.json"
     ledger_path = run_dir / "instruction-ledger.json"
     prompt_index_path = run_dir / "artifacts" / "prompts" / "index.json"
-    for path in (
+    required_paths: list[Path] = [
         instruction_path,
-        metadata_path,
-        solution_path,
-        verifier_path,
         run_metadata_path,
         ledger_path,
         prompt_index_path,
         rubric_path,
-    ):
+    ]
+    if not generic_case:
+        required_paths.extend(
+            path for path in (metadata_path, solution_path, verifier_path) if path
+        )
+    else:
+        required_paths.extend(
+            path for path in (solution_path, verifier_path) if path is not None
+        )
+    for path in required_paths:
         if not path.is_file():
             raise DeepSWEEvaluationError(
                 f"required prompt-evaluation input is missing: {path}"
             )
 
     instruction = instruction_path.read_text(encoding="utf-8")
-    solution_patch = solution_path.read_text(encoding="utf-8")
-    verifier_patch = verifier_path.read_text(encoding="utf-8")
+    solution_patch = _read_optional_text(solution_path)
+    verifier_patch = _read_optional_text(verifier_path)
     run_metadata = _read_json(run_metadata_path)
     ledger = _read_json(ledger_path)
     rubric = yaml.safe_load(rubric_path.read_text(encoding="utf-8"))
-    try:
-        with metadata_path.open("rb") as stream:
-            task_metadata = tomllib.load(stream)
-    except (OSError, tomllib.TOMLDecodeError) as error:
+    if generic_case:
+        rubric_schema = "prompt-eval-rubric-v1"
+        rubric_identity = rubric.get("case_id") if isinstance(rubric, Mapping) else None
+        rubric_error = "unsupported prompt evaluation rubric"
+    else:
+        try:
+            with metadata_path.open("rb") as stream:
+                task_metadata = tomllib.load(stream)
+        except (OSError, tomllib.TOMLDecodeError) as error:
+            raise DeepSWEEvaluationError(
+                f"could not read DeepSWE task metadata: {error}"
+            ) from error
+        metadata = task_metadata.get("metadata", {})
+        task_id = metadata.get("task_id") if isinstance(metadata, Mapping) else None
+        rubric_schema = "deepswe-design-gold-v1"
+        rubric_identity = rubric.get("task_id") if isinstance(rubric, Mapping) else None
+        rubric_error = "unsupported DeepSWE prompt rubric"
+    if not isinstance(rubric, Mapping) or rubric.get("schema_version") != rubric_schema:
+        raise DeepSWEEvaluationError(rubric_error)
+    if task_id != rubric_identity or run_metadata.get("task_id") != task_id:
         raise DeepSWEEvaluationError(
-            f"could not read DeepSWE task metadata: {error}"
-        ) from error
-
-    metadata = task_metadata.get("metadata", {})
-    task_id = metadata.get("task_id") if isinstance(metadata, Mapping) else None
-    if (
-        not isinstance(rubric, Mapping)
-        or rubric.get("schema_version") != "deepswe-design-gold-v1"
-    ):
-        raise DeepSWEEvaluationError("unsupported DeepSWE prompt rubric")
-    if task_id != rubric.get("task_id") or run_metadata.get("task_id") != task_id:
-        raise DeepSWEEvaluationError(
-            "task, prompt run metadata, and rubric must identify the same task"
+            "case/task, prompt run metadata, and rubric must identify the same input"
         )
     if ledger.get("schema_version") != "instruction-ledger-v1":
         raise DeepSWEEvaluationError("unsupported instruction ledger")
@@ -449,8 +498,19 @@ def evaluate_deepswe_worker_prompt(
             raise DeepSWEEvaluationError(
                 f"rubric source excerpt is stale for criterion {criterion_id}"
             )
-        symbols = _string_list(criterion, "solution_symbols")
-        test_names = _string_list(criterion, "verifier_tests")
+        list_reader = _optional_string_list if generic_case else _string_list
+        symbols = list_reader(criterion, "solution_symbols")
+        test_names = list_reader(criterion, "verifier_tests")
+        if generic_case and symbols and solution_path is None:
+            raise DeepSWEEvaluationError(
+                f"criterion {criterion_id} uses reference anchors but the case "
+                "has no solution patch"
+            )
+        if generic_case and test_names and verifier_path is None:
+            raise DeepSWEEvaluationError(
+                f"criterion {criterion_id} uses verifier anchors but the case "
+                "has no verifier patch"
+            )
         required_prompt_claims = _optional_string_list(
             criterion, "required_prompt_claims"
         )
@@ -525,27 +585,29 @@ def evaluate_deepswe_worker_prompt(
                 ),
                 "evaluation_error": "judge_evidence_quote_missing",
             }
-        findings.append(
-            {
-                "criterion_id": criterion_id,
-                "importance": importance,
-                "dimension": dimension,
-                "instruction_excerpt": excerpt,
-                "solution_symbols": symbols,
-                "reference_solution_evidence": _solution_evidence(
-                    solution_patch, symbols
-                ),
-                "verifier_tests": test_names,
-                "required_prompt_claims": required_prompt_claims,
-                "forbidden_prompt_claims": forbidden_prompt_claims,
-                "prompt_request_ids": [item["request_id"] for item in prompts],
-                **decision,
-            }
-        )
+        finding = {
+            "criterion_id": criterion_id,
+            "importance": importance,
+            "dimension": dimension,
+            "instruction_excerpt": excerpt,
+            "solution_symbols": symbols,
+            "reference_solution_evidence": _solution_evidence(solution_patch, symbols),
+            "verifier_tests": test_names,
+            "required_prompt_claims": required_prompt_claims,
+            "forbidden_prompt_claims": forbidden_prompt_claims,
+            "prompt_request_ids": [item["request_id"] for item in prompts],
+            **decision,
+        }
+        if generic_case:
+            finding["validation_test_ids"] = _optional_string_list(
+                criterion, "validation_test_ids"
+            )
+        findings.append(finding)
 
     score_summary = _summarize_prompt_findings(findings)
     report: dict[str, Any] = {
-        "schema_version": "deepswe-worker-prompt-evaluation-v2",
+        "schema_version": "prompt-evaluation-report-v1",
+        "evaluation_case_type": "generic" if generic_case else "deepswe",
         "scoring_contract": _PROMPT_SCORE_CONTRACT,
         "scoring_parameters": {
             "importance_weights": dict(_PROMPT_IMPORTANCE_WEIGHTS),
@@ -565,19 +627,46 @@ def evaluate_deepswe_worker_prompt(
         ],
         "reference_fingerprints": {
             "instruction": _sha256(instruction_path),
-            "solution_patch": _sha256(solution_path),
-            "verifier_patch": _sha256(verifier_path),
+            **(
+                {"solution_patch": _sha256(solution_path)}
+                if solution_path is not None and solution_path.is_file()
+                else {}
+            ),
+            **(
+                {"verifier_patch": _sha256(verifier_path)}
+                if verifier_path is not None and verifier_path.is_file()
+                else {}
+            ),
             "rubric": _sha256(rubric_path),
         },
         "candidate_fingerprints": {
             "instruction_ledger": _sha256(ledger_path),
             "prompt_index": _sha256(prompt_index_path),
+            **({"case": _sha256(case_path)} if case_path is not None else {}),
         },
         "summary": {"judge_calls": judge_calls, **score_summary},
         "findings": findings,
     }
     report["fingerprint"] = _content_fingerprint(report)
     return report
+
+
+def evaluate_prompt_case(
+    *,
+    case_path: Path,
+    run_dir: Path,
+    judge: DesignJudge,
+    rubric_path: Path,
+    judge_id: str | None = None,
+) -> dict[str, Any]:
+    """Evaluate a generic prompt case using the shared prompt scoring core."""
+    return evaluate_deepswe_worker_prompt(
+        case_path=case_path,
+        run_dir=run_dir,
+        judge=judge,
+        rubric_path=rubric_path,
+        judge_id=judge_id,
+    )
 
 
 def _summarize_prompt_findings(
@@ -904,6 +993,12 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value
 
 
+def _read_optional_text(path: Path | None) -> str:
+    if path is None or not path.is_file():
+        return ""
+    return path.read_text(encoding="utf-8")
+
+
 def _sha256(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
@@ -919,4 +1014,5 @@ __all__ = [
     "DeepSWEEvaluationError",
     "evaluate_deepswe_design",
     "evaluate_deepswe_worker_prompt",
+    "evaluate_prompt_case",
 ]

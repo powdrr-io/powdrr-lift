@@ -251,7 +251,7 @@ def test_worker_prompt_evaluation_checks_exact_captured_prompt_and_references(
         judge_id="fake/judge",
     )
 
-    assert report["schema_version"] == "deepswe-worker-prompt-evaluation-v2"
+    assert report["schema_version"] == "prompt-evaluation-report-v1"
     assert report["scoring_contract"] == "prompt-score-v1"
     assert report["scoring_parameters"]["importance_weights"] == {
         "critical": 3,
@@ -369,6 +369,71 @@ def test_worker_prompt_judge_must_check_for_contradictions_across_sections(
     assert report["findings"][0]["decision"] == "contradicted"
     assert report["summary"]["critical_failures"] == ["api-adds-value"]
     assert report["summary"]["passed"] is False
+
+
+def test_generic_prompt_case_uses_shared_report_and_scoring_core(
+    tmp_path: Path,
+) -> None:
+    task_dir, run_dir, _ = _inputs(tmp_path)
+    _capture_prompt_artifacts(run_dir, "The API adds a value and returns it.")
+    instruction_path = task_dir / "instruction.md"
+    case_path = tmp_path / "generic-case.json"
+    case_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "prompt-eval-case-v1",
+                "case_id": "generic-api-case",
+                "instruction_path": "task/instruction.md",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run_dir / "run-metadata.json").write_text(
+        json.dumps({"task_id": "generic-api-case"}), encoding="utf-8"
+    )
+    rubric_path = tmp_path / "generic-rubric.yaml"
+    rubric_path.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": "prompt-eval-rubric-v1",
+                "case_id": "generic-api-case",
+                "criteria": [
+                    {
+                        "id": "returns-value",
+                        "importance": "critical",
+                        "dimension": "coverage",
+                        "instruction_excerpt": "The API adds a value.",
+                        "expected_behavior": "The API returns the added value.",
+                        "required_prompt_claims": ["return the value"],
+                        "forbidden_prompt_claims": [],
+                        "validation_test_ids": ["api.test_returns_value"],
+                    }
+                ],
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    # Generic cases need the instruction and captured run, but no task files.
+    task_dir.joinpath("task.toml").unlink()
+    task_dir.joinpath("solution/solution.patch").unlink()
+    task_dir.joinpath("tests/test.patch").unlink()
+
+    report = evaluate_deepswe_worker_prompt(
+        case_path=case_path,
+        run_dir=run_dir,
+        judge=FakeJudge(quote="The API adds a value and returns it."),
+        rubric_path=rubric_path,
+        judge_id="test/fake",
+    )
+
+    assert report["schema_version"] == "prompt-evaluation-report-v1"
+    assert report["evaluation_case_type"] == "generic"
+    assert report["task_id"] == "generic-api-case"
+    assert report["summary"]["prompt_score"] == 100
+    assert report["findings"][0]["validation_test_ids"] == ["api.test_returns_value"]
+    assert "solution_patch" not in report["reference_fingerprints"]
+    assert instruction_path.is_file()
 
 
 def test_worker_prompt_evaluation_rejects_stale_capture_fingerprint(

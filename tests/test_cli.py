@@ -22,6 +22,28 @@ from powdrr_lift.workrr.human_task import HumanTaskRunnerConfig
 from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig
 
 
+def test_prompt_evaluation_cli_preserves_deepswe_and_adds_generic_case() -> None:
+    parser = build_parser()
+    generic = parser.parse_args(
+        [
+            "evaluate-prompt",
+            "--case",
+            "case.json",
+            "--run-dir",
+            "run",
+            "--rubric",
+            "rubric.yaml",
+        ]
+    )
+    deepswe = parser.parse_args(
+        ["evaluate-deepswe-prompt", "--task-dir", "task", "--run-dir", "run"]
+    )
+
+    assert generic.func.__name__ == "_run_generic_prompt_evaluation"
+    assert generic.case == Path("case.json")
+    assert deepswe.func.__name__ == "_run_deepswe_prompt_evaluation"
+
+
 def test_harbor_feature_defaults_to_benchmark_mode_without_policy_option() -> None:
     stdout = io.StringIO()
     with redirect_stdout(stdout), pytest.raises(SystemExit) as exc_info:

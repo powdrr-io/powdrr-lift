@@ -229,6 +229,10 @@ from powdrr_lift.workrr.human_task import (
 )
 from powdrr_lift.workrr.local_model import download_local_qwen_model
 from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
+from powdrr_lift.workrr.prompt_benchmark_comparison import (
+    PromptBenchmarkComparisonError,
+    compare_prompt_benchmark,
+)
 from powdrr_lift.workrr.provider_config import (
     ALL_PROVIDERS,
     default_llm_mappings,
@@ -1779,6 +1783,16 @@ def build_parser() -> argparse.ArgumentParser:
     prompt_eval_parser.add_argument("--judge-base-url")
     prompt_eval_parser.add_argument("--json", action="store_true")
     prompt_eval_parser.set_defaults(func=_run_generic_prompt_evaluation)
+
+    prompt_benchmark_parser = subparsers.add_parser(
+        "compare-prompt-benchmark",
+        help="Compare a prompt evaluation with final benchmark validation results.",
+    )
+    prompt_benchmark_parser.add_argument("--prompt-report", required=True, type=Path)
+    prompt_benchmark_parser.add_argument("--benchmark-run", required=True, type=Path)
+    prompt_benchmark_parser.add_argument("--report", type=Path)
+    prompt_benchmark_parser.add_argument("--json", action="store_true")
+    prompt_benchmark_parser.set_defaults(func=_run_prompt_benchmark_comparison)
 
     replay_subject_bindings_parser = subparsers.add_parser(
         "replay-subject-bindings",
@@ -5764,6 +5778,44 @@ def _run_generic_prompt_evaluation(args: argparse.Namespace) -> int:
         )
         print(f"Report: {report_path}")
     return 0 if report["summary"]["passed"] else 1
+
+
+def _run_prompt_benchmark_comparison(args: argparse.Namespace) -> int:
+    try:
+        report = compare_prompt_benchmark(
+            prompt_report_path=args.prompt_report,
+            benchmark_run_path=args.benchmark_run,
+        )
+    except PromptBenchmarkComparisonError as error:
+        print(f"Prompt/benchmark comparison failed: {error}", file=sys.stderr)
+        return 1
+    default_parent = (
+        args.benchmark_run if args.benchmark_run.is_dir() else args.benchmark_run.parent
+    )
+    report_path = args.report or default_parent / "prompt-benchmark-comparison.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+    else:
+        summary = report["summary"]
+        pass_rate = summary["validation_pass_rate"]
+        rate_text = "n/a" if pass_rate is None else f"{pass_rate:.1%}"
+        print(
+            f"Prompt/benchmark comparison {report['benchmark']['run_id']}: "
+            f"prompt score {report['prompt_report']['score']}/100; "
+            f"gate {report['prompt_report']['gate']}; "
+            f"critical failures "
+            f"{report['prompt_report']['critical_failure_count']}; "
+            f"validation pass rate {rate_text}; "
+            f"unresolved {summary['unresolved_count']}; "
+            f"unmapped failures {summary['unmapped_failure_count']}."
+        )
+        print(f"Report: {report_path}")
+    return 0
 
 
 def _extract_workflow_responses(args: argparse.Namespace) -> int:

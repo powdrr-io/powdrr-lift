@@ -44,6 +44,20 @@ def test_prompt_evaluation_cli_preserves_deepswe_and_adds_generic_case() -> None
     assert deepswe.func.__name__ == "_run_deepswe_prompt_evaluation"
 
 
+def test_prompt_benchmark_comparison_cli_dispatches() -> None:
+    args = build_parser().parse_args(
+        [
+            "compare-prompt-benchmark",
+            "--prompt-report",
+            "prompt.json",
+            "--benchmark-run",
+            "run",
+        ]
+    )
+
+    assert args.func.__name__ == "_run_prompt_benchmark_comparison"
+
+
 def test_harbor_feature_defaults_to_benchmark_mode_without_policy_option() -> None:
     stdout = io.StringIO()
     with redirect_stdout(stdout), pytest.raises(SystemExit) as exc_info:

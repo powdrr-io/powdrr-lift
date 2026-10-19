@@ -164,6 +164,40 @@ run's ledger. Generic and DeepSWE prompt evaluations emit the same
 `prompt-evaluation-report-v1` report and scoring contract. The
 `evaluate-deepswe-prompt` command remains available for task-directory users.
 
+### Comparing a prompt evaluation with benchmark validation
+
+After a run completes validation, compare its final `run-result.json` or
+`report.json` with the immutable prompt report:
+
+```bash
+uv run powdrr-lift compare-prompt-benchmark \
+  --prompt-report /path/to/captured-run/prompt-quality-evaluation.json \
+  --benchmark-run /path/to/benchmark-run \
+  --report /path/to/benchmark-run/prompt-benchmark-comparison.json
+```
+
+The command also accepts a standalone
+`coding-agent-validation-report-v1` JSON file. For a run directory it reads the
+final `run-result.json` first, falling back to `report.json`; it does not infer
+results from old attempts. A result's `test_id` is its mapping key, with its
+validation profile name used when no test ID is emitted. Rubric
+`validation_test_ids` must use those stable IDs. It checks the prompt report
+fingerprint and, when present, task and request identity before comparing.
+
+The separate `prompt-benchmark-comparison-v1` report copies the prompt score,
+gate, and fingerprint, then records normalized pass, fail, not-run, and
+infrastructure-error results; per-criterion mappings; unmapped failures; and
+review interpretations. It also records run/task/request identity, Powdrr
+revision and version, and worker profile/provider when the run artifacts
+contain them. Missing mapped results become `not_run`. Timed-out or
+blocked checks are `infrastructure_error`, excluded from the validation pass
+rate along with not-run checks. Interpretations flag areas for review and do
+not automatically assign a root cause or modify the prompt report.
+The pass-rate denominator counts executed validation units; a unit is an
+individual test when `test_id` is present, otherwise it is the named validation
+profile. `validation_unit_count` includes passed, failed, not-run, and
+infrastructure-error units.
+
 The rubric covers distinctions exercised by the benchmark tests, including
 state-owned versus callback-merged data, absent versus explicitly empty
 declarations, callback mutation persistence, and shallow versus deep history.

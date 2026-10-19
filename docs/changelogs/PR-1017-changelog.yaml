@@ -144,17 +144,17 @@ files:
     rationale: Ensure execute-proposed-pr receives its required task_context input.
   - path: docs/procedrr/processes/execute-proposed-pr.yaml
     type: modified
-    span: {start_line: 107, end_line: 124}
+    span: {start_line: 109, end_line: 126}
     summary: Judge validation success from the complete recorded command result.
     rationale: Avoid assuming a fixed nesting shape for command results in the task worker.
   - path: docs/procedrr/processes/execute-proposed-pr.yaml
     type: modified
-    span: {start_line: 126, end_line: 126}
+    span: {start_line: 128, end_line: 128}
     summary: Branch on the validation-status judge result.
     rationale: Route only failed validation records into the repair workflow.
   - path: docs/procedrr/processes/execute-proposed-pr.yaml
     type: modified
-    span: {start_line: 128, end_line: 128}
+    span: {start_line: 130, end_line: 130}
     summary: Treat a confirmed passing validation record as complete.
     rationale: Keep the validation loop focused on commands that need repair.
   - path: docs/procedrr/processes/execute-proposed-pr.yaml

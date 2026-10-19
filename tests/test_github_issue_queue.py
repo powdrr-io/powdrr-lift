@@ -305,6 +305,40 @@ def test_github_issue_client_filters_issues_server_side_by_label_and_state() -> 
     )
 
 
+def test_github_client_skips_labels_that_already_exist() -> None:
+    commands: list[list[str]] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        return subprocess.CompletedProcess(arguments, 0, "{}", "")
+
+    client = GitHubIssueClient("example/project", run=run)
+    client.ensure_queue_labels()
+    assert client.ensure_plan_label("feature-v1") == _plan_label("feature-v1")
+
+    assert len(commands) == len(QUEUE_LABELS) + 1
+    assert all("--method" not in command for command in commands)
+
+
+def test_github_client_creates_missing_labels() -> None:
+    commands: list[list[str]] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        if "--method" not in arguments:
+            return subprocess.CompletedProcess(arguments, 1, "", "HTTP 404")
+        return subprocess.CompletedProcess(arguments, 0, "{}", "")
+
+    GitHubIssueClient("example/project", run=run).ensure_queue_labels()
+
+    assert len(commands) == len(QUEUE_LABELS) * 2
+    assert all("--method" in command for command in commands[1::2])
+
+
 def test_github_client_requires_plan_commit_on_default_branch() -> None:
     commands: list[list[str]] = []
 

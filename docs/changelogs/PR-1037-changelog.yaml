@@ -1,0 +1,205 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1037
+title: Keep MiniSWE probe prompts within process limits
+intent:
+  problem: MiniSWE probe authoring passes its task as a command-line argument, and long generated contexts can exceed the operating system argument limit before any probe is authored.
+  goal: Compact the behavior context and support file-backed MiniSWE task input so large probe prompts can reach the authoring agent safely.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3095
+    end_line: 3097
+  summary: Reduce probe-authoring context to relevant proposal descriptions and core scenario fields.
+  rationale: Preserve behavior and scenario provenance while avoiding verbose derived metadata in the model prompt.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3102
+    end_line: 3102
+  summary: Compile a compact behavior-scenario context for probe authoring.
+  rationale: Avoid passing verbose scenario metadata to MiniSWE.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3120
+    end_line: 3120
+  summary: Replace the full proposal diff with relevant proposal changes.
+  rationale: Keep the probe prompt focused on behavior-facing acceptance context.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3122
+    end_line: 3122
+  summary: Send compact scenarios while retaining their IDs.
+  rationale: Preserve probe provenance with less prompt overhead.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3235
+    end_line: 3276
+  summary: Add compact serializers for proposal changes and behavior scenarios.
+  rationale: Keep probe context bounded without dropping the scenario identifiers needed to bind generated probes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Add temporary-file support for large MiniSWE task prompts.
+  rationale: Avoid embedding large prompt text in subprocess arguments.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Set the safe size threshold for MiniSWE task arguments.
+  rationale: Route oversized prompts through the file-backed runner.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 710
+    end_line: 713
+  summary: Detect prompts that exceed the safe task-argument size.
+  rationale: Select a launch path before invoking the coding agent.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 715
+    end_line: 731
+  summary: Keep the direct MiniSWE CLI path for smaller prompts.
+  rationale: Preserve existing launch behavior for normal-sized requests.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 731
+    end_line: 734
+  summary: Route oversized first attempts through the Python session entry point.
+  rationale: Read large task text from a file instead of a process argument.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 734
+    end_line: 735
+  summary: Configure the file-backed session launch.
+  rationale: Preserve the MiniSWE task worktree context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 741
+    end_line: 755
+  summary: Write large task text to a temporary file and pass its path to MiniSWE.
+  rationale: Keep the full task intact while staying below OS argument limits.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 806
+    end_line: 828
+  summary: Route oversized MiniSWE task prompts through a temporary task file and clean it up after the attempt.
+  rationale: Avoid per-argument operating-system limits while preserving the existing prompt and attempt lifecycle.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 23
+  summary: Accept a file-backed task source in the MiniSWE session runner.
+  rationale: Allow large task prompts without passing their content in argv.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Make trajectory output optional for fresh file-backed sessions.
+  rationale: Preserve the normal MiniSWE default output behavior.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 43
+  summary: Read task text from either argv or a task file and optionally load a prior trajectory.
+  rationale: Support fresh and resumed sessions through the same entry point.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 49
+    end_line: 49
+  summary: Bind the loaded task text into MiniSWE configuration.
+  rationale: Give MiniSWE the same task content from either launch mode.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 54
+    end_line: 54
+  summary: Preserve the default trajectory output when no path is supplied.
+  rationale: Keep file-backed startup compatible with CLI defaults.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 67
+    end_line: 70
+  summary: Start a fresh MiniSWE session with the loaded task.
+  rationale: Make task-file startup follow the same agent run lifecycle.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 72
+  summary: Append loaded task text when continuing a saved session.
+  rationale: Keep resumed prompts consistent with fresh sessions.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Import request replacement support for the large-prompt regression test.
+  rationale: Build a request whose prompt exceeds the argument threshold.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 358
+    end_line: 396
+  summary: Verify large prompts use a task file and clean it up after the attempt.
+  rationale: Prevent regressions in the provider’s file-backed launch path.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 131
+  summary: Add oversized provenance metadata to the probe-authoring fixture.
+  rationale: Exercise prompt compaction with deliberately verbose scenario data.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 143
+  summary: Assert that compact probe prompts exclude verbose metadata and stay bounded.
+  rationale: Prevent the original oversized prompt regression.
+entities:
+- id: miniswe-task-file-input
+  type: Subcommand
+  action: added
+- id: compact-probe-authoring-context
+  type: Function
+  action: added
+- id: oversized-miniswe-task-handoff
+  type: Function
+  action: added
+- id: miniswe-large-prompt-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: large-mini-task-does-not-use-argv-payload
+  description: MiniSWE prompts over the configured argument-size threshold are read from a temporary file and are not placed in one command-line argument.
+  action: added
+- id: task-file-cleaned-after-attempt
+  description: The temporary MiniSWE task file is removed after the worker attempt completes or raises.
+  action: added
+- id: probe-context-retains-scenario-provenance
+  description: Compact probe context preserves scenario identifiers and the given, when, then, subject, and assumption fields while excluding verbose metadata.
+  action: added
+guidance:
+- id: keep-probe-authoring-context-focused
+  description: Use the task instruction, implementation acceptance context, concise proposal descriptions, and core behavior scenario fields when authoring independent probes.
+  action: added

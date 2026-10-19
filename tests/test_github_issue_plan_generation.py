@@ -12,6 +12,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     PLAN_ITEMS_RESPONSE_SCHEMA,
     PlanGenerationError,
     PlanPullRequest,
+    _plan_item_refinement_issues,
     generate_execution_plan_yaml,
     load_plan_workflow_instance,
     publish_execution_plan_pull_request,
@@ -49,6 +50,26 @@ def _item(item_id: str, *, dependencies: list[str] | None = None) -> dict[str, A
         "acceptance_criteria": [f"{item_id} meets its documented acceptance criteria."],
         "dependencies": dependencies or [],
     }
+
+
+def test_plan_refinement_detects_cross_runtime_implementation_only() -> None:
+    cross_runtime_item = {
+        "id": "protocol",
+        "scope": ["Implement Python parsers and Swift parsers for the protocol."],
+        "implementation_steps": [],
+    }
+    parity_only_item = {
+        "id": "swift-parity",
+        "scope": ["Implement Swift parsers for the protocol."],
+        "implementation_steps": [
+            "Add tests comparing Swift parser output with Python fixtures."
+        ],
+    }
+
+    assert _plan_item_refinement_issues([cross_runtime_item]) == [
+        "protocol combines implementation runtimes: python, swift"
+    ]
+    assert _plan_item_refinement_issues([parity_only_item]) == []
 
 
 def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:

@@ -196,6 +196,31 @@ class GitHubIssueClient:
 
     def ensure_plan_label(self, plan_id: str) -> str:
         label = _plan_label(plan_id)
+        self._ensure_label(
+            label,
+            color="5319e7",
+            description=f"Powdrr plan index for {plan_id}",
+        )
+        return label
+
+    def ensure_queue_labels(self) -> None:
+        for status, label in QUEUE_LABELS.items():
+            self._ensure_label(
+                label,
+                color=_label_color(status),
+                description=f"Powdrr queue state: {status.replace('_', ' ')}",
+            )
+
+    def _ensure_label(self, label: str, *, color: str, description: str) -> None:
+        endpoint = f"repos/{self.repository}/labels/{quote(label, safe='')}"
+        existing = self._invoke(["api", endpoint], check=False)
+        if existing.returncode == 0:
+            return
+        if "HTTP 404" not in existing.stderr:
+            raise GitHubIssueQueueError(
+                f"could not check GitHub label {label!r}: {existing.stderr.strip()}"
+            )
+
         created = self._invoke(
             [
                 "api",
@@ -205,40 +230,16 @@ class GitHubIssueClient:
                 "-f",
                 f"name={label}",
                 "-f",
-                "color=5319e7",
+                f"color={color}",
                 "-f",
-                f"description=Powdrr plan index for {plan_id}",
+                f"description={description}",
             ],
             check=False,
         )
-        if created.returncode != 0 and "already_exists" not in created.stderr:
+        if created.returncode != 0:
             raise GitHubIssueQueueError(
-                f"could not create GitHub plan label {label!r}: "
-                f"{created.stderr.strip()}"
+                f"could not create GitHub label {label!r}: {created.stderr.strip()}"
             )
-        return label
-
-    def ensure_queue_labels(self) -> None:
-        for status, label in QUEUE_LABELS.items():
-            created = self._invoke(
-                [
-                    "api",
-                    f"repos/{self.repository}/labels",
-                    "--method",
-                    "POST",
-                    "-f",
-                    f"name={label}",
-                    "-f",
-                    f"color={_label_color(status)}",
-                    "-f",
-                    f"description=Powdrr queue state: {status.replace('_', ' ')}",
-                ],
-                check=False,
-            )
-            if created.returncode != 0 and "already_exists" not in created.stderr:
-                raise GitHubIssueQueueError(
-                    f"could not create GitHub label {label!r}: {created.stderr.strip()}"
-                )
 
     def ensure_plan_commit_merged(self, plan_commit: str) -> None:
         repository = self._api("GET", f"repos/{self.repository}")

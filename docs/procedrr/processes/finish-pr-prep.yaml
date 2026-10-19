@@ -32,19 +32,26 @@ steps:
       tool: invoke_tool
       parameters:
         tool: shell
-        parameters: {command: [git, diff, --cached, --stat]}
-      bind: staged_diff_summary
+        parameters: {command: [git, diff, --cached, --name-only]}
+      bind: staged_file_names
+  - operation:
+      tool: invoke_tool
+      parameters:
+        tool: shell
+        parameters: {command: [git, diff, --name-only, main...HEAD]}
+      bind: committed_file_names
   - judge:
       kind: construct_one
       question: Does the staged pull-request scope match files_to_publish?
-      subject: staged_diff_summary
+      subject: staged_file_names
       prompt_system: Return only the declared JSON object.
       instructions:
-        - Compare staged_diff_summary with the exact files_to_publish input; the staged diff is authoritative for what will be committed.
-        - Confirm only when the staged set contains every files_to_publish path and no other path.
+        - Compare staged_file_names and committed_file_names with the exact files_to_publish input.
+        - Confirm only when every files_to_publish path is already committed relative to main or staged now, and no unrelated path is staged.
+        - A path in committed_file_names is already part of the feature branch and does not need to be staged again.
         - repository_status_before is pre-staging context. Unstaged or untracked paths outside files_to_publish remain excluded from the commit and do not fail this scope check.
         - Name every unexpected staged path or missing intended staged path in findings.
-      context: [files_to_publish, repository_status_before, staged_diff_summary]
+      context: [files_to_publish, repository_status_before, staged_file_names, committed_file_names]
       output:
         name: scope_review
         schema:

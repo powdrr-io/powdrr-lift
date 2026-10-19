@@ -121,6 +121,23 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
         },
         tool="gh",
     )[-4:] == ["--base", "main", "--head", "workflow/demo"]
+    assert intrinsic_command(
+        {
+            "operation": "pr_publish_clean",
+            "title": "Add feature",
+            "body": "Summary",
+            "base": "main",
+            "publication_branch": "powdrr/feature-implementation",
+            "files_to_publish": ["src/a.py"],
+            "commit_message": "Implement feature",
+        },
+        tool="gh",
+    )[-4:] == [
+        "--base",
+        "main",
+        "--head",
+        "powdrr/feature-implementation",
+    ]
 
 
 def test_gh_edit_rejects_a_model_owned_target(tmp_path: Path) -> None:

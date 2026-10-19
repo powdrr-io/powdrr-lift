@@ -1293,7 +1293,10 @@ def _is_idempotent_success(action: Any) -> bool:
         return False
     if tool == "git":
         return parameters.get("operation") in {"add", "commit", "switch"}
-    return tool == "gh" and parameters.get("operation") == "pr_create"
+    return tool == "gh" and parameters.get("operation") in {
+        "pr_create",
+        "pr_publish_clean",
+    }
 
 
 class WorkflowLLMActionEngine:

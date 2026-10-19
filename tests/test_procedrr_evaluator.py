@@ -334,7 +334,9 @@ outputs: {validation_results: {type: array, items: {type: object}}}
 steps:
   - operation:
       tool: internal
-      parameters: {command: [finish]}
+      parameters:
+        command: [finish]
+        files_to_publish: "${files_to_publish}"
       bind: validation_results
   - terminal: succeeded
 """,
@@ -344,6 +346,7 @@ name: create-pull-request
 inputs:
   - {name: user_request, type: string, required: true}
   - {name: workflow_context, type: object, required: true}
+  - {name: files_to_publish, type: array, required: true}
 outputs:
   pull_request_url:
     type: string
@@ -351,7 +354,9 @@ outputs:
 steps:
   - operation:
       tool: internal
-      parameters: {command: [publish]}
+      parameters:
+        command: [publish]
+        files_to_publish: "${files_to_publish}"
       bind: pull_request_url
   - terminal: succeeded
 """,
@@ -364,9 +369,8 @@ steps:
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
-            if "Which exact implementation files" in question:
+            if "Which repository validation labels" in question:
                 return {
-                    "files_to_publish": ["src/feature.py"],
                     "language_labels": ["python"],
                 }
             if "What populated pull-request request" in question:
@@ -376,21 +380,29 @@ steps:
                         "feature-name": "Feature",
                         "commit-message": "Implement feature",
                         "populated-pr-description": "Implements the feature.",
-                        "files-to-publish": ["src/feature.py"],
+                        # Simulate an incomplete model response. The publisher
+                        # must receive the implementation result's full list.
+                        "files-to-publish": ["attestation/component-00.py"],
                         "base-branch": "main",
+                        "publication-branch": "powdrr/pr-01-implementation",
                     },
                 }
             raise AssertionError(f"Unexpected judge question: {question}")
 
     calls: list[str] = []
+    call_parameters: list[Mapping[str, Any]] = []
+    implementation_paths = [
+        f"attestation/component-{index:02d}.py" for index in range(65)
+    ]
 
     def execute(_tool: str, parameters: Mapping[str, Any]) -> Any:
         command = parameters["command"][0]
         calls.append(command)
+        call_parameters.append(parameters)
         if command == "implement":
             return {
                 "passed": implementation_passes,
-                "changed_paths": ["src/feature.py"] if implementation_passes else [],
+                "changed_paths": implementation_paths if implementation_passes else [],
             }
         if command == "finish":
             return [{"command": "pytest", "status": "passed"}]
@@ -440,6 +452,8 @@ steps:
     assert result.bindings["pull_request_url"] == (
         "https://github.com/example/repo/pull/123"
     )
+    assert call_parameters[1]["files_to_publish"] == implementation_paths
+    assert call_parameters[-1]["files_to_publish"] == implementation_paths
 
 
 def test_called_process_uses_its_own_recovery_declarations(tmp_path: Path) -> None:

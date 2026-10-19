@@ -1,8 +1,8 @@
 version: 1
 name: finish-pr-prep
 description: >-
-  Confirm the staged PR scope, discover validation commands from repository
-  guidance, run every declared command, and repair failures before succeeding.
+  Verify the complete implementation file list, discover validation commands from
+  repository guidance, run every declared command, and repair failures before succeeding.
 inputs:
   - {name: files_to_publish, type: array, required: true}
   - {name: language_labels, type: array, required: true}
@@ -15,53 +15,9 @@ steps:
   - operation:
       tool: invoke_tool
       parameters:
-        tool: shell
-        parameters: {command: [git, status, --short]}
-      bind: repository_status_before
-  - operation:
-      tool: invoke_tool
-      parameters:
         tool: git
-        parameters: {operation: add, paths: "${files_to_publish}"}
-      bind: stage_result
-  - gate:
-      subject: stage_result.returncode
-      equals: 0
-      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
-  - operation:
-      tool: invoke_tool
-      parameters:
-        tool: shell
-        parameters: {command: [git, diff, --cached, --name-only]}
-      bind: staged_file_names
-  - operation:
-      tool: invoke_tool
-      parameters:
-        tool: shell
-        parameters: {command: [git, diff, --name-only, main...HEAD]}
-      bind: committed_file_names
-  - judge:
-      kind: construct_one
-      question: Does the staged pull-request scope match files_to_publish?
-      subject: staged_file_names
-      prompt_system: Return only the declared JSON object.
-      instructions:
-        - Compare staged_file_names and committed_file_names with the exact files_to_publish input.
-        - Confirm only when every files_to_publish path is already committed relative to main or staged now, and no unrelated path is staged.
-        - A path in committed_file_names is already part of the feature branch and does not need to be staged again.
-        - repository_status_before is pre-staging context. Unstaged or untracked paths outside files_to_publish remain excluded from the commit and do not fail this scope check.
-        - Name every unexpected staged path or missing intended staged path in findings.
-      context: [files_to_publish, repository_status_before, staged_file_names, committed_file_names]
-      output:
-        name: scope_review
-        schema:
-          type: object
-          required: [confirmed, findings]
-          additionalProperties: false
-          properties:
-            confirmed: {type: boolean}
-            findings: {type: array, items: {type: string}}
-      validation: {kind: json_schema}
+        parameters: {operation: verify_pr_scope, paths: "${files_to_publish}"}
+      bind: scope_review
   - gate:
       subject: scope_review.confirmed
       equals: true

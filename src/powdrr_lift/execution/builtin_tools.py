@@ -69,6 +69,7 @@ class IntrinsicRepositoryAdapter:
             "head",
             "default_branch",
             "show_ref",
+            "verify_pr_scope",
             "switch",
             "switch_create",
             "commit",
@@ -81,6 +82,7 @@ class IntrinsicRepositoryAdapter:
             "pr_checks",
             "pr_comments",
             "pr_create",
+            "pr_publish_clean",
             "pr_edit",
             "pr_review_comment",
         }
@@ -98,11 +100,15 @@ class IntrinsicRepositoryAdapter:
         result = execute_intrinsic_git_gh_tool(
             tool, arguments, worktree_root=context.worktree_root
         )
+        output: Any = result
+        if operation == "pr_publish_clean":
+            output = result.get("pull_request_url")
         mutating = operation in {
             "add",
             "move",
             "rename",
             "pr_create",
+            "pr_publish_clean",
             "pr_edit",
             "pr_review_comment",
         }
@@ -113,7 +119,7 @@ class IntrinsicRepositoryAdapter:
             if tool == "git" and mutating
             else ToolEffect.WORKSPACE_READ
         )
-        return ToolResult(result, frozenset({effect}))
+        return ToolResult(output, frozenset({effect}))
 
     def effects_for(
         self, context: ToolContext, arguments: Mapping[str, Any]
@@ -123,7 +129,13 @@ class IntrinsicRepositoryAdapter:
             return frozenset(
                 {
                     ToolEffect.GITHUB_MUTATION
-                    if operation in {"pr_create", "pr_edit", "pr_review_comment"}
+                    if operation
+                    in {
+                        "pr_create",
+                        "pr_publish_clean",
+                        "pr_edit",
+                        "pr_review_comment",
+                    }
                     else ToolEffect.WORKSPACE_READ
                 }
             )
@@ -900,7 +912,13 @@ def invoke_intrinsic_capability(
     elif tool == "gh":
         semantic_action = (
             "mutate_pull_request"
-            if operation in {"pr_create", "pr_edit", "pr_review_comment"}
+            if operation
+            in {
+                "pr_create",
+                "pr_publish_clean",
+                "pr_edit",
+                "pr_review_comment",
+            }
             else "inspect_pull_request"
         )
         request_tool = "repository"

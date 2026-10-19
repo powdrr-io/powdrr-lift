@@ -147,6 +147,11 @@ files:
     span: {start_line: 108, end_line: 108}
     summary: Read validation return codes from the nested operation result binding.
     rationale: Let the plan worker branch on the actual validation command exit code.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1431, end_line: 1437}
+    summary: Model wrapped command results in the proposed-PR workflow integration test.
+    rationale: Match the result shape exposed by the durable task worker adapter.
   - path: tests/test_workflow_template_specification.py
     type: modified
     span: {start_line: 330, end_line: 331}

@@ -19,7 +19,7 @@ from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.llm import complete_json
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
-POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v1"
+POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v2"
 POSTRUN_PROBE_RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -31,13 +31,15 @@ POSTRUN_PROBE_RESPONSE_SCHEMA: dict[str, Any] = {
                     "probe_id": {"type": "string"},
                     "scenario_id": {"type": "string"},
                     "oracle_basis": {"type": "string"},
-                    "test_source": {"type": "string"},
+                    "imports": {"type": "array", "items": {"type": "string"}},
+                    "body": {"type": "array", "items": {"type": "string"}},
                 },
                 "required": [
                     "probe_id",
                     "scenario_id",
                     "oracle_basis",
-                    "test_source",
+                    "imports",
+                    "body",
                 ],
                 "additionalProperties": False,
             },
@@ -54,12 +56,14 @@ class PostRunProbe:
     scenario_id: str
     oracle_basis: str
     test_source: str
+    imports: tuple[str, ...] = ()
 
-    def to_data(self) -> dict[str, str]:
+    def to_data(self) -> dict[str, Any]:
         return {
             "probe_id": self.probe_id,
             "scenario_id": self.scenario_id,
             "oracle_basis": self.oracle_basis,
+            "imports": list(self.imports),
             "test_source": self.test_source,
         }
 
@@ -117,13 +121,13 @@ def generate_postrun_probes(
                 "exercise the candidate software's public API or stable repository "
                 "contract, then assert the observed result. Never test that the "
                 "instruction text contains a requirement or copy source text into "
-                "an assertion. Return test_source as a "
-                "self-contained Python module containing exactly one ordinary "
-                "zero-argument test function. Use plain Python assertions; do not "
-                "use pytest fixtures or pytest-specific helpers. The function name "
-                "must start with test_probe_. The function must have no arguments, "
-                "contain at least one assert and one call to the software under "
-                "test, and must not import pytest. Do not "
+                "an assertion. Return `imports` as module names and `body` as a "
+                "list of Python statement strings. The runner builds the import "
+                "statements and zero-argument test function from this structure; "
+                "do not put imports or a function definition in `body`. Use plain "
+                "Python assertions; do not use pytest fixtures or pytest-specific "
+                "helpers. The body must contain at least one assert and one call "
+                "to the software under test, and must not import pytest. Do not "
                 "write files, launch subprocesses, access the network, or alter "
                 "repository state. Keep probes minimal and deterministic."
             ),
@@ -144,27 +148,144 @@ def generate_postrun_probes(
     response = complete_json(
         client, messages, response_schema=POSTRUN_PROBE_RESPONSE_SCHEMA
     )
+    try:
+        return _parse_generated_probes(response, eligible)
+    except _RepairableGeneratedProbeErrors as error:
+        repair_messages = [
+            *messages,
+            {
+                "role": "assistant",
+                "content": json.dumps(response, ensure_ascii=False, sort_keys=True),
+            },
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {
+                        "task": (
+                            "Repair the flagged probe validation issues. "
+                            "Preserve each probe's behavior, probe_id, scenario_id, "
+                            "oracle_basis, and imports. Change only body statements "
+                            "needed to satisfy the listed validation errors. Keep "
+                            "each assertion tied to its source-supported expected "
+                            "behavior. Return only the corrected "
+                            "probes in the array; do not repeat valid probes."
+                        ),
+                        "validation_error": str(error),
+                        "invalid_probe_ids": list(error.probe_ids),
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                ),
+            },
+        ]
+        try:
+            repaired_response = complete_json(
+                client,
+                repair_messages,
+                response_schema=POSTRUN_PROBE_RESPONSE_SCHEMA,
+            )
+            repaired = _parse_generated_probes(repaired_response, eligible)
+        except Exception as repair_error:
+            raise ValueError(
+                "probe validation repair failed after one tailored retry: "
+                f"{type(repair_error).__name__}: {repair_error}"
+            ) from repair_error
+        original_by_id = {probe.probe_id: probe for probe in error.probes}
+        repaired_by_id = {probe.probe_id: probe for probe in repaired}
+        expected_repaired_ids = set(error.probe_ids)
+        if expected_repaired_ids != set(repaired_by_id):
+            raise ValueError(
+                "probe syntax repair did not return exactly the invalid probe IDs"
+            ) from None
+        for probe_id in error.probe_ids:
+            original = original_by_id[probe_id]
+            candidate = repaired_by_id[probe_id]
+            if (
+                candidate.scenario_id != original.scenario_id
+                or candidate.oracle_basis != original.oracle_basis
+                or candidate.imports != original.imports
+            ):
+                raise ValueError(
+                    "probe syntax repair changed probe provenance or imports for "
+                    f"{probe_id!r}"
+                ) from None
+        return tuple(
+            repaired_by_id[probe.probe_id]
+            if probe.probe_id in expected_repaired_ids
+            else probe
+            for probe in error.probes
+        )
+
+
+class _RepairableGeneratedProbeErrors(ValueError):
+    def __init__(
+        self,
+        message: str,
+        *,
+        probes: Sequence[PostRunProbe],
+        probe_ids: Sequence[str],
+    ) -> None:
+        super().__init__(message)
+        self.probes = tuple(probes)
+        self.probe_ids = tuple(probe_ids)
+
+
+def _parse_generated_probes(
+    response: Mapping[str, Any], scenarios: Sequence[Mapping[str, Any]]
+) -> tuple[PostRunProbe, ...]:
     raw_probes = response.get("probes")
     if not isinstance(raw_probes, list):
         raise ValueError("probe generator response must contain a probes array")
     probes: list[PostRunProbe] = []
+    repairable_errors: list[tuple[str, str]] = []
     seen_ids: set[str] = set()
-    known_scenarios = {str(item["scenario_id"]) for item in eligible}
+    known_scenarios = {str(item["scenario_id"]) for item in scenarios}
     for raw in raw_probes:
         if not isinstance(raw, Mapping):
             raise ValueError("probe generator returned a malformed probe")
         probe_id = _required_text(raw, "probe_id")
         scenario_id = _required_text(raw, "scenario_id")
         oracle_basis = _required_text(raw, "oracle_basis")
-        test_source = _required_text(raw, "test_source")
+        imports = _required_text_list(raw, "imports", allow_empty=True)
+        body = _required_text_list(raw, "body")
         if probe_id in seen_ids:
             raise ValueError(f"probe generator returned duplicate id {probe_id!r}")
         if scenario_id not in known_scenarios:
             raise ValueError(f"probe refers to unknown scenario {scenario_id!r}")
-        _validate_test_source(test_source)
         seen_ids.add(probe_id)
-        probes.append(PostRunProbe(probe_id, scenario_id, oracle_basis, test_source))
+        try:
+            test_source = _render_test_source(imports, body)
+            _validate_test_source(test_source)
+        except ValueError as error:
+            if not _is_repairable_probe_error(str(error)):
+                raise
+            repairable_errors.append((probe_id, str(error)))
+            test_source = ""
+        probes.append(
+            PostRunProbe(
+                probe_id, scenario_id, oracle_basis, test_source, tuple(imports)
+            )
+        )
+    if repairable_errors:
+        detail = "; ".join(
+            f"{probe_id}: {error}" for probe_id, error in repairable_errors
+        )
+        raise _RepairableGeneratedProbeErrors(
+            detail,
+            probes=probes,
+            probe_ids=[probe_id for probe_id, _ in repairable_errors],
+        )
     return tuple(probes)
+
+
+def _is_repairable_probe_error(error: str) -> bool:
+    return error.startswith(
+        (
+            "generated probe is not valid Python:",
+            "generated probe must contain an observable assertion",
+            "generated probe assertion must exercise a non-built-in software call",
+        )
+    )
 
 
 def run_postrun_probes(
@@ -298,6 +419,10 @@ def _validate_test_source(source: str) -> None:
         for item in tree.body
     ):
         raise ValueError("generated probe has executable module-level statements")
+    if any(
+        isinstance(node, (ast.Import, ast.ImportFrom)) for node in ast.walk(function)
+    ):
+        raise ValueError("generated probe imports must be declared in imports")
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             if node.func.id in {"open", "exec", "eval", "compile", "__import__"}:
@@ -364,6 +489,52 @@ def _required_text(value: Mapping[str, Any], key: str) -> str:
     if not isinstance(item, str) or not item.strip():
         raise ValueError(f"probe generator returned an empty {key}")
     return item.strip()
+
+
+def _required_text_list(
+    value: Mapping[str, Any], key: str, *, allow_empty: bool = False
+) -> list[str]:
+    items = value.get(key)
+    if not isinstance(items, list) or not all(
+        isinstance(item, str) and item.strip() for item in items
+    ):
+        raise ValueError(f"probe generator returned an invalid {key} array")
+    normalized = [item.strip() for item in items]
+    if not normalized and not allow_empty:
+        raise ValueError(f"probe generator returned an empty {key}")
+    return normalized
+
+
+def _render_test_source(imports: Sequence[str], body: Sequence[str]) -> str:
+    for module_name in imports:
+        if not re.fullmatch(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*", module_name):
+            raise ValueError(
+                f"probe generator returned an invalid import module {module_name!r}"
+            )
+    body_nodes: list[ast.stmt] = []
+    for statement in body:
+        try:
+            parsed = ast.parse(statement)
+        except (SyntaxError, ValueError) as error:
+            raise ValueError(f"generated probe is not valid Python: {error}") from error
+        body_nodes.extend(parsed.body)
+    if not body_nodes:
+        raise ValueError("probe generator returned an empty body")
+    source_template = "\n".join(f"import {name}" for name in imports)
+    if source_template:
+        source_template += "\n\n"
+    source_template += "def test_probe_generated():\n    pass\n"
+    module = ast.parse(source_template)
+    test_function = next(
+        node for node in module.body if isinstance(node, ast.FunctionDef)
+    )
+    test_function.body = body_nodes
+    module = ast.fix_missing_locations(module)
+    try:
+        compile(module, "<generated-postrun-probe>", "exec")
+    except (SyntaxError, ValueError) as error:
+        raise ValueError(f"generated probe is not valid Python: {error}") from error
+    return ast.unparse(module) + "\n"
 
 
 def _output(stdout: str | bytes | None, stderr: str | bytes | None) -> str:

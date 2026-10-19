@@ -1,0 +1,32 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1018
+title: Repair the live execute-proposed-pr workflow scenario
+intent:
+  problem: The live workflow scenario refers to a legacy template deleted when the workflow was ported to Procedrr, so it crashes before execution.
+  goal: Run the live scenario from the checked-in workflow tasks and exercise that same scenario end to end with the deterministic fixture responses.
+human-decisions: []
+structured_files: []
+files:
+- path: workflow-evals/scenarios/execute-proposed-pr/live-task-all.yaml
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Point the live scenario at the checked-in workflow tasks
+  rationale: Avoid loading the removed legacy task template.
+- path: tests/test_workflow_scenario.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Load checked-in workflow scenarios in tests
+  rationale: Reuse the actual live scenario and scripted full-workflow fixture.
+- path: tests/test_workflow_scenario.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 143
+  summary: Exercise the live scenario through the complete workflow runner
+  rationale: Execute all workflow tasks with deterministic responses and verify the final output and task completion.
+entities: []
+entity_relationships: []

@@ -1,61 +1,103 @@
 version: 1
 name: execute-proposed-pr-workflow
-description: Execute one durable proposed-PR task through implementation, validation, scope review, and pull-request preparation.
+description: Implement one reviewed plan item, validate it, and publish an implementation pull request.
 inputs:
-- name: task_context
-  type: object
-  required: true
-limits:
-  llm_activations: 260
-  tool_calls: 260
-  context_chars: 60000
-  context_value_chars: 16000
+  - {name: task_context, type: object, required: true}
+outputs:
+  pull_request_url:
+    type: string
+    minLength: 1
+    pattern: ^https?://[^ ]+/pull/[0-9]+$
+limits: {llm_activations: 32, tool_calls: 120, context_chars: 60000, context_value_chars: 16000}
 steps:
-- specialize:
-    process: generate-fragment
-    max_steps: 120
-    question: >-
-      Execute this proposed-PR workflow for the claimed durable task in
-      task_context. Preserve this order. First call the `execute-proposed-pr`
-      Procedrr process with `process_id` set to `execute-proposed-pr` and a
-      `bindings` mapping that passes the current `task_context` binding under
-      the nested process input named `task_context`. In the operation JSON,
-      encode that as `{"bindings":{"task_context":{"type":"reference",
-      "value":"task_context"}}}`. Wait for its result; do not claim
-      implementation or completeness without the returned evidence. Next run
-      the repository's formatting, lint, type, and
-      other validation commands that apply to the changed files. Read validation
-      commands from repository tool context and the proposed-PR context; do not
-      assume a command passed without its result. Review the complete diff for
-      scope, missing files, generated artifacts, and secrets. Repair only
-      findings supported by that review, then rerun affected validation. If
-      task_context.input_state marks this as the final proposed PR and supplies
-      proposal-document paths, promote those documents to their declared
-      current-state paths and verify the move. Finally derive the exact files
-      and language labels to publish and call `finish-pr-prep` with
-      files_to_publish and language_labels. Wait for its result before
-      continuing. Then invoke the `create-pull-request` Procedrr process through
-      `task_run_process`, passing `user_request` and a `workflow_context` that
-      includes the proposed-PR context, exact files_to_publish and
-      language_labels, accepted validation results, base branch `main`, a
-      commit message, and a fully populated PR description grounded in the
-      implementation and checks that actually ran. Wait for the nested process
-      result and require its returned pull-request URL before reporting
-      success. Return a concise report containing implementation, validation,
-      scope-review, document-promotion when applicable, and pull-request URL.
-      Do not stage, commit, push, or open a pull request outside the
-      `finish-pr-prep` and `create-pull-request` processes.
-    context: [task_context]
-    allowed_tools:
-    - gather_context
-    - read_document
-    - invoke_tool
-    - file_management
-    - edit
-    - yaml_edit
-    - task_run_process
-    - respond
-    bind: proposed_pr_workflow
-- call:
-    fragment: "${proposed_pr_workflow}"
-    max_steps: 120
+  - call:
+      process: execute-proposed-pr
+      inputs:
+        task_context: {type: reference, value: task_context}
+      outputs:
+        implementation_result: coding_attempt
+  - gate:
+      subject: implementation_result.passed
+      equals: true
+      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+  - judge:
+      kind: construct_one
+      question: Which exact implementation files and validation labels belong in the proposed PR?
+      subject: implementation_result.changed_paths
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Include every actual product implementation path reported in changed_paths and no generated runtime state, logs, caches, or unrelated files.
+        - Derive language_labels from the listed file extensions and include every applicable repository validation category.
+        - Return a non-empty files_to_publish list with repository-relative paths.
+      context: [task_context, implementation_result]
+      output:
+        name: publication_scope
+        schema:
+          type: object
+          required: [files_to_publish, language_labels]
+          additionalProperties: false
+          properties:
+            files_to_publish:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items: {type: string, minLength: 1}
+            language_labels:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - call:
+      process: finish-pr-prep
+      inputs:
+        files_to_publish: {type: reference, value: publication_scope.files_to_publish}
+        language_labels: {type: reference, value: publication_scope.language_labels}
+      outputs:
+        validation_results: validation_results
+  - judge:
+      kind: construct_one
+      question: What populated pull-request request and workflow context describe the implemented plan item?
+      subject: implementation_result
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Ground the request and every description claim in task_context, implementation_result, and validation_results.
+        - Include the proposed PR title, objective, scope, implementation details, acceptance criteria, and exact validation commands and results.
+        - Set files-to-publish to the exact publication_scope.files_to_publish list and base-branch to main.
+        - Provide a clear commit message and a complete populated PR description. Do not claim any unrun check passed.
+      context: [task_context, implementation_result, publication_scope, validation_results]
+      output:
+        name: pull_request_request
+        schema:
+          type: object
+          required: [user_request, workflow_context]
+          additionalProperties: false
+          properties:
+            user_request: {type: string, minLength: 1}
+            workflow_context:
+              type: object
+              required:
+                - feature-name
+                - commit-message
+                - populated-pr-description
+                - files-to-publish
+                - base-branch
+              additionalProperties: true
+              properties:
+                feature-name: {type: string, minLength: 1}
+                commit-message: {type: string, minLength: 1}
+                populated-pr-description: {type: string, minLength: 1}
+                files-to-publish:
+                  type: array
+                  minItems: 1
+                  items: {type: string, minLength: 1}
+                base-branch: {type: string, const: main}
+      validation: {kind: json_schema}
+  - call:
+      process: create-pull-request
+      inputs:
+        user_request: {type: reference, value: pull_request_request.user_request}
+        workflow_context: {type: reference, value: pull_request_request.workflow_context}
+      outputs:
+        pull_request_url: pull_request_url
+  - terminal: succeeded

@@ -325,15 +325,20 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
         .get("execute-proposed-pr-workflow")
         .document
     )
-    question = process["steps"][0]["specialize"]["question"]
-    assert "`execute-proposed-pr` Procedrr process" in question
-    assert "a `bindings` mapping" in question
-    assert '"value":"task_context"' in question
-    assert "formatting, lint, type" in question
-    assert "Review the complete diff for scope" in question
-    assert "`finish-pr-prep`" in question
-    assert "`create-pull-request` Procedrr process" in question
-    assert "returned pull-request URL" in question
+    steps = process["steps"]
+    process_calls = [step["call"]["process"] for step in steps if "call" in step]
+    assert process_calls == [
+        "execute-proposed-pr",
+        "finish-pr-prep",
+        "create-pull-request",
+    ]
+    assert steps[0]["call"]["outputs"] == {"implementation_result": "coding_attempt"}
+    assert steps[1]["gate"]["subject"] == "implementation_result.passed"
+    assert steps[2]["judge"]["output"]["name"] == "publication_scope"
+    assert steps[3]["call"]["outputs"] == {"validation_results": "validation_results"}
+    assert steps[4]["judge"]["output"]["name"] == "pull_request_request"
+    assert steps[5]["call"]["outputs"] == {"pull_request_url": "pull_request_url"}
+    assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
 
 
 def test_instantiate_procedrr_process_workflow_creates_task(tmp_path: Path) -> None:

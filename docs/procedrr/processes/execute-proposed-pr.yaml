@@ -2,6 +2,15 @@ version: 1
 name: execute-proposed-pr
 inputs:
   - {name: task_context, type: object, required: true}
+outputs:
+  coding_attempt:
+    type: object
+    required: [passed, changed_paths]
+    properties:
+      passed: {type: boolean}
+      changed_paths: {type: array, items: {type: string}}
+      validation: {type: object}
+      error: {type: [string, "null"]}
 description: >-
   Implement one reviewed plan item with the configured coding agent, run the
   plan's verification command, and complete the durable workflow only after

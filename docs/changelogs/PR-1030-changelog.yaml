@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1029
+change_id: 1030
 title: Compare prompt grades with benchmark validation
 intent:
   problem: Prompt reports cannot be connected to completed benchmark validation, leaving prompt findings and implementation outcomes disconnected.

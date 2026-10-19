@@ -142,16 +142,6 @@ files:
     span: {start_line: 20, end_line: 26}
     summary: Instruct the outer plan workflow to pass task_context through nested process bindings.
     rationale: Ensure execute-proposed-pr receives its required task_context input.
-  - path: docs/procedrr/processes/execute-proposed-pr.yaml
-    type: modified
-    span: {start_line: 108, end_line: 108}
-    summary: Read validation return codes from the direct operation result binding.
-    rationale: Let the plan worker branch on the actual validation command exit code.
-  - path: tests/test_procedrr_evaluator.py
-    type: modified
-    span: {start_line: 1431, end_line: 1437}
-    summary: Exercise direct command result bindings in the proposed-PR workflow integration test.
-    rationale: Keep the shared process test aligned with the durable task worker result shape.
   - path: tests/test_workflow_template_specification.py
     type: modified
     span: {start_line: 330, end_line: 331}
@@ -159,7 +149,12 @@ files:
     rationale: Prevent the outer workflow from omitting execute-proposed-pr's required input.
   - path: src/powdrr_lift/workrr/task_agent.py
     type: modified
-    span: {start_line: 1475, end_line: 1484}
+    span: {start_line: 1457, end_line: 1457}
+    summary: Execute nested Procedrr operations while retaining their tool result for binding.
+    rationale: Let calling processes receive the operation result without exposing task execution metadata.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1472, end_line: 1481}
     summary: Return the raw result from nested tool operations.
     rationale: Keep Procedrr operation bindings consistent with direct tool results so callers can inspect command outputs.
   - path: tests/test_workflow_task_agent.py
@@ -174,7 +169,7 @@ files:
     rationale: Verify nested operations expose return values to the calling process.
   - path: tests/test_workflow_task_agent.py
     type: modified
-    span: {start_line: 688, end_line: 725}
+    span: {start_line: 688, end_line: 724}
     summary: Verify nested Procedrr operations bind the raw command result.
     rationale: Keep worker operation bindings aligned with the Procedrr process result shape.
   - path: docs/procedrr/processes/generate-fragment.yaml

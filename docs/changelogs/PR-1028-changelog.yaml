@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1027
+change_id: 1028
 title: Generalize prompt evaluation cases
 intent:
   problem: Prompt grading only accepts DeepSWE task directories and task-specific rubric files.

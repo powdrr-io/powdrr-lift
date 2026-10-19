@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1037
+change_id: 1038
 title: Keep MiniSWE probe prompts within process limits
 intent:
   problem: MiniSWE probe authoring passes its task as a command-line argument, and long generated contexts can exceed the operating system argument limit before any probe is authored.

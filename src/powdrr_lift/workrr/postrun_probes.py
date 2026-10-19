@@ -278,6 +278,13 @@ def _parse_generated_probes(
     return tuple(probes)
 
 
+def parse_generated_postrun_probes(
+    response: Mapping[str, Any], scenarios: Sequence[Mapping[str, Any]]
+) -> tuple[PostRunProbe, ...]:
+    """Validate a serialized probe document from any probe authoring agent."""
+    return _parse_generated_probes(response, scenarios)
+
+
 def _is_repairable_probe_error(error: str) -> bool:
     return error.startswith(
         (
@@ -557,6 +564,7 @@ __all__ = [
     "PostRunProbe",
     "PostRunProbeResult",
     "generate_postrun_probes",
+    "parse_generated_postrun_probes",
     "probe_failures",
     "run_postrun_probes",
 ]

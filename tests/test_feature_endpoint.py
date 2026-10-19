@@ -35,6 +35,7 @@ from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttemptStore,
     CodingAgentStatus,
     ImplementationRequest,
+    MiniSWEAgentProvider,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationReport,
@@ -75,6 +76,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _feature_endpoint_result,
     _finalize_implementation_review,
     _finalize_proposal_review,
+    _generate_miniswe_postrun_probes,
     _instruction_coverage_gaps,
     _load_implementation_plan,
     _load_procedrr_replay_responses,
@@ -103,6 +105,90 @@ from powdrr_lift.workrr.feature_endpoint import (
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
+
+
+def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "module.py").write_text("def public_api(value): return value\n")
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.email", "test@example.com")
+    _git(repository, "config", "user.name", "Test")
+    _git(repository, "add", "module.py")
+    _git(repository, "commit", "-qm", "baseline")
+    base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
+    plan_path = tmp_path / "structrr-diff.yaml"
+    plan_path.write_text("features: []\n", encoding="utf-8")
+    output_root = tmp_path / "artifacts"
+    scenarios = ({"scenario_id": "selector", "then": {"result": "value"}},)
+
+    def author_probe_suite(
+        self: MiniSWEAgentProvider,
+        request: ImplementationRequest,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        assert "Implementation prompt and acceptance context" in request.prompt
+        assert "Proposal Structrr diff" in request.prompt
+        (worktree_root / "probe-suite.json").write_text(
+            json.dumps(
+                {
+                    "probes": [
+                        {
+                            "probe_id": "selector-result",
+                            "scenario_id": "selector",
+                            "oracle_basis": "The instruction defines this result.",
+                            "imports": ["module"],
+                            "body": ["assert module.public_api('value') == 'value'"],
+                        }
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(["mini"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
+    config = FeatureEndpointConfig(
+        feature_description="Add selector handling.",
+        work_item_name="selector-handling",
+        repo_root=repository,
+        allowed_paths=("src", "tests"),
+    )
+    request = ImplementationRequest(
+        request_id="selector-implementation",
+        objective="Add selector handling.",
+        prompt="Implement the proposed selector handling.",
+        base_commit=base_commit,
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("src", "tests"),
+        acceptance_criteria=("Handle the selector contract.",),
+        validation_profiles=("pytest",),
+        context_refs=("structrr-diff:structrr-diff.yaml",),
+    )
+
+    probes = _generate_miniswe_postrun_probes(
+        config,
+        runner=subprocess.run,
+        worktree=repository,
+        output_root=output_root,
+        base_commit=base_commit,
+        plan_path=plan_path,
+        request=request,
+        scenarios=scenarios,
+    )
+
+    assert [probe.probe_id for probe in probes] == ["selector-result"]
+    suite = json.loads(
+        (output_root / "postrun-probes" / "probe-suite.json").read_text()
+    )
+    assert suite["generation_method"] == "minisweagent_pre_coding"
+    assert suite["probes"][0]["scenario_id"] == "selector"
+    assert not (output_root / "miniswe-probe-authoring" / "repository").exists()
+    assert _git(repository, "status", "--porcelain").stdout == ""
 
 
 def test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes(

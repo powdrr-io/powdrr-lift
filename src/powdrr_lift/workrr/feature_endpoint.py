@@ -122,6 +122,7 @@ from powdrr_lift.workrr.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     PostRunProbe,
     generate_postrun_probes,
+    parse_generated_postrun_probes,
     probe_failures,
     run_postrun_probes,
 )
@@ -2690,6 +2691,7 @@ def _run_code_agent_phase(
         state["behavior_probe_repair_status"] = repair_artifact.get("status")
     if (
         not config.capture_worker_prompts_only
+        and config.code_agent != "minisweagent"
         and "postrun_probes" not in state
         and implementation_packet.behavior_scenarios
     ):
@@ -2901,6 +2903,42 @@ def _run_code_agent_phase(
             )
         elif index > 1 or isinstance(code_task, Mapping):
             request = replace(request, allow_existing_changes=True)
+        if (
+            not config.capture_worker_prompts_only
+            and config.code_agent == "minisweagent"
+            and not repair_mode
+            and "postrun_probes" not in state
+            and implementation_packet.behavior_scenarios
+        ):
+            probes = _generate_miniswe_postrun_probes(
+                config,
+                runner=runner,
+                worktree=worktree,
+                output_root=output_root,
+                base_commit=base_commit,
+                plan_path=plan_path,
+                request=request,
+                scenarios=tuple(
+                    item.to_data() for item in implementation_packet.behavior_scenarios
+                ),
+            )
+            state["postrun_probes"] = probes
+            state["postrun_probe_artifact_root"] = output_root / "postrun-probes"
+            state["postrun_probe_generation_error"] = None
+        probes_for_request = state.get("postrun_probes")
+        if (
+            isinstance(probes_for_request, tuple)
+            and probes_for_request
+            and config.code_agent == "minisweagent"
+        ):
+            request = replace(
+                request,
+                prompt=(
+                    request.prompt
+                    + "\n\n"
+                    + _render_precode_probe_context(probes_for_request)
+                ),
+            )
         request_path = output_root / "implementation-request.json"
         request_path.write_text(request.to_json(), encoding="utf-8")
         operation_request_path = output_root / "requests" / f"{unit.unit_id}.json"
@@ -3022,6 +3060,193 @@ def _capture_worker_prompt(
         "request": request,
         "state": {"request_path": request_path},
     }
+
+
+def _generate_miniswe_postrun_probes(
+    config: FeatureEndpointConfig,
+    *,
+    runner: Runner,
+    worktree: Path,
+    output_root: Path,
+    base_commit: str,
+    plan_path: Path,
+    request: ImplementationRequest,
+    scenarios: Sequence[Mapping[str, Any]],
+) -> tuple[PostRunProbe, ...]:
+    """Ask MiniSWE to author a frozen probe suite in a clean baseline worktree."""
+    if not scenarios:
+        return ()
+    probe_output = output_root / "postrun-probes"
+    probe_output.mkdir(parents=True, exist_ok=True)
+    authoring_root = output_root / "miniswe-probe-authoring"
+    probe_worktree = authoring_root / "repository"
+    authoring_root.mkdir(parents=True, exist_ok=True)
+    if probe_worktree.exists():
+        raise PowdrrExecutionError(
+            f"probe-authoring worktree already exists: {probe_worktree}"
+        )
+    _run(
+        runner,
+        worktree,
+        ["git", "worktree", "add", "--detach", str(probe_worktree), base_commit],
+    )
+    try:
+        try:
+            proposal_diff = plan_path.read_text(encoding="utf-8")
+        except OSError as error:
+            raise PowdrrExecutionError(
+                f"cannot read proposal diff for probe authoring: {error}"
+            ) from error
+        suite_path = probe_worktree / "probe-suite.json"
+        probe_prompt = (
+            "Author executable post-coding behavior probes for the task below. "
+            "This is a pre-coding step: the solution is intentionally absent. "
+            "Do not implement the task or edit source/tests. Write exactly one "
+            "file, `probe-suite.json`, in the repository root. It must be JSON "
+            "with a top-level `probes` array. Each probe must contain `probe_id`, "
+            "`scenario_id`, `oracle_basis`, `imports` (module names), and `body` "
+            "(Python statement strings). Each body must call the public software "
+            "under test and assert an instruction-supported outcome. Prefer "
+            "boundary, negative, and interaction cases that are not merely "
+            "restatements of the happy path. Do not assert against instruction "
+            "text or private implementation details. Do not use pytest, write "
+            "files, launch subprocesses, or access the network. Omit a scenario "
+            "when the supplied contract does not define a safe oracle.\n\n"
+            f"Task objective:\n{request.objective}\n\n"
+            f"Implementation prompt and acceptance context:\n{request.prompt}\n\n"
+            f"Proposal Structrr diff:\n{proposal_diff}\n\n"
+            "Behavior scenarios (the scenario_id values are required provenance):\n"
+            f"{json.dumps(list(scenarios), indent=2, sort_keys=True)}\n\n"
+            "Return from the agent after writing probe-suite.json."
+        )
+        probe_request = ImplementationRequest(
+            request_id=f"{request.request_id}-probe-authoring",
+            objective="Author independent post-coding behavior probes",
+            prompt=probe_prompt,
+            base_commit=base_commit,
+            plan_fingerprint=request.plan_fingerprint,
+            allowed_paths=("probe-suite.json",),
+            acceptance_criteria=(
+                "Write a valid probe-suite.json containing source-grounded probes.",
+                "Do not modify implementation files or existing tests.",
+            ),
+            validation_profiles=(),
+            context_refs=request.context_refs,
+        )
+        probe_provider = MiniSWEAgentProvider(
+            executable=config.minisweagent_executable,
+            model=config.minisweagent_model,
+            timeout_seconds=300.0,
+            diagnostics_root=authoring_root / "diagnostics",
+            progress_callback=config.progress_callback,
+        )
+        probe_runner = CodingAgentRunner(
+            provider=probe_provider,
+            store=CodingAgentAttemptStore(authoring_root / "attempts"),
+        )
+        authoring_attempts: list[dict[str, Any]] = []
+        probes: tuple[PostRunProbe, ...] = ()
+        validation_error: Exception | None = None
+        for attempt_number in range(1, 3):
+            if attempt_number == 2:
+                probe_request = replace(
+                    probe_request,
+                    request_id=f"{request.request_id}-probe-authoring-repair",
+                    prompt=(
+                        "Repair the pre-coding probe artifact only. The previous "
+                        "probe suite failed this exact validation:\n"
+                        f"{validation_error}\n\n"
+                        "Rewrite `probe-suite.json` as valid JSON matching the "
+                        "required `probes` schema. Preserve valid probe meaning "
+                        "and IDs where possible. Use only the supplied task "
+                        "contract and scenario IDs. Do not edit implementation "
+                        "files or tests. Return after fixing the artifact."
+                    ),
+                    allow_existing_changes=True,
+                )
+            attempt = probe_runner.run(
+                probe_request,
+                worktree_root=probe_worktree,
+                attempt_id=(f"{request.request_id}-probe-authoring-{attempt_number}"),
+            )
+            authoring_attempts.append(attempt.to_data())
+            if attempt.status is not CodingAgentStatus.COMPLETED:
+                raise PowdrrExecutionError(
+                    "MiniSWE probe authoring did not produce an in-scope result: "
+                    f"{attempt.to_data()}"
+                )
+            if attempt.changed_paths != ("probe-suite.json",):
+                raise PowdrrExecutionError(
+                    "MiniSWE probe authoring must create only probe-suite.json; "
+                    f"changed {attempt.changed_paths}"
+                )
+            try:
+                response = json.loads(suite_path.read_text(encoding="utf-8"))
+                if not isinstance(response, Mapping):
+                    raise ValueError("probe suite must be a JSON object")
+                probes = parse_generated_postrun_probes(response, scenarios)
+                if not probes:
+                    raise ValueError("probe suite contains no probes")
+                validation_error = None
+                break
+            except (OSError, json.JSONDecodeError, ValueError) as error:
+                validation_error = error
+                if attempt_number == 2:
+                    raise PowdrrExecutionError(
+                        "MiniSWE probe suite failed validation after one tailored "
+                        f"repair: {error}"
+                    ) from error
+        if not probes:
+            raise PowdrrExecutionError(
+                "MiniSWE probe suite is empty after the validation repair"
+            )
+        suite_document = {
+            "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
+            "generation_status": "generated",
+            "generation_method": "minisweagent_pre_coding",
+            "source_instruction": request.objective,
+            "proposal_diff_path": str(plan_path),
+            "authoring_attempts": authoring_attempts,
+            "probes": [item.to_data() for item in probes],
+            "scenarios_without_executable_probe": sorted(
+                {str(item["scenario_id"]) for item in scenarios}
+                - {item.scenario_id for item in probes}
+            ),
+        }
+        (probe_output / "probe-suite.json").write_text(
+            json.dumps(suite_document, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        (probe_output / "probe-authoring-prompt.md").write_text(
+            probe_prompt.rstrip() + "\n", encoding="utf-8"
+        )
+        return probes
+    finally:
+        _run(
+            runner,
+            worktree,
+            ["git", "worktree", "remove", "--force", str(probe_worktree)],
+        )
+
+
+def _render_precode_probe_context(probes: Sequence[PostRunProbe]) -> str:
+    rendered = [
+        "## MiniSWE-authored post-coding probes",
+        "These frozen probes were authored before implementation from the task "
+        "instruction and proposal diff. Preserve their expected behavior; the "
+        "workflow will run these exact probes after coding.",
+    ]
+    for probe in probes:
+        rendered.extend(
+            [
+                f"### {probe.probe_id} ({probe.scenario_id})",
+                f"Oracle basis: {probe.oracle_basis}",
+                "```python",
+                probe.test_source.rstrip(),
+                "```",
+            ]
+        )
+    return "\n\n".join(rendered)
 
 
 def _proposal_evidence_fingerprints(

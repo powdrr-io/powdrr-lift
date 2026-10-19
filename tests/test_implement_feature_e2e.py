@@ -625,17 +625,14 @@ class ProbeEnabledPlanningClient(DeterministicPlanningClient):
                         "oracle_basis": (
                             "The instruction explicitly names both output lines."
                         ),
-                        "test_source": (
-                            "import contextlib\n"
-                            "import io\n"
-                            "import runpy\n"
-                            "def test_probe_second_greeting():\n"
-                            "    output = io.StringIO()\n"
-                            "    with contextlib.redirect_stdout(output):\n"
-                            "        runpy.run_path('hello_world.py')\n"
-                            "    assert output.getvalue().splitlines() == ["
-                            "'Hello, world!', 'Hello from Powdrr!']\n"
-                        ),
+                        "imports": ["contextlib", "io", "runpy"],
+                        "body": [
+                            "output = io.StringIO()",
+                            "with contextlib.redirect_stdout(output):\n"
+                            "    runpy.run_path('hello_world.py')",
+                            "assert output.getvalue().splitlines() == "
+                            "['Hello, world!', 'Hello from Powdrr!']",
+                        ],
                     }
                 ]
             }
@@ -680,11 +677,8 @@ class InvalidSyntaxProbePlanningClient(ProbeEnabledPlanningClient):
                         "probe_id": "invalid-python",
                         "scenario_id": "scenario:instruction-001",
                         "oracle_basis": "The probe generator response is malformed.",
-                        "test_source": (
-                            "def test_probe_invalid():\n"
-                            "    assert True\n"
-                            "  assert False\n"
-                        ),
+                        "imports": [],
+                        "body": ["assert True\n  assert False"],
                     }
                 ]
             }
@@ -710,11 +704,8 @@ class RepairProbePlanningClient(ProbeEnabledPlanningClient):
                         "oracle_basis": (
                             "The instruction requires greeting_count() to return 2."
                         ),
-                        "test_source": (
-                            "import hello_world\n"
-                            "def test_probe_greeting_count():\n"
-                            "    assert hello_world.greeting_count() == 2\n"
-                        ),
+                        "imports": ["hello_world"],
+                        "body": ["assert hello_world.greeting_count() == 2"],
                     }
                 ]
             }

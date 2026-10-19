@@ -24,6 +24,16 @@ class _ProbeClient:
         return self.response
 
 
+class _ProbeRetryClient:
+    def __init__(self, responses: list[dict[str, Any]]) -> None:
+        self.responses = list(responses)
+        self.messages: list[list[dict[str, str]]] = []
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        self.messages.append(messages)
+        return self.responses.pop(0)
+
+
 def test_generate_postrun_probes_excludes_unresolved_scenarios() -> None:
     client = _ProbeClient(
         {
@@ -32,11 +42,8 @@ def test_generate_postrun_probes_excludes_unresolved_scenarios() -> None:
                     "probe_id": "probe-1",
                     "scenario_id": "scenario-1",
                     "oracle_basis": "The instruction explicitly requires this result.",
-                    "test_source": (
-                        "import math\n"
-                        "def test_probe_result():\n"
-                        "    assert math.factorial(2) == 2\n"
-                    ),
+                    "imports": ["math"],
+                    "body": ["assert math.factorial(2) == 2"],
                 }
             ]
         }
@@ -54,42 +61,132 @@ def test_generate_postrun_probes_excludes_unresolved_scenarios() -> None:
     )
 
     assert [probe.scenario_id for probe in probes] == ["scenario-1"]
+    assert probes[0].test_source == (
+        "import math\n\n"
+        "def test_probe_generated():\n"
+        "    assert math.factorial(2) == 2\n"
+    )
     assert client.messages is not None
     assert "candidate implementation" in client.messages[0]["content"]
     assert "scenario-2" not in client.messages[1]["content"]
 
 
+def test_generate_postrun_probes_repairs_invalid_python_once() -> None:
+    valid_probe = {
+        "probe_id": "probe-1",
+        "scenario_id": "scenario-1",
+        "oracle_basis": "The instruction explicitly requires this result.",
+        "imports": ["math"],
+        "body": ["assert math.factorial(2) == 2"],
+    }
+    invalid_probe = {
+        **valid_probe,
+        "probe_id": "probe-2",
+        "body": ["assert math.factorial(2) == 2\n  assert False"],
+    }
+    corrected_probe = {
+        **invalid_probe,
+        "body": ["assert math.factorial(2) == 2"],
+    }
+    client = _ProbeRetryClient(
+        [
+            {"probes": [valid_probe, invalid_probe]},
+            {"probes": [corrected_probe]},
+        ]
+    )
+
+    probes = generate_postrun_probes(
+        client,
+        instruction="Return the accumulated result.",
+        scenarios=({"scenario_id": "scenario-1"},),
+    )
+
+    assert len(client.messages) == 2
+    feedback = client.messages[1][-1]["content"]
+    assert "validation issues" in feedback
+    assert "probe-2" in feedback
+    assert [probe.probe_id for probe in probes] == ["probe-1", "probe-2"]
+    assert all("assert False" not in probe.test_source for probe in probes)
+
+
+def test_probe_syntax_repair_cannot_change_imports_or_provenance() -> None:
+    invalid_probe = {
+        "probe_id": "probe-1",
+        "scenario_id": "scenario-1",
+        "oracle_basis": "The instruction explicitly requires this result.",
+        "imports": ["math"],
+        "body": ["assert math.factorial(2) == 2\n  assert False"],
+    }
+    altered_probe = {
+        **invalid_probe,
+        "imports": ["json"],
+        "body": ["assert json.loads('2') == 2"],
+    }
+    client = _ProbeRetryClient(
+        [{"probes": [invalid_probe]}, {"probes": [altered_probe]}]
+    )
+
+    with pytest.raises(ValueError, match="changed probe provenance or imports"):
+        generate_postrun_probes(
+            client,
+            instruction="Return the accumulated result.",
+            scenarios=({"scenario_id": "scenario-1"},),
+        )
+
+
+def test_probe_generation_retries_when_probe_has_no_assertion() -> None:
+    incomplete_probe = {
+        "probe_id": "probe-1",
+        "scenario_id": "scenario-1",
+        "oracle_basis": "The instruction explicitly requires this result.",
+        "imports": ["math"],
+        "body": ["value = math.factorial(2)"],
+    }
+    corrected_probe = {
+        **incomplete_probe,
+        "body": ["assert math.factorial(2) == 2"],
+    }
+    client = _ProbeRetryClient(
+        [{"probes": [incomplete_probe]}, {"probes": [corrected_probe]}]
+    )
+
+    probes = generate_postrun_probes(
+        client,
+        instruction="Return the accumulated result.",
+        scenarios=({"scenario_id": "scenario-1"},),
+    )
+
+    assert len(client.messages) == 2
+    assert "observable assertion" in client.messages[1][-1]["content"]
+    assert len(probes) == 1
+    assert "assert math.factorial(2) == 2" in probes[0].test_source
+
+
 @pytest.mark.parametrize(
-    ("source", "expected_error"),
+    ("imports", "body", "expected_error"),
     [
-        ("def test_not_a_probe():\n    assert True\n", "test_probe_"),
-        ("def test_probe_broken():\n    assert True\n  assert False\n", "valid Python"),
+        ([], ["answer = 42"], "observable assertion"),
+        ([], ["assert True\n  assert False"], "valid Python"),
         (
-            "import math\n"
-            "import subprocess\n"
-            "def test_probe_side_effect():\n    assert math.factorial(1) == 1\n",
+            ["subprocess"],
+            ["assert subprocess.run(['true']).returncode == 0"],
             "disallowed system module",
         ),
         (
-            "import math\n"
-            "from pathlib import Path\n"
-            "def test_probe_side_effect():\n    assert math.factorial(1) == 1\n",
+            ["pathlib"],
+            ["assert pathlib.Path('.').exists()"],
             "disallowed system module",
         ),
+        ([], ["assert open('file', 'w')"], "disallowed function"),
         (
-            "def test_probe_bad():\n    assert open('file', 'w')\n",
-            "disallowed function",
-        ),
-        (
-            "import bandit\n"
-            "def test_probe_symbol_exists():\n"
-            "    assert hasattr(bandit, 'process')\n",
+            ["bandit"],
+            ["assert hasattr(bandit, 'process')"],
             "non-built-in software call",
         ),
     ],
 )
 def test_generate_postrun_probes_rejects_unsafe_or_malformed_source(
-    source: str, expected_error: str
+    imports: list[str], body: list[str], expected_error: str
 ) -> None:
     client = _ProbeClient(
         {
@@ -98,7 +195,8 @@ def test_generate_postrun_probes_rejects_unsafe_or_malformed_source(
                     "probe_id": "probe-1",
                     "scenario_id": "scenario-1",
                     "oracle_basis": "explicit instruction behavior",
-                    "test_source": source,
+                    "imports": imports,
+                    "body": body,
                 }
             ]
         }

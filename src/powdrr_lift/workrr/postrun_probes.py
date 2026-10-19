@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import builtins
 import json
 import os
 import re
@@ -292,10 +293,6 @@ def _validate_test_source(source: str) -> None:
         or function.args.kwarg
     ):
         raise ValueError("generated probe function must take no arguments")
-    if not any(isinstance(node, ast.Assert) for node in ast.walk(function)):
-        raise ValueError("generated probe must contain an observable assertion")
-    if not any(isinstance(node, ast.Call) for node in ast.walk(function)):
-        raise ValueError("generated probe must call the software under test")
     if any(
         not isinstance(item, (ast.Import, ast.ImportFrom, ast.FunctionDef))
         for item in tree.body
@@ -343,6 +340,23 @@ def _validate_test_source(source: str) -> None:
                 "ctypes",
             }:
                 raise ValueError("generated probe imports a disallowed system module")
+    if not any(isinstance(node, ast.Assert) for node in ast.walk(function)):
+        raise ValueError("generated probe must contain an observable assertion")
+    builtin_names = set(dir(builtins))
+    assert_calls = (
+        call
+        for assertion in ast.walk(function)
+        if isinstance(assertion, ast.Assert)
+        for call in ast.walk(assertion.test)
+        if isinstance(call, ast.Call)
+    )
+    if not any(
+        not isinstance(call.func, ast.Name) or call.func.id not in builtin_names
+        for call in assert_calls
+    ):
+        raise ValueError(
+            "generated probe assertion must exercise a non-built-in software call"
+        )
 
 
 def _required_text(value: Mapping[str, Any], key: str) -> str:

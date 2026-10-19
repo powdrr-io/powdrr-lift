@@ -393,9 +393,6 @@ def discover_validation_profiles(
                 "stestr configuration/CI",
                 provider_name="stestr",
                 declaration="declared" if stestr_commands else "inferred",
-                evidence=(".stestr.conf",)
-                if (root_path / ".stestr.conf").is_file()
-                else (),
             )
         )
 

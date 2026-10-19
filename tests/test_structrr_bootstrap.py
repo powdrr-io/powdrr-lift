@@ -246,6 +246,41 @@ def test_benchmark_bootstrap_omits_validation_without_tracked_source(
     )
 
 
+def test_benchmark_bootstrap_keeps_stestr_profile_from_tracked_configuration(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    (repo / ".stestr.conf").write_text("[DEFAULT]\ntest_path=tests\n", encoding="utf-8")
+    (repo / "tox.ini").write_text(
+        "[tox]\nenvlist=py\n[testenv]\ncommands=stestr run\n",
+        encoding="utf-8",
+    )
+    (repo / "tests").mkdir()
+    (repo / "tests/test_app.py").write_text(
+        "def test_app():\n    assert True\n", encoding="utf-8"
+    )
+    _git(repo, "add", ".stestr.conf", "tox.ini", "tests/test_app.py")
+    _git(repo, "commit", "-qm", "declare stestr validation")
+
+    result = bootstrap_structrr(
+        repo,
+        output_path=tmp_path / "benchmark-stestr.yaml",
+        benchmark_mode=True,
+    )
+
+    assert result.validation.successful
+    tools = {item["id"]: item for item in result.document["tools"]}
+    assert tools["validation:stestr"]["validation_action"] == [
+        "stestr",
+        "run",
+        "--concurrency",
+        "1",
+    ]
+    assert "stestr" in {
+        item["provider"] for item in result.document["validation_inventory"]
+    }
+
+
 def test_bootstrap_records_detected_validation_tools(tmp_path: Path) -> None:
     repo = _fixture_repo(tmp_path)
     (repo / "pyproject.toml").write_text(

@@ -5648,6 +5648,9 @@ def _compile_code_task_plan(
         else []
     )
     plans = _flow_items(parameters.get("verification_plans"))
+    validation_profile = _preferred_code_task_validation_profile(
+        parameters.get("validation_profiles")
+    )
     # Feature obligations are new product work.  A passing baseline cannot
     # satisfy them because their focused tests do not exist until the worker
     # adds them.  Baseline failures are still useful evidence, but the absence
@@ -5750,7 +5753,9 @@ def _compile_code_task_plan(
                     source.get("contract_refs", ())
                 ),
                 "allowed_paths": list(getattr(config, "allowed_paths", ())),
-                "validation_profiles": ["pytest"],
+                "validation_profiles": [validation_profile]
+                if validation_profile
+                else ["pytest"],
                 "acceptance_criteria": acceptance_criteria,
                 "planned_additions": [],
                 "planned_deletions": [],
@@ -6131,6 +6136,38 @@ def _evaluate_deterministic_decision(parameters: Mapping[str, Any]) -> dict[str,
         "outcome": "blocked",
         "explanation": "decision did not provide a boolean result",
     }
+
+
+def _preferred_code_task_validation_profile(value: Any) -> str | None:
+    """Choose a native test profile for the coding task's focused checks."""
+    profiles = (
+        [item for item in value if isinstance(item, Mapping)]
+        if isinstance(value, list)
+        else []
+    )
+    ranked: list[tuple[int, str]] = []
+    for profile in profiles:
+        name = profile.get("name")
+        command = profile.get("command")
+        if (
+            not isinstance(name, str)
+            or not name.strip()
+            or not isinstance(command, list)
+        ):
+            continue
+        tokens = {
+            Path(str(item)).name.casefold() for item in command if isinstance(item, str)
+        }
+        if "stestr" in tokens:
+            rank = 0
+        elif "pytest" in tokens:
+            rank = 1
+        elif "test" in name.casefold() or "test" in tokens:
+            rank = 2
+        else:
+            continue
+        ranked.append((rank, name.strip()))
+    return min(ranked)[1] if ranked else None
 
 
 def _finalize_flow_review(

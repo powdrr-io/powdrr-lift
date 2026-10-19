@@ -363,6 +363,7 @@ steps:
         baseline: {type: reference, value: baseline.path}
         plan: {type: reference, value: plan.path}
         proposal_review_receipt: {type: reference, value: proposal_review_result.receipt_path}
+        validation_profiles: {type: reference, value: validation_profiles}
         verification_plans: {type: reference, value: obligation_verification_plans.plans}
         populations: {type: reference, value: obligation_populations.populations}
         baseline_evidence: {type: reference, value: obligation_baseline}

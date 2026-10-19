@@ -238,3 +238,44 @@ PYTHONPATH=src /Users/gregory/code/powdrr-lift/.venv/bin/python \
 The synthetic cases complement the three real task prompt evaluations. They do
 not use solution or verifier patches as source labels; those references remain
 exclusive to the offline prompt evaluator.
+
+## Comparing generated probes with verifier cases
+
+Generated postrun probes are persisted before the coding worker runs, under
+`postrun-probes/probe-suite.json` in the feature run directory. Compare that
+frozen suite with the task's verifier patch after the run:
+
+```bash
+uv run powdrr-lift evaluate-deepswe-probes \
+  --task-dir /path/to/deep-swe/tasks/python-statemachine-state-data-scoping \
+  --run-dir /path/to/feature-run \
+  --report /path/to/feature-run/probe-quality-evaluation.json
+```
+
+The evaluator checks that the suite contains the task's exact instruction,
+fingerprints the frozen suite and verifier patch, discovers named tests from
+`tests/test.patch`, and asks a separate judge to describe their asserted
+behaviors and match them to the generated probes. It reads verifier tests only
+after probe generation. It does not read the reference solution or pass verifier
+content to the probe generator.
+
+The report retains each verifier test's behavior and source quote, each probe's
+instruction support (`explicit`, `inferred`, `unsupported`, or `unclear`), and
+its verifier coverage (`exact`, `partial`, `none`, or `unjudgeable`). Summary
+metrics include exact and any-match case recall, exact and any-match probe
+precision, unjudgeable verifier cases, unsupported probes, and probes unmatched
+to the verifier. When a suite has no executable probes, the report records the
+generation error and unprobed scenarios and leaves recall undefined; it does not
+claim that unassessed tests were covered or missed. An instruction-supported
+probe can be unmatched to the verifier; that is reported separately from an
+unsupported probe. These are diagnostic metrics, not a run acceptance gate. A
+probe suite with no executable probes still produces a report when individual
+verifier tests can be discovered.
+
+Test identifiers are currently discovered from common Python, Go, Rust, Java,
+JavaScript, and TypeScript test naming patterns. Tasks whose verifier patch does
+not use a recognized test naming style currently fail with a clear input error;
+an explicit test-case manifest is a future extension. Matching is model-judged
+and requires quoted source evidence. Invalid quotes are recorded as
+unjudgeable evidence rather than counted as matches, so unclear cases should be
+reviewed before using aggregate metrics to change probe-generation policy.

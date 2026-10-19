@@ -1,0 +1,89 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1032
+title: Compare generated probes with DeepSWE verifier tests
+intent:
+  problem: Generated probes are run during implementation, but there is no offline measure of how well they cover independent DeepSWE verifier behaviors or whether they assert unsupported behavior.
+  goal: Evaluate a frozen probe suite against task verifier tests and record auditable coverage metrics without exposing verifier material to probe generation.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 241
+    end_line: 281
+  summary: Document the probe-to-verifier evaluation command, reports, metrics, and limits.
+  rationale: Make the offline evaluation reproducible and explain how to read incomplete or uncertain results.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 184
+    end_line: 187
+  summary: Register the probe evaluation implementation with the CLI.
+  rationale: Expose the offline verifier comparison as a supported command.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1767
+    end_line: 1783
+  summary: Add the evaluate-deepswe-probes command and its task, suite, report, and judge options.
+  rationale: Let operators evaluate saved probe suites against DeepSWE task verifier tests.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5780
+    end_line: 5840
+  summary: Load the frozen suite, run offline evaluation, and write its report.
+  rationale: Keep verifier assessment separate from probe generation and persist reproducible findings.
+- path: src/powdrr_lift/workrr/deepswe_probe_evaluation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 575
+  summary: Validate frozen probe suites, interpret named verifier tests, and calculate evidence-backed coverage metrics.
+  rationale: Measure probe coverage and instruction support while preserving explicit unknowns and artifact fingerprints.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 107
+  summary: Test command parsing and the no-probe path that requires no judge credentials.
+  rationale: Verify CLI dispatch and allow unavailable suites to produce reports without a model call.
+- path: tests/test_deepswe_probe_evaluation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 243
+  summary: Test verifier matching, recall and precision, unsupported probes, citation validation, unavailable suites, and test identifier discovery.
+  rationale: Verify the evaluation report's measurements and fail-closed evidence handling.
+entities:
+- id: deepswe-probe-evaluation-command
+  type: Subcommand
+  action: added
+- id: deepswe-probe-evaluation-function
+  type: Function
+  action: added
+- id: deepswe-probe-coverage-report
+  type: Coverage report
+  action: added
+- id: deepswe-probe-evaluation-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: verifier-ground-truth-stays-offline
+  description: DeepSWE verifier patches are read only by the offline evaluator after probe generation and are never provided to the probe generator.
+  action: added
+- id: unsupported-and-unmatched-probes-are-distinct
+  description: A probe unsupported by the instruction is counted separately from an instruction-supported probe that is absent from the verifier tests.
+  action: added
+- id: invalid-evaluation-evidence-cannot-count-as-a-match
+  description: A judge finding with a missing or invalid source quote is marked unjudgeable and excluded from positive coverage metrics.
+  action: added
+- id: absent-probe-coverage-is-not-fabricated
+  description: If a suite has no executable probes, the report preserves the generation error and leaves case recall undefined instead of claiming pass or failure.
+  action: added
+guidance:
+- id: review-ground-truth-match-evidence
+  description: Review ambiguous model-judged verifier mappings before changing probe-generation policy based on aggregate metrics.
+  action: added

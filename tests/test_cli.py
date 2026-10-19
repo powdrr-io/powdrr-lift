@@ -44,6 +44,67 @@ def test_prompt_evaluation_cli_preserves_deepswe_and_adds_generic_case() -> None
     assert deepswe.func.__name__ == "_run_deepswe_prompt_evaluation"
 
 
+def test_deepswe_probe_evaluation_cli_dispatches() -> None:
+    args = build_parser().parse_args(
+        [
+            "evaluate-deepswe-probes",
+            "--task-dir",
+            "task",
+            "--run-dir",
+            "run",
+            "--probe-suite",
+            "suite.json",
+        ]
+    )
+
+    assert args.func.__name__ == "_run_deepswe_probe_evaluation"
+    assert args.probe_suite == Path("suite.json")
+
+
+def test_deepswe_probe_evaluation_skips_judge_for_empty_suite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import powdrr_lift.cli as cli
+
+    run_dir = tmp_path / "run"
+    suite_path = run_dir / "postrun-probes" / "probe-suite.json"
+    suite_path.parent.mkdir(parents=True)
+    suite_path.write_text('{"probes": []}', encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    def evaluate(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {
+            "task_id": "sample-task",
+            "summary": {
+                "exact_case_recall": None,
+                "any_case_recall": None,
+                "unsupported_probe_count": 0,
+            },
+        }
+
+    monkeypatch.setattr(cli, "evaluate_deepswe_probes", evaluate)
+    monkeypatch.setattr(
+        cli,
+        "resolve_workflow_provider",
+        lambda *_args: pytest.fail("judge provider should not be resolved"),
+    )
+
+    status = main(
+        [
+            "evaluate-deepswe-probes",
+            "--task-dir",
+            str(tmp_path / "task"),
+            "--run-dir",
+            str(run_dir),
+        ]
+    )
+
+    assert status == 0
+    assert captured["judge"] is None
+    assert (run_dir / "probe-quality-evaluation.json").is_file()
+
+
 def test_prompt_benchmark_comparison_cli_dispatches() -> None:
     args = build_parser().parse_args(
         [

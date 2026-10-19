@@ -326,13 +326,21 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
         .document
     )
     steps = process["steps"]
-    assert process["limits"]["tool_calls"] == 400
+    assert "tool_calls" not in process["limits"]
+    assert "llm_activations" not in process["limits"]
     process_calls = [step["call"]["process"] for step in steps if "call" in step]
     assert process_calls == [
         "execute-proposed-pr",
         "finish-pr-prep",
         "create-pull-request",
     ]
+    catalog = ProcessCatalog.load(
+        Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    )
+    for process_name in process_calls:
+        limits = catalog.get(process_name).document.get("limits", {})
+        assert "tool_calls" not in limits
+        assert "llm_activations" not in limits
     assert steps[0]["call"]["outputs"] == {"implementation_result": "coding_attempt"}
     assert steps[1]["gate"]["subject"] == "implementation_result.passed"
     assert steps[2]["judge"]["output"]["name"] == "publication_scope"

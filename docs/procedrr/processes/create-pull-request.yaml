@@ -10,7 +10,7 @@ outputs:
     type: string
     minLength: 1
     pattern: ^https?://[^ ]+/pull/[0-9]+$
-limits: {llm_activations: 1, tool_calls: 1, context_chars: 12000, context_value_chars: 8000}
+limits: {context_chars: 12000, context_value_chars: 8000}
 steps:
   - operation:
       tool: invoke_tool

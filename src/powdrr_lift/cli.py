@@ -178,6 +178,7 @@ from powdrr_lift.workrr.deepswe_design_evaluation import (
     DeepSWEEvaluationError,
     evaluate_deepswe_design,
     evaluate_deepswe_worker_prompt,
+    evaluate_prompt_case,
 )
 from powdrr_lift.workrr.differential_verification import (
     classify_differential_result,
@@ -1759,6 +1760,25 @@ def build_parser() -> argparse.ArgumentParser:
     deepswe_prompt_eval_parser.add_argument("--judge-base-url")
     deepswe_prompt_eval_parser.add_argument("--json", action="store_true")
     deepswe_prompt_eval_parser.set_defaults(func=_run_deepswe_prompt_evaluation)
+
+    prompt_eval_parser = subparsers.add_parser(
+        "evaluate-prompt",
+        help=(
+            "Evaluate captured worker prompts with a versioned prompt case and rubric."
+        ),
+    )
+    prompt_eval_parser.add_argument("--case", required=True, type=Path)
+    prompt_eval_parser.add_argument("--run-dir", required=True, type=Path)
+    prompt_eval_parser.add_argument("--rubric", required=True, type=Path)
+    prompt_eval_parser.add_argument("--report", type=Path)
+    prompt_eval_parser.add_argument(
+        "--judge-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
+    )
+    prompt_eval_parser.add_argument("--judge-model")
+    prompt_eval_parser.add_argument("--judge-api-key")
+    prompt_eval_parser.add_argument("--judge-base-url")
+    prompt_eval_parser.add_argument("--json", action="store_true")
+    prompt_eval_parser.set_defaults(func=_run_generic_prompt_evaluation)
 
     replay_subject_bindings_parser = subparsers.add_parser(
         "replay-subject-bindings",
@@ -5690,6 +5710,53 @@ def _run_deepswe_prompt_evaluation(args: argparse.Namespace) -> int:
         summary = report["summary"]
         print(
             f"DeepSWE worker-prompt evaluation {report['task_id']}: "
+            f"score {summary['prompt_score']}/100; gate {summary['gate']}; "
+            f"{summary['supported_count']}/{summary['criterion_count']} supported; "
+            f"critical failures {len(summary['critical_failures'])}; "
+            f"evaluation errors {len(summary['evaluation_errors'])}."
+        )
+        print(f"Report: {report_path}")
+    return 0 if report["summary"]["passed"] else 1
+
+
+def _run_generic_prompt_evaluation(args: argparse.Namespace) -> int:
+    provider = resolve_workflow_provider(args.judge_provider)
+    mapping = default_llm_mappings(provider)["standard_reasoning"]
+    try:
+        credentials = resolve_provider_credentials(
+            mapping.provider,
+            args.judge_api_key,
+            args.judge_base_url,
+        )
+        model = args.judge_model or mapping.model
+        judge = build_workflow_client(
+            credentials,
+            model=model,
+            model_cache_dir=args.run_dir / ".models",
+            progress_stream=sys.stderr,
+        )
+        report = evaluate_prompt_case(
+            case_path=args.case,
+            run_dir=args.run_dir,
+            judge=judge,
+            rubric_path=args.rubric,
+            judge_id=f"{mapping.provider}/{model}",
+        )
+    except (DeepSWEEvaluationError, PowdrrExecutionError) as error:
+        print(f"Prompt evaluation failed: {error}", file=sys.stderr)
+        return 1
+    report_path = args.report or args.run_dir / "prompt-quality-evaluation.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+    else:
+        summary = report["summary"]
+        print(
+            f"Prompt evaluation {report['task_id']}: "
             f"score {summary['prompt_score']}/100; gate {summary['gate']}; "
             f"{summary['supported_count']}/{summary['criterion_count']} supported; "
             f"critical failures {len(summary['critical_failures'])}; "

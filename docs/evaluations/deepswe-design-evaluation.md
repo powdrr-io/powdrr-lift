@@ -97,7 +97,7 @@ explicit absence check: branch/commit directions must not leak into worker
 prompts. Ground-truth files and rubric content are only read after prompt
 capture; they are not supplied to the design interview or request compiler.
 
-The v2 prompt report gives a reproducible 0–100 `summary.prompt_score`. Each
+The prompt report gives a reproducible 0–100 `summary.prompt_score`. Each
 criterion has weight 3 when critical and 1 when important; only `supported`
 earns points. `missing`, `contradicted`, and `ambiguous` earn zero. The report
 retains the weighted coverage ratio and adds verdict counts and per-dimension
@@ -112,6 +112,57 @@ the source excerpt, rubric dimension, evidence quote, verdict, and reason;
 `summary.evaluation_errors` identifies judge or evidence-protocol failures so
 they are distinguishable from prompt defects. A high aggregate score never
 overrides a critical failure.
+
+### Evaluating a non-DeepSWE prompt capture
+
+`evaluate-prompt` uses the same captured prompt index, hash checks, source
+anchor validation, judge evidence protocol, and score aggregation without
+requiring `task.toml`, a reference solution, or verifier patches. Create a case
+manifest and a rubric with matching IDs:
+
+```json
+{
+  "schema_version": "prompt-eval-case-v1",
+  "case_id": "my-repository-feature",
+  "instruction_path": "instructions.md"
+}
+```
+
+```yaml
+schema_version: prompt-eval-rubric-v1
+case_id: my-repository-feature
+criteria:
+  - id: required-api-behavior
+    instruction_excerpt: "The API must return the normalized value."
+    expected_behavior: "The worker prompt directs the worker to return the normalized value."
+    importance: critical
+    dimension: coverage
+    required_prompt_claims:
+      - "return the normalized value"
+    forbidden_prompt_claims: []
+    validation_test_ids:
+      - "tests/test_api.py::test_normalized_value"
+```
+
+Paths in the case manifest are relative to the manifest. Optional
+`solution_patch_path` and `verifier_patch_path` entries allow offline reference
+anchor checks using `solution_symbols` and `verifier_tests`; generic cases do
+not need them. `validation_test_ids` are recorded for later benchmark
+comparison and are not read or run by prompt evaluation.
+
+```bash
+uv run powdrr-lift evaluate-prompt \
+  --case /path/to/prompt-eval-case.json \
+  --run-dir /path/to/captured-run \
+  --rubric /path/to/prompt-eval-rubric.yaml \
+  --report /path/to/captured-run/prompt-quality-evaluation.json
+```
+
+The run metadata, rubric, and case must identify the same case ID. The case's
+instruction file must exactly match the instruction recorded in the captured
+run's ledger. Generic and DeepSWE prompt evaluations emit the same
+`prompt-evaluation-report-v1` report and scoring contract. The
+`evaluate-deepswe-prompt` command remains available for task-directory users.
 
 The rubric covers distinctions exercised by the benchmark tests, including
 state-owned versus callback-merged data, absent versus explicitly empty

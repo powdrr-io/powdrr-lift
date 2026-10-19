@@ -1,0 +1,177 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1028
+title: Generalize prompt evaluation cases
+intent:
+  problem: Prompt grading only accepts DeepSWE task directories and task-specific rubric files.
+  goal: Evaluate captured prompts from any case through the same scoring, provenance, and evidence checks while preserving the DeepSWE command.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 100
+    end_line: 100
+  summary: Rename the worker prompt report description to avoid implying the old report schema.
+  rationale: Keep documentation aligned with the shared prompt-evaluation-report-v1 contract.
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 116
+    end_line: 166
+  summary: Document generic case manifests, rubric criteria, and the evaluate-prompt command.
+  rationale: Let operators apply prompt grading to non-DeepSWE captures and record validation mappings.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 181
+    end_line: 181
+  summary: Import the generic prompt case evaluator for CLI dispatch.
+  rationale: Route generic prompt evaluation through the shared evaluation implementation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1764
+    end_line: 1782
+  summary: Add the evaluate-prompt CLI command and generic case arguments.
+  rationale: Expose reusable prompt evaluation for captured runs outside DeepSWE.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5719
+    end_line: 5765
+  summary: Implement generic prompt evaluation output and score summary.
+  rationale: Save the shared report and surface score, gate, and evaluation errors to CLI users.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 57
+    end_line: 74
+  summary: Resolve generic case instruction and optional reference paths.
+  rationale: Support portable case manifests with paths relative to the manifest.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 328
+    end_line: 329
+  summary: Allow the shared evaluator to receive either a DeepSWE task or generic case.
+  rationale: Keep both entry points on one prompt loading and scoring path.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 335
+    end_line: 335
+  summary: Describe the evaluator as supporting both case types.
+  rationale: Reflect the generic input behavior in its API documentation.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 362
+  summary: Load generic case identity, instruction, and optional offline reference files.
+  rationale: Remove task.toml and DeepSWE directory naming as requirements for generic evaluation.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 366
+    end_line: 375
+  summary: Check required run artifacts and optional generic case references.
+  rationale: Preserve input validation while allowing reference-free generic cases.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 372
+    end_line: 381
+  summary: Read optional references and validate case/task identity against the rubric and run.
+  rationale: Keep provenance checks consistent for both evaluation entry points.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 388
+    end_line: 389
+  summary: Use a shared instruction-ledger and source-text verification path.
+  rationale: Ensure generic cases grade the exact instruction captured by the run.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 393
+    end_line: 412
+  summary: Validate either generic rubric IDs or DeepSWE task IDs.
+  rationale: Retain source and run identity safeguards across rubric formats.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 414
+    end_line: 414
+  summary: Generalize the identity mismatch error for both case types.
+  rationale: Make provenance failures meaningful for generic evaluations.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 501
+    end_line: 513
+  summary: Validate optional generic reference anchors and validation test mappings.
+  rationale: Support reusable rubric criteria while keeping offline reference checks explicit.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 588
+    end_line: 605
+  summary: Record generic validation test IDs in criterion findings.
+  rationale: Preserve stable criterion-to-test mappings for the planned benchmark comparison stage.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 609
+    end_line: 610
+  summary: Emit one versioned report schema for generic and DeepSWE prompt evaluations.
+  rationale: Make reports consumable by the same tooling while identifying case type.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 630
+    end_line: 645
+  summary: Fingerprint optional references and the generic case manifest.
+  rationale: Keep report provenance auditable when generic cases omit benchmark references.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 654
+    end_line: 671
+  summary: Add the generic public evaluator wrapper over the shared score core.
+  rationale: Provide a clear API for the evaluate-prompt CLI and reusable callers.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 996
+    end_line: 1001
+  summary: Read optional case reference content safely.
+  rationale: Avoid requiring solution or verifier content for ordinary generic prompt cases.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 1017
+    end_line: 1017
+  summary: Export the generic prompt evaluator API.
+  rationale: Make the new entry point available to other package modules.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 46
+  summary: Assert generic CLI dispatch and preserve the existing DeepSWE command dispatch.
+  rationale: Catch parser regressions in both supported command paths.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 254
+    end_line: 254
+  summary: Assert the shared report schema for the compatible DeepSWE evaluator.
+  rationale: Lock in the report contract used by both CLI entry points.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 374
+    end_line: 438
+  summary: Exercise a generic case without task metadata, solution, or verifier files.
+  rationale: Prove non-DeepSWE inputs use the same score and validation mapping behavior.

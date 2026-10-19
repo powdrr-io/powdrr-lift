@@ -21,6 +21,16 @@ steps:
   - operation:
       tool: invoke_tool
       parameters:
+        tool: git
+        parameters: {operation: add, paths: "${files_to_publish}"}
+      bind: stage_result
+  - gate:
+      subject: stage_result.returncode
+      equals: 0
+      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+  - operation:
+      tool: invoke_tool
+      parameters:
         tool: shell
         parameters: {command: [git, diff, --cached, --stat]}
       bind: staged_diff_summary
@@ -30,9 +40,10 @@ steps:
       subject: staged_diff_summary
       prompt_system: Return only the declared JSON object.
       instructions:
-        - Compare repository_status_before and staged_diff_summary with the exact files_to_publish input.
-        - Confirm only when the staged set is the intended pull-request scope.
-        - Name every unexpected, missing, or unstaged path in findings.
+        - Compare staged_diff_summary with the exact files_to_publish input; the staged diff is authoritative for what will be committed.
+        - Confirm only when the staged set contains every files_to_publish path and no other path.
+        - repository_status_before is pre-staging context. Unstaged or untracked paths outside files_to_publish remain excluded from the commit and do not fail this scope check.
+        - Name every unexpected staged path or missing intended staged path in findings.
       context: [files_to_publish, repository_status_before, staged_diff_summary]
       output:
         name: scope_review

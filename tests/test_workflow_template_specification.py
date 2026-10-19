@@ -332,6 +332,8 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     assert "formatting, lint, type" in question
     assert "Review the complete diff for scope" in question
     assert "`finish-pr-prep`" in question
+    assert "`create-pull-request` Procedrr process" in question
+    assert "returned pull-request URL" in question
 
 
 def test_instantiate_procedrr_process_workflow_creates_task(tmp_path: Path) -> None:

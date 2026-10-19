@@ -33,11 +33,18 @@ steps:
       proposal-document paths, promote those documents to their declared
       current-state paths and verify the move. Finally derive the exact files
       and language labels to publish and call `finish-pr-prep` with
-      files_to_publish and language_labels. Wait for its result before reporting
+      files_to_publish and language_labels. Wait for its result before
+      continuing. Then invoke the `create-pull-request` Procedrr process through
+      `task_run_process`, passing `user_request` and a `workflow_context` that
+      includes the proposed-PR context, exact files_to_publish and
+      language_labels, accepted validation results, base branch `main`, a
+      commit message, and a fully populated PR description grounded in the
+      implementation and checks that actually ran. Wait for the nested process
+      result and require its returned pull-request URL before reporting
       success. Return a concise report containing implementation, validation,
-      scope-review, document-promotion when applicable, and pull-request
-      preparation results. Do not stage, commit, push, or open a pull request
-      outside the finish-pr-prep process.
+      scope-review, document-promotion when applicable, and pull-request URL.
+      Do not stage, commit, push, or open a pull request outside the
+      `finish-pr-prep` and `create-pull-request` processes.
     context: [task_context]
     allowed_tools:
     - gather_context

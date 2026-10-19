@@ -9,6 +9,7 @@ import pytest
 from powdrr_lift.workrr.postrun_probes import (
     PostRunProbe,
     generate_postrun_probes,
+    parse_generated_postrun_probes,
     probe_failures,
     run_postrun_probes,
 )
@@ -32,6 +33,47 @@ class _ProbeRetryClient:
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
         self.messages.append(messages)
         return self.responses.pop(0)
+
+
+def test_parse_generated_postrun_probes_validates_miniswe_manifest() -> None:
+    probes = parse_generated_postrun_probes(
+        {
+            "probes": [
+                {
+                    "probe_id": "negative-selection",
+                    "scenario_id": "selector",
+                    "oracle_basis": "The task says `none` applies no suppression.",
+                    "imports": ["module"],
+                    "body": [
+                        "assert module.public_api('# nosec-begin none') == []",
+                    ],
+                }
+            ]
+        },
+        ({"scenario_id": "selector"},),
+    )
+
+    assert len(probes) == 1
+    assert probes[0].probe_id == "negative-selection"
+    assert "module.public_api" in probes[0].test_source
+
+
+def test_parse_generated_postrun_probes_rejects_unknown_scenario() -> None:
+    with pytest.raises(ValueError, match="unknown scenario"):
+        parse_generated_postrun_probes(
+            {
+                "probes": [
+                    {
+                        "probe_id": "probe-1",
+                        "scenario_id": "not-in-contract",
+                        "oracle_basis": "source basis",
+                        "imports": [],
+                        "body": ["assert public_api() is None"],
+                    }
+                ]
+            },
+            ({"scenario_id": "scenario-1"},),
+        )
 
 
 def test_generate_postrun_probes_excludes_unresolved_scenarios() -> None:

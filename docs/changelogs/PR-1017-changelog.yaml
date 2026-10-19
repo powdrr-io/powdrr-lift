@@ -219,7 +219,7 @@ files:
     rationale: Construct the same edit value passed by Procedrr operations.
   - path: tests/test_workflow_task_agent.py
     type: modified
-    span: {start_line: 47, end_line: 47}
+    span: {start_line: 46, end_line: 46}
     summary: Import the task edit application helper for new-file coverage.
     rationale: Exercise the task agent's normal file edit implementation.
   - path: tests/test_workflow_task_agent.py

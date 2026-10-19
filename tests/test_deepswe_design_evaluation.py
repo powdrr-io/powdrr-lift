@@ -10,6 +10,7 @@ import yaml
 
 from powdrr_lift.workrr.deepswe_design_evaluation import (
     DeepSWEEvaluationError,
+    _summarize_prompt_findings,
     evaluate_deepswe_design,
     evaluate_deepswe_worker_prompt,
 )
@@ -123,6 +124,7 @@ def _inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
                     {
                         "id": "api-adds-value",
                         "importance": "critical",
+                        "dimension": "faithfulness",
                         "instruction_excerpt": "The API adds a value.",
                         "expected_behavior": "The API returns an added value.",
                         "solution_symbols": ["add_value"],
@@ -133,6 +135,7 @@ def _inputs(tmp_path: Path) -> tuple[Path, Path, Path]:
                     {
                         "id": "process-only",
                         "importance": "important",
+                        "dimension": "consistency_scope",
                         "worker_prompt_expectation": "absent",
                         "instruction_excerpt": (
                             "A branch and commit are process instructions."
@@ -183,6 +186,52 @@ def _capture_prompt_artifacts(run_dir: Path, prompt: str) -> None:
     )
 
 
+def test_checked_in_prompt_rubrics_assign_supported_dimensions() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    rubric_paths = (
+        repo_root / "docs/evaluations/deepswe-python-statemachine-state-data.yaml",
+        repo_root / "docs/evaluations/deepswe-skrub-duration-encoding.yaml",
+        repo_root / "docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml",
+    )
+    allowed_dimensions = {
+        "coverage",
+        "faithfulness",
+        "grounding",
+        "actionability",
+        "consistency_scope",
+        "clarity",
+    }
+
+    for rubric_path in rubric_paths:
+        rubric = yaml.safe_load(rubric_path.read_text(encoding="utf-8"))
+        assert rubric["criteria"]
+        assert all(
+            criterion.get("dimension") in allowed_dimensions
+            for criterion in rubric["criteria"]
+        )
+
+
+def test_legacy_prompt_rubric_defaults_to_coverage_dimension(
+    tmp_path: Path,
+) -> None:
+    task_dir, run_dir, rubric_path = _inputs(tmp_path)
+    _capture_prompt_artifacts(run_dir, "Adds value")
+    rubric = yaml.safe_load(rubric_path.read_text(encoding="utf-8"))
+    for criterion in rubric["criteria"]:
+        criterion.pop("dimension", None)
+    rubric_path.write_text(yaml.safe_dump(rubric), encoding="utf-8")
+
+    report = evaluate_deepswe_worker_prompt(
+        task_dir=task_dir,
+        run_dir=run_dir,
+        judge=FakeJudge(),
+        rubric_path=rubric_path,
+    )
+
+    assert {item["dimension"] for item in report["findings"]} == {"coverage"}
+    assert report["summary"]["dimension_scores"]["coverage"]["score"] == 100
+
+
 def test_worker_prompt_evaluation_checks_exact_captured_prompt_and_references(
     tmp_path: Path,
 ) -> None:
@@ -202,13 +251,33 @@ def test_worker_prompt_evaluation_checks_exact_captured_prompt_and_references(
         judge_id="fake/judge",
     )
 
-    assert report["schema_version"] == "deepswe-worker-prompt-evaluation-v1"
+    assert report["schema_version"] == "deepswe-worker-prompt-evaluation-v2"
+    assert report["scoring_contract"] == "prompt-score-v1"
+    assert report["scoring_parameters"]["importance_weights"] == {
+        "critical": 3,
+        "important": 1,
+    }
+    assert report["summary"]["prompt_score"] == 100
+    assert report["summary"]["gate"] == "pass"
+    assert report["summary"]["dimension_scores"]["faithfulness"]["score"] == 100
+    assert report["summary"]["dimension_scores"]["consistency_scope"]["score"] == 100
     assert report["summary"]["passed"] is True
     assert report["findings"][0]["decision"] == "supported"
     assert report["findings"][0]["evidence_quote"] == "Adds value"
     assert len(judge.calls) == 1
+    assert report["summary"]["judge_calls"] == 1
+    assert report["findings"][0]["dimension"] == "faithfulness"
     assert report["findings"][1]["decision"] == "supported"
     assert report["findings"][1]["evidence_quote"] == ""
+    replay = evaluate_deepswe_worker_prompt(
+        task_dir=task_dir,
+        run_dir=run_dir,
+        judge=FakeJudge(),
+        rubric_path=rubric_path,
+        judge_id="fake/judge",
+    )
+    assert replay["summary"] == report["summary"]
+    assert replay["fingerprint"] == report["fingerprint"]
 
 
 def test_worker_prompt_rubric_rejects_problem_context_as_worker_content(
@@ -351,6 +420,132 @@ def test_worker_prompt_evaluation_accepts_retry_attempts_for_same_request(
     )
 
     assert len(report["worker_prompts"]) == 2
+
+
+def test_prompt_score_uses_weighted_verdicts_and_critical_gate() -> None:
+    summary = _summarize_prompt_findings(
+        [
+            {
+                "criterion_id": "covered-critical",
+                "importance": "critical",
+                "dimension": "coverage",
+                "decision": "supported",
+            },
+            {
+                "criterion_id": "missing-critical",
+                "importance": "critical",
+                "dimension": "faithfulness",
+                "decision": "missing",
+            },
+            {
+                "criterion_id": "ambiguous-important",
+                "importance": "important",
+                "dimension": "faithfulness",
+                "decision": "ambiguous",
+            },
+            {
+                "criterion_id": "covered-important",
+                "importance": "important",
+                "dimension": "clarity",
+                "decision": "supported",
+            },
+        ]
+    )
+
+    assert summary["prompt_score"] == 50
+    assert summary["weighted_coverage"] == 0.5
+    assert summary["verdict_counts"] == {
+        "supported": 2,
+        "missing": 1,
+        "contradicted": 0,
+        "ambiguous": 1,
+    }
+    assert summary["dimension_scores"]["coverage"]["score"] == 100
+    assert summary["dimension_scores"]["faithfulness"]["score"] == 0
+    assert summary["critical_failures"] == ["missing-critical"]
+    assert summary["gate"] == "fail"
+    assert summary["passed"] is False
+
+
+def test_prompt_evaluation_error_is_distinct_from_prompt_failure(
+    tmp_path: Path,
+) -> None:
+    task_dir, run_dir, rubric_path = _inputs(tmp_path)
+    _capture_prompt_artifacts(run_dir, "Adds value")
+
+    class FailingJudge(FakeJudge):
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, str]:
+            raise TimeoutError("temporary judge timeout")
+
+    report = evaluate_deepswe_worker_prompt(
+        task_dir=task_dir,
+        run_dir=run_dir,
+        judge=FailingJudge(),
+        rubric_path=rubric_path,
+    )
+
+    assert report["summary"]["prompt_score"] == 25
+    assert report["summary"]["gate"] == "error"
+    assert report["summary"]["passed"] is False
+    assert report["summary"]["evaluation_errors"] == [
+        {"criterion_id": "api-adds-value", "code": "judge_call_failed"}
+    ]
+    assert report["findings"][0]["decision"] == "ambiguous"
+
+
+def test_prompt_evaluation_rejects_unknown_rubric_dimension(
+    tmp_path: Path,
+) -> None:
+    task_dir, run_dir, rubric_path = _inputs(tmp_path)
+    _capture_prompt_artifacts(run_dir, "Adds value")
+    rubric = yaml.safe_load(rubric_path.read_text(encoding="utf-8"))
+    rubric["criteria"][0]["dimension"] = "invented-dimension"
+    rubric_path.write_text(yaml.safe_dump(rubric), encoding="utf-8")
+
+    with pytest.raises(DeepSWEEvaluationError, match="dimension"):
+        evaluate_deepswe_worker_prompt(
+            task_dir=task_dir,
+            run_dir=run_dir,
+            judge=FakeJudge(),
+            rubric_path=rubric_path,
+        )
+
+
+def test_prompt_evaluation_requires_quotes_for_contradictory_verdicts(
+    tmp_path: Path,
+) -> None:
+    task_dir, run_dir, rubric_path = _inputs(tmp_path)
+    _capture_prompt_artifacts(run_dir, "Adds value")
+
+    class NoQuoteJudge(FakeJudge):
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, str]:
+            self.calls.append(messages)
+            return {
+                "decision": "contradicted",
+                "evidence_quote": "",
+                "reason": "A prompt section contradicts the expected behavior.",
+            }
+
+    report = evaluate_deepswe_worker_prompt(
+        task_dir=task_dir,
+        run_dir=run_dir,
+        judge=NoQuoteJudge(),
+        rubric_path=rubric_path,
+    )
+
+    assert report["findings"][0]["decision"] == "ambiguous"
+    assert report["findings"][0]["evaluation_error"] == "judge_evidence_quote_missing"
+    assert report["summary"]["gate"] == "error"
 
 
 def test_evaluation_uses_task_references_and_requires_candidate_evidence(

@@ -22,6 +22,12 @@ rubric's checked behaviors. It does not show that a coding agent will implement
 them correctly: prompt-only mode intentionally stopped before worker execution,
 and judge coverage is not a substitute for running the benchmark tests.
 
+These are historical v1 reports. Under the v2 critical/important weights, the
+same findings correspond to a 100/100 prompt score for each task, but the
+reports remain unchanged and have no dimension breakdown because those
+captures predate dimension-labeled rubric criteria. The scores are arithmetic
+re-expression of the recorded supported findings, not a new judge evaluation.
+
 The first skrub evaluation reported 11/12 because its rubric combined three
 unrelated source claims (non-duration rejection, null propagation, and output
 names) under an excerpt that did not occur in the worker prompt. The evaluator

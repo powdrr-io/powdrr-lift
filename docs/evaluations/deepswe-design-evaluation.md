@@ -97,6 +97,22 @@ explicit absence check: branch/commit directions must not leak into worker
 prompts. Ground-truth files and rubric content are only read after prompt
 capture; they are not supplied to the design interview or request compiler.
 
+The v2 prompt report gives a reproducible 0–100 `summary.prompt_score`. Each
+criterion has weight 3 when critical and 1 when important; only `supported`
+earns points. `missing`, `contradicted`, and `ambiguous` earn zero. The report
+retains the weighted coverage ratio and adds verdict counts and per-dimension
+scores for coverage, faithfulness, grounding, actionability, consistency/scope,
+and clarity. Rubrics may assign a dimension per criterion; older rubrics without
+one remain readable as `coverage` until annotated.
+
+The separate `summary.gate` is `pass` only when every critical criterion is
+supported and no evaluation errors occurred. It is `fail` for critical prompt
+findings and `error` when the judge or evidence protocol fails. Findings retain
+the source excerpt, rubric dimension, evidence quote, verdict, and reason;
+`summary.evaluation_errors` identifies judge or evidence-protocol failures so
+they are distinguishable from prompt defects. A high aggregate score never
+overrides a critical failure.
+
 The rubric covers distinctions exercised by the benchmark tests, including
 state-owned versus callback-merged data, absent versus explicitly empty
 declarations, callback mutation persistence, and shallow versus deep history.

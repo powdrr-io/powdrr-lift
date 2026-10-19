@@ -1,0 +1,637 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1025
+title: Add scored prompt evaluation reports
+intent:
+  problem: Prompt evaluations expose weighted coverage and criterion findings but
+    do not provide a versioned 0–100 score, dimension breakdown, or distinct evaluation-error
+    gate.
+  goal: Produce reproducible prompt scores with auditable findings and distinguish
+    prompt shortcomings from judge/evidence failures.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 100
+    end_line: 115
+  summary: Document the prompt-score formula, dimension scores, and gate/error meanings.
+  rationale: Help readers interpret numeric scores without confusing evaluation failures
+    with prompt defects.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 23
+    end_line: 23
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 33
+    end_line: 33
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 42
+    end_line: 42
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 60
+    end_line: 60
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 69
+    end_line: 69
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 79
+    end_line: 79
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 96
+    end_line: 96
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 106
+    end_line: 106
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 121
+    end_line: 121
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 132
+    end_line: 132
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 152
+    end_line: 152
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 162
+    end_line: 162
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 170
+    end_line: 170
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 179
+    end_line: 179
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 188
+    end_line: 188
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-python-statemachine-state-data.yaml
+  type: modified
+  span:
+    start_line: 195
+    end_line: 195
+  summary: Assign score dimensions to state-data prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 48
+    end_line: 48
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 55
+    end_line: 55
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 62
+    end_line: 62
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 69
+    end_line: 69
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 76
+    end_line: 76
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 90
+    end_line: 90
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-skrub-duration-encoding.yaml
+  type: modified
+  span:
+    start_line: 97
+    end_line: 97
+  summary: Assign score dimensions to duration-encoding prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 48
+    end_line: 48
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 55
+    end_line: 55
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 62
+    end_line: 62
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 69
+    end_line: 69
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 76
+    end_line: 76
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Assign score dimensions to JSONPath prompt criteria.
+  rationale: Make the criterion-level breakdown useful for this existing evaluation.
+- path: docs/evaluations/semantic-prompt-baseline-2026-10-04/README.md
+  type: modified
+  span:
+    start_line: 25
+    end_line: 30
+  summary: Record the arithmetic score interpretation for historical all-supported
+    captures.
+  rationale: Keep historical v1 report artifacts unchanged while making their scores
+    comparable.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5693
+    end_line: 5693
+  summary: Print prompt score, gate, critical failure count, and evaluation error
+    count.
+  rationale: Surface the final evaluation result directly when the command completes.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5695
+    end_line: 5696
+  summary: Print prompt score, gate, critical failure count, and evaluation error
+    count.
+  rationale: Surface the final evaluation result directly when the command completes.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 47
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 427
+    end_line: 427
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 435
+    end_line: 435
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 442
+    end_line: 442
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 445
+    end_line: 445
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 491
+    end_line: 491
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 512
+    end_line: 512
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 516
+    end_line: 516
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 523
+    end_line: 524
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 526
+    end_line: 526
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 532
+    end_line: 532
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 546
+    end_line: 546
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 548
+    end_line: 555
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 576
+    end_line: 576
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 583
+    end_line: 648
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 711
+    end_line: 711
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 718
+    end_line: 718
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: src/powdrr_lift/workrr/deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 733
+    end_line: 733
+  summary: Add a versioned prompt score, dimension breakdown, critical gate, and evaluation
+    error reporting.
+  rationale: Tie reproducible scores and detailed findings to the exact captured prompt
+    and rubric.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Test weighted score math, dimensions, gating, judge errors, evidence, and
+    fingerprint reproducibility.
+  rationale: Verify the score contract on supported, missing, ambiguous, contradictory,
+    legacy, and failed-judge cases.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 127
+    end_line: 127
+  summary: Test weighted score math, dimensions, gating, judge errors, evidence, and
+    fingerprint reproducibility.
+  rationale: Verify the score contract on supported, missing, ambiguous, contradictory,
+    legacy, and failed-judge cases.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 138
+    end_line: 138
+  summary: Test weighted score math, dimensions, gating, judge errors, evidence, and
+    fingerprint reproducibility.
+  rationale: Verify the score contract on supported, missing, ambiguous, contradictory,
+    legacy, and failed-judge cases.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 189
+    end_line: 234
+  summary: Test weighted score math, dimensions, gating, judge errors, evidence, and
+    fingerprint reproducibility.
+  rationale: Verify the score contract on supported, missing, ambiguous, contradictory,
+    legacy, and failed-judge cases.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 254
+    end_line: 263
+  summary: Test weighted score math, dimensions, gating, judge errors, evidence, and
+    fingerprint reproducibility.
+  rationale: Verify the score contract on supported, missing, ambiguous, contradictory,
+    legacy, and failed-judge cases.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 269
+  summary: Test weighted score math, dimensions, gating, judge errors, evidence, and
+    fingerprint reproducibility.
+  rationale: Verify the score contract on supported, missing, ambiguous, contradictory,
+    legacy, and failed-judge cases.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 272
+    end_line: 280
+  summary: Test weighted score math, dimensions, gating, judge errors, evidence, and
+    fingerprint reproducibility.
+  rationale: Verify the score contract on supported, missing, ambiguous, contradictory,
+    legacy, and failed-judge cases.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 425
+    end_line: 550
+  summary: Test weighted score math, dimensions, gating, judge errors, evidence, and
+    fingerprint reproducibility.
+  rationale: Verify the score contract on supported, missing, ambiguous, contradictory,
+    legacy, and failed-judge cases.
+entities:
+- id: worker-prompt-evaluation-report
+  type: Configuration file
+  action: added
+- id: prompt-score-summary-function
+  type: Function
+  action: added
+- id: prompt-score-contract-tests
+  type: Regression test
+  action: added
+entity_relationships: []
+invariants:
+- id: prompt-score-is-reproducible-from-findings
+  description: The versioned score is calculated only from criterion verdicts and
+    declared importance weights, and its parameters are recorded in the report.
+  action: added
+- id: critical-prompt-findings-fail-the-gate
+  description: Any critical criterion not supported fails the prompt gate regardless
+    of aggregate score.
+  action: added
+- id: evaluator-failures-are-distinct-from-prompt-findings
+  description: Judge and evidence-protocol failures are recorded as evaluation errors
+    and produce an error gate rather than a prompt pass.
+  action: added
+guidance:
+- id: preserve-score-schema-and-dimension-labels
+  description: Update scoring weights or dimension definitions only through a versioned
+    scoring contract, and keep dimension assignments on rubric criteria.
+  action: added

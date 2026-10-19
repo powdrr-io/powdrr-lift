@@ -241,6 +241,66 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     assert provider_timeouts == [1800.0]
 
 
+def test_clean_pr_publish_result_is_recorded_like_pr_create(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = _workflow(tmp_path)
+    task = workflow.tasks[0]
+    url = "https://github.com/example/repo/pull/42"
+    recorded: list[object] = []
+
+    class RuntimeStub:
+        def require_publish_readiness(self) -> None:
+            pass
+
+    monkeypatch.setattr(
+        task_agent,
+        "invoke_intrinsic_capability",
+        lambda *_args, **_kwargs: url,
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "_record_task_pull_request",
+        lambda *args, **_kwargs: recorded.append(args[5]),
+    )
+    strategy = task_agent._TaskWorkflowExecutionStrategy(
+        config=cast(Any, SimpleNamespace(verbose=False)),
+        workflow=workflow,
+        task=task,
+        repo_root=tmp_path,
+        error_log_root=tmp_path,
+        client=cast(Any, None),
+        compaction_client=cast(Any, None),
+        model="test-model",
+        mapping_provider="test-provider",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        action_engine=cast(Any, None),
+        events=[],
+        repair_fallback_client=None,
+        repair_fallback_model=None,
+        runtime=cast(Any, RuntimeStub()),
+    )
+
+    strategy._execute_tool(
+        WorkflowAction(
+            kind="invoke_tool",
+            tool="gh",
+            parameters={
+                "operation": "pr_publish_clean",
+                "files_to_publish": ["src/example.py"],
+            },
+        )
+    )
+
+    assert len(recorded) == 1
+    assert isinstance(recorded[0], Mapping)
+    assert recorded[0]["stdout"] == url
+    assert recorded[0]["command"] == ["gh", "pr", "create"]
+    assert strategy.events[-1]["result"] == recorded[0]
+
+
 def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:
     action = WorkflowAction(
         kind="edit",

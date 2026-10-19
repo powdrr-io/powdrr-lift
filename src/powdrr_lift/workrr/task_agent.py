@@ -1302,10 +1302,30 @@ class _TaskWorkflowExecutionStrategy:
                 worktree_root=self.repo_root,
                 runtime=self.runtime,
             )
-            if result.get("stdout"):
-                print(str(result["stdout"]), end="", file=self.stdout)
-            if result.get("stderr"):
-                print(str(result["stderr"]), end="", file=self.stderr)
+            if (
+                action.tool == GH_TOOL
+                and action.parameters.get("operation") == "pr_publish_clean"
+                and isinstance(result, str)
+            ):
+                # The clean publisher returns its URL directly, unlike the
+                # subprocess-shaped result returned by the other git/gh
+                # operations. Normalize it so PR recording follows the same
+                # path as `gh pr create`.
+                result = {
+                    "tool": GH_TOOL,
+                    "command": ["gh", "pr", "create"],
+                    "returncode": 0,
+                    "stdout": result,
+                    "stderr": "",
+                    "pull_request_url": result,
+                }
+            if isinstance(result, Mapping):
+                if result.get("stdout"):
+                    print(str(result["stdout"]), end="", file=self.stdout)
+                if result.get("stderr"):
+                    print(str(result["stderr"]), end="", file=self.stderr)
+            elif isinstance(result, str):
+                print(result, end="", file=self.stdout)
         elif action.tool == "coding-agent":
             result = self._run_coding_agent()
         elif action.tool == "fuzzy-match":

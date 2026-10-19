@@ -129,6 +129,7 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
             "capability_matrix": {"verbose-provenance": "details " * 20000},
         },
     )
+    authoring_attempt_ids: list[str] = []
 
     def author_probe_suite(
         self: MiniSWEAgentProvider,
@@ -137,24 +138,37 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
         worktree_root: Path,
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
-        assert "Implementation prompt and acceptance context" in request.prompt
-        assert "Relevant Proposal Structrr changes" in request.prompt
-        assert "capability_matrix" not in request.prompt
-        assert len(request.prompt.encode("utf-8")) < 64 * 1024
+        authoring_attempt_ids.append(attempt_id)
+        if attempt_id.endswith("-1"):
+            assert "Implementation prompt and acceptance context" in request.prompt
+            assert "Relevant Proposal Structrr changes" in request.prompt
+            assert "capability_matrix" not in request.prompt
+            assert "never put `import`" in request.prompt
+            assert len(request.prompt.encode("utf-8")) < 64 * 1024
+            probe = {
+                "probe_id": "selector-result",
+                "scenario_id": "selector",
+                "oracle_basis": "The instruction defines this result.",
+                "imports": [],
+                "body": [
+                    "import module",
+                    "assert module.public_api('value') == 'value'",
+                ],
+            }
+        else:
+            assert (
+                "generated probe imports must be declared in imports" in request.prompt
+            )
+            assert "Move every import out of `body`" in request.prompt
+            probe = {
+                "probe_id": "selector-result",
+                "scenario_id": "selector",
+                "oracle_basis": "The instruction defines this result.",
+                "imports": ["module"],
+                "body": ["assert module.public_api('value') == 'value'"],
+            }
         (worktree_root / "probe-suite.json").write_text(
-            json.dumps(
-                {
-                    "probes": [
-                        {
-                            "probe_id": "selector-result",
-                            "scenario_id": "selector",
-                            "oracle_basis": "The instruction defines this result.",
-                            "imports": ["module"],
-                            "body": ["assert module.public_api('value') == 'value'"],
-                        }
-                    ]
-                }
-            ),
+            json.dumps({"probes": [probe]}),
             encoding="utf-8",
         )
         return subprocess.CompletedProcess(["mini"], 0, "", "")
@@ -190,6 +204,7 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
     )
 
     assert [probe.probe_id for probe in probes] == ["selector-result"]
+    assert len(authoring_attempt_ids) == 2
     suite = json.loads(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )

@@ -48,7 +48,7 @@ class FakeProvider:
     ) -> subprocess.CompletedProcess[str]:
         del request, attempt_id
         if self.action == "allowed":
-            (worktree_root / "src").mkdir()
+            (worktree_root / "src").mkdir(exist_ok=True)
             (worktree_root / "src" / "change.py").write_text("value = 1\n")
             return subprocess.CompletedProcess(
                 ["fake"], 0, '{"type":"session.completed"}\n', ""
@@ -463,6 +463,28 @@ def test_allowed_worker_result_captures_json_events_and_diff(tmp_path: Path) -> 
     assert attempt.out_of_scope_paths == ()
     assert attempt.diff_fingerprint
     assert attempt.events == ({"type": "session.completed"},)
+
+
+def test_worker_diff_excludes_preexisting_dirty_files(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
+    (worktree / "src").mkdir()
+    (worktree / "src" / "preexisting.py").write_text("value = 0\n")
+    request = ImplementationRequest(
+        **{
+            **_request(_head(worktree)).to_data(),
+            "allow_existing_changes": True,
+        }
+    )
+
+    attempt = run_coding_agent(
+        FakeProvider("allowed"),
+        request,
+        worktree_root=worktree,
+        attempt_id="attempt-with-existing-workflow-state",
+    )
+
+    assert attempt.status is CodingAgentStatus.COMPLETED
+    assert attempt.changed_paths == ("src/change.py",)
 
 
 def test_worker_removes_declared_ephemeral_artifacts_before_final_diff(

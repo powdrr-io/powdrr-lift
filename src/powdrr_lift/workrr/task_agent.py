@@ -5,6 +5,7 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
@@ -50,6 +51,18 @@ from powdrr_lift.workrr.action_operations import (
     _apply_yaml_operations,
     _list_worktree_files,
     _resolve_pre_step_template,
+)
+from powdrr_lift.workrr.coding_agent import (
+    CodingAgentAttemptStore,
+    CodingAgentRunner,
+    ImplementationRequest,
+    OpenCodePermissionPolicy,
+    build_coding_agent_provider,
+)
+from powdrr_lift.workrr.coding_agent_validation import (
+    ValidationReportStatus,
+    ValidationRunner,
+    parse_validation_profile,
 )
 from powdrr_lift.workrr.error_logging import record_workflow_llm_error
 from powdrr_lift.workrr.execution_loop import (
@@ -233,6 +246,13 @@ class WorkflowTaskAgentConfig:
     timeout_backoff_seconds: float = 10.0
     context_compaction_threshold: float = 0.75
     verbose: bool = False
+    code_agent: str = "minisweagent"
+    opencode_executable: str = "opencode"
+    opencode_model: str | None = None
+    minisweagent_executable: str = "mini"
+    minisweagent_model: str | None = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+    coding_agent_timeout_seconds: float = 1800.0
+    coding_agent_validation_timeout_seconds: float = 1800.0
     allow_unmanaged_git: bool = False
     run_deterministic_invoke_tool_pre_steps: bool = False
     guidance: tuple[str, ...] = ()
@@ -245,6 +265,14 @@ def _context_compaction_threshold(context_window: int, fraction: float) -> int:
             "context_compaction_threshold must be greater than 0 and at most 1."
         )
     return max(1, int(context_window * fraction))
+
+
+def _issue_worker_string_list(value: object) -> tuple[str, ...]:
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item.strip() for item in value
+    ):
+        return ()
+    return tuple(item.strip() for item in value)
 
 
 def _select_workflow_instance(
@@ -1111,6 +1139,8 @@ class _TaskWorkflowExecutionStrategy:
                 print(str(result["stdout"]), end="", file=self.stdout)
             if result.get("stderr"):
                 print(str(result["stderr"]), end="", file=self.stderr)
+        elif action.tool == "coding-agent":
+            result = self._run_coding_agent()
         elif action.tool == "fuzzy-match":
             result = invoke_fuzzy_match_capability(
                 action.parameters,
@@ -1127,8 +1157,8 @@ class _TaskWorkflowExecutionStrategy:
         else:
             raise PowdrrExecutionError(
                 f"Unsupported workflow task tool {action.tool!r}; supported tools "
-                "are shell, internal, git, gh, fuzzy-match, basedpyright-symbol, and "
-                "basedpyright-structure."
+                "are shell, internal, git, gh, coding-agent, fuzzy-match, "
+                "basedpyright-symbol, and basedpyright-structure."
             )
         event = {
             "kind": action.kind,
@@ -1151,6 +1181,123 @@ class _TaskWorkflowExecutionStrategy:
             runtime=self.runtime,
         )
         self.events.append(event)
+
+    def _run_coding_agent(self) -> dict[str, Any]:
+        proposed = self.task.input_state.get("proposed_pr_context")
+        if not isinstance(proposed, Mapping):
+            raise PowdrrExecutionError(
+                "coding-agent requires proposed_pr_context in task input"
+            )
+        objective = str(proposed.get("objective", "")).strip()
+        if not objective:
+            raise PowdrrExecutionError("proposed PR objective must not be empty")
+        steps = _issue_worker_string_list(proposed.get("implementation_steps"))
+        scope = _issue_worker_string_list(proposed.get("scope"))
+        criteria = _issue_worker_string_list(proposed.get("acceptance_criteria"))
+        verification_command = proposed.get("verification_command")
+        if (
+            not isinstance(verification_command, str)
+            or not verification_command.strip()
+        ):
+            raise PowdrrExecutionError(
+                "proposed PR must declare a verification_command"
+            )
+        try:
+            validation_profile = parse_validation_profile(
+                f"verify={verification_command}"
+            )
+        except ValueError as error:
+            raise PowdrrExecutionError(str(error)) from error
+        workflow_id = str(self.task.input_state.get("proposed_pr_id", ""))
+        plan_data = {
+            "workflow_id": workflow_id,
+            "objective": objective,
+            "scope": scope,
+            "implementation_steps": steps,
+            "acceptance_criteria": criteria,
+            "verification_command": verification_command,
+        }
+        fingerprint = hashlib.sha256(
+            json.dumps(plan_data, sort_keys=True).encode("utf-8")
+        ).hexdigest()
+        request_id = f"{workflow_id}-implementation"
+        attempt_id = f"{request_id}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
+        base_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        prompt_lines = [
+            "Implement this reviewed proposed PR in the current repository.",
+            "Make the actual product and test changes; do not return a plan, "
+            "review summary, or placeholder implementation.",
+            "Follow the implementation steps in order and satisfy every "
+            "acceptance criterion.",
+            "Do not edit workflow state or durable task files.",
+            "Objective:",
+            objective,
+            "Scope:",
+            *(f"- {value}" for value in scope),
+            "Implementation steps:",
+            *(f"- {value}" for value in steps),
+            "Acceptance criteria:",
+            *(f"- {value}" for value in criteria),
+        ]
+        request = ImplementationRequest(
+            request_id=request_id,
+            objective=objective,
+            prompt="\n".join(prompt_lines),
+            base_commit=base_commit,
+            plan_fingerprint=fingerprint,
+            allowed_paths=(".",),
+            acceptance_criteria=criteria,
+            validation_profiles=(validation_profile.name,),
+            allowed_commands=(verification_command,),
+            allow_existing_changes=True,
+        )
+        store_root = (
+            Path(tempfile.gettempdir()) / "powdrr-lift-issue-worker" / workflow_id
+        )
+        provider = build_coding_agent_provider(
+            self.config.code_agent,
+            opencode_executable=self.config.opencode_executable,
+            opencode_model=self.config.opencode_model,
+            minisweagent_executable=self.config.minisweagent_executable,
+            minisweagent_model=self.config.minisweagent_model,
+            timeout_seconds=self.config.coding_agent_timeout_seconds,
+            diagnostics_root=store_root / self.config.code_agent,
+            permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
+        )
+        runner = CodingAgentRunner(
+            provider=provider,
+            store=CodingAgentAttemptStore(store_root),
+        )
+        attempt = runner.run(
+            request,
+            worktree_root=self.repo_root,
+            attempt_id=attempt_id,
+        )
+        validation = ValidationRunner(
+            {validation_profile.name: validation_profile},
+            timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
+        ).run(request, attempt, worktree_root=self.repo_root)
+        runner.store.save_validation_report(validation)
+        result = {
+            "passed": (
+                attempt.status.value == "completed"
+                and bool(attempt.changed_paths)
+                and validation.status is ValidationReportStatus.PASSED
+            ),
+            "attempt_id": attempt.attempt_id,
+            "status": attempt.status.value,
+            "changed_paths": list(attempt.changed_paths),
+            "validation": validation.to_data(),
+            "error": attempt.error,
+        }
+        self.events.append({"kind": "coding_agent", "result": result})
+        return result
 
     def record_action_error(self, action: WorkflowAction, error: Exception) -> None:
         self.response_correction = _action_response_correction(action, error)

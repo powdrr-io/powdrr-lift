@@ -181,6 +181,10 @@ from powdrr_lift.workrr.deepswe_design_evaluation import (
     evaluate_deepswe_worker_prompt,
     evaluate_prompt_case,
 )
+from powdrr_lift.workrr.deepswe_probe_evaluation import (
+    DeepSWEProbeEvaluationError,
+    evaluate_deepswe_probes,
+)
 from powdrr_lift.workrr.differential_verification import (
     classify_differential_result,
     detect_verifier_changes,
@@ -1759,6 +1763,23 @@ def build_parser() -> argparse.ArgumentParser:
     deepswe_design_eval_parser.add_argument("--judge-base-url")
     deepswe_design_eval_parser.add_argument("--json", action="store_true")
     deepswe_design_eval_parser.set_defaults(func=_run_deepswe_design_evaluation)
+
+    deepswe_probe_eval_parser = subparsers.add_parser(
+        "evaluate-deepswe-probes",
+        help=("Compare a frozen generated probe suite with DeepSWE verifier tests."),
+    )
+    deepswe_probe_eval_parser.add_argument("--task-dir", required=True, type=Path)
+    deepswe_probe_eval_parser.add_argument("--run-dir", required=True, type=Path)
+    deepswe_probe_eval_parser.add_argument("--probe-suite", type=Path)
+    deepswe_probe_eval_parser.add_argument("--report", type=Path)
+    deepswe_probe_eval_parser.add_argument(
+        "--judge-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
+    )
+    deepswe_probe_eval_parser.add_argument("--judge-model")
+    deepswe_probe_eval_parser.add_argument("--judge-api-key")
+    deepswe_probe_eval_parser.add_argument("--judge-base-url")
+    deepswe_probe_eval_parser.add_argument("--json", action="store_true")
+    deepswe_probe_eval_parser.set_defaults(func=_run_deepswe_probe_evaluation)
 
     deepswe_prompt_eval_parser = subparsers.add_parser(
         "evaluate-deepswe-prompt",
@@ -5754,6 +5775,67 @@ def _run_deepswe_design_evaluation(args: argparse.Namespace) -> int:
         )
         print(f"Report: {report_path}")
     return 0 if report["summary"]["passed"] else 1
+
+
+def _run_deepswe_probe_evaluation(args: argparse.Namespace) -> int:
+    try:
+        default_suite_path = args.run_dir / "postrun-probes" / "probe-suite.json"
+        suite_path = args.probe_suite or default_suite_path
+        try:
+            suite_data = json.loads(suite_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            suite_data = None
+        has_probes = (
+            isinstance(suite_data, Mapping)
+            and isinstance(suite_data.get("probes"), list)
+            and bool(suite_data["probes"])
+        )
+        judge_id = None
+        judge = None
+        if has_probes:
+            provider = resolve_workflow_provider(args.judge_provider)
+            mapping = default_llm_mappings(provider)["standard_reasoning"]
+            credentials = resolve_provider_credentials(
+                mapping.provider,
+                args.judge_api_key,
+                args.judge_base_url,
+            )
+            model = args.judge_model or mapping.model
+            judge = build_workflow_client(
+                credentials,
+                model=model,
+                model_cache_dir=args.run_dir / ".models",
+                progress_stream=sys.stderr,
+            )
+            judge_id = f"{mapping.provider}/{model}"
+        report = evaluate_deepswe_probes(
+            task_dir=args.task_dir,
+            run_dir=args.run_dir,
+            probe_suite_path=args.probe_suite,
+            judge=judge,
+            judge_id=judge_id,
+        )
+    except (DeepSWEProbeEvaluationError, PowdrrExecutionError) as error:
+        print(f"DeepSWE probe evaluation failed: {error}", file=sys.stderr)
+        return 1
+    report_path = args.report or args.run_dir / "probe-quality-evaluation.json"
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(
+        json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    if args.json:
+        print(json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False))
+    else:
+        summary = report["summary"]
+        print(
+            f"DeepSWE probe evaluation {report['task_id']}: "
+            f"exact case recall {summary['exact_case_recall']}; "
+            f"any case recall {summary['any_case_recall']}; "
+            f"unsupported probes {summary['unsupported_probe_count']}."
+        )
+        print(f"Report: {report_path}")
+    return 0
 
 
 def _run_deepswe_prompt_evaluation(args: argparse.Namespace) -> int:

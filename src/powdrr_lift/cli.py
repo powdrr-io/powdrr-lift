@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import difflib
+import hashlib
 import io
 import json
 import math
@@ -2705,7 +2706,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
     def run_task(
         workflow_path: Path,
         workflow_id: str,
-        _worker_id: str,
+        worker_id: str,
         item: Any,
         plan: ReviewedExecutionPlan,
         checkpoint_callback: TaskCheckpointCallback,
@@ -2723,19 +2724,22 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 workflow_id,
                 base_branch="main",
             )
+            workflow_instance_id = _plan_workflow_instance_id(
+                workflow_id, instance.inputs, worker_id
+            )
             runtime_relative_directory = (
                 Path("docs")
                 / "workflows"
                 / slugify_workflow_id(plan.plan_id)
                 / "runtime"
-                / slugify_workflow_id(workflow_id)
+                / slugify_workflow_id(workflow_instance_id)
             )
             workflow_dir, _tasks = instantiate_procedrr_process_workflow(
                 process_id=instance.process_id,
                 process_directory=_bundled_procedrr_process_directory(),
                 input_state=instance.inputs,
-                work_item_name=workflow_id,
-                workflow_instance_name=workflow_id,
+                work_item_name=workflow_instance_id,
+                workflow_instance_name=workflow_instance_id,
                 output_root=(integration_worktree / runtime_relative_directory.parent),
             )
             save_workflow_git_state(
@@ -2810,6 +2814,20 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
         )
     )
     return 0 if report.outcome in {"no_eligible_work", "awaiting_review"} else 1
+
+
+def _plan_workflow_instance_id(
+    workflow_id: str, input_state: Mapping[str, Any], worker_id: str
+) -> str:
+    """Keep each durable Procedrr worker attempt distinct and resumable."""
+    serialized = json.dumps(
+        input_state,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+    fingerprint = hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:12]
+    return f"{workflow_id}-task-{fingerprint}-{slugify_workflow_id(worker_id)}"
 
 
 def _bundled_procedrr_process_directory() -> Path:

@@ -307,12 +307,44 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
     assert status == 0
     assert runtime_directory.is_relative_to(integration_worktree)
     assert runtime_directory != workflow_file.parent
-    assert len([*runtime_directory.glob("*.yaml")]) == 2
+    workflow_instance = cli.load_plan_workflow_instance(workflow_file)
+    instance_id = cli._plan_workflow_instance_id(
+        plan.items[0].workflow_id, workflow_instance.inputs, "worker"
+    )
+    assert runtime_directory.name == cli.slugify_workflow_id(instance_id)
+    task_files = list(runtime_directory.glob("*.yaml"))
+    assert len(task_files) == 2
+    assert task_files[0].stem.startswith(
+        f"{cli.slugify_workflow_id(plan.items[0].workflow_id)}-task-"
+    )
     state = load_workflow_git_state(runtime_directory, plan.items[0].workflow_id)
     assert state is not None
     assert (
         state.workflow_relative_directory
         == runtime_directory.relative_to(integration_worktree).as_posix()
+    )
+
+
+def test_plan_workflow_instance_id_tracks_input_changes() -> None:
+    workflow_id = "proposal-v1-foundation"
+
+    original = cli._plan_workflow_instance_id(
+        workflow_id, {"objective": "first"}, "worker-a"
+    )
+
+    assert (
+        cli._plan_workflow_instance_id(workflow_id, {"objective": "first"}, "worker-a")
+        == original
+    )
+    assert (
+        cli._plan_workflow_instance_id(
+            workflow_id, {"objective": "revised"}, "worker-a"
+        )
+        != original
+    )
+    assert (
+        cli._plan_workflow_instance_id(workflow_id, {"objective": "first"}, "worker-b")
+        != original
     )
 
 

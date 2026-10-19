@@ -142,6 +142,11 @@ files:
     span: {start_line: 20, end_line: 26}
     summary: Instruct the outer plan workflow to pass task_context through nested process bindings.
     rationale: Ensure execute-proposed-pr receives its required task_context input.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 107, end_line: 128}
+    summary: Judge validation success from the complete recorded command result.
+    rationale: Avoid assuming a fixed nesting shape for command results in the task worker.
   - path: tests/test_workflow_template_specification.py
     type: modified
     span: {start_line: 330, end_line: 331}
@@ -187,6 +192,11 @@ files:
     span: {start_line: 617, end_line: 618}
     summary: Assert generate-fragment guidance uses declared requirement bindings.
     rationale: Keep the generic fragment prompt aligned with fragment validation rules.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1301, end_line: 1302}
+    summary: Return a passing decision for validation results in the workflow integration test.
+    rationale: Exercise the validation-result judge before the process continues to PR preparation.
 entities:
   - id: plan-worker-runtime-directory-regression
     type: Regression test

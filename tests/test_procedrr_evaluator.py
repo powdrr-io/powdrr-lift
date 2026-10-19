@@ -1298,6 +1298,8 @@ class HelloWorldLLM:
                     "ruff reports no issues",
                 ],
             }
+        if "Does this validation command report an exit code of zero?" in question:
+            return {"passed": True}
         if "What one JSON-encoded Procedrr step should be appended" in question:
             self.fragment_round += 1
             value: Any

@@ -104,10 +104,28 @@ steps:
       item_binding: validation_record
       collect: {binding: repair_actions, mode: list, value: repair_action}
       body:
+        - judge:
+            question: Does this validation command report an exit code of zero?
+            subject: validation_record
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Inspect the complete validation record and find its command result.
+              - Pass only when the command result contains an integer returncode equal to zero.
+              - If the result is missing, malformed, or has any other returncode, mark it failed.
+            context: [validation_record]
+            output:
+              name: validation_status
+              schema:
+                type: object
+                required: [passed]
+                additionalProperties: false
+                properties:
+                  passed: {type: boolean}
+            validation: {kind: json_schema}
         - branch:
-            subject: validation_record.result.returncode
+            subject: validation_status.passed
             cases:
-              0: []
+              true: []
             default:
               - judge:
                   kind: plan_one_repair

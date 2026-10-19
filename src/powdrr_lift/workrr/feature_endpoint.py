@@ -3092,11 +3092,14 @@ def _generate_miniswe_postrun_probes(
     )
     try:
         try:
-            proposal_diff = plan_path.read_text(encoding="utf-8")
+            proposal_diff = _compact_miniswe_probe_proposal(
+                plan_path.read_text(encoding="utf-8")
+            )
         except OSError as error:
             raise PowdrrExecutionError(
                 f"cannot read proposal diff for probe authoring: {error}"
             ) from error
+        scenario_context = _compact_miniswe_probe_scenarios(scenarios)
         suite_path = probe_worktree / "probe-suite.json"
         probe_prompt = (
             "Author executable post-coding behavior probes for the task below. "
@@ -3114,9 +3117,9 @@ def _generate_miniswe_postrun_probes(
             "when the supplied contract does not define a safe oracle.\n\n"
             f"Task objective:\n{request.objective}\n\n"
             f"Implementation prompt and acceptance context:\n{request.prompt}\n\n"
-            f"Proposal Structrr diff:\n{proposal_diff}\n\n"
+            f"Relevant Proposal Structrr changes:\n{proposal_diff}\n\n"
             "Behavior scenarios (the scenario_id values are required provenance):\n"
-            f"{json.dumps(list(scenarios), indent=2, sort_keys=True)}\n\n"
+            f"{json.dumps(scenario_context, indent=2, sort_keys=True)}\n\n"
             "Return from the agent after writing probe-suite.json."
         )
         probe_request = ImplementationRequest(
@@ -3227,6 +3230,48 @@ def _generate_miniswe_postrun_probes(
             worktree,
             ["git", "worktree", "remove", "--force", str(probe_worktree)],
         )
+
+
+def _compact_miniswe_probe_proposal(proposal_diff: str) -> str:
+    """Keep only behavior-facing proposal text needed to author probes."""
+    try:
+        document = yaml.safe_load(proposal_diff)
+    except yaml.YAMLError as error:
+        raise PowdrrExecutionError(
+            f"cannot parse proposal diff for probe authoring: {error}"
+        ) from error
+    if not isinstance(document, Mapping):
+        raise PowdrrExecutionError("proposal diff for probe authoring is not a mapping")
+    summary: dict[str, list[dict[str, Any]]] = {}
+    for section in ("features", "invariants", "guidance"):
+        entries = document.get(section)
+        if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
+            continue
+        compact_entries: list[dict[str, Any]] = []
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                continue
+            compact = {
+                key: entry[key]
+                for key in ("id", "action", "description")
+                if isinstance(entry.get(key), str)
+            }
+            if compact:
+                compact_entries.append(compact)
+        if compact_entries:
+            summary[section] = compact_entries
+    return json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True)
+
+
+def _compact_miniswe_probe_scenarios(
+    scenarios: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Omit verbose provenance and dimensions already covered by the prompt."""
+    fields = ("scenario_id", "subject", "given", "when", "then", "assumptions")
+    return [
+        {key: scenario[key] for key in fields if key in scenario}
+        for scenario in scenarios
+    ]
 
 
 def _render_precode_probe_context(probes: Sequence[PostRunProbe]) -> str:

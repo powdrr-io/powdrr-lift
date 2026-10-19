@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -352,6 +353,45 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
         "MiniSWE started.",
         "MiniSWE active (0m 10s elapsed; 2 model calls, 1 tool call).",
     ]
+
+
+def test_minisweagent_provider_reads_large_task_prompt_from_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worktree = _git_repo(tmp_path)
+    diagnostics = tmp_path / "diagnostics"
+    provider = MiniSWEAgentProvider(diagnostics_root=diagnostics)
+    prompt = "Author pre-coding probes.\n" + ("scenario details\n" * 6000)
+    request = replace(_request(_head(worktree)), prompt=prompt)
+    captured: dict[str, object] = {}
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        captured["command"] = command
+        task_path = Path(command[command.index("--task-file") + 1])
+        captured["task_path"] = task_path
+        assert task_path.read_text(encoding="utf-8") == prompt
+        assert "--task" not in command
+        assert all(len(argument.encode("utf-8")) < 64 * 1024 for argument in command)
+        output = Path(command[command.index("--output") + 1])
+        output.write_text(
+            json.dumps({"info": {"exit_status": "Submitted"}}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, "done\n", "")
+
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_minisweagent", fake_run)
+    result = provider.run(request, worktree_root=worktree, attempt_id="large-task")
+
+    command = captured["command"]
+    assert isinstance(command, list)
+    assert command[1:3] == ["-m", "powdrr_lift.minisweagent_session"]
+    assert "--task-file" in command
+    assert result.returncode == 0
+    task_path = captured["task_path"]
+    assert isinstance(task_path, Path)
+    assert not task_path.exists()
 
 
 def test_minisweagent_provider_continues_saved_session_on_next_attempt(

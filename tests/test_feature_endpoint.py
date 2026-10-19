@@ -122,7 +122,13 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
     plan_path = tmp_path / "structrr-diff.yaml"
     plan_path.write_text("features: []\n", encoding="utf-8")
     output_root = tmp_path / "artifacts"
-    scenarios = ({"scenario_id": "selector", "then": {"result": "value"}},)
+    scenarios = (
+        {
+            "scenario_id": "selector",
+            "then": {"result": "value"},
+            "capability_matrix": {"verbose-provenance": "details " * 20000},
+        },
+    )
 
     def author_probe_suite(
         self: MiniSWEAgentProvider,
@@ -132,7 +138,9 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
         assert "Implementation prompt and acceptance context" in request.prompt
-        assert "Proposal Structrr diff" in request.prompt
+        assert "Relevant Proposal Structrr changes" in request.prompt
+        assert "capability_matrix" not in request.prompt
+        assert len(request.prompt.encode("utf-8")) < 64 * 1024
         (worktree_root / "probe-suite.json").write_text(
             json.dumps(
                 {

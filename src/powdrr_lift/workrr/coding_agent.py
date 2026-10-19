@@ -13,6 +13,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
@@ -28,6 +29,7 @@ from powdrr_lift.opencode_monitor import run_opencode
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v1"
+MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES = 64 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -705,34 +707,52 @@ class MiniSWEAgentProvider:
             if self.diagnostics_root is not None
             else None
         )
+        task_file: Path | None = None
+        use_task_file = (
+            len(request.prompt.encode("utf-8")) > MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES
+        )
         if self.session_trajectory is None:
-            command.extend(
-                [
-                    "--task",
-                    request.prompt,
-                    "--yolo",
-                    "--exit-immediately",
-                    # Powdrr owns the wall-clock budget and can continue a partial
-                    # attempt locally. mini's default dollar limit otherwise exits
-                    # cleanly in the middle of an implementation.
-                    "--cost-limit",
-                    "0",
-                ]
-            )
-            if self.model is not None:
-                command.extend(("--model", self.model))
-        else:
+            if not use_task_file:
+                command.extend(
+                    [
+                        "--task",
+                        request.prompt,
+                        "--yolo",
+                        "--exit-immediately",
+                        # Powdrr owns the wall-clock budget and can continue a partial
+                        # attempt locally. mini's default dollar limit otherwise exits
+                        # cleanly in the middle of an implementation.
+                        "--cost-limit",
+                        "0",
+                    ]
+                )
+                if self.model is not None:
+                    command.extend(("--model", self.model))
+        if self.session_trajectory is not None or use_task_file:
             # mini has no CLI resume flag. Restore its saved conversation and
             # append this request as another user message in the same session.
+            # For large prompts, use the Python entry point and read task text
+            # from a file to stay below the operating system's per-argument limit.
             command = [
                 sys.executable,
                 "-m",
                 "powdrr_lift.minisweagent_session",
-                "--previous",
-                str(self.session_trajectory),
-                "--task",
-                request.prompt,
             ]
+            if self.session_trajectory is not None:
+                command.extend(("--previous", str(self.session_trajectory)))
+            if use_task_file:
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    prefix="powdrr-miniswe-task-",
+                    suffix=".txt",
+                    delete=False,
+                ) as task_stream:
+                    task_stream.write(request.prompt)
+                    task_file = Path(task_stream.name)
+                command.extend(("--task-file", str(task_file)))
+            else:
+                command.extend(("--task", request.prompt))
             if mini_config is not None:
                 command.extend(("--config", str(mini_config)))
             command.extend(("--config", f"environment.cwd={worktree_root.resolve()}"))
@@ -783,25 +803,29 @@ class MiniSWEAgentProvider:
             last_reported_signature = signature
             last_reported_at = snapshot.elapsed_seconds
 
-        completed = run_minisweagent(
-            command,
-            trajectory_path=(
-                self.diagnostics_root / f"{attempt_id}.traj.json"
-                if self.diagnostics_root is not None
-                else None
-            ),
-            log_path=(
-                self.diagnostics_root / f"{attempt_id}.ndjson"
-                if self.diagnostics_root is not None
-                else None
-            ),
-            cwd=worktree_root,
-            env=environment,
-            timeout_seconds=self.timeout_seconds,
-            on_snapshot=(
-                report_progress if self.progress_callback is not None else None
-            ),
-        )
+        try:
+            completed = run_minisweagent(
+                command,
+                trajectory_path=(
+                    self.diagnostics_root / f"{attempt_id}.traj.json"
+                    if self.diagnostics_root is not None
+                    else None
+                ),
+                log_path=(
+                    self.diagnostics_root / f"{attempt_id}.ndjson"
+                    if self.diagnostics_root is not None
+                    else None
+                ),
+                cwd=worktree_root,
+                env=environment,
+                timeout_seconds=self.timeout_seconds,
+                on_snapshot=(
+                    report_progress if self.progress_callback is not None else None
+                ),
+            )
+        finally:
+            if task_file is not None:
+                task_file.unlink(missing_ok=True)
         if output_path is not None and output_path.exists():
             self.session_trajectory = output_path
         if completed.returncode == 0 and self.diagnostics_root is not None:

@@ -47,6 +47,7 @@ from powdrr_lift.workrr.task_agent import (
     _build_workflow_client,
     _durable_task_action_output_state,
     _handle_exhausted_timeout,
+    _implementation_paths_against_base,
     _list_worktree_files,
     _publish_workflow_progress,
     _read_task_document,
@@ -56,6 +57,49 @@ from powdrr_lift.workrr.task_agent import (
     _workflow_file_command_error,
     run_workflow_task,
 )
+
+
+def test_implementation_paths_include_committed_work_and_exclude_runtime_state(
+    tmp_path: Path,
+) -> None:
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-b", "main")
+    git("config", "user.name", "Test User")
+    git("config", "user.email", "test@example.invalid")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    git("add", "README.md")
+    git("commit", "-m", "base")
+    git("switch", "-c", "implementation")
+
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "implementation.py").write_text(
+        "VALUE = True\n", encoding="utf-8"
+    )
+    runtime_state = (
+        tmp_path / "docs" / "workflows" / "example" / "runtime" / "state.json"
+    )
+    runtime_state.parent.mkdir(parents=True)
+    runtime_state.write_text("{}\n", encoding="utf-8")
+    git("add", "src/implementation.py", "docs/workflows/example/runtime/state.json")
+    git("commit", "-m", "checkpoint implementation")
+
+    (tmp_path / "src" / "untracked.py").write_text("OTHER = True\n", encoding="utf-8")
+    (tmp_path / ".powdrr").mkdir()
+    (tmp_path / ".powdrr" / "run.json").write_text("{}\n", encoding="utf-8")
+
+    assert _implementation_paths_against_base(tmp_path) == (
+        "src/implementation.py",
+        "src/untracked.py",
+    )
 
 
 def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:

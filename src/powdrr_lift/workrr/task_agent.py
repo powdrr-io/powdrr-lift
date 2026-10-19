@@ -10,7 +10,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, TextIO
 
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
@@ -273,6 +273,85 @@ def _issue_worker_string_list(value: object) -> tuple[str, ...]:
     ):
         return ()
     return tuple(item.strip() for item in value)
+
+
+def _implementation_paths_against_base(repo_root: Path) -> tuple[str, ...]:
+    """Find candidate implementation files already present on this work branch.
+
+    A resumed issue can start from a branch where a previous durable checkpoint
+    committed valid implementation changes. Those files are not new changes in
+    the current coding-agent attempt, but they still belong to the proposed PR.
+    Exclude local workflow checkpoints and caches so they cannot satisfy the
+    implementation gate by themselves.
+    """
+    base_ref = next(
+        (
+            ref
+            for ref in ("origin/main", "main", "origin/master", "master")
+            if subprocess.run(
+                ["git", "rev-parse", "--verify", f"{ref}^{{commit}}"],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            ).returncode
+            == 0
+        ),
+        None,
+    )
+    paths: set[str] = set()
+    commands = (
+        ["git", "diff", "--name-only", "-z", f"{base_ref}...HEAD"]
+        if base_ref is not None
+        else []
+    )
+    if commands:
+        result = subprocess.run(
+            commands,
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            paths.update(
+                path.decode("utf-8", errors="surrogateescape")
+                for path in result.stdout.split(b"\0")
+                if path
+            )
+    for command in (
+        ["git", "diff", "--name-only", "-z", "HEAD"],
+        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
+    ):
+        result = subprocess.run(
+            command,
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            paths.update(
+                path.decode("utf-8", errors="surrogateescape")
+                for path in result.stdout.split(b"\0")
+                if path
+            )
+
+    implementation_paths = []
+    for path in paths:
+        parts = PurePosixPath(path).parts
+        if (
+            parts[0] == ".powdrr"
+            or (
+                len(parts) >= 3
+                and parts[:2] == ("docs", "workflows")
+                and "runtime" in parts[2:]
+            )
+            or "__pycache__" in parts
+            or ".pytest_cache" in parts
+            or path.endswith(".pyc")
+        ):
+            continue
+        implementation_paths.append(path)
+    return tuple(sorted(implementation_paths))
 
 
 def _select_workflow_instance(
@@ -1284,15 +1363,21 @@ class _TaskWorkflowExecutionStrategy:
             timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
         ).run(request, attempt, worktree_root=self.repo_root)
         runner.store.save_validation_report(validation)
+        implementation_paths = tuple(
+            sorted(
+                set(attempt.changed_paths)
+                | set(_implementation_paths_against_base(self.repo_root))
+            )
+        )
         result = {
             "passed": (
                 attempt.status.value == "completed"
-                and bool(attempt.changed_paths)
+                and bool(implementation_paths)
                 and validation.status is ValidationReportStatus.PASSED
             ),
             "attempt_id": attempt.attempt_id,
             "status": attempt.status.value,
-            "changed_paths": list(attempt.changed_paths),
+            "changed_paths": list(implementation_paths),
             "validation": validation.to_data(),
             "error": attempt.error,
         }

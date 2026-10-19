@@ -294,6 +294,154 @@ steps:
     assert calls == [{"command": ["record_feature", "Add a greeting"]}]
 
 
+@pytest.mark.parametrize("implementation_passes", [True, False])
+@pytest.mark.parametrize("pull_request_url_valid", [True, False])
+def test_execute_proposed_pr_workflow_enforces_implementation_and_pr_calls(
+    tmp_path: Path, implementation_passes: bool, pull_request_url_valid: bool
+) -> None:
+    from procedrr import parse_and_validate
+
+    processes = {
+        "execute-proposed-pr": """\
+version: 1
+name: execute-proposed-pr
+inputs: [{name: task_context, type: object, required: true}]
+outputs:
+  coding_attempt:
+    type: object
+    required: [passed, changed_paths]
+    properties:
+      passed: {type: boolean}
+      changed_paths: {type: array, items: {type: string}}
+steps:
+  - operation:
+      tool: internal
+      parameters: {command: [implement]}
+      bind: coding_attempt
+  - gate:
+      subject: coding_attempt.passed
+      equals: true
+      on_failure: {terminal: failed}
+  - terminal: succeeded
+""",
+        "finish-pr-prep": """\
+version: 1
+name: finish-pr-prep
+inputs:
+  - {name: files_to_publish, type: array, required: true}
+  - {name: language_labels, type: array, required: true}
+outputs: {validation_results: {type: array, items: {type: object}}}
+steps:
+  - operation:
+      tool: internal
+      parameters: {command: [finish]}
+      bind: validation_results
+  - terminal: succeeded
+""",
+        "create-pull-request": """\
+version: 1
+name: create-pull-request
+inputs:
+  - {name: user_request, type: string, required: true}
+  - {name: workflow_context, type: object, required: true}
+outputs:
+  pull_request_url:
+    type: string
+    pattern: ^https?://[^ ]+/pull/[0-9]+$
+steps:
+  - operation:
+      tool: internal
+      parameters: {command: [publish]}
+      bind: pull_request_url
+  - terminal: succeeded
+""",
+    }
+    for name, source in processes.items():
+        (tmp_path / f"{name}.yaml").write_text(source, encoding="utf-8")
+
+    class WorkflowLLM:
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            question = messages[1]["content"]
+            if "Which exact implementation files" in question:
+                return {
+                    "files_to_publish": ["src/feature.py"],
+                    "language_labels": ["python"],
+                }
+            if "What populated pull-request request" in question:
+                return {
+                    "user_request": "Publish the implemented feature.",
+                    "workflow_context": {
+                        "feature-name": "Feature",
+                        "commit-message": "Implement feature",
+                        "populated-pr-description": "Implements the feature.",
+                        "files-to-publish": ["src/feature.py"],
+                        "base-branch": "main",
+                    },
+                }
+            raise AssertionError(f"Unexpected judge question: {question}")
+
+    calls: list[str] = []
+
+    def execute(_tool: str, parameters: Mapping[str, Any]) -> Any:
+        command = parameters["command"][0]
+        calls.append(command)
+        if command == "implement":
+            return {
+                "passed": implementation_passes,
+                "changed_paths": ["src/feature.py"] if implementation_passes else [],
+            }
+        if command == "finish":
+            return [{"command": "pytest", "status": "passed"}]
+        if command == "publish":
+            return (
+                "https://github.com/example/repo/pull/123"
+                if pull_request_url_valid
+                else "not-a-pull-request-url"
+            )
+        raise AssertionError(f"Unexpected operation: {command}")
+
+    process_directory = Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    workflow = parse_and_validate(
+        (process_directory / "execute-proposed-pr-workflow.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    evaluator = Evaluator(WorkflowLLM(), execute, process_directory=tmp_path)
+    if not implementation_passes:
+        with pytest.raises(ValidationGateError):
+            evaluator.evaluate(
+                workflow, {"task_context": {"objective": "Implement a feature"}}
+            )
+        assert calls == ["implement"]
+        return
+
+    if not pull_request_url_valid:
+        with pytest.raises(EvaluationError):
+            evaluator.evaluate(
+                workflow, {"task_context": {"objective": "Implement a feature"}}
+            )
+        assert calls == ["implement", "finish", "publish"]
+        return
+
+    result = evaluator.evaluate(
+        workflow, {"task_context": {"objective": "Implement a feature"}}
+    )
+    process_calls = [
+        event.data["name"] for event in result.events if event.kind == "process"
+    ]
+    assert process_calls == [
+        "execute-proposed-pr",
+        "finish-pr-prep",
+        "create-pull-request",
+    ]
+    assert calls == ["implement", "finish", "publish"]
+    assert result.bindings["pull_request_url"] == (
+        "https://github.com/example/repo/pull/123"
+    )
+
+
 def test_called_process_uses_its_own_recovery_declarations(tmp_path: Path) -> None:
     from procedrr import parse_and_validate
 

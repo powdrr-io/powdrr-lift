@@ -246,19 +246,23 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     workflow = _workflow(tmp_path)
-    task = workflow.tasks[0]
+    task = replace(
+        workflow.tasks[0],
+        input_state={"proposed_pr_id": "feature-v1-pr-01"},
+    )
     url = "https://github.com/example/repo/pull/42"
     recorded: list[object] = []
+    published_parameters: list[Mapping[str, Any]] = []
 
     class RuntimeStub:
         def require_publish_readiness(self) -> None:
             pass
 
-    monkeypatch.setattr(
-        task_agent,
-        "invoke_intrinsic_capability",
-        lambda *_args, **_kwargs: url,
-    )
+    def publish(_tool: str, parameters: Mapping[str, Any], **_kwargs: Any) -> str:
+        published_parameters.append(dict(parameters))
+        return url
+
+    monkeypatch.setattr(task_agent, "invoke_intrinsic_capability", publish)
     monkeypatch.setattr(
         task_agent,
         "_record_task_pull_request",
@@ -290,6 +294,7 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
             parameters={
                 "operation": "pr_publish_clean",
                 "files_to_publish": ["src/example.py"],
+                "publication_branch": "powdrr/feature-v1-pr-01",
             },
         )
     )
@@ -299,6 +304,9 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
     assert recorded[0]["stdout"] == url
     assert recorded[0]["command"] == ["gh", "pr", "create"]
     assert strategy.events[-1]["result"] == url
+    assert published_parameters[0]["publication_branch"] == (
+        "powdrr/feature-v1-pr-01-implementation"
+    )
 
 
 def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:

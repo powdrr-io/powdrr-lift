@@ -1254,6 +1254,28 @@ class _TaskWorkflowExecutionStrategy:
                 tool=action.tool,
                 parameters=repaired_parameters,
             )
+        if (
+            action.tool == GH_TOOL
+            and action.parameters.get("operation") == "pr_publish_clean"
+        ):
+            proposed_pr_id = self.task.input_state.get("proposed_pr_id")
+            if isinstance(proposed_pr_id, str) and proposed_pr_id.strip():
+                expected_branch = (
+                    f"powdrr/{slugify_workflow_id(proposed_pr_id)}-implementation"
+                )
+                if action.parameters.get("publication_branch") != expected_branch:
+                    corrected_parameters = dict(action.parameters)
+                    corrected_parameters["publication_branch"] = expected_branch
+                    action = WorkflowAction(
+                        kind=action.kind,
+                        tool=action.tool,
+                        parameters=corrected_parameters,
+                    )
+                    print(
+                        "Corrected clean publication branch to the deterministic "
+                        f"workflow branch {expected_branch}.",
+                        file=self.stderr,
+                    )
         command_error = _workflow_file_command_error(
             action.parameters,
             self.workflow.directory,

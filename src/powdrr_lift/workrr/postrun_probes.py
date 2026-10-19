@@ -475,20 +475,12 @@ def _validate_test_source(source: str) -> None:
     if not any(isinstance(node, ast.Assert) for node in ast.walk(function)):
         raise ValueError("generated probe must contain an observable assertion")
     builtin_names = set(dir(builtins))
-    assert_calls = (
-        call
-        for assertion in ast.walk(function)
-        if isinstance(assertion, ast.Assert)
-        for call in ast.walk(assertion.test)
-        if isinstance(call, ast.Call)
-    )
+    function_calls = (node for node in ast.walk(function) if isinstance(node, ast.Call))
     if not any(
         not isinstance(call.func, ast.Name) or call.func.id not in builtin_names
-        for call in assert_calls
+        for call in function_calls
     ):
-        raise ValueError(
-            "generated probe assertion must exercise a non-built-in software call"
-        )
+        raise ValueError("generated probe must exercise a non-built-in software call")
 
 
 def _required_text(value: Mapping[str, Any], key: str) -> str:

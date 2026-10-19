@@ -58,6 +58,32 @@ def test_parse_generated_postrun_probes_validates_miniswe_manifest() -> None:
     assert "module.public_api" in probes[0].test_source
 
 
+def test_parse_generated_postrun_probes_allows_api_call_before_assertion() -> None:
+    probes = parse_generated_postrun_probes(
+        {
+            "probes": [
+                {
+                    "probe_id": "reject-invalid-option",
+                    "scenario_id": "validation",
+                    "oracle_basis": "Invalid options are rejected.",
+                    "imports": ["module"],
+                    "body": [
+                        (
+                            "raised = False\ntry:\n    module.public_api()\n"
+                            "except ValueError:\n    raised = True"
+                        ),
+                        "assert raised",
+                    ],
+                }
+            ]
+        },
+        ({"scenario_id": "validation"},),
+    )
+
+    assert "module.public_api()" in probes[0].test_source
+    assert "assert raised" in probes[0].test_source
+
+
 def test_parse_generated_postrun_probes_rejects_unknown_scenario() -> None:
     with pytest.raises(ValueError, match="unknown scenario"):
         parse_generated_postrun_probes(

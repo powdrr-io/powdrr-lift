@@ -144,6 +144,8 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
             assert "Relevant Proposal Structrr changes" in request.prompt
             assert "capability_matrix" not in request.prompt
             assert "never put `import`" in request.prompt
+            assert "complete statement in one body entry" in request.prompt
+            assert "call may be in setup or exception handling" in request.prompt
             assert len(request.prompt.encode("utf-8")) < 64 * 1024
             probe = {
                 "probe_id": "selector-result",
@@ -160,6 +162,7 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
                 "generated probe imports must be declared in imports" in request.prompt
             )
             assert "Move every import out of `body`" in request.prompt
+            assert "complete compound statement in one" in request.prompt
             probe = {
                 "probe_id": "selector-result",
                 "scenario_id": "selector",

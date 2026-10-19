@@ -1,9 +1,9 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1038
-title: Keep MiniSWE probe prompts within process limits
+title: Keep MiniSWE probe authoring reliable within process limits
 intent:
-  problem: MiniSWE probe authoring passes its task as a command-line argument, and long generated contexts can exceed the operating system argument limit before any probe is authored.
-  goal: Compact the behavior context and support file-backed MiniSWE task input so large probe prompts can reach the authoring agent safely.
+  problem: MiniSWE probe authoring passes its task as a command-line argument, and long generated contexts can exceed the operating system argument limit before any probe is authored. Generated probes can also fail the runner when compound statements are split across body entries or when API calls happen before the final assertion.
+  goal: Compact the behavior context, support file-backed MiniSWE task input, and align authoring guidance and validation with the rendered probe function.
 human-decisions: []
 structured_files: []
 files:
@@ -203,6 +203,34 @@ files:
     end_line: 207
   summary: Assert that a second authoring attempt repairs the invalid import placement.
   rationale: Verify successful suite persistence after the targeted repair.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3117
+    end_line: 3127
+  summary: Explain that complete compound statements belong in one body entry and tested API calls may precede assertions.
+  rationale: Match authoring instructions to the runner's AST rendering and support exception probes.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 483
+    end_line: 492
+  summary: Accept probes that call the public software anywhere in the test function and assert the observed outcome.
+  rationale: Permit valid setup and exception handling before outcome assertions.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 76
+  summary: Cover a complete try/except body entry that calls the API before asserting the captured exception outcome.
+  rationale: Prevent regression of the validator failure found in a fresh DeepSWE run.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 166
+  summary: Assert the authoring and repair prompts explain compound statement formatting and API call placement.
+  rationale: Keep generated probe instructions aligned with runner validation.
 entities:
 - id: miniswe-task-file-input
   type: Subcommand
@@ -210,6 +238,9 @@ entities:
 - id: compact-probe-authoring-context
   type: Function
   action: added
+- id: renderable-miniswe-behavior-probes
+  type: Function
+  action: modified
 - id: oversized-miniswe-task-handoff
   type: Function
   action: added
@@ -226,6 +257,9 @@ invariants:
   action: added
 - id: probe-context-retains-scenario-provenance
   description: Compact probe context preserves scenario identifiers and the given, when, then, subject, and assumption fields while excluding verbose metadata.
+  action: added
+- id: probe-api-call-in-function
+  description: A generated probe contains a public software call somewhere in its test function and an assertion of observable behavior.
   action: added
 guidance:
 - id: keep-probe-authoring-context-focused

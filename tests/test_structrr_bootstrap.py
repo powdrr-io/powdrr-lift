@@ -246,6 +246,73 @@ def test_benchmark_bootstrap_omits_validation_without_tracked_source(
     )
 
 
+def test_benchmark_bootstrap_keeps_stestr_profile_from_tracked_configuration(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    (repo / ".stestr.conf").write_text("[DEFAULT]\ntest_path=tests\n", encoding="utf-8")
+    (repo / "tox.ini").write_text(
+        "[tox]\nenvlist=py\n[testenv]\ncommands=stestr run\n",
+        encoding="utf-8",
+    )
+    (repo / "tests").mkdir()
+    (repo / "tests/test_app.py").write_text(
+        "def test_app():\n    assert True\n", encoding="utf-8"
+    )
+    _git(repo, "add", ".stestr.conf", "tox.ini", "tests/test_app.py")
+    _git(repo, "commit", "-qm", "declare stestr validation")
+
+    result = bootstrap_structrr(
+        repo,
+        output_path=tmp_path / "benchmark-stestr.yaml",
+        benchmark_mode=True,
+    )
+
+    assert result.validation.successful
+    tools = {item["id"]: item for item in result.document["tools"]}
+    assert tools["validation:stestr"]["validation_action"] == [
+        "stestr",
+        "run",
+        "--concurrency",
+        "1",
+    ]
+    assert "stestr" in {
+        item["provider"] for item in result.document["validation_inventory"]
+    }
+
+
+def test_benchmark_bootstrap_ignores_generated_tox_environments(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    (repo / "tox.ini").write_text(
+        "[tox]\nenvlist=py\n[testenv]\ncommands=stestr run\n",
+        encoding="utf-8",
+    )
+    generated_tox = (
+        repo / ".tox/pep8/lib/python3.12/site-packages/stestr/tests/files/tox.ini"
+    )
+    generated_tox.parent.mkdir(parents=True)
+    generated_tox.write_text(
+        "[tox]\nenvlist=generated\n[testenv]\ncommands=pytest\n",
+        encoding="utf-8",
+    )
+    _git(repo, "add", "tox.ini")
+    _git(repo, "commit", "-qm", "declare project validation")
+
+    result = bootstrap_structrr(
+        repo,
+        output_path=tmp_path / "benchmark-generated-tox.yaml",
+        benchmark_mode=True,
+    )
+
+    assert result.validation.successful, result.validation.issues
+    assert not any(
+        profile.get("cwd", "").startswith(".tox/")
+        for profile in result.document["validation_inventory"]
+    )
+
+
 def test_bootstrap_records_detected_validation_tools(tmp_path: Path) -> None:
     repo = _fixture_repo(tmp_path)
     (repo / "pyproject.toml").write_text(

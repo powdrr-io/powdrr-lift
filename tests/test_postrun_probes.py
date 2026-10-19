@@ -33,7 +33,9 @@ def test_generate_postrun_probes_excludes_unresolved_scenarios() -> None:
                     "scenario_id": "scenario-1",
                     "oracle_basis": "The instruction explicitly requires this result.",
                     "test_source": (
-                        "def test_probe_result():\n    assert sum((2, 2)) == 4\n"
+                        "import math\n"
+                        "def test_probe_result():\n"
+                        "    assert math.factorial(2) == 2\n"
                     ),
                 }
             ]
@@ -63,18 +65,26 @@ def test_generate_postrun_probes_excludes_unresolved_scenarios() -> None:
         ("def test_not_a_probe():\n    assert True\n", "test_probe_"),
         ("def test_probe_broken():\n    assert True\n  assert False\n", "valid Python"),
         (
+            "import math\n"
             "import subprocess\n"
-            "def test_probe_side_effect():\n    assert sum((1,)) == 1\n",
+            "def test_probe_side_effect():\n    assert math.factorial(1) == 1\n",
             "disallowed system module",
         ),
         (
+            "import math\n"
             "from pathlib import Path\n"
-            "def test_probe_side_effect():\n    assert sum((1,)) == 1\n",
+            "def test_probe_side_effect():\n    assert math.factorial(1) == 1\n",
             "disallowed system module",
         ),
         (
             "def test_probe_bad():\n    assert open('file', 'w')\n",
             "disallowed function",
+        ),
+        (
+            "import bandit\n"
+            "def test_probe_symbol_exists():\n"
+            "    assert hasattr(bandit, 'process')\n",
+            "non-built-in software call",
         ),
     ],
 )
@@ -110,13 +120,13 @@ def test_run_postrun_probes_executes_each_probe_and_returns_repair_findings(
             "good",
             "scenario-good",
             "explicit",
-            "def test_probe_good():\n    assert sum((2, 2)) == 4\n",
+            "import math\ndef test_probe_good():\n    assert math.factorial(2) == 2\n",
         ),
         PostRunProbe(
             "bad",
             "scenario-bad",
             "explicit",
-            "def test_probe_bad():\n    assert sum((2, 2)) == 5\n",
+            "import math\ndef test_probe_bad():\n    assert math.factorial(2) == 5\n",
         ),
     )
 
@@ -127,4 +137,4 @@ def test_run_postrun_probes_executes_each_probe_and_returns_repair_findings(
     failures = probe_failures([item.to_data() for item in results])
     assert len(failures) == 1
     assert failures[0]["scenario_id"] == "scenario-bad"
-    assert "assert sum((2, 2)) == 5" in failures[0]["reason"]
+    assert "assert math.factorial(2) == 5" in failures[0]["reason"]

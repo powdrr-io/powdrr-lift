@@ -73,7 +73,7 @@ def test_discovers_stestr_profile_from_repository_configuration(tmp_path: Path) 
     stestr = next(profile for profile in profiles if profile.name == "stestr")
     assert stestr.command == ("stestr", "run", "--concurrency", "1")
     assert stestr.provider == "stestr"
-    assert stestr.evidence == (".stestr.conf",)
+    assert stestr.evidence == ()
 
 
 def test_discovers_stestr_from_ci_command(tmp_path: Path) -> None:

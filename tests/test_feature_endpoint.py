@@ -4290,6 +4290,39 @@ def test_code_task_plan_skips_invalid_candidate_and_keeps_valid_tasks(
     assert result["structural_decisions"][0]["passed"] is False
 
 
+def test_code_task_plan_selects_discovered_native_test_profile(
+    tmp_path: Path,
+) -> None:
+    result = _compile_code_task_plan(
+        {
+            "baseline_evidence": {"failing_cases": []},
+            "validation_profiles": [
+                {
+                    "name": "pytest",
+                    "command": ["pytest", "-q"],
+                },
+                {
+                    "name": "stestr",
+                    "command": ["stestr", "run", "--concurrency", "1"],
+                },
+            ],
+            "verification_plans": [
+                {
+                    "obligation_id": "nosec-directives",
+                    "kind": "feature",
+                    "operation": "implement region and next-statement directives",
+                    "oracle": "the findings are suppressed for those directive scopes",
+                    "evidence_case": "Run the directive regression cases.",
+                }
+            ],
+        },
+        output_root=tmp_path,
+        config=SimpleNamespace(allowed_paths=("bandit/core",)),
+    )
+
+    assert result["tasks"][0]["validation_profiles"] == ["stestr"]
+
+
 def test_code_task_plan_coalesces_product_obligations_into_one_worker_task(
     tmp_path: Path,
 ) -> None:

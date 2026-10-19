@@ -1402,12 +1402,27 @@ def _build_document(
 def _validation_tool_source(root: Path, tracked_files: Sequence[str]) -> str | None:
     for relative in (
         "pyproject.toml",
+        "setup.cfg",
+        "tox.ini",
+        ".stestr.conf",
+        "noxfile.py",
         ".github/workflows/ci.yml",
         ".github/workflows/ci.yaml",
         "Makefile",
     ):
         if relative in tracked_files:
             return relative
+    workflow = next(
+        (
+            relative
+            for relative in tracked_files
+            if relative.startswith(".github/workflows/")
+            and Path(relative).suffix.casefold() in {".yml", ".yaml"}
+        ),
+        None,
+    )
+    if workflow is not None:
+        return workflow
     return None
 
 

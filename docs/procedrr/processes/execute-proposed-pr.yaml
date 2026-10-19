@@ -96,8 +96,10 @@ steps:
       collect: {binding: current_validation_results, mode: list, key: command, value: validation_result}
       body:
         - operation:
-            tool: internal
-            parameters: {command: "${validation_command}"}
+            tool: invoke_tool
+            parameters:
+              tool: shell
+              parameters: {command: "${validation_command}"}
             bind: validation_result
   - for_each:
       snapshot: {name: current_validation_results, max_items: 16}
@@ -293,8 +295,10 @@ recoveries:
                       new_text: "${final_repair_action.new_text}"
                 bind: final_repair_result
             - operation:
-                tool: internal
-                parameters: {command: "${final_repair_action.verification_command}"}
+                tool: invoke_tool
+                parameters:
+                  tool: shell
+                  parameters: {command: "${final_repair_action.verification_command}"}
                 bind: final_repair_validation
             - gate:
                 subject: final_repair_validation.returncode
@@ -307,8 +311,10 @@ recoveries:
           collect: {binding: final_revalidation_results, mode: list, key: command, value: final_revalidation_result}
           body:
             - operation:
-                tool: internal
-                parameters: {command: "${final_revalidation_command}"}
+                tool: invoke_tool
+                parameters:
+                  tool: shell
+                  parameters: {command: "${final_revalidation_command}"}
                 bind: final_revalidation_result
       - operation:
           tool: gather_context
@@ -411,8 +417,10 @@ recoveries:
                 new_text: "${final_repair_edit.new_text}"
           bind: final_repair_result
       - operation:
-          tool: internal
-          parameters: {command: "${final_repair_action.verification_command}"}
+          tool: invoke_tool
+          parameters:
+            tool: shell
+            parameters: {command: "${final_repair_action.verification_command}"}
           bind: final_repair_validation
       - gate:
           subject: final_repair_validation.returncode

@@ -157,6 +157,26 @@ files:
     span: {start_line: 128, end_line: 128}
     summary: Treat a confirmed passing validation record as complete.
     rationale: Keep the validation loop focused on commands that need repair.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 99, end_line: 102}
+    summary: Run implementation validation commands through the shell capability.
+    rationale: Allow the planned validation script and test commands while keeping Powdrr internal commands restricted.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 298, end_line: 301}
+    summary: Run final repair verification through the shell capability.
+    rationale: Let repair checks execute the validation command selected for the failed check.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 314, end_line: 317}
+    summary: Run post-repair revalidation through the shell capability.
+    rationale: Recheck planned commands after a successful semantic repair.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 420, end_line: 423}
+    summary: Run retried repair verification through the shell capability.
+    rationale: Keep the repair retry path consistent with the authorized command runner.
   - path: tests/test_workflow_template_specification.py
     type: modified
     span: {start_line: 330, end_line: 331}
@@ -207,6 +227,11 @@ files:
     span: {start_line: 1301, end_line: 1302}
     summary: Return a passing decision for validation results in the workflow integration test.
     rationale: Exercise the validation-result judge before the process continues to PR preparation.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1425, end_line: 1434}
+    summary: Execute shell validation commands in the proposed-PR process integration test.
+    rationale: Verify the process uses the shell capability for planned verification commands.
 entities:
   - id: plan-worker-runtime-directory-regression
     type: Regression test

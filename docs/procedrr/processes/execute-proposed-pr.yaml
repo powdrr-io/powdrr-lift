@@ -96,18 +96,38 @@ steps:
       collect: {binding: current_validation_results, mode: list, key: command, value: validation_result}
       body:
         - operation:
-            tool: internal
-            parameters: {command: "${validation_command}"}
+            tool: invoke_tool
+            parameters:
+              tool: shell
+              parameters: {command: "${validation_command}"}
             bind: validation_result
   - for_each:
       snapshot: {name: current_validation_results, max_items: 16}
       item_binding: validation_record
       collect: {binding: repair_actions, mode: list, value: repair_action}
       body:
+        - judge:
+            question: Does this validation command report an exit code of zero?
+            subject: validation_record
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Inspect the complete validation record and find its command result.
+              - Pass only when the command result contains an integer returncode equal to zero.
+              - If the result is missing, malformed, or has any other returncode, mark it failed.
+            context: [validation_record]
+            output:
+              name: validation_status
+              schema:
+                type: object
+                required: [passed]
+                additionalProperties: false
+                properties:
+                  passed: {type: boolean}
+            validation: {kind: json_schema}
         - branch:
-            subject: validation_record.result.returncode
+            subject: validation_status.passed
             cases:
-              0: []
+              true: []
             default:
               - judge:
                   kind: plan_one_repair
@@ -275,8 +295,10 @@ recoveries:
                       new_text: "${final_repair_action.new_text}"
                 bind: final_repair_result
             - operation:
-                tool: internal
-                parameters: {command: "${final_repair_action.verification_command}"}
+                tool: invoke_tool
+                parameters:
+                  tool: shell
+                  parameters: {command: "${final_repair_action.verification_command}"}
                 bind: final_repair_validation
             - gate:
                 subject: final_repair_validation.returncode
@@ -289,8 +311,10 @@ recoveries:
           collect: {binding: final_revalidation_results, mode: list, key: command, value: final_revalidation_result}
           body:
             - operation:
-                tool: internal
-                parameters: {command: "${final_revalidation_command}"}
+                tool: invoke_tool
+                parameters:
+                  tool: shell
+                  parameters: {command: "${final_revalidation_command}"}
                 bind: final_revalidation_result
       - operation:
           tool: gather_context
@@ -393,8 +417,10 @@ recoveries:
                 new_text: "${final_repair_edit.new_text}"
           bind: final_repair_result
       - operation:
-          tool: internal
-          parameters: {command: "${final_repair_action.verification_command}"}
+          tool: invoke_tool
+          parameters:
+            tool: shell
+            parameters: {command: "${final_repair_action.verification_command}"}
           bind: final_repair_validation
       - gate:
           subject: final_repair_validation.returncode

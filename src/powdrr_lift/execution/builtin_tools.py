@@ -66,6 +66,7 @@ class IntrinsicRepositoryAdapter:
             "status",
             "remote",
             "branch_current",
+            "head",
             "default_branch",
             "show_ref",
             "switch",

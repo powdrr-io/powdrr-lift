@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from argparse import Namespace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -107,7 +109,9 @@ def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> No
         repo_root=tmp_path,
         verification_command="scripts/verify-all.sh",
     )
-    workflow_file = tmp_path / plan.items[0].workflow_file
+    workflow_relative_file = plan.items[0].workflow_file
+    assert workflow_relative_file is not None
+    workflow_file = tmp_path / workflow_relative_file
     instance = load_plan_workflow_instance(workflow_file)
 
     workflow_dir, tasks = instantiate_procedrr_process_workflow(
@@ -126,6 +130,87 @@ def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> No
     assert tasks[0].input_state["proposed_pr_id"] == instance.workflow_id
     assert tasks[0].input_state["proposed_pr_context"]["verification_command"] == (
         "scripts/verify-all.sh"
+    )
+
+
+def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from powdrr_lift.workrr.git import load_workflow_git_state
+
+    rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement the feature.",
+        plan_id="procedrr-worker-v1",
+        client=FakePlanningClient({"items": [_item("foundation")]}),
+    )
+    write_execution_plan_artifacts(
+        rendered_plan=rendered,
+        plan=plan,
+        output_path=tmp_path / "docs/plans/procedrr-worker-v1.yaml",
+        repo_root=tmp_path,
+        verification_command="scripts/verify-all.sh",
+    )
+    workflow_relative_file = plan.items[0].workflow_file
+    assert workflow_relative_file is not None
+    workflow_file = tmp_path / workflow_relative_file
+    integration_worktree = tmp_path / "integration-worktree"
+    integration_worktree.mkdir()
+    captured: dict[str, Any] = {}
+
+    monkeypatch.setattr(cli, "resolve_repo_root", lambda _path: tmp_path)
+    monkeypatch.setattr(
+        cli,
+        "create_workflow_worktree",
+        lambda *_args, **_kwargs: (integration_worktree, "powdrr/foundation"),
+    )
+
+    def run_workflow_task(config: Any, **_kwargs: Any) -> int:
+        captured["workflow_dir"] = config.workflow_dir
+        return 0
+
+    def run_worker_once(**kwargs: Any) -> SimpleNamespace:
+        kwargs["run_task"](
+            workflow_file,
+            plan.items[0].workflow_id,
+            "worker",
+            plan.items[0],
+            plan,
+            lambda *_args: None,
+        )
+        return SimpleNamespace(
+            outcome="awaiting_review",
+            issue_number=23,
+            item_id=plan.items[0].item_id,
+            detail=None,
+        )
+
+    monkeypatch.setattr(cli, "run_workflow_task", run_workflow_task)
+    monkeypatch.setattr(cli, "run_worker_once", run_worker_once)
+
+    status = cli._run_github_issue_worker(
+        Namespace(
+            repo_root=tmp_path,
+            repository="owner/repo",
+            worker_id="worker",
+            provider="auto",
+            api_key=None,
+            base_url=None,
+            max_roundtrips=1,
+            context_compaction_threshold=0.75,
+            verbose=False,
+        )
+    )
+
+    runtime_directory = Path(captured["workflow_dir"])
+    assert status == 0
+    assert runtime_directory.is_relative_to(integration_worktree)
+    assert runtime_directory != workflow_file.parent
+    assert len([*runtime_directory.glob("*.yaml")]) == 2
+    state = load_workflow_git_state(runtime_directory, plan.items[0].workflow_id)
+    assert state is not None
+    assert (
+        state.workflow_relative_directory
+        == runtime_directory.relative_to(integration_worktree).as_posix()
     )
 
 

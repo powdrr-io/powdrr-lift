@@ -1,0 +1,264 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1017
+title: Run plan tasks from durable worker runtime directories
+intent:
+  problem: The issue worker loads plan descriptor files as Procedrr task files, so a claimed plan issue fails before its task can execute.
+  goal: Instantiate each planned process workflow in the integration worktree and persist its worker state beside the generated tasks.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 14, end_line: 14}
+    summary: Remove the temporary-directory dependency from issue worker setup.
+    rationale: Store the generated runtime workflow in the integration worktree so it persists across task checkpoints.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 204, end_line: 204}
+    summary: Remove the unused integration branch helper import.
+    rationale: Use the branch returned when creating or reusing the workflow worktree.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2687, end_line: 2714}
+    summary: Instantiate plan tasks in a dedicated runtime directory in the integration worktree.
+    rationale: Keep generated Procedrr task files separate from the plan descriptor and available for execution.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2716, end_line: 2720}
+    summary: Save workflow Git state with the runtime directory path and plan dependencies.
+    rationale: Allow checkpoint and task discovery code to find the durable workflow state.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2722, end_line: 2739}
+    summary: Run the generated Procedrr task from its runtime directory.
+    rationale: Prevent plan descriptor YAML files from being interpreted as task files.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Import argument parsing helpers for the issue worker regression test.
+    rationale: Construct the CLI argument namespace required by the worker entry point.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Import a lightweight fake worker report type for the regression test.
+    rationale: Return a deterministic worker outcome without invoking GitHub or an agent.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 112, end_line: 114}
+    summary: Assert the generated plan workflow path exists before loading it.
+    rationale: Make the test's optional workflow path explicit to type checkers.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 136, end_line: 216}
+    summary: Verify plan issue execution uses the durable runtime directory and saves workflow state there.
+    rationale: Prevent regressions where plan descriptor files are mistaken for Procedrr task definitions.
+  - path: src/powdrr_lift/builtin_tool_help.py
+    type: modified
+    span: {start_line: 61, end_line: 64}
+    summary: Document the bounded Git operations exposed by the built-in Git tool.
+    rationale: Make the supported HEAD read operation discoverable to workflow agents.
+  - path: src/powdrr_lift/execution/builtin_tools.py
+    type: modified
+    span: {start_line: 69, end_line: 69}
+    summary: Allow the intrinsic repository adapter to validate HEAD reads.
+    rationale: Permit checkpoint code to request the current commit through the bounded Git interface.
+  - path: src/powdrr_lift/intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 186, end_line: 187}
+    summary: Translate the HEAD operation to `git rev-parse HEAD`.
+    rationale: Give workflow checkpoints the current commit identifier through an allowlisted operation.
+  - path: src/powdrr_lift/intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 219, end_line: 219}
+    summary: Permit the bounded `rev-parse` command in the intrinsic Git executor.
+    rationale: Execute the supported HEAD lookup while keeping other Git commands restricted.
+  - path: src/powdrr_lift/process/task_step.py
+    type: modified
+    span: {start_line: 57, end_line: 57}
+    summary: Add HEAD reads to the task process read-only Git tool package.
+    rationale: Make the operation available to generated workflow tasks.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2726, end_line: 2727}
+    summary: Map checkpoint commit lookups to the structured HEAD operation.
+    rationale: Keep task-agent Git access within the intrinsic repository boundary.
+  - path: tests/test_intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Import the internal Git operation translator for regression coverage.
+    rationale: Verify task-agent checkpoint commands map to the supported intrinsic operation.
+  - path: tests/test_intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 21, end_line: 25}
+    summary: Assert HEAD lookups map to the bounded intrinsic Git command.
+    rationale: Prevent checkpoint failures from unsupported `rev-parse HEAD` operations.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 652, end_line: 653}
+    summary: Run interrupted task checkpoint recovery before restoring workflow files.
+    rationale: Return a task from locked to its last consistent state before retrying a worker.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 655, end_line: 655}
+    summary: Record the reset task checkpoint recovery result.
+    rationale: Include checkpoint rollback in the workflow recovery report.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 657, end_line: 666}
+    summary: Restore generated workflow files after rolling back interrupted task state.
+    rationale: Preserve the initial workflow definition while clearing only interrupted progress.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 882, end_line: 882}
+    summary: Track task files whose first recorded checkpoint is already locked.
+    rationale: Handle interrupted workers whose claim commit is the task file's initial history.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 937, end_line: 939}
+    summary: Read the current locked task when no earlier task snapshot is available.
+    rationale: Distinguish an initial interrupted claim from an invalid task checkpoint.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 941, end_line: 953}
+    summary: Queue a valid first-claim task for reopening when its history has no prior state.
+    rationale: Recover a task whose first published state was locked.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 957, end_line: 957}
+    summary: Allow recovery from either an earlier checkpoint or a first recorded claim.
+    rationale: Avoid leaving the issue blocked when no prior task snapshot exists.
+  - path: src/powdrr_lift/workrr/git.py
+    type: modified
+    span: {start_line: 959, end_line: 1015}
+    summary: Reopen and publish a first-claim task as open when no earlier snapshot exists.
+    rationale: Clear the durable lock without discarding the generated workflow definition.
+  - path: src/powdrr_lift/workrr/action_operations.py
+    type: modified
+    span: {start_line: 193, end_line: 195}
+    summary: Allow a line-one replacement to create a previously missing file.
+    rationale: Let generated workflow fragments create new files through the existing edit operation.
+  - path: tests/test_workflow_git.py
+    type: modified
+    span: {start_line: 334, end_line: 481}
+    summary: Verify recovery restores a remotely published locked task to its pending checkpoint.
+    rationale: Prevent stale locks from permanently blocking a retried workflow task.
+  - path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+    type: modified
+    span: {start_line: 20, end_line: 26}
+    summary: Instruct the outer plan workflow to pass task_context through nested process bindings.
+    rationale: Ensure execute-proposed-pr receives its required task_context input.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 109, end_line: 126}
+    summary: Judge validation success from the complete recorded command result.
+    rationale: Avoid assuming a fixed nesting shape for command results in the task worker.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 128, end_line: 128}
+    summary: Branch on the validation-status judge result.
+    rationale: Route only failed validation records into the repair workflow.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 130, end_line: 130}
+    summary: Treat a confirmed passing validation record as complete.
+    rationale: Keep the validation loop focused on commands that need repair.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 99, end_line: 102}
+    summary: Run implementation validation commands through the shell capability.
+    rationale: Allow the planned validation script and test commands while keeping Powdrr internal commands restricted.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 298, end_line: 301}
+    summary: Run final repair verification through the shell capability.
+    rationale: Let repair checks execute the validation command selected for the failed check.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 314, end_line: 317}
+    summary: Run post-repair revalidation through the shell capability.
+    rationale: Recheck planned commands after a successful semantic repair.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 420, end_line: 423}
+    summary: Run retried repair verification through the shell capability.
+    rationale: Keep the repair retry path consistent with the authorized command runner.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 330, end_line: 331}
+    summary: Assert the plan workflow documents nested process binding syntax.
+    rationale: Prevent the outer workflow from omitting execute-proposed-pr's required input.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1457, end_line: 1457}
+    summary: Execute nested Procedrr operations while retaining their tool result for binding.
+    rationale: Let calling processes receive the operation result without exposing task execution metadata.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1472, end_line: 1481}
+    summary: Return the raw result from nested tool operations.
+    rationale: Keep Procedrr operation bindings consistent with direct tool results so callers can inspect command outputs.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Import a lightweight task strategy fixture for nested operation result coverage.
+    rationale: Exercise the Procedrr operation adapter without running another workflow.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 54, end_line: 54}
+    summary: Import the task Procedrr operation adapter for direct result binding coverage.
+    rationale: Verify nested operations expose return values to the calling process.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 712, end_line: 748}
+    summary: Verify nested Procedrr operations bind the raw command result.
+    rationale: Keep worker operation bindings aligned with the Procedrr process result shape.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 33, end_line: 33}
+    summary: Import the line edit value used by the new-file regression test.
+    rationale: Construct the same edit value passed by Procedrr operations.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 46, end_line: 46}
+    summary: Import the task edit application helper for new-file coverage.
+    rationale: Exercise the task agent's normal file edit implementation.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 61, end_line: 82}
+    summary: Verify a line-one edit creates a missing file and its parent directories.
+    rationale: Prevent generated plan tasks from failing when they create new repository files.
+  - path: docs/procedrr/processes/generate-fragment.yaml
+    type: modified
+    span: {start_line: 48, end_line: 48}
+    summary: Require edit judges to use a declared fragment input for requirement context.
+    rationale: Prevent generated fragments from referencing unavailable fragment_goal bindings.
+  - path: docs/procedrr/processes/generate-fragment.yaml
+    type: modified
+    span: {start_line: 78, end_line: 78}
+    summary: Update the canonical edit-judge example to use a requirement binding.
+    rationale: Show valid declared-binding context in generated source-edit judges.
+  - path: tests/test_procedrr.py
+    type: modified
+    span: {start_line: 617, end_line: 618}
+    summary: Assert generate-fragment guidance uses declared requirement bindings.
+    rationale: Keep the generic fragment prompt aligned with fragment validation rules.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1301, end_line: 1302}
+    summary: Return a passing decision for validation results in the workflow integration test.
+    rationale: Exercise the validation-result judge before the process continues to PR preparation.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1425, end_line: 1434}
+    summary: Execute shell validation commands in the proposed-PR process integration test.
+    rationale: Verify the process uses the shell capability for planned verification commands.
+entities:
+  - id: plan-worker-runtime-directory-regression
+    type: Regression test
+    action: added
+entity_relationships: []
+invariants:
+  - id: plan-worker-uses-durable-runtime-files
+    description: Generated Procedrr task files and workflow state reside in a dedicated runtime directory in the integration worktree, separate from the plan descriptors.
+    action: added
+guidance: []

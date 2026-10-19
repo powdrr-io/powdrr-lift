@@ -11,7 +11,6 @@ import re
 import shlex
 import subprocess
 import sys
-import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
@@ -201,7 +200,6 @@ from powdrr_lift.workrr.git import (
     commit_and_push_workflow_initialization,
     create_workflow_worktree,
     inspect_workflow_run,
-    integration_branch_name,
     resolve_git_repository_root,
     save_workflow_git_state,
     slugify_workflow_id,
@@ -2686,52 +2684,59 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 raise PlanGenerationError(
                     "workflow definition ID does not match its plan item"
                 )
-            with tempfile.TemporaryDirectory(
-                prefix=f"powdrr-{workflow_id}-"
-            ) as temporary_root:
-                workflow_dir, tasks = instantiate_procedrr_process_workflow(
-                    process_id=instance.process_id,
-                    process_directory=_bundled_procedrr_process_directory(),
-                    input_state=instance.inputs,
-                    work_item_name=workflow_id,
-                    workflow_instance_name=workflow_id,
-                    output_root=Path(temporary_root),
-                )
-                save_workflow_git_state(
-                    workflow_dir,
-                    WorkflowGitState(
-                        proposed_pr_id=workflow_id,
-                        base_branch="main",
-                        integration_branch=integration_branch_name(workflow_id),
-                        workflow_relative_directory=(
-                            Path(item.workflow_file).parent.as_posix()
-                            if item.workflow_file is not None
-                            else ""
-                        ),
-                        depends_on_workflows=tuple(
-                            planned.workflow_id
-                            for dependency in item.dependencies
-                            for planned in plan.items
-                            if planned.item_id == dependency
-                        ),
+            integration_worktree, integration_branch = create_workflow_worktree(
+                repo_root,
+                workflow_id,
+                base_branch="main",
+            )
+            runtime_relative_directory = (
+                Path("docs")
+                / "workflows"
+                / slugify_workflow_id(plan.plan_id)
+                / "runtime"
+                / slugify_workflow_id(workflow_id)
+            )
+            workflow_dir, _tasks = instantiate_procedrr_process_workflow(
+                process_id=instance.process_id,
+                process_directory=_bundled_procedrr_process_directory(),
+                input_state=instance.inputs,
+                work_item_name=workflow_id,
+                workflow_instance_name=workflow_id,
+                output_root=(integration_worktree / runtime_relative_directory.parent),
+            )
+            save_workflow_git_state(
+                workflow_dir,
+                WorkflowGitState(
+                    proposed_pr_id=workflow_id,
+                    base_branch="main",
+                    integration_branch=integration_branch,
+                    workflow_relative_directory=(
+                        workflow_dir.relative_to(integration_worktree).as_posix()
                     ),
-                )
-                return run_workflow_task(
-                    WorkflowTaskAgentConfig(
-                        workflow_dir=workflow_dir,
-                        repo_root=repo_root,
-                        provider=args.provider,
-                        workflow_id=workflow_id,
-                        api_key=args.api_key,
-                        base_url=args.base_url,
-                        max_roundtrips=args.max_roundtrips,
-                        context_compaction_threshold=args.context_compaction_threshold,
-                        verbose=args.verbose,
-                        task_checkpoint_callback=checkpoint_callback,
+                    depends_on_workflows=tuple(
+                        planned.workflow_id
+                        for dependency in item.dependencies
+                        for planned in plan.items
+                        if planned.item_id == dependency
                     ),
-                    stdout=sys.stdout,
-                    stderr=sys.stderr,
-                )
+                ),
+            )
+            return run_workflow_task(
+                WorkflowTaskAgentConfig(
+                    workflow_dir=workflow_dir,
+                    repo_root=repo_root,
+                    provider=args.provider,
+                    workflow_id=workflow_id,
+                    api_key=args.api_key,
+                    base_url=args.base_url,
+                    max_roundtrips=args.max_roundtrips,
+                    context_compaction_threshold=args.context_compaction_threshold,
+                    verbose=args.verbose,
+                    task_checkpoint_callback=checkpoint_callback,
+                ),
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+            )
         return run_workflow_task(
             WorkflowTaskAgentConfig(
                 workflow_dir=workflow_dir,

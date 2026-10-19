@@ -1454,7 +1454,7 @@ class _TaskProcedrrOperations:
         action = _operation_to_action(normalized)
         before = len(self.strategy.events)
         try:
-            outcome = self.strategy.execute_action(action)
+            self.strategy.execute_action(action)
         except (PowdrrExecutionError, RuntimeError, ValueError) as error:
             if isinstance(error, PowdrrExecutionError) and (
                 error.error_code in {"action_not_allowed", "action_unauthorized"}
@@ -1469,10 +1469,16 @@ class _TaskProcedrrOperations:
             self.strategy.events.append(failure)
             return {"error": str(error), "retryable": True}
         observed = self.strategy.events[before:]
-        return {
-            "continue_running": outcome.continue_running,
-            "events": observed,
-        }
+        return next(
+            (
+                event["result"]
+                for event in reversed(observed)
+                if event.get("kind") == action.kind
+                and event.get("tool") == action.tool
+                and "result" in event
+            ),
+            None,
+        )
 
     def _run_nested_process(self, parameters: Mapping[str, Any]) -> dict[str, Any]:
         process_id = parameters.get("process_id")
@@ -2717,6 +2723,8 @@ def _git_operation_parameters(arguments: list[str]) -> dict[str, Any]:
         return {"operation": "remote"}
     if arguments == ["branch", "--show-current"]:
         return {"operation": "branch_current"}
+    if arguments == ["rev-parse", "HEAD"]:
+        return {"operation": "head"}
     if arguments[:2] == ["symbolic-ref", "--short"]:
         return {"operation": "default_branch"}
     if arguments[:2] == ["show-ref", "--verify"]:

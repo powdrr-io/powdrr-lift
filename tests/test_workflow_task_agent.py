@@ -6,6 +6,7 @@ import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -29,6 +30,7 @@ from powdrr_lift.process.tasks import (
     WorkflowTask,
 )
 from powdrr_lift.workrr import task_agent
+from powdrr_lift.workrr.actions import WorkflowEdit
 from powdrr_lift.workrr.git import (
     WorkflowGitInconsistency,
     WorkflowGitState,
@@ -41,6 +43,7 @@ from powdrr_lift.workrr.llm import (
 )
 from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
+    _apply_task_edits,
     _build_workflow_client,
     _durable_task_action_output_state,
     _handle_exhausted_timeout,
@@ -48,10 +51,33 @@ from powdrr_lift.workrr.task_agent import (
     _publish_workflow_progress,
     _read_task_document,
     _select_ready_workflow_git_state,
+    _TaskProcedrrOperations,
     _validate_workflow_task_state,
     _workflow_file_command_error,
     run_workflow_task,
 )
+
+
+def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:
+    action = WorkflowAction(
+        kind="edit",
+        file_path="attestation/scripts/verify-all.sh",
+        edits=(
+            WorkflowEdit(
+                "replace_lines",
+                start_line=1,
+                end_line=1,
+                text="#!/usr/bin/env bash\necho verified",
+            ),
+        ),
+    )
+
+    _apply_task_edits(action, tmp_path)
+
+    created = tmp_path / "attestation" / "scripts" / "verify-all.sh"
+    assert created.read_text(encoding="utf-8") == (
+        "#!/usr/bin/env bash\necho verified\n"
+    )
 
 
 class _FakeClient:
@@ -681,6 +707,43 @@ def test_process_workflow_task_runs_nested_process_in_same_worktree(
     ].output_state == {"ok": True}
     assert (tmp_path / "nested.txt").read_text(encoding="utf-8") == "after\n"
     assert len(client.messages) == 3
+
+
+def test_nested_procedrr_operation_returns_action_result_binding() -> None:
+    result = {"returncode": 0, "stdout": "verified", "stderr": ""}
+    strategy: Any = SimpleNamespace(
+        workflow=SimpleNamespace(),
+        task=SimpleNamespace(task_id="task-001", process_checkpoint=None),
+        stdout=io.StringIO(),
+        events=[],
+    )
+
+    def execute_action(action: Any) -> SimpleNamespace:
+        strategy.events.append(
+            {
+                "kind": action.kind,
+                "tool": action.tool,
+                "result": result,
+            }
+        )
+        return SimpleNamespace(continue_running=True)
+
+    strategy.execute_action = execute_action
+    process_catalog: Any = SimpleNamespace()
+    process_client: Any = SimpleNamespace()
+    operations = _TaskProcedrrOperations(
+        strategy,
+        process_id="outer-process",
+        process_catalog=process_catalog,
+        process_client=process_client,
+    )
+
+    output = operations.execute(
+        "internal",
+        {"command": ["echo", "verified"]},
+    )
+
+    assert output == result
 
 
 def test_nested_atomic_tool_step_advances_without_llm_confirmation(

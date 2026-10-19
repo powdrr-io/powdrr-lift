@@ -614,6 +614,8 @@ def test_checked_in_generate_fragment_definition_is_single_decision() -> None:
         "fragment_state.accepted",
         "fragment_state.diagnostic.code",
     ]
+    assert "Do not use fragment_goal as a binding" in source
+    assert '"context":["requirement_binding","hello_source"]' in source
 
 
 def test_checked_in_design_interview_definition_parses() -> None:

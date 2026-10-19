@@ -327,6 +327,8 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     )
     question = process["steps"][0]["specialize"]["question"]
     assert "`execute-proposed-pr` Procedrr process" in question
+    assert "a `bindings` mapping" in question
+    assert '"value":"task_context"' in question
     assert "formatting, lint, type" in question
     assert "Review the complete diff for scope" in question
     assert "`finish-pr-prep`" in question

@@ -1298,6 +1298,8 @@ class HelloWorldLLM:
                     "ruff reports no issues",
                 ],
             }
+        if "Does this validation command report an exit code of zero?" in question:
+            return {"passed": True}
         if "What one JSON-encoded Procedrr step should be appended" in question:
             self.fragment_round += 1
             value: Any
@@ -1420,6 +1422,16 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
     document = parse_and_validate(source)
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        if tool == "invoke_tool" and parameters.get("tool") == "shell":
+            command = parameters.get("parameters", {}).get("command", [])
+            completed = subprocess.run(
+                command, cwd=tmp_path, capture_output=True, text=True
+            )
+            return {
+                "returncode": completed.returncode,
+                "stdout": completed.stdout,
+                "stderr": completed.stderr,
+            }
         if tool == "internal":
             command = parameters.get("command", [])
             if command[:2] == ["powdrr-lift", "show-proposed-pr"]:

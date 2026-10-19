@@ -190,6 +190,9 @@ def _apply_file_edits(current_text: str, edits: Sequence[WorkflowEdit]) -> str:
 
         end_line = edit.end_line if edit.end_line is not None else edit.start_line
         end_index = end_line
+        if not lines and start_index == 0 and end_line == 1:
+            lines = edit.text.splitlines() if edit.text is not None else []
+            continue
         if end_index > len(lines):
             raise _WorkflowEditRangeError(
                 "Workflow edit action range ends at line "

@@ -183,6 +183,8 @@ def _git_command(parameters: Mapping[str, Any]) -> list[str]:
         command = ["remote"]
     elif operation == "branch_current":
         command = ["branch", "--show-current"]
+    elif operation == "head":
+        command = ["rev-parse", "HEAD"]
     elif operation == "default_branch":
         command = ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]
     elif operation == "show_ref":
@@ -214,6 +216,7 @@ def _git_command(parameters: Mapping[str, Any]) -> list[str]:
         "status",
         "remote",
         "branch",
+        "rev-parse",
         "symbolic-ref",
         "show-ref",
         "switch",

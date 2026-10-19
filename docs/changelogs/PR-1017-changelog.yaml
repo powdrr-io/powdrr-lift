@@ -204,12 +204,12 @@ files:
     rationale: Exercise the Procedrr operation adapter without running another workflow.
   - path: tests/test_workflow_task_agent.py
     type: modified
-    span: {start_line: 52, end_line: 52}
+    span: {start_line: 54, end_line: 54}
     summary: Import the task Procedrr operation adapter for direct result binding coverage.
     rationale: Verify nested operations expose return values to the calling process.
   - path: tests/test_workflow_task_agent.py
     type: modified
-    span: {start_line: 688, end_line: 724}
+    span: {start_line: 712, end_line: 748}
     summary: Verify nested Procedrr operations bind the raw command result.
     rationale: Keep worker operation bindings aligned with the Procedrr process result shape.
   - path: tests/test_workflow_task_agent.py

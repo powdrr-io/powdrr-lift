@@ -61,15 +61,17 @@ from powdrr_lift.workrr.coding_agent import (
     DEFAULT_CODING_AGENT_TIMEOUT_SECONDS,
     DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
     CodingAgentAttemptStore,
+    CodingAgentRecoveryDecision,
     CodingAgentRunner,
     ImplementationRequest,
     OpenCodePermissionPolicy,
     build_coding_agent_provider,
+    run_coding_agent_recovery,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
     ValidationReportStatus,
-    ValidationRunner,
+    execute_coding_agent_attempt,
     parse_validation_profile,
 )
 from powdrr_lift.workrr.error_logging import record_workflow_llm_error
@@ -1383,9 +1385,10 @@ class _TaskWorkflowExecutionStrategy:
             provider=provider,
             store=CodingAgentAttemptStore(store_root),
         )
-        attempt_records: list[dict[str, Any]] = []
-        recovery_issue: Mapping[str, Any] | None = None
-        for attempt_number in range(1, 4):
+
+        def run_attempt(
+            attempt_number: int, recovery_issue: Mapping[str, Any] | None
+        ) -> dict[str, Any]:
             attempt_request = request
             if recovery_issue is not None:
                 attempt_request = replace(
@@ -1404,23 +1407,19 @@ class _TaskWorkflowExecutionStrategy:
                 f"{request.request_id}-attempt-{attempt_number:02d}-"
                 f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
             )
-            attempt = runner.run(
+            execution = execute_coding_agent_attempt(
+                runner,
                 attempt_request,
                 worktree_root=self.repo_root,
                 attempt_id=attempt_id,
+                profiles={validation_profile.name: validation_profile},
+                validation_timeout_seconds=(
+                    self.config.coding_agent_validation_timeout_seconds
+                ),
             )
-            validation = ValidationRunner(
-                {validation_profile.name: validation_profile},
-                timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
-            ).run(attempt_request, attempt, worktree_root=self.repo_root)
-            runner.store.save_validation_report(validation)
-            diff_check = subprocess.run(
-                ["git", "diff", "--check"],
-                cwd=self.repo_root,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
+            attempt = execution.attempt
+            validation = execution.validation
+            diff_check = execution.diff_check
             implementation_paths = tuple(
                 sorted(
                     set(attempt.changed_paths)
@@ -1433,39 +1432,48 @@ class _TaskWorkflowExecutionStrategy:
                 and diff_check.returncode == 0
                 and validation.status is ValidationReportStatus.PASSED
             )
-            attempt_records.append(
-                {
-                    "attempt": attempt.to_data(),
-                    "validation": validation.to_data(),
-                    "diff_check": {
-                        "returncode": diff_check.returncode,
-                        "stdout": diff_check.stdout,
-                        "stderr": diff_check.stderr,
-                    },
-                    "changed_paths": list(implementation_paths),
-                    "passed": passed,
-                }
-            )
-            if passed or attempt.status.value == "policy_denied":
-                break
-            recovery_issue = {
-                "category": "coding_attempt_incomplete",
-                "status": attempt.status.value,
-                "error": attempt.error,
-                "changed_paths": list(implementation_paths),
+            return {
+                "attempt": attempt.to_data(),
                 "validation": validation.to_data(),
                 "diff_check": {
                     "returncode": diff_check.returncode,
                     "stdout": diff_check.stdout,
                     "stderr": diff_check.stderr,
                 },
-                "instruction": (
-                    "Continue the reviewed implementation in the current worktree. "
-                    "Inspect and preserve useful edits, repair the reported "
-                    "validation failures, and satisfy every acceptance criterion. "
-                    "Do not re-plan unrelated work."
-                ),
+                "changed_paths": list(implementation_paths),
+                "passed": passed,
             }
+
+        def evaluate_attempt(
+            record: Mapping[str, Any],
+        ) -> CodingAgentRecoveryDecision:
+            attempt_data = record.get("attempt")
+            if not isinstance(attempt_data, Mapping):
+                return CodingAgentRecoveryDecision(passed=False, terminal=True)
+            if record.get("passed") is True:
+                return CodingAgentRecoveryDecision(passed=True)
+            if attempt_data.get("status") == "policy_denied":
+                return CodingAgentRecoveryDecision(passed=False, terminal=True)
+            return CodingAgentRecoveryDecision(
+                passed=False,
+                issue={
+                    "category": "coding_attempt_incomplete",
+                    "status": attempt_data.get("status"),
+                    "error": attempt_data.get("error"),
+                    "changed_paths": record.get("changed_paths", []),
+                    "validation": record.get("validation"),
+                    "diff_check": record.get("diff_check"),
+                    "instruction": (
+                        "Continue the reviewed implementation in the current worktree. "
+                        "Inspect and preserve useful edits, repair the reported "
+                        "validation failures, and satisfy every acceptance criterion. "
+                        "Do not re-plan unrelated work."
+                    ),
+                },
+            )
+
+        recovery = run_coding_agent_recovery(run_attempt, evaluate_attempt)
+        attempt_records = list(recovery.attempts)
 
         final_attempt = attempt_records[-1]
         attempt_data = final_attempt["attempt"]

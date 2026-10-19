@@ -626,10 +626,14 @@ class ProbeEnabledPlanningClient(DeterministicPlanningClient):
                             "The instruction explicitly names both output lines."
                         ),
                         "test_source": (
+                            "import contextlib\n"
+                            "import io\n"
                             "import runpy\n"
-                            "def test_probe_second_greeting(capsys):\n"
-                            "    runpy.run_path('hello_world.py')\n"
-                            "    assert capsys.readouterr().out.splitlines() == ["
+                            "def test_probe_second_greeting():\n"
+                            "    output = io.StringIO()\n"
+                            "    with contextlib.redirect_stdout(output):\n"
+                            "        runpy.run_path('hello_world.py')\n"
+                            "    assert output.getvalue().splitlines() == ["
                             "'Hello, world!', 'Hello from Powdrr!']\n"
                         ),
                     }

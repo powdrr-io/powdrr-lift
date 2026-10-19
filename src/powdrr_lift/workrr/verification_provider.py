@@ -287,8 +287,128 @@ class PytestVerificationProvider:
         }
 
 
+class StestrVerificationProvider:
+    """Collect and run exact unittest identities through stestr."""
+
+    name = "stestr"
+
+    def detect(
+        self,
+        root: Path,
+        profiles: Sequence[DiscoveredValidationProfile],
+    ) -> bool:
+        del root
+        return any(
+            profile.provider == self.name
+            or _command_mentions(profile.command, self.name)
+            for profile in profiles
+        )
+
+    def inventory(
+        self, root: Path, profile: DiscoveredValidationProfile
+    ) -> ProviderInventory:
+        command = _stestr_command(profile.command, "list")
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=root,
+                capture_output=True,
+                text=True,
+                timeout=600,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            return ProviderInventory(
+                self.name,
+                profile.name,
+                (),
+                _package_version("stestr"),
+                f"stestr collection failed: {error}",
+                command,
+            )
+        selectors = tuple(
+            sorted(
+                {line.strip() for line in completed.stdout.splitlines() if line.strip()}
+            )
+        )
+        return ProviderInventory(
+            self.name,
+            profile.name,
+            selectors,
+            _package_version("stestr"),
+            None
+            if completed.returncode == 0
+            else f"stestr list exited with {completed.returncode}",
+            command,
+        )
+
+    def execute(self, request: VerificationProviderRequest) -> ProviderExecutionResult:
+        command = (*_stestr_command(request.command, "run"), request.selector)
+        started = time.monotonic()
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=request.root,
+                capture_output=True,
+                text=True,
+                timeout=request.timeout_seconds,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            return ProviderExecutionResult(
+                self.name,
+                request.selector,
+                request.profile,
+                "timed_out",
+                124,
+                "stestr execution timed out",
+                _output_text(error.stdout),
+                _output_text(error.stderr),
+                _duration_ms(started),
+                _package_version("stestr"),
+            )
+        except OSError as error:
+            return ProviderExecutionResult(
+                self.name,
+                request.selector,
+                request.profile,
+                "errored",
+                error=f"could not start stestr: {error}",
+                duration_ms=_duration_ms(started),
+                provider_version=_package_version("stestr"),
+            )
+        return ProviderExecutionResult(
+            self.name,
+            request.selector,
+            request.profile,
+            "passed" if completed.returncode == 0 else "failed",
+            completed.returncode,
+            None
+            if completed.returncode == 0
+            else f"stestr exited with {completed.returncode}",
+            completed.stdout,
+            completed.stderr,
+            _duration_ms(started),
+            _package_version("stestr"),
+        )
+
+    def normalize(self, result: ProviderExecutionResult) -> dict[str, Any]:
+        return {
+            "provider": result.provider,
+            "selector": result.selector,
+            "profile": result.profile,
+            "status": result.status,
+            "returncode": result.returncode,
+            "error": result.error,
+            "duration_ms": result.duration_ms,
+            "provider_version": result.provider_version,
+        }
+
+
 def default_verification_provider_registry() -> VerificationProviderRegistry:
-    return VerificationProviderRegistry((PytestVerificationProvider(),))
+    return VerificationProviderRegistry(
+        (PytestVerificationProvider(), StestrVerificationProvider())
+    )
 
 
 def discover_verification_inventory(
@@ -343,6 +463,23 @@ def match_selector(
 
 def _command_mentions(command: Sequence[str], value: str) -> bool:
     return any(Path(part).name == value or part == value for part in command)
+
+
+def _stestr_command(command: Sequence[str], action: str) -> tuple[str, ...]:
+    try:
+        index = next(
+            index
+            for index, part in enumerate(command)
+            if Path(part).name.casefold() == "stestr"
+        )
+    except StopIteration:
+        return ("stestr", action)
+    tail = list(command[index + 1 :])
+    if tail and tail[0] in {"run", "list"}:
+        tail.pop(0)
+    if action == "list":
+        tail = []
+    return (*command[: index + 1], action, *tail)
 
 
 def _pytest_arguments(command: Sequence[str], root: Path) -> list[str]:
@@ -401,6 +538,7 @@ __all__ = [
     "ProviderExecutionResult",
     "ProviderInventory",
     "PytestVerificationProvider",
+    "StestrVerificationProvider",
     "VERIFICATION_PROVIDER_INVENTORY_SCHEMA_VERSION",
     "VerificationProvider",
     "VerificationProviderRegistry",

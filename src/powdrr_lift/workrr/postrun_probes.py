@@ -7,6 +7,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -105,15 +106,23 @@ def generate_postrun_probes(
         {
             "role": "system",
             "content": (
-                "Create a small independent pytest probe suite for software behavior. "
+                "Create a small independent Python probe suite for software behavior. "
                 "Use only the source instruction, behavior scenarios, and baseline "
                 "repository contract supplied below. The candidate implementation "
                 "and task solution tests are intentionally unavailable. Each probe "
                 "must test one observable behavior and use a public API or stable "
                 "repository contract. Do not invent expected behavior: omit a "
-                "scenario if its oracle is unresolved. Return test_source as a "
-                "self-contained Python pytest module containing exactly one test "
-                "function. The function name must start with test_probe_. Do not "
+                "scenario if its oracle is unresolved. Every probe must import and "
+                "exercise the candidate software's public API or stable repository "
+                "contract, then assert the observed result. Never test that the "
+                "instruction text contains a requirement or copy source text into "
+                "an assertion. Return test_source as a "
+                "self-contained Python module containing exactly one ordinary "
+                "zero-argument test function. Use plain Python assertions; do not "
+                "use pytest fixtures or pytest-specific helpers. The function name "
+                "must start with test_probe_. The function must have no arguments, "
+                "contain at least one assert and one call to the software under "
+                "test, and must not import pytest. Do not "
                 "write files, launch subprocesses, access the network, or alter "
                 "repository state. Keep probes minimal and deterministic."
             ),
@@ -164,25 +173,17 @@ def run_postrun_probes(
     profiles: Sequence[DiscoveredValidationProfile],
     timeout_seconds: float = 180.0,
 ) -> tuple[PostRunProbeResult, ...]:
-    """Run frozen probes as isolated pytest modules in the candidate checkout."""
-    pytest_profile = _pytest_profile(profiles)
-    if pytest_profile is None:
-        return tuple(
-            PostRunProbeResult(
-                probe.probe_id,
-                probe.scenario_id,
-                "unavailable",
-                error="no discovered pytest validation profile is available",
-            )
-            for probe in probes
-        )
+    """Run frozen probes independently of the repository's test framework."""
+    del profiles  # Probes have their own execution boundary and need no test profile.
     results: list[PostRunProbeResult] = []
     with tempfile.TemporaryDirectory(prefix="powdrr-probes-") as temporary:
         probe_root = Path(temporary)
+        runner_path = probe_root / "run_probe.py"
+        runner_path.write_text(_PROBE_RUNNER, encoding="utf-8")
         for index, probe in enumerate(probes):
             test_path = probe_root / f"test_probe_{index:03d}.py"
             test_path.write_text(probe.test_source.rstrip() + "\n", encoding="utf-8")
-            command = _probe_pytest_command(pytest_profile.command, test_path)
+            command = (sys.executable, str(runner_path), str(test_path))
             environment = os.environ.copy()
             environment.pop("VIRTUAL_ENV", None)
             existing_pythonpath = environment.get("PYTHONPATH", "")
@@ -252,31 +253,25 @@ def probe_failures(results: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]
     ]
 
 
-def _pytest_profile(
-    profiles: Sequence[DiscoveredValidationProfile],
-) -> DiscoveredValidationProfile | None:
-    for profile in profiles:
-        if any(
-            part.casefold() == "pytest" or Path(part).name.casefold() == "pytest"
-            for part in profile.command
-        ) or any(
-            profile.command[index] == "-m"
-            and index + 1 < len(profile.command)
-            and profile.command[index + 1] == "pytest"
-            for index in range(len(profile.command))
-        ):
-            return profile
-    return None
+_PROBE_RUNNER = """\
+import importlib.util
+import sys
 
-
-def _probe_pytest_command(command: Sequence[str], test_path: Path) -> tuple[str, ...]:
-    """Keep the discovered launcher, but omit its repository-wide selectors."""
-    for index, part in enumerate(command):
-        if Path(part).name.casefold() == "pytest":
-            return (*command[: index + 1], "-q", str(test_path))
-        if part == "-m" and index + 1 < len(command) and command[index + 1] == "pytest":
-            return (*command[: index + 2], "-q", str(test_path))
-    raise ValueError("pytest validation profile has no direct pytest entry point")
+path = sys.argv[1]
+spec = importlib.util.spec_from_file_location("powdrr_generated_probe", path)
+if spec is None or spec.loader is None:
+    raise RuntimeError(f"cannot load generated probe: {path}")
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+tests = [
+    value
+    for name, value in vars(module).items()
+    if name.startswith("test_probe_") and callable(value)
+]
+if len(tests) != 1:
+    raise RuntimeError(f"expected exactly one probe function, found {len(tests)}")
+tests[0]()
+"""
 
 
 def _validate_test_source(source: str) -> None:
@@ -288,6 +283,19 @@ def _validate_test_source(source: str) -> None:
     functions = [item for item in tree.body if isinstance(item, ast.FunctionDef)]
     if len(functions) != 1 or not functions[0].name.startswith("test_probe_"):
         raise ValueError("each generated probe must contain one test_probe_ function")
+    function = functions[0]
+    if (
+        function.args.args
+        or function.args.posonlyargs
+        or function.args.kwonlyargs
+        or function.args.vararg
+        or function.args.kwarg
+    ):
+        raise ValueError("generated probe function must take no arguments")
+    if not any(isinstance(node, ast.Assert) for node in ast.walk(function)):
+        raise ValueError("generated probe must contain an observable assertion")
+    if not any(isinstance(node, ast.Call) for node in ast.walk(function)):
+        raise ValueError("generated probe must call the software under test")
     if any(
         not isinstance(item, (ast.Import, ast.ImportFrom, ast.FunctionDef))
         for item in tree.body
@@ -303,6 +311,8 @@ def _validate_test_source(source: str) -> None:
             raise ValueError("generated probe references __builtins__")
         if isinstance(node, ast.Import):
             roots = {alias.name.split(".", 1)[0] for alias in node.names}
+            if "pytest" in roots:
+                raise ValueError("generated probe must not depend on pytest")
             if roots & {
                 "os",
                 "socket",
@@ -318,6 +328,8 @@ def _validate_test_source(source: str) -> None:
                 raise ValueError("generated probe imports a disallowed system module")
         if isinstance(node, ast.ImportFrom):
             root = (node.module or "").split(".", 1)[0]
+            if root == "pytest":
+                raise ValueError("generated probe must not depend on pytest")
             if root in {
                 "os",
                 "socket",

@@ -378,6 +378,26 @@ def discover_validation_profiles(
                 "pytest configuration/CI",
             )
         )
+    stestr_commands = tuple(
+        command
+        for command in ci_commands
+        if any(Path(part).name.casefold() == "stestr" for part in command)
+    )
+    if (root_path / ".stestr.conf").is_file() or stestr_commands:
+        profiles.append(
+            DiscoveredValidationProfile(
+                "stestr",
+                stestr_commands[0]
+                if stestr_commands
+                else ("stestr", "run", "--concurrency", "1"),
+                "stestr configuration/CI",
+                provider_name="stestr",
+                declaration="declared" if stestr_commands else "inferred",
+                evidence=(".stestr.conf",)
+                if (root_path / ".stestr.conf").is_file()
+                else (),
+            )
+        )
 
     package_json = _load_package_json(root_path)
     if package_json and _has_script(package_json, ("test", "check", "lint")):
@@ -536,7 +556,12 @@ def _discover_nested_validation_profiles(
 def _validation_command_kind(command: tuple[str, ...]) -> str | None:
     tokens = tuple(token.lower() for token in command)
     joined = " ".join(tokens)
-    if "pytest" in tokens or " test" in f" {joined}" or "vitest" in tokens:
+    if (
+        "pytest" in tokens
+        or "stestr" in tokens
+        or " test" in f" {joined}"
+        or "vitest" in tokens
+    ):
         return "test"
     if "ruff" in tokens and "format" in tokens:
         return "format"
@@ -940,6 +965,7 @@ def _discover_make_profiles(
                 "format-check",
                 "lint",
                 "pre-commit",
+                "stestr",
                 "test",
                 "tests",
                 "typecheck",
@@ -2127,6 +2153,7 @@ def _commands_from_script(script: str) -> tuple[tuple[str, ...], ...]:
                 "bun",
                 "pre-commit",
                 "hatch",
+                "stestr",
                 "go",
                 "cargo",
             }:

@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1029
+title: Compare prompt grades with benchmark validation
+intent:
+  problem: Prompt reports cannot be connected to completed benchmark validation, leaving prompt findings and implementation outcomes disconnected.
+  goal: Emit an auditable comparison linked to an immutable prompt report and final validation artifacts, with explicit mappings and inconclusive states.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 167
+    end_line: 200
+  summary: Document the benchmark comparison command, supported report formats, mappings, and result interpretation.
+  rationale: Explain how to compare a completed Powdrr run with its prompt evaluation without changing the original score.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 232
+    end_line: 235
+  summary: Import benchmark comparison support into the CLI.
+  rationale: Expose comparison of prompt and validation evidence through the command interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1787
+    end_line: 1795
+  summary: Add the compare-prompt-benchmark CLI arguments.
+  rationale: Accept a prompt report, completed benchmark run, and optional output path.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5783
+    end_line: 5818
+  summary: Write comparison reports and print score, gate, pass rate, unresolved, and unmapped counts.
+  rationale: Make evaluation outcomes and validation status visible in the command result.
+- path: src/powdrr_lift/workrr/prompt_benchmark_comparison.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 446
+  summary: Load canonical Powdrr run and coding-agent validation reports, verify identity, normalize result states, and compare declared criterion mappings.
+  rationale: Produce a separate fingerprinted comparison with evidence, unmapped failures, pass rate, unresolved statuses, and cautious review interpretations.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 58
+  summary: Verify comparison CLI parsing and dispatch.
+  rationale: Prevent regressions in the public command entry point.
+- path: tests/test_prompt_benchmark_comparison.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 269
+  summary: Cover mixed validation outcomes, mapping, provenance, immutable report fingerprints, supported artifact formats, and CLI report output.
+  rationale: Prove the comparison handles passing, failing, missing, blocked, and unmapped results without changing the prompt score.

@@ -521,7 +521,20 @@ def _discover_nested_validation_profiles(
         "build.gradle",
         "gradlew",
     }
-    ignored = {".git", ".venv", "venv", "node_modules", "vendor", "dist", "build"}
+    ignored = {
+        ".git",
+        ".nox",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".tox",
+        ".venv",
+        "__pycache__",
+        "build",
+        "dist",
+        "node_modules",
+        "vendor",
+        "venv",
+    }
     project_roots: set[Path] = set()
     for directory, child_dirs, filenames in os.walk(root):
         child_dirs[:] = [name for name in child_dirs if name not in ignored]

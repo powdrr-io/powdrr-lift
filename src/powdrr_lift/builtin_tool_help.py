@@ -60,7 +60,8 @@ _HELP: dict[str, dict[str, Any]] = {
         "parameters": {
             "operation": (
                 "One of status, remote, branch_current, head, default_branch, "
-                "show_ref, switch, switch_create, commit, push, add, move, or rename."
+                "show_ref, verify_pr_scope, switch, switch_create, commit, push, "
+                "add, move, or rename."
             ),
             "paths": "Relative paths for add.",
             "source": "Relative source path for move.",
@@ -82,15 +83,16 @@ _HELP: dict[str, dict[str, Any]] = {
         ),
         "parameters": {
             "operation": (
-                "One of pr_view, pr_diff, pr_checks, pr_create, pr_edit, "
+                "One of pr_view, pr_diff, pr_checks, pr_create, pr_publish_clean, "
+                "pr_edit, "
                 "pr_comments, or pr_review_comment."
             ),
             "pr_reference": (
                 "Pull-request number or branch for inspection operations only; "
                 "the runtime selects the target for pr_edit."
             ),
-            "title": "Pull-request title for pr_create or pr_edit.",
-            "body": "Pull-request body for pr_create or pr_edit.",
+            "title": "Pull-request title for create, publish-clean, or edit.",
+            "body": "Pull-request body for create, publish-clean, or edit.",
             "help": "Set true to request the tool's conventional --help guidance.",
         },
         "examples": [

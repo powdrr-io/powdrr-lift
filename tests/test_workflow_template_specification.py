@@ -335,8 +335,17 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     assert steps[0]["call"]["outputs"] == {"implementation_result": "coding_attempt"}
     assert steps[1]["gate"]["subject"] == "implementation_result.passed"
     assert steps[2]["judge"]["output"]["name"] == "publication_scope"
+    assert "files_to_publish" not in steps[2]["judge"]["output"]["schema"]["required"]
+    assert steps[3]["call"]["inputs"]["files_to_publish"] == {
+        "type": "reference",
+        "value": "implementation_result.changed_paths",
+    }
     assert steps[3]["call"]["outputs"] == {"validation_results": "validation_results"}
     assert steps[4]["judge"]["output"]["name"] == "pull_request_request"
+    assert steps[5]["call"]["inputs"]["files_to_publish"] == {
+        "type": "reference",
+        "value": "implementation_result.changed_paths",
+    }
     assert steps[5]["call"]["outputs"] == {"pull_request_url": "pull_request_url"}
     assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
 
@@ -353,12 +362,15 @@ def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files
         .get("create-pull-request")
         .document
     )
-    question = process["steps"][0]["specialize"]["question"]
-
-    assert "Do not delete or edit files outside `files_to_publish`" in question
-    assert "committed_file_names" in question
-    assert "already committed relative to `<base-branch>`" in question
-    assert "delete exactly one" not in question
+    operation = process["steps"][0]["operation"]
+    parameters = operation["parameters"]["parameters"]
+    assert parameters["operation"] == "pr_publish_clean"
+    assert parameters["files_to_publish"]["value"] == "files_to_publish"
+    assert (
+        parameters["publication_branch"]["value"]
+        == "workflow_context.publication-branch"
+    )
+    assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
 
 
 def test_instantiate_procedrr_process_workflow_creates_task(tmp_path: Path) -> None:

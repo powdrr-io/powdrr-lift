@@ -57,6 +57,7 @@ _TOOL_PACKAGES: dict[str, tuple[dict[str, Any], ...]] = {
             "head",
             "default_branch",
             "show_ref",
+            "verify_pr_scope",
         )
     ),
     "git_additive": tuple(
@@ -77,7 +78,12 @@ _TOOL_PACKAGES: dict[str, tuple[dict[str, Any], ...]] = {
     ),
     "gh_write": tuple(
         {"tool": "gh", "operation": operation}
-        for operation in ("pr_create", "pr_edit", "pr_review_comment")
+        for operation in (
+            "pr_create",
+            "pr_publish_clean",
+            "pr_edit",
+            "pr_review_comment",
+        )
     ),
 }
 _TOOL_PACKAGES["git_readonly_and_additive"] = (

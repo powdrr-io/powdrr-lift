@@ -1232,7 +1232,8 @@ class _TaskWorkflowExecutionStrategy:
         elif action.tool in {GIT_TOOL, GH_TOOL}:
             if (
                 action.tool == GH_TOOL
-                and action.parameters.get("operation") == "pr_create"
+                and action.parameters.get("operation")
+                in {"pr_create", "pr_publish_clean"}
                 and self.runtime is not None
             ):
                 self.runtime.require_publish_readiness()

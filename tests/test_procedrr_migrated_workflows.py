@@ -118,6 +118,7 @@ def test_handle_ad_hoc_runs_finish_pr_prep_for_changed_files() -> None:
     assert result.bindings["pr_prep_results"] == []
     assert calls == [
         ("shell", {"command": ["git", "status", "--short"]}),
+        ("git", {"operation": "add", "paths": ["src/app.py"]}),
         ("shell", {"command": ["git", "diff", "--cached", "--stat"]}),
     ]
 
@@ -147,6 +148,11 @@ def test_finish_pr_prep_runs_every_discovered_validation_tool() -> None:
     )
 
     assert result.terminal_status.value == "succeeded"
+    assert calls[:3] == [
+        ("shell", {"command": ["git", "status", "--short"]}),
+        ("git", {"operation": "add", "paths": ["src/app.py"]}),
+        ("shell", {"command": ["git", "diff", "--cached", "--stat"]}),
+    ]
     assert [call for call in calls if call[1].get("command") == "ruff check ."] == [
         ("shell", {"command": "ruff check ."})
     ]
@@ -208,7 +214,7 @@ def test_finish_pr_prep_repairs_then_reruns_all_validations() -> None:
 
     assert result.terminal_status.value == "succeeded"
     assert validation_calls == 2
-    assert restaged_paths == ["src/app.py", "README.md"]
+    assert restaged_paths == ["src/app.py", "README.md"] * 2
     assert edits == [
         {
             "operation": "replace_lines",

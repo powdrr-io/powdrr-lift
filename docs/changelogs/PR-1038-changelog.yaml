@@ -24,22 +24,36 @@ files:
 - path: src/powdrr_lift/workrr/feature_endpoint.py
   type: modified
   span:
-    start_line: 3120
-    end_line: 3120
-  summary: Replace the full proposal diff with relevant proposal changes.
-  rationale: Keep the probe prompt focused on behavior-facing acceptance context.
+    start_line: 3117
+    end_line: 3123
+  summary: Explain that all probe imports must be listed in the imports array and that bodies contain function statements only.
+  rationale: Match the authoring instructions to the runner’s generated source format.
 - path: src/powdrr_lift/workrr/feature_endpoint.py
   type: modified
   span:
-    start_line: 3122
-    end_line: 3122
+    start_line: 3126
+    end_line: 3126
+  summary: Keep scenario IDs in the compact prompt context.
+  rationale: Preserve probe provenance.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3128
+    end_line: 3128
   summary: Send compact scenarios while retaining their IDs.
   rationale: Preserve probe provenance with less prompt overhead.
 - path: src/powdrr_lift/workrr/feature_endpoint.py
   type: modified
   span:
-    start_line: 3235
-    end_line: 3276
+    start_line: 3171
+    end_line: 3177
+  summary: Give the repair attempt explicit directions for moving imports from probe bodies to the imports array.
+  rationale: Make the validation retry actionable for the observed schema error.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3246
+    end_line: 3287
   summary: Add compact serializers for proposal changes and behavior scenarios.
   rationale: Keep probe context bounded without dropping the scenario identifiers needed to bind generated probes.
 - path: src/powdrr_lift/workrr/coding_agent.py
@@ -165,16 +179,30 @@ files:
   type: modified
   span:
     start_line: 125
-    end_line: 131
+    end_line: 132
   summary: Add oversized provenance metadata to the probe-authoring fixture.
   rationale: Exercise prompt compaction with deliberately verbose scenario data.
 - path: tests/test_feature_endpoint.py
   type: modified
   span:
     start_line: 141
-    end_line: 143
+    end_line: 169
   summary: Assert that compact probe prompts exclude verbose metadata and stay bounded.
   rationale: Prevent the original oversized prompt regression.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 171
+  summary: Serialize the invalid and repaired probe fixtures for consecutive MiniSWE attempts.
+  rationale: Exercise the bounded repair path.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 207
+    end_line: 207
+  summary: Assert that a second authoring attempt repairs the invalid import placement.
+  rationale: Verify successful suite persistence after the targeted repair.
 entities:
 - id: miniswe-task-file-input
   type: Subcommand

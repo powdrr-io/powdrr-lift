@@ -1238,6 +1238,7 @@ class _TaskWorkflowExecutionStrategy:
         return WorkflowActionOutcome(continue_running=False)
 
     def _execute_tool(self, action: WorkflowAction) -> None:
+        record_result: Any = None
         repaired_parameters = _repair_workflow_file_command(
             action.parameters,
             self.workflow.directory,
@@ -1302,6 +1303,7 @@ class _TaskWorkflowExecutionStrategy:
                 worktree_root=self.repo_root,
                 runtime=self.runtime,
             )
+            record_result = result
             if (
                 action.tool == GH_TOOL
                 and action.parameters.get("operation") == "pr_publish_clean"
@@ -1311,7 +1313,7 @@ class _TaskWorkflowExecutionStrategy:
                 # subprocess-shaped result returned by the other git/gh
                 # operations. Normalize it so PR recording follows the same
                 # path as `gh pr create`.
-                result = {
+                record_result = {
                     "tool": GH_TOOL,
                     "command": ["gh", "pr", "create"],
                     "returncode": 0,
@@ -1353,6 +1355,8 @@ class _TaskWorkflowExecutionStrategy:
             "parameters": action.parameters,
             "result": result,
         }
+        if record_result is None:
+            record_result = result
         if self.runtime is None:
             raise PowdrrExecutionError(
                 "Workflow task pull-request recording requires an execution runtime.",
@@ -1364,7 +1368,7 @@ class _TaskWorkflowExecutionStrategy:
             self.task.task_id,
             self.repo_root,
             self.events,
-            result,
+            record_result,
             runtime=self.runtime,
         )
         self.events.append(event)

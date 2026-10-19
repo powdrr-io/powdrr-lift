@@ -298,7 +298,7 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
     assert isinstance(recorded[0], Mapping)
     assert recorded[0]["stdout"] == url
     assert recorded[0]["command"] == ["gh", "pr", "create"]
-    assert strategy.events[-1]["result"] == recorded[0]
+    assert strategy.events[-1]["result"] == url
 
 
 def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:

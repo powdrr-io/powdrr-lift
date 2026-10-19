@@ -8,7 +8,7 @@ outputs:
     type: string
     minLength: 1
     pattern: ^https?://[^ ]+/pull/[0-9]+$
-limits: {llm_activations: 32, tool_calls: 120, context_chars: 60000, context_value_chars: 16000}
+limits: {llm_activations: 32, tool_calls: 400, context_chars: 60000, context_value_chars: 16000}
 steps:
   - call:
       process: execute-proposed-pr

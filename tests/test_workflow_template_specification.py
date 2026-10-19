@@ -326,6 +326,7 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
         .document
     )
     steps = process["steps"]
+    assert process["limits"]["tool_calls"] == 400
     process_calls = [step["call"]["process"] for step in steps if "call" in step]
     assert process_calls == [
         "execute-proposed-pr",

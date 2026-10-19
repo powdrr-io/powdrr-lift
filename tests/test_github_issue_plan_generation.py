@@ -42,6 +42,10 @@ def _item(item_id: str, *, dependencies: list[str] | None = None) -> dict[str, A
         "title": f"Implement {item_id}",
         "objective": f"Deliver {item_id} from the plan.",
         "scope": [f"component: {item_id}"],
+        "implementation_steps": [
+            f"Implement the smallest behavior for {item_id}.",
+            f"Add focused tests proving {item_id} works.",
+        ],
         "acceptance_criteria": [f"{item_id} meets its documented acceptance criteria."],
         "dependencies": dependencies or [],
     }
@@ -68,6 +72,10 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     assert "Implement a foundation" in client.messages[1]["content"]
     assert [item.item_id for item in plan.items] == ["foundation", "integration"]
     assert plan.items[1].dependencies == ("foundation",)
+    assert plan.items[0].implementation_steps == (
+        "Implement the smallest behavior for foundation.",
+        "Add focused tests proving foundation works.",
+    )
     assert plan.items[0].workflow_file == (
         "docs/workflows/local-attestation-v1/local-attestation-v1-foundation.yaml"
     )
@@ -79,6 +87,41 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     assert (
         "schema: https://powdrr.io/schemas/github-issue-execution-plan-v1" in rendered
     )
+    assert "implementation_steps:" in rendered
+    assert "Implement the smallest behavior for foundation." in rendered
+    assert "implementation step" in client.messages[0]["content"]
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda item: item.pop("implementation_steps"), "complete planning contract"),
+        (
+            lambda item: item.update(
+                scope=[f"component {index}" for index in range(6)]
+            ),
+            "between 1 and 5 scope entries",
+        ),
+        (
+            lambda item: item.update(
+                implementation_steps=[f"step {index}" for index in range(9)]
+            ),
+            "between 1 and 8 implementation steps",
+        ),
+    ],
+)
+def test_generate_execution_plan_yaml_rejects_oversized_or_incomplete_items(
+    mutate: Any, message: str
+) -> None:
+    item = _item("foundation")
+    mutate(item)
+
+    with pytest.raises(PlanGenerationError, match=message):
+        generate_execution_plan_yaml(
+            source_plan="# Plan\nDo the work.",
+            plan_id="local-attestation-v1",
+            client=FakePlanningClient({"items": [item]}),
+        )
 
 
 def test_generated_plan_records_source_document() -> None:
@@ -131,6 +174,44 @@ def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> No
     assert tasks[0].input_state["proposed_pr_context"]["verification_command"] == (
         "scripts/verify-all.sh"
     )
+    assert tasks[0].input_state["proposed_pr_context"]["implementation_steps"] == [
+        "Implement the smallest behavior for foundation.",
+        "Add focused tests proving foundation works.",
+    ]
+
+
+def test_execute_proposed_pr_process_requires_actionable_implementation_plan() -> None:
+    import yaml
+
+    process_path = (
+        Path(__file__).parents[1]
+        / "docs"
+        / "procedrr"
+        / "processes"
+        / "execute-proposed-pr.yaml"
+    )
+    process = yaml.safe_load(process_path.read_text(encoding="utf-8"))
+    planning_step = next(
+        step["judge"]["output"]
+        for step in process["steps"]
+        if "judge" in step
+        and step["judge"].get("output", {}).get("name") == "implementation_plan"
+    )
+    schema = planning_step["schema"]
+
+    assert schema["required"] == [
+        "actions",
+        "validation_commands",
+        "acceptance_conditions",
+    ]
+    action_schema = schema["properties"]["actions"]["items"]
+    assert action_schema["required"] == [
+        "covers_steps",
+        "file_paths",
+        "change",
+        "expected_result",
+    ]
+    assert action_schema["properties"]["file_paths"]["maxItems"] == 5
 
 
 def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
@@ -373,6 +454,10 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
             "title": "Implement foundation",
             "objective": "Deliver foundation from the plan.",
             "scope": ["component: foundation"],
+            "implementation_steps": [
+                "Implement the smallest behavior for foundation.",
+                "Add focused tests proving foundation works.",
+            ],
             "acceptance_criteria": [
                 "foundation meets its documented acceptance criteria."
             ],

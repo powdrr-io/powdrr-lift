@@ -46,6 +46,7 @@ class PlannedWorkItem:
     workflow_directory: str | None
     workflow_id: str
     workflow_file: str | None = None
+    implementation_steps: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -844,9 +845,18 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             "dependencies",
             "workflow_id",
         }
-        if set(raw) not in (
-            common_fields | {"workflow_directory"},
-            common_fields | {"workflow_file"},
+        workflow_fields = (
+            {"workflow_directory"},
+            {"workflow_file"},
+        )
+        optional_fields: tuple[set[str], set[str]] = (
+            {"implementation_steps"},
+            set(),
+        )
+        if not any(
+            set(raw) == common_fields | workflow_field | optional_field
+            for workflow_field in workflow_fields
+            for optional_field in optional_fields
         ):
             raise GitHubIssueQueueError(f"{field} has unknown or missing fields")
         item_id = raw.get("id")
@@ -881,10 +891,21 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             workflow_directory=workflow_dir if isinstance(workflow_dir, str) else None,
             workflow_id=workflow_id,
             workflow_file=workflow_file if isinstance(workflow_file, str) else None,
+            implementation_steps=(
+                _string_list(raw, "implementation_steps", field)
+                if "implementation_steps" in raw
+                else ()
+            ),
         )
         if not item.scope or not item.acceptance_criteria:
             raise GitHubIssueQueueError(
                 f"{field} must declare scope and acceptance criteria"
+            )
+        if "implementation_steps" in raw and (
+            len(item.scope) > 5 or not 1 <= len(item.implementation_steps) <= 8
+        ):
+            raise GitHubIssueQueueError(
+                f"{field} exceeds the bounded scope or implementation-step limits"
             )
         items.append(item)
     ids = [item.item_id for item in items]

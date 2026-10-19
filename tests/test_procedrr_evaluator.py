@@ -1288,6 +1288,16 @@ class HelloWorldLLM:
             return {"file_path": "hello.py", "reason": "confirm current output"}
         if "smallest ordered implementation plan" in question:
             return {
+                "actions": [
+                    {
+                        "covers_steps": ["Print Here I Am after Hello, World."],
+                        "file_paths": ["hello.py", "test_hello.py"],
+                        "change": "Add the second output and assert both lines.",
+                        "expected_result": (
+                            "The program and focused test show both lines."
+                        ),
+                    }
+                ],
                 "validation_commands": [
                     [sys.executable, "-m", "pytest", "-q"],
                     ["ruff", "check", "hello.py"],
@@ -1473,6 +1483,7 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
                     "proposed_pr_context": {
                         "id": "hello-world",
                         "intent": "Add a second output line.",
+                        "implementation_steps": ["Print Here I Am after Hello, World."],
                     },
                 }
             },
@@ -1480,6 +1491,9 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
     )
 
     assert result.bindings["completeness_review"]["complete"] is True
+    assert result.bindings["implementation_plan"]["actions"][0]["covers_steps"] == [
+        "Print Here I Am after Hello, World."
+    ]
     assert result.bindings["invariant_review"]["preserved"] is True
     assert result.bindings["security_review"]["safe"] is True
     assert (

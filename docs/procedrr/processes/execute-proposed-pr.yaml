@@ -54,18 +54,41 @@ steps:
         proposed PR.
       instructions:
         - Use the proposed PR and gathered repository context as the only evidence.
+        - When proposed_pr_context.implementation_steps is present, translate each entry into one or more concrete actions without omission or broadening. For older plan items without that field, derive the smallest bounded action list from the reviewed objective, scope, and acceptance criteria, including focused tests.
+        - Every action must list the exact implementation-step text it covers in covers_steps. If the task has no implementation_steps, list the exact scope or acceptance statements each action addresses.
         - Name exact repository-relative files for every coding action.
         - Order actions so each action leaves the tree buildable and testable.
         - Include the command-level validation needed after the actions.
         - Do not include unrelated refactors or speculative work.
+        - Keep the action list small enough for this single PR; if the accepted scope cannot fit, report that in acceptance_conditions and do not claim the task complete.
       context: [task_context, repository_context, source_document, initial_static_analysis]
       output:
         name: implementation_plan
         schema:
           type: object
-          required: [validation_commands, acceptance_conditions]
+          required: [actions, validation_commands, acceptance_conditions]
           additionalProperties: false
           properties:
+            actions:
+              type: array
+              minItems: 1
+              maxItems: 8
+              items:
+                type: object
+                required: [covers_steps, file_paths, change, expected_result]
+                additionalProperties: false
+                properties:
+                  covers_steps:
+                    type: array
+                    minItems: 1
+                    items: {type: string, minLength: 1}
+                  file_paths:
+                    type: array
+                    minItems: 1
+                    maxItems: 5
+                    items: {type: string, minLength: 1}
+                  change: {type: string, minLength: 1}
+                  expected_result: {type: string, minLength: 1}
             validation_commands:
               type: array
               minItems: 1
@@ -82,8 +105,9 @@ steps:
       question: >-
         Generate the validated Procedrr implementation fragment for this
         proposed feature. The fragment must inspect source on demand, make one
-        edit decision at a time, validate each edit, repair failures, and finish
-        only after all acceptance conditions are evidenced.
+        edit decision at a time, implement every action in implementation_plan.actions,
+        validate each edit, repair failures, and finish only after all actions
+        and acceptance conditions are evidenced.
       context: [task_context, implementation_plan, repository_context, source_document, initial_static_analysis]
       allowed_tools: [gather_context, internal, edit, read_document, invoke_tool, list_files]
       bind: implementation_program
@@ -178,6 +202,8 @@ steps:
       prompt_system: Return only the declared JSON object.
       instructions:
         - Judge against the actual final repository context and validation results.
+        - Verify every implementation_plan.actions entry has a corresponding change in the final tree.
+        - If proposed_pr_context.implementation_steps is present, verify the union of implementation_plan.actions.covers_steps accounts for every entry; otherwise verify every reviewed scope entry and acceptance criterion is represented by an action.
         - Mark complete only when every condition is evidenced.
         - List each missing condition precisely.
       context: [task_context, implementation_plan, current_validation_results, final_repository_context]

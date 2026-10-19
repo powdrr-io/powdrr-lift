@@ -1,0 +1,189 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1021
+title: Make planned PR workflows executable
+intent:
+  problem: Generated plans can group too much work into one PR, and their workers receive no concrete implementation action contract.
+  goal: Bound plan items to small reviewed slices and require the worker to map and complete every planned implementation step.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 27, end_line: 29}
+    summary: Add concrete implementation steps to the reviewed plan example.
+    rationale: Show the new bounded work outline in the durable plan document.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 42, end_line: 47}
+    summary: Document the per-item scope and implementation-step bounds.
+    rationale: Explain how the planner splits broad work into dependent PRs.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 88, end_line: 90}
+    summary: Add reviewed implementation steps to the generated workflow example.
+    rationale: Show the structured handoff that the worker receives.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 97, end_line: 101}
+    summary: Describe how worker actions map to reviewed steps.
+    rationale: Make the workflow's execution and completeness contract reviewable.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 57, end_line: 58}
+    summary: Map reviewed implementation steps to bounded actions, including a legacy-plan fallback.
+    rationale: Give each task an actionable implementation outline while keeping older plans executable.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 63, end_line: 63}
+    summary: Bound the worker action plan to the scope of one PR.
+    rationale: Prevent an oversized plan item from being declared complete in one worker task.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 69, end_line: 69}
+    summary: Require actions alongside validation and acceptance conditions.
+    rationale: Make implementation work a validated part of the worker plan schema.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 72, end_line: 91}
+    summary: Define action coverage, file paths, changes, and expected results.
+    rationale: Give the fragment builder concrete edit targets and evidence for each action.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 108, end_line: 110}
+    summary: Require the implementation fragment to carry out each planned action.
+    rationale: Connect code generation to the validated action plan.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 205, end_line: 206}
+    summary: Check that final changes account for every action and reviewed step.
+    rationale: Block success when planned work is missing from the final tree.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 50, end_line: 50}
+    summary: Require implementation steps in the generated item schema.
+    rationale: Make the reviewed plan carry a concrete execution outline.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 69, end_line: 69}
+    summary: Cap the number of scope entries per work item.
+    rationale: Limit each generated PR to a focused implementation surface.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 76, end_line: 85}
+    summary: Define bounded implementation steps for each work item.
+    rationale: Keep the plan outline concrete and small enough for one worker run.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 208, end_line: 215}
+    summary: Validate implementation-step values in workflow descriptors.
+    rationale: Accept old descriptors while rejecting malformed new inputs.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 405, end_line: 406}
+    summary: Ask the planner for small dependency-ordered PR slices.
+    rationale: Set the intended decomposition granularity at the planning boundary.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 413, end_line: 426}
+    summary: Explain vertical-slice sizing, testing, and dependency requirements.
+    rationale: Split broad foundations into useful, independently verifiable work.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 460, end_line: 485}
+    summary: Reject incomplete or oversized model-generated work items.
+    rationale: Enforce the planning contract before writing or publishing a plan.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 602, end_line: 602}
+    summary: Copy reviewed implementation steps into the generated worker input.
+    rationale: Preserve the plan-to-workflow handoff.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 49, end_line: 49}
+    summary: Store implementation steps on parsed work items.
+    rationale: Retain the reviewed outline after loading the pinned queue plan.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 848, end_line: 859}
+    summary: Accept implementation steps as an optional plan field.
+    rationale: Keep previously published plans readable while supporting the stronger contract.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 894, end_line: 898}
+    summary: Parse implementation steps when present.
+    rationale: Pass reviewed step text to generated workflow instances.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 904, end_line: 909}
+    summary: Enforce bounded scope and step counts for new plans.
+    rationale: Prevent reviewers from accidentally bypassing the item-size limits.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 45, end_line: 48}
+    summary: Include implementation steps in plan-generation fixtures.
+    rationale: Keep test plans aligned with the new required output shape.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 75, end_line: 78}
+    summary: Assert plan steps survive generation.
+    rationale: Protect the reviewed execution outline from being dropped.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 90, end_line: 124}
+    summary: Test bounded plan output and rejection of incomplete oversized items.
+    rationale: Verify generator validation at the planning boundary.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 177, end_line: 214}
+    summary: Verify workflow propagation and required worker action structure.
+    rationale: Test the reviewed plan handoff and file-level implementation contract.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 457, end_line: 460}
+    summary: Assert generated workflow inputs contain the reviewed steps.
+    rationale: Prevent plan artifact writing from losing implementation context.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 209, end_line: 228}
+    summary: Reject plan items that exceed the bounded scope limit.
+    rationale: Keep reviewed plans within the worker's intended task size.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1291, end_line: 1300}
+    summary: Add an actionable implementation plan to the end-to-end worker fixture.
+    rationale: Exercise the new action schema in the Procedrr execution path.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1486, end_line: 1486}
+    summary: Provide a reviewed implementation step to the worker process.
+    rationale: Verify that the action plan has source steps to cover.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1494, end_line: 1496}
+    summary: Assert the action plan covers the reviewed step.
+    rationale: Protect step-to-action traceability through execution.
+entities:
+  - id: github-issue-plan-generation
+    type: Module
+    action: added
+  - id: execute-proposed-pr-process
+    type: Workflow
+    action: added
+  - id: bounded-plan-item-contract
+    type: Configuration file
+    action: added
+  - id: executable-plan-action-coverage-test
+    type: Regression test
+    action: added
+entity_relationships: []
+invariants:
+  - id: generated-plan-items-have-bounded-execution-scope
+    description: New generated plan items contain at most five scope entries and one to eight concrete implementation steps.
+    action: added
+  - id: worker-accounts-for-reviewed-implementation-steps
+    description: The worker maps every reviewed step to file-level actions and checks each action and step during completeness review.
+    action: added
+guidance:
+  - id: preserve-plan-steps-through-worker-execution
+    description: Keep implementation_steps in the reviewed plan, generated workflow input, worker action plan, and completeness review.
+    action: added

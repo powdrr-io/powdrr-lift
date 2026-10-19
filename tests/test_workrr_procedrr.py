@@ -3,13 +3,14 @@ from typing import Any, cast
 
 import pytest
 
-from powdrr_lift.errors import ProviderExecutionError
+from powdrr_lift.errors import PowdrrExecutionError, ProviderExecutionError
 from powdrr_lift.workrr.procedrr import (
     ProcedrrResponseError,
     StructuredToolExecutor,
     WorkrrProcedrrClient,
     _is_retryable_provider_failure,
 )
+from powdrr_lift.workrr.providers import _parse_json_object
 
 
 class RepairingClient:
@@ -132,6 +133,45 @@ def test_procedrr_uses_workrr_schema_repair_transport(tmp_path: Path) -> None:
 
     assert result == {"complete": True}
     assert provider.calls == 2
+
+
+def test_procedrr_repairs_non_object_json_provider_response(tmp_path: Path) -> None:
+    class NonObjectThenSuccess:
+        calls = 0
+        messages: list[list[dict[str, str]]] = []
+
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.messages.append(messages)
+            self.calls += 1
+            if self.calls == 1:
+                raise PowdrrExecutionError(
+                    "OpenAI response content must be a JSON object.",
+                    error_code="invalid_json_response",
+                )
+            return {"complete": True}
+
+    provider = NonObjectThenSuccess()
+    client = WorkrrProcedrrClient(
+        cast(Any, provider), process_directory=tmp_path, max_retries=1
+    )
+
+    result = client.complete_json(
+        [{"role": "user", "content": "judge this"}],
+        response_schema=SCHEMA,
+    )
+
+    assert result == {"complete": True}
+    assert provider.calls == 2
+    assert "previous response was invalid" in provider.messages[1][-1]["content"]
+
+
+def test_provider_marks_non_object_json_as_repairable_output() -> None:
+    with pytest.raises(PowdrrExecutionError) as error:
+        _parse_json_object('"not an object"', "OpenAI response content")
+
+    assert error.value.error_code == "invalid_json_response"
 
 
 def test_procedrr_retries_transient_provider_failures_with_backoff(

@@ -375,8 +375,14 @@ def _is_retryable_provider_failure(error: Exception) -> bool:
 
 def _is_invalid_json_response(error: Exception) -> bool:
     """Recognize parse failures that can be repaired against the same schema."""
+    if getattr(error, "error_code", None) == "invalid_json_response":
+        return True
     message = str(error).casefold()
-    return "not valid json" in message or "invalid json" in message
+    return (
+        "not valid json" in message
+        or "invalid json" in message
+        or "must be a json object" in message
+    )
 
 
 __all__ = [

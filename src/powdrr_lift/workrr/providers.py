@@ -1129,10 +1129,14 @@ def _parse_json_object(content: str, context: str) -> dict[str, Any]:
             if parsed_content is None:
                 raise PowdrrExecutionError(
                     f"{context} was not valid JSON: {exc.msg} at line "
-                    f"{exc.lineno}, column {exc.colno}.\nResponse content:\n{content}"
+                    f"{exc.lineno}, column {exc.colno}.\nResponse content:\n{content}",
+                    error_code="invalid_json_response",
                 ) from exc
     if not isinstance(parsed_content, dict):
-        raise PowdrrExecutionError(f"{context} must be a JSON object.")
+        raise PowdrrExecutionError(
+            f"{context} must be a JSON object.",
+            error_code="invalid_json_response",
+        )
     return cast("dict[str, Any]", parsed_content)
 
 

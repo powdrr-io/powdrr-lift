@@ -1085,6 +1085,7 @@ def run_coding_agent(
             ),
         )
     before_status = _working_paths(worktree_root)
+    before_snapshot = _working_tree_snapshot(worktree_root, before_status)
     if before_status and not request.allow_existing_changes:
         return CodingAgentAttempt(
             attempt_id,
@@ -1109,7 +1110,15 @@ def run_coding_agent(
         )
     _remove_ephemeral_paths(worktree_root, request, before_status)
     after_head = _git_output(worktree_root, "rev-parse", "HEAD")
-    changed_paths = tuple(sorted(_working_paths(worktree_root)))
+    after_status = _working_paths(worktree_root)
+    after_snapshot = _working_tree_snapshot(worktree_root, after_status)
+    changed_paths = tuple(
+        sorted(
+            path
+            for path in before_snapshot.keys() | after_snapshot.keys()
+            if before_snapshot.get(path) != after_snapshot.get(path)
+        )
+    )
     out_of_scope = tuple(
         path
         for path in changed_paths
@@ -1171,6 +1180,22 @@ def _working_paths(worktree_root: Path) -> set[str]:
         output = _git_output(worktree_root, *arguments)
         paths.update(line for line in output.splitlines() if line)
     return paths
+
+
+def _working_tree_snapshot(
+    worktree_root: Path, paths: set[str]
+) -> dict[str, str | None]:
+    """Hash dirty paths so attempts can run beside durable workflow state."""
+    snapshot: dict[str, str | None] = {}
+    for relative_path in paths:
+        path = worktree_root / relative_path
+        if path.is_symlink():
+            snapshot[relative_path] = "symlink:" + os.readlink(path)
+        elif path.is_file():
+            snapshot[relative_path] = hashlib.sha256(path.read_bytes()).hexdigest()
+        else:
+            snapshot[relative_path] = None
+    return snapshot
 
 
 def _path_is_allowed(path: str, allowed_paths: Sequence[str]) -> bool:

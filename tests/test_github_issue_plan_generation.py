@@ -201,7 +201,7 @@ def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> No
     ]
 
 
-def test_execute_proposed_pr_process_requires_actionable_implementation_plan() -> None:
+def test_execute_proposed_pr_process_runs_coding_agent_before_completion() -> None:
     import yaml
 
     process_path = (
@@ -212,27 +212,13 @@ def test_execute_proposed_pr_process_requires_actionable_implementation_plan() -
         / "execute-proposed-pr.yaml"
     )
     process = yaml.safe_load(process_path.read_text(encoding="utf-8"))
-    planning_step = next(
-        step["judge"]["output"]
-        for step in process["steps"]
-        if "judge" in step
-        and step["judge"].get("output", {}).get("name") == "implementation_plan"
-    )
-    schema = planning_step["schema"]
+    coding_step = process["steps"][0]["operation"]["parameters"]
+    completion_gate = process["steps"][1]["gate"]
 
-    assert schema["required"] == [
-        "actions",
-        "validation_commands",
-        "acceptance_conditions",
-    ]
-    action_schema = schema["properties"]["actions"]["items"]
-    assert action_schema["required"] == [
-        "covers_steps",
-        "file_paths",
-        "change",
-        "expected_result",
-    ]
-    assert action_schema["properties"]["file_paths"]["maxItems"] == 5
+    assert coding_step["tool"] == "coding-agent"
+    assert completion_gate["subject"] == "coding_attempt.passed"
+    assert completion_gate["equals"] is True
+    assert process["steps"][-1] == {"terminal": "succeeded"}
 
 
 def test_issue_worker_runs_plan_task_from_durable_runtime_directory(

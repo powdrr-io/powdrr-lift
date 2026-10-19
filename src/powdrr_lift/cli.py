@@ -389,6 +389,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     github_issue_worker_parser.add_argument("--api-key")
     github_issue_worker_parser.add_argument("--base-url")
+    github_issue_worker_parser.add_argument(
+        "--code-agent", choices=("opencode", "minisweagent"), default="minisweagent"
+    )
+    github_issue_worker_parser.add_argument("--opencode-executable", default="opencode")
+    github_issue_worker_parser.add_argument("--opencode-model")
+    github_issue_worker_parser.add_argument("--minisweagent-executable", default="mini")
+    github_issue_worker_parser.add_argument(
+        "--minisweagent-model",
+        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+    )
+    github_issue_worker_parser.add_argument(
+        "--coding-agent-timeout-seconds", type=float, default=1800.0
+    )
+    github_issue_worker_parser.add_argument(
+        "--coding-agent-validation-timeout-seconds", type=float, default=1800.0
+    )
     github_issue_worker_parser.add_argument("--max-roundtrips", type=int, default=128)
     github_issue_worker_parser.add_argument(
         "--context-compaction-threshold", type=float, default=0.75
@@ -2770,6 +2786,25 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                     max_roundtrips=args.max_roundtrips,
                     context_compaction_threshold=args.context_compaction_threshold,
                     verbose=args.verbose,
+                    code_agent=getattr(args, "code_agent", "minisweagent"),
+                    opencode_executable=getattr(
+                        args, "opencode_executable", "opencode"
+                    ),
+                    opencode_model=getattr(args, "opencode_model", None),
+                    minisweagent_executable=getattr(
+                        args, "minisweagent_executable", "mini"
+                    ),
+                    minisweagent_model=getattr(
+                        args,
+                        "minisweagent_model",
+                        "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+                    ),
+                    coding_agent_timeout_seconds=getattr(
+                        args, "coding_agent_timeout_seconds", 1800.0
+                    ),
+                    coding_agent_validation_timeout_seconds=getattr(
+                        args, "coding_agent_validation_timeout_seconds", 1800.0
+                    ),
                     task_checkpoint_callback=checkpoint_callback,
                 ),
                 stdout=sys.stdout,
@@ -2786,6 +2821,23 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 max_roundtrips=args.max_roundtrips,
                 context_compaction_threshold=args.context_compaction_threshold,
                 verbose=args.verbose,
+                code_agent=getattr(args, "code_agent", "minisweagent"),
+                opencode_executable=getattr(args, "opencode_executable", "opencode"),
+                opencode_model=getattr(args, "opencode_model", None),
+                minisweagent_executable=getattr(
+                    args, "minisweagent_executable", "mini"
+                ),
+                minisweagent_model=getattr(
+                    args,
+                    "minisweagent_model",
+                    "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+                ),
+                coding_agent_timeout_seconds=getattr(
+                    args, "coding_agent_timeout_seconds", 1800.0
+                ),
+                coding_agent_validation_timeout_seconds=getattr(
+                    args, "coding_agent_validation_timeout_seconds", 1800.0
+                ),
                 task_checkpoint_callback=checkpoint_callback,
             ),
             stdout=sys.stdout,

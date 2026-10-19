@@ -19,7 +19,7 @@ steps:
   - gate:
       subject: implementation_result.passed
       equals: true
-      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {terminal: failed}
   - judge:
       kind: construct_one
       question: Which repository validation labels apply to the implementation files?

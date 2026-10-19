@@ -28,6 +28,8 @@ from powdrr_lift.opencode_monitor import run_opencode
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v1"
+DEFAULT_CODING_AGENT_TIMEOUT_SECONDS = 1800.0
+DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS = 1800.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -873,6 +875,7 @@ def build_coding_agent_provider(
             executable=opencode_executable,
             model=opencode_model,
             timeout_seconds=timeout_seconds,
+            absolute_timeout_seconds=max(timeout_seconds, 900.0),
             diagnostics_root=diagnostics_root,
             permission_policy=permission_policy,
             prompt_prefix=prompt_prefix,

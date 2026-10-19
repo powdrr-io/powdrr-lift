@@ -88,6 +88,8 @@ from powdrr_lift.structrr.verification_obligations import (
 from powdrr_lift.workrr.actualization import reconcile_actualization
 from powdrr_lift.workrr.candidate_checkpoint import checkpoint_candidate_changes
 from powdrr_lift.workrr.coding_agent import (
+    DEFAULT_CODING_AGENT_TIMEOUT_SECONDS,
+    DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
     CodingAgentAttempt,
     CodingAgentAttemptStore,
     CodingAgentRunner,
@@ -178,6 +180,10 @@ class FeatureEndpointConfig:
     prepared_worktree: Path | None = None
     prepared_branch: str | None = None
     agent_managed_git: bool = False
+    coding_agent_timeout_seconds: float = DEFAULT_CODING_AGENT_TIMEOUT_SECONDS
+    coding_agent_validation_timeout_seconds: float = (
+        DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -2777,7 +2783,7 @@ def _run_code_agent_phase(
                 opencode_model=config.opencode_model,
                 minisweagent_executable=config.minisweagent_executable,
                 minisweagent_model=config.minisweagent_model,
-                timeout_seconds=300.0,
+                timeout_seconds=config.coding_agent_timeout_seconds,
                 diagnostics_root=output_root / config.code_agent,
                 permission_policy=OpenCodePermissionPolicy(
                     _allowed_validation_commands(state["validation_profiles"])
@@ -3869,7 +3875,11 @@ def _allowed_validation_commands(
 
 
 def _run_validation_profile(
-    parameters: Mapping[str, Any], *, worktree: Path, state: dict[str, Any]
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    state: dict[str, Any],
+    timeout_seconds: float = DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     profile = parameters.get("profile")
     if not isinstance(profile, Mapping):
@@ -3887,9 +3897,10 @@ def _run_validation_profile(
     # resolves every declared profile and returns a multi-result report for
     # this single-profile operation.
     request = replace(state["request"], validation_profiles=(name,))
-    report = ValidationRunner({name: ValidationProfile(name, tuple(command))}).run(
-        request, state["attempt"], worktree_root=worktree
-    )
+    report = ValidationRunner(
+        {name: ValidationProfile(name, tuple(command))},
+        timeout_seconds=timeout_seconds,
+    ).run(request, state["attempt"], worktree_root=worktree)
     if len(report.results) != 1:
         raise PowdrrExecutionError(
             f"validation profile {name!r} did not produce one result"
@@ -6627,7 +6638,15 @@ def _run_code_task_agent(
         attempt = result.get("attempt")
         checkpoints = state.get("operation_checkpoints", ())
         checkpoint = checkpoints[-1] if checkpoints else None
-        focused_validation = _run_code_task_focused_validation(state, worktree=worktree)
+        focused_validation = _run_code_task_focused_validation(
+            state,
+            worktree=worktree,
+            timeout_seconds=getattr(
+                config,
+                "coding_agent_validation_timeout_seconds",
+                DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
+            ),
+        )
         if focused_validation is not None:
             result = {**result, "coding_validation": focused_validation}
             attempt_results[-1] = result
@@ -6709,7 +6728,7 @@ def _run_code_task_agent(
 
 
 def _run_code_task_focused_validation(
-    state: Mapping[str, Any], *, worktree: Path
+    state: Mapping[str, Any], *, worktree: Path, timeout_seconds: float
 ) -> dict[str, Any] | None:
     """Validate a completed coding attempt before accepting its task receipt."""
     request = state.get("request")
@@ -6728,7 +6747,9 @@ def _run_code_task_focused_validation(
     }
     if not discovered:
         return None
-    report = ValidationRunner(discovered).run(request, attempt, worktree_root=worktree)
+    report = ValidationRunner(discovered, timeout_seconds=timeout_seconds).run(
+        request, attempt, worktree_root=worktree
+    )
     attempt_store = state.get("attempt_store")
     if isinstance(attempt_store, CodingAgentAttemptStore):
         attempt_store.save_validation_report(report)

@@ -107,7 +107,7 @@ from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
 
 
-def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
+def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repository = tmp_path / "repository"
@@ -120,9 +120,21 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
     _git(repository, "commit", "-qm", "baseline")
     base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
     plan_path = tmp_path / "structrr-diff.yaml"
-    plan_path.write_text("features: []\n", encoding="utf-8")
+    plan_path.write_text("proposal-only-secret: do not include\n", encoding="utf-8")
     output_root = tmp_path / "artifacts"
-    scenarios = ({"scenario_id": "selector", "then": {"result": "value"}},)
+    scenarios = (
+        {
+            "scenario_id": "selector",
+            "given": "the public API receives a selector",
+            "when": "it processes a matching finding",
+            "then": {"result": "value"},
+            "evidence": ["The instruction defines this result."],
+            "related_requirements": ["selector parsing"],
+            "dimensions": {"normal_result": "ASSUMED DEFAULT: not an oracle"},
+            "assumptions": [{"resolution": "must not be sent as a requirement"}],
+            "faithfulness_ref": {"artifact_path": "large-review-metadata.json"},
+        },
+    )
 
     def author_probe_suite(
         self: MiniSWEAgentProvider,
@@ -131,8 +143,18 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
         worktree_root: Path,
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
-        assert "Implementation prompt and acceptance context" in request.prompt
-        assert "Proposal Structrr diff" in request.prompt
+        assert "Task instruction:\nAdd selector handling." in request.prompt
+        assert '"scenario_id": "selector"' in request.prompt
+        assert '"given": "the public API receives a selector"' in request.prompt
+        assert '"when": "it processes a matching finding"' in request.prompt
+        assert '"then": {\n      "result": "value"' in request.prompt
+        assert '"evidence": [' in request.prompt
+        assert '"related_requirements": [' in request.prompt
+        assert "Implement the proposed selector handling." not in request.prompt
+        assert "proposal-only-secret" not in request.prompt
+        assert "ASSUMED DEFAULT" not in request.prompt
+        assert "must not be sent as a requirement" not in request.prompt
+        assert "large-review-metadata.json" not in request.prompt
         (worktree_root / "probe-suite.json").write_text(
             json.dumps(
                 {
@@ -176,7 +198,6 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
         worktree=repository,
         output_root=output_root,
         base_commit=base_commit,
-        plan_path=plan_path,
         request=request,
         scenarios=scenarios,
     )
@@ -187,6 +208,7 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
     )
     assert suite["generation_method"] == "minisweagent_pre_coding"
     assert suite["probes"][0]["scenario_id"] == "selector"
+    assert "proposal_diff_path" not in suite
     assert not (output_root / "miniswe-probe-authoring" / "repository").exists()
     assert _git(repository, "status", "--porcelain").stdout == ""
 

@@ -2916,7 +2916,6 @@ def _run_code_agent_phase(
                 worktree=worktree,
                 output_root=output_root,
                 base_commit=base_commit,
-                plan_path=plan_path,
                 request=request,
                 scenarios=tuple(
                     item.to_data() for item in implementation_packet.behavior_scenarios
@@ -3069,7 +3068,6 @@ def _generate_miniswe_postrun_probes(
     worktree: Path,
     output_root: Path,
     base_commit: str,
-    plan_path: Path,
     request: ImplementationRequest,
     scenarios: Sequence[Mapping[str, Any]],
 ) -> tuple[PostRunProbe, ...]:
@@ -3091,13 +3089,19 @@ def _generate_miniswe_postrun_probes(
         ["git", "worktree", "add", "--detach", str(probe_worktree), base_commit],
     )
     try:
-        try:
-            proposal_diff = plan_path.read_text(encoding="utf-8")
-        except OSError as error:
-            raise PowdrrExecutionError(
-                f"cannot read proposal diff for probe authoring: {error}"
-            ) from error
         suite_path = probe_worktree / "probe-suite.json"
+        scenario_fields = (
+            "scenario_id",
+            "given",
+            "when",
+            "then",
+            "evidence",
+            "related_requirements",
+        )
+        compact_scenarios = [
+            {field: scenario[field] for field in scenario_fields if field in scenario}
+            for scenario in scenarios
+        ]
         probe_prompt = (
             "Author executable post-coding behavior probes for the task below. "
             "This is a pre-coding step: the solution is intentionally absent. "
@@ -3112,11 +3116,12 @@ def _generate_miniswe_postrun_probes(
             "text or private implementation details. Do not use pytest, write "
             "files, launch subprocesses, or access the network. Omit a scenario "
             "when the supplied contract does not define a safe oracle.\n\n"
-            f"Task objective:\n{request.objective}\n\n"
-            f"Implementation prompt and acceptance context:\n{request.prompt}\n\n"
-            f"Proposal Structrr diff:\n{proposal_diff}\n\n"
-            "Behavior scenarios (the scenario_id values are required provenance):\n"
-            f"{json.dumps(list(scenarios), indent=2, sort_keys=True)}\n\n"
+            f"Task instruction:\n{request.objective}\n\n"
+            "Behavior scenarios. Treat each `then` as an oracle only when its "
+            "`evidence` supports it. Use `related_requirements` to identify "
+            "useful interactions; do not add behavior from assumptions or other "
+            "metadata. Preserve each `scenario_id` as provenance:\n"
+            f"{json.dumps(compact_scenarios, indent=2, sort_keys=True)}\n\n"
             "Return from the agent after writing probe-suite.json."
         )
         probe_request = ImplementationRequest(
@@ -3205,7 +3210,6 @@ def _generate_miniswe_postrun_probes(
             "generation_status": "generated",
             "generation_method": "minisweagent_pre_coding",
             "source_instruction": request.objective,
-            "proposal_diff_path": str(plan_path),
             "authoring_attempts": authoring_attempts,
             "probes": [item.to_data() for item in probes],
             "scenarios_without_executable_probe": sorted(

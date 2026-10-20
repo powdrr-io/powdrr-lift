@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -10,53 +11,69 @@ from powdrr_lift.workrr.postrun_probes import (
     PostRunProbe,
     PostRunProbeResult,
     baseline_probe_failures,
-    generate_postrun_probes,
     parse_generated_postrun_probe_source,
     probe_failures,
     run_postrun_probes,
 )
 
 
-class _ProbeClient:
-    def __init__(self, response: dict[str, Any]) -> None:
-        self.response = response
-        self.messages: list[dict[str, str]] | None = None
-
-    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
-        self.messages = messages
-        return self.response
-
-
 def _source(body: str = "assert module.public_api('value') == 'handled:value'") -> str:
+    obligations = [
+        {
+            "obligation_id": "selector-obligation",
+            "scenario_id": "selector",
+            "category": "transformation",
+            "rule": "other",
+            "supported": True,
+            "summary": "The selector returns the matching result.",
+            "condition": "A selector matches a finding.",
+            "operation": "Call the public API.",
+            "expected": "The matching result is returned.",
+            "operands": [],
+            "evidence": [{"source": "instruction", "quote": "Add selector handling."}],
+            "unresolved_reason": "",
+        }
+    ]
     return (
+        f'"""{json.dumps({"obligations": obligations})}"""\n'
         "import module\n\n"
         "def test_probe_selector():\n"
         '    """{"probe_id": "selector-result", '
         '"scenario_id": "selector", '
+        '"obligation_id": "selector-obligation", '
         '"oracle_basis": "The instruction defines this result."}"""\n'
         f"    {body}\n"
     )
 
 
+def _parse(
+    source: str, scenarios: tuple[dict[str, object], ...]
+) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
+    return parse_generated_postrun_probe_source(
+        source,
+        scenarios,
+        instruction="Add selector handling.",
+        repository_contract={},
+    )
+
+
 def test_parse_generated_probe_source_preserves_complete_code_and_metadata() -> None:
     source = _source()
-    probes = parse_generated_postrun_probe_source(
-        source, ({"scenario_id": "selector"},)
-    )
+    obligations, probes = _parse(source, ({"scenario_id": "selector"},))
 
     assert len(probes) == 1
     assert probes[0].probe_id == "selector-result"
     assert probes[0].function_name == "test_probe_selector"
     assert probes[0].test_source == source
+    assert obligations[0]["category"] == "transformation"
+    assert probes[0].obligation_id == "selector-obligation"
 
 
 def test_probe_imports_inside_function_are_valid_python() -> None:
     source = _source(
         "import module\n    assert module.public_api('value') == 'handled:value'"
     )
-    probes = parse_generated_postrun_probe_source(
-        source, ({"scenario_id": "selector"},)
-    )
+    _, probes = _parse(source, ({"scenario_id": "selector"},))
     assert len(probes) == 1
 
 
@@ -78,7 +95,7 @@ def test_probe_imports_inside_function_are_valid_python() -> None:
         ),
         (
             "def test_probe_selector():\n    assert module.public_api('x')\n",
-            "metadata docstring",
+            "module docstring",
         ),
     ],
 )
@@ -86,28 +103,56 @@ def test_parser_rejects_invalid_or_unsafe_probe_code(
     source: str, expected_error: str
 ) -> None:
     with pytest.raises(ValueError, match=expected_error):
-        parse_generated_postrun_probe_source(source, ({"scenario_id": "selector"},))
+        _parse(source, ({"scenario_id": "selector"},))
 
 
 def test_probe_parser_rejects_unknown_scenario() -> None:
     with pytest.raises(ValueError, match="unknown scenario"):
-        parse_generated_postrun_probe_source(_source(), ({"scenario_id": "other"},))
+        _parse(_source(), ({"scenario_id": "other"},))
 
 
-def test_generate_postrun_probes_requests_complete_executable_source() -> None:
-    client = _ProbeClient({"source": _source()})
-    probes = generate_postrun_probes(
-        client,
-        instruction="Add selector handling.",
-        scenarios=(
-            {"scenario_id": "selector"},
-            {"scenario_id": "unresolved", "unresolved_dimensions": ["oracle"]},
-        ),
+def test_probe_parser_preserves_mapping_key_and_value_roles() -> None:
+    source = _source()
+    document = json.loads(source.split('"""', 2)[1])
+    base = document["obligations"][0]
+    base.update(
+        {
+            "obligation_id": "rename-source-key",
+            "scenario_id": "rename",
+            "category": "validation",
+            "rule": "reference_integrity",
+            "summary": "A rename source exists.",
+            "condition": "The source key is unknown.",
+            "operation": "Create with the rename mapping.",
+            "expected": "Creation rejects the unknown key.",
+            "operands": [
+                {
+                    "name": "rename source",
+                    "role": "mapping_key",
+                    "meaning": "child field",
+                }
+            ],
+            "evidence": [{"source": "instruction", "quote": "invalid rename keys"}],
+        }
     )
-    assert len(probes) == 1
-    assert probes[0].test_source == _source()
-    assert client.messages is not None
-    assert "complete Python module" in client.messages[0]["content"]
+    source = source.replace(
+        '"obligation_id": "selector-obligation"',
+        '"obligation_id": "rename-source-key"',
+    ).replace('"scenario_id": "selector"', '"scenario_id": "rename"')
+    module_doc = json.dumps(document)
+    first = source.index('"""')
+    last = source.index('"""', first + 3)
+    source = source[: first + 3] + module_doc + source[last:]
+    source = source.replace(
+        '"obligation_id": "selector-obligation"', '"obligation_id": "rename-source-key"'
+    )
+    obligations, probes = parse_generated_postrun_probe_source(
+        source,
+        ({"scenario_id": "rename"},),
+        instruction="invalid rename keys",
+    )
+    assert obligations[0]["operands"][0]["role"] == "mapping_key"
+    assert probes[0].obligation_category == "validation"
 
 
 def test_run_postrun_probes_executes_each_function_from_same_module(
@@ -116,18 +161,44 @@ def test_run_postrun_probes_executes_each_function_from_same_module(
     module = tmp_path / "module.py"
     module.write_text("def public_api(value): return 'handled:' + value\n")
     source = (
-        "import module\n\n"
+        '"""'
+        + json.dumps(
+            {
+                "obligations": [
+                    {
+                        "obligation_id": f"obligation-{scenario}",
+                        "scenario_id": scenario,
+                        "category": "other",
+                        "rule": "other",
+                        "supported": True,
+                        "summary": "Check the result.",
+                        "condition": "The API receives a value.",
+                        "operation": "Call the public API.",
+                        "expected": "The documented result is returned.",
+                        "operands": [],
+                        "evidence": [{"source": "instruction", "quote": "explicit"}],
+                        "unresolved_reason": "",
+                    }
+                    for scenario in ("good", "bad")
+                ]
+            }
+        )
+        + '"""\nimport module\n\n'
         "def test_probe_good():\n"
         '    """{"probe_id": "good", "scenario_id": "good", '
+        '"obligation_id": "obligation-good", '
         '"oracle_basis": "explicit"}"""\n'
         "    assert module.public_api('value') == 'handled:value'\n\n"
         "def test_probe_bad():\n"
         '    """{"probe_id": "bad", "scenario_id": "bad", '
+        '"obligation_id": "obligation-bad", '
         '"oracle_basis": "explicit"}"""\n'
         "    assert module.public_api('value') == 'wrong'\n"
     )
-    probes = parse_generated_postrun_probe_source(
-        source, ({"scenario_id": "good"}, {"scenario_id": "bad"})
+    _, probes = parse_generated_postrun_probe_source(
+        source,
+        ({"scenario_id": "good"}, {"scenario_id": "bad"}),
+        instruction="explicit",
     )
 
     results = run_postrun_probes(probes, root=tmp_path, profiles=())
@@ -162,6 +233,9 @@ def test_postrun_probe_execution_reports_runtime_failure(tmp_path: Path) -> None
         "explicit",
         _source("assert module.public_api('value') == 'handled:value'"),
         "test_probe_selector",
+        "selector-obligation",
+        "transformation",
+        "other",
     )
     (tmp_path / "module.py").write_text("def public_api(value): return value\n")
     result = run_postrun_probes((probe,), root=tmp_path, profiles=())[0]

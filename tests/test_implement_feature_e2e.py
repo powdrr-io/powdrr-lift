@@ -15,12 +15,69 @@ import yaml
 
 from powdrr_lift.core.decision_obligation import evidence_fingerprint
 from powdrr_lift.core.semantic_decision import SEMANTIC_DIMENSION_DECISION_KINDS
+from powdrr_lift.workrr.coding_agent import MiniSWEAgentProvider
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     run_feature_in_place,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _write_supported_probe_module(
+    root: Path,
+    scenarios: list[dict[str, Any]],
+    *,
+    evidence: str,
+    operation: str,
+    expected: str,
+    imports: tuple[str, ...],
+    body: str,
+) -> None:
+    obligations = []
+    functions = []
+    for index, scenario in enumerate(scenarios):
+        scenario_id = scenario["scenario_id"]
+        obligation_id = f"obligation-{scenario_id}"
+        obligations.append(
+            {
+                "obligation_id": obligation_id,
+                "scenario_id": scenario_id,
+                "category": "transformation",
+                "rule": "other",
+                "supported": True,
+                "summary": expected,
+                "condition": operation,
+                "operation": operation,
+                "expected": expected,
+                "operands": [],
+                "evidence": [{"source": "instruction", "quote": evidence}],
+                "unresolved_reason": "",
+            }
+        )
+        metadata = {
+            "probe_id": f"probe-{scenario_id}",
+            "scenario_id": scenario_id,
+            "obligation_id": obligation_id,
+            "oracle_basis": evidence,
+        }
+        function_body = body.format(index=index)
+        functions.append(
+            f"def test_probe_{index}():\n"
+            f'    """{json.dumps(metadata)}"""\n'
+            + "\n".join(f"    {line}" for line in function_body.splitlines())
+        )
+    source = (
+        '"""'
+        + json.dumps({"obligations": obligations})
+        + '"""\n'
+        + "\n".join(f"import {name}" for name in imports)
+        + "\n\n"
+        + "\n\n".join(functions)
+        + "\n"
+    )
+    (root / "probe_suite.py").write_text(source, encoding="utf-8")
+    subprocess.run(["git", "add", "-f", "probe_suite.py"], cwd=root, check=True)
 
 
 @pytest.fixture(autouse=True)
@@ -35,6 +92,56 @@ def keep_deterministic_feature_tests_off_live_jev(
         "SUBQ_API_KEY",
     ):
         monkeypatch.delenv(name, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def keep_probe_authoring_on_deterministic_miniswe(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Avoid live model calls while exercising MiniSWE's authoring boundary."""
+
+    def author_unresolved_suite(
+        self: MiniSWEAgentProvider,
+        request: Any,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        del self, attempt_id
+        scenarios = json.loads(
+            request.prompt.split("Preserve each `scenario_id` as provenance:\n", 1)[
+                1
+            ].split("\n\nBaseline repository contract", 1)[0]
+        )
+        obligations = [
+            {
+                "obligation_id": f"unresolved-{item['scenario_id']}",
+                "scenario_id": item["scenario_id"],
+                "category": "other",
+                "rule": "unresolved",
+                "supported": False,
+                "summary": "No safe executable oracle is defined in this fixture.",
+                "condition": "",
+                "operation": "",
+                "expected": "",
+                "operands": [],
+                "evidence": [],
+                "unresolved_reason": (
+                    "The fixture does not specify a public API oracle."
+                ),
+            }
+            for item in scenarios
+        ]
+        (worktree_root / "probe_suite.py").write_text(
+            '"""' + json.dumps({"obligations": obligations}) + '"""\n',
+            encoding="utf-8",
+        )
+        subprocess.run(
+            ["git", "add", "-f", "probe_suite.py"], cwd=worktree_root, check=True
+        )
+        return subprocess.CompletedProcess(["miniswe-test-double"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_unresolved_suite)
 
 
 DEEPSWE_STATE_DATA_DESCRIPTION = """\
@@ -953,9 +1060,41 @@ def _fixture_repo(tmp_path: Path) -> Path:
 
 def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo = _fixture_repo(tmp_path)
     fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
+
+    def author_stdout_probe(
+        self: MiniSWEAgentProvider,
+        request: Any,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        del self, attempt_id
+        scenarios = json.loads(
+            request.prompt.split("Preserve each `scenario_id` as provenance:\n", 1)[
+                1
+            ].split("\n\nBaseline repository contract", 1)[0]
+        )
+        _write_supported_probe_module(
+            worktree_root,
+            scenarios,
+            evidence="print Hello from Powdrr! second.",
+            operation="Run hello_world.py and capture stdout.",
+            expected="The original greeting is followed by the requested greeting.",
+            imports=("contextlib", "io", "runpy"),
+            body=(
+                "output = io.StringIO()\n"
+                "with contextlib.redirect_stdout(output):\n"
+                "    runpy.run_path('hello_world.py')\n"
+                "assert output.getvalue() == 'Hello, world!\\nHello from Powdrr!\\n'"
+            ),
+        )
+        return subprocess.CompletedProcess(["miniswe-test-double"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_stdout_probe)
     result = run_feature_in_place(
         FeatureEndpointConfig(
             feature_description=(
@@ -1000,9 +1139,10 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     assert repair_document["used_scenarios"][0]["when"] == (
         "Run hello_world.py and capture stdout."
     )
-    assert [item["status"] for item in result.review["postrun_probe_results"]] == [
-        "passed"
-    ]
+    assert result.review["postrun_probe_results"]
+    assert all(
+        item["status"] == "passed" for item in result.review["postrun_probe_results"]
+    )
     assert Path(result.review["postrun_probe_results_path"]).is_file()
     assert Path(result.review["actual_diff_path"]).is_file()
     assert Path(result.review["candidate_comparison_path"]).is_file()
@@ -1075,9 +1215,32 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
 
 def test_implement_feature_records_invalid_generated_probe_and_continues(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo = _fixture_repo(tmp_path)
     fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
+    authoring_calls = 0
+
+    def author_invalid_probe(
+        self: MiniSWEAgentProvider,
+        request: Any,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal authoring_calls
+        del self, request, attempt_id
+        authoring_calls += 1
+        suffix = "(" if authoring_calls == 1 else "( :"
+        (worktree_root / "probe_suite.py").write_text(
+            f"def test_probe_invalid{suffix}\n    pass\n", encoding="utf-8"
+        )
+        subprocess.run(
+            ["git", "add", "-f", "probe_suite.py"], cwd=worktree_root, check=True
+        )
+        return subprocess.CompletedProcess(["miniswe-test-double"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_invalid_probe)
     result = run_feature_in_place(
         FeatureEndpointConfig(
             feature_description=(
@@ -1122,11 +1285,41 @@ def test_implement_feature_records_invalid_generated_probe_and_continues(
 
 def test_implement_feature_generates_tailored_repair_prompt_and_retries_probe(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo = _fixture_repo(tmp_path)
     fake_opencode = _fake_opencode(
         tmp_path / "fake-opencode", repair_second_attempt=True
     )
+
+    def author_count_probe(
+        self: MiniSWEAgentProvider,
+        request: Any,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        del self, attempt_id
+        scenarios = json.loads(
+            request.prompt.split("Preserve each `scenario_id` as provenance:\n", 1)[
+                1
+            ].split("\n\nBaseline repository contract", 1)[0]
+        )
+        _write_supported_probe_module(
+            worktree_root,
+            scenarios,
+            evidence="greeting_count() to hello_world.py and have it return 2.",
+            operation="Call hello_world.greeting_count().",
+            expected="greeting_count returns 2.",
+            imports=("hello_world",),
+            body=(
+                "greeting_count = hello_world.__dict__.get('greeting_count')\n"
+                "assert callable(greeting_count) and greeting_count() == 2"
+            ),
+        )
+        return subprocess.CompletedProcess(["miniswe-test-double"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_count_probe)
     result = run_feature_in_place(
         FeatureEndpointConfig(
             feature_description=(
@@ -1154,9 +1347,10 @@ def test_implement_feature_generates_tailored_repair_prompt_and_retries_probe(
     )
 
     assert result.review["candidate_correction_attempts"] == 1
-    assert [item["status"] for item in result.review["postrun_probe_results"]] == [
-        "passed"
-    ]
+    assert result.review["postrun_probe_results"]
+    assert all(
+        item["status"] == "passed" for item in result.review["postrun_probe_results"]
+    )
     assert "def greeting_count():" in (repo / "hello_world.py").read_text(
         encoding="utf-8"
     )

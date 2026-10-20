@@ -651,12 +651,25 @@ def test_named_procedrr_process_outputs_complete_durable_task(
         outputs={"summary": {"type": "object"}},
     )
 
+    client = _ProcedrrFragmentClient(
+        [
+            {
+                "operation": {
+                    "tool": "respond",
+                    "parameters": {"text": "Published pull request."},
+                    "bind": "summary",
+                }
+            },
+            {"terminal": "succeeded"},
+        ]
+    )
     stderr = io.StringIO()
     exit_code = run_workflow_task(
         WorkflowTaskAgentConfig(
             workflow_dir=workflow.directory,
             repo_root=tmp_path,
         ),
+        client=client,
         stdout=io.StringIO(),
         stderr=stderr,
     )

@@ -83,6 +83,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _materialize_feature_intents,
     _operation_checkpoint,
     _plan_text_items,
+    _probe_interaction_plan_decision,
     _proposal_execution_units,
     _remove_temporary_feature_artifacts,
     _render_pull_request_body,
@@ -102,6 +103,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     run_feature_endpoint,
     run_feature_in_place,
 )
+from powdrr_lift.workrr.postrun_probes import ProbeInteractionPlan
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
@@ -122,6 +124,7 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
     plan_path = tmp_path / "structrr-diff.yaml"
     plan_path.write_text("proposal-only-secret: do not include\n", encoding="utf-8")
     output_root = tmp_path / "artifacts"
+    worker_commit_shas: list[str] = []
     scenarios = (
         {
             "scenario_id": "selector",
@@ -181,6 +184,11 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
             "    assert module.public_api('value') == 'handled:value'\n",
             encoding="utf-8",
         )
+        _git(worktree_root, "add", "-f", "probe_suite.py")
+        _git(worktree_root, "commit", "-qm", "author probe suite")
+        worker_commit_shas.append(
+            _git(worktree_root, "rev-parse", "HEAD").stdout.strip()
+        )
         return subprocess.CompletedProcess(["mini"], 0, "", "")
 
     monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
@@ -220,6 +228,9 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
     assert suite["generation_method"] == "minisweagent_pre_coding"
+    assert (
+        suite["authoring_attempts"][0]["worker_commit_sha"] == (worker_commit_shas[0])
+    )
     assert suite["probes"][0]["scenario_id"] == "selector"
     assert "import module" in suite["probe_source"]
     assert suite["baseline_results"][0]["status"] == "failed"
@@ -227,6 +238,155 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
     assert "proposal_diff_path" not in suite
     assert not (output_root / "miniswe-probe-authoring" / "repository").exists()
     assert _git(repository, "status", "--porcelain").stdout == ""
+
+
+def test_interaction_plan_final_gate_distinguishes_empty_and_failed() -> None:
+    empty = _probe_interaction_plan_decision({"interaction_plan_status": "empty"})
+    not_run = _probe_interaction_plan_decision({"interaction_plan_status": "not_run"})
+    failed = _probe_interaction_plan_decision(
+        {
+            "interaction_plan_status": "failed",
+            "interaction_plan_error": "invalid exact quote evidence",
+        }
+    )
+
+    assert empty == {
+        "check": "interaction_plan_generated_or_validly_empty",
+        "passed": True,
+        "status": "empty",
+        "error": None,
+    }
+    assert not_run["passed"] is True
+    assert not_run["status"] == "not_run"
+    assert failed == {
+        "check": "interaction_plan_generated_or_validly_empty",
+        "passed": False,
+        "status": "failed",
+        "error": "invalid exact quote evidence",
+    }
+
+
+@pytest.mark.parametrize(
+    ("plan", "expected_status"),
+    [
+        (ProbeInteractionPlan("empty"), "empty"),
+        (
+            ProbeInteractionPlan(
+                "failed", error="ValueError: invalid interaction evidence"
+            ),
+            "failed",
+        ),
+    ],
+)
+def test_miniswe_authors_individual_probes_for_empty_or_failed_interaction_plan(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    plan: ProbeInteractionPlan,
+    expected_status: str,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "module.py").write_text(
+        "def public_api(value): return value\n", encoding="utf-8"
+    )
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.email", "test@example.com")
+    _git(repository, "config", "user.name", "Test")
+    _git(repository, "add", "module.py")
+    _git(repository, "commit", "-qm", "baseline")
+    base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
+    output_root = tmp_path / "artifacts"
+    scenarios = ({"scenario_id": "single-requirement"},)
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.resolve_probe_interaction_plan",
+        lambda *_args, **_kwargs: plan,
+    )
+
+    def author_probe_suite(
+        self: MiniSWEAgentProvider,
+        request: ImplementationRequest,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        assert f"Interaction-plan status: {expected_status}" in request.prompt
+        assert "Required cross-requirement interactions" not in request.prompt
+        obligation = {
+            "obligation_id": "single-obligation",
+            "scenario_id": "single-requirement",
+            "category": "presence",
+            "rule": "presence",
+            "supported": True,
+            "summary": "The public result includes the requested value.",
+            "condition": "The API receives a value.",
+            "operation": "Call the public API with that value.",
+            "expected": "The API returns the value.",
+            "operands": [],
+            "evidence": [{"source": "instruction", "quote": "Keep values."}],
+            "unresolved_reason": "",
+        }
+        source = (
+            '"""' + json.dumps({"obligations": [obligation]}) + '"""\n'
+            "import module\n\n"
+            "def test_probe_value():\n"
+            '    """{"probe_id": "value", '
+            '"scenario_id": "single-requirement", '
+            '"obligation_id": "single-obligation", '
+            '"oracle_basis": "Keep values."}"""\n'
+            "    assert module.public_api('value') == 'kept:value'\n"
+        )
+        (worktree_root / "probe_suite.py").write_text(source, encoding="utf-8")
+        _git(worktree_root, "add", "-f", "probe_suite.py")
+        _git(worktree_root, "commit", "-qm", "author individual probe")
+        return subprocess.CompletedProcess(["mini"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
+    config = FeatureEndpointConfig(
+        feature_description="Keep values.",
+        work_item_name="individual-probe",
+        repo_root=repository,
+        allowed_paths=("src", "tests"),
+    )
+    request = ImplementationRequest(
+        request_id="individual-probe",
+        objective="Keep values.",
+        prompt="Implement value handling.",
+        base_commit=base_commit,
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("src", "tests"),
+        acceptance_criteria=("Keep values.",),
+        validation_profiles=(),
+        context_refs=(),
+    )
+
+    obligations, probes = _generate_miniswe_postrun_probes(
+        config,
+        runner=subprocess.run,
+        worktree=repository,
+        output_root=output_root,
+        base_commit=base_commit,
+        request=request,
+        scenarios=scenarios,
+        instruction="Keep values.",
+        repository_contract={},
+        interaction_client=None,
+    )
+
+    assert len(obligations) == 1
+    assert len(probes) == 1
+    suite = json.loads(
+        (output_root / "postrun-probes" / "probe-suite.json").read_text()
+    )
+    plan_artifact = json.loads(
+        (output_root / "postrun-probes" / "interaction-plan.json").read_text()
+    )
+    assert suite["generation_status"] == "generated"
+    assert suite["interaction_plan_status"] == expected_status
+    assert plan_artifact["status"] == expected_status
+    assert (suite["interaction_plan_error"] is not None) is (
+        expected_status == "failed"
+    )
 
 
 def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
@@ -282,7 +442,7 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
         worktree_root: Path,
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
-        assert "Required cross-requirement interactions" in request.prompt
+        assert "Interaction-plan status: generated" in request.prompt
         assert "special-value-difference" in request.prompt
         obligations = [
             {
@@ -368,6 +528,7 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
     assert suite["interaction_obligations"] == [interaction]
+    assert suite["interaction_plan_status"] == "generated"
     assert suite["baseline_results"][0]["status"] == "failed"
 
 
@@ -385,6 +546,7 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
     output_root = tmp_path / "artifacts"
     requests: list[ImplementationRequest] = []
+    worker_commit_shas: list[str] = []
 
     def author_probe_suite(
         self: MiniSWEAgentProvider,
@@ -394,6 +556,10 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
         requests.append(request)
+        if len(requests) == 1:
+            assert request.base_commit == base_commit
+        else:
+            assert request.base_commit == worker_commit_shas[0]
         expected = "value" if len(requests) == 1 else "handled:value"
         obligation = {
             "obligation_id": "selector-obligation",
@@ -419,6 +585,12 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
             f"    assert module.public_api('value') == '{expected}'\n",
             encoding="utf-8",
         )
+        if len(requests) == 1:
+            _git(worktree_root, "add", "-f", "probe_suite.py")
+            _git(worktree_root, "commit", "-qm", "author initial probe suite")
+            worker_commit_shas.append(
+                _git(worktree_root, "rev-parse", "HEAD").stdout.strip()
+            )
         return subprocess.CompletedProcess(["mini"], 0, "", "")
 
     monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
@@ -459,6 +631,10 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     suite = json.loads(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
+    assert (
+        suite["authoring_attempts"][0]["worker_commit_sha"] == (worker_commit_shas[0])
+    )
+    assert suite["authoring_attempts"][1]["status"] == "completed"
     assert suite["baseline_results"][0]["status"] == "failed"
 
 

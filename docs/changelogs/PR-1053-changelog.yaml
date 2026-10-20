@@ -1,0 +1,242 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1053
+title: Keep empty and failed interaction plans distinct
+intent:
+  problem: Interaction-planning failures stopped MiniSWE from authoring individual scenario probes, and persisted artifacts did not distinguish an empty plan from a planner failure.
+  goal: Preserve interaction-planning outcomes explicitly, continue individual probe authoring after empty or failed planning, and expose failures for final review.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/deepswe_probe_evaluation.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Accept probe suite schema version five
+  rationale: Keep the DeepSWE evaluator compatible with the updated postrun probe artifact schema.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 130
+  summary: Remove direct interaction planner import
+  rationale: Centralize planner exception handling in the explicit outcome resolver.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 132
+    end_line: 132
+  summary: Use the explicit interaction-plan resolver
+  rationale: Route probe generation through the resolver that returns a typed plan outcome.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2882
+    end_line: 2886
+  summary: Initialize an explicit not-run interaction outcome
+  rationale: Preserve the distinction between a planner that was not invoked and one that returned empty or failed.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2907
+    end_line: 2924
+  summary: Restore the plan outcome when probe authoring raises
+  rationale: Keep planner status and error available when individual probe suite authoring fails.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2934
+    end_line: 2936
+  summary: Preserve interaction outcome in unavailable suite artifacts
+  rationale: Do not replace empty or failed interaction planning with a generic unavailable status.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2948
+    end_line: 2968
+  summary: Restore interaction outcome for final review
+  rationale: Carry persisted status and error into final review state after probe generation.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2973
+    end_line: 2974
+  summary: Store interaction status and error in run state
+  rationale: Make the actual planner result available to the final implementation review.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3139
+    end_line: 3140
+  summary: Resolve interaction planning without aborting probe authoring
+  rationale: Convert valid empty plans and planner errors into inspectable outcomes so scenario probe authoring can continue.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3142
+    end_line: 3142
+  summary: Pass planned interactions to probe authoring
+  rationale: Retain planned interactions when present while empty and failed plans leave individual scenario work available.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3145
+    end_line: 3152
+  summary: Write a dedicated interaction-plan artifact
+  rationale: Persist status, error, and generated interactions before MiniSWE runs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3223
+    end_line: 3229
+  summary: Tell MiniSWE to continue after empty or failed planning
+  rationale: Prevent missing interactions from suppressing individual scenario probe generation or encouraging invented interactions.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3345
+    end_line: 3346
+  summary: Include interaction status and error in the probe suite
+  rationale: Keep the suite outcome aligned with the dedicated plan artifact.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7331
+    end_line: 7334
+  summary: Add interaction planning to final review
+  rationale: Include the plan outcome in the implementation review decision record.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7375
+    end_line: 7376
+  summary: Include interaction outcome in review context
+  rationale: Give final review access to the planner's status and any error.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7435
+    end_line: 7446
+  summary: Distinguish failed plans from valid empty plans in review
+  rationale: Record failure as a review issue while treating empty, unconfigured, and not-run outcomes distinctly.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Bump the postrun probe artifact schema
+  rationale: Version the new interaction-plan status and error fields in probe artifacts.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 264
+    end_line: 299
+  summary: Model interaction-plan results as explicit outcomes
+  rationale: Distinguish valid empty plans from planning or validation failures and from a missing planner configuration.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 793
+    end_line: 793
+  summary: Export the interaction-plan result class
+  rationale: Make the explicit plan outcome available to workflow code and tests.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 798
+    end_line: 798
+  summary: Export the interaction-plan resolver
+  rationale: Make the shared outcome resolver available to workflow code.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 86
+    end_line: 86
+  summary: Import the final interaction decision helper
+  rationale: Exercise the status decision in isolation.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 106
+    end_line: 106
+  summary: Import explicit plan outcomes for integration coverage
+  rationale: Parameterize the probe authoring regression over empty and failed outcomes.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 243
+    end_line: 391
+  summary: Verify individual probes continue for empty and failed plans
+  rationale: Protect distinct outcome reporting and ensure either interaction-planning outcome still reaches individual probe authoring.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 445
+    end_line: 445
+  summary: Assert generated-plan prompt behavior
+  rationale: Verify generated interactions are still required when planning succeeds with interactions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 531
+    end_line: 531
+  summary: Assert generated plan status in the suite
+  rationale: Verify the authored suite retains successful interaction planning status.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 221
+    end_line: 222
+  summary: Return a valid empty plan in the deterministic planner double
+  rationale: Keep end-to-end feature tests aligned with the new interaction-planning request schema.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Import the interaction-plan resolver
+  rationale: Exercise its empty, failed, and unconfigured results.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 194
+    end_line: 243
+  summary: Verify empty, failed, and unconfigured interaction outcomes
+  rationale: Exercise exact outcome distinctions at the interaction-plan resolver boundary.
+entities:
+- id: probe-interaction-plan-result
+  type: Class
+  action: added
+- id: resolve-probe-interaction-plan
+  type: Function
+  action: added
+- id: interaction-plan-outcome-regression-tests
+  type: Regression test
+  action: added
+entity_relationships:
+- id: resolver-returns-explicit-interaction-plan-result
+  type: returns
+  source: resolve-probe-interaction-plan
+  target: probe-interaction-plan-result
+  action: added
+  description: The resolver returns explicit generated, empty, failed, or unconfigured planning outcomes with any error attached.
+- id: regression-tests-protect-probe-authoring-outcomes
+  type: exercises
+  source: interaction-plan-outcome-regression-tests
+  target: resolve-probe-interaction-plan
+  action: added
+  description: Regression coverage verifies outcome distinctions and continued individual probe authoring.
+invariants:
+- id: empty-interaction-plan-is-not-a-planning-failure
+  description: A successfully generated plan with no interactions is persisted as empty and remains distinct from failed planning.
+  action: added
+- id: interaction-planning-failure-does-not-stop-individual-probes
+  description: MiniSWE continues authoring individual scenario probes when interaction planning is empty or fails.
+  action: added
+- id: interaction-planner-failure-remains-reviewable
+  description: Interaction-planning errors remain attached to artifacts and final review state.
+  action: added
+guidance:
+- id: preserve-interaction-plan-outcome
+  description: Preserve empty and failed interaction-planning outcomes separately in the plan artifact, probe suite, and final review; continue individual scenario probe authoring for either outcome.
+  action: added

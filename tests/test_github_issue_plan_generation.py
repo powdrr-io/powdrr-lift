@@ -9,19 +9,34 @@ from typing import Any
 import pytest
 
 from powdrr_lift import cli
+from powdrr_lift.workrr import github_issue_plan_generation, jev_classifier
 from powdrr_lift.workrr.github_issue_plan_generation import (
+    PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
     PLAN_ITEMS_RESPONSE_SCHEMA,
     PlanGenerationError,
     PlanPullRequest,
+    _apply_plan_coverage_assessments,
+    _ensure_ci_bootstrap,
     _plan_item_refinement_issues,
+    _require_jev_grouping_approval,
+    _validated_plan_coverage_assessments,
     generate_execution_plan_yaml,
+    generate_multi_pr_structrr_proposal,
     inspect_repository_ci,
     inspect_repository_code,
     load_plan_workflow_instance,
     publish_execution_plan_pull_request,
     write_execution_plan_artifacts,
 )
+from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_lift.workrr.multipr_structrr import compile_multi_pr_proposal
+from powdrr_lift.workrr.plan_sizing import size_plan_items
+
+
+@pytest.fixture(autouse=True)
+def _disable_live_semantic_providers(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
 
 
 class FakePlanningClient:
@@ -38,6 +53,36 @@ class FakePlanningClient:
     ) -> dict[str, Any]:
         self.messages = messages
         self.response_schema = response_schema
+        if response_schema == PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA:
+            return {
+                "assessments": [
+                    {
+                        "item_id": str(item["id"]),
+                        "status": "missing",
+                        "scope_assessments": [
+                            {
+                                "requirement_id": f"{item['id']}:scope-{index:02d}",
+                                "status": "missing",
+                                "existing_evidence": [],
+                                "remaining_requirement": "",
+                            }
+                            for index, _scope in enumerate(
+                                item.get("scope", []), start=1
+                            )
+                        ],
+                        "remaining_work": "",
+                        "remaining_item": {
+                            "title": "",
+                            "objective": "",
+                            "scope": [],
+                            "allowed_paths": [],
+                            "implementation_steps": [],
+                            "acceptance_criteria": [],
+                        },
+                    }
+                    for item in self.response.get("items", [])
+                ]
+            }
         return self.response
 
 
@@ -117,6 +162,129 @@ def test_plan_refinement_detects_cross_runtime_implementation_only() -> None:
     assert _plan_item_refinement_issues([parity_only_item]) == []
 
 
+def test_plan_sizing_groups_cohesive_items_to_target_work_size() -> None:
+    first = _item("codec-model")
+    first["scope"] = ["component: codec", "Define codec model"]
+    first["allowed_paths"] = ["src/codec/model.py"]
+    first["implementation_steps"] = ["Define the typed codec model."]
+    second = _item("codec-parser", dependencies=["codec-model"])
+    second["scope"] = ["component: codec", "Parse codec input"]
+    second["allowed_paths"] = ["src/codec/parser.py"]
+    second["implementation_steps"] = [
+        "Parse codec input into the typed model.",
+        "Add focused parser tests.",
+    ]
+
+    sized = size_plan_items([first, second])
+
+    assert len(sized) == 1
+    assert sized[0]["id"] == "codec-model"
+    assert sized[0]["title"] == "Implement codec-model; Implement codec-parser"
+    assert len(sized[0]["implementation_steps"]) == 3
+    assert sized[0]["dependencies"] == []
+    assert size_plan_items([first, second]) == sized
+    assert sized[0]["allowed_paths"] == [
+        "src/codec/model.py",
+        "src/codec/parser.py",
+    ]
+
+
+def test_plan_sizing_keeps_incompatible_or_unrelated_items_separate() -> None:
+    python_item = _item("python-codec")
+    python_item["scope"] = ["component: codec", "Implement Python codec"]
+    python_item["allowed_paths"] = ["src/codec/python.py"]
+    swift_item = _item("swift-codec", dependencies=["python-codec"])
+    swift_item["scope"] = ["component: codec", "Implement Swift codec"]
+    swift_item["allowed_paths"] = ["src/codec/swift.swift"]
+    swift_item["implementation_steps"] = ["Implement Swift codec behavior."]
+
+    sized = size_plan_items([python_item, swift_item])
+
+    assert [item["id"] for item in sized] == ["python-codec", "swift-codec"]
+    assert sized[1]["dependencies"] == ["python-codec"]
+
+    first_component = _item("first-component")
+    first_component["scope"] = ["component: first"]
+    first_component["allowed_paths"] = ["src/first/feature.py"]
+    first_component["implementation_steps"] = ["Implement first component behavior."]
+    second_component = _item("second-component")
+    second_component["scope"] = ["component: second"]
+    second_component["allowed_paths"] = ["src/second/feature.py"]
+    second_component["implementation_steps"] = ["Implement second component behavior."]
+    unrelated = size_plan_items([first_component, second_component])
+
+    assert [item["id"] for item in unrelated] == [
+        "first-component",
+        "second-component",
+    ]
+
+
+def test_plan_sizing_never_merges_ci_bootstrap_with_product_work() -> None:
+    bootstrap = {
+        **_item("ci-bootstrap"),
+        "title": "Establish CI validation",
+        "scope": ["component: repository", "Add CI workflow"],
+        "allowed_paths": [".github/workflows/verify.yml"],
+        "implementation_steps": ["Run verification in pull request CI."],
+    }
+    product = _item("feature", dependencies=["ci-bootstrap"])
+    product["scope"] = ["component: repository", "Add the feature"]
+    product["allowed_paths"] = [".github/workflows/verify.yml"]
+    product["implementation_steps"] = ["Implement the feature."]
+
+    sized = size_plan_items([bootstrap, product])
+
+    assert [item["id"] for item in sized] == ["ci-bootstrap", "feature"]
+    assert sized[1]["dependencies"] == ["ci-bootstrap"]
+
+
+def test_jev_can_approve_or_veto_plan_grouping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proposal = [_item("one")]
+    decisions = iter(["approve", "veto"])
+    requests: list[dict[str, Any]] = []
+
+    def classify(request: dict[str, Any], *_args: Any) -> dict[str, str]:
+        requests.append(request)
+        return {"choice": next(decisions)}
+
+    monkeypatch.setenv("TYPESAFEAI_API_KEY", "test-key")
+    monkeypatch.setattr(jev_classifier, "_call_jev", classify)
+
+    _require_jev_grouping_approval(proposal, FakePlanningClient({"items": proposal}))
+
+    assert requests[0]["allowed_values"] == ["approve", "veto"]
+    assert '"id": "one"' in requests[0]["state"]["source_text"]
+
+    with pytest.raises(PlanGenerationError, match="Jev vetoed"):
+        _require_jev_grouping_approval(
+            proposal, FakePlanningClient({"items": proposal})
+        )
+
+    class UnavailableJevJudge:
+        provider = "JEV"
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, str]:
+            del messages, response_schema
+            raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(
+        github_issue_plan_generation,
+        "preferred_semantic_classifier_client",
+        lambda *_args, **_kwargs: UnavailableJevJudge(),
+    )
+    with pytest.raises(PlanGenerationError, match="failed closed"):
+        _require_jev_grouping_approval(
+            proposal, FakePlanningClient({"items": proposal})
+        )
+
+
 def test_plan_requires_ci_bootstrap_and_dependency_when_repository_has_no_ci() -> None:
     ci_item = _item("ci-bootstrap")
     ci_item["title"] = "Set up CI validation"
@@ -139,6 +307,53 @@ def test_plan_requires_ci_bootstrap_and_dependency_when_repository_has_no_ci() -
         "foundation must establish continuous integration before the product work",
         "feature must depend on the initial CI item foundation",
     ]
+
+
+def test_planner_inserts_ci_bootstrap_when_model_omits_the_initial_gate() -> None:
+    items = [
+        _item("verifier"),
+        _item("cli", dependencies=["verifier"]),
+    ]
+
+    repaired = _ensure_ci_bootstrap(items, "bash attestation/scripts/verify-all.sh")
+
+    assert repaired[0]["id"] == "ci-bootstrap"
+    assert repaired[0]["allowed_paths"] == [".github/workflows/verify.yml"]
+    assert "bash attestation/scripts/verify-all.sh" in str(repaired[0])
+    assert repaired[1]["dependencies"] == ["ci-bootstrap"]
+    assert repaired[2]["dependencies"] == ["verifier", "ci-bootstrap"]
+    assert (
+        _plan_item_refinement_issues(
+            repaired,
+            require_ci_bootstrap=True,
+            verification_command="bash attestation/scripts/verify-all.sh",
+        )
+        == []
+    )
+
+
+def test_planner_repairs_ci_item_missing_exact_verification_command() -> None:
+    ci_item = _item("ci-bootstrap")
+    ci_item["title"] = "Set up continuous integration"
+    ci_item["implementation_steps"] = ["Add a GitHub Actions workflow."]
+    ci_item["allowed_paths"] = [".github/workflows/verify.yml"]
+    feature_item = _item("verifier")
+
+    repaired = _ensure_ci_bootstrap(
+        [ci_item, feature_item], "bash attestation/scripts/verify-all.sh"
+    )
+
+    assert len(repaired) == 2
+    assert "bash attestation/scripts/verify-all.sh" in str(repaired[0])
+    assert repaired[1]["dependencies"] == ["ci-bootstrap"]
+    assert (
+        _plan_item_refinement_issues(
+            repaired,
+            require_ci_bootstrap=True,
+            verification_command="bash attestation/scripts/verify-all.sh",
+        )
+        == []
+    )
 
 
 def test_inspect_repository_ci_reports_existing_workflow_and_missing_ci(
@@ -223,6 +438,7 @@ def test_inspect_repository_code_follows_up_with_symbol_and_test_lookups(
     assert "src/attestation/verifier.py" in context
     assert "tests/test_verifier.py" in context
     assert "verify_ed25519_signature" in context
+    assert "assert not verify_signature(b'invalid')" in context
     assert "Analyzed checkout: commit unborn HEAD" in context
     assert "working tree has changes: yes" in context
     assert "working-tree status ??; not in analyzed commit" in context
@@ -276,6 +492,34 @@ def test_planner_repairs_missing_ci_bootstrap_and_blocks_later_items() -> None:
     assert "continuous integration before the product work" in repair_prompt
     assert "scripts/verify-all.sh" in repair_prompt
     assert "partial signature verifier" in repair_prompt
+
+
+def test_plan_generation_repairs_persistent_missing_ci_gate() -> None:
+    uncorrected = {
+        "items": [
+            _item("verifier"),
+            _item("cli", dependencies=["verifier"]),
+        ]
+    }
+    client = SequencedPlanningClient([uncorrected] * 8)
+
+    _, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement the verifier and CLI.",
+        plan_id="validation-gate-v1",
+        client=client,
+        verification_command="bash attestation/scripts/verify-all.sh",
+        repository_ci_context="No recognized CI configuration files were found.",
+    )
+
+    assert [item.item_id for item in plan.items] == [
+        "ci-bootstrap",
+        "verifier",
+        "cli",
+    ]
+    assert plan.items[0].dependencies == ()
+    assert plan.items[1].dependencies == ("ci-bootstrap",)
+    assert plan.items[2].dependencies == ("verifier", "ci-bootstrap")
+    assert "bash attestation/scripts/verify-all.sh" in str(plan.items[0])
 
 
 def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
@@ -337,6 +581,330 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     )
     assert "scripts/verify-all.sh" in client.messages[1]["content"]
     assert "verify_signature" in client.messages[1]["content"]
+
+
+def test_generate_execution_plan_yaml_uses_deterministic_sizing() -> None:
+    first = _item("codec-model")
+    first["scope"] = ["component: codec", "Define codec model"]
+    first["allowed_paths"] = ["src/codec/model.py"]
+    first["implementation_steps"] = ["Define the typed codec model."]
+    second = _item("codec-parser", dependencies=["codec-model"])
+    second["scope"] = ["component: codec", "Parse codec input"]
+    second["allowed_paths"] = ["src/codec/parser.py"]
+    second["implementation_steps"] = [
+        "Parse codec input into the typed model.",
+        "Add focused parser tests.",
+    ]
+    client = FakePlanningClient({"items": [first, second]})
+
+    _rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nDefine and parse a codec.",
+        plan_id="codec-v1",
+        client=client,
+    )
+
+    assert [item.item_id for item in plan.items] == ["codec-model"]
+    assert len(plan.items[0].implementation_steps) == 3
+    assert plan.items[0].dependencies == ()
+
+
+def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    implementation = tmp_path / "src/schema.py"
+    implementation.parent.mkdir(parents=True)
+    implementation.write_text("def parse_policy(): pass\n", encoding="utf-8")
+    test_file = tmp_path / "tests/test_parsers.py"
+    test_file.parent.mkdir(parents=True)
+    test_file.write_text(
+        "def test_parse_policy():\n    assert parse_policy() is None\n",
+        encoding="utf-8",
+    )
+    verifier = tmp_path / "src/verifier.py"
+    verifier.write_text("def verify_signature(): pass\n", encoding="utf-8")
+    verifier_test = tmp_path / "tests/test_verifier.py"
+    verifier_test.write_text(
+        "def test_verify_signature():\n    assert verify_signature()\n",
+        encoding="utf-8",
+    )
+    portable_item = _item("portable-verifier", dependencies=["schema-parsers"])
+    portable_item["scope"].append("Add the missing stable rejection reason API.")
+    draft = {
+        "items": [
+            _item("schema-parsers"),
+            portable_item,
+        ]
+    }
+    reconciled = {"items": [_item("portable-verifier")]}
+    audit = {
+        "assessments": [
+            {
+                "item_id": "schema-parsers",
+                "status": "complete",
+                "scope_assessments": [
+                    {
+                        "requirement_id": "schema-parsers:scope-01",
+                        "status": "complete",
+                        "existing_evidence": [
+                            {
+                                "path": "src/schema.py",
+                                "symbol": "parse_policy",
+                                "kind": "implementation",
+                                "rationale": "The parser implements the contract.",
+                            },
+                            {
+                                "path": "tests/test_parsers.py",
+                                "symbol": "test_parse_policy",
+                                "kind": "test",
+                                "rationale": "The parser behavior has a focused test.",
+                            },
+                        ],
+                        "remaining_requirement": "",
+                    }
+                ],
+                "remaining_work": "",
+                "remaining_item": {
+                    "title": "",
+                    "objective": "",
+                    "scope": [],
+                    "allowed_paths": [],
+                    "implementation_steps": [],
+                    "acceptance_criteria": [],
+                },
+            },
+            {
+                "item_id": "portable-verifier",
+                "status": "partial",
+                "scope_assessments": [
+                    {
+                        "requirement_id": "portable-verifier:scope-01",
+                        "status": "partial",
+                        "existing_evidence": [
+                            {
+                                "path": "src/verifier.py",
+                                "symbol": "verify_signature",
+                                "kind": "implementation",
+                                "rationale": "A signature helper already exists.",
+                            },
+                            {
+                                "path": "tests/test_verifier.py",
+                                "symbol": "test_verify_signature",
+                                "kind": "test",
+                                "rationale": "The current helper has a focused test.",
+                            },
+                        ],
+                        "remaining_requirement": (
+                            "Add the missing authorization decision API."
+                        ),
+                    },
+                    {
+                        "requirement_id": "portable-verifier:scope-02",
+                        "status": "missing",
+                        "existing_evidence": [
+                            {
+                                "path": "src/verifier.py",
+                                "symbol": "verify_signature",
+                                "kind": "implementation",
+                                "rationale": (
+                                    "This helper verifies signatures but does not "
+                                    "provide stable rejection reasons."
+                                ),
+                            },
+                            {
+                                "path": "tests/test_verifier.py",
+                                "symbol": "test_verify_signature",
+                                "kind": "test",
+                                "rationale": (
+                                    "This test does not exercise authorization "
+                                    "rejection reasons."
+                                ),
+                            },
+                        ],
+                        "remaining_requirement": (
+                            "Add the missing stable rejection reason API."
+                        ),
+                    },
+                ],
+                "remaining_work": "Add the missing authorization decision API.",
+                "remaining_item": {
+                    "title": "Complete verifier authorization decisions",
+                    "objective": "Add only the missing authorization decision API.",
+                    "scope": ["Implement stable authorization rejection decisions."],
+                    "allowed_paths": ["src/verifier.py"],
+                    "implementation_steps": [
+                        "Implement authorization decisions for verifier inputs."
+                    ],
+                    "acceptance_criteria": [
+                        "Each authorization failure returns a stable reason."
+                    ],
+                },
+            },
+        ]
+    }
+    client = SequencedPlanningClient([draft, draft, audit, reconciled])
+    inspected_contexts: list[str] = []
+
+    def inspect_draft(_repo_root: Path, source_plan: str, _client: Any) -> str:
+        inspected_contexts.append(source_plan)
+        return (
+            "Current checkout evidence: attestation/verifier/parsers.py implements "
+            "strict policy parsing; tests/test_parsers.py covers duplicate keys."
+        )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.github_issue_plan_generation.inspect_repository_code",
+        inspect_draft,
+    )
+    _, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement strict parsers and a portable verifier.",
+        plan_id="current-state-reconciliation-v1",
+        client=client,
+        repository_ci_context=(
+            "Recognized CI configuration files:\n"
+            "--- .github/workflows/verify.yml ---\n"
+            "run: bash attestation/scripts/verify-all.sh"
+        ),
+        repository_code_context="Initial evidence mentions the verifier package.",
+        repository_root=tmp_path,
+    )
+
+    assert len(client.messages) == 4
+    assert len(inspected_contexts) == 1
+    assert "schema-parsers" in inspected_contexts[0]
+    audit_prompt = client.messages[2][1]["content"]
+    assert "portable-verifier:scope-02" in audit_prompt
+    audit_instructions = client.messages[2][0]["content"]
+    assert "Assess every supplied scope requirement separately" in audit_instructions
+    reconciliation_prompt = client.messages[3][1]["content"]
+    assert "Current checkout evidence" in reconciliation_prompt
+    assert "schema-parsers" in reconciliation_prompt
+    assert [item.item_id for item in plan.items] == ["portable-verifier"]
+    assert plan.items[0].title == "Complete verifier authorization decisions"
+    assert plan.items[0].scope == (
+        "Add the missing authorization decision API.",
+        "Add the missing stable rejection reason API.",
+    )
+
+
+def test_incomplete_coverage_audit_preserves_unassessed_items(tmp_path: Path) -> None:
+    audit = {
+        "assessments": [
+            {
+                "item_id": "reviewed",
+                "status": "missing",
+                "scope_assessments": [
+                    {
+                        "requirement_id": "reviewed:scope-01",
+                        "status": "missing",
+                        "existing_evidence": [],
+                        "remaining_requirement": "",
+                    }
+                ],
+                "remaining_work": "",
+                "remaining_item": {
+                    "title": "",
+                    "objective": "",
+                    "scope": [],
+                    "allowed_paths": [],
+                    "implementation_steps": [],
+                    "acceptance_criteria": [],
+                },
+            }
+        ]
+    }
+
+    assessments = _validated_plan_coverage_assessments(
+        audit,
+        [_item("reviewed"), _item("unassessed")],
+        repository_root=tmp_path,
+    )
+
+    assert assessments["reviewed"]["status"] == "missing"
+    assert assessments["unassessed"]["status"] == "missing"
+    assert assessments["unassessed"]["scope_assessments"] == [
+        {
+            "requirement_id": "unassessed:scope-01",
+            "status": "missing",
+            "existing_evidence": [],
+            "remaining_requirement": "",
+        }
+    ]
+
+
+def test_missing_coverage_assessment_can_retain_the_full_draft_item() -> None:
+    remaining_item = {
+        "title": "Implement missing component",
+        "objective": "Implement the component from the source plan.",
+        "scope": ["Implement component behavior."],
+        "allowed_paths": ["src/component.py"],
+        "implementation_steps": ["Implement component behavior."],
+        "acceptance_criteria": ["Component behavior is verified."],
+    }
+    item = _item("missing")
+    assessments = {
+        "missing": {
+            "status": "missing",
+            "remaining_item": remaining_item,
+        }
+    }
+
+    result = _apply_plan_coverage_assessments([item], assessments)
+
+    assert result[0]["title"] == "Implement missing component"
+    assert result[0]["scope"] == ["Implement component behavior."]
+
+
+def test_structrr_proposal_normalizes_content_identity_from_subject_id() -> None:
+    plan = ReviewedExecutionPlan(
+        plan_id="attestation-current-state",
+        items=(
+            PlannedWorkItem(
+                item_id="schema-contracts",
+                title="Define protocol schemas",
+                objective="Add the attestation schema contracts.",
+                scope=("Add JSON schemas for policy records.",),
+                acceptance_criteria=("The schemas validate all fixtures.",),
+                dependencies=(),
+                workflow_directory=None,
+                workflow_id="attestation-current-state-schema-contracts",
+                allowed_paths=("attestation/schemas",),
+            ),
+        ),
+    )
+    baseline: dict[str, Any] = {
+        "entities": [],
+        "entity_relationships": [],
+        "files": [],
+        "source_subjects": [],
+        "source_bindings": [],
+        "active_intent": {},
+        "human-decisions": [],
+        "invariants": [],
+    }
+    invalid_operation = {
+        "operation_id": "add-schema-package",
+        "item_id": "schema-contracts",
+        "section": "entities",
+        "subject_id": "entity:attestation-schemas",
+        "action": "added",
+        "content": {"id": "wrong-identity", "type": "Module"},
+    }
+    client = SequencedPlanningClient([{"operations": [invalid_operation]}])
+
+    proposal = generate_multi_pr_structrr_proposal(
+        plan=plan,
+        baseline_snapshot=baseline,
+        source_plan="# Attestation plan",
+        client=client,
+    )
+
+    assert len(client.messages) == 1
+    assert proposal.item_proposals["schema-contracts"].operations[0].subject_id == (
+        "entity:attestation-schemas"
+    )
+    assert proposal.item_proposals["schema-contracts"].operations[0].content["id"] == (
+        "entity:attestation-schemas"
+    )
 
 
 def test_plan_can_append_a_final_review_dependent_on_all_implementation_items() -> None:
@@ -752,6 +1320,10 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
         cli,
         "inspect_repository_code",
         lambda *_args: "existing repository implementation evidence",
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.github_issue_plan_generation.inspect_repository_code",
+        lambda *_args: "targeted implementation and test evidence",
     )
     monkeypatch.setattr(
         cli, "_stage_generated_file", lambda _root, path: staged.append(path)

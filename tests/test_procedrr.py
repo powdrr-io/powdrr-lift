@@ -795,3 +795,138 @@ def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:
     assert "verify_code_task_decision" in flow_text
     assert "verify_implementation_decision" in flow_text
     assert "Does this one" in flow_text
+
+
+def test_feature_plan_gets_complexity_and_quality_reviews_before_final_plan() -> None:
+    from pathlib import Path
+
+    import yaml
+
+    from procedrr import ProcessCatalog
+
+    processes_path = Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    catalog = ProcessCatalog.load(processes_path)
+    process = catalog.get("start-implementing-feature").document
+    question = process["steps"][0]["specialize"]["question"]
+    embedded = question.split("Embedded workflow document:\n---\n", 1)[1]
+    workflow = yaml.safe_load(embedded)
+    steps = workflow["steps"]
+    step_ids = [step.get("id") for step in steps]
+    plan_index = step_ids.index("plan-proposed-prs")
+    complexity_index = step_ids.index("challenge-proposed-pr-complexity")
+    quality_index = step_ids.index("challenge-proposed-pr-code-quality")
+    final_plan_index = step_ids.index("plan-proposed-pr-specification")
+    outline = steps[plan_index]["outputs"][1]
+    complexity = steps[complexity_index]
+    quality = steps[quality_index]
+    final_plan = steps[final_plan_index]
+    resolve_index = step_ids.index("resolve-feature-context")
+    select_index = step_ids.index("select-feature-context")
+    code_quality_judge = next(
+        step["judge"]
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("judge", {}).get("output", {}).get("name")
+        == "code_quality_evidence_review"
+    )
+    effect_allocation_judge = next(
+        step["judge"]
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("judge", {}).get("output", {}).get("name")
+        == "effect_allocation_review"
+    )
+    reconcile_index = step_ids.index("reconcile-proposed-pr-effect-allocation")
+    evaluate_index = step_ids.index("evaluate-proposed-pr-specification")
+
+    assert plan_index < complexity_index < quality_index < final_plan_index
+    assert resolve_index < select_index
+    assert steps[resolve_index]["pre_step"]["template"]["command"][:2] == [
+        "powdrr-lift",
+        "resolve-feature-context",
+    ]
+    assert "sole source of matching decisions" in steps[select_index]["details"]
+    assert code_quality_judge["provider"] == "jev"
+    assert effect_allocation_judge["provider"] == "jev"
+    assert code_quality_judge["output"]["schema"]["properties"]["disposition"][
+        "enum"
+    ] == ["supported", "unsupported", "unclear"]
+    assert effect_allocation_judge["output"]["schema"]["properties"]["disposition"][
+        "enum"
+    ] == ["supported", "unsupported", "unclear"]
+    assert "code_quality_evidence_review" in [
+        item["name"] for item in final_plan["inputs"]
+    ]
+    assert (
+        step_ids.index("allocate-proposed-pr-effects")
+        < reconcile_index
+        < evaluate_index
+    )
+    assert outline["name"] == "proposed_pr_designs"
+    assert {
+        "planned_files",
+        "planned_tests",
+        "existing_components_considered",
+    }.issubset(outline["schema"]["items"]["properties"])
+    assert "planning_pushback" in [item["name"] for item in complexity["outputs"]]
+    assert {
+        "existing_capability",
+        "duplication",
+        "configuration",
+        "standard_or_library",
+    }.issubset(
+        complexity["outputs"][0]["schema"]["properties"]["reviews"]["items"][
+            "properties"
+        ]
+    )
+    assert "code_quality_review" in [item["name"] for item in quality["outputs"]]
+    quality_review = quality["outputs"][0]["schema"]["properties"]
+    assert {"reviews", "pushbacks"}.issubset(quality_review)
+    assert {
+        "duplication_and_reuse",
+        "conditional_dispatch",
+        "legacy_compatibility",
+        "error_handling",
+        "contracts",
+        "test_quality",
+        "resource_lifecycle",
+        "concurrency",
+        "security",
+        "recommended_design",
+    }.issubset(quality_review["reviews"]["items"]["properties"])
+    assert quality_review["pushbacks"]["items"]["properties"]["category"]["enum"] == [
+        "duplication",
+        "command_pattern",
+        "legacy_compatibility",
+        "error_handling",
+        "contracts",
+        "test_quality",
+        "resource_lifecycle",
+        "concurrency",
+        "security",
+    ]
+    assert "long if/elif/else sequences" in quality["details"]
+    assert "command pattern" in quality["details"]
+    assert "explicit feature requirement" in quality["details"]
+    assert "short verbatim excerpt in evidence" in quality["details"]
+    for area in (
+        "unbounded",
+        "inputs, outputs, state changes",
+        "meaningful public",
+        "cleanup and ownership",
+        "race and ordering",
+        "untrusted input",
+        "conditional review areas",
+    ):
+        assert area in quality["details"]
+    assert "planning_pushback" in [item["name"] for item in final_plan["inputs"]]
+    assert "code_quality_review" in [item["name"] for item in final_plan["inputs"]]
+    assert "Address every code-quality finding_id exactly once" in final_plan["details"]
+    assert (
+        "error-handling, contract, test, lifecycle, concurrency"
+        in final_plan["details"]
+    )
+    assert (
+        "Then address each planning-complexity finding_id exactly once"
+        in final_plan["details"]
+    )

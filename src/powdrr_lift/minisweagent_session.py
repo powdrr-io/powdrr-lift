@@ -17,28 +17,41 @@ from minisweagent.utils.serialize import UNSET, recursive_merge
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--previous", type=Path, required=True)
-    parser.add_argument("--task", required=True)
+    parser.add_argument("--previous", type=Path)
+    task_source = parser.add_mutually_exclusive_group(required=True)
+    task_source.add_argument("--task")
+    task_source.add_argument("--task-file", type=Path)
     parser.add_argument("--config", action="append", default=[])
     parser.add_argument("--model")
-    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
 
-    previous = json.loads(args.previous.read_text(encoding="utf-8"))
-    messages = previous.get("messages") if isinstance(previous, dict) else None
-    if not isinstance(messages, list) or not messages:
-        raise ValueError(f"trajectory has no messages: {args.previous}")
+    if args.task is not None:
+        task = args.task
+    elif args.task_file is not None:
+        task = args.task_file.read_text(encoding="utf-8")
+    else:
+        raise ValueError("one of --task or --task-file is required")
+    messages: list[dict[str, Any]] | None = None
+    if args.previous is not None:
+        previous = json.loads(args.previous.read_text(encoding="utf-8"))
+        previous_messages = (
+            previous.get("messages") if isinstance(previous, dict) else None
+        )
+        if not isinstance(previous_messages, list) or not previous_messages:
+            raise ValueError(f"trajectory has no messages: {args.previous}")
+        messages = cast("list[dict[str, Any]]", previous_messages)
 
     config_specs = args.config or [str(builtin_config_dir / "mini.yaml")]
     config = recursive_merge(
         *(get_config_from_spec(spec) for spec in config_specs),
         {
-            "run": {"task": args.task},
+            "run": {"task": task},
             "agent": {
                 "mode": "yolo",
                 "confirm_exit": False,
                 "cost_limit": 0,
-                "output_path": args.output,
+                "output_path": args.output or UNSET,
             },
             "model": {"model_name": args.model or UNSET},
         },
@@ -51,8 +64,12 @@ def main() -> int:
             model, environment, config.get("agent", {}), default_type="interactive"
         ),
     )
+    if messages is None:
+        agent.run(task)
+        status = agent.messages[-1].get("extra", {}).get("exit_status")
+        return 0 if status == "Submitted" else 125
     agent.messages = messages[:-1] if messages[-1].get("role") == "exit" else messages
-    agent.add_messages(model.format_message(role="user", content=args.task))
+    agent.add_messages(model.format_message(role="user", content=task))
 
     while True:
         try:

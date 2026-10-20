@@ -19,7 +19,7 @@ from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.llm import complete_json
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
-POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v4"
+POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v5"
 _INTERACTION_PLAN_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -259,6 +259,42 @@ class PostRunProbeResult:
             "output": self.output,
             "error": self.error,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class ProbeInteractionPlan:
+    """Result of planning cross-requirement cases, separate from suite status."""
+
+    status: str
+    interactions: tuple[dict[str, Any], ...] = ()
+    error: str | None = None
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "error": self.error,
+            "interactions": list(self.interactions),
+        }
+
+
+def resolve_probe_interaction_plan(
+    client: WorkflowLLMClient | None,
+    *,
+    instruction: str,
+    scenarios: Sequence[Mapping[str, Any]],
+) -> ProbeInteractionPlan:
+    """Return explicit empty, failed, or unconfigured interaction outcomes."""
+    if client is None:
+        return ProbeInteractionPlan("not_configured")
+    try:
+        interactions = generate_probe_interaction_plan(
+            client, instruction=instruction, scenarios=scenarios
+        )
+    except Exception as error:
+        return ProbeInteractionPlan("failed", error=f"{type(error).__name__}: {error}")
+    return ProbeInteractionPlan(
+        "generated" if interactions else "empty", interactions=interactions
+    )
 
 
 def parse_generated_postrun_probe_source(
@@ -564,20 +600,12 @@ def _validate_probe_function(function: ast.FunctionDef, tree: ast.Module) -> Non
 
     if not any(isinstance(node, ast.Assert) for node in ast.walk(function)):
         raise ValueError(f"{function.name} must contain an observable assertion")
-    assert_calls = (
-        call
-        for assertion in ast.walk(function)
-        if isinstance(assertion, ast.Assert)
-        for call in ast.walk(assertion.test)
-        if isinstance(call, ast.Call)
-    )
+    function_calls = (node for node in ast.walk(function) if isinstance(node, ast.Call))
     if not any(
         not isinstance(call.func, ast.Name) or call.func.id not in builtin_names
-        for call in assert_calls
+        for call in function_calls
     ):
-        raise ValueError(
-            f"{function.name} assertion must exercise a non-built-in software call"
-        )
+        raise ValueError(f"{function.name} must exercise a non-built-in software call")
 
 
 def _validate_import_roots(roots: set[str]) -> None:
@@ -762,10 +790,12 @@ __all__ = [
     "POSTRUN_PROBE_SCHEMA_VERSION",
     "PostRunProbe",
     "PostRunProbeResult",
+    "ProbeInteractionPlan",
     "baseline_probe_failures",
     "generate_probe_interaction_plan",
     "parse_generated_postrun_probe_source",
     "probe_failures",
+    "resolve_probe_interaction_plan",
     "run_postrun_probes",
     "validate_probe_interaction_plan",
 ]

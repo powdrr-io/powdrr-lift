@@ -1,0 +1,192 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1049
+title: Accept scoped MiniSWE probe commits
+intent:
+  problem: MiniSWE probe authoring commits its generated suite, but the coding-agent guard rejected every HEAD change and discarded the probes.
+  goal: Accept forward commits whose changed files are within the request's allowed paths, preserve their diff evidence, and continue to reject out-of-scope changes and rewritten history.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 520
+    end_line: 520
+  summary: Record the worker commit SHA in attempt results
+  rationale: Keep the identity of an accepted worker-authored commit in the persisted attempt record.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 538
+    end_line: 538
+  summary: Serialize the worker commit SHA
+  rationale: Persist commit metadata with the coding-agent attempt.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1078
+    end_line: 1078
+  summary: Load the worker commit SHA from attempt records
+  rationale: Restore commit metadata when reading persisted coding-agent attempts.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1169
+    end_line: 1182
+  summary: Validate committed paths and preserve their diff fingerprint
+  rationale: Include committed changes in scope checks and accept forward commits when all changes are authorized.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1185
+    end_line: 1190
+  summary: Include committed paths in change accounting
+  rationale: Ensure committed changes are evaluated with uncommitted working-tree changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1201
+    end_line: 1204
+  summary: Allow commits descended from the request baseline
+  rationale: Keep commit authorization tied to the original worker request.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1207
+    end_line: 1208
+  summary: Report policy denial for out-of-scope or rewritten changes
+  rationale: Distinguish disallowed paths from history rewrites.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1233
+    end_line: 1233
+  summary: Record the accepted worker commit SHA
+  rationale: Make accepted worker-authored commits auditable.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1248
+    end_line: 1258
+  summary: Reject rewritten commit history
+  rationale: Permit descendant commits while preserving the guard against replacing or rewriting the request baseline.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3213
+    end_line: 3215
+  summary: Base the repair request on the accepted authoring commit
+  rationale: Let MiniSWE repair an invalid probe suite from the HEAD produced by its first accepted authoring attempt.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 90
+  summary: Simulate an allowed worker commit
+  rationale: Exercise the coding-agent boundary with a provider that commits an in-scope file.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 568
+    end_line: 593
+  summary: Verify in-scope commits are accepted and recorded
+  rationale: Protect commit path accounting, SHA recording, fingerprinting, and policy enforcement.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 603
+    end_line: 605
+  summary: Assert out-of-scope commits are denied
+  rationale: Verify committed changes outside the implementation request remain blocked.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 125
+  summary: Track the MiniSWE worker commit in the probe authoring regression
+  rationale: Verify the probe authoring flow retains metadata for the suite commit.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 185
+    end_line: 189
+  summary: Commit the authored probe suite in the regression test
+  rationale: Reproduce the MiniSWE behavior that triggered policy denial.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 231
+  summary: Assert the authoring attempt records its commit SHA
+  rationale: Verify accepted MiniSWE commits remain visible in the generated suite report.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 397
+  summary: Track the commit produced by the initial probe authoring attempt
+  rationale: Verify the repair request uses the accepted suite commit as its baseline.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 407
+    end_line: 410
+  summary: Assert initial and repair requests use the correct bases
+  rationale: Ensure the first request starts from the untouched repository and the repair continues from the first worker commit.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 436
+    end_line: 441
+  summary: Commit the initial probe suite in the repair regression
+  rationale: Reproduce MiniSWE's commit behavior before triggering a probe-suite repair.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 482
+    end_line: 485
+  summary: Verify the committed suite and repair attempt are retained
+  rationale: Protect the complete authoring retry path after a worker commit.
+entities:
+- id: coding-agent-attempt
+  type: Class
+  action: added
+- id: run-coding-agent
+  type: Function
+  action: added
+- id: coding-agent-commit-policy-regression-tests
+  type: Unit test
+  action: added
+- id: miniswe-probe-authoring-flow-regression-test
+  type: Integration test
+  action: added
+entity_relationships:
+- id: coding-agent-attempt-records-worker-commit
+  type: records
+  source: coding-agent-attempt
+  target: run-coding-agent
+  action: added
+  description: The coding-agent boundary records the accepted worker commit SHA and captures committed paths in the attempt diff evidence.
+- id: miniswe-probe-authoring-uses-coding-agent-commit-policy
+  type: exercises
+  source: miniswe-probe-authoring-flow-regression-test
+  target: run-coding-agent
+  action: added
+  description: The probe authoring regression verifies MiniSWE's in-scope commit is accepted through the shared coding-agent boundary.
+invariants:
+- id: worker-commits-remain-within-authorized-paths
+  description: A worker commit is accepted only when its changed paths are within the request's allowed or ephemeral paths.
+  action: altered
+- id: worker-history-must-descend-from-request-baseline
+  description: A worker may add commits but may not rewrite the request's baseline history.
+  action: altered
+- id: accepted-worker-commit-is-auditable
+  description: Accepted worker commits retain their SHA, changed paths, and diff fingerprint in the attempt record.
+  action: added
+- id: probe-repair-uses-current-authoring-head
+  description: A probe-suite repair request uses the current accepted authoring HEAD as its base commit.
+  action: added
+guidance:
+- id: allow-miniswe-authored-probe-commits
+  description: MiniSWE probe authoring may commit its suite; repair attempts must use that accepted commit as their base while changed-path authorization and ancestry checks continue to enforce scope.
+  action: added

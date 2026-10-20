@@ -20,444 +20,1400 @@ steps:
 - specialize:
     process: generate-fragment
     max_steps: 120
-    question: "Execute this named workflow for the supplied user request. Treat the embedded\
-      \ workflow document as task-specific requirements and preserve its ordering, gates,\
-      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
-      \ processes. Use only current bindings and evidence. Do not invent results or claim\
-      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
-      ---\nname: start-implementing-feature\ninputs:\n- name: canonical-feature-name\n- name:\
-      \ candidate-names\n- name: proposed_pr_id\n- name: proposed-pr-id\n- name: proposed-pr-name\n\
-      - name: workflow-id\n- name: id\n- name: path\n- name: pull-request-title\ninteraction_style:\
-      \ engineering\nwhen_to_use:\n- When the user is ready to begin implementing a feature.\n\
-      - When the feature needs proposed PR planning and durable execution workflows\n  before\
-      \ implementation starts.\n- When the generated planning artifacts and first task should\
-      \ be placed in a\n  pull request for user review.\nsteps:\n- id: capture-feature-query\n\
-      \  description: Capture the feature name to search for.\n  actions: []\n  step_type:\
-      \ governed\n  llm_type: simple_task\n  details: >-\n    Extract the feature name or\
-      \ identifier from the user's request without\n    selecting a canonical repository feature.\
-      \ Normalize surrounding prose but\n    preserve the meaningful words in the requested\
-      \ name. If the request does\n    not identify any feature, ask one specific question.\
-      \ Otherwise advance with\n    exactly one output named feature_query. The following\
-      \ deterministic steps\n    use this value only as a search query; they select nothing.\n\
-      \  outputs:\n  - name: feature_query\n    type: string\n    required_for_next_step:\
-      \ true\n    schema: {type: string}\n- id: discover-proposed-feature\n  description:\
-      \ Discover proposed feature specification candidates.\n  actions: []\n  step_type: invoke_tool\n\
-      \  llm_type: simple_task\n  inputs:\n  - name: feature_query\n    type: string\n   \
-      \ required: true\n    source: previous_step\n  pre_step:\n    action: invoke_tool\n\
-      \    template:\n      tool: fuzzy-match\n      command:\n      - fuzzy-match\n     \
-      \ - docs/proposals\n      - -name\n      - <feature-query>\n      - -type\n      - d\n\
-      \      - -maxdepth\n      - \"2\"\n      - -print\n  outputs:\n  - name: proposed_feature_candidates\n\
-      \    type: any\n    required_for_next_step: true\n    schema: {type: array, items: {type:\
-      \ object}}\n- id: discover-current-feature\n  description: Discover current feature\
-      \ specification candidates.\n  actions: []\n  step_type: invoke_tool\n  llm_type: simple_task\n\
-      \  inputs:\n  - name: feature_query\n    type: string\n    required: true\n    source:\
-      \ previous_step\n  pre_step:\n    action: invoke_tool\n    template:\n      tool: fuzzy-match\n\
-      \      command:\n      - fuzzy-match\n      - docs/current\n      - -name\n      - <feature-query>\n\
-      \      - -type\n      - d\n      - -maxdepth\n      - \"2\"\n      - -print\n  outputs:\n\
-      \  - name: current_feature_candidates\n    type: any\n    required_for_next_step: true\n\
-      \    schema: {type: array, items: {type: object}}\n- id: discover-feature-workflows\n\
-      \  description: Discover execution workflow candidates.\n  actions: []\n  step_type:\
-      \ invoke_tool\n  llm_type: simple_task\n  inputs:\n  - name: feature_query\n    type:\
-      \ string\n    required: true\n    source: previous_step\n  pre_step:\n    action: invoke_tool\n\
-      \    template:\n      tool: fuzzy-match\n      command:\n      - fuzzy-match\n     \
-      \ - docs/workflows\n      - -name\n      - <feature-query>\n      - -type\n      - d\n\
-      \      - -maxdepth\n      - \"3\"\n      - -print\n  outputs:\n  - name: workflow_candidates\n\
-      \    type: any\n    required_for_next_step: true\n    schema: {type: array, items: {type:\
-      \ object}}\n- id: select-feature-context\n  description: Select the canonical feature\
-      \ and workflow context.\n  actions: [goto_step]\n  step_type: governed\n  llm_type:\
-      \ standard_reasoning\n  details: >-\n    Inputs are the exact proposed_feature_candidates,\n\
-      \    current_feature_candidates, workflow_candidates, and feature_query outputs\n  \
-      \  from the preceding discovery steps. Normalize case, spaces, underscores,\n    and\
-      \ hyphens. If exactly one proposal or current-feature directory matches\n    feature_query,\
-      \ select it, use the matching directory's basename as the\n    canonical feature_name,\
-      \ and emit the exact\n    document paths. A workflow directory is never an independent\
-      \ choice: its\n    only valid path is docs/workflows/<canonical-feature-name>. If no\
-      \ candidate\n    matches, emit one prompt_user action. If multiple candidates remain\
-      \ tied,\n    emit one prompt_user action naming the candidate paths. If the user supplies\n\
-      \    a new identifier, emit one goto_step action for the relevant discovery step;\n\
-      \    do not combine it with another action. For example:\n    {\"action\":\"prompt_user\"\
-      ,\"text\":\"Which feature or workflow should I use from these candidates: <candidate-names>?\"\
-      }\n    Never ask the user to choose a missing workflow directory; do not ask the\n \
-      \   user which workflow path to use. Do not ask whether\n    documents exist before\
-      \ searching. Emit feature_name only after selecting a\n    canonical feature. Pass the\
-      \ selected specification documents,\n    workflow documents, canonical feature name,\
-      \ and missing-document findings\n    to the next step. Emit `specification_documents`\
-      \ as the exact existing\n    file paths for the canonical documents, `workflow_documents`\
-      \ as the exact\n    existing workflow file paths, and `missing_documents` as exact paths\
-      \ that\n    are absent. These are arrays of file paths, never directory paths. The\n\
-      \    canonical specification filenames are exactly\n    system-specification.yaml, architecture-specification.yaml,\n\
-      \    implementation-specification.yaml, and proposed-pr-specification.yaml;\n    never\
-      \ invent specification-v1.yaml or another filename from the schema name.\n  outputs:\n\
-      \  - name: feature_name\n    type: string\n    required_for_next_step: true\n    schema:\
-      \ {type: string}\n  - name: specification_documents\n    type: array\n    required_for_next_step:\
-      \ true\n    schema:\n      type: array\n      items:\n        type: string\n  - name:\
-      \ workflow_documents\n    type: array\n    required_for_next_step: true\n    schema:\n\
-      \      type: array\n      items:\n        type: string\n  - name: missing_documents\n\
-      \    type: array\n    required_for_next_step: true\n    schema:\n      type: array\n\
-      \      items:\n        type: string\n  inputs:\n  - name: feature_query\n    type: string\n\
-      \    required: true\n    source: previous_step\n  - name: proposed_feature_candidates\n\
-      \    type: array\n    required: true\n    source: previous_step\n  - name: current_feature_candidates\n\
-      \    type: array\n    required: true\n    source: previous_step\n  - name: workflow_candidates\n\
-      \    type: array\n    required: true\n    source: previous_step\n- id: bootstrap-project-structure\n\
-      \  description: Bootstrap the project-wide module and tool structure.\n  actions: [task_run_process]\n\
-      \  step_type: governed\n  llm_type: standard_reasoning\n  pre_step:\n    action: invoke_tool\n\
-      \    template:\n      tool: shell\n      command:\n      - test\n      - -f\n      -\
-      \ docs/project_structure/project-structure.yaml\n  details: >-\n    The engine-owned\
-      \ pre-step result is authoritative; do not reread it. If the\n    artifact exists, emit\
-      \ one next_step action and reuse it. If it is missing,\n    emit one task_run_process action\
-      \ for the exact process id\n    `bootstrap-code-structure`; after that action returns,\
-      \ emit next_step in the\n    following turn. The nested process is project-wide\n    and\
-      \ must not ask for a feature or target module. Never invoke bootstrap\n    merely because\
-      \ this step is present: the gate result is authoritative.\n- id: confirm-project-structure\n\
-      \  description: Confirm the project-structure artifact is available.\n  actions: []\n\
-      \  step_type: gate\n  llm_type: simple_task\n  details: The gate passes only when the\
-      \ project-structure artifact exists in the active worktree.\n  pre_step:\n    action:\
-      \ invoke_tool\n    template:\n      tool: shell\n      command:\n      - test\n    \
-      \  - -f\n      - docs/project_structure/project-structure.yaml\n  gate:\n    outcome:\n\
-      \      path: returncode\n      equals: 0\n    goto_step: bootstrap-project-structure\n\
-      \    retry_context: >-\n      The project-structure artifact is not available in the\
-      \ active worktree.\n      Rerun bootstrap-project-structure so the nested bootstrap\
-      \ process can\n      create the artifact in the same worktree, then retry this gate.\n\
-      - id: plan-proposed-prs\n  description: Plan the proposed PR implementation sequence.\n\
-      \  actions: [invoke_tool, read_document]\n  step_type: governed\n  llm_type: high_reasoning\n\
-      \  tool_invocations:\n  - tool: basedpyright-structure\n    operation: inspect_structure\n\
-      \  - tool: basedpyright-symbol\n    operation: resolve_symbol\n  inputs:\n  - name:\
-      \ feature_name\n    type: string\n    required: true\n    source: previous_step\n  -\
-      \ name: specification_documents\n    type: array\n    required: true\n    source: previous_step\n\
-      \  - name: workflow_documents\n    type: array\n    required: true\n    source: previous_step\n\
-      \  details: >-\n    This is a planning-only step. Do not create, edit, rename, or delete\
-      \ the\n    proposed PR specification; the following deterministic generation step owns\n\
-      \    creation of that file. Use only the exact specification document paths handed off\
-      \ by\n    select-feature-context; do not synthesize a filename from a schema,\n    template\
-      \ id, or feature description. If the unified proposed-PR specification already exists\
-      \ in the selected\n    feature context, inspect and reuse its ordered `proposed_prs`\
-      \ entries and\n    pass their stable names and paths onward. Otherwise analyze the feature\n\
-      \    context and the project structure to define ordered proposed PRs\n    with incremental\
-      \ validation, clear boundaries, low risk, dependencies, and\n    stable names for the\
-      \ later single proposed-pr-specification.yaml file. For each proposed\n    PR, record\
-      \ its goal, scope, files, tests, acceptance criteria, validation\n    commands, dependencies,\
-      \ and risks. Record every action-bearing id from the\n    feature-wide specification-v1\
-      \ sections after the proposed_prs section,\n    preserving source order and action.\
-      \ Label every change item with the\n    proposed_pr_id that will deliver it. Use the\n\
-      \    read_document action to inspect docs/procedrr/processes/execute-proposed-pr-workflow.yaml; do not\n  \
-      \  use shell commands to read the template. A proposed PR dependency means\n    the\
-      \ predecessor workflow is complete only after its integration pull\n    request is merged;\
-      \ completion of the predecessor's final task or creation\n    of its pull request is\
-      \ not sufficient. Preserve these workflow-level\n    dependencies in the instantiation\
-      \ plan. Do not generate one proposed-PR\n    file per PR. Before next_step, return\n\
-      \    exactly one output named proposed_pr_names containing every stable proposed\n \
-      \   PR name. Do not rely on decisions_and_context for this handoff. When a\n    proposed\
-      \ PR touches Python source or tests, inspect each implementation area\n    with the\
-      \ bounded `basedpyright-structure` tool and resolve key symbols with\n    `basedpyright-symbol`\
-      \ before finalizing its file and dependency plan. Use\n    those read-only tools instead\
-      \ of inferring module boundaries from text\n    matches alone. Skip them only when the\
-      \ proposed PR has no Python paths. Use\n    BasedPyright only after an exact repository-relative\
-      \ Python file path is\n    present in the selected specification or inspected project\
-      \ context. The\n    `path` parameter must end in `.py` and must name a file, never a\
-      \ directory,\n    proposal folder, glob, or guessed path. If no concrete Python file\
-      \ is known,\n    do not invoke BasedPyright yet; read the relevant context or choose\
-      \ a\n    materially different allowed action. After a capability error, do not\n   \
-      \ reread a document that already succeeded; use the diagnostic candidate file\n    list\
-      \ or another declared discovery action to select a different exact file.\n    these\
-      \ exact action shapes:\n    {\"action\":\"invoke_tool\",\"tool\":\"basedpyright-structure\"\
-      ,\"parameters\":{\"operation\":\"inspect_structure\",\"path\":\"src/example.py\"}}\n\
-      \    and {\"action\":\"invoke_tool\",\"tool\":\"basedpyright-symbol\",\"parameters\"\
-      :{\"operation\":\"resolve_symbol\",\"query\":\"Example\"}}.\n  outputs:\n  - name: proposed_pr_names\n\
-      \    type: any\n    required_for_next_step: true\n    schema: {type: array, items: {type:\
-      \ string}}\n- id: generate-proposed-pr-specification\n  description: Generate the single\
-      \ proposed PR specification template.\n  actions: []\n  step_type: invoke_tool\n  llm_type:\
-      \ simple_task\n  inputs:\n  - name: feature_name\n    type: string\n    required: true\n\
-      \    source: previous_step\n  pre_step:\n    action: invoke_tool\n    template:\n  \
-      \    tool: internal\n      command:\n      - powdrr-lift\n      - pr-specification\n\
-      \      - --work-item-name\n      - <feature-name>\n      - --output\n      - docs/proposals/<feature-name>/proposed-pr-specification.yaml\n\
-      \  outputs:\n  - name: proposed_pr_specification_template\n    type: any\n    required_for_next_step:\
-      \ true\n    schema: {type: object, additionalProperties: true}\n- id: plan-proposed-pr-specification\n\
-      \  description: Define the ordered proposed PR plan.\n  actions: [read_document]\n \
-      \ step_type: governed\n  llm_type: high_reasoning\n  details: >-\n    This is a planning-only\
-      \ judgment. Do not edit YAML and do not inspect,\n    copy, assign, or mention authoritative\
-      \ effects. Return exactly one object\n    in `next_step.outputs.proposed_pr_plan`. It\
-      \ contains only one ordered\n    `proposed_prs` array. Every entry contains exactly\
-      \ `id`, `intent`,\n    `justification`, and `dependent_pr_ids`; use an empty dependency\
-      \ array when\n    there are no prerequisites. Do not supply effect references, assignments,\n\
-      \    section/id/action triples, schema, work-item id, feature ids, paths,\n    comments,\
-      \ or persisted-document fields. The runtime validates the complete\n    plan before\
-      \ exposing authoritative effects to the later allocation phase.\n    Return exactly\
-      \ {\"action\":\"next_step\",\"outputs\":{\"proposed_pr_plan\":{\"proposed_prs\":[{\"\
-      id\":\"proposed-pr-id\",\"intent\":\"Implement the change\",\"justification\":\"Required\
-      \ by the feature\",\"dependent_pr_ids\":[]}]}}}.\n  outputs:\n  - name: proposed_pr_plan\n\
-      \    type: object\n    required_for_next_step: true\n    schema:\n      type: object\n\
-      \      additionalProperties: false\n      required: [proposed_prs]\n      properties:\n\
-      \        proposed_prs:\n          type: array\n          minItems: 1\n          items:\n\
-      \            type: object\n            additionalProperties: false\n            required:\
-      \ [id, intent, justification, dependent_pr_ids]\n            properties:\n         \
-      \     id: {type: string, minLength: 1}\n              intent: {type: string, minLength:\
-      \ 1}\n              justification: {type: string, minLength: 1}\n              dependent_pr_ids:\n\
-      \                type: array\n                items: {type: string, minLength: 1}\n\
-      - id: load-authoritative-pr-effects\n  description: Load authoritative effects for allocation.\n\
-      \  actions: []\n  step_type: invoke_tool\n  llm_type: simple_task\n  pre_step:\n   \
-      \ action: invoke_tool\n    template:\n      tool: internal\n      command:\n      -\
-      \ powdrr-lift\n      - authoritative-pr-effects\n      - --work-item-name\n      - <feature-name>\n\
-      \  outputs:\n  - name: authoritative_effects\n    type: object\n    required_for_next_step:\
-      \ true\n    schema:\n      type: object\n      additionalProperties: false\n      required:\
-      \ [effects]\n      properties:\n        effects:\n          type: array\n          items:\n\
-      \            type: object\n            additionalProperties: false\n            required:\
-      \ [effect_ref, section, id, action]\n            properties:\n              effect_ref:\
-      \ {type: string, minLength: 1}\n              section: {type: string, minLength: 1}\n\
-      \              id: {type: string, minLength: 1}\n              action: {type: string,\
-      \ minLength: 1}\n- id: allocate-proposed-pr-effects\n  description: Allocate authoritative\
-      \ effects to the planned PRs.\n  actions: []\n  step_type: governed\n  llm_type: high_reasoning\n\
-      \  details: >-\n    Use the validated proposed_pr_plan and runtime-owned authoritative_effects\n\
-      \    handoffs. Return exactly one object in\n    `next_step.outputs.effect_allocation`,\
-      \ containing only `assignments`. Return\n    every supplied effect_ref exactly once\
-      \ with one target proposed_pr_id from\n    the validated plan. Never return, copy, or\
-      \ invent section, id, action, YAML,\n    schema, feature ids, or other persisted-document\
-      \ fields. Runtime code\n    resolves each reference, validates total and exact allocation,\
-      \ compiles the\n    read-only compatibility document, validates it, and only then writes\
-      \ it.\n    Return exactly {\"action\":\"next_step\",\"outputs\":{\"effect_allocation\"\
-      :{\"assignments\":[{\"effect_ref\":\"effect-ref\",\"proposed_pr_id\":\"proposed-pr-id\"\
-      }]}}}.\n  inputs:\n  - name: proposed_pr_plan\n    type: object\n    source: previous_step\n\
-      \  - name: authoritative_effects\n    type: object\n    source: previous_step\n  outputs:\n\
-      \  - name: effect_allocation\n    type: object\n    required_for_next_step: true\n \
-      \   schema:\n      type: object\n      additionalProperties: false\n      required:\
-      \ [assignments]\n      properties:\n        assignments:\n          type: array\n  \
-      \        minItems: 1\n          items:\n            type: object\n            additionalProperties:\
-      \ false\n            required: [effect_ref, proposed_pr_id]\n            properties:\n\
-      \              effect_ref: {type: string, minLength: 1}\n              proposed_pr_id:\
-      \ {type: string, minLength: 1}\n- id: evaluate-proposed-pr-specification\n  description:\
-      \ Route proposed PR evaluation deterministically.\n  actions: []\n  step_type: gate\n\
-      \  llm_type: simple_task\n  details: >-\n    Runtime code evaluates the compiled proposed\
-      \ PR document exactly once. A\n    successful result advances directly to workflow planning\
-      \ without an LLM\n    confirmation. A failure routes to semantic repair with the complete\n\
-      \    structured evaluator issues.\n  pre_step:\n    action: invoke_tool\n    template:\n\
-      \      tool: internal\n      command:\n      - powdrr-lift\n      - evaluate\n     \
-      \ - docs/proposals/<feature-name>\n  gate:\n    outcome:\n      path: returncode\n \
-      \     equals: 0\n    goto_step: repair-proposed-pr-specification\n    success_goto_step:\
-      \ plan-workflow-instantiation\n    retry_context: >-\n      Use the structured evaluator\
-      \ issues to identify whether the proposed PR\n      plan or effect allocation must change.\
-      \ Do not edit the generated YAML.\n- id: repair-proposed-pr-specification\n  description:\
-      \ Repair every reported proposed PR specification issue.\n  actions: [read_document,\
-      \ goto_step]\n  next_step_override: evaluate-proposed-pr-specification\n  step_type:\
-      \ governed\n  llm_type: fast_iteration\n  details: >-\n    Do not repair YAML. Review\
-      \ the structured issues selected by the runtime\n    gate. Use goto_step with `plan-proposed-pr-specification`\
-      \ when PR ids,\n    intent, justification, or dependencies must change. Use goto_step\
-      \ with\n    `allocate-proposed-pr-effects` when only effect ownership must change. The\n\
-      \    selected phase must return a complete replacement decision object and the\n   \
-      \ runtime will compile and evaluate the whole document again. Do not\n    instantiate\
-      \ workflows, stage artifacts, request approval, or create a pull\n    request while\
-      \ the proposed PR file is invalid.\n- id: plan-workflow-instantiation\n  description:\
-      \ Plan execution workflow instantiation.\n  actions: [gather_context, edit, yaml_edit,\
-      \ file_management, read_document]\n  step_type: governed\n  llm_type: simple_task\n\
-      \  inputs:\n  - name: proposed_pr_names\n    type: array\n    required: true\n    source:\
-      \ previous_step\n  - name: feature_name\n    type: string\n    required: true\n    source:\
-      \ previous_step\n  - name: proposed_pr_specification_template\n    type: object\n  \
-      \  required: true\n    source: previous_step\n  details: >-\n    Use the `proposed_pr_names`,\
-      \ `feature_name`, and\n    `proposed_pr_specification_template` inputs from the preceding\
-      \ steps. For each\n    validated proposed PR, inspect whether its matching workflow\n\
-      \    already exists and reuse it when present. For each missing workflow,\n    inspect\
-      \ docs/procedrr/processes/execute-proposed-pr-workflow.yaml with read_document, resolve\n    every process input\
-      \ placeholder from the matching validated proposed PR,\n    and prepare the complete\
-      \ instantiation\n    values. Use the fixed Procedrr process, canonical feature name, distinct\
-      \ workflow\n    instance names, proposed-PR order, and dependency relationships. Before\n\
-      \    finalizing the values, use gather_context with type `tools` for the\n    selected\
-      \ feature to discover the repository's authoritative test command.\n    Include that\
-      \ command in `proposed_pr_context.verification_command` for every\n    execute-proposed-pr\
-      \ workflow.\n    The workflow metadata file is named exactly\n    `<proposed_pr_id>-workflow.yaml`\
-      \ inside\n    `docs/workflows/<canonical-feature-name>/`; `<proposed_pr_id>` is the\
-      \ exact\n    id from `proposed_prs`, such as `interaction-log-core`. Do not prepend\
-      \ the\n    process id (`execute-proposed-pr-workflow`), the process filename, or a branch name.\n\
-      \    Use the exact path returned by instantiation or an exact filename listed by\n \
-      \   the workflow directory; never compose a filename from memory. Do not\n    pass workflow\
-      \ dependencies manually: instantiate-workflow derives them from\n    dependent_prs in\
-      \ the matching proposed PR specification. The resulting\n    workflow state must preserve\
-      \ those derived dependencies so its integration\n    PR must be MERGED before any task\
-      \ in the dependent workflow is selected.\n    Do not model this only as an upstream\
-      \ task dependency. Never ask the user\n    for a process id, leave a required placeholder\
-      \ empty, or overwrite an\n    existing workflow without approval. Pass an invocation\
-      \ plan containing\n    every created or reused workflow and its proposed-PR relationship\
-      \ onward.\n  outputs:\n  - name: verification-command\n    type: string\n    required_for_next_step:\
-      \ true\n    schema: {type: string}\n  - name: invocation-plan\n    type: object\n  \
-      \  required_for_next_step: true\n    schema: {type: object, additionalProperties: true}\n\
-      - id: instantiate-execution-workflows\n  description: Instantiate each missing execution\
-      \ workflow.\n  actions: [invoke_tool, edit, yaml_edit, read_document]\n  step_type:\
-      \ governed\n  llm_type: simple_task\n  tool_invocation_packages: [git_readonly_and_additive]\n\
-      \  inputs:\n  - name: invocation-plan\n    type: object\n    required: true\n    source:\
-      \ previous_step\n  - name: verification-command\n    type: string\n    required: true\n\
-      \    source: previous_step\n  - name: feature_name\n    type: string\n    required:\
-      \ true\n    source: previous_step\n  details: >-\n    Invoke instantiate-workflow once\
-      \ for each missing workflow listed in the\n    `invocation-plan` input. Use docs/procedrr/processes/execute-proposed-pr-workflow.yaml,\
-      \ pass every\n    process inputs as JSON with repeated --process-input NAME=JSON\
-      \ options,\n    Do not pass workflow dependencies manually: instantiate-workflow derives\n\
-      \    them from the unified proposed-PR specification. The dependency graph is\n    the\
-      \ source of truth; do not claim dependencies were applied unless they\n    are present\
-      \ in the persisted workflow state.\n    Use the `feature_name` input as the shared work-item\
-      \ name. The\n    command must create the powdrr/<proposed-pr-id> integration branch\
-      \ while\n    writing workflow files into this active worktree. Stop if a returned\n\
-      \    workflow directory is outside the active worktree. Pass every created or\n    reused\
-      \ workflow identity onward. Relationships use semantic identifiers;\n    never add file\
-      \ or directory pointers. If initialization reports a\n    non-fast-forward merge because\
-      \ the dedicated integration branch is stale,\n    retry the exact invocation once with\
-      \ `--force`; this resets only that\n    dedicated integration branch to the current\
-      \ generated source commit and\n    uses lease-protected push. Do not use `--force` for\
-      \ any other command.\n    After every invocation succeeds, record its exact returned\
-      \ workflow identity.\n    Before advancing, emit one `workflow_instantiation_report`\
-      \ output containing\n    every requested workflow exactly once. Each entry must copy\
-      \ the command result\n    fields without invention and include `workflow_id`, `workflow_directory`,\n\
-      \    `integration_branch`, `integration_worktree`, `task_count`, and `reused`.\n   \
-      \ Set `reused` to true when the command reports an existing idempotent workflow\n  \
-      \  and false when it creates one. Use this exact handoff shape:\n    {\"action\":\"\
-      next_step\",\"outputs\":{\"workflow_instantiation_report\":{\"workflows\":[{\"workflow_id\"\
-      :\"<id>\",\"workflow_directory\":\"<path>\",\"integration_branch\":\"powdrr/<id>\",\"\
-      integration_worktree\":\"<path>\",\"task_count\":0,\"reused\":false}]}},\"decisions_and_context\"\
-      :\"Recorded every successful workflow instantiation result.\"}\n    Do not advance after\
-      \ a failed invocation, do not invoke a new instance name,\n    and do not put the successful\
-      \ identities only in decisions_and_context.\n  tool_invocations:\n  - tool: internal\n\
-      \    command:\n    - powdrr-lift\n    - instantiate-workflow\n    - --work-item-name\n\
-      \    - <feature-name>\n    - --workflow-instance-name\n    - <proposed-pr-name>\n  \
-      \  - --process-input\n    - work_item_name=<feature-name-json>\n    - --process-input\n    - proposed_pr_id=<proposed-pr-name-json>\n    - --process-input\n    - feature_description=<feature-description-json>\n    - --process-input\n    - proposed_pr_context=<proposed-pr-context-json>\n    - --process\n    - execute-proposed-pr-workflow\n\
-      \  - tool: internal\n    command:\n    - powdrr-lift\n    - instantiate-workflow\n \
-      \   - --work-item-name\n    - <feature-name>\n    - --workflow-instance-name\n    -\
-      \ <proposed-pr-name>\n    - --process-input\n    - work_item_name=<feature-name-json>\n    - --process-input\n    - proposed_pr_id=<proposed-pr-name-json>\n    - --process-input\n    - feature_description=<feature-description-json>\n    - --process-input\n    - proposed_pr_context=<proposed-pr-context-json>\n    - --process\n\
-      \    - execute-proposed-pr-workflow\n    - --force\n  outputs:\n  - name: workflow_instantiation_report\n\
-      \    type: any\n    required_for_next_step: true\n    schema:\n      type: object\n\
-      \      additionalProperties: false\n      properties:\n        workflows:\n        \
-      \  type: array\n          items:\n            type: object\n            additionalProperties:\
-      \ false\n            properties:\n              workflow_id: {type: string}\n      \
-      \        workflow_directory: {type: string}\n              integration_branch: {type:\
-      \ string}\n              integration_worktree: {type: string}\n              task_count:\
-      \ {type: integer}\n              reused: {type: boolean}\n            required:\n  \
-      \          - workflow_id\n            - workflow_directory\n            - integration_branch\n\
-      \            - integration_worktree\n            - task_count\n            - reused\n\
-      \      required: [workflows]\n- id: verify-workflow-dependencies\n  description: Verify\
-      \ workflow-level dependency metadata.\n  actions: [read_document, goto_step]\n  step_type:\
-      \ governed\n  llm_type: fast_iteration\n  inputs:\n  - name: workflow_instantiation_report\n\
-      \    type: any\n    required: true\n    source: previous_step\n  details: >-\n    Compare\
-      \ the dependency relationships in the unified proposed-PR file with every\n    generated\
-      \ or reused `<proposed_pr_id>-workflow.yaml` in\n    docs/workflows/<feature-name>/.\
-      \ The filename is derived only from the exact\n    proposed_pr_id; do not use the template\
-      \ id, process filename, branch name,\n    or a guessed name. If a path is not present\
-      \ in the instantiation result,\n    use the exact filenames returned by read_document's\
-      \ missing-file error\n    before reading it. Read each workflow state document and build\n\
-      \    an exact table of workflow id to depends_on_workflows. Confirm that every\n   \
-      \ proposed_pr dependent_prs predecessor appears in the matching workflow's\n    depends_on_workflows\
-      \ list, that workflows with no planned predecessors have\n    no dependency entries,\
-      \ and that no undeclared dependency was added. Do not\n    infer dependencies from ordering,\
-      \ filenames, task upstream_task_ids, or\n    prose. If any mismatch exists, do not stage\
-      \ or create a pull request; use\n    goto_step with step_id `plan-workflow-instantiation`\
-      \ and include the exact\n    workflow id, expected dependency list, actual dependency\
-      \ list, and file\n    path. Continue only after the persisted metadata exactly matches\
-      \ the plan.\n    When every workflow matches, choose next_step and emit exactly one\n\
-      \    `workflow_dependency_report` output. The output must contain one `workflows`\n\
-      \    entry for every workflow and an `all_match` boolean set to true. Each entry\n \
-      \   must include the exact `workflow_id`, `path`, `expected_dependencies`,\n    `actual_dependencies`,\
-      \ and `matches: true`. Use this exact output shape:\n    {\"action\":\"next_step\",\"\
-      outputs\":{\"workflow_dependency_report\":{\"workflows\":[{\"workflow_id\":\"<id>\"\
-      ,\"path\":\"<exact path>\",\"expected_dependencies\":[],\"actual_dependencies\":[],\"\
-      matches\":true}],\"all_match\":true}},\"decisions_and_context\":\"Verified every workflow\
-      \ dependency against the unified proposed-PR plan.\"}\n    Do not put the report only\
-      \ in decisions_and_context and do not advance\n    without the declared output.\n  outputs:\n\
-      \  - name: workflow_dependency_report\n    type: any\n    required_for_next_step: true\n\
-      \    schema:\n      type: object\n      additionalProperties: false\n      properties:\n\
-      \        workflows:\n          type: array\n          items:\n            type: object\n\
-      \            additionalProperties: false\n            properties:\n              workflow_id:\
-      \ {type: string}\n              path: {type: string}\n              expected_dependencies:\n\
-      \                type: array\n                items: {type: string}\n              actual_dependencies:\n\
-      \                type: array\n                items: {type: string}\n              matches:\
-      \ {type: boolean}\n            required:\n            - workflow_id\n            - path\n\
-      \            - expected_dependencies\n            - actual_dependencies\n          \
-      \  - matches\n        all_match: {type: boolean}\n      required: [workflows, all_match]\n\
-      - id: inspect-workflow-repository-state\n  description: Inspect generated workflow repository\
-      \ state.\n  actions: []\n  step_type: invoke_tool\n  llm_type: simple_task\n  pre_step:\n\
-      \    action: invoke_tool\n    template:\n      tool: internal\n      command:\n    \
-      \  - powdrr-lift\n      - repository-state\n  outputs:\n  - name: instantiated_repository_state\n\
-      \    type: any\n    required_for_next_step: true\n    schema: {type: object, additionalProperties:\
-      \ true}\n- id: verify-workflow-artifacts\n  description: Verify workflow artifacts are\
-      \ in the active worktree.\n  actions: [edit, yaml_edit, file_management, read_document]\n\
-      \  step_type: governed\n  llm_type: fast_iteration\n  details: >-\n    Confirm from\
-      \ the repository-state result that every generated workflow task\n    file and <workflow-id>-workflow.yaml\
-      \ is under docs/workflows/ in this active\n    worktree, that each integration branch\
-      \ is powdrr/<proposed-pr-id>, and that\n    no required artifact exists only below .worktrees/.\
-      \ If any file is missing\n    or outside the active worktree, stop and report the inconsistency;\
-      \ do not\n    stage or create a pull request.\n- id: review-workflow-proposed-pr-links\n\
-      \  description: Review the bidirectional workflow and proposed-PR mapping.\n  actions:\
-      \ [edit, yaml_edit, file_management, read_document, goto_step]\n  step_type: governed\n\
-      \  llm_type: high_reasoning\n  details: >-\n    Build an exact mapping table from every\
-      \ validated proposed-PR specification\n    in docs/proposals/<feature-name>/ to its\
-      \ execution workflow in\n    docs/workflows/<feature-name>/. Confirm that every proposed\
-      \ PR has exactly\n    one matching workflow and that every workflow has exactly one\
-      \ matching\n    proposed PR. Match only stable proposed-PR ids and the workflow's\n\
-      \    proposed-pr-id metadata; do not infer matches from ordering, directory\n    names,\
-      \ branch names, or fuzzy similarity. Check both directions explicitly:\n    proposed\
-      \ PR -> workflow and workflow -> proposed PR. If any proposed PR is\n    missing a workflow,\
-      \ or any workflow is missing its proposed PR, do not stage\n    artifacts or continue\
-      \ to pull-request preparation; return to the relevant\n    planning or instantiation\
-      \ step with the mismatch and exact paths. For\n    example, return\n    `{\"action\"\
-      :\"goto_step\",\"step_id\":\"plan-workflow-instantiation\",\"decisions_and_context\"\
-      :\"Proposed PR <id> has no matching workflow at <path>.\"}`\n    when a proposed PR\
-      \ has no workflow, or\n    `{\"action\":\"goto_step\",\"step_id\":\"plan-proposed-prs\"\
-      ,\"decisions_and_context\":\"Workflow <path> has no matching proposed PR.\"}`\n    when\
-      \ a workflow has no proposed PR. After the mapping is complete, unique,\n    and recorded\
-      \ in workflow context, return\n    `{\"action\":\"next_step\",\"decisions_and_context\"\
-      :\"Every proposed PR maps to exactly one workflow, and every workflow maps to exactly\
-      \ one proposed PR.\"}`.\n- id: evaluate-workflow-artifacts\n  description: Evaluate\
-      \ workflow tasks and relationship invariants deterministically.\n  actions: []\n  step_type:\
-      \ invoke_tool\n  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n    template:\n\
-      \      tool: internal\n      command:\n      - powdrr-lift\n      - evaluate\n     \
-      \ - docs/proposals/<feature-name>\n  outputs:\n  - name: workflow_artifact_evaluation\n\
-      \    type: any\n    required_for_next_step: true\n    schema: {type: object, additionalProperties:\
-      \ true}\n- id: stage-validated-artifacts\n  description: Stage the validated implementation\
-      \ and workflow artifacts.\n  actions: []\n  step_type: invoke_tool\n  llm_type: simple_task\n\
-      \  pre_step:\n    action: invoke_tool\n    template:\n      tool: git\n      operation:\
-      \ add\n      paths:\n      - docs/proposals/<feature-name>\n      - docs/workflows\n\
-      - id: verify-staged-artifacts\n  description: Verify the staged artifact set.\n  actions:\
-      \ []\n  step_type: invoke_tool\n  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n\
-      \    template:\n      tool: internal\n      command:\n      - powdrr-lift\n      - repository-state\n\
-      \  outputs:\n  - name: staged_artifact_repository_state\n    type: any\n    required_for_next_step:\
-      \ true\n    schema: {type: object, additionalProperties: true}\n- id: prepare-feature-pull-request-dependency\n\
-      \  description: Run finish-pr-prep on the validated planning artifacts.\n  step_type:\
-      \ uses_process\n  llm_type: fast_iteration\n  details: >-\n    Run finish-pr-prep before\
-      \ publishing the required preparation handoffs.\n  uses_process:\n    process: finish-pr-prep\n\
-      \n- id: prepare-feature-pull-request\n  description: Run finish-pr-prep on the validated\
-      \ planning artifacts.\n  actions: []\n  step_type: predicated\n  llm_type: fast_iteration\n\
-      \  completion:\n    required_outputs:\n    - final_repository_state\n    - readiness_report\n\
-      \  details: >-\n    The preceding finish-pr-prep step has already produced the context\
-      \ for this\n    handoff. Apply judgment only to whether its returned repository state\
-      \ and\n    readiness report are acceptable; do not invoke tools or the nested process\n\
-      \    again. After the nested process returns, explicitly publish both handoffs with\n\
-      \    an `emit_outputs` action,\n    copying the exact values returned by the nested\
-      \ process:\n    {\"action\":\"emit_outputs\",\"outputs\":{\"final_repository_state\":{\"\
-      clean\":true,\"files\":[]},\"readiness_report\":{\"ready\":true,\"reasons\":[],\"satisfied_requirements\"\
-      :[]}}}\n    Do not return next_step or synthesize either value; the step advances only\n\
-      \    after both declared outputs are explicitly emitted and the readiness report\n \
-      \   is accepted.\n  outputs:\n  - name: final_repository_state\n    type: any\n    required_for_next_step:\
-      \ true\n    schema:\n      type: object\n      required: [clean, files]\n      properties:\n\
-      \        root: {type: string}\n        branch: {type: string}\n        upstream: {type:\
-      \ string}\n        ahead: {type: integer}\n        behind: {type: integer}\n       \
-      \ clean: {type: boolean}\n        files:\n          type: array\n          items:\n\
-      \            type: object\n            required: [path, staged, unstaged, untracked,\
-      \ conflicted]\n            properties:\n              path: {type: string}\n       \
-      \       index_status: {type: string}\n              worktree_status: {type: string}\n\
-      \              staged: {type: boolean}\n              unstaged: {type: boolean}\n  \
-      \            untracked: {type: boolean}\n              conflicted: {type: boolean}\n\
-      \  - name: readiness_report\n    type: any\n    required_for_next_step: true\n    schema:\n\
-      \      type: object\n      additionalProperties: false\n      required: [ready, reasons,\
-      \ satisfied_requirements]\n      properties:\n        ready: {type: boolean}\n     \
-      \   reasons:\n          type: array\n          items: {type: string}\n        satisfied_requirements:\n\
-      \          type: array\n          items: {type: string}\n- id: create-feature-pull-request\n\
-      \  description: Commit the validated artifacts and open a draft pull request.\n  actions:\
-      \ []\n  step_type: uses_process\n  llm_type: simple_task\n  details: >-\n    Invoke create-pull-request\
-      \ with pr-kind `feature`, commit message `Add\n    <feature-name> implementation workflow`,\
-      \ and pull-request title\n    `<pull-request-title>`. Pass files_to_publish containing\
-      \ exactly every\n    validated file under docs/proposals/<feature-name>/ and docs/workflows/,\n\
-      \    plus the validated planning artifacts and Feature Plan context. The nested\n  \
-      \  process must stage exactly that list. Do not advance until it has committed,\n    pushed,\
-      \ and created or updated a pull request successfully. Never claim a\n    PR is ready\
-      \ without a returned PR URL.\n  uses_process:\n    process: create-pull-request\n- id: handoff-feature-pull-request\n\
-      \  description: Hand the draft pull request to the user for review.\n  actions: [edit,\
-      \ yaml_edit, file_management, read_document]\n  step_type: governed\n  llm_type: standard_reasoning\n\
-      \  details: Show the pull request URL. Summarize the selected feature, every proposed\
-      \ PR, every execution workflow, and their dependency relationships. State that implementation\
-      \ has not begun and the draft pull request is ready for review."
+    question: |-
+      Execute this named workflow for the supplied user request. Treat the embedded workflow document as task-specific requirements and preserve its ordering, gates, outputs, and user-facing questions. Map its actions to the allowed Procedrr operation tools. Replace legacy nested-process requests with calls to matching declared Procedrr processes. Use only current bindings and evidence. Do not invent results or claim an operation succeeded without its returned result.
+
+      Embedded workflow document:
+      ---
+      name: start-implementing-feature
+      inputs:
+      - name: canonical-feature-name
+      - name: candidate-names
+      - name: proposed_pr_id
+      - name: proposed-pr-id
+      - name: proposed-pr-name
+      - name: workflow-id
+      - name: id
+      - name: path
+      - name: pull-request-title
+      interaction_style: engineering
+      when_to_use:
+      - When the user is ready to begin implementing a feature.
+      - When the feature needs proposed PR planning and durable execution workflows before implementation starts.
+      - When the generated planning artifacts and first task should be placed in a pull request for user review.
+      steps:
+      - id: capture-feature-query
+        description: Capture the feature name to search for.
+        actions: []
+        step_type: governed
+        llm_type: simple_task
+        details: Extract the feature name or identifier from the user's request without selecting a canonical
+          repository feature. Normalize surrounding prose but preserve the meaningful words in the requested
+          name. If the request does not identify any feature, ask one specific question. Otherwise advance with
+          exactly one output named feature_query. The following deterministic steps use this value only as a
+          search query; they select nothing.
+        outputs:
+        - name: feature_query
+          type: string
+          required_for_next_step: true
+          schema:
+            type: string
+      - id: resolve-feature-context
+        description: Deterministically match the requested feature to repository context.
+        actions: []
+        step_type: invoke_tool
+        llm_type: simple_task
+        inputs:
+        - name: feature_query
+          type: string
+          required: true
+          source: previous_step
+        details: Run the deterministic feature-context resolver exactly once. Do not select or rename a feature
+          in the model. The resolver normalizes names, ranks candidates deterministically, and returns selected,
+          not_found, or ambiguous status.
+        pre_step:
+          action: invoke_tool
+          template:
+            tool: internal
+            command:
+            - powdrr-lift
+            - resolve-feature-context
+            - --feature-query
+            - <feature-query>
+        outputs:
+        - name: feature_context
+          type: object
+          required_for_next_step: true
+          scope: skill
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+            - status
+            - feature_name
+            - proposal_directory
+            - current_directory
+            - specification_documents
+            - workflow_documents
+            - missing_documents
+            - candidate_names
+            properties:
+              status:
+                type: string
+                enum:
+                - selected
+                - not_found
+                - ambiguous
+              feature_name:
+                type:
+                - string
+                - 'null'
+              proposal_directory:
+                type:
+                - string
+                - 'null'
+              current_directory:
+                type:
+                - string
+                - 'null'
+              specification_documents:
+                type: array
+                items:
+                  type: string
+              workflow_documents:
+                type: array
+                items:
+                  type: string
+              missing_documents:
+                type: array
+                items:
+                  type: string
+              candidate_names:
+                type: array
+                items:
+                  type: string
+      - id: select-feature-context
+        description: Select the canonical feature and workflow context.
+        actions:
+        - goto_step
+        step_type: governed
+        llm_type: standard_reasoning
+        details: Treat feature_context as the sole source of matching decisions. If status is selected, copy
+          feature_name, specification_documents, workflow_documents, and missing_documents exactly and advance.
+          Never recompute or change the match. If status is not_found, ask one question identifying the missing
+          feature. If status is ambiguous, ask one question listing candidate_names. If the user supplies an
+          identifier or clarifies a candidate, use goto_step to return to capture-feature-query, then rerun
+          resolve-feature-context with the clarified feature_query. Do not ask the user to choose a workflow
+          path; the resolver derives it from feature_name. Outputs are exact file paths; do not emit directory
+          paths or invent specification filenames.
+        outputs:
+        - name: feature_name
+          type: string
+          required_for_next_step: true
+          schema:
+            type: string
+        - name: specification_documents
+          type: array
+          required_for_next_step: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: workflow_documents
+          type: array
+          required_for_next_step: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: missing_documents
+          type: array
+          required_for_next_step: true
+          schema:
+            type: array
+            items:
+              type: string
+        inputs:
+        - name: feature_context
+          type: object
+          required: true
+          source: previous_step
+      - id: bootstrap-project-structure
+        description: Bootstrap the project-wide module and tool structure.
+        actions:
+        - task_run_process
+        step_type: governed
+        llm_type: standard_reasoning
+        pre_step:
+          action: invoke_tool
+          template:
+            tool: shell
+            command:
+            - test
+            - -f
+            - docs/project_structure/project-structure.yaml
+        details: 'The engine-owned pre-step result is authoritative; do not reread it. If the artifact exists,
+          emit one next_step action and reuse it. If it is missing, emit one task_run_process action for the
+          exact process id `bootstrap-code-structure`; after that action returns, emit next_step in the following
+          turn. The nested process is project-wide and must not ask for a feature or target module. Never invoke
+          bootstrap merely because this step is present: the gate result is authoritative.'
+      - id: confirm-project-structure
+        description: Confirm the project-structure artifact is available.
+        actions: []
+        step_type: gate
+        llm_type: simple_task
+        details: The gate passes only when the project-structure artifact exists in the active worktree.
+        pre_step:
+          action: invoke_tool
+          template:
+            tool: shell
+            command:
+            - test
+            - -f
+            - docs/project_structure/project-structure.yaml
+        gate:
+          outcome:
+            path: returncode
+            equals: 0
+          goto_step: bootstrap-project-structure
+          retry_context: The project-structure artifact is not available in the active worktree. Rerun bootstrap-project-structure
+            so the nested bootstrap process can create the artifact in the same worktree, then retry this gate.
+      - id: plan-proposed-prs
+        description: Plan the proposed PR implementation sequence.
+        actions:
+        - invoke_tool
+        - read_document
+        step_type: governed
+        llm_type: high_reasoning
+        tool_invocations:
+        - tool: basedpyright-structure
+          operation: inspect_structure
+        - tool: basedpyright-symbol
+          operation: resolve_symbol
+        inputs:
+        - name: feature_name
+          type: string
+          required: true
+          source: previous_step
+        - name: specification_documents
+          type: array
+          required: true
+          source: previous_step
+        - name: workflow_documents
+          type: array
+          required: true
+          source: previous_step
+        details: 'This is a planning-only step. Do not create, edit, rename, or delete the proposed PR specification;
+          the following deterministic generation step owns creation of that file. Use only the exact specification
+          document paths handed off by select-feature-context; do not synthesize a filename from a schema, template
+          id, or feature description. If the unified proposed-PR specification already exists in the selected
+          feature context, inspect and reuse its ordered `proposed_prs` entries and pass their stable names
+          and paths onward. Otherwise analyze the feature context and the project structure to define ordered
+          proposed PRs with incremental validation, clear boundaries, low risk, dependencies, and stable names
+          for the later single proposed-pr-specification.yaml file. For each proposed PR, record its goal, scope,
+          files, tests, acceptance criteria, validation commands, dependencies, and risks. Record every action-bearing
+          id from the feature-wide specification-v1 sections after the proposed_prs section, preserving source
+          order and action. Label every change item with the proposed_pr_id that will deliver it. Use the read_document
+          action to inspect docs/procedrr/processes/execute-proposed-pr-workflow.yaml; do not use shell commands
+          to read the template. A proposed PR dependency means the predecessor workflow is complete only after
+          its integration pull request is merged; completion of the predecessor''s final task or creation of
+          its pull request is not sufficient. Preserve these workflow-level dependencies in the instantiation
+          plan. Do not generate one proposed-PR file per PR. Before next_step, return two outputs named proposed_pr_names
+          and proposed_pr_designs, one design per stable proposed PR. Include each design''s intent, scope summary,
+          planned files and tests, and existing components considered. Do not rely on decisions_and_context
+          for this handoff. When a proposed PR touches Python source or tests, inspect each implementation area
+          with the bounded `basedpyright-structure` tool and resolve key symbols with `basedpyright-symbol`
+          before finalizing its file and dependency plan. Use those read-only tools instead of inferring module
+          boundaries from text matches alone. Skip them only when the proposed PR has no Python paths. Use BasedPyright
+          only after an exact repository-relative Python file path is present in the selected specification
+          or inspected project context. The `path` parameter must end in `.py` and must name a file, never a
+          directory, proposal folder, glob, or guessed path. If no concrete Python file is known, do not invoke
+          BasedPyright yet; read the relevant context or choose a materially different allowed action. After
+          a capability error, do not reread a document that already succeeded; use the diagnostic candidate
+          file list or another declared discovery action to select a different exact file. these exact action
+          shapes: {"action":"invoke_tool","tool":"basedpyright-structure","parameters":{"operation":"inspect_structure","path":"src/example.py"}}
+          and {"action":"invoke_tool","tool":"basedpyright-symbol","parameters":{"operation":"resolve_symbol","query":"Example"}}.'
+        outputs:
+        - name: proposed_pr_names
+          type: any
+          required_for_next_step: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: proposed_pr_designs
+          type: array
+          required_for_next_step: true
+          schema:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              additionalProperties: false
+              required:
+              - proposed_pr_id
+              - intent
+              - scope_summary
+              - planned_files
+              - planned_tests
+              - existing_components_considered
+              properties:
+                proposed_pr_id:
+                  type: string
+                  minLength: 1
+                intent:
+                  type: string
+                  minLength: 1
+                scope_summary:
+                  type: string
+                  minLength: 1
+                planned_files:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+                planned_tests:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+                existing_components_considered:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+      - id: generate-proposed-pr-specification
+        description: Generate the single proposed PR specification template.
+        actions: []
+        step_type: invoke_tool
+        llm_type: simple_task
+        inputs:
+        - name: feature_name
+          type: string
+          required: true
+          source: previous_step
+        pre_step:
+          action: invoke_tool
+          template:
+            tool: internal
+            command:
+            - powdrr-lift
+            - pr-specification
+            - --work-item-name
+            - <feature-name>
+            - --output
+            - docs/proposals/<feature-name>/proposed-pr-specification.yaml
+        outputs:
+        - name: proposed_pr_specification_template
+          type: any
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: true
+      - id: challenge-proposed-pr-complexity
+        description: Independently challenge the proposed PR plan's complexity.
+        actions:
+        - invoke_tool
+        - read_document
+        step_type: governed
+        llm_type: high_reasoning
+        tool_invocations:
+        - tool: basedpyright-structure
+          operation: inspect_structure
+        - tool: basedpyright-symbol
+          operation: resolve_symbol
+        inputs:
+        - name: proposed_pr_designs
+          type: array
+          required: true
+          source: previous_step
+        - name: specification_documents
+          type: array
+          required: true
+          source: previous_step
+        - name: workflow_documents
+          type: array
+          required: true
+          source: previous_step
+        details: 'Act as an independent skeptical design reviewer. Do not edit files, expand scope, or assume
+          that more abstraction or a new dependency is better. Review every proposed PR against the feature
+          requirements, project structure, named existing components, relevant source, `pyproject.toml`, and
+          the repository''s lockfile when present. Use exact known paths and symbols; for Python paths, inspect
+          structure and resolve key symbols with the declared BasedPyright tools. For every PR explicitly examine:
+          (1) whether existing behavior or planned work is duplicated and can be extended or shared; (2) whether
+          a configuration, parameter, policy, or data change can satisfy the need without new branching or a
+          new subsystem; (3) whether the standard library, an already-declared dependency, or a well-established
+          library is a simpler fit. Check package metadata or existing repository usage before recommending
+          a library; do not invent package capabilities or propose a new dependency without explaining its maintenance,
+          compatibility, and security tradeoffs. Also challenge unnecessary PR splits, abstractions, and scope.
+          Every claim must cite concrete source evidence. Do not manufacture pushback: record why no simpler
+          viable option exists when the current design is already the smallest fit. Return one review for every
+          proposed_pr_id and a pushbacks array containing only concrete, actionable simplifications. Use stable
+          finding ids and tie each finding to one proposed PR. Return exactly one output named `planning_pushback`.'
+        outputs:
+        - name: planning_pushback
+          type: object
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+            - reviews
+            - pushbacks
+            properties:
+              reviews:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - proposed_pr_id
+                  - existing_capability
+                  - duplication
+                  - configuration
+                  - standard_or_library
+                  - smallest_sufficient_design
+                  properties:
+                    proposed_pr_id:
+                      type: string
+                      minLength: 1
+                    existing_capability:
+                      type: string
+                      minLength: 1
+                    duplication:
+                      type: string
+                      minLength: 1
+                    configuration:
+                      type: string
+                      minLength: 1
+                    standard_or_library:
+                      type: string
+                      minLength: 1
+                    smallest_sufficient_design:
+                      type: string
+                      minLength: 1
+              pushbacks:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - finding_id
+                  - proposed_pr_id
+                  - category
+                  - evidence
+                  - simpler_alternative
+                  - expected_tradeoff
+                  properties:
+                    finding_id:
+                      type: string
+                      minLength: 1
+                    proposed_pr_id:
+                      type: string
+                      minLength: 1
+                    category:
+                      type: string
+                      enum:
+                      - existing_capability
+                      - duplication
+                      - configuration
+                      - library
+                      - over_scoped
+                    evidence:
+                      type: string
+                      minLength: 1
+                    simpler_alternative:
+                      type: string
+                      minLength: 1
+                    expected_tradeoff:
+                      type: string
+                      minLength: 1
+      - id: challenge-proposed-pr-code-quality
+        description: Independently review proposed PRs for code quality risks.
+        actions:
+        - invoke_tool
+        - read_document
+        step_type: governed
+        llm_type: high_reasoning
+        tool_invocations:
+        - tool: basedpyright-structure
+          operation: inspect_structure
+        - tool: basedpyright-symbol
+          operation: resolve_symbol
+        inputs:
+        - name: proposed_pr_designs
+          type: array
+          required: true
+          source: previous_step
+        - name: specification_documents
+          type: array
+          required: true
+          source: previous_step
+        - name: workflow_documents
+          type: array
+          required: true
+          source: previous_step
+        details: 'Independently review every proposed PR''s planned changes against the feature requirements
+          and the existing implementation areas. Do not edit code or infer requirements from historical behavior.
+          Use exact paths and symbols, inspect relevant Python structure and resolve key symbols with the declared
+          tools. For each proposed PR, identify duplicated behavior or data flow and name the existing component
+          to extend or the smallest shared helper/interface to plan. Look for long if/elif/else sequences that
+          dispatch among distinct operations or modes. Recommend a command pattern with one command per operation
+          and a shared execution interface when that dispatch is long; identify the branch sequence and the
+          proposed command boundary. Do not impose this pattern on a short local condition or when the code
+          is not dispatching distinct behavior. Identify every planned branch that preserves legacy, fallback,
+          or compatibility behavior. Keep it only when an explicit feature requirement or acceptance criterion
+          requires it; otherwise recommend removing it. Cite the exact source or requirement for each finding.
+          Do not manufacture findings when behavior is already shared, there is no long dispatch, or no legacy
+          path is planned. Check error paths for swallowed exceptions, success-shaped defaults, and unbounded
+          retries; preserve useful failure context and follow repository conventions. Check whether inputs,
+          outputs, state changes, side effects, and failure cases have clear contracts and appropriate types,
+          using the project''s established patterns. Check that tests cover required behavior and important
+          edge cases at meaningful public boundaries rather than only mirroring implementation details. If the
+          change owns files, processes, connections, locks, or temporary artifacts, inspect cleanup and ownership
+          on success and failure paths. If work overlaps or shares mutable state, inspect race and ordering
+          assumptions and recommend synchronization only where needed. If the change handles untrusted input,
+          authorization, or sensitive data, inspect validation and authorization at the action boundary and
+          prevent sensitive values from reaching logs or errors. Treat these as conditional review areas: cite
+          the affected path, symbol, or requirement, and do not manufacture findings when a risk is absent.
+          Return one review for every proposed_pr_id and only concrete, actionable pushbacks. Return exactly
+          one output named `code_quality_review`. For every pushback, include the exact source path or requirement
+          id and a short verbatim excerpt in evidence; do not rely on a paraphrase alone. Omit a pushback when
+          you cannot provide a concrete excerpt.'
+        outputs:
+        - name: code_quality_review
+          type: object
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+            - reviews
+            - pushbacks
+            properties:
+              reviews:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - proposed_pr_id
+                  - duplication_and_reuse
+                  - conditional_dispatch
+                  - legacy_compatibility
+                  - error_handling
+                  - contracts
+                  - test_quality
+                  - resource_lifecycle
+                  - concurrency
+                  - security
+                  - recommended_design
+                  properties:
+                    proposed_pr_id:
+                      type: string
+                      minLength: 1
+                    duplication_and_reuse:
+                      type: string
+                      minLength: 1
+                    conditional_dispatch:
+                      type: string
+                      minLength: 1
+                    legacy_compatibility:
+                      type: string
+                      minLength: 1
+                    error_handling:
+                      type: string
+                      minLength: 1
+                    contracts:
+                      type: string
+                      minLength: 1
+                    test_quality:
+                      type: string
+                      minLength: 1
+                    resource_lifecycle:
+                      type: string
+                      minLength: 1
+                    concurrency:
+                      type: string
+                      minLength: 1
+                    security:
+                      type: string
+                      minLength: 1
+                    recommended_design:
+                      type: string
+                      minLength: 1
+              pushbacks:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - finding_id
+                  - proposed_pr_id
+                  - category
+                  - evidence
+                  - recommendation
+                  properties:
+                    finding_id:
+                      type: string
+                      minLength: 1
+                    proposed_pr_id:
+                      type: string
+                      minLength: 1
+                    category:
+                      type: string
+                      enum:
+                      - duplication
+                      - command_pattern
+                      - legacy_compatibility
+                      - error_handling
+                      - contracts
+                      - test_quality
+                      - resource_lifecycle
+                      - concurrency
+                      - security
+                    evidence:
+                      type: string
+                      minLength: 1
+                    recommendation:
+                      type: string
+                      minLength: 1
+      - judge:
+          kind: classify_one
+          provider: jev
+          question: Do the code-quality pushbacks provide evidence that supports each recommendation?
+          subject: code_quality_review.pushbacks
+          prompt_system: Return only the declared JSON object.
+          instructions:
+          - Review every pushback in the supplied code_quality_review. Check whether each claim is supported
+            by its cited evidence and the supplied proposed PR design and specification context.
+          - Return supported only when every non-empty pushback has concrete evidence that logically supports
+            its recommendation. Return unsupported if any claim is contradicted or clearly unsupported. Return
+            unclear when needed context or evidence is missing or ambiguous.
+          - Do not infer facts about source files that are not included in the context. Do not add findings,
+            rewrite recommendations, or decide feature scope.
+          context:
+          - code_quality_review
+          - proposed_pr_designs
+          - specification_documents
+          - workflow_documents
+          output:
+            name: code_quality_evidence_review
+            schema:
+              type: object
+              required:
+              - disposition
+              additionalProperties: false
+              properties:
+                disposition:
+                  type: string
+                  enum:
+                  - supported
+                  - unsupported
+                  - unclear
+          validation:
+            kind: json_schema
+      - id: plan-proposed-pr-specification
+        description: Define the ordered proposed PR plan.
+        actions:
+        - read_document
+        inputs:
+        - name: proposed_pr_designs
+          type: array
+          required: true
+          source: previous_step
+        - name: planning_pushback
+          type: object
+          required: true
+          source: previous_step
+        - name: code_quality_review
+          type: object
+          required: true
+          source: previous_step
+        - name: code_quality_evidence_review
+          type: object
+          required: true
+          source: previous_step
+        step_type: governed
+        llm_type: high_reasoning
+        details: 'This is a planning-only judgment. Do not edit YAML and do not inspect, copy, assign, or mention
+          authoritative effects.  Reconcile both the independent `planning_pushback` and `code_quality_review`
+          reviews with the proposed PR designs and feature scope. Address every code-quality finding_id exactly
+          once: Apply supported reuse and refactoring, use the command pattern for long operation-dispatch conditionals,
+          and resolve concrete error-handling, contract, test, lifecycle, concurrency, and security findings
+          with scoped plan changes and validation. Keep these checks conditional on relevant code paths and
+          do not broaden scope or add abstractions without evidence. Also remove legacy behavior unless an explicit
+          feature requirement or acceptance criterion requires it. Reject findings only with concrete evidence
+          in the affected PR justification. Then address each planning-complexity finding_id exactly once by
+          adopting a supported simpler alternative by changing the proposed plan, or reject it with concrete
+          evidence and put that rationale in the affected PR''s justification. Do not adopt a suggestion that
+          would omit a requirement, widen scope, add an unjustified dependency, or weaken validation. Keep the
+          smallest coherent PR boundaries and preserve necessary dependencies. Return exactly one object in
+          `next_step.outputs.proposed_pr_plan`. It contains only one ordered `proposed_prs` array. Every entry
+          contains exactly `id`, `intent`, `justification`, and `dependent_pr_ids`; use an empty dependency
+          array when there are no prerequisites. Do not supply effect references, assignments, section/id/action
+          triples, schema, work-item id, feature ids, paths, comments, or persisted-document fields. The runtime
+          validates the complete plan before exposing authoritative effects to the later allocation phase. Return
+          exactly {"action":"next_step","outputs":{"proposed_pr_plan":{"proposed_prs":[{"id":"proposed-pr-id","intent":"Implement
+          the change","justification":"Required by the feature","dependent_pr_ids":[]}]}}}. Review code_quality_evidence_review
+          alongside each original pushback. Resolve unsupported or unclear claims by checking the cited source
+          and requirement evidence; do not treat a JEV disposition as a new requirement or automatically discard
+          a valid issue.'
+        outputs:
+        - name: proposed_pr_plan
+          type: object
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+            - proposed_prs
+            properties:
+              proposed_prs:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - id
+                  - intent
+                  - justification
+                  - dependent_pr_ids
+                  properties:
+                    id:
+                      type: string
+                      minLength: 1
+                    intent:
+                      type: string
+                      minLength: 1
+                    justification:
+                      type: string
+                      minLength: 1
+                    dependent_pr_ids:
+                      type: array
+                      items:
+                        type: string
+                        minLength: 1
+      - id: load-authoritative-pr-effects
+        description: Load authoritative effects for allocation.
+        actions: []
+        step_type: invoke_tool
+        llm_type: simple_task
+        pre_step:
+          action: invoke_tool
+          template:
+            tool: internal
+            command:
+            - powdrr-lift
+            - authoritative-pr-effects
+            - --work-item-name
+            - <feature-name>
+        outputs:
+        - name: authoritative_effects
+          type: object
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+            - effects
+            properties:
+              effects:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - effect_ref
+                  - section
+                  - id
+                  - action
+                  properties:
+                    effect_ref:
+                      type: string
+                      minLength: 1
+                    section:
+                      type: string
+                      minLength: 1
+                    id:
+                      type: string
+                      minLength: 1
+                    action:
+                      type: string
+                      minLength: 1
+      - id: allocate-proposed-pr-effects
+        description: Allocate authoritative effects to the planned PRs.
+        actions: []
+        step_type: governed
+        llm_type: high_reasoning
+        details: Use the validated proposed_pr_plan and runtime-owned authoritative_effects handoffs. Return
+          exactly one object in `next_step.outputs.effect_allocation`, containing only `assignments`. Return
+          every supplied effect_ref exactly once with one target proposed_pr_id from the validated plan. Never
+          return, copy, or invent section, id, action, YAML, schema, feature ids, or other persisted-document
+          fields. Runtime code resolves each reference, validates total and exact allocation, compiles the read-only
+          compatibility document, validates it, and only then writes it. Return exactly {"action":"next_step","outputs":{"effect_allocation":{"assignments":[{"effect_ref":"effect-ref","proposed_pr_id":"proposed-pr-id"}]}}}.
+        inputs:
+        - name: proposed_pr_plan
+          type: object
+          source: previous_step
+        - name: authoritative_effects
+          type: object
+          source: previous_step
+        outputs:
+        - name: effect_allocation
+          type: object
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+            - assignments
+            properties:
+              assignments:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - effect_ref
+                  - proposed_pr_id
+                  properties:
+                    effect_ref:
+                      type: string
+                      minLength: 1
+                    proposed_pr_id:
+                      type: string
+                      minLength: 1
+      - judge:
+          kind: classify_one
+          provider: jev
+          question: Do all proposed PR assignments fit their authoritative effects and the stated PR scopes?
+          subject: effect_allocation.assignments
+          prompt_system: Return only the declared JSON object.
+          instructions:
+          - Check every assignment against its matching effect_ref in authoritative_effects.effects and the
+            target proposed_pr_id intent and scope in proposed_pr_plan.
+          - Return supported only when every effect is clearly owned by its assigned PR. Return unsupported
+            if any assignment is contradicted or clearly outside its PR scope. Return unclear when an effect
+            or PR scope is ambiguous.
+          - Do not change identifiers or produce alternative assignments.
+          context:
+          - effect_allocation.assignments
+          - authoritative_effects
+          - proposed_pr_plan
+          output:
+            name: effect_allocation_review
+            schema:
+              type: object
+              required:
+              - disposition
+              additionalProperties: false
+              properties:
+                disposition:
+                  type: string
+                  enum:
+                  - supported
+                  - unsupported
+                  - unclear
+          validation:
+            kind: json_schema
+      - id: reconcile-proposed-pr-effect-allocation
+        description: Reconcile the planned effect allocation with independent JEV checks.
+        actions: []
+        step_type: governed
+        llm_type: high_reasoning
+        inputs:
+        - name: proposed_pr_plan
+          type: object
+          required: true
+          source: previous_step
+        - name: authoritative_effects
+          type: object
+          required: true
+          source: previous_step
+        - name: effect_allocation
+          type: object
+          required: true
+          source: previous_step
+        - name: effect_allocation_review
+          type: object
+          required: true
+          source: previous_step
+        details: Review effect_allocation_review against each authoritative effect and proposed PR scope. Preserve
+          the allocation when supported. If unsupported or unclear, inspect every assignment and reassign only
+          to a proposed_pr_id whose intent and scope explicitly cover that effect; if none does, revise the
+          proposed PR plan and route through its existing repair path. Return every authoritative effect_ref
+          exactly once, with no other fields. Do not change authoritative effect text.
+        outputs:
+        - name: effect_allocation
+          type: object
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+            - assignments
+            properties:
+              assignments:
+                type: array
+                minItems: 1
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - effect_ref
+                  - proposed_pr_id
+                  properties:
+                    effect_ref:
+                      type: string
+                      minLength: 1
+                    proposed_pr_id:
+                      type: string
+                      minLength: 1
+      - id: evaluate-proposed-pr-specification
+        description: Route proposed PR evaluation deterministically.
+        actions: []
+        step_type: gate
+        llm_type: simple_task
+        details: Runtime code evaluates the compiled proposed PR document exactly once. A successful result
+          advances directly to workflow planning without an LLM confirmation. A failure routes to semantic repair
+          with the complete structured evaluator issues.
+        pre_step:
+          action: invoke_tool
+          template:
+            tool: internal
+            command:
+            - powdrr-lift
+            - evaluate
+            - docs/proposals/<feature-name>
+        gate:
+          outcome:
+            path: returncode
+            equals: 0
+          goto_step: repair-proposed-pr-specification
+          success_goto_step: plan-workflow-instantiation
+          retry_context: Use the structured evaluator issues to identify whether the proposed PR plan or effect
+            allocation must change. Do not edit the generated YAML.
+      - id: repair-proposed-pr-specification
+        description: Repair every reported proposed PR specification issue.
+        actions:
+        - read_document
+        - goto_step
+        next_step_override: evaluate-proposed-pr-specification
+        step_type: governed
+        llm_type: fast_iteration
+        details: Do not repair YAML. Review the structured issues selected by the runtime gate. Use goto_step
+          with `plan-proposed-pr-specification` when PR ids, intent, justification, or dependencies must change.
+          Use goto_step with `allocate-proposed-pr-effects` when only effect ownership must change. The selected
+          phase must return a complete replacement decision object and the runtime will compile and evaluate
+          the whole document again. Do not instantiate workflows, stage artifacts, request approval, or create
+          a pull request while the proposed PR file is invalid.
+      - id: plan-workflow-instantiation
+        description: Plan execution workflow instantiation.
+        actions:
+        - gather_context
+        - edit
+        - yaml_edit
+        - file_management
+        - read_document
+        step_type: governed
+        llm_type: simple_task
+        inputs:
+        - name: proposed_pr_names
+          type: array
+          required: true
+          source: previous_step
+        - name: feature_name
+          type: string
+          required: true
+          source: previous_step
+        - name: proposed_pr_specification_template
+          type: object
+          required: true
+          source: previous_step
+        details: 'Use the `proposed_pr_names`, `feature_name`, and `proposed_pr_specification_template` inputs
+          from the preceding steps. For each validated proposed PR, inspect whether its matching workflow already
+          exists and reuse it when present. For each missing workflow, inspect docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+          with read_document, resolve every process input placeholder from the matching validated proposed PR,
+          and prepare the complete instantiation values. Use the fixed Procedrr process, canonical feature name,
+          distinct workflow instance names, proposed-PR order, and dependency relationships. Before finalizing
+          the values, use gather_context with type `tools` for the selected feature to discover the repository''s
+          authoritative test command. Include that command in `proposed_pr_context.verification_command` for
+          every execute-proposed-pr workflow. The workflow metadata file is named exactly `<proposed_pr_id>-workflow.yaml`
+          inside `docs/workflows/<canonical-feature-name>/`; `<proposed_pr_id>` is the exact id from `proposed_prs`,
+          such as `interaction-log-core`. Do not prepend the process id (`execute-proposed-pr-workflow`), the
+          process filename, or a branch name. Use the exact path returned by instantiation or an exact filename
+          listed by the workflow directory; never compose a filename from memory. Do not pass workflow dependencies
+          manually: instantiate-workflow derives them from dependent_prs in the matching proposed PR specification.
+          The resulting workflow state must preserve those derived dependencies so its integration PR must be
+          MERGED before any task in the dependent workflow is selected. Do not model this only as an upstream
+          task dependency. Never ask the user for a process id, leave a required placeholder empty, or overwrite
+          an existing workflow without approval. Pass an invocation plan containing every created or reused
+          workflow and its proposed-PR relationship onward.'
+        outputs:
+        - name: verification-command
+          type: string
+          required_for_next_step: true
+          schema:
+            type: string
+        - name: invocation-plan
+          type: object
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: true
+      - id: instantiate-execution-workflows
+        description: Instantiate each missing execution workflow.
+        actions:
+        - invoke_tool
+        - edit
+        - yaml_edit
+        - read_document
+        step_type: governed
+        llm_type: simple_task
+        tool_invocation_packages:
+        - git_readonly_and_additive
+        inputs:
+        - name: invocation-plan
+          type: object
+          required: true
+          source: previous_step
+        - name: verification-command
+          type: string
+          required: true
+          source: previous_step
+        - name: feature_name
+          type: string
+          required: true
+          source: previous_step
+        details: 'Invoke instantiate-workflow once for each missing workflow listed in the `invocation-plan`
+          input. Use docs/procedrr/processes/execute-proposed-pr-workflow.yaml, pass every process inputs as
+          JSON with repeated --process-input NAME=JSON options, Do not pass workflow dependencies manually:
+          instantiate-workflow derives them from the unified proposed-PR specification. The dependency graph
+          is the source of truth; do not claim dependencies were applied unless they are present in the persisted
+          workflow state. Use the `feature_name` input as the shared work-item name. The command must create
+          the powdrr/<proposed-pr-id> integration branch while writing workflow files into this active worktree.
+          Stop if a returned workflow directory is outside the active worktree. Pass every created or reused
+          workflow identity onward. Relationships use semantic identifiers; never add file or directory pointers.
+          If initialization reports a non-fast-forward merge because the dedicated integration branch is stale,
+          retry the exact invocation once with `--force`; this resets only that dedicated integration branch
+          to the current generated source commit and uses lease-protected push. Do not use `--force` for any
+          other command. After every invocation succeeds, record its exact returned workflow identity. Before
+          advancing, emit one `workflow_instantiation_report` output containing every requested workflow exactly
+          once. Each entry must copy the command result fields without invention and include `workflow_id`,
+          `workflow_directory`, `integration_branch`, `integration_worktree`, `task_count`, and `reused`. Set
+          `reused` to true when the command reports an existing idempotent workflow and false when it creates
+          one. Use this exact handoff shape: {"action":"next_step","outputs":{"workflow_instantiation_report":{"workflows":[{"workflow_id":"<id>","workflow_directory":"<path>","integration_branch":"powdrr/<id>","integration_worktree":"<path>","task_count":0,"reused":false}]}},"decisions_and_context":"Recorded
+          every successful workflow instantiation result."} Do not advance after a failed invocation, do not
+          invoke a new instance name, and do not put the successful identities only in decisions_and_context.'
+        tool_invocations:
+        - tool: internal
+          command:
+          - powdrr-lift
+          - instantiate-workflow
+          - --work-item-name
+          - <feature-name>
+          - --workflow-instance-name
+          - <proposed-pr-name>
+          - --process-input
+          - work_item_name=<feature-name-json>
+          - --process-input
+          - proposed_pr_id=<proposed-pr-name-json>
+          - --process-input
+          - feature_description=<feature-description-json>
+          - --process-input
+          - proposed_pr_context=<proposed-pr-context-json>
+          - --process
+          - execute-proposed-pr-workflow
+        - tool: internal
+          command:
+          - powdrr-lift
+          - instantiate-workflow
+          - --work-item-name
+          - <feature-name>
+          - --workflow-instance-name
+          - <proposed-pr-name>
+          - --process-input
+          - work_item_name=<feature-name-json>
+          - --process-input
+          - proposed_pr_id=<proposed-pr-name-json>
+          - --process-input
+          - feature_description=<feature-description-json>
+          - --process-input
+          - proposed_pr_context=<proposed-pr-context-json>
+          - --process
+          - execute-proposed-pr-workflow
+          - --force
+        outputs:
+        - name: workflow_instantiation_report
+          type: any
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              workflows:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    workflow_id:
+                      type: string
+                    workflow_directory:
+                      type: string
+                    integration_branch:
+                      type: string
+                    integration_worktree:
+                      type: string
+                    task_count:
+                      type: integer
+                    reused:
+                      type: boolean
+                  required:
+                  - workflow_id
+                  - workflow_directory
+                  - integration_branch
+                  - integration_worktree
+                  - task_count
+                  - reused
+            required:
+            - workflows
+      - id: verify-workflow-dependencies
+        description: Verify workflow-level dependency metadata.
+        actions:
+        - read_document
+        - goto_step
+        step_type: governed
+        llm_type: fast_iteration
+        inputs:
+        - name: workflow_instantiation_report
+          type: any
+          required: true
+          source: previous_step
+        details: 'Compare the dependency relationships in the unified proposed-PR file with every generated
+          or reused `<proposed_pr_id>-workflow.yaml` in docs/workflows/<feature-name>/. The filename is derived
+          only from the exact proposed_pr_id; do not use the template id, process filename, branch name, or
+          a guessed name. If a path is not present in the instantiation result, use the exact filenames returned
+          by read_document''s missing-file error before reading it. Read each workflow state document and build
+          an exact table of workflow id to depends_on_workflows. Confirm that every proposed_pr dependent_prs
+          predecessor appears in the matching workflow''s depends_on_workflows list, that workflows with no
+          planned predecessors have no dependency entries, and that no undeclared dependency was added. Do not
+          infer dependencies from ordering, filenames, task upstream_task_ids, or prose. If any mismatch exists,
+          do not stage or create a pull request; use goto_step with step_id `plan-workflow-instantiation` and
+          include the exact workflow id, expected dependency list, actual dependency list, and file path. Continue
+          only after the persisted metadata exactly matches the plan. When every workflow matches, choose next_step
+          and emit exactly one `workflow_dependency_report` output. The output must contain one `workflows`
+          entry for every workflow and an `all_match` boolean set to true. Each entry must include the exact
+          `workflow_id`, `path`, `expected_dependencies`, `actual_dependencies`, and `matches: true`. Use this
+          exact output shape: {"action":"next_step","outputs":{"workflow_dependency_report":{"workflows":[{"workflow_id":"<id>","path":"<exact
+          path>","expected_dependencies":[],"actual_dependencies":[],"matches":true}],"all_match":true}},"decisions_and_context":"Verified
+          every workflow dependency against the unified proposed-PR plan."} Do not put the report only in decisions_and_context
+          and do not advance without the declared output.'
+        outputs:
+        - name: workflow_dependency_report
+          type: any
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              workflows:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    workflow_id:
+                      type: string
+                    path:
+                      type: string
+                    expected_dependencies:
+                      type: array
+                      items:
+                        type: string
+                    actual_dependencies:
+                      type: array
+                      items:
+                        type: string
+                    matches:
+                      type: boolean
+                  required:
+                  - workflow_id
+                  - path
+                  - expected_dependencies
+                  - actual_dependencies
+                  - matches
+              all_match:
+                type: boolean
+            required:
+            - workflows
+            - all_match
+      - id: inspect-workflow-repository-state
+        description: Inspect generated workflow repository state.
+        actions: []
+        step_type: invoke_tool
+        llm_type: simple_task
+        pre_step:
+          action: invoke_tool
+          template:
+            tool: internal
+            command:
+            - powdrr-lift
+            - repository-state
+        outputs:
+        - name: instantiated_repository_state
+          type: any
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: true
+      - id: verify-workflow-artifacts
+        description: Verify workflow artifacts are in the active worktree.
+        actions:
+        - edit
+        - yaml_edit
+        - file_management
+        - read_document
+        step_type: governed
+        llm_type: fast_iteration
+        details: Confirm from the repository-state result that every generated workflow task file and <workflow-id>-workflow.yaml
+          is under docs/workflows/ in this active worktree, that each integration branch is powdrr/<proposed-pr-id>,
+          and that no required artifact exists only below .worktrees/. If any file is missing or outside the
+          active worktree, stop and report the inconsistency; do not stage or create a pull request.
+      - id: review-workflow-proposed-pr-links
+        description: Review the bidirectional workflow and proposed-PR mapping.
+        actions:
+        - edit
+        - yaml_edit
+        - file_management
+        - read_document
+        - goto_step
+        step_type: governed
+        llm_type: high_reasoning
+        details: 'Build an exact mapping table from every validated proposed-PR specification in docs/proposals/<feature-name>/
+          to its execution workflow in docs/workflows/<feature-name>/. Confirm that every proposed PR has exactly
+          one matching workflow and that every workflow has exactly one matching proposed PR. Match only stable
+          proposed-PR ids and the workflow''s proposed-pr-id metadata; do not infer matches from ordering, directory
+          names, branch names, or fuzzy similarity. Check both directions explicitly: proposed PR -> workflow
+          and workflow -> proposed PR. If any proposed PR is missing a workflow, or any workflow is missing
+          its proposed PR, do not stage artifacts or continue to pull-request preparation; return to the relevant
+          planning or instantiation step with the mismatch and exact paths. For example, return `{"action":"goto_step","step_id":"plan-workflow-instantiation","decisions_and_context":"Proposed
+          PR <id> has no matching workflow at <path>."}` when a proposed PR has no workflow, or `{"action":"goto_step","step_id":"plan-proposed-prs","decisions_and_context":"Workflow
+          <path> has no matching proposed PR."}` when a workflow has no proposed PR. After the mapping is complete,
+          unique, and recorded in workflow context, return `{"action":"next_step","decisions_and_context":"Every
+          proposed PR maps to exactly one workflow, and every workflow maps to exactly one proposed PR."}`.'
+      - id: evaluate-workflow-artifacts
+        description: Evaluate workflow tasks and relationship invariants deterministically.
+        actions: []
+        step_type: invoke_tool
+        llm_type: simple_task
+        pre_step:
+          action: invoke_tool
+          template:
+            tool: internal
+            command:
+            - powdrr-lift
+            - evaluate
+            - docs/proposals/<feature-name>
+        outputs:
+        - name: workflow_artifact_evaluation
+          type: any
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: true
+      - id: stage-validated-artifacts
+        description: Stage the validated implementation and workflow artifacts.
+        actions: []
+        step_type: invoke_tool
+        llm_type: simple_task
+        pre_step:
+          action: invoke_tool
+          template:
+            tool: git
+            operation: add
+            paths:
+            - docs/proposals/<feature-name>
+            - docs/workflows
+      - id: verify-staged-artifacts
+        description: Verify the staged artifact set.
+        actions: []
+        step_type: invoke_tool
+        llm_type: simple_task
+        pre_step:
+          action: invoke_tool
+          template:
+            tool: internal
+            command:
+            - powdrr-lift
+            - repository-state
+        outputs:
+        - name: staged_artifact_repository_state
+          type: any
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: true
+      - id: prepare-feature-pull-request-dependency
+        description: Run finish-pr-prep on the validated planning artifacts.
+        step_type: uses_process
+        llm_type: fast_iteration
+        details: Run finish-pr-prep before publishing the required preparation handoffs.
+        uses_process:
+          process: finish-pr-prep
+      - id: prepare-feature-pull-request
+        description: Run finish-pr-prep on the validated planning artifacts.
+        actions: []
+        step_type: predicated
+        llm_type: fast_iteration
+        completion:
+          required_outputs:
+          - final_repository_state
+          - readiness_report
+        details: 'The preceding finish-pr-prep step has already produced the context for this handoff. Apply
+          judgment only to whether its returned repository state and readiness report are acceptable; do not
+          invoke tools or the nested process again. After the nested process returns, explicitly publish both
+          handoffs with an `emit_outputs` action, copying the exact values returned by the nested process: {"action":"emit_outputs","outputs":{"final_repository_state":{"clean":true,"files":[]},"readiness_report":{"ready":true,"reasons":[],"satisfied_requirements":[]}}}
+          Do not return next_step or synthesize either value; the step advances only after both declared outputs
+          are explicitly emitted and the readiness report is accepted.'
+        outputs:
+        - name: final_repository_state
+          type: any
+          required_for_next_step: true
+          schema:
+            type: object
+            required:
+            - clean
+            - files
+            properties:
+              root:
+                type: string
+              branch:
+                type: string
+              upstream:
+                type: string
+              ahead:
+                type: integer
+              behind:
+                type: integer
+              clean:
+                type: boolean
+              files:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - path
+                  - staged
+                  - unstaged
+                  - untracked
+                  - conflicted
+                  properties:
+                    path:
+                      type: string
+                    index_status:
+                      type: string
+                    worktree_status:
+                      type: string
+                    staged:
+                      type: boolean
+                    unstaged:
+                      type: boolean
+                    untracked:
+                      type: boolean
+                    conflicted:
+                      type: boolean
+        - name: readiness_report
+          type: any
+          required_for_next_step: true
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+            - ready
+            - reasons
+            - satisfied_requirements
+            properties:
+              ready:
+                type: boolean
+              reasons:
+                type: array
+                items:
+                  type: string
+              satisfied_requirements:
+                type: array
+                items:
+                  type: string
+      - id: create-feature-pull-request
+        description: Commit the validated artifacts and open a draft pull request.
+        actions: []
+        step_type: uses_process
+        llm_type: simple_task
+        details: Invoke create-pull-request with pr-kind `feature`, commit message `Add <feature-name> implementation
+          workflow`, and pull-request title `<pull-request-title>`. Pass files_to_publish containing exactly
+          every validated file under docs/proposals/<feature-name>/ and docs/workflows/, plus the validated
+          planning artifacts and Feature Plan context. The nested process must stage exactly that list. Do not
+          advance until it has committed, pushed, and created or updated a pull request successfully. Never
+          claim a PR is ready without a returned PR URL.
+        uses_process:
+          process: create-pull-request
+      - id: handoff-feature-pull-request
+        description: Hand the draft pull request to the user for review.
+        actions:
+        - edit
+        - yaml_edit
+        - file_management
+        - read_document
+        step_type: governed
+        llm_type: standard_reasoning
+        details: Show the pull request URL. Summarize the selected feature, every proposed PR, every execution
+          workflow, and their dependency relationships. State that implementation has not begun and the draft
+          pull request is ready for review.
     context:
     - user_request
     - workflow_context

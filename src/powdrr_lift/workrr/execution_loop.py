@@ -46,6 +46,7 @@ from powdrr_lift.intrinsic_git_gh import GH_TOOL, GIT_TOOL
 from powdrr_lift.workrr.action_operations import _resolve_pre_step_template
 from powdrr_lift.workrr.chat_io import _verbose_print
 from powdrr_lift.workrr.context import WorkflowContext
+from powdrr_lift.workrr.feature_context import resolve_feature_context
 from powdrr_lift.workrr.operation_validation import (
     command_items_for_validation,
     record_runtime_readiness_from_pre_step,
@@ -166,6 +167,11 @@ def _is_authoritative_effect_command(command: object) -> bool:
         "powdrr-lift",
         "authoritative-pr-effects",
     ]
+
+
+def _is_feature_context_command(command: object) -> bool:
+    command_items = command_items_for_validation(command)
+    return command_items[:2] == ["powdrr-lift", "resolve-feature-context"]
 
 
 def _gate_outcome_matches(
@@ -405,6 +411,24 @@ def _run_deterministic_pre_step(
             result = invoke_fuzzy_match_capability(
                 parameters,
                 worktree_root=worktree_root,
+                runtime=runtime,
+            )
+        elif tool == _INTERNAL_TOOL and _is_feature_context_command(
+            parameters.get("command")
+        ):
+            command = command_items_for_validation(parameters.get("command"))
+            feature_query = _extract_command_option(command, "--feature-query")
+            if feature_query is None:
+                raise PowdrrExecutionError(
+                    "resolve-feature-context requires --feature-query."
+                )
+            result = invoke_repository_read(
+                "feature_context",
+                {"feature_query": feature_query},
+                worktree_root=worktree_root,
+                executor=lambda _arguments: resolve_feature_context(
+                    feature_query, worktree_root
+                ),
                 runtime=runtime,
             )
         elif tool == _INTERNAL_TOOL and _is_authoritative_effect_command(

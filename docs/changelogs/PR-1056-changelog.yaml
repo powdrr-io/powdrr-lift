@@ -1,0 +1,219 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1056
+title: Retain valid partial behavior-probe repairs
+intent:
+  problem: One omitted or malformed revision caused the legacy JSON repair path to reject the entire response and discard valid revisions.
+  goal: Repair flagged scenarios in bounded batches, retain each valid source-faithful revision, and record omitted, malformed, or failed outcomes distinctly for review.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 24
+  summary: Version batched behavior-probe repair artifacts
+  rationale: Identify the artifact fields that record bounded requests and unresolved scenario IDs.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 96
+    end_line: 97
+  summary: Preserve valid revisions across incomplete repair batches
+  rationale: Request flagged scenarios in bounded batches, retain valid revisions, and report omissions or service failures without discarding successful work.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 111
+  summary: Iterate flagged scenarios deterministically
+  rationale: Keep batch membership stable across repair runs.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 113
+  summary: Validate repairable scenario fields
+  rationale: Identify source scenarios that cannot be sent for text repair.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 118
+  summary: Record scenarios without repairable source fields
+  rationale: Preserve their IDs and report partial repair when no scenarios can be sent.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 120
+  summary: Report when no flagged scenarios can be repaired
+  rationale: Distinguish a valid no-work outcome from a request failure.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 123
+    end_line: 259
+  summary: Preserve valid revisions across incomplete repair batches
+  rationale: Request flagged scenarios in bounded batches, retain valid revisions, and report omissions or service failures without discarding successful work.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 149
+    end_line: 190
+  summary: Validate candidate revisions without losing other repairs
+  rationale: Reject invalid candidates per scenario and keep unrelated valid revisions available.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 264
+    end_line: 265
+  summary: Build batch-specific source-grounded repair requests
+  rationale: Give each request only its flagged scenarios and their authoritative source clauses.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 267
+    end_line: 272
+  summary: Keep repair requests grounded in source clauses
+  rationale: Avoid adding unsupported assumptions while improving scenario text.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 279
+    end_line: 279
+  summary: Include the batch repository contract
+  rationale: Supply current repository context to the repair request.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 281
+    end_line: 281
+  summary: Include batch-specific flagged scenarios
+  rationale: Keep each JSON request scoped to the scenarios being repaired.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 291
+    end_line: 291
+  summary: Parse repair revisions as partial batch results
+  rationale: Return accepted revisions alongside item-level parsing errors.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 293
+    end_line: 293
+  summary: Return accepted revisions and parse errors
+  rationale: Make partial response details available to the batch outcome recorder.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 295
+    end_line: 296
+  summary: Require a revisions array in each response
+  rationale: Treat invalid response shape as failure while allowing a valid empty array.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 298
+    end_line: 303
+  summary: Collect item-level parsing errors
+  rationale: Continue parsing other items when one revision is not an object.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 306
+    end_line: 307
+  summary: Ignore revisions with unknown scenario IDs
+  rationale: Preserve valid expected revisions while surfacing unexpected output.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 309
+    end_line: 312
+  summary: Reject duplicate scenario revisions individually
+  rationale: Avoid selecting an arbitrary revision when the response contains duplicates.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 317
+    end_line: 318
+  summary: Reject invalid revision fields individually
+  rationale: Keep malformed items from invalidating other batch revisions.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span:
+    start_line: 320
+    end_line: 322
+  summary: Return validated revisions and errors
+  rationale: Keep valid items available for scenario validation and repair.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 51
+    end_line: 51
+  summary: Parameterize scenario revisions by ID
+  rationale: Exercise deterministic batches containing more than one scenario.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Parameterize scenario revision IDs
+  rationale: Exercise deterministic batches containing more than one scenario.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 96
+    end_line: 96
+  summary: Assert the batch repair prompt
+  rationale: Verify the repair prompt requests one revision per supplied scenario and maintains source grounding.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 131
+    end_line: 131
+  summary: Rename the valid-empty repair regression
+  rationale: Assert an empty revision array is partial output rather than a service or schema failure.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 238
+  summary: Verify partial and failed batch outcomes
+  rationale: Protect retained valid revisions and distinguish empty responses from unavailable repair services.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 241
+    end_line: 269
+  summary: Verify invalid revision fallback
+  rationale: Keep the original scenario when an accepted revision fails compilation.
+entities:
+- id: repair-behavior-probes
+  type: Function
+  action: added
+- id: behavior-probe-repair-partial-response-regression-tests
+  type: Regression test
+  action: added
+entity_relationships:
+- id: tests-exercise-partial-behavior-probe-repair
+  type: exercises
+  source: behavior-probe-repair-partial-response-regression-tests
+  target: repair-behavior-probes
+  action: added
+  description: Regression coverage verifies valid revisions survive omissions and that empty, failed, and invalid repair outcomes remain reviewable.
+invariants:
+- id: partial-probe-repair-preserves-valid-revisions
+  description: A missing or malformed revision does not discard valid revisions from the same or other batches.
+  action: added
+- id: probe-repair-empty-and-unavailable-are-distinct
+  description: A valid empty revision array is recorded as partial repair, while a request or response failure with no successful batch is recorded as unavailable.
+  action: added
+- id: invalid-probe-revision-keeps-original-scenario
+  description: A candidate that fails scenario compilation is rejected individually, leaving the original scenario and other valid revisions intact.
+  action: added
+guidance:
+- id: preserve-partial-behavior-probe-repair
+  description: Repair flagged scenarios in bounded batches, retain source-faithful and compilable revisions independently, and expose omitted, malformed, or failed batch outcomes in the repair artifact.
+  action: added

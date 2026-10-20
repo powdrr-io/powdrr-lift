@@ -1142,9 +1142,11 @@ def test_process_workflow_task_propagates_verbose_to_nested_tools(
     assert observed_verbose == [True]
 
 
+@pytest.mark.parametrize("with_checkpoint_callback", [False, True])
 def test_process_workflow_task_uses_workflow_integration_worktree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    with_checkpoint_callback: bool,
 ) -> None:
     primary_root = tmp_path / "repo"
     primary_root.mkdir()
@@ -1278,12 +1280,15 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         _record_publish,
     )
 
-    exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(
-            workflow_dir=workflow_dir,
-            repo_root=primary_root,
-            task_checkpoint_callback=_record_checkpoint,
+    config = WorkflowTaskAgentConfig(
+        workflow_dir=workflow_dir,
+        repo_root=primary_root,
+        task_checkpoint_callback=(
+            _record_checkpoint if with_checkpoint_callback else None
         ),
+    )
+    exit_code = run_workflow_task(
+        config,
         client=_FakeClient([{"action": "complete", "output_state": {"ok": True}}]),
         stdout=io.StringIO(),
         stderr=io.StringIO(),
@@ -1292,7 +1297,11 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
     assert exit_code == 0
     assert published_roots == [integration_root, integration_root]
     assert final_pr_calls == []
-    assert checkpoints == [("feature-17-task-001", "state", {"ok": True}, "d" * 40)]
+    assert checkpoints == (
+        [("feature-17-task-001", "state", {"ok": True}, "d" * 40)]
+        if with_checkpoint_callback
+        else []
+    )
     assert WorkflowInstance.from_directory(
         integration_root / "docs" / "workflows" / "feature"
     ).tasks[0].status is (TaskStatus.COMPLETED)

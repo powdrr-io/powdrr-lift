@@ -2184,7 +2184,6 @@ def run_workflow_task(
         print(str(exc), file=stderr)
         return 2
 
-    last_runtime: ExecutionRuntime | None = None
     while True:
         task = _select_task(workflow, requested_task_id)
         requested_task_id = None
@@ -2202,20 +2201,9 @@ def run_workflow_task(
                 ):
                     return 0
                 if workflow_git_state is not None:
-                    if config.task_checkpoint_callback is None:
-                        _open_final_workflow_pull_request(
-                            repo_root,
-                            workflow,
-                            workflow_git_state,
-                            stdout=stdout,
-                            runtime=last_runtime,
-                        )
-                    else:
-                        print(
-                            "Workflow completed; task state was recorded on its "
-                            "GitHub issue.",
-                            file=stdout,
-                        )
+                    # Workflow execution state is persisted at task boundaries;
+                    # issue-backed callers additionally record the checkpoint on
+                    # the issue. The workflow itself does not need a pull request.
                     return 0
                 if not _is_git_worktree(repo_root):
                     return 0
@@ -2269,7 +2257,6 @@ def run_workflow_task(
                 guidance,
                 source_ref=f"{task.task_id}:explicit-guidance",
             )
-        last_runtime = runtime
         try:
             if workflow_git_state is not None:
                 validate_workflow_git_state(

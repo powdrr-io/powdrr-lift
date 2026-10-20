@@ -229,6 +229,148 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
     assert _git(repository, "status", "--porcelain").stdout == ""
 
 
+def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "module.py").write_text("def public_api(value): return value\n")
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.email", "test@example.com")
+    _git(repository, "config", "user.name", "Test")
+    _git(repository, "add", "module.py")
+    _git(repository, "commit", "-qm", "baseline")
+    base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
+    output_root = tmp_path / "artifacts"
+    instruction = "Special values are operands. Operators combine values."
+    scenarios = (
+        {"scenario_id": "special-value", "then": "all values are selected"},
+        {"scenario_id": "operator", "then": "difference removes values"},
+    )
+    interaction = {
+        "interaction_id": "special-value-difference",
+        "scenario_ids": ["special-value", "operator"],
+        "condition": "The special value is the left operand of difference.",
+        "operation": "Evaluate all minus one concrete value.",
+        "expected": (
+            "The concrete value remains selected out; another value is selected."
+        ),
+        "evidence_quotes": [
+            "Special values are operands.",
+            "Operators combine values.",
+        ],
+    }
+
+    class _PlanningClient:
+        calls = 0
+
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls == 1:
+                return {"interactions": [interaction]}
+            assert "proposed_interactions" in messages[1]["content"]
+            return {"interactions": []}
+
+    planning_client = _PlanningClient()
+
+    def author_probe_suite(
+        self: MiniSWEAgentProvider,
+        request: ImplementationRequest,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        assert "Required cross-requirement interactions" in request.prompt
+        assert "special-value-difference" in request.prompt
+        obligations = [
+            {
+                "obligation_id": f"obligation-{scenario_id}",
+                "scenario_id": scenario_id,
+                "category": "transformation",
+                "rule": "other",
+                "supported": True,
+                "summary": "The selected value is suppressed.",
+                "condition": "The selector applies to a finding.",
+                "operation": "Call the public API.",
+                "expected": "The result reflects the selector.",
+                "operands": [],
+                "evidence": [
+                    {
+                        "source": "instruction",
+                        "quote": "Special values are operands.",
+                    }
+                ],
+                "unresolved_reason": "",
+            }
+            for scenario_id in ("special-value", "operator")
+        ]
+        source = [
+            '"""' + json.dumps({"obligations": obligations}) + '"""',
+            "import module",
+        ]
+        for index, scenario_id in enumerate(("special-value", "operator")):
+            metadata = {
+                "probe_id": f"probe-{index}",
+                "scenario_id": scenario_id,
+                "obligation_id": f"obligation-{scenario_id}",
+                "oracle_basis": "Both instruction clauses define this interaction.",
+                "interaction_ids": (["special-value-difference"] if index == 0 else []),
+            }
+            source.extend(
+                [
+                    "",
+                    f"def test_probe_{index}():",
+                    f'    """{json.dumps(metadata)}"""',
+                    "    assert module.public_api('value') == 'implemented'",
+                ]
+            )
+        (worktree_root / "probe_suite.py").write_text(
+            "\n".join(source) + "\n", encoding="utf-8"
+        )
+        return subprocess.CompletedProcess(["mini"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
+    config = FeatureEndpointConfig(
+        feature_description=instruction,
+        work_item_name="interaction-probes",
+        repo_root=repository,
+        allowed_paths=("src", "tests"),
+    )
+    request = ImplementationRequest(
+        request_id="interaction-probe-test",
+        objective=instruction,
+        prompt="Implement the feature.",
+        base_commit=base_commit,
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("src", "tests"),
+        acceptance_criteria=("Implement the behavior.",),
+        validation_profiles=("pytest",),
+    )
+
+    _, probes = _generate_miniswe_postrun_probes(
+        config,
+        runner=subprocess.run,
+        worktree=repository,
+        output_root=output_root,
+        base_commit=base_commit,
+        request=request,
+        scenarios=scenarios,
+        instruction=instruction,
+        repository_contract={},
+        interaction_client=planning_client,
+    )
+
+    assert planning_client.calls == 2
+    assert probes[0].interaction_ids == ("special-value-difference",)
+    suite = json.loads(
+        (output_root / "postrun-probes" / "probe-suite.json").read_text()
+    )
+    assert suite["interaction_obligations"] == [interaction]
+    assert suite["baseline_results"][0]["status"] == "failed"
+
+
 def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

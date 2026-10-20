@@ -11,9 +11,11 @@ from powdrr_lift.workrr.postrun_probes import (
     PostRunProbe,
     PostRunProbeResult,
     baseline_probe_failures,
+    generate_probe_interaction_plan,
     parse_generated_postrun_probe_source,
     probe_failures,
     run_postrun_probes,
+    validate_probe_interaction_plan,
 )
 
 
@@ -109,6 +111,147 @@ def test_parser_rejects_invalid_or_unsafe_probe_code(
 def test_probe_parser_rejects_unknown_scenario() -> None:
     with pytest.raises(ValueError, match="unknown scenario"):
         _parse(_source(), ({"scenario_id": "other"},))
+
+
+def test_interaction_plan_requires_multiple_scenarios_and_exact_evidence() -> None:
+    scenarios = (
+        {"scenario_id": "special-value"},
+        {"scenario_id": "operator"},
+    )
+    interaction = {
+        "interaction_id": "special-value-with-operator",
+        "scenario_ids": ["special-value", "operator"],
+        "condition": "A special value is used as an operator operand.",
+        "operation": "Apply the operator to the special value and a concrete value.",
+        "expected": "The result contains only the values selected by the operation.",
+        "evidence_quotes": ["all values are selected", "difference removes a value"],
+    }
+
+    validated = validate_probe_interaction_plan(
+        [interaction],
+        instruction="all values are selected; difference removes a value",
+        scenarios=scenarios,
+    )
+
+    assert validated == (interaction,)
+    invalid = {**interaction, "evidence_quotes": ["invented", "difference"]}
+    with pytest.raises(ValueError, match="exact quotes"):
+        validate_probe_interaction_plan(
+            [invalid],
+            instruction="all values are selected; difference removes a value",
+            scenarios=scenarios,
+        )
+
+
+def test_interaction_plan_is_generated_as_structured_metadata() -> None:
+    class _PlanningClient:
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            assert "interactions" in messages[0]["content"]
+            if "proposed_interactions" in messages[1]["content"]:
+                return {
+                    "interactions": [
+                        {
+                            "interaction_id": "special-value-with-operator",
+                            "scenario_ids": ["special-value", "operator"],
+                            "condition": "A special value is an operand.",
+                            "operation": "Evaluate the expression.",
+                            "expected": "Only selected results are suppressed.",
+                            "evidence_quotes": [
+                                "all values",
+                                "operators are supported",
+                            ],
+                        }
+                    ]
+                }
+            return {"interactions": []}
+
+    interactions = generate_probe_interaction_plan(
+        _PlanningClient(),
+        instruction="all values are selected; operators are supported",
+        scenarios=(
+            {"scenario_id": "special-value"},
+            {"scenario_id": "operator"},
+        ),
+    )
+
+    assert interactions[0]["interaction_id"] == "special-value-with-operator"
+
+
+def test_probe_suite_must_cover_each_required_interaction() -> None:
+    instruction = "all values are selected; difference removes a value"
+    scenarios = (
+        {"scenario_id": "special-value"},
+        {"scenario_id": "operator"},
+    )
+    interaction = {
+        "interaction_id": "special-value-with-operator",
+        "scenario_ids": ["special-value", "operator"],
+        "condition": "A special value is used as an operator operand.",
+        "operation": "Apply the operator to the special value and a concrete value.",
+        "expected": "The result contains only the values selected by the operation.",
+        "evidence_quotes": ["all values are selected", "difference removes a value"],
+    }
+    obligations = [
+        {
+            "obligation_id": f"obligation-{scenario_id}",
+            "scenario_id": scenario_id,
+            "category": "transformation",
+            "rule": "other",
+            "supported": True,
+            "summary": "The selector result is observed.",
+            "condition": "The API receives a selector.",
+            "operation": "Call the public API.",
+            "expected": "The selected result is returned.",
+            "operands": [],
+            "evidence": [{"source": "instruction", "quote": "all values are selected"}],
+            "unresolved_reason": "",
+        }
+        for scenario_id in ("special-value", "operator")
+    ]
+
+    def source(interaction_ids: list[str]) -> str:
+        lines = [
+            f'"""{json.dumps({"obligations": obligations})}"""',
+            "import module",
+        ]
+        for index, scenario_id in enumerate(("special-value", "operator")):
+            metadata = {
+                "probe_id": f"probe-{index}",
+                "scenario_id": scenario_id,
+                "obligation_id": f"obligation-{scenario_id}",
+                "oracle_basis": "The instruction defines the interaction.",
+                "interaction_ids": interaction_ids if index == 0 else [],
+            }
+            lines.extend(
+                [
+                    "",
+                    f"def test_probe_{index}():",
+                    f'    """{json.dumps(metadata)}"""',
+                    "    assert module.public_api('value') == 'handled:value'",
+                ]
+            )
+        return "\n".join(lines) + "\n"
+
+    interactions = validate_probe_interaction_plan(
+        [interaction], instruction=instruction, scenarios=scenarios
+    )
+    _, probes = parse_generated_postrun_probe_source(
+        source(["special-value-with-operator"]),
+        scenarios,
+        instruction=instruction,
+        interaction_obligations=interactions,
+    )
+    assert probes[0].interaction_ids == ("special-value-with-operator",)
+
+    with pytest.raises(ValueError, match="omitted required interactions"):
+        parse_generated_postrun_probe_source(
+            source([]),
+            scenarios,
+            instruction=instruction,
+            interaction_obligations=interactions,
+        )
 
 
 def test_probe_parser_preserves_mapping_key_and_value_roles() -> None:

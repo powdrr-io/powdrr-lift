@@ -127,6 +127,7 @@ from powdrr_lift.workrr.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     PostRunProbe,
     baseline_probe_failures,
+    generate_probe_interaction_plan,
     parse_generated_postrun_probe_source,
     probe_failures,
     run_postrun_probes,
@@ -2889,6 +2890,10 @@ def _run_code_agent_phase(
                     scenarios=probe_scenarios,
                     instruction=feature_description,
                     repository_contract=implementation_packet.contract_closure or {},
+                    interaction_client=cast(
+                        WorkflowLLMClient | None,
+                        state.get("probe_generation_client"),
+                    ),
                 )
             except Exception as error:
                 generation_error = str(error)
@@ -2903,6 +2908,8 @@ def _run_code_agent_phase(
                             "generation_error": generation_error,
                             "source_instruction": feature_description,
                             "obligations": [],
+                            "interaction_obligations": [],
+                            "interaction_plan_status": "unavailable",
                             "probes": [],
                             "scenarios_without_executable_probe": sorted(
                                 str(item["scenario_id"]) for item in probe_scenarios
@@ -3077,10 +3084,18 @@ def _generate_miniswe_postrun_probes(
     scenarios: Sequence[Mapping[str, Any]],
     instruction: str,
     repository_contract: Mapping[str, Any],
+    interaction_client: WorkflowLLMClient | None = None,
 ) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
     """Ask MiniSWE to author a frozen probe suite in a clean baseline worktree."""
     if not scenarios:
         return (), ()
+    interaction_obligations = (
+        generate_probe_interaction_plan(
+            interaction_client, instruction=instruction, scenarios=scenarios
+        )
+        if interaction_client is not None
+        else ()
+    )
     probe_output = output_root / "postrun-probes"
     probe_output.mkdir(parents=True, exist_ok=True)
     authoring_root = output_root / "miniswe-probe-authoring"
@@ -3151,6 +3166,13 @@ def _generate_miniswe_postrun_probes(
             "Baseline repository contract (use for API shapes and operand roles, "
             "not to invent normative behavior):\n"
             f"{json.dumps(repository_contract, indent=2, sort_keys=True)}\n\n"
+            "Required cross-requirement interactions. For every entry below, "
+            "write at least one probe whose function docstring includes its ID "
+            "in `interaction_ids`. The probe must exercise the stated condition, "
+            "operation, and observable result, including the excluded case when "
+            "specified. Do not omit an interaction or claim coverage without an "
+            "assertion that observes it:\n"
+            f"{json.dumps(interaction_obligations, indent=2, sort_keys=True)}\n\n"
             "Return from the agent after writing probe_suite.py."
         )
         probe_request = ImplementationRequest(
@@ -3229,6 +3251,7 @@ def _generate_miniswe_postrun_probes(
                     scenarios,
                     instruction=instruction,
                     repository_contract=repository_contract,
+                    interaction_obligations=interaction_obligations,
                 )
                 baseline_results = run_postrun_probes(
                     probes,
@@ -3260,6 +3283,10 @@ def _generate_miniswe_postrun_probes(
             "generation_method": "minisweagent_pre_coding",
             "source_instruction": instruction,
             "obligations": list(obligations),
+            "interaction_obligations": list(interaction_obligations),
+            "interaction_plan_status": (
+                "generated" if interaction_client is not None else "not_configured"
+            ),
             "authoring_attempts": authoring_attempts,
             "probe_source": suite_source,
             "probes": [item.to_data() for item in probes],

@@ -656,11 +656,9 @@ def _validated_plan_coverage_assessments(
                 raise PlanGenerationError(
                     f"partial plan item {item_id} needs a concrete remaining item"
                 )
-        elif status == "missing" and (
-            evidence or remaining_work.strip() or any(remaining_item.values())
-        ):
+        elif status == "missing" and evidence:
             raise PlanGenerationError(
-                f"missing plan item {item_id} cannot include existing or remaining work"
+                f"missing plan item {item_id} cannot cite existing evidence"
             )
     return by_id
 
@@ -682,7 +680,11 @@ def _apply_plan_coverage_assessments(
         if status == "complete":
             continue
         rewritten = dict(item)
-        if status == "partial":
+        if status == "partial" or (
+            status == "missing"
+            and isinstance(assessment.get("remaining_item"), Mapping)
+            and any(assessment["remaining_item"].values())
+        ):
             remaining_item = assessment["remaining_item"]
             for field in (
                 "title",
@@ -1614,8 +1616,10 @@ def generate_execution_plan_yaml(
                         "evidence. For partial items, write a complete remaining_item "
                         "containing only the unimplemented title, objective, scope, "
                         "paths, implementation steps, and acceptance criteria. For "
-                        "complete or missing items, remaining_item fields must be "
-                        "empty. Read the supplied full symbol bodies, not only "
+                        "complete items, remaining_item fields must be empty. For "
+                        "missing items, either leave remaining_item empty or copy "
+                        "the full draft item. Read the supplied full symbol bodies, "
+                        "not only "
                         "their names. A test declaration is evidence of coverage, "
                         "not proof that the test passed. Do not mark a draft item "
                         "missing merely because its code is in a differently named "

@@ -14,6 +14,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     PLAN_ITEMS_RESPONSE_SCHEMA,
     PlanGenerationError,
     PlanPullRequest,
+    _apply_plan_coverage_assessments,
     _ensure_ci_bootstrap,
     _plan_item_refinement_issues,
     _validated_plan_coverage_assessments,
@@ -575,6 +576,29 @@ def test_incomplete_coverage_audit_preserves_unassessed_items(tmp_path: Path) ->
     assert assessments["reviewed"]["status"] == "missing"
     assert assessments["unassessed"]["status"] == "missing"
     assert assessments["unassessed"]["existing_evidence"] == []
+
+
+def test_missing_coverage_assessment_can_retain_the_full_draft_item() -> None:
+    remaining_item = {
+        "title": "Implement missing component",
+        "objective": "Implement the component from the source plan.",
+        "scope": ["Implement component behavior."],
+        "allowed_paths": ["src/component.py"],
+        "implementation_steps": ["Implement component behavior."],
+        "acceptance_criteria": ["Component behavior is verified."],
+    }
+    item = _item("missing")
+    assessments = {
+        "missing": {
+            "status": "missing",
+            "remaining_item": remaining_item,
+        }
+    }
+
+    result = _apply_plan_coverage_assessments([item], assessments)
+
+    assert result[0]["title"] == "Implement missing component"
+    assert result[0]["scope"] == ["Implement component behavior."]
 
 
 def test_structrr_proposal_normalizes_content_identity_from_subject_id() -> None:

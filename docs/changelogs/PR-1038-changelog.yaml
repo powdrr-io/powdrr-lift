@@ -2,8 +2,8 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1038
 title: Keep MiniSWE probe authoring reliable within process limits
 intent:
-  problem: MiniSWE probe authoring passes its task as a command-line argument, and long generated contexts can exceed the operating system argument limit before any probe is authored. Generated probes can also fail the runner when compound statements are split across body entries or when API calls happen before the final assertion.
-  goal: Compact the behavior context, support file-backed MiniSWE task input, and align authoring guidance and validation with the rendered probe function.
+  problem: MiniSWE probe authoring passes its task as a command-line argument, and long generated contexts can exceed the operating system argument limit before any probe is authored. Generated probes can also fail the runner when compound statements are split across body entries or when API calls happen before the final assertion. Correction attempts can be rejected when MiniSWE commits scoped changes because the runner only recognizes uncommitted worktree changes.
+  goal: Compact the behavior context, support file-backed MiniSWE task input, align authoring guidance and validation with the rendered probe function, and accept and report scoped worker commits.
 human-decisions: []
 structured_files: []
 files:
@@ -231,6 +231,27 @@ files:
     end_line: 166
   summary: Assert the authoring and repair prompts explain compound statement formatting and API call placement.
   rationale: Keep generated probe instructions aligned with runner validation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 456
+    end_line: 493
+  summary: Record whether the worker committed and the commit IDs in each attempt artifact.
+  rationale: Preserve an auditable record when MiniSWE creates its own commit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1141
+    end_line: 1199
+  summary: Include committed changes in scope checks and attempt diffs while rejecting rewritten history and out-of-scope paths.
+  rationale: Validate the complete worker result whether its changes are committed or left in the worktree.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 592
+    end_line: 627
+  summary: Verify scoped worker commits are accepted and recorded while committed out-of-scope changes remain denied.
+  rationale: Prevent regressions in commit-aware worker validation.
 entities:
 - id: miniswe-task-file-input
   type: Subcommand
@@ -260,6 +281,9 @@ invariants:
   action: added
 - id: probe-api-call-in-function
   description: A generated probe contains a public software call somewhere in its test function and an assertion of observable behavior.
+  action: added
+- id: worker-commit-is-scoped-and-recorded
+  description: Worker-created commits are accepted only when they descend from the request base and all committed paths are in scope; accepted commit IDs and committed status are included in the attempt artifact.
   action: added
 guidance:
 - id: keep-probe-authoring-context-focused

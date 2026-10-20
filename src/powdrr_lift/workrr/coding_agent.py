@@ -28,7 +28,7 @@ from powdrr_lift.minisweagent_monitor import MiniSWEAgentSnapshot, run_minisweag
 from powdrr_lift.opencode_monitor import run_opencode
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
-CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v1"
+CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v2"
 MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES = 64 * 1024
 
 
@@ -465,6 +465,8 @@ class CodingAgentAttempt:
     changed_paths: tuple[str, ...] = ()
     out_of_scope_paths: tuple[str, ...] = ()
     diff_fingerprint: str | None = None
+    worker_committed: bool = False
+    commit_ids: tuple[str, ...] = ()
     events: tuple[Mapping[str, Any], ...] = ()
     stdout: str = ""
     stderr: str = ""
@@ -482,6 +484,8 @@ class CodingAgentAttempt:
             "changed_paths": list(self.changed_paths),
             "out_of_scope_paths": list(self.out_of_scope_paths),
             "diff_fingerprint": self.diff_fingerprint,
+            "worker_committed": self.worker_committed,
+            "commit_ids": list(self.commit_ids),
             "events": [dict(event) for event in self.events],
             "stdout": self.stdout,
             "stderr": self.stderr,
@@ -1042,6 +1046,8 @@ class CodingAgentAttemptStore:
                 cast(list[str], data.get("out_of_scope_paths", []))
             ),
             diff_fingerprint=cast(str | None, data.get("diff_fingerprint")),
+            worker_committed=bool(data.get("worker_committed", False)),
+            commit_ids=tuple(cast(list[str], data.get("commit_ids", []))),
             events=tuple(cast(list[Mapping[str, Any]], data.get("events", []))),
             stdout=cast(str, data.get("stdout", "")),
             stderr=cast(str, data.get("stderr", "")),
@@ -1136,11 +1142,16 @@ def run_coding_agent(
     after_head = _git_output(worktree_root, "rev-parse", "HEAD")
     after_status = _working_paths(worktree_root)
     after_snapshot = _working_tree_snapshot(worktree_root, after_status)
+    commit_ids = _commits_between(worktree_root, before_head, after_head)
+    committed_paths = _committed_paths(worktree_root, before_head, after_head)
     changed_paths = tuple(
         sorted(
-            path
-            for path in before_snapshot.keys() | after_snapshot.keys()
-            if before_snapshot.get(path) != after_snapshot.get(path)
+            committed_paths
+            | {
+                path
+                for path in before_snapshot.keys() | after_snapshot.keys()
+                if before_snapshot.get(path) != after_snapshot.get(path)
+            }
         )
     )
     out_of_scope = tuple(
@@ -1151,11 +1162,14 @@ def run_coding_agent(
         )
     )
     fingerprint = _worktree_fingerprint(worktree_root, changed_paths)
-    if before_head != after_head or out_of_scope:
+    head_rewritten = before_head != after_head and not _git_is_ancestor(
+        worktree_root, before_head, after_head
+    )
+    if head_rewritten or out_of_scope:
         status = CodingAgentStatus.POLICY_DENIED
         terminal_error = (
-            "worker changed HEAD"
-            if before_head != after_head
+            "worker rewrote HEAD instead of adding commits"
+            if head_rewritten
             else "worker changed paths outside the implementation request"
         )
     elif completed.returncode == 124:
@@ -1176,6 +1190,8 @@ def run_coding_agent(
         changed_paths=changed_paths,
         out_of_scope_paths=out_of_scope,
         diff_fingerprint=fingerprint,
+        worker_committed=bool(commit_ids),
+        commit_ids=commit_ids,
         events=_json_events(completed.stdout),
         stdout=completed.stdout,
         stderr=completed.stderr,
@@ -1192,6 +1208,43 @@ def _git_output(worktree_root: Path, *arguments: str) -> str:
         check=True,
     )
     return result.stdout.strip()
+
+
+def _commits_between(
+    worktree_root: Path, before_head: str, after_head: str
+) -> tuple[str, ...]:
+    if before_head == after_head:
+        return ()
+    output = _git_output(
+        worktree_root, "rev-list", "--reverse", f"{before_head}..{after_head}"
+    )
+    return tuple(line for line in output.splitlines() if line)
+
+
+def _committed_paths(
+    worktree_root: Path, before_head: str, after_head: str
+) -> set[str]:
+    if before_head == after_head:
+        return set()
+    output = _git_output(
+        worktree_root,
+        "diff",
+        "--name-only",
+        "--no-renames",
+        f"{before_head}..{after_head}",
+    )
+    return {line for line in output.splitlines() if line}
+
+
+def _git_is_ancestor(worktree_root: Path, ancestor: str, revision: str) -> bool:
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, revision],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0
 
 
 def _working_paths(worktree_root: Path) -> set[str]:

@@ -50,7 +50,17 @@ class FakePlanningClient:
                     {
                         "item_id": str(item["id"]),
                         "status": "missing",
-                        "existing_evidence": [],
+                        "scope_assessments": [
+                            {
+                                "requirement_id": f"{item['id']}:scope-{index:02d}",
+                                "status": "missing",
+                                "existing_evidence": [],
+                                "remaining_requirement": "",
+                            }
+                            for index, _scope in enumerate(
+                                item.get("scope", []), start=1
+                            )
+                        ],
                         "remaining_work": "",
                         "remaining_item": {
                             "title": "",
@@ -436,10 +446,12 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
         "def test_verify_signature():\n    assert verify_signature()\n",
         encoding="utf-8",
     )
+    portable_item = _item("portable-verifier", dependencies=["schema-parsers"])
+    portable_item["scope"].append("Add the missing stable rejection reason API.")
     draft = {
         "items": [
             _item("schema-parsers"),
-            _item("portable-verifier", dependencies=["schema-parsers"]),
+            portable_item,
         ]
     }
     reconciled = {"items": [_item("portable-verifier")]}
@@ -448,19 +460,26 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
             {
                 "item_id": "schema-parsers",
                 "status": "complete",
-                "existing_evidence": [
+                "scope_assessments": [
                     {
-                        "path": "src/schema.py",
-                        "symbol": "parse_policy",
-                        "kind": "implementation",
-                        "rationale": "The current parser implements the contract.",
-                    },
-                    {
-                        "path": "tests/test_parsers.py",
-                        "symbol": "test_parse_policy",
-                        "kind": "test",
-                        "rationale": "The parser behavior has a focused test.",
-                    },
+                        "requirement_id": "schema-parsers:scope-01",
+                        "status": "complete",
+                        "existing_evidence": [
+                            {
+                                "path": "src/schema.py",
+                                "symbol": "parse_policy",
+                                "kind": "implementation",
+                                "rationale": "The parser implements the contract.",
+                            },
+                            {
+                                "path": "tests/test_parsers.py",
+                                "symbol": "test_parse_policy",
+                                "kind": "test",
+                                "rationale": "The parser behavior has a focused test.",
+                            },
+                        ],
+                        "remaining_requirement": "",
+                    }
                 ],
                 "remaining_work": "",
                 "remaining_item": {
@@ -475,18 +494,33 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
             {
                 "item_id": "portable-verifier",
                 "status": "partial",
-                "existing_evidence": [
+                "scope_assessments": [
                     {
-                        "path": "src/verifier.py",
-                        "symbol": "verify_signature",
-                        "kind": "implementation",
-                        "rationale": "A narrow signature helper already exists.",
+                        "requirement_id": "portable-verifier:scope-01",
+                        "status": "partial",
+                        "existing_evidence": [
+                            {
+                                "path": "src/verifier.py",
+                                "symbol": "verify_signature",
+                                "kind": "implementation",
+                                "rationale": "A signature helper already exists.",
+                            },
+                            {
+                                "path": "tests/test_verifier.py",
+                                "symbol": "test_verify_signature",
+                                "kind": "test",
+                                "rationale": "The current helper has a focused test.",
+                            },
+                        ],
+                        "remaining_requirement": (
+                            "Add the missing authorization decision API."
+                        ),
                     },
                     {
-                        "path": "tests/test_verifier.py",
-                        "symbol": "test_verify_signature",
-                        "kind": "test",
-                        "rationale": "The current helper has a focused test.",
+                        "requirement_id": "portable-verifier:scope-02",
+                        "status": "missing",
+                        "existing_evidence": [],
+                        "remaining_requirement": "",
                     },
                 ],
                 "remaining_work": "Add the missing authorization decision API.",
@@ -536,14 +570,17 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
     assert len(inspected_contexts) == 1
     assert "schema-parsers" in inspected_contexts[0]
     audit_prompt = client.messages[2][1]["content"]
-    assert "Classify the draft work by existing coverage" in audit_prompt
+    assert "portable-verifier:scope-02" in audit_prompt
+    audit_instructions = client.messages[2][0]["content"]
+    assert "Assess every supplied scope requirement separately" in audit_instructions
     reconciliation_prompt = client.messages[3][1]["content"]
     assert "Current checkout evidence" in reconciliation_prompt
     assert "schema-parsers" in reconciliation_prompt
     assert [item.item_id for item in plan.items] == ["portable-verifier"]
     assert plan.items[0].title == "Complete verifier authorization decisions"
     assert plan.items[0].scope == (
-        "Implement stable authorization rejection decisions.",
+        "Add the missing authorization decision API.",
+        "Add the missing stable rejection reason API.",
     )
 
 
@@ -553,7 +590,14 @@ def test_incomplete_coverage_audit_preserves_unassessed_items(tmp_path: Path) ->
             {
                 "item_id": "reviewed",
                 "status": "missing",
-                "existing_evidence": [],
+                "scope_assessments": [
+                    {
+                        "requirement_id": "reviewed:scope-01",
+                        "status": "missing",
+                        "existing_evidence": [],
+                        "remaining_requirement": "",
+                    }
+                ],
                 "remaining_work": "",
                 "remaining_item": {
                     "title": "",
@@ -575,7 +619,14 @@ def test_incomplete_coverage_audit_preserves_unassessed_items(tmp_path: Path) ->
 
     assert assessments["reviewed"]["status"] == "missing"
     assert assessments["unassessed"]["status"] == "missing"
-    assert assessments["unassessed"]["existing_evidence"] == []
+    assert assessments["unassessed"]["scope_assessments"] == [
+        {
+            "requirement_id": "unassessed:scope-01",
+            "status": "missing",
+            "existing_evidence": [],
+            "remaining_requirement": "",
+        }
+    ]
 
 
 def test_missing_coverage_assessment_can_retain_the_full_draft_item() -> None:

@@ -131,8 +131,8 @@ def test_inspect_repository_ci_reports_existing_workflow_and_missing_ci(
     assert "scripts/verify-all.sh" in context
 
 
-def test_inspect_repository_code_selects_relevant_source_and_test_evidence(
-    tmp_path: Path,
+def test_inspect_repository_code_follows_up_with_symbol_and_test_lookups(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     source = tmp_path / "src/attestation/verifier.py"
@@ -153,14 +153,50 @@ def test_inspect_repository_code_selects_relevant_source_and_test_evidence(
     unrelated.parent.mkdir(parents=True)
     unrelated.write_text("def blue():\n    return 'blue'\n", encoding="utf-8")
 
+    lookups: list[str] = []
+
+    def lookup(
+        queries: list[str], *, worktree_root: Path, limit: int
+    ) -> dict[str, list[dict[str, Any]]]:
+        assert worktree_root == tmp_path
+        assert limit == 20
+        lookups.extend(queries)
+        return {
+            query: [
+                {
+                    "name": query,
+                    "path": (
+                        "src/attestation/verifier.py"
+                        if query == "verify_signature"
+                        else "tests/test_verifier.py"
+                    ),
+                    "range": {"start_line": 1, "end_line": 2},
+                }
+            ]
+            for query in queries
+        }
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.github_issue_plan_generation.find_workspace_symbols",
+        lookup,
+    )
+    client = SequencedPlanningClient(
+        [
+            {"queries": ["verify_signature"], "done": False},
+            {"queries": ["test_verify_signature"], "done": True},
+        ]
+    )
     context = inspect_repository_code(
         tmp_path,
         "Implement Ed25519 signature verification for attestation payloads.",
+        client,
     )
 
+    assert lookups == ["verify_signature", "test_verify_signature"]
+    assert len(client.messages) == 2
+    assert "verify_signature" in client.messages[1][1]["content"]
     assert "src/attestation/verifier.py" in context
     assert "tests/test_verifier.py" in context
-    assert "src/catalog/colors.py" not in context
     assert "verify_ed25519_signature" in context
     assert "Analyzed checkout: commit unborn HEAD" in context
     assert "working tree has changes: yes" in context

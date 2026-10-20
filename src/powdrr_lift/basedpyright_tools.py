@@ -38,6 +38,29 @@ def execute_basedpyright_tool(
     )
 
 
+def find_workspace_symbols(
+    queries: list[str], *, worktree_root: Path, limit: int = 50
+) -> dict[str, list[dict[str, Any]]]:
+    """Run several workspace symbol queries in one language-server session."""
+    if not 1 <= limit <= _MAX_RESULTS:
+        raise PowdrrExecutionError(
+            f"limit must be an integer from 1 through {_MAX_RESULTS}."
+        )
+    with _BasedPyrightLanguageServer(worktree_root) as server:
+        _open_workspace_python_documents(server, worktree_root)
+        results: dict[str, list[dict[str, Any]]] = {}
+        for query in queries:
+            symbols = server.request("workspace/symbol", {"query": query})
+            if not isinstance(symbols, list):
+                raise PowdrrExecutionError(
+                    "basedpyright returned an invalid workspace symbol result."
+                )
+            results[query] = [
+                _symbol_to_data(symbol, worktree_root) for symbol in symbols[:limit]
+            ]
+    return results
+
+
 def _find_symbols(
     parameters: dict[str, Any],
     *,
@@ -45,19 +68,12 @@ def _find_symbols(
 ) -> dict[str, Any]:
     query = _required_string(parameters, "query")
     limit = _result_limit(parameters)
-    with _BasedPyrightLanguageServer(worktree_root) as server:
-        _open_workspace_python_documents(server, worktree_root)
-        symbols = server.request("workspace/symbol", {"query": query})
-    if not isinstance(symbols, list):
-        raise PowdrrExecutionError(
-            "basedpyright returned an invalid workspace symbol result."
-        )
     return {
         "tool": BASEDPYRIGHT_SYMBOL_TOOL,
         "query": query,
-        "results": [
-            _symbol_to_data(symbol, worktree_root) for symbol in symbols[:limit]
-        ],
+        "results": find_workspace_symbols(
+            [query], worktree_root=worktree_root, limit=limit
+        )[query],
     }
 
 

@@ -2586,7 +2586,9 @@ def _run_plan(args: argparse.Namespace) -> int:
             source_document=source_plan_relative,
             verification_command=args.verification_command,
             repository_ci_context=inspect_repository_ci(repo_root),
-            repository_code_context=inspect_repository_code(repo_root, source_plan),
+            repository_code_context=inspect_repository_code(
+                repo_root, source_plan, planning_client
+            ),
         )
         generated_files = write_execution_plan_artifacts(
             rendered_plan=rendered,

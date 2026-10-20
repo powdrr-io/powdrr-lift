@@ -284,6 +284,80 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     assert suite["baseline_results"][0]["status"] == "failed"
 
 
+def test_miniswe_probe_authoring_repairs_wrong_output_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "module.py").write_text("def public_api(value): return value\n")
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.email", "test@example.com")
+    _git(repository, "config", "user.name", "Test")
+    _git(repository, "add", "module.py")
+    _git(repository, "commit", "-qm", "baseline")
+    base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
+    output_root = tmp_path / "artifacts"
+    requests: list[ImplementationRequest] = []
+
+    def author_probe_suite(
+        self: MiniSWEAgentProvider,
+        request: ImplementationRequest,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        requests.append(request)
+        if len(requests) == 2:
+            (worktree_root / "probe_suite.py").write_text(
+                "import module\n\n"
+                "def test_probe_selector():\n"
+                '    """{"probe_id": "selector-result", '
+                '"scenario_id": "selector", '
+                '"oracle_basis": "The instruction defines this result."}"""\n'
+                "    assert module.public_api('value') == 'handled:value'\n",
+                encoding="utf-8",
+            )
+        return subprocess.CompletedProcess(["mini"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
+    config = FeatureEndpointConfig(
+        feature_description="Add selector handling.",
+        work_item_name="selector-handling",
+        repo_root=repository,
+        allowed_paths=("src", "tests"),
+    )
+    request = ImplementationRequest(
+        request_id="selector-implementation",
+        objective="Add selector handling.",
+        prompt="Implement selector handling.",
+        base_commit=base_commit,
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("src", "tests"),
+        acceptance_criteria=("Handle the selector contract.",),
+        validation_profiles=("pytest",),
+    )
+
+    probes = _generate_miniswe_postrun_probes(
+        config,
+        runner=subprocess.run,
+        worktree=repository,
+        output_root=output_root,
+        base_commit=base_commit,
+        request=request,
+        scenarios=({"scenario_id": "selector", "then": "return handled value"},),
+    )
+
+    assert len(probes) == 1
+    assert len(requests) == 2
+    assert "relative" in requests[0].prompt
+    assert "changed_paths=()" in requests[1].prompt
+    assert "Do not use `/probe_suite.py`" in requests[1].prompt
+    suite = json.loads(
+        (output_root / "postrun-probes" / "probe-suite.json").read_text()
+    )
+    assert suite["baseline_results"][0]["status"] == "failed"
+
+
 def test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes(
     tmp_path: Path,
 ) -> None:

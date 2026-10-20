@@ -3106,8 +3106,10 @@ def _generate_miniswe_postrun_probes(
         probe_prompt = (
             "Author executable post-coding behavior probes for the task below. "
             "This is a pre-coding step: the solution is intentionally absent. "
-            "Do not implement the task or edit source/tests. Write exactly one "
-            "file, `probe_suite.py`, in the repository root. This must be the "
+            "Do not implement the task or edit source/tests. The current working "
+            "directory is the clean repository root. Write exactly one relative "
+            "file named `probe_suite.py` in that directory. Do not use an absolute "
+            "path or change directories. This must be the "
             "complete executable Python module: write normal Python imports and "
             "function bodies directly. Do not return JSON, split imports from "
             "function bodies, or ask Powdrr to assemble Python source. Define "
@@ -3167,14 +3169,21 @@ def _generate_miniswe_postrun_probes(
                         "The previous module failed this exact validation or "
                         "baseline execution check:\n"
                         f"{validation_error}\n\n"
-                        "Rewrite `probe_suite.py` as complete executable Python. "
+                        "The current working directory is the clean repository "
+                        "root. Write or rewrite the relative file `probe_suite.py` "
+                        "there. Do not use `/probe_suite.py`, `cd /`, or another "
+                        "absolute path. Confirm with `pwd` and `git status --short` "
+                        "that this exact file changed in the current repository. "
+                        "Rewrite it as complete executable Python. "
                         "Use ordinary Python imports and function bodies directly; "
                         "do not split them into JSON fields. Preserve source-grounded "
                         "behavior and scenario provenance. Every probe must run "
                         "successfully as Python and fail on the untouched baseline "
                         "through its assertion (not through syntax, import, or "
-                        "runtime errors). Use only the supplied contract and "
-                        "scenario IDs. Do not edit implementation files or tests."
+                        "runtime errors). Remove or refine probes that passed on "
+                        "the baseline, using only behavior the task requires. Use "
+                        "only the supplied contract and scenario IDs. Do not edit "
+                        "implementation files or tests."
                     ),
                     allow_existing_changes=True,
                 )
@@ -3189,12 +3198,15 @@ def _generate_miniswe_postrun_probes(
                     "MiniSWE probe authoring did not produce an in-scope result: "
                     f"{attempt.to_data()}"
                 )
-            if attempt.changed_paths != ("probe_suite.py",):
-                raise PowdrrExecutionError(
-                    "MiniSWE probe authoring must create only probe_suite.py; "
-                    f"changed {attempt.changed_paths}"
-                )
             try:
+                if attempt.changed_paths != ("probe_suite.py",):
+                    raise ValueError(
+                        "MiniSWE must create only the relative file "
+                        "`probe_suite.py` in its current repository root; "
+                        f"changed_paths={attempt.changed_paths!r}. The previous "
+                        "attempt created no file in that worktree (it wrote an "
+                        "absolute `/probe_suite.py` path instead)."
+                    )
                 suite_source = suite_path.read_text(encoding="utf-8")
                 probes = parse_generated_postrun_probe_source(suite_source, scenarios)
                 if not probes:

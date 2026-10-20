@@ -14,6 +14,7 @@ from powdrr_lift.workrr.postrun_probes import (
     generate_probe_interaction_plan,
     parse_generated_postrun_probe_source,
     probe_failures,
+    resolve_probe_interaction_plan,
     run_postrun_probes,
     validate_probe_interaction_plan,
 )
@@ -188,6 +189,56 @@ def test_interaction_plan_is_generated_as_structured_metadata() -> None:
     )
 
     assert interactions[0]["interaction_id"] == "special-value-with-operator"
+
+
+def test_interaction_plan_result_distinguishes_empty_from_failure() -> None:
+    class _EmptyClient:
+        def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:
+            return {"interactions": []}
+
+    class _InvalidClient:
+        def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:
+            return {
+                "interactions": [
+                    {
+                        "interaction_id": "bad-interaction",
+                        "scenario_ids": ["special-value", "operator"],
+                        "condition": "The requirements are combined.",
+                        "operation": "Apply the operation.",
+                        "expected": "The combined result is returned.",
+                        "evidence_quotes": ["invented quote", "another invented quote"],
+                    }
+                ]
+            }
+
+    scenarios = (
+        {"scenario_id": "special-value"},
+        {"scenario_id": "operator"},
+    )
+    instruction = "Special values are operands. Operators combine values."
+
+    empty = resolve_probe_interaction_plan(
+        _EmptyClient(),
+        instruction=instruction,
+        scenarios=scenarios,
+    )
+    failed = resolve_probe_interaction_plan(
+        _InvalidClient(),
+        instruction=instruction,
+        scenarios=scenarios,
+    )
+    unconfigured = resolve_probe_interaction_plan(
+        None, instruction=instruction, scenarios=scenarios
+    )
+
+    assert empty.status == "empty"
+    assert empty.interactions == ()
+    assert empty.error is None
+    assert failed.status == "failed"
+    assert failed.interactions == ()
+    assert failed.error is not None and "exact quotes" in failed.error
+    assert unconfigured.status == "not_configured"
+    assert unconfigured.error is None
 
 
 def test_probe_suite_must_cover_each_required_interaction() -> None:

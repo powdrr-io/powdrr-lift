@@ -16,6 +16,7 @@ SUPPORTED_PROBE_SUITE_SCHEMA_VERSIONS = {
     "instruction-derived-probe-suite-v2",
     "instruction-derived-probe-suite-v3",
     "instruction-derived-probe-suite-v4",
+    "instruction-derived-probe-suite-v5",
 }
 
 _TEST_PATTERNS = (

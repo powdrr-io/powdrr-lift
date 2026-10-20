@@ -218,6 +218,8 @@ class DeterministicPlanningClient:
         required = set(response_schema.get("required", ()))
         properties = response_schema.get("properties", {})
 
+        if required == {"interactions"}:
+            return {"interactions": []}
         if required == {"status", "value", "reason_code"} and (
             "scenario claim" in text
         ):

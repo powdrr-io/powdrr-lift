@@ -493,7 +493,7 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
     assert [item.item_id for item in plan.items] == ["portable-verifier"]
 
 
-def test_structrr_proposal_repairs_content_identity_mismatch() -> None:
+def test_structrr_proposal_normalizes_content_identity_from_subject_id() -> None:
     plan = ReviewedExecutionPlan(
         plan_id="attestation-current-state",
         items=(
@@ -528,16 +528,7 @@ def test_structrr_proposal_repairs_content_identity_mismatch() -> None:
         "action": "added",
         "content": {"id": "wrong-identity", "type": "Module"},
     }
-    corrected_operation = {
-        **invalid_operation,
-        "content": {"id": "entity:attestation-schemas", "type": "Module"},
-    }
-    client = SequencedPlanningClient(
-        [
-            {"operations": [invalid_operation]},
-            {"operations": [corrected_operation]},
-        ]
-    )
+    client = SequencedPlanningClient([{"operations": [invalid_operation]}])
 
     proposal = generate_multi_pr_structrr_proposal(
         plan=plan,
@@ -546,11 +537,11 @@ def test_structrr_proposal_repairs_content_identity_mismatch() -> None:
         client=client,
     )
 
-    assert len(client.messages) == 2
-    repair_prompt = client.messages[1][1]["content"]
-    assert "content identity differs from subject_id" in repair_prompt
-    assert "wrong-identity" in repair_prompt
+    assert len(client.messages) == 1
     assert proposal.item_proposals["schema-contracts"].operations[0].subject_id == (
+        "entity:attestation-schemas"
+    )
+    assert proposal.item_proposals["schema-contracts"].operations[0].content["id"] == (
         "entity:attestation-schemas"
     )
 

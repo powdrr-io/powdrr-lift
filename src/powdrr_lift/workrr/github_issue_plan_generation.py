@@ -359,12 +359,13 @@ def generate_multi_pr_structrr_proposal(
         operations = response.get("operations")
         if not isinstance(operations, list):
             raise PlanGenerationError("Structrr planning operations must be a list")
+        normalized_operations = _normalize_structrr_operation_identities(operations)
         try:
             return compile_multi_pr_proposal(
                 plan_id=plan.plan_id,
                 baseline_snapshot=baseline_snapshot,
                 items=plan_items,
-                proposed_operations=operations,
+                proposed_operations=normalized_operations,
                 source_ref=f"plan:{plan.plan_id}",
             )
         except ValueError as error:
@@ -421,6 +422,34 @@ def generate_multi_pr_structrr_proposal(
                 },
             ]
     raise PlanGenerationError("Structrr proposal repair loop ended unexpectedly")
+
+
+def _normalize_structrr_operation_identities(
+    operations: list[Any],
+) -> list[Any]:
+    """Use each operation's canonical subject ID in its duplicated content key."""
+    normalized: list[Any] = []
+    for operation in operations:
+        if not isinstance(operation, Mapping):
+            normalized.append(operation)
+            continue
+        section = operation.get("section")
+        subject_id = operation.get("subject_id")
+        identity_field = "stable_key" if section == "files" else "id"
+        content = operation.get("content")
+        if (
+            isinstance(subject_id, str)
+            and section in {"entities", "entity_relationships", "files"}
+            and isinstance(content, Mapping)
+        ):
+            corrected = dict(operation)
+            corrected_content = dict(content)
+            corrected_content[identity_field] = subject_id
+            corrected["content"] = corrected_content
+            normalized.append(corrected)
+        else:
+            normalized.append(operation)
+    return normalized
 
 
 def _snapshot_fingerprint(snapshot: Mapping[str, Any]) -> str:

@@ -70,6 +70,13 @@ files:
     end_line: 1258
   summary: Reject rewritten commit history
   rationale: Permit descendant commits while preserving the guard against replacing or rewriting the request baseline.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3213
+    end_line: 3215
+  summary: Base the repair request on the accepted authoring commit
+  rationale: Let MiniSWE repair an invalid probe suite from the HEAD produced by its first accepted authoring attempt.
 - path: tests/test_coding_agent.py
   type: modified
   span:
@@ -112,6 +119,34 @@ files:
     end_line: 231
   summary: Assert the authoring attempt records its commit SHA
   rationale: Verify accepted MiniSWE commits remain visible in the generated suite report.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 397
+  summary: Track the commit produced by the initial probe authoring attempt
+  rationale: Verify the repair request uses the accepted suite commit as its baseline.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 407
+    end_line: 410
+  summary: Assert initial and repair requests use the correct bases
+  rationale: Ensure the first request starts from the untouched repository and the repair continues from the first worker commit.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 436
+    end_line: 441
+  summary: Commit the initial probe suite in the repair regression
+  rationale: Reproduce MiniSWE's commit behavior before triggering a probe-suite repair.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 482
+    end_line: 485
+  summary: Verify the committed suite and repair attempt are retained
+  rationale: Protect the complete authoring retry path after a worker commit.
 entities:
 - id: coding-agent-attempt
   type: Class
@@ -148,7 +183,10 @@ invariants:
 - id: accepted-worker-commit-is-auditable
   description: Accepted worker commits retain their SHA, changed paths, and diff fingerprint in the attempt record.
   action: added
+- id: probe-repair-uses-current-authoring-head
+  description: A probe-suite repair request uses the current accepted authoring HEAD as its base commit.
+  action: added
 guidance:
 - id: allow-miniswe-authored-probe-commits
-  description: MiniSWE probe authoring may commit its suite; rely on changed-path authorization and baseline ancestry checks to enforce scope.
+  description: MiniSWE probe authoring may commit its suite; repair attempts must use that accepted commit as their base while changed-path authorization and ancestry checks continue to enforce scope.
   action: added

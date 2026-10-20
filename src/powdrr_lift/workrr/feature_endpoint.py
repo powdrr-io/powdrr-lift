@@ -127,9 +127,9 @@ from powdrr_lift.workrr.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     PostRunProbe,
     baseline_probe_failures,
-    generate_probe_interaction_plan,
     parse_generated_postrun_probe_source,
     probe_failures,
+    resolve_probe_interaction_plan,
     run_postrun_probes,
 )
 from powdrr_lift.workrr.probe_repair import repair_behavior_probes
@@ -2879,6 +2879,11 @@ def _run_code_agent_phase(
             obligations: tuple[dict[str, Any], ...] = ()
             probes: tuple[PostRunProbe, ...] = ()
             generation_error: str | None = None
+            interaction_plan: dict[str, Any] = {
+                "status": "not_run",
+                "error": None,
+                "interactions": [],
+            }
             try:
                 obligations, probes = _generate_miniswe_postrun_probes(
                     config,
@@ -2899,6 +2904,24 @@ def _run_code_agent_phase(
                 generation_error = str(error)
                 probe_root = output_root / "postrun-probes"
                 probe_root.mkdir(parents=True, exist_ok=True)
+                interaction_plan_path = probe_root / "interaction-plan.json"
+                if interaction_plan_path.is_file():
+                    try:
+                        saved_plan = json.loads(
+                            interaction_plan_path.read_text(encoding="utf-8")
+                        )
+                        if isinstance(saved_plan, Mapping):
+                            interaction_plan = {
+                                "status": saved_plan.get("status", "not_run"),
+                                "error": saved_plan.get("error"),
+                                "interactions": saved_plan.get("interactions", []),
+                            }
+                    except (OSError, json.JSONDecodeError):
+                        interaction_plan = {
+                            "status": "artifact_error",
+                            "error": "interaction plan artifact could not be read",
+                            "interactions": [],
+                        }
                 (probe_root / "probe-suite.json").write_text(
                     json.dumps(
                         {
@@ -2908,8 +2931,9 @@ def _run_code_agent_phase(
                             "generation_error": generation_error,
                             "source_instruction": feature_description,
                             "obligations": [],
-                            "interaction_obligations": [],
-                            "interaction_plan_status": "unavailable",
+                            "interaction_obligations": interaction_plan["interactions"],
+                            "interaction_plan_status": interaction_plan["status"],
+                            "interaction_plan_error": interaction_plan["error"],
                             "probes": [],
                             "scenarios_without_executable_probe": sorted(
                                 str(item["scenario_id"]) for item in probe_scenarios
@@ -2921,10 +2945,33 @@ def _run_code_agent_phase(
                     + "\n",
                     encoding="utf-8",
                 )
+            if interaction_plan["status"] == "not_run":
+                interaction_plan_path = (
+                    output_root / "postrun-probes" / "interaction-plan.json"
+                )
+                if interaction_plan_path.is_file():
+                    try:
+                        saved_plan = json.loads(
+                            interaction_plan_path.read_text(encoding="utf-8")
+                        )
+                        if isinstance(saved_plan, Mapping):
+                            interaction_plan = {
+                                "status": saved_plan.get("status", "not_run"),
+                                "error": saved_plan.get("error"),
+                                "interactions": saved_plan.get("interactions", []),
+                            }
+                    except (OSError, json.JSONDecodeError):
+                        interaction_plan = {
+                            "status": "artifact_error",
+                            "error": "interaction plan artifact could not be read",
+                            "interactions": [],
+                        }
             state["postrun_probe_obligations"] = obligations
             state["postrun_probes"] = probes
             state["postrun_probe_artifact_root"] = output_root / "postrun-probes"
             state["postrun_probe_generation_error"] = generation_error
+            state["interaction_plan_status"] = interaction_plan["status"]
+            state["interaction_plan_error"] = interaction_plan["error"]
         probes_for_request = state.get("postrun_probes")
         if (
             isinstance(probes_for_request, tuple)
@@ -3089,15 +3136,20 @@ def _generate_miniswe_postrun_probes(
     """Ask MiniSWE to author a frozen probe suite in a clean baseline worktree."""
     if not scenarios:
         return (), ()
-    interaction_obligations = (
-        generate_probe_interaction_plan(
-            interaction_client, instruction=instruction, scenarios=scenarios
-        )
-        if interaction_client is not None
-        else ()
+    interaction_plan = resolve_probe_interaction_plan(
+        interaction_client, instruction=instruction, scenarios=scenarios
     )
+    interaction_obligations = interaction_plan.interactions
     probe_output = output_root / "postrun-probes"
     probe_output.mkdir(parents=True, exist_ok=True)
+    interaction_plan_document = {
+        "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
+        **interaction_plan.to_data(),
+    }
+    (probe_output / "interaction-plan.json").write_text(
+        json.dumps(interaction_plan_document, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     authoring_root = output_root / "miniswe-probe-authoring"
     probe_worktree = authoring_root / "repository"
     authoring_root.mkdir(parents=True, exist_ok=True)
@@ -3168,12 +3220,13 @@ def _generate_miniswe_postrun_probes(
             "Baseline repository contract (use for API shapes and operand roles, "
             "not to invent normative behavior):\n"
             f"{json.dumps(repository_contract, indent=2, sort_keys=True)}\n\n"
-            "Required cross-requirement interactions. For every entry below, "
-            "write at least one probe whose function docstring includes its ID "
-            "in `interaction_ids`. The probe must exercise the stated condition, "
-            "operation, and observable result, including the excluded case when "
-            "specified. Do not omit an interaction or claim coverage without an "
-            "assertion that observes it:\n"
+            "Interaction-plan status: "
+            f"{interaction_plan.status}. If it is `empty`, `failed`, or "
+            "`not_configured`, continue with individual scenarios and do not "
+            "invent interaction cases. If it is `generated`, write at least one "
+            "probe per listed interaction, with its ID in `interaction_ids`; "
+            "exercise the stated condition, operation, and observable result, "
+            "including an excluded case when specified.\n"
             f"{json.dumps(interaction_obligations, indent=2, sort_keys=True)}\n\n"
             "Return from the agent after writing probe_suite.py."
         )
@@ -3289,9 +3342,8 @@ def _generate_miniswe_postrun_probes(
             "source_instruction": instruction,
             "obligations": list(obligations),
             "interaction_obligations": list(interaction_obligations),
-            "interaction_plan_status": (
-                "generated" if interaction_client is not None else "not_configured"
-            ),
+            "interaction_plan_status": interaction_plan.status,
+            "interaction_plan_error": interaction_plan.error,
             "authoring_attempts": authoring_attempts,
             "probe_source": suite_source,
             "probes": [item.to_data() for item in probes],
@@ -7276,6 +7328,10 @@ def _prepare_final_implementation_review(
                 "passed": not behavior_probe_findings,
                 "findings": behavior_probe_findings,
             },
+            {
+                "decision_id": "final:probe-interaction-plan",
+                **_probe_interaction_plan_decision(state),
+            },
         ],
         "semantic_worklist": {"specifications": specifications},
         "invariant_worklist": {"specifications": invariant_specifications},
@@ -7316,6 +7372,8 @@ def _prepare_final_implementation_review(
                 else "not_run"
             ),
             "error": state.get("postrun_probe_generation_error"),
+            "interaction_plan_status": state.get("interaction_plan_status", "not_run"),
+            "interaction_plan_error": state.get("interaction_plan_error"),
             "suite_path": str(
                 Path(state["postrun_probe_artifact_root"]) / "probe-suite.json"
             )
@@ -7372,6 +7430,18 @@ def _candidate_behavior_probe_findings(
     from powdrr_lift.core.behavior_contract import behavior_scenario_probe_findings
 
     return behavior_scenario_probe_findings(scenarios)
+
+
+def _probe_interaction_plan_decision(state: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep a valid empty plan distinct from a failed interaction planner."""
+    status = state.get("interaction_plan_status", "not_run")
+    passed = status in {"generated", "empty", "not_configured", "not_run"}
+    return {
+        "check": "interaction_plan_generated_or_validly_empty",
+        "passed": passed,
+        "status": status,
+        "error": state.get("interaction_plan_error"),
+    }
 
 
 def _instruction_coverage_worklist(

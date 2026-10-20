@@ -194,6 +194,7 @@ PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA: dict[str, Any] = {
                     "status",
                     "existing_evidence",
                     "remaining_work",
+                    "remaining_item",
                 ],
                 "properties": {
                     "item_id": {"type": "string", "minLength": 1},
@@ -222,6 +223,38 @@ PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA: dict[str, Any] = {
                         },
                     },
                     "remaining_work": {"type": "string"},
+                    "remaining_item": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": [
+                            "title",
+                            "objective",
+                            "scope",
+                            "allowed_paths",
+                            "implementation_steps",
+                            "acceptance_criteria",
+                        ],
+                        "properties": {
+                            "title": {"type": "string"},
+                            "objective": {"type": "string"},
+                            "scope": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "allowed_paths": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "implementation_steps": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "acceptance_criteria": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                        },
+                    },
                 },
             },
         }
@@ -458,12 +491,12 @@ def _snapshot_fingerprint(snapshot: Mapping[str, Any]) -> str:
     return snapshot_digest(snapshot)
 
 
-def _validated_completed_plan_item_ids(
+def _validated_plan_coverage_assessments(
     audit: Any,
     draft_items: list[Any],
     *,
     repository_root: Path,
-) -> set[str]:
+) -> dict[str, Mapping[str, Any]]:
     if not isinstance(audit, Mapping) or set(audit) != {"assessments"}:
         raise PlanGenerationError("current-state audit must contain assessments")
     assessments = audit.get("assessments")
@@ -488,17 +521,30 @@ def _validated_completed_plan_item_ids(
             "current-state audit item IDs do not match the draft plan"
         )
 
-    completed: set[str] = set()
     root = repository_root.resolve()
     for item_id, assessment in by_id.items():
         status = assessment.get("status")
         evidence = assessment.get("existing_evidence")
         remaining_work = assessment.get("remaining_work")
+        remaining_item = assessment.get("remaining_item")
         if status not in {"complete", "partial", "missing"}:
             raise PlanGenerationError(
                 f"current-state audit has an invalid status for {item_id}"
             )
-        if not isinstance(evidence, list) or not isinstance(remaining_work, str):
+        if (
+            not isinstance(evidence, list)
+            or not isinstance(remaining_work, str)
+            or not isinstance(remaining_item, Mapping)
+            or set(remaining_item)
+            != {
+                "title",
+                "objective",
+                "scope",
+                "allowed_paths",
+                "implementation_steps",
+                "acceptance_criteria",
+            }
+        ):
             raise PlanGenerationError(
                 f"current-state audit evidence is malformed for {item_id}"
             )
@@ -566,16 +612,80 @@ def _validated_completed_plan_item_ids(
                     f"complete plan item {item_id} needs implementation "
                     "and test evidence"
                 )
-            completed.add(item_id)
-        elif status == "partial" and (not evidence or not remaining_work.strip()):
+            if any(remaining_item.values()):
+                raise PlanGenerationError(
+                    f"complete plan item {item_id} must have no remaining item"
+                )
+        elif status == "partial":
+            if (
+                not evidence
+                or not remaining_work.strip()
+                or not isinstance(remaining_item.get("title"), str)
+                or not remaining_item["title"].strip()
+                or not isinstance(remaining_item.get("objective"), str)
+                or not remaining_item["objective"].strip()
+                or any(
+                    not isinstance(remaining_item.get(field), list)
+                    or not remaining_item[field]
+                    or not all(
+                        isinstance(value, str) and value.strip()
+                        for value in remaining_item[field]
+                    )
+                    for field in (
+                        "scope",
+                        "allowed_paths",
+                        "implementation_steps",
+                        "acceptance_criteria",
+                    )
+                )
+            ):
+                raise PlanGenerationError(
+                    f"partial plan item {item_id} needs a concrete remaining item"
+                )
+        elif status == "missing" and (
+            evidence or remaining_work.strip() or any(remaining_item.values())
+        ):
             raise PlanGenerationError(
-                f"partial plan item {item_id} needs evidence and remaining work"
+                f"missing plan item {item_id} cannot include existing or remaining work"
             )
-        elif status == "missing" and evidence:
+    return by_id
+
+
+def _apply_plan_coverage_assessments(
+    items: list[Any], assessments: Mapping[str, Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    audited: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, Mapping):
+            raise PlanGenerationError("audited plan items must be objects")
+        item_id = item.get("id")
+        if not isinstance(item_id, str) or item_id not in assessments:
             raise PlanGenerationError(
-                f"missing plan item {item_id} cannot cite existing evidence"
+                "current-state reconciliation changed the audited plan item IDs"
             )
-    return completed
+        assessment = assessments[item_id]
+        status = assessment.get("status")
+        if status == "complete":
+            continue
+        rewritten = dict(item)
+        if status == "partial":
+            remaining_item = assessment["remaining_item"]
+            for field in (
+                "title",
+                "objective",
+                "scope",
+                "allowed_paths",
+                "implementation_steps",
+                "acceptance_criteria",
+            ):
+                rewritten[field] = remaining_item[field]
+        audited.append(rewritten)
+    completed_ids = {
+        item_id
+        for item_id, assessment in assessments.items()
+        if assessment.get("status") == "complete"
+    }
+    return _remove_completed_plan_items(audited, completed_ids)
 
 
 def _remove_completed_plan_items(
@@ -1487,7 +1597,11 @@ def generate_execution_plan_yaml(
                         "remaining behavior; choose missing when the evidence does "
                         "not show implementation. Cite exact repository-relative "
                         "file paths and symbol names for implementation and test "
-                        "evidence. Read the supplied full symbol bodies, not only "
+                        "evidence. For partial items, write a complete remaining_item "
+                        "containing only the unimplemented title, objective, scope, "
+                        "paths, implementation steps, and acceptance criteria. For "
+                        "complete or missing items, remaining_item fields must be "
+                        "empty. Read the supplied full symbol bodies, not only "
                         "their names. A test declaration is evidence of coverage, "
                         "not proof that the test passed. Do not mark a draft item "
                         "missing merely because its code is in a differently named "
@@ -1514,11 +1628,19 @@ def generate_execution_plan_yaml(
             ],
             response_schema=PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
         )
-        completed_item_ids = _validated_completed_plan_item_ids(
+        coverage_assessments = _validated_plan_coverage_assessments(
             coverage_audit,
             raw_items,
             repository_root=repository_root,
         )
+        audited_draft_items = _apply_plan_coverage_assessments(
+            raw_items,
+            coverage_assessments,
+        )
+        if not audited_draft_items:
+            raise PlanGenerationError(
+                "current-state audit found no remaining implementation work"
+            )
         reconciliation = complete_json(
             client,
             [
@@ -1532,6 +1654,8 @@ def generate_execution_plan_yaml(
                         "implementation and test excerpts and honor the separate "
                         "coverage assessments. Remove every item assessed complete; "
                         "the runtime will remove it even if it is returned. "
+                        "For partial items, use the audited remaining_item as the "
+                        "replacement for the original scope. "
                         "Remove work already "
                         "implemented and covered by relevant tests; narrow partial "
                         "work to missing behavior; preserve requirements without "
@@ -1551,11 +1675,9 @@ def generate_execution_plan_yaml(
                         {
                             "task": "Reconcile planned work with current code.",
                             "source_plan_markdown": source_plan,
-                            "draft_items": raw_items,
+                            "draft_items": audited_draft_items,
                             "coverage_assessments": (
-                                coverage_audit.get("assessments")
-                                if isinstance(coverage_audit, Mapping)
-                                else None
+                                list(coverage_assessments.values())
                             ),
                             "repository_ci_context": repository_ci_context,
                             "repository_code_context_before_draft": (
@@ -1581,9 +1703,9 @@ def generate_execution_plan_yaml(
             raise PlanGenerationError(
                 "current-state reconciliation must return at least one item"
             )
-        raw_items = _remove_completed_plan_items(
+        raw_items = _apply_plan_coverage_assessments(
             reconciled_items,
-            completed_item_ids,
+            coverage_assessments,
         )
         if not raw_items:
             raise PlanGenerationError(

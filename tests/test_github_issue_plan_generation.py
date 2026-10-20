@@ -50,6 +50,14 @@ class FakePlanningClient:
                         "status": "missing",
                         "existing_evidence": [],
                         "remaining_work": "",
+                        "remaining_item": {
+                            "title": "",
+                            "objective": "",
+                            "scope": [],
+                            "allowed_paths": [],
+                            "implementation_steps": [],
+                            "acceptance_criteria": [],
+                        },
                     }
                     for item in self.response.get("items", [])
                 ]
@@ -419,6 +427,13 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
         "def test_parse_policy():\n    assert parse_policy() is None\n",
         encoding="utf-8",
     )
+    verifier = tmp_path / "src/verifier.py"
+    verifier.write_text("def verify_signature(): pass\n", encoding="utf-8")
+    verifier_test = tmp_path / "tests/test_verifier.py"
+    verifier_test.write_text(
+        "def test_verify_signature():\n    assert verify_signature()\n",
+        encoding="utf-8",
+    )
     draft = {
         "items": [
             _item("schema-parsers"),
@@ -446,12 +461,45 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
                     },
                 ],
                 "remaining_work": "",
+                "remaining_item": {
+                    "title": "",
+                    "objective": "",
+                    "scope": [],
+                    "allowed_paths": [],
+                    "implementation_steps": [],
+                    "acceptance_criteria": [],
+                },
             },
             {
                 "item_id": "portable-verifier",
-                "status": "missing",
-                "existing_evidence": [],
-                "remaining_work": "",
+                "status": "partial",
+                "existing_evidence": [
+                    {
+                        "path": "src/verifier.py",
+                        "symbol": "verify_signature",
+                        "kind": "implementation",
+                        "rationale": "A narrow signature helper already exists.",
+                    },
+                    {
+                        "path": "tests/test_verifier.py",
+                        "symbol": "test_verify_signature",
+                        "kind": "test",
+                        "rationale": "The current helper has a focused test.",
+                    },
+                ],
+                "remaining_work": "Add the missing authorization decision API.",
+                "remaining_item": {
+                    "title": "Complete verifier authorization decisions",
+                    "objective": "Add only the missing authorization decision API.",
+                    "scope": ["Implement stable authorization rejection decisions."],
+                    "allowed_paths": ["src/verifier.py"],
+                    "implementation_steps": [
+                        "Implement authorization decisions for verifier inputs."
+                    ],
+                    "acceptance_criteria": [
+                        "Each authorization failure returns a stable reason."
+                    ],
+                },
             },
         ]
     }
@@ -491,6 +539,10 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
     assert "Current checkout evidence" in reconciliation_prompt
     assert "schema-parsers" in reconciliation_prompt
     assert [item.item_id for item in plan.items] == ["portable-verifier"]
+    assert plan.items[0].title == "Complete verifier authorization decisions"
+    assert plan.items[0].scope == (
+        "Implement stable authorization rejection decisions.",
+    )
 
 
 def test_structrr_proposal_normalizes_content_identity_from_subject_id() -> None:

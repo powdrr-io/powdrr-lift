@@ -811,7 +811,7 @@ def test_feature_plan_gets_complexity_and_quality_reviews_before_final_plan() ->
     embedded = question.split("Embedded workflow document:\n---\n", 1)[1]
     workflow = yaml.safe_load(embedded)
     steps = workflow["steps"]
-    step_ids = [step["id"] for step in steps]
+    step_ids = [step.get("id") for step in steps]
     plan_index = step_ids.index("plan-proposed-prs")
     complexity_index = step_ids.index("challenge-proposed-pr-complexity")
     quality_index = step_ids.index("challenge-proposed-pr-code-quality")
@@ -820,8 +820,48 @@ def test_feature_plan_gets_complexity_and_quality_reviews_before_final_plan() ->
     complexity = steps[complexity_index]
     quality = steps[quality_index]
     final_plan = steps[final_plan_index]
+    resolve_index = step_ids.index("resolve-feature-context")
+    select_index = step_ids.index("select-feature-context")
+    code_quality_judge = next(
+        step["judge"]
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("judge", {}).get("output", {}).get("name")
+        == "code_quality_evidence_review"
+    )
+    effect_allocation_judge = next(
+        step["judge"]
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("judge", {}).get("output", {}).get("name")
+        == "effect_allocation_review"
+    )
+    reconcile_index = step_ids.index("reconcile-proposed-pr-effect-allocation")
+    evaluate_index = step_ids.index("evaluate-proposed-pr-specification")
 
     assert plan_index < complexity_index < quality_index < final_plan_index
+    assert resolve_index < select_index
+    assert steps[resolve_index]["pre_step"]["template"]["command"][:2] == [
+        "powdrr-lift",
+        "resolve-feature-context",
+    ]
+    assert "sole source of matching decisions" in steps[select_index]["details"]
+    assert code_quality_judge["provider"] == "jev"
+    assert effect_allocation_judge["provider"] == "jev"
+    assert code_quality_judge["output"]["schema"]["properties"]["disposition"][
+        "enum"
+    ] == ["supported", "unsupported", "unclear"]
+    assert effect_allocation_judge["output"]["schema"]["properties"]["disposition"][
+        "enum"
+    ] == ["supported", "unsupported", "unclear"]
+    assert "code_quality_evidence_review" in [
+        item["name"] for item in final_plan["inputs"]
+    ]
+    assert (
+        step_ids.index("allocate-proposed-pr-effects")
+        < reconcile_index
+        < evaluate_index
+    )
     assert outline["name"] == "proposed_pr_designs"
     assert {
         "planned_files",
@@ -868,6 +908,7 @@ def test_feature_plan_gets_complexity_and_quality_reviews_before_final_plan() ->
     assert "long if/elif/else sequences" in quality["details"]
     assert "command pattern" in quality["details"]
     assert "explicit feature requirement" in quality["details"]
+    assert "short verbatim excerpt in evidence" in quality["details"]
     for area in (
         "unbounded",
         "inputs, outputs, state changes",

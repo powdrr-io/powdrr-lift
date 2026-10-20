@@ -29,6 +29,7 @@ from powdrr_lift.workrr.execution_state import (
     ProcessExecutionReference,
     _WorkflowExecutionState,
 )
+from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.provider_runtime import WorkflowClientRegistry
@@ -215,10 +216,19 @@ def run_procedrr_workflow_chat(
     operation_executor = WorkrrOperationExecutor(
         {name: operation_handler(name) for name in operation_names}
     )
+    planning_client = procedrr_client("normal")
+    jev_classifier = JevSemanticClassifierClient(planning_client)
+    jev_client = WorkrrProcedrrClient(
+        jev_classifier,
+        process_directory=process_dir,
+        max_retries=config.max_stalled_roundtrips,
+        provider_retry_attempts=config.provider_retry_attempts,
+        provider_retry_delay_seconds=config.provider_retry_delay_seconds,
+    )
     judge_clients = {
-        "planning": procedrr_client("normal"),
+        "planning": planning_client,
         "adversarial": procedrr_client("adversarial"),
-        "jev": procedrr_client("normal"),
+        "jev": jev_client,
     }
 
     run_directory = configured_repo_root / ".powdrr" / "procedrr-runs"
@@ -253,7 +263,7 @@ def run_procedrr_workflow_chat(
 
     service = ProcedrrExecutionService(
         catalog,
-        procedrr_client("normal"),
+        planning_client,
         operation_executor,
         judge_clients=judge_clients,
         event_sink=persist_event,

@@ -55,6 +55,7 @@ from powdrr_lift.workrr.execution_state import (
     _record_durable_fact,
     _WorkflowExecutionState,
 )
+from powdrr_lift.workrr.feature_context import resolve_feature_context
 from powdrr_lift.workrr.llm import WorkflowAction, WorkflowFileEdits
 from powdrr_lift.workrr.operation_validation import (
     command_items_for_validation,
@@ -705,6 +706,24 @@ def _handle_workflow_action_invoke_tool(
             worktree_root=state.worktree_root,
             runtime=_ensure_execution_runtime(state),
         )
+    elif action.tool == _INTERNAL_TOOL and _is_feature_context_command(
+        action.parameters.get("command")
+    ):
+        command = command_items_for_validation(action.parameters.get("command"))
+        feature_query = _command_option(command, "--feature-query")
+        if feature_query is None:
+            raise PowdrrExecutionError(
+                "resolve-feature-context requires --feature-query."
+            )
+        tool_result = invoke_repository_read(
+            "feature_context",
+            {"feature_query": feature_query},
+            worktree_root=state.worktree_root,
+            executor=lambda _arguments: resolve_feature_context(
+                feature_query, state.worktree_root
+            ),
+            runtime=_ensure_execution_runtime(state),
+        )
     elif action.tool in {"shell", _INTERNAL_TOOL}:
         if action.tool == _INTERNAL_TOOL and action.parameters.get("help") is not True:
             validate_internal_command(action.parameters.get("command"))
@@ -819,6 +838,21 @@ def _handle_workflow_action_invoke_tool(
     state.execution_events.append(event)
     state.audit_events.append(event)
     return True
+
+
+def _is_feature_context_command(command: object) -> bool:
+    try:
+        items = command_items_for_validation(command)
+    except PowdrrExecutionError:
+        return False
+    return items[:2] == ["powdrr-lift", "resolve-feature-context"]
+
+
+def _command_option(command: Sequence[str], option: str) -> str | None:
+    for index, item in enumerate(command):
+        if item == option and index + 1 < len(command):
+            return command[index + 1]
+    return None
 
 
 def _record_chat_pull_request(

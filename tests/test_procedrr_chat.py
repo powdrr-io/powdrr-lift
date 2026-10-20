@@ -5,9 +5,12 @@ import subprocess
 from collections.abc import Mapping
 from io import StringIO
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+from powdrr_lift.workrr import procedrr_chat
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
+from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_chat import (
     _operation_to_action,
@@ -171,3 +174,72 @@ steps:
     assert exit_code == 0, stderr.getvalue()
     assert "Matched process: echo-process" in stdout.getvalue()
     assert "Done: Inspect this fixture." in stdout.getvalue()
+
+
+def test_chat_jev_provider_uses_the_decision_classifier_with_planning_fallback(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    process_dir = tmp_path / "processes"
+    process_dir.mkdir()
+    repo_root = tmp_path / ".worktrees" / "chat"
+    repo_root.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
+    source_process_dir = Path("docs/procedrr/processes")
+    shutil.copy(source_process_dir / "select-process.yaml", process_dir)
+    (process_dir / "echo-process.yaml").write_text(
+        """\
+version: 1
+name: echo-process
+description: Exercise judge-provider wiring.
+inputs:
+  - {name: user_request, type: string, required: true}
+  - {name: workflow_context, type: object, required: true}
+  - {name: language_labels, type: array, required: true}
+steps:
+  - terminal: succeeded
+""",
+        encoding="utf-8",
+    )
+    client = WorkrrProcedrrClient(
+        _SelectingProvider(),  # type: ignore[arg-type]
+        process_directory=process_dir,
+        provider_retry_attempts=0,
+    )
+    captured: dict[str, Any] = {}
+
+    class CapturingExecutionService:
+        def __init__(
+            self,
+            *args: Any,
+            judge_clients: Mapping[str, Any] | None = None,
+            **kwargs: Any,
+        ):
+            _ = (args, kwargs)
+            if judge_clients is not None:
+                captured.update(judge_clients)
+
+        def execute(self, *_args: Any, **_kwargs: Any) -> Any:
+            return SimpleNamespace(
+                terminal_status=procedrr_chat.ProcessTerminalStatus.SUCCEEDED,
+                bindings={"route": {"process_name": "echo-process"}},
+            )
+
+    monkeypatch.setattr(
+        procedrr_chat, "ProcedrrExecutionService", CapturingExecutionService
+    )
+    stderr = StringIO()
+    exit_code = run_procedrr_workflow_chat(
+        WorkflowChatConfig(
+            processes_dir=process_dir,
+            repo_root=repo_root,
+            provider="local",
+            execution_id="jev-provider-wiring",
+        ),
+        procedrr_client_factory=lambda _role: client,
+        input_func=lambda: "Exercise judge wiring.",
+        stdout=StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0, stderr.getvalue()
+    assert isinstance(captured["jev"]._client, JevSemanticClassifierClient)

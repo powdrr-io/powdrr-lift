@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -67,8 +68,13 @@ class FakeProvider:
             (worktree_root / "agent_error.txt").write_text("diagnostic\n")
             (worktree_root / "coverage.xml").write_text("<coverage/>\n")
             return subprocess.CompletedProcess(["fake"], 0, "", "")
-        (worktree_root / "README.md").write_text("committed unexpectedly\n")
-        subprocess.run(["git", "add", "README.md"], cwd=worktree_root, check=True)
+        relative_path = (
+            "README.md" if self.action == "out-of-scope-commit" else "src/change.py"
+        )
+        target = worktree_root / relative_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("committed change\n")
+        subprocess.run(["git", "add", relative_path], cwd=worktree_root, check=True)
         subprocess.run(
             [
                 "git",
@@ -354,6 +360,45 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     ]
 
 
+def test_minisweagent_provider_reads_large_task_prompt_from_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worktree = _git_repo(tmp_path)
+    diagnostics = tmp_path / "diagnostics"
+    provider = MiniSWEAgentProvider(diagnostics_root=diagnostics)
+    prompt = "Author pre-coding probes.\n" + ("scenario details\n" * 6000)
+    request = replace(_request(_head(worktree)), prompt=prompt)
+    captured: dict[str, object] = {}
+
+    def fake_run(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        captured["command"] = command
+        task_path = Path(command[command.index("--task-file") + 1])
+        captured["task_path"] = task_path
+        assert task_path.read_text(encoding="utf-8") == prompt
+        assert "--task" not in command
+        assert all(len(argument.encode("utf-8")) < 64 * 1024 for argument in command)
+        output = Path(command[command.index("--output") + 1])
+        output.write_text(
+            json.dumps({"info": {"exit_status": "Submitted"}}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, "done\n", "")
+
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_minisweagent", fake_run)
+    result = provider.run(request, worktree_root=worktree, attempt_id="large-task")
+
+    command = captured["command"]
+    assert isinstance(command, list)
+    assert command[1:3] == ["-m", "powdrr_lift.minisweagent_session"]
+    assert "--task-file" in command
+    assert result.returncode == 0
+    task_path = captured["task_path"]
+    assert isinstance(task_path, Path)
+    assert not task_path.exists()
+
+
 def test_minisweagent_provider_continues_saved_session_on_next_attempt(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -544,7 +589,7 @@ def test_worker_out_of_scope_change_is_policy_denied(tmp_path: Path) -> None:
     assert attempt.out_of_scope_paths == ("README.md",)
 
 
-def test_worker_commit_is_policy_denied(tmp_path: Path) -> None:
+def test_worker_commit_is_accepted_and_recorded(tmp_path: Path) -> None:
     worktree = _git_repo(tmp_path)
     attempt = run_coding_agent(
         FakeProvider("commit"),
@@ -553,8 +598,33 @@ def test_worker_commit_is_policy_denied(tmp_path: Path) -> None:
         attempt_id="attempt-3",
     )
 
+    assert attempt.status is CodingAgentStatus.COMPLETED
+    assert attempt.error is None
+    assert attempt.worker_committed is True
+    assert len(attempt.commit_ids) == 1
+    assert attempt.changed_paths == ("src/change.py",)
+    assert attempt.diff_fingerprint is not None
+
+    store = CodingAgentAttemptStore(tmp_path / "attempt-artifacts")
+    store.save_attempt(attempt)
+    persisted = store.load_attempt("attempt-3")
+    assert persisted.worker_committed is True
+    assert persisted.commit_ids == attempt.commit_ids
+
+
+def test_worker_commit_outside_scope_is_policy_denied(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
+    attempt = run_coding_agent(
+        FakeProvider("out-of-scope-commit"),
+        _request(_head(worktree)),
+        worktree_root=worktree,
+        attempt_id="attempt-out-of-scope-commit",
+    )
+
     assert attempt.status is CodingAgentStatus.POLICY_DENIED
-    assert attempt.error == "worker changed HEAD"
+    assert attempt.out_of_scope_paths == ("README.md",)
+    assert attempt.worker_committed is True
+    assert len(attempt.commit_ids) == 1
 
 
 def test_worker_rejects_worktree_at_wrong_base_commit(tmp_path: Path) -> None:

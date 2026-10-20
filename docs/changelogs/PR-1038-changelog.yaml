@@ -1,0 +1,361 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1038
+title: Keep MiniSWE probe authoring reliable within process limits
+intent:
+  problem: MiniSWE probe authoring passes its task as a command-line argument, and long generated contexts can exceed the operating system argument limit before any probe is authored. Generated probes can also fail the runner when compound statements are split across body entries or when API calls happen before the final assertion. Correction attempts can be rejected when MiniSWE commits scoped changes because the runner only recognizes uncommitted worktree changes.
+  goal: Compact the behavior context, support file-backed MiniSWE task input, align authoring guidance and validation with the rendered probe function, and accept and report scoped worker commits.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3095
+    end_line: 3097
+  summary: Reduce probe-authoring context to relevant proposal descriptions and core scenario fields.
+  rationale: Preserve behavior and scenario provenance while avoiding verbose derived metadata in the model prompt.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3102
+    end_line: 3102
+  summary: Compile a compact behavior-scenario context for probe authoring.
+  rationale: Avoid passing verbose scenario metadata to MiniSWE.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Add temporary-file support for large MiniSWE task prompts.
+  rationale: Avoid embedding large prompt text in subprocess arguments.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 731
+    end_line: 734
+  summary: Route oversized first attempts through the Python session entry point.
+  rationale: Read large task text from a file instead of a process argument.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 23
+  summary: Accept a file-backed task source in the MiniSWE session runner.
+  rationale: Allow large task prompts without passing their content in argv.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Make trajectory output optional for fresh file-backed sessions.
+  rationale: Preserve the normal MiniSWE default output behavior.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 43
+  summary: Read task text from either argv or a task file and optionally load a prior trajectory.
+  rationale: Support fresh and resumed sessions through the same entry point.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 49
+    end_line: 49
+  summary: Bind the loaded task text into MiniSWE configuration.
+  rationale: Give MiniSWE the same task content from either launch mode.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 54
+    end_line: 54
+  summary: Preserve the default trajectory output when no path is supplied.
+  rationale: Keep file-backed startup compatible with CLI defaults.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 67
+    end_line: 70
+  summary: Start a fresh MiniSWE session with the loaded task.
+  rationale: Make task-file startup follow the same agent run lifecycle.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 72
+  summary: Append loaded task text when continuing a saved session.
+  rationale: Keep resumed prompts consistent with fresh sessions.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Import request replacement support for the large-prompt regression test.
+  rationale: Build a request whose prompt exceeds the argument threshold.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 132
+  summary: Add oversized provenance metadata to the probe-authoring fixture.
+  rationale: Exercise prompt compaction with deliberately verbose scenario data.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 32
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 468
+    end_line: 469
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 487
+    end_line: 488
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 714
+    end_line: 717
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 719
+    end_line: 735
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 738
+    end_line: 739
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 745
+    end_line: 759
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 810
+    end_line: 832
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1049
+    end_line: 1050
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1145
+    end_line: 1146
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1149
+    end_line: 1154
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1165
+    end_line: 1168
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1171
+    end_line: 1172
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1193
+    end_line: 1194
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1213
+    end_line: 1249
+  summary: Record and validate MiniSWE worker-created commits as part of the scoped implementation result.
+  rationale: Include committed files and commit IDs in the attempt evidence, while rejecting rewritten or out-of-scope changes.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3117
+    end_line: 3128
+  summary: Refine compact probe context and authoring guidance for rendered executable probes.
+  rationale: Keep generated probes aligned with the actual runner contract.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3131
+    end_line: 3131
+  summary: Refine compact probe context and authoring guidance for rendered executable probes.
+  rationale: Keep generated probes aligned with the actual runner contract.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3133
+    end_line: 3133
+  summary: Refine compact probe context and authoring guidance for rendered executable probes.
+  rationale: Keep generated probes aligned with the actual runner contract.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3176
+    end_line: 3185
+  summary: Refine compact probe context and authoring guidance for rendered executable probes.
+  rationale: Keep generated probes aligned with the actual runner contract.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3254
+    end_line: 3295
+  summary: Refine compact probe context and authoring guidance for rendered executable probes.
+  rationale: Keep generated probes aligned with the actual runner contract.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 478
+    end_line: 478
+  summary: Validate rendered probes based on API calls and observable assertions across the complete function.
+  rationale: Accept setup and exception-handling statements before outcome assertions.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 481
+    end_line: 481
+  summary: Validate rendered probes based on API calls and observable assertions across the complete function.
+  rationale: Accept setup and exception-handling statements before outcome assertions.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 483
+    end_line: 483
+  summary: Validate rendered probes based on API calls and observable assertions across the complete function.
+  rationale: Accept setup and exception-handling statements before outcome assertions.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 71
+    end_line: 77
+  summary: Test acceptance and reporting of scoped worker-created commits, and denial of out-of-scope commits.
+  rationale: Ensure commit-aware implementation validation is auditable and scope-safe.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 363
+    end_line: 401
+  summary: Test acceptance and reporting of scoped worker-created commits, and denial of out-of-scope commits.
+  rationale: Ensure commit-aware implementation validation is auditable and scope-safe.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 592
+    end_line: 592
+  summary: Test acceptance and reporting of scoped worker-created commits, and denial of out-of-scope commits.
+  rationale: Ensure commit-aware implementation validation is auditable and scope-safe.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 601
+    end_line: 623
+  summary: Test acceptance and reporting of scoped worker-created commits, and denial of out-of-scope commits.
+  rationale: Ensure commit-aware implementation validation is auditable and scope-safe.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 625
+    end_line: 627
+  summary: Test acceptance and reporting of scoped worker-created commits, and denial of out-of-scope commits.
+  rationale: Ensure commit-aware implementation validation is auditable and scope-safe.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 172
+  summary: Cover compact prompt fields, probe repair guidance, and executable probe rendering.
+  rationale: Keep authoring prompts and repaired probes compatible with runner behavior.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 174
+    end_line: 174
+  summary: Cover compact prompt fields, probe repair guidance, and executable probe rendering.
+  rationale: Keep authoring prompts and repaired probes compatible with runner behavior.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 210
+    end_line: 210
+  summary: Cover compact prompt fields, probe repair guidance, and executable probe rendering.
+  rationale: Keep authoring prompts and repaired probes compatible with runner behavior.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 61
+    end_line: 86
+  summary: Test a probe with a public API call and assertion inside a complete try/except body.
+  rationale: Prevent rejection of valid exception probes.
+entities:
+- id: miniswe-task-file-input
+  type: Subcommand
+  action: added
+- id: compact-probe-authoring-context
+  type: Function
+  action: added
+- id: renderable-miniswe-behavior-probes
+  type: Function
+  action: added
+- id: oversized-miniswe-task-handoff
+  type: Function
+  action: added
+- id: miniswe-large-prompt-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: large-mini-task-does-not-use-argv-payload
+  description: MiniSWE prompts over the configured argument-size threshold are read from a temporary file and are not placed in one command-line argument.
+  action: added
+- id: task-file-cleaned-after-attempt
+  description: The temporary MiniSWE task file is removed after the worker attempt completes or raises.
+  action: added
+- id: probe-context-retains-scenario-provenance
+  description: Compact probe context preserves scenario identifiers and the given, when, then, subject, and assumption fields while excluding verbose metadata.
+  action: added
+- id: probe-api-call-in-function
+  description: A generated probe contains a public software call somewhere in its test function and an assertion of observable behavior.
+  action: added
+- id: worker-commit-is-scoped-and-recorded
+  description: Worker-created commits are accepted only when they descend from the request base and all committed paths are in scope; accepted commit IDs and committed status are included in the attempt artifact.
+  action: added
+guidance:
+- id: keep-probe-authoring-context-focused
+  description: Use the task instruction, implementation acceptance context, concise proposal descriptions, and core behavior scenario fields when authoring independent probes.
+  action: added

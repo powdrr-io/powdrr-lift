@@ -146,8 +146,8 @@ steps:
       \ completion of the predecessor's final task or creation\n    of its pull request is\
       \ not sufficient. Preserve these workflow-level\n    dependencies in the instantiation\
       \ plan. Do not generate one proposed-PR\n    file per PR. Before next_step, return\n\
-      \    exactly one output named proposed_pr_names containing every stable proposed\n \
-      \   PR name. Do not rely on decisions_and_context for this handoff. When a\n    proposed\
+      \    two outputs named proposed_pr_names and proposed_pr_designs, one design per stable proposed\n \
+      \   PR. Include each design's intent, scope summary, planned files and tests, and existing components considered. Do not rely on decisions_and_context for this handoff. When a\n    proposed\
       \ PR touches Python source or tests, inspect each implementation area\n    with the\
       \ bounded `basedpyright-structure` tool and resolve key symbols with\n    `basedpyright-symbol`\
       \ before finalizing its file and dependency plan. Use\n    those read-only tools instead\
@@ -165,18 +165,66 @@ steps:
       \    and {\"action\":\"invoke_tool\",\"tool\":\"basedpyright-symbol\",\"parameters\"\
       :{\"operation\":\"resolve_symbol\",\"query\":\"Example\"}}.\n  outputs:\n  - name: proposed_pr_names\n\
       \    type: any\n    required_for_next_step: true\n    schema: {type: array, items: {type:\
-      \ string}}\n- id: generate-proposed-pr-specification\n  description: Generate the single\
+      \ string}}\n  - name: proposed_pr_designs\n    type: array\n    required_for_next_step: true\n    schema:\n\
+  \      type: array\n      minItems: 1\n      items:\n        type: object\n        additionalProperties:\
+  \ false\n        required: [proposed_pr_id, intent, scope_summary, planned_files, planned_tests, existing_components_considered]\n\
+  \        properties:\n          proposed_pr_id: {type: string, minLength: 1}\n          intent: {type:\
+  \ string, minLength: 1}\n          scope_summary: {type: string, minLength: 1}\n          planned_files:\n            type: array\n            items: {type: string, minLength: 1}\n          planned_tests:\n            type: array\n            items: {type: string, minLength: 1}\n          existing_components_considered:\n\
+  \            type: array\n            items: {type: string, minLength: 1}\n\n- id: generate-proposed-pr-specification\n  description: Generate the single\
       \ proposed PR specification template.\n  actions: []\n  step_type: invoke_tool\n  llm_type:\
       \ simple_task\n  inputs:\n  - name: feature_name\n    type: string\n    required: true\n\
       \    source: previous_step\n  pre_step:\n    action: invoke_tool\n    template:\n  \
       \    tool: internal\n      command:\n      - powdrr-lift\n      - pr-specification\n\
       \      - --work-item-name\n      - <feature-name>\n      - --output\n      - docs/proposals/<feature-name>/proposed-pr-specification.yaml\n\
       \  outputs:\n  - name: proposed_pr_specification_template\n    type: any\n    required_for_next_step:\
-      \ true\n    schema: {type: object, additionalProperties: true}\n- id: plan-proposed-pr-specification\n\
-      \  description: Define the ordered proposed PR plan.\n  actions: [read_document]\n \
+      \ true\n    schema: {type: object, additionalProperties: true}\n\n- id: challenge-proposed-pr-complexity\n  description: Independently challenge the proposed\
+  \ PR plan's complexity.\n  actions: [invoke_tool, read_document]\n  step_type: governed\n  llm_type:\
+  \ high_reasoning\n  tool_invocations:\n  - tool: basedpyright-structure\n    operation: inspect_structure\n\
+  \  - tool: basedpyright-symbol\n    operation: resolve_symbol\n  inputs:\n  - name: proposed_pr_designs\n\
+  \    type: array\n    required: true\n    source: previous_step\n  - name: specification_documents\n\
+  \    type: array\n    required: true\n    source: previous_step\n  - name: workflow_documents\n    type: array\n    required: true\n    source: previous_step\n  details: >-\n    Act as an independent\
+  \ skeptical design reviewer. Do not edit files, expand\n    scope, or assume that more abstraction or\
+  \ a new dependency is better. Review\n    every proposed PR against the feature requirements, project\
+  \ structure, named\n    existing components, relevant source, `pyproject.toml`, and the repository's\n\
+  \    lockfile when present. Use exact known paths and symbols; for Python paths,\n    inspect structure\
+  \ and resolve key symbols with the declared BasedPyright tools.\n    For every PR explicitly examine:\
+  \ (1) whether existing behavior or planned work\n    is duplicated and can be extended or shared; (2)\
+  \ whether a configuration,\n    parameter, policy, or data change can satisfy the need without new branching\n\
+  \    or a new subsystem; (3) whether the standard library, an already-declared\n    dependency, or a\
+  \ well-established library is a simpler fit. Check package\n    metadata or existing repository usage\
+  \ before recommending a library; do not\n    invent package capabilities or propose a new dependency\
+  \ without explaining\n    its maintenance, compatibility, and security tradeoffs. Also challenge\n \
+  \   unnecessary PR splits, abstractions, and scope. Every claim must cite concrete\n    source evidence.\
+  \ Do not manufacture pushback: record why no simpler viable\n    option exists when the current design\
+  \ is already the smallest fit. Return one\n    review for every proposed_pr_id and a pushbacks array\
+  \ containing only concrete,\n    actionable simplifications. Use stable finding ids and tie each finding\
+  \ to one\n    proposed PR. Return exactly one output named `planning_pushback`.\n  outputs:\n  - name:\
+  \ planning_pushback\n    type: object\n    required_for_next_step: true\n    schema:\n      type: object\n\
+  \      additionalProperties: false\n      required: [reviews, pushbacks]\n      properties:\n      \
+  \  reviews:\n          type: array\n          minItems: 1\n          items:\n            type: object\n\
+  \            additionalProperties: false\n            required: [proposed_pr_id, existing_capability,\
+  \ duplication, configuration, standard_or_library, smallest_sufficient_design]\n            properties:\n\
+  \              proposed_pr_id: {type: string, minLength: 1}\n              existing_capability: {type:\
+  \ string, minLength: 1}\n              duplication: {type: string, minLength: 1}\n              configuration:\
+  \ {type: string, minLength: 1}\n              standard_or_library: {type: string, minLength: 1}\n  \
+  \            smallest_sufficient_design: {type: string, minLength: 1}\n        pushbacks:\n        \
+  \  type: array\n          items:\n            type: object\n            additionalProperties: false\n\
+  \            required: [finding_id, proposed_pr_id, category, evidence, simpler_alternative, expected_tradeoff]\n\
+  \            properties:\n              finding_id: {type: string, minLength: 1}\n              proposed_pr_id:\
+  \ {type: string, minLength: 1}\n              category:\n                type: string\n            \
+  \    enum: [existing_capability, duplication, configuration, library, over_scoped]\n              evidence:\
+  \ {type: string, minLength: 1}\n              simpler_alternative: {type: string, minLength: 1}\n  \
+  \            expected_tradeoff: {type: string, minLength: 1}\n- id: plan-proposed-pr-specification\n\
+      \  description: Define the ordered proposed PR plan.\n  actions: [read_document]\n  inputs:\n  - name: proposed_pr_designs\n    type: array\n    required: true\n    source: previous_step\n\
+  \  - name: planning_pushback\n    type: object\n    required: true\n    source: previous_step\n \
       \ step_type: governed\n  llm_type: high_reasoning\n  details: >-\n    This is a planning-only\
       \ judgment. Do not edit YAML and do not inspect,\n    copy, assign, or mention authoritative\
-      \ effects. Return exactly one object\n    in `next_step.outputs.proposed_pr_plan`. It\
+      \ effects. \n    Reconcile the independent `planning_pushback` review with the proposed PR\n    designs and\
+  \ feature scope. Address every finding_id exactly once: adopt a\n    supported simpler alternative by\
+  \ changing the proposed plan, or reject it\n    with concrete evidence and put that rationale in the\
+  \ affected PR's\n    justification. Do not adopt a suggestion that would omit a requirement,\n    widen\
+  \ scope, add an unjustified dependency, or weaken validation. Keep the\n    smallest coherent PR boundaries\
+  \ and preserve necessary dependencies.\n    Return exactly one object\n    in `next_step.outputs.proposed_pr_plan`. It\
       \ contains only one ordered\n    `proposed_prs` array. Every entry contains exactly\
       \ `id`, `intent`,\n    `justification`, and `dependent_pr_ids`; use an empty dependency\
       \ array when\n    there are no prerequisites. Do not supply effect references, assignments,\n\

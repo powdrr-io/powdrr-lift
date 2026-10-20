@@ -398,6 +398,62 @@ def active_decision_drift_findings(
     return tuple(findings)
 
 
+def inherited_decision_records(
+    baseline_snapshot: Mapping[str, Any],
+) -> tuple[dict[str, Any], ...]:
+    """Return the pre-existing decisions and invariants a PR must carry forward.
+
+    The baseline is the Structrr state at this PR's execution point, including
+    earlier accepted plan diffs. Feature intent is intentionally excluded: it
+    lives in the current proposal overlay, not in this baseline inventory.
+    """
+    records: list[dict[str, Any]] = []
+    active_intent = _records_by_identity(
+        baseline_snapshot.get("active_intent"), "clause_id"
+    )
+    if active_intent:
+        for identity, record in sorted(active_intent.items()):
+            if record.get("active", True) is False:
+                continue
+            records.append(
+                {
+                    "decision_id": f"active_intent:{identity}",
+                    "section": "active_intent",
+                    "record_id": identity,
+                    "record": record,
+                }
+            )
+    else:
+        # Older Structrr snapshots may predate active_intent. Read their source
+        # sections without duplicating records once the canonical section exists.
+        for section in ("invariants", "guidance"):
+            for identity, record in sorted(
+                _records_by_identity(baseline_snapshot.get(section), "id").items()
+            ):
+                if record.get("state") in {"removed", "retired", "superseded"}:
+                    continue
+                records.append(
+                    {
+                        "decision_id": f"{section}:{identity}",
+                        "section": section,
+                        "record_id": identity,
+                        "record": record,
+                    }
+                )
+    for identity, record in sorted(
+        _records_by_identity(baseline_snapshot.get("human-decisions"), "id").items()
+    ):
+        records.append(
+            {
+                "decision_id": f"human-decisions:{identity}",
+                "section": "human-decisions",
+                "record_id": identity,
+                "record": record,
+            }
+        )
+    return tuple(records)
+
+
 def write_multi_pr_proposal(
     path: str | Path, proposal: MultiPRStructrrProposal
 ) -> None:
@@ -523,6 +579,7 @@ __all__ = [
     "MULTIPR_STRUCTRR_SCHEMA",
     "MultiPRStructrrProposal",
     "active_decision_drift_findings",
+    "inherited_decision_records",
     "compile_multi_pr_proposal",
     "load_multi_pr_proposal",
     "rebase_item_proposal",

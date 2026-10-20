@@ -73,6 +73,30 @@ def _item(item_id: str, *, dependencies: list[str] | None = None) -> dict[str, A
     }
 
 
+def _empty_structrr_proposal(plan: Any) -> Any:
+    return compile_multi_pr_proposal(
+        plan_id=plan.plan_id,
+        baseline_snapshot={
+            "entities": [],
+            "entity_relationships": [],
+            "source_subjects": [],
+            "active_intent": [],
+            "human-decisions": [],
+            "invariants": [],
+        },
+        items=[
+            {
+                "id": item.item_id,
+                "acceptance_criteria": list(item.acceptance_criteria),
+                "allowed_paths": list(item.allowed_paths),
+            }
+            for item in plan.items
+        ],
+        proposed_operations=[],
+        source_ref=f"plan:{plan.plan_id}",
+    )
+
+
 def test_plan_refinement_detects_cross_runtime_implementation_only() -> None:
     cross_runtime_item = {
         "id": "protocol",
@@ -398,6 +422,23 @@ def test_generated_plan_records_source_document() -> None:
     assert plan.source_document == "docs/plans/proposal.md"
 
 
+def test_execute_pr_artifact_writer_requires_structrr_proposal(tmp_path: Path) -> None:
+    rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement the feature.",
+        plan_id="structrr-required-v1",
+        client=FakePlanningClient({"items": [_item("foundation")]}),
+    )
+
+    with pytest.raises(PlanGenerationError, match="require a generated Structrr"):
+        write_execution_plan_artifacts(
+            rendered_plan=rendered,
+            plan=plan,
+            output_path=tmp_path / "docs/plans/structrr-required-v1.yaml",
+            repo_root=tmp_path,
+            verification_command="scripts/verify-all.sh",
+        )
+
+
 def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> None:
     from powdrr_lift.process.templates import instantiate_procedrr_process_workflow
 
@@ -413,6 +454,7 @@ def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> No
         output_path=tmp_path / "docs/plans/procedrr-process-v1.yaml",
         repo_root=tmp_path,
         verification_command="scripts/verify-all.sh",
+        structrr_proposal=_empty_structrr_proposal(plan),
     )
     workflow_relative_file = plan.items[0].workflow_file
     assert workflow_relative_file is not None
@@ -459,6 +501,8 @@ def test_execute_proposed_pr_process_runs_coding_agent_before_completion() -> No
     assert coding_step["tool"] == "coding-agent"
     assert completion_gate["subject"] == "coding_attempt.passed"
     assert completion_gate["equals"] is True
+    assert process["steps"][2]["gate"]["subject"] == "coding_attempt.structrr.passed"
+    assert process["steps"][2]["gate"]["equals"] is True
     assert process["steps"][-1] == {"terminal": "succeeded"}
 
 
@@ -478,6 +522,7 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
         output_path=tmp_path / "docs/plans/procedrr-worker-v1.yaml",
         repo_root=tmp_path,
         verification_command="scripts/verify-all.sh",
+        structrr_proposal=_empty_structrr_proposal(plan),
     )
     workflow_relative_file = plan.items[0].workflow_file
     assert workflow_relative_file is not None
@@ -539,7 +584,7 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
         plan.items[0].workflow_id, workflow_instance.inputs, "worker"
     )
     assert runtime_directory.name == cli.slugify_workflow_id(instance_id)
-    task_files = list(runtime_directory.glob("*.yaml"))
+    task_files = sorted(runtime_directory.glob("*.yaml"))
     assert len(task_files) == 2
     assert task_files[0].stem.startswith(
         f"{cli.slugify_workflow_id(plan.items[0].workflow_id)}-task-"
@@ -785,6 +830,7 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
             "verification_command": "scripts/verify-all.sh",
             "structrr_proposal_file": "docs/plans/proposal-v1-structrr-proposal.json",
             "structrr_item_id": "foundation",
+            "require_structrr_proposal": True,
         },
     }
     assert not list((tmp_path / "docs/workflows/proposal-v1").glob("*-task-*.yaml"))
@@ -1035,6 +1081,7 @@ def test_plan_artifact_writer_preserves_existing_workflow_files(tmp_path: Any) -
             output_path=output_path,
             repo_root=tmp_path,
             verification_command="pytest -q",
+            structrr_proposal=_empty_structrr_proposal(plan),
         )
 
     assert sentinel.read_text(encoding="utf-8") == "preserve"

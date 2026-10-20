@@ -3159,15 +3159,19 @@ def _generate_miniswe_postrun_probes(
         probes: tuple[PostRunProbe, ...] = ()
         validation_error: str | None = None
         baseline_results: tuple[Any, ...] = ()
-        for attempt_number in range(1, 3):
-            if attempt_number == 2:
+        max_authoring_attempts = 4
+        for attempt_number in range(1, max_authoring_attempts + 1):
+            if attempt_number > 1:
                 probe_request = replace(
                     probe_request,
-                    request_id=f"{request.request_id}-probe-authoring-repair",
+                    request_id=(
+                        f"{request.request_id}-probe-authoring-repair-"
+                        f"{attempt_number - 1}"
+                    ),
                     prompt=(
                         "Repair the complete pre-coding Python probe module only. "
-                        "The previous module failed this exact validation or "
-                        "baseline execution check:\n"
+                        "The previous attempt failed this exact placement, code "
+                        "validation, or baseline execution check:\n"
                         f"{validation_error}\n\n"
                         "The current working directory is the clean repository "
                         "root. Write or rewrite the relative file `probe_suite.py` "
@@ -3176,7 +3180,10 @@ def _generate_miniswe_postrun_probes(
                         "that this exact file changed in the current repository. "
                         "Rewrite it as complete executable Python. "
                         "Use ordinary Python imports and function bodies directly; "
-                        "do not split them into JSON fields. Preserve source-grounded "
+                        "do not split them into JSON fields. At module scope, use "
+                        "only imports and function definitions; put setup and all "
+                        "executable statements inside probe functions. Preserve "
+                        "source-grounded "
                         "behavior and scenario provenance. Every probe must run "
                         "successfully as Python and fail on the untouched baseline "
                         "through its assertion (not through syntax, import, or "
@@ -3225,10 +3232,11 @@ def _generate_miniswe_postrun_probes(
                 break
             except (OSError, ValueError) as error:
                 validation_error = str(error)
-                if attempt_number == 2:
+                if attempt_number == max_authoring_attempts:
                     raise PowdrrExecutionError(
                         "MiniSWE executable probe suite failed validation or did "
-                        "not fail on the baseline after one tailored repair: "
+                        "not fail on the baseline after "
+                        f"{max_authoring_attempts - 1} tailored repairs: "
                         f"{error}"
                     ) from error
         if not probes:

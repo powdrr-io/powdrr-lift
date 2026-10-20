@@ -1,0 +1,212 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1058
+title: Add deterministic feature matching and JEV planning reviews
+intent:
+  problem: Feature-context matching and selected planning judgments depended on general LLM responses,
+    allowing inconsistent feature selection and unreviewed planning claims.
+  goal: Resolve feature context deterministically and use JEV to independently review PR-effect assignments
+    and code-quality evidence before planning reconciliation.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 23
+    end_line: 1416
+  summary: Rework embedded planning workflow representation
+  rationale: Add deterministic feature resolution and JEV reviews with reconciliation before proposed-plan
+    evaluation.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 58
+  summary: Import deterministic feature-context resolver
+  rationale: Make the resolver available to the interactive workflow action adapter.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 709
+    end_line: 726
+  summary: Execute feature-context resolution as a repository read
+  rationale: Return deterministic match, tie, and missing results to the workflow.
+- path: src/powdrr_lift/workrr/chat_actions.py
+  type: modified
+  span:
+    start_line: 843
+    end_line: 857
+  summary: Recognize and parse feature-context commands
+  rationale: Route only the declared resolver subcommand through the deterministic path.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 49
+    end_line: 49
+  summary: Import deterministic feature-context resolver
+  rationale: Make the resolver available to workflow pre-steps.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 176
+  summary: Recognize feature-context resolver commands
+  rationale: Distinguish the deterministic command from general shell operations.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 416
+    end_line: 433
+  summary: Resolve feature context during deterministic pre-steps
+  rationale: Return selected context or an explicit ambiguity/no-match status.
+- path: src/powdrr_lift/workrr/feature_context.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 127
+  summary: Resolve feature context deterministically
+  rationale: Normalize candidate names, choose a unique best match, derive document paths, and report
+    ties or missing candidates.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Import JEV classifier client
+  rationale: Make typed JEV judgments available in chat-run workflows.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 219
+    end_line: 227
+  summary: Build a JEV-backed judge client
+  rationale: Route JEV judges through the decision API with planning fallback.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 229
+  summary: Route planning judges through the planning client
+  rationale: Keep ordinary planning judgments on the configured planning model.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 231
+    end_line: 231
+  summary: Route JEV judges through the classifier client
+  rationale: Avoid aliasing JEV decisions to the planning client.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 266
+    end_line: 266
+  summary: Reuse the planning client for workflow execution
+  rationale: Keep the base workflow model separate from JEV judge routing.
+- path: tests/test_feature_context.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 53
+  summary: Test deterministic feature matching outcomes
+  rationale: Cover normalized unique selection, ambiguity, missing matches, and document paths.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 814
+    end_line: 814
+  summary: Handle workflow nodes without IDs in test extraction
+  rationale: Allow JEV judge nodes to coexist with named planning steps.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 823
+    end_line: 840
+  summary: Assert deterministic resolver placement and JEV routing
+  rationale: Protect workflow ordering and independent-review contracts.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 843
+    end_line: 864
+  summary: Assert effect allocation reconciliation order
+  rationale: Require reconciliation after JEV review and before deterministic plan evaluation.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 911
+    end_line: 911
+  summary: Require exact evidence excerpts for code-quality findings
+  rationale: Ensure JEV receives concrete cited evidence to classify.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Import chat workflow module for provider wiring checks
+  rationale: Inspect the constructed JEV judge client in integration coverage.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Import JEV classifier client for routing assertions
+  rationale: Assert the chat runner installs the typed classifier adapter.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Import lightweight execution-service test support
+  rationale: Replace network execution while observing configured judge clients.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 177
+    end_line: 245
+  summary: Test JEV judge-provider wiring in chat
+  rationale: Verify JEV judges use the classifier adapter with planning fallback.
+entities:
+- id: deterministic-feature-context-resolver
+  type: Function
+  action: added
+- id: start-implementing-feature-planning-workflow
+  type: Workflow
+  action: added
+- id: planning-context-resolution-and-review-tests
+  type: Regression test
+  action: added
+entity_relationships:
+- id: tests-cover-deterministic-feature-context-resolution
+  type: exercises
+  source: planning-context-resolution-and-review-tests
+  target: deterministic-feature-context-resolver
+  action: added
+  description: Regression tests verify normalized unique matches, ties, and missing-feature results.
+- id: workflow-runs-independent-planning-reviews
+  type: exercises
+  source: start-implementing-feature-planning-workflow
+  target: deterministic-feature-context-resolver
+  action: added
+  description: The workflow combines deterministic feature matching with JEV review and planning reconciliation.
+invariants:
+- id: feature-context-selection-is-deterministic
+  description: A unique best normalized proposal or current-feature match is selected deterministically;
+    ties and no-match results ask the user for clarification.
+  action: added
+- id: jev-reviews-feed-planning-reconciliation
+  description: JEV review results inform the planning model, which reconciles unsupported or unclear claims
+    before deterministic proposed-plan evaluation.
+  action: added
+- id: authoritative-effect-identities-remain-unchanged
+  description: Effect-allocation review may change ownership assignments but may not edit authoritative
+    effect references or source text.
+  action: added
+guidance:
+- id: keep-feature-context-matching-deterministic
+  description: Derive canonical feature and workflow paths from deterministic candidate matching; ask
+    for clarification only for missing or tied candidates.
+  action: added
+- id: treat-jev-planning-results-as-independent-evidence
+  description: Use JEV dispositions as review evidence for a planning reconciliation step, not as an automatic
+    change to requirements or effect ownership.
+  action: added

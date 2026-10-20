@@ -16,6 +16,44 @@ _RUNTIME = re.compile(
     re.IGNORECASE,
 )
 _COMPONENT = re.compile(r"\bcomponent\s*:\s*([a-z0-9._/-]+)", re.IGNORECASE)
+_PATH_RUNTIME_SUFFIXES = {
+    ".py": "python",
+    ".pyi": "python",
+    ".swift": "swift",
+    ".rs": "rust",
+    ".go": "golang",
+    ".java": "java",
+    ".js": "javascript",
+    ".jsx": "javascript",
+    ".ts": "typescript",
+    ".tsx": "typescript",
+    ".kt": "kotlin",
+    ".kts": "kotlin",
+    ".rb": "ruby",
+    ".php": "php",
+    ".scala": "scala",
+    ".ex": "elixir",
+    ".exs": "elixir",
+    ".erl": "erlang",
+    ".dart": "dart",
+    ".cc": "c++",
+    ".cpp": "c++",
+    ".cxx": "c++",
+    ".h": "c++",
+    ".hpp": "c++",
+    ".cs": "c#",
+    ".m": "objective-c",
+    ".mm": "objective-c",
+}
+_IMPLEMENTATION_ACTION = re.compile(
+    r"\b(?:implement|create|build|develop|port|introduce|extend|add)\w*\b",
+    re.IGNORECASE,
+)
+_CODE_ARTIFACT = re.compile(
+    r"\b(?:parser|package|library|module|record|service|daemon|cli|binary|target|"
+    r"provider|client|worker|adapter|implementation)\w*\b",
+    re.IGNORECASE,
+)
 
 
 class PlanSizingError(ValueError):
@@ -47,6 +85,8 @@ def size_plan_items(
     # canonical contract validator can report the precise field error.
     if any(not _is_sizable_item(item, max_work_units) for item in normalized):
         return normalized
+
+    normalized = split_mixed_runtime_items(normalized)
 
     item_ids: list[str] = []
     item_units: list[int] = []
@@ -135,7 +175,7 @@ def size_plan_items(
 
 def _merge_is_valid(group: Sequence[Mapping[str, Any]]) -> bool:
     if len(group) == 1:
-        return True
+        return len(_item_runtimes(group[0])) <= 1
     if any(str(item.get("id", "")).startswith("ci-bootstrap") for item in group):
         return False
     if not _has_shared_component(group):
@@ -246,10 +286,158 @@ def _item_runtimes(item: Mapping[str, Any]) -> set[str]:
             continue
         for value in values:
             if isinstance(value, str):
-                runtimes.update(
-                    match.group(0).casefold() for match in _RUNTIME.finditer(value)
-                )
+                runtimes.update(_implementation_runtimes(value))
+    paths = item.get("allowed_paths", [])
+    if isinstance(paths, list):
+        for path in paths:
+            if isinstance(path, str):
+                runtimes.update(_path_runtimes(path))
     return runtimes
+
+
+def _implementation_runtimes(value: str) -> set[str]:
+    runtimes: set[str] = set()
+    for match in _RUNTIME.finditer(value):
+        if re.search(r"\b(?:with|from|against|to)\s+$", value[: match.start()]):
+            continue
+        context = value[max(0, match.start() - 80) : match.end() + 80]
+        if _IMPLEMENTATION_ACTION.search(context) and _CODE_ARTIFACT.search(context):
+            runtimes.add(match.group(0).casefold())
+    return runtimes
+
+
+def _path_runtimes(path: str) -> set[str]:
+    suffix = "." + path.rsplit(".", 1)[-1].casefold() if "." in path else ""
+    runtime = _PATH_RUNTIME_SUFFIXES.get(suffix)
+    return {runtime} if runtime else set()
+
+
+def split_mixed_runtime_items(
+    items: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Split multi-runtime items into runtime-homogeneous solver work units.
+
+    The solver only groups these normalized units. It must never be asked to
+    accept a mixed-runtime singleton as a valid PR.
+    """
+    split_items: list[dict[str, Any]] = []
+    item_expansions: dict[str, list[str]] = {}
+    used_ids = {str(item.get("id", "")) for item in items}
+    for item in items:
+        source_id = str(item["id"])
+        runtimes = sorted(_item_runtimes(item))
+        if len(runtimes) <= 1:
+            split_items.append(dict(item))
+            item_expansions[source_id] = [source_id]
+            continue
+
+        steps_by_runtime: dict[str, list[str]] = {runtime: [] for runtime in runtimes}
+        for step in item["implementation_steps"]:
+            step_runtimes = _implementation_runtimes(step) | _path_runtimes(step)
+            if len(step_runtimes) != 1:
+                raise PlanSizingError(
+                    f"cannot split mixed-runtime item {source_id!r}: "
+                    "each implementation "
+                    "step must identify exactly one runtime"
+                )
+            runtime = next(iter(step_runtimes))
+            if runtime not in steps_by_runtime:
+                raise PlanSizingError(
+                    f"mixed-runtime item {source_id!r} has a step for unexpected "
+                    f"runtime {runtime!r}"
+                )
+            steps_by_runtime[runtime].append(step)
+
+        if any(not steps for steps in steps_by_runtime.values()):
+            missing = sorted(
+                runtime for runtime, steps in steps_by_runtime.items() if not steps
+            )
+            raise PlanSizingError(
+                f"cannot split mixed-runtime item {source_id!r}: no independently "
+                f"attributed implementation step for {', '.join(missing)}"
+            )
+
+        scope_by_runtime: dict[str, list[str]] = {runtime: [] for runtime in runtimes}
+        for entry in item["scope"]:
+            entry_runtimes = _implementation_runtimes(entry) | _path_runtimes(entry)
+            if len(entry_runtimes) > 1:
+                raise PlanSizingError(
+                    f"cannot split mixed-runtime item {source_id!r}: split this scope "
+                    "entry into runtime-specific entries"
+                )
+            if not entry_runtimes:
+                for runtime in runtimes:
+                    scope_by_runtime[runtime].append(entry)
+                continue
+            runtime = next(iter(entry_runtimes))
+            if runtime in scope_by_runtime:
+                scope_by_runtime[runtime].append(entry)
+
+        paths_by_runtime: dict[str, list[str]] = {runtime: [] for runtime in runtimes}
+        for path in item["allowed_paths"]:
+            path_runtimes = _path_runtimes(path)
+            if len(path_runtimes) == 1:
+                runtime = next(iter(path_runtimes))
+                if runtime in paths_by_runtime:
+                    paths_by_runtime[runtime].append(path)
+                continue
+            for runtime in runtimes:
+                paths_by_runtime[runtime].append(path)
+
+        generated_ids: list[str] = []
+        for index, runtime in enumerate(runtimes):
+            if not scope_by_runtime[runtime]:
+                raise PlanSizingError(
+                    f"cannot split mixed-runtime item {source_id!r}: no scope entry "
+                    f"describes the {runtime} work"
+                )
+            if not paths_by_runtime[runtime]:
+                raise PlanSizingError(
+                    f"cannot split mixed-runtime item {source_id!r}: no allowed path "
+                    f"is attributable to the {runtime} work"
+                )
+            generated_id = (
+                source_id if index == 0 else _runtime_item_id(source_id, runtime)
+            )
+            if generated_id in generated_ids or (
+                generated_id in used_ids and generated_id != source_id
+            ):
+                raise PlanSizingError(
+                    f"runtime splitting produced duplicate item id {generated_id!r}"
+                )
+            generated_ids.append(generated_id)
+            used_ids.add(generated_id)
+            runtime_label = runtime.title()
+            title_suffix = f" ({runtime_label})"
+            title = str(item["title"])
+            if len(title) + len(title_suffix) > 200:
+                title = f"{title[: 200 - len(title_suffix) - 1].rstrip()}…"
+            split_items.append(
+                {
+                    **dict(item),
+                    "id": generated_id,
+                    "title": f"{title}{title_suffix}",
+                    "scope": scope_by_runtime[runtime],
+                    "allowed_paths": paths_by_runtime[runtime],
+                    "implementation_steps": steps_by_runtime[runtime],
+                }
+            )
+        item_expansions[source_id] = generated_ids
+
+    for item in split_items:
+        dependencies = item.get("dependencies", [])
+        expanded: list[str] = []
+        for dependency in dependencies:
+            for mapped in item_expansions.get(dependency, [dependency]):
+                if mapped != item["id"] and mapped not in expanded:
+                    expanded.append(mapped)
+        item["dependencies"] = expanded
+    return split_items
+
+
+def _runtime_item_id(item_id: str, runtime: str) -> str:
+    suffix = f"-{runtime}"
+    return f"{item_id[: 100 - len(suffix)]}{suffix}"
 
 
 def _unique_group_values(

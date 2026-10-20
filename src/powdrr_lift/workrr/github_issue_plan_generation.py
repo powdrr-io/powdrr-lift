@@ -32,7 +32,11 @@ from powdrr_lift.workrr.multipr_structrr import (
     compile_multi_pr_proposal,
     write_multi_pr_proposal,
 )
-from powdrr_lift.workrr.plan_sizing import PlanSizingError, size_plan_items
+from powdrr_lift.workrr.plan_sizing import (
+    PlanSizingError,
+    size_plan_items,
+    split_mixed_runtime_items,
+)
 
 MAX_SOURCE_PLAN_CHARS = 500_000
 MAX_PLAN_ITEMS = 100
@@ -1689,11 +1693,17 @@ def generate_execution_plan_yaml(
             raise PlanGenerationError(
                 "planning response must contain at least one item"
             )
-        refinement_issues = _plan_item_refinement_issues(
-            raw_items,
-            require_ci_bootstrap=has_ci_configuration is False,
-            verification_command=verification_command,
-        )
+        try:
+            raw_items = split_mixed_runtime_items(raw_items)
+        except PlanSizingError as error:
+            refinement_issues = [str(error)]
+        else:
+            response = {"items": raw_items}
+            refinement_issues = _plan_item_refinement_issues(
+                raw_items,
+                require_ci_bootstrap=has_ci_configuration is False,
+                verification_command=verification_command,
+            )
         if not refinement_issues:
             break
         response = complete_json(
@@ -1750,10 +1760,6 @@ def generate_execution_plan_yaml(
         raise PlanGenerationError("planning response must contain at least one item")
     if has_ci_configuration is False:
         raw_items = _ensure_ci_bootstrap(raw_items, verification_command)
-    if len(raw_items) > MAX_PLAN_ITEMS:
-        raise PlanGenerationError(
-            f"planning response exceeds the {MAX_PLAN_ITEMS}-item limit"
-        )
     remaining_issues = _plan_item_refinement_issues(
         raw_items,
         require_ci_bootstrap=has_ci_configuration is False,
@@ -1929,6 +1935,13 @@ def generate_execution_plan_yaml(
             )
         if has_ci_configuration is False:
             raw_items = _ensure_ci_bootstrap(raw_items, verification_command)
+        try:
+            raw_items = split_mixed_runtime_items(raw_items)
+        except (KeyError, PlanSizingError, TypeError) as error:
+            raise PlanGenerationError(
+                "current-state reconciliation could not be split into "
+                f"runtime-homogeneous work: {error}"
+            ) from error
         remaining_issues = _plan_item_refinement_issues(
             raw_items,
             require_ci_bootstrap=has_ci_configuration is False,
@@ -1953,6 +1966,10 @@ def generate_execution_plan_yaml(
         raise PlanGenerationError(
             "deterministic PR sizing produced decomposition violations: "
             + "; ".join(remaining_issues)
+        )
+    if len(raw_items) > MAX_PLAN_ITEMS:
+        raise PlanGenerationError(
+            f"deterministic PR sizing produced more than {MAX_PLAN_ITEMS} items"
         )
     _require_jev_grouping_approval(raw_items, client)
 

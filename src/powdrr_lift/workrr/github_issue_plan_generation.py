@@ -192,7 +192,7 @@ PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA: dict[str, Any] = {
                 "required": [
                     "item_id",
                     "status",
-                    "existing_evidence",
+                    "scope_assessments",
                     "remaining_work",
                     "remaining_item",
                 ],
@@ -202,23 +202,60 @@ PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA: dict[str, Any] = {
                         "type": "string",
                         "enum": ["complete", "partial", "missing"],
                     },
-                    "existing_evidence": {
+                    "scope_assessments": {
                         "type": "array",
+                        "minItems": 1,
+                        "maxItems": MAX_ITEM_SCOPE_ENTRIES,
                         "items": {
                             "type": "object",
                             "additionalProperties": False,
-                            "required": ["path", "symbol", "kind", "rationale"],
+                            "required": [
+                                "requirement_id",
+                                "status",
+                                "existing_evidence",
+                                "remaining_requirement",
+                            ],
                             "properties": {
-                                "path": {"type": "string", "minLength": 1},
-                                "symbol": {"type": "string", "minLength": 1},
-                                "kind": {
-                                    "type": "string",
-                                    "enum": ["implementation", "test"],
-                                },
-                                "rationale": {
+                                "requirement_id": {
                                     "type": "string",
                                     "minLength": 1,
                                 },
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["complete", "partial", "missing"],
+                                },
+                                "existing_evidence": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": False,
+                                        "required": [
+                                            "path",
+                                            "symbol",
+                                            "kind",
+                                            "rationale",
+                                        ],
+                                        "properties": {
+                                            "path": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                            },
+                                            "symbol": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                            },
+                                            "kind": {
+                                                "type": "string",
+                                                "enum": ["implementation", "test"],
+                                            },
+                                            "rationale": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                            },
+                                        },
+                                    },
+                                },
+                                "remaining_requirement": {"type": "string"},
                             },
                         },
                     },
@@ -491,6 +528,22 @@ def _snapshot_fingerprint(snapshot: Mapping[str, Any]) -> str:
     return snapshot_digest(snapshot)
 
 
+def _plan_scope_requirements(item: Mapping[str, Any]) -> list[dict[str, str]]:
+    scope = item.get("scope")
+    item_id = item.get("id")
+    if (
+        not isinstance(item_id, str)
+        or not isinstance(scope, list)
+        or not scope
+        or not all(isinstance(value, str) and value.strip() for value in scope)
+    ):
+        raise PlanGenerationError("plan item scope requirements are malformed")
+    return [
+        {"requirement_id": f"{item_id}:scope-{index:02d}", "requirement": text}
+        for index, text in enumerate(scope, start=1)
+    ]
+
+
 def _validated_plan_coverage_assessments(
     audit: Any,
     draft_items: list[Any],
@@ -530,15 +583,32 @@ def _validated_plan_coverage_assessments(
         by_id[item_id] = {
             "item_id": item_id,
             "status": "missing",
-            "existing_evidence": [],
+            "scope_assessments": [
+                {
+                    "requirement_id": requirement["requirement_id"],
+                    "status": "missing",
+                    "existing_evidence": [],
+                    "remaining_requirement": "",
+                }
+                for requirement in _plan_scope_requirements(
+                    next(
+                        item
+                        for item in draft_items
+                        if isinstance(item, Mapping) and item.get("id") == item_id
+                    )
+                )
+            ],
             "remaining_work": "",
             "remaining_item": empty_remaining_item,
         }
 
     root = repository_root.resolve()
+    draft_by_id = {
+        str(item.get("id")): item for item in draft_items if isinstance(item, Mapping)
+    }
     for item_id, assessment in by_id.items():
         status = assessment.get("status")
-        evidence = assessment.get("existing_evidence")
+        scope_assessments = assessment.get("scope_assessments")
         remaining_work = assessment.get("remaining_work")
         remaining_item = assessment.get("remaining_item")
         if status not in {"complete", "partial", "missing"}:
@@ -546,7 +616,7 @@ def _validated_plan_coverage_assessments(
                 f"current-state audit has an invalid status for {item_id}"
             )
         if (
-            not isinstance(evidence, list)
+            not isinstance(scope_assessments, list)
             or not isinstance(remaining_work, str)
             or not isinstance(remaining_item, Mapping)
             or set(remaining_item)
@@ -562,78 +632,143 @@ def _validated_plan_coverage_assessments(
             raise PlanGenerationError(
                 f"current-state audit evidence is malformed for {item_id}"
             )
-        evidence_kinds: set[str] = set()
-        for entry in evidence:
-            if not isinstance(entry, Mapping) or set(entry) != {
-                "path",
-                "symbol",
-                "kind",
-                "rationale",
+        expected_requirements = _plan_scope_requirements(draft_by_id[item_id])
+        if len(scope_assessments) != len(expected_requirements):
+            raise PlanGenerationError(
+                f"current-state audit omitted scope requirements for {item_id}"
+            )
+        requirement_statuses: list[str] = []
+        for requirement, requirement_assessment in zip(
+            expected_requirements, scope_assessments, strict=True
+        ):
+            if not isinstance(requirement_assessment, Mapping) or set(
+                requirement_assessment
+            ) != {
+                "requirement_id",
+                "status",
+                "existing_evidence",
+                "remaining_requirement",
             }:
                 raise PlanGenerationError(
-                    f"current-state audit evidence is malformed for {item_id}"
+                    f"current-state scope assessment is malformed for {item_id}"
                 )
-            relative_path = entry.get("path")
-            symbol = entry.get("symbol")
-            kind = entry.get("kind")
-            rationale = entry.get("rationale")
+            requirement_id = requirement_assessment.get("requirement_id")
+            requirement_status = requirement_assessment.get("status")
+            evidence = requirement_assessment.get("existing_evidence")
+            remaining_requirement = requirement_assessment.get("remaining_requirement")
             if (
-                not isinstance(relative_path, str)
-                or not isinstance(symbol, str)
-                or not isinstance(kind, str)
-                or not isinstance(rationale, str)
-                or not rationale.strip()
-                or Path(relative_path).is_absolute()
-                or ".." in Path(relative_path).parts
-                or kind not in {"implementation", "test"}
+                requirement_id != requirement["requirement_id"]
+                or requirement_status not in {"complete", "partial", "missing"}
+                or not isinstance(evidence, list)
+                or not isinstance(remaining_requirement, str)
             ):
                 raise PlanGenerationError(
-                    f"current-state audit evidence is invalid for {item_id}"
+                    f"current-state scope assessment is invalid for {item_id}"
                 )
-            evidence_path = (root / relative_path).resolve()
-            if root not in evidence_path.parents or not evidence_path.is_file():
+            requirement_statuses.append(requirement_status)
+            evidence_kinds: set[str] = set()
+            for entry in evidence:
+                if not isinstance(entry, Mapping) or set(entry) != {
+                    "path",
+                    "symbol",
+                    "kind",
+                    "rationale",
+                }:
+                    raise PlanGenerationError(
+                        f"current-state audit evidence is malformed for {item_id}"
+                    )
+                relative_path = entry.get("path")
+                symbol = entry.get("symbol")
+                kind = entry.get("kind")
+                rationale = entry.get("rationale")
+                if (
+                    not isinstance(relative_path, str)
+                    or not isinstance(symbol, str)
+                    or not isinstance(kind, str)
+                    or not isinstance(rationale, str)
+                    or not rationale.strip()
+                    or Path(relative_path).is_absolute()
+                    or ".." in Path(relative_path).parts
+                    or kind not in {"implementation", "test"}
+                ):
+                    raise PlanGenerationError(
+                        f"current-state audit evidence is invalid for {item_id}"
+                    )
+                evidence_path = (root / relative_path).resolve()
+                if root not in evidence_path.parents or not evidence_path.is_file():
+                    raise PlanGenerationError(
+                        "current-state audit cited a missing repository file for "
+                        f"{item_id}: {relative_path}"
+                    )
+                try:
+                    evidence_text = evidence_path.read_text(encoding="utf-8")
+                except (OSError, UnicodeError) as error:
+                    raise PlanGenerationError(
+                        f"could not read current-state audit evidence for {item_id}: "
+                        f"{relative_path}"
+                    ) from error
+                if symbol not in evidence_text:
+                    raise PlanGenerationError(
+                        "current-state audit cited a symbol absent from "
+                        f"{relative_path}: {symbol}"
+                    )
+                if kind == "test" and not any(
+                    part.casefold().startswith("test")
+                    or "test" in part.casefold()
+                    or "fixture" in part.casefold()
+                    for part in Path(relative_path).parts
+                ):
+                    raise PlanGenerationError(
+                        "current-state audit cited a non-test file as test "
+                        f"evidence: {relative_path}"
+                    )
+                evidence_kinds.add(kind)
+            if requirement_status == "complete" and evidence_kinds != {
+                "implementation",
+                "test",
+            }:
                 raise PlanGenerationError(
-                    "current-state audit cited a missing repository file for "
-                    f"{item_id}: "
-                    f"{relative_path}"
+                    f"complete scope requirement {requirement_id} needs "
+                    "implementation and test evidence"
                 )
-            try:
-                evidence_text = evidence_path.read_text(encoding="utf-8")
-            except (OSError, UnicodeError) as error:
-                raise PlanGenerationError(
-                    f"could not read current-state audit evidence for {item_id}: "
-                    f"{relative_path}"
-                ) from error
-            if symbol not in evidence_text:
-                raise PlanGenerationError(
-                    f"current-state audit cited a symbol absent from {relative_path}: "
-                    f"{symbol}"
-                )
-            if kind == "test" and not any(
-                part.casefold().startswith("test")
-                or "test" in part.casefold()
-                or "fixture" in part.casefold()
-                for part in Path(relative_path).parts
+            if requirement_status == "partial" and (
+                not evidence
+                or not remaining_requirement.strip()
+                or "implementation" not in evidence_kinds
             ):
                 raise PlanGenerationError(
-                    f"current-state audit cited a non-test file as test evidence: "
-                    f"{relative_path}"
+                    f"partial scope requirement {requirement_id} needs existing "
+                    "implementation evidence and a concrete remainder"
                 )
-            evidence_kinds.add(kind)
+            if requirement_status == "missing" and (
+                evidence or remaining_requirement.strip()
+            ):
+                raise PlanGenerationError(
+                    f"missing scope requirement {requirement_id} cannot claim "
+                    "existing evidence or a narrowed remainder"
+                )
+        derived_status = (
+            "complete"
+            if all(value == "complete" for value in requirement_statuses)
+            else (
+                "missing"
+                if all(value == "missing" for value in requirement_statuses)
+                else "partial"
+            )
+        )
+        if status != derived_status:
+            raise PlanGenerationError(
+                f"current-state audit status does not match scope assessments for "
+                f"{item_id}"
+            )
         if status == "complete":
-            if evidence_kinds != {"implementation", "test"}:
-                raise PlanGenerationError(
-                    f"complete plan item {item_id} needs implementation "
-                    "and test evidence"
-                )
             if any(remaining_item.values()):
                 raise PlanGenerationError(
                     f"complete plan item {item_id} must have no remaining item"
                 )
         elif status == "partial":
             if (
-                not evidence
-                or not remaining_work.strip()
+                not remaining_work.strip()
                 or not isinstance(remaining_item.get("title"), str)
                 or not remaining_item["title"].strip()
                 or not isinstance(remaining_item.get("objective"), str)
@@ -656,10 +791,9 @@ def _validated_plan_coverage_assessments(
                 raise PlanGenerationError(
                     f"partial plan item {item_id} needs a concrete remaining item"
                 )
-        elif status == "missing" and evidence:
-            raise PlanGenerationError(
-                f"missing plan item {item_id} cannot cite existing evidence"
-            )
+        normalized_assessment = dict(assessment)
+        normalized_assessment["_scope_requirements"] = expected_requirements
+        by_id[item_id] = normalized_assessment
     return by_id
 
 
@@ -695,6 +829,37 @@ def _apply_plan_coverage_assessments(
                 "acceptance_criteria",
             ):
                 rewritten[field] = remaining_item[field]
+        scope_assessments = assessment.get("scope_assessments")
+        if isinstance(scope_assessments, list):
+            raw_requirements = assessment.get("_scope_requirements")
+            requirements = (
+                raw_requirements
+                if isinstance(raw_requirements, list)
+                else _plan_scope_requirements(item)
+            )
+            by_requirement = {
+                str(entry.get("requirement_id")): entry
+                for entry in scope_assessments
+                if isinstance(entry, Mapping)
+            }
+            remaining_scope: list[str] = []
+            for requirement in requirements:
+                entry = by_requirement.get(requirement["requirement_id"])
+                if not isinstance(entry, Mapping):
+                    remaining_scope.append(requirement["requirement"])
+                    continue
+                requirement_status = entry.get("status")
+                if requirement_status == "complete":
+                    continue
+                if requirement_status == "partial":
+                    remaining_requirement = entry.get("remaining_requirement")
+                    if isinstance(remaining_requirement, str) and remaining_requirement:
+                        remaining_scope.append(remaining_requirement)
+                    else:
+                        remaining_scope.append(requirement["requirement"])
+                else:
+                    remaining_scope.append(requirement["requirement"])
+            rewritten["scope"] = remaining_scope
         audited.append(rewritten)
     completed_ids = {
         item_id
@@ -1607,13 +1772,17 @@ def generate_execution_plan_yaml(
                     "role": "system",
                     "content": (
                         "Audit every draft item against the current repository. "
-                        "For each item, choose complete only when the concrete "
-                        "behavior is implemented and relevant tests exercise it; "
-                        "choose partial when some behavior exists and name the "
-                        "remaining behavior; choose missing when the evidence does "
-                        "not show implementation. Cite exact repository-relative "
-                        "file paths and symbol names for implementation and test "
-                        "evidence. For partial items, write a complete remaining_item "
+                        "Assess every supplied scope requirement separately using "
+                        "its exact requirement_id. Mark complete only when that "
+                        "requirement is implemented and relevant tests exercise it; "
+                        "mark partial when part exists, cite its implementation, and "
+                        "state only the unimplemented remainder; mark missing when "
+                        "the evidence does not show implementation. Cite exact "
+                        "repository-relative paths and symbols in each requirement's "
+                        "existing_evidence. Set the item status to complete only if "
+                        "all scope requirements are complete, missing only if all "
+                        "are missing, and partial otherwise. For partial items, "
+                        "write a complete remaining_item "
                         "containing only the unimplemented title, objective, scope, "
                         "paths, implementation steps, and acceptance criteria. For "
                         "complete items, remaining_item fields must be empty. For "
@@ -1623,7 +1792,8 @@ def generate_execution_plan_yaml(
                         "their names. A test declaration is evidence of coverage, "
                         "not proof that the test passed. Do not mark a draft item "
                         "missing merely because its code is in a differently named "
-                        "file. Return one assessment for every draft item."
+                        "file. Return one assessment for every draft item and one "
+                        "scope_assessment for every supplied scope requirement."
                     ),
                 },
                 {
@@ -1633,6 +1803,11 @@ def generate_execution_plan_yaml(
                             "task": "Classify the draft work by existing coverage.",
                             "source_plan_markdown": source_plan,
                             "draft_items": raw_items,
+                            "scope_requirements_by_item": {
+                                str(item["id"]): _plan_scope_requirements(item)
+                                for item in raw_items
+                                if isinstance(item, Mapping)
+                            },
                             "repository_code_context_before_draft": (
                                 repository_code_context
                             ),
@@ -1673,7 +1848,9 @@ def generate_execution_plan_yaml(
                         "coverage assessments. Remove every item assessed complete; "
                         "the runtime will remove it even if it is returned. "
                         "For partial items, use the audited remaining_item as the "
-                        "replacement for the original scope. "
+                        "replacement for the original item and retain exactly the "
+                        "scope-assessment remainders. Fully covered scope entries "
+                        "are removed deterministically after reconciliation. "
                         "Remove work already "
                         "implemented and covered by relevant tests; narrow partial "
                         "work to missing behavior; preserve requirements without "

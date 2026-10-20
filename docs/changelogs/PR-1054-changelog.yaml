@@ -9,25 +9,59 @@ structured_files: []
 files:
 - path: docs/procedrr/processes/start-implementing-feature.yaml
   type: modified
-  span:
-    start_line: 217
-    end_line: 219
-  summary: Add an independent code quality review between complexity review and final plan formation.
-  rationale: Check reuse, long conditional dispatch, and legacy behavior against planned changes and explicit feature requirements.
+  span: {start_line: 217, end_line: 217}
+  summary: Add an independent code quality review after complexity review.
+  rationale: Check duplication, long conditional dispatch, and planned legacy behavior against explicit feature requirements.
 - path: docs/procedrr/processes/start-implementing-feature.yaml
   type: modified
-  span:
-    start_line: 219
-    end_line: 227
-  summary: Pass code quality findings into final plan formation and require each finding to be resolved.
-  rationale: Make supported refactoring, command pattern recommendations, and legacy removal part of the proposed plan.
+  span: {start_line: 219, end_line: 219}
+  summary: Pass the structured quality review to the final PR planner.
+  rationale: Ensure every proposed PR's findings reach plan reconciliation.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span: {start_line: 222, end_line: 223}
+  summary: Require the final planner to resolve code quality and complexity findings.
+  rationale: Make supported refactoring, command pattern recommendations, and removal of unrequired legacy behavior actionable in the plan.
 - path: tests/test_procedrr.py
   type: modified
-  span:
-    start_line: 800
-    end_line: 870
-  summary: Verify the code quality review schema, ordering, recommendations, and final plan handoff.
-  rationale: Prevent regressions that skip review or fail to reconcile its findings.
+  span: {start_line: 800, end_line: 800}
+  summary: Rename the planning review test to cover complexity and code quality.
+  rationale: Keep the test name aligned with its expanded coverage.
+- path: tests/test_procedrr.py
+  type: modified
+  span: {start_line: 816, end_line: 817}
+  summary: Assert that code quality review runs between complexity review and final planning.
+  rationale: Protect the workflow sequence.
+- path: tests/test_procedrr.py
+  type: modified
+  span: {start_line: 820, end_line: 821}
+  summary: Capture both review steps in the workflow test.
+  rationale: Inspect each output contract independently.
+- path: tests/test_procedrr.py
+  type: modified
+  span: {start_line: 824, end_line: 824}
+  summary: Require both independent reviews before final plan formation.
+  rationale: Prevent either review from being skipped.
+- path: tests/test_procedrr.py
+  type: modified
+  span: {start_line: 831, end_line: 831}
+  summary: Verify the complexity review handoff.
+  rationale: Preserve the existing structured complexity review contract.
+- path: tests/test_procedrr.py
+  type: modified
+  span: {start_line: 838, end_line: 838}
+  summary: Verify the complexity review's existing pushback categories.
+  rationale: Preserve coverage while adding the code quality review.
+- path: tests/test_procedrr.py
+  type: modified
+  span: {start_line: 842, end_line: 858}
+  summary: Verify the code quality review fields, categories, and instructions.
+  rationale: Require explicit examination of reuse, command style dispatch, and legacy behavior.
+- path: tests/test_procedrr.py
+  type: modified
+  span: {start_line: 860, end_line: 865}
+  summary: Verify final planning receives and resolves both review outputs.
+  rationale: Ensure findings from both reviewers are reconciled before the plan is finalized.
 entities:
 - id: proposed-pr-code-quality-review-step
   type: Step

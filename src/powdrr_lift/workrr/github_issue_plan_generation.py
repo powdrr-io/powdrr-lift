@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import re
@@ -525,6 +526,13 @@ def inspect_repository_code(
                     continue
                 first = max(1, start or 1)
                 last = min(len(lines), end or first + 80, first + 159)
+                if file_path.suffix.casefold() == ".py":
+                    first, last = _expand_python_symbol_span(
+                        symbol,
+                        lines,
+                        fallback_start=first,
+                        fallback_end=last,
+                    )
                 excerpt = "\n".join(
                     f"{number}: {lines[number - 1]}"
                     for number in range(first, last + 1)
@@ -585,6 +593,73 @@ def inspect_repository_code(
         + "Symbol definitions and tests are evidence; they do not prove tests pass.\n"
         + code_context
     )
+
+
+def _expand_python_symbol_span(
+    symbol: Mapping[str, Any],
+    lines: list[str],
+    *,
+    fallback_start: int,
+    fallback_end: int,
+) -> tuple[int, int]:
+    """Expand a language-server symbol range to its complete Python definition."""
+    name = symbol.get("name")
+    if not isinstance(name, str) or not lines:
+        return fallback_start, fallback_end
+    try:
+        tree = ast.parse("\n".join(lines))
+    except SyntaxError:
+        return fallback_start, fallback_end
+
+    candidates: list[ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef] = []
+    parents: dict[ast.AST, ast.AST] = {}
+    for parent in ast.walk(tree):
+        for child in ast.iter_child_nodes(parent):
+            parents[child] = parent
+        if (
+            isinstance(parent, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+            and parent.name == name
+        ):
+            candidates.append(parent)
+
+    reported_line = fallback_start
+    container_name = symbol.get("container_name")
+    matching = [
+        node
+        for node in candidates
+        if node.lineno <= reported_line <= (node.end_lineno or node.lineno)
+        or any(
+            decorator.lineno <= reported_line <= (node.end_lineno or node.lineno)
+            for decorator in node.decorator_list
+        )
+    ]
+    if isinstance(container_name, str):
+        matching = [
+            node
+            for node in matching
+            if any(
+                isinstance(parent, ast.ClassDef) and parent.name == container_name
+                for parent in _ast_ancestors(node, parents)
+            )
+        ]
+    if not matching:
+        return fallback_start, fallback_end
+
+    node = min(matching, key=lambda candidate: candidate.end_lineno or candidate.lineno)
+    definition_start = min(
+        [node.lineno, *(decorator.lineno for decorator in node.decorator_list)]
+    )
+    definition_end = node.end_lineno or node.lineno
+    return max(1, definition_start), min(len(lines), definition_end)
+
+
+def _ast_ancestors(node: ast.AST, parents: Mapping[ast.AST, ast.AST]) -> list[ast.AST]:
+    ancestors: list[ast.AST] = []
+    current = parents.get(node)
+    while current is not None:
+        ancestors.append(current)
+        current = parents.get(current)
+    return ancestors
 
 
 @dataclass(frozen=True, slots=True)

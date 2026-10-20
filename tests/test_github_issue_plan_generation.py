@@ -249,6 +249,7 @@ def test_inspect_repository_code_follows_up_with_symbol_and_test_lookups(
     assert "src/attestation/verifier.py" in context
     assert "tests/test_verifier.py" in context
     assert "verify_ed25519_signature" in context
+    assert "assert not verify_signature(b'invalid')" in context
     assert "Analyzed checkout: commit unborn HEAD" in context
     assert "working tree has changes: yes" in context
     assert "working-tree status ??; not in analyzed commit" in context

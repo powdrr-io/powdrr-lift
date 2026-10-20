@@ -846,19 +846,45 @@ def test_feature_plan_gets_complexity_and_quality_reviews_before_final_plan() ->
         "duplication_and_reuse",
         "conditional_dispatch",
         "legacy_compatibility",
+        "error_handling",
+        "contracts",
+        "test_quality",
+        "resource_lifecycle",
+        "concurrency",
+        "security",
         "recommended_design",
     }.issubset(quality_review["reviews"]["items"]["properties"])
     assert quality_review["pushbacks"]["items"]["properties"]["category"]["enum"] == [
         "duplication",
         "command_pattern",
         "legacy_compatibility",
+        "error_handling",
+        "contracts",
+        "test_quality",
+        "resource_lifecycle",
+        "concurrency",
+        "security",
     ]
     assert "long if/elif/else sequences" in quality["details"]
     assert "command pattern" in quality["details"]
     assert "explicit feature requirement" in quality["details"]
+    for area in (
+        "unbounded",
+        "inputs, outputs, state changes",
+        "meaningful public",
+        "cleanup and ownership",
+        "race and ordering",
+        "untrusted input",
+        "conditional review areas",
+    ):
+        assert area in quality["details"]
     assert "planning_pushback" in [item["name"] for item in final_plan["inputs"]]
     assert "code_quality_review" in [item["name"] for item in final_plan["inputs"]]
     assert "Address every code-quality finding_id exactly once" in final_plan["details"]
+    assert (
+        "error-handling, contract, test, lifecycle, concurrency"
+        in final_plan["details"]
+    )
     assert (
         "Then address each planning-complexity finding_id exactly once"
         in final_plan["details"]

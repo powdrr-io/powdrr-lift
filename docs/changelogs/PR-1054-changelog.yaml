@@ -2,8 +2,8 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1054
 title: Add planning code quality review
 intent:
-  problem: Proposed implementation plans can duplicate existing behavior, preserve legacy paths without a requirement, or use long conditional dispatch instead of a command structure.
-  goal: Independently review each proposed PR for these code quality risks and require the final plan to resolve concrete findings.
+  problem: Proposed implementation plans can duplicate behavior, preserve unnecessary legacy paths, use long conditional dispatch, or miss important error, contract, test, lifecycle, concurrency, and security risks.
+  goal: Independently review each proposed PR for applicable code quality risks and require the final plan to resolve concrete findings.
 human-decisions: []
 structured_files: []
 files:
@@ -11,7 +11,7 @@ files:
   type: modified
   span: {start_line: 217, end_line: 217}
   summary: Add an independent code quality review after complexity review.
-  rationale: Check duplication, long conditional dispatch, and planned legacy behavior against explicit feature requirements.
+  rationale: Check reuse, long conditional dispatch, legacy behavior, and applicable reliability and security concerns against source evidence and explicit feature requirements.
 - path: docs/procedrr/processes/start-implementing-feature.yaml
   type: modified
   span: {start_line: 219, end_line: 219}
@@ -21,7 +21,7 @@ files:
   type: modified
   span: {start_line: 222, end_line: 223}
   summary: Require the final planner to resolve code quality and complexity findings.
-  rationale: Make supported refactoring, command pattern recommendations, and removal of unrequired legacy behavior actionable in the plan.
+  rationale: Make supported refactoring, command pattern recommendations, justified legacy behavior, and scoped fixes for applicable reliability and security findings actionable in the plan.
 - path: tests/test_procedrr.py
   type: modified
   span: {start_line: 800, end_line: 800}
@@ -59,6 +59,26 @@ files:
   rationale: Require explicit examination of reuse, command style dispatch, and legacy behavior.
 - path: tests/test_procedrr.py
   type: modified
+  span: {start_line: 849, end_line: 854}
+  summary: Require structured review fields for error handling, contracts, test quality, lifecycle, concurrency, and security.
+  rationale: Keep the added review dimensions explicit in its output contract.
+- path: tests/test_procedrr.py
+  type: modified
+  span: {start_line: 861, end_line: 866}
+  summary: Allow actionable pushbacks for the added code quality dimensions.
+  rationale: Ensure concrete findings can flow to final planning.
+- path: tests/test_procedrr.py
+  type: modified
+  span: {start_line: 871, end_line: 880}
+  summary: Verify the additional checks are conditional and evidence-based.
+  rationale: Avoid manufacturing findings for paths the change does not affect.
+- path: tests/test_procedrr.py
+  type: modified
+  span: {start_line: 884, end_line: 886}
+  summary: Verify final planning receives and resolves the additional quality findings.
+  rationale: Ensure scoped fixes and validation are included when those findings apply.
+- path: tests/test_procedrr.py
+  type: modified
   span: {start_line: 860, end_line: 865}
   summary: Verify final planning receives and resolves both review outputs.
   rationale: Ensure findings from both reviewers are reconciled before the plan is finalized.
@@ -72,7 +92,7 @@ entities:
 entity_relationships: []
 invariants:
 - id: every-proposed-pr-gets-code-quality-review
-  description: Every proposed PR receives a review of duplicate behavior, long operation dispatch, and planned legacy compatibility paths, with concrete source or requirement evidence.
+  description: Every proposed PR receives an evidence-based review of duplication, long operation dispatch, legacy behavior, and applicable error, contract, test, lifecycle, concurrency, and security risks; irrelevant review dimensions do not create findings.
   action: added
 - id: final-plan-resolves-code-quality-findings
   description: The final plan resolves each concrete code quality finding by adopting it or providing evidence in the affected PR justification; legacy behavior remains only for explicit feature requirements or acceptance criteria.
@@ -83,4 +103,7 @@ guidance:
   action: added
 - id: avoid-unrequired-legacy-support
   description: Do not preserve legacy, fallback, or compatibility behavior unless an explicit feature requirement or acceptance criterion calls for it.
+  action: added
+- id: condition-quality-pushback-on-evidence
+  description: Ground quality findings in exact code or requirements, and raise concurrency, lifecycle, and security recommendations only when the planned change touches those concerns.
   action: added

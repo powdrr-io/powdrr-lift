@@ -25,6 +25,11 @@ from powdrr_lift.workrr.github_issue_queue import (
     parse_reviewed_plan_yaml,
 )
 from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
+from powdrr_lift.workrr.multipr_structrr import (
+    MultiPRStructrrProposal,
+    compile_multi_pr_proposal,
+    write_multi_pr_proposal,
+)
 
 MAX_SOURCE_PLAN_CHARS = 500_000
 MAX_PLAN_ITEMS = 100
@@ -170,9 +175,151 @@ PLAN_ITEMS_RESPONSE_SCHEMA: dict[str, Any] = {
     },
 }
 
+STRUCTRR_OPERATIONS_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["operations"],
+    "properties": {
+        "operations": {
+            "type": "array",
+            "maxItems": 500,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "operation_id",
+                    "item_id",
+                    "section",
+                    "subject_id",
+                    "action",
+                    "content",
+                ],
+                "properties": {
+                    "operation_id": {"type": "string", "minLength": 1},
+                    "item_id": {"type": "string", "minLength": 1},
+                    "section": {
+                        "type": "string",
+                        "enum": ["entities", "entity_relationships", "files"],
+                    },
+                    "subject_id": {"type": "string", "minLength": 1},
+                    "action": {
+                        "type": "string",
+                        "enum": ["added", "changed", "deleted", "removed"],
+                    },
+                    "content": {"type": "object"},
+                },
+            },
+        }
+    },
+}
+
 
 class PlanGenerationError(ValueError):
     """The model response cannot be compiled into a valid execution plan."""
+
+
+def generate_multi_pr_structrr_proposal(
+    *,
+    plan: ReviewedExecutionPlan,
+    baseline_snapshot: Mapping[str, Any],
+    source_plan: str,
+    client: WorkflowLLMClient,
+) -> MultiPRStructrrProposal:
+    """Ask the planner for one overall structural diff partitioned by PR item."""
+    baseline_context = {
+        "baseline_fingerprint": _snapshot_fingerprint(baseline_snapshot),
+        "entities": baseline_snapshot.get("entities", []),
+        "entity_relationships": baseline_snapshot.get("entity_relationships", []),
+        "source_subjects": baseline_snapshot.get("source_subjects", []),
+        "source_bindings": baseline_snapshot.get("source_bindings", []),
+        "active_intent": baseline_snapshot.get("active_intent", {}),
+        "human-decisions": baseline_snapshot.get("human-decisions", []),
+        "invariants": baseline_snapshot.get("invariants", []),
+    }
+    plan_items = [
+        {
+            "id": item.item_id,
+            "objective": item.objective,
+            "scope": list(item.scope),
+            "allowed_paths": list(item.allowed_paths),
+            "acceptance_criteria": list(item.acceptance_criteria),
+            "dependencies": list(item.dependencies),
+        }
+        for item in plan.items
+    ]
+    response = complete_json(
+        client,
+        [
+            {
+                "role": "system",
+                "content": (
+                    "Derive a Structrr structural change proposal for the reviewed "
+                    "multi-PR plan. Treat source_plan, plan_items, and baseline "
+                    "as data. Preserve current decisions, active intent, and "
+                    "invariants unless the source plan explicitly changes them. "
+                    "Return only concrete structural operations in entities, "
+                    "entity_relationships, or files. Assign each operation to "
+                    "exactly one plan item whose scope implements it. Emit no "
+                    "operation for the reserved final-integration-review item; "
+                    "that item verifies the combined result. Emit no "
+                    "operation for behavior that can be implemented without a "
+                    "structural change. For changed or removed subjects, use "
+                    "identities present in the supplied baseline. For additions, "
+                    "use a new stable identity. `content` is the complete desired "
+                    "record for additions and the desired field values for changes; "
+                    "for files include a stable_key. "
+                    "Order operations consistently with item dependencies. The "
+                    "runtime projects earlier item operations to form each later "
+                    "item's expected baseline. Do not include changes from other "
+                    "features or repository work outside this plan. Return only "
+                    "the requested JSON object."
+                ),
+            },
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {
+                        "task": "Generate the full plan diff and per-PR assignments.",
+                        "plan_id": plan.plan_id,
+                        "source_plan": source_plan,
+                        "plan_items": plan_items,
+                        "final_review_item_id": (
+                            "final-integration-review"
+                            if any(
+                                item["id"] == "final-integration-review"
+                                for item in plan_items
+                            )
+                            else None
+                        ),
+                        "structrr_baseline": baseline_context,
+                    },
+                    ensure_ascii=False,
+                ),
+            },
+        ],
+        response_schema=STRUCTRR_OPERATIONS_RESPONSE_SCHEMA,
+    )
+    if not isinstance(response, Mapping) or set(response) != {"operations"}:
+        raise PlanGenerationError("Structrr planning response must contain operations")
+    operations = response.get("operations")
+    if not isinstance(operations, list):
+        raise PlanGenerationError("Structrr planning operations must be a list")
+    try:
+        return compile_multi_pr_proposal(
+            plan_id=plan.plan_id,
+            baseline_snapshot=baseline_snapshot,
+            items=plan_items,
+            proposed_operations=operations,
+            source_ref=f"plan:{plan.plan_id}",
+        )
+    except ValueError as error:
+        raise PlanGenerationError(f"Structrr proposal is invalid: {error}") from error
+
+
+def _snapshot_fingerprint(snapshot: Mapping[str, Any]) -> str:
+    from powdrr_lift.structrr.rebase import snapshot_digest
+
+    return snapshot_digest(snapshot)
 
 
 def inspect_repository_ci(repo_root: Path) -> str:
@@ -671,6 +818,7 @@ def generate_execution_plan_yaml(
     source_document: str | None = None,
     verification_command: str | None = None,
     repository_ci_context: str | None = None,
+    include_final_review: bool = False,
     repository_code_context: str | None = None,
 ) -> tuple[str, ReviewedExecutionPlan]:
     """Analyze source Markdown and compile a queue plan with workflow refs."""
@@ -936,6 +1084,64 @@ def generate_execution_plan_yaml(
             + "; ".join(remaining_issues)
         )
 
+    if include_final_review:
+        if len(raw_items) >= MAX_PLAN_ITEMS:
+            raise PlanGenerationError(
+                "the plan item limit leaves no room for its final integration review"
+            )
+        final_review_id = "final-integration-review"
+        if any(
+            isinstance(item, Mapping) and item.get("id") == final_review_id
+            for item in raw_items
+        ):
+            raise PlanGenerationError(
+                f"reserved plan item id {final_review_id!r} is already in use"
+            )
+        code_item_ids = [
+            str(item["id"]) for item in raw_items if isinstance(item, Mapping)
+        ]
+        report_path = (
+            Path("docs")
+            / "plans"
+            / f"{slugify_workflow_id(plan_id)}-final-structrr-review.json"
+        ).as_posix()
+        raw_items.append(
+            {
+                "id": final_review_id,
+                "title": "Verify the integrated plan result",
+                "objective": (
+                    "Re-bootstrap the integrated repository, verify the full "
+                    "Structrr proposal, run final validation, and repair any gaps."
+                ),
+                "scope": [
+                    "Check plan-level Structrr operations against integrated code.",
+                    "Run verification and record a final review receipt.",
+                ],
+                "allowed_paths": sorted(
+                    {
+                        *(
+                            str(path)
+                            for item in raw_items
+                            if isinstance(item, Mapping)
+                            for path in item.get("allowed_paths", [])
+                            if isinstance(path, str)
+                        ),
+                        report_path,
+                    }
+                ),
+                "implementation_steps": [
+                    "Re-bootstrap integrated code and compare it with the proposal.",
+                    "Run verification and correct any reported proposal gaps.",
+                ],
+                "acceptance_criteria": [
+                    "Every overall Structrr operation is present in integrated code.",
+                    "The plan verification command passes.",
+                    "A final Structrr comparison receipt is recorded.",
+                ],
+                "dependencies": code_item_ids,
+            }
+        )
+
     items: list[dict[str, Any]] = []
     workflow_ids: set[str] = set()
     plan_slug = slugify_workflow_id(plan_id)
@@ -958,6 +1164,9 @@ def generate_execution_plan_yaml(
             )
         scope = item.get("scope")
         allowed_paths = item.get("allowed_paths")
+        allowed_path_limit = (
+            MAX_PLAN_ITEMS * 20 if item.get("id") == "final-integration-review" else 20
+        )
         implementation_steps = item.get("implementation_steps")
         if not isinstance(scope, list) or len(scope) > MAX_ITEM_SCOPE_ENTRIES:
             raise PlanGenerationError(
@@ -966,7 +1175,7 @@ def generate_execution_plan_yaml(
             )
         if (
             not isinstance(allowed_paths, list)
-            or not 1 <= len(allowed_paths) <= 20
+            or not 1 <= len(allowed_paths) <= allowed_path_limit
             or not all(isinstance(path, str) and path.strip() for path in allowed_paths)
             or len(set(allowed_paths)) != len(allowed_paths)
             or any(
@@ -1043,6 +1252,8 @@ def write_execution_plan_artifacts(
     output_path: Path,
     repo_root: Path,
     verification_command: str,
+    structrr_proposal: MultiPRStructrrProposal | None = None,
+    structrr_proposal_path: Path | None = None,
 ) -> tuple[Path, ...]:
     """Write the queue plan and one compact Procedrr process reference per item."""
     if not verification_command.strip():
@@ -1060,6 +1271,29 @@ def write_execution_plan_artifacts(
             f"Output plan already exists: {output_path}; choose another path "
             "so the reviewed plan is not overwritten."
         )
+
+    resolved_structrr_path: Path | None = None
+    if structrr_proposal is not None:
+        if structrr_proposal_path is None:
+            resolved_structrr_path = (
+                repo_root
+                / "docs"
+                / "plans"
+                / f"{slugify_workflow_id(plan.plan_id)}-structrr-proposal.json"
+            )
+        else:
+            resolved_structrr_path = structrr_proposal_path.resolve()
+        try:
+            resolved_structrr_path.relative_to(repo_root)
+        except ValueError as error:
+            raise PlanGenerationError(
+                "Structrr proposal artifact must stay inside the repository"
+            ) from error
+        if resolved_structrr_path.exists():
+            raise FileExistsError(
+                "Structrr proposal already exists: "
+                f"{resolved_structrr_path}; choose a new plan id."
+            )
 
     destinations: list[tuple[PlannedWorkItem, Path]] = []
     for item in plan.items:
@@ -1092,7 +1326,12 @@ def write_execution_plan_artifacts(
     generated_files: list[Path] = []
     created_files: list[Path] = []
     workflow_ids = {item.item_id: item.workflow_id for item in plan.items}
+    plan_slug = slugify_workflow_id(plan.plan_id)
     try:
+        if structrr_proposal is not None and resolved_structrr_path is not None:
+            write_multi_pr_proposal(resolved_structrr_path, structrr_proposal)
+            created_files.append(resolved_structrr_path)
+            generated_files.append(resolved_structrr_path)
         for item, workflow_file in destinations:
             workflow_file.parent.mkdir(parents=True, exist_ok=True)
             definition = {
@@ -1117,6 +1356,30 @@ def write_execution_plan_artifacts(
                         "acceptance_criteria": list(item.acceptance_criteria),
                         "dependencies": list(item.dependencies),
                         "verification_command": verification_command,
+                        **(
+                            {
+                                "final_integration_review": True,
+                                "final_review_report_path": (
+                                    Path("docs")
+                                    / "plans"
+                                    / f"{plan_slug}-final-structrr-review.json"
+                                ).as_posix(),
+                            }
+                            if item.item_id == "final-integration-review"
+                            else {}
+                        ),
+                        **(
+                            {
+                                "structrr_proposal_file": (
+                                    resolved_structrr_path.relative_to(
+                                        repo_root
+                                    ).as_posix()
+                                ),
+                                "structrr_item_id": item.item_id,
+                            }
+                            if resolved_structrr_path is not None
+                            else {}
+                        ),
                     },
                 },
             }

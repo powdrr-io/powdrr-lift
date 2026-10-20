@@ -130,7 +130,7 @@ def compile_proposal_revision(
                 if raw_action == "changed"
                 else "add"
             )
-            raw_subject = item.get("id", f"item-{index}")
+            raw_subject = item.get("id", item.get("stable_key", f"item-{index}"))
             subject_id = str(raw_subject)
             operation_id = f"{action}:{section}:{subject_id}"
             if operation_id in seen_ids:

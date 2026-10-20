@@ -191,6 +191,7 @@ from powdrr_lift.workrr.differential_verification import (
 )
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
+    _structrr_taxonomy_path,
     run_feature_endpoint,
     run_feature_in_place,
 )
@@ -214,6 +215,7 @@ from powdrr_lift.workrr.git import (
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanGenerationError,
     generate_execution_plan_yaml,
+    generate_multi_pr_structrr_proposal,
     inspect_repository_ci,
     load_plan_workflow_instance,
     publish_execution_plan_pull_request,
@@ -2577,6 +2579,25 @@ def _run_plan(args: argparse.Namespace) -> int:
         )
         if callable(set_output_limit):
             set_output_limit(8192)
+        bootstrap_output = (
+            repo_root
+            / ".powdrr"
+            / "plan-structrr-bootstrap"
+            / f"{slugify_workflow_id(args.plan_id)}.yaml"
+        )
+        bootstrap = bootstrap_structrr(
+            repo_root,
+            output_path=bootstrap_output,
+            taxonomy_path=_structrr_taxonomy_path(repo_root),
+        )
+        if not bootstrap.validation.successful:
+            details = "; ".join(
+                f"{issue.code}: {issue.message}"
+                for issue in bootstrap.validation.issues
+            )
+            raise PlanGenerationError(
+                f"Structrr bootstrap failed before plan generation: {details}"
+            )
         source_plan_relative = source_path.relative_to(repo_root).as_posix()
         rendered, plan = generate_execution_plan_yaml(
             source_plan=source_plan,
@@ -2585,6 +2606,13 @@ def _run_plan(args: argparse.Namespace) -> int:
             source_document=source_plan_relative,
             verification_command=args.verification_command,
             repository_ci_context=inspect_repository_ci(repo_root),
+            include_final_review=True,
+        )
+        structrr_proposal = generate_multi_pr_structrr_proposal(
+            plan=plan,
+            baseline_snapshot=bootstrap.document,
+            source_plan=source_plan,
+            client=planning_client,
         )
         generated_files = write_execution_plan_artifacts(
             rendered_plan=rendered,
@@ -2592,6 +2620,7 @@ def _run_plan(args: argparse.Namespace) -> int:
             output_path=output_path,
             repo_root=repo_root,
             verification_command=args.verification_command,
+            structrr_proposal=structrr_proposal,
         )
         for generated_file in generated_files:
             _stage_generated_file(repo_root, generated_file)

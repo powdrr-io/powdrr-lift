@@ -740,12 +740,17 @@ def _validated_plan_coverage_assessments(
                     f"partial scope requirement {requirement_id} needs existing "
                     "implementation evidence and a concrete remainder"
                 )
-            if requirement_status == "missing" and (
-                evidence or remaining_requirement.strip()
+            if (
+                requirement_status == "missing"
+                and remaining_requirement.strip()
+                not in {
+                    "",
+                    requirement["requirement"],
+                }
             ):
                 raise PlanGenerationError(
-                    f"missing scope requirement {requirement_id} cannot claim "
-                    "existing evidence or a narrowed remainder"
+                    f"missing scope requirement {requirement_id} must retain its "
+                    "full original scope"
                 )
         derived_status = (
             "complete"
@@ -1781,7 +1786,11 @@ def generate_execution_plan_yaml(
                         "repository-relative paths and symbols in each requirement's "
                         "existing_evidence. Set the item status to complete only if "
                         "all scope requirements are complete, missing only if all "
-                        "are missing, and partial otherwise. For partial items, "
+                        "are missing, and partial otherwise. For missing scope "
+                        "requirements, cite related implementation or tests only "
+                        "when the rationale explains why they do not satisfy that "
+                        "requirement, and leave remaining_requirement empty or repeat "
+                        "its full original text. For partial items, "
                         "write a complete remaining_item "
                         "containing only the unimplemented title, objective, scope, "
                         "paths, implementation steps, and acceptance criteria. For "

@@ -214,6 +214,7 @@ from powdrr_lift.workrr.git import (
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanGenerationError,
     generate_execution_plan_yaml,
+    inspect_repository_ci,
     load_plan_workflow_instance,
     publish_execution_plan_pull_request,
     write_execution_plan_artifacts,
@@ -2582,6 +2583,8 @@ def _run_plan(args: argparse.Namespace) -> int:
             plan_id=args.plan_id,
             client=planning_client,
             source_document=source_plan_relative,
+            verification_command=args.verification_command,
+            repository_ci_context=inspect_repository_ci(repo_root),
         )
         generated_files = write_execution_plan_artifacts(
             rendered_plan=rendered,

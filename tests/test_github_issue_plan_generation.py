@@ -14,6 +14,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanPullRequest,
     _plan_item_refinement_issues,
     generate_execution_plan_yaml,
+    inspect_repository_ci,
     load_plan_workflow_instance,
     publish_execution_plan_pull_request,
     write_execution_plan_artifacts,
@@ -35,6 +36,22 @@ class FakePlanningClient:
         self.messages = messages
         self.response_schema = response_schema
         return self.response
+
+
+class SequencedPlanningClient:
+    def __init__(self, responses: list[dict[str, Any]]) -> None:
+        self.responses = responses
+        self.messages: list[list[dict[str, str]]] = []
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        del response_schema
+        self.messages.append(messages)
+        return self.responses.pop(0)
 
 
 def _item(item_id: str, *, dependencies: list[str] | None = None) -> dict[str, Any]:
@@ -73,6 +90,91 @@ def test_plan_refinement_detects_cross_runtime_implementation_only() -> None:
     assert _plan_item_refinement_issues([parity_only_item]) == []
 
 
+def test_plan_requires_ci_bootstrap_and_dependency_when_repository_has_no_ci() -> None:
+    ci_item = _item("ci-bootstrap")
+    ci_item["title"] = "Set up CI validation"
+    ci_item["implementation_steps"] = [
+        "Add a GitHub Actions continuous integration workflow.",
+        "Run scripts/verify-all.sh in CI.",
+    ]
+    product_item = _item("feature", dependencies=["ci-bootstrap"])
+    assert (
+        _plan_item_refinement_issues(
+            [ci_item, product_item],
+            require_ci_bootstrap=True,
+            verification_command="scripts/verify-all.sh",
+        )
+        == []
+    )
+    assert _plan_item_refinement_issues(
+        [_item("foundation"), product_item], require_ci_bootstrap=True
+    ) == [
+        "foundation must establish continuous integration before the product work",
+        "feature must depend on the initial CI item foundation",
+    ]
+
+
+def test_inspect_repository_ci_reports_existing_workflow_and_missing_ci(
+    tmp_path: Path,
+) -> None:
+    assert inspect_repository_ci(tmp_path).startswith(
+        "No recognized CI configuration files were found."
+    )
+    workflow = tmp_path / ".github/workflows/verify.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("name: Verify\nrun: scripts/verify-all.sh\n", encoding="utf-8")
+    context = inspect_repository_ci(tmp_path)
+    assert "Recognized CI configuration files" in context
+    assert ".github/workflows/verify.yml" in context
+    assert "scripts/verify-all.sh" in context
+
+
+def test_planner_repairs_missing_ci_bootstrap_and_blocks_later_items() -> None:
+    original = {
+        "items": [
+            _item("foundation"),
+            _item("integration", dependencies=["foundation"]),
+        ]
+    }
+    ci_item = _item("ci-bootstrap")
+    ci_item["title"] = "Set up continuous integration"
+    ci_item["objective"] = "Run repository verification in CI before feature work."
+    ci_item["allowed_paths"] = [".github/workflows/verify.yml"]
+    ci_item["implementation_steps"] = [
+        "Add .github/workflows/verify.yml.",
+        "Run scripts/verify-all.sh in the CI workflow.",
+    ]
+    repaired = {
+        "items": [
+            ci_item,
+            _item("foundation", dependencies=["ci-bootstrap"]),
+            _item("integration", dependencies=["foundation", "ci-bootstrap"]),
+        ]
+    }
+    client = SequencedPlanningClient([original, original, repaired])
+
+    _, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement a foundation, then integration.",
+        plan_id="ci-first-v1",
+        client=client,
+        verification_command="scripts/verify-all.sh",
+        repository_ci_context=("No recognized CI configuration files were found."),
+    )
+
+    assert len(client.messages) == 3
+    assert [item.item_id for item in plan.items] == [
+        "ci-bootstrap",
+        "foundation",
+        "integration",
+    ]
+    assert plan.items[0].dependencies == ()
+    assert plan.items[1].dependencies == ("ci-bootstrap",)
+    assert plan.items[2].dependencies == ("foundation", "ci-bootstrap")
+    repair_prompt = client.messages[2][1]["content"]
+    assert "continuous integration before the product work" in repair_prompt
+    assert "scripts/verify-all.sh" in repair_prompt
+
+
 def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     client = FakePlanningClient(
         {
@@ -87,6 +189,12 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
         source_plan="# Plan\nImplement a foundation, then integration.",
         plan_id="local-attestation-v1",
         client=client,
+        verification_command="scripts/verify-all.sh",
+        repository_ci_context=(
+            "Recognized CI configuration files:\n"
+            "--- .github/workflows/verify.yml ---\n"
+            "run: scripts/verify-all.sh"
+        ),
     )
 
     assert client.response_schema == PLAN_ITEMS_RESPONSE_SCHEMA
@@ -115,6 +223,8 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     assert "Implement the smallest behavior for foundation." in rendered
     assert "implementation step" in client.messages[0]["content"]
     assert "filesystem paths" in client.messages[0]["content"]
+    assert "runs the supplied verification command" in client.messages[0]["content"]
+    assert "scripts/verify-all.sh" in client.messages[1]["content"]
 
 
 @pytest.mark.parametrize(
@@ -418,6 +528,9 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
 ) -> None:
     source = tmp_path / "proposal.md"
     source.write_text("# Proposal\nAdd a foundation and integration.", encoding="utf-8")
+    ci_config = tmp_path / ".github/workflows/verify.yml"
+    ci_config.parent.mkdir(parents=True)
+    ci_config.write_text("name: Verify\n", encoding="utf-8")
     staged: list[Any] = []
     client = FakePlanningClient(
         {
@@ -516,6 +629,9 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
     assert publications[0]["repo_root"] == tmp_path
     assert publications[0]["generated_files"] == tuple(staged)
     assert publications[0]["source_plan_path"] == "proposal.md"
+    assert client.messages is not None
+    assert "scripts/verify-all.sh" in client.messages[1]["content"]
+    assert "name: Verify" in client.messages[1]["content"]
     assert "source_document: proposal.md" in output.read_text(encoding="utf-8")
     assert set(staged) == {output, workflow_file, dependent_workflow_file}
     response = capsys.readouterr().out

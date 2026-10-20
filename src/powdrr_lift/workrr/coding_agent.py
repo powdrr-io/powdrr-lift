@@ -517,6 +517,7 @@ class CodingAgentAttempt:
     stdout: str = ""
     stderr: str = ""
     error: str | None = None
+    worker_commit_sha: str | None = None
     schema_version: str = CODING_AGENT_ATTEMPT_SCHEMA_VERSION
 
     def to_data(self) -> dict[str, Any]:
@@ -534,6 +535,7 @@ class CodingAgentAttempt:
             "stdout": self.stdout,
             "stderr": self.stderr,
             "error": self.error,
+            "worker_commit_sha": self.worker_commit_sha,
         }
 
 
@@ -1073,6 +1075,7 @@ class CodingAgentAttemptStore:
             stdout=cast(str, data.get("stdout", "")),
             stderr=cast(str, data.get("stderr", "")),
             error=cast(str | None, data.get("error")),
+            worker_commit_sha=cast(str | None, data.get("worker_commit_sha")),
             schema_version=cast(str, data["schema_version"]),
         )
 
@@ -1163,11 +1166,28 @@ def run_coding_agent(
     after_head = _git_output(worktree_root, "rev-parse", "HEAD")
     after_status = _working_paths(worktree_root)
     after_snapshot = _working_tree_snapshot(worktree_root, after_status)
+    committed_paths = (
+        set(
+            _git_output(
+                worktree_root,
+                "diff",
+                "--name-only",
+                "--no-renames",
+                before_head,
+                after_head,
+            ).splitlines()
+        )
+        if before_head != after_head
+        else set()
+    )
     changed_paths = tuple(
         sorted(
-            path
-            for path in before_snapshot.keys() | after_snapshot.keys()
-            if before_snapshot.get(path) != after_snapshot.get(path)
+            committed_paths
+            | {
+                path
+                for path in before_snapshot.keys() | after_snapshot.keys()
+                if before_snapshot.get(path) != after_snapshot.get(path)
+            }
         )
     )
     out_of_scope = tuple(
@@ -1178,11 +1198,14 @@ def run_coding_agent(
         )
     )
     fingerprint = _worktree_fingerprint(worktree_root, changed_paths)
-    if before_head != after_head or out_of_scope:
+    history_rewritten = before_head != after_head and not _is_ancestor(
+        worktree_root, before_head, after_head
+    )
+    if history_rewritten or out_of_scope:
         status = CodingAgentStatus.POLICY_DENIED
         terminal_error = (
-            "worker changed HEAD"
-            if before_head != after_head
+            "worker rewrote HEAD"
+            if history_rewritten
             else "worker changed paths outside the implementation request"
         )
     elif completed.returncode == 124:
@@ -1207,6 +1230,7 @@ def run_coding_agent(
         stdout=completed.stdout,
         stderr=completed.stderr,
         error=terminal_error,
+        worker_commit_sha=after_head if before_head != after_head else None,
     )
 
 
@@ -1219,6 +1243,17 @@ def _git_output(worktree_root: Path, *arguments: str) -> str:
         check=True,
     )
     return result.stdout.strip()
+
+
+def _is_ancestor(worktree_root: Path, ancestor: str, commit: str) -> bool:
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", ancestor, commit],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0
 
 
 def _working_paths(worktree_root: Path) -> set[str]:

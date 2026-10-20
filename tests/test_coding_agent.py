@@ -67,6 +67,27 @@ class FakeProvider:
             (worktree_root / "agent_error.txt").write_text("diagnostic\n")
             (worktree_root / "coverage.xml").write_text("<coverage/>\n")
             return subprocess.CompletedProcess(["fake"], 0, "", "")
+        if self.action == "commit-allowed":
+            (worktree_root / "src").mkdir(exist_ok=True)
+            (worktree_root / "src" / "change.py").write_text("value = 1\n")
+            subprocess.run(
+                ["git", "add", "src/change.py"], cwd=worktree_root, check=True
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.com",
+                    "commit",
+                    "-m",
+                    "allowed worker commit",
+                ],
+                cwd=worktree_root,
+                check=True,
+            )
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
         (worktree_root / "README.md").write_text("committed unexpectedly\n")
         subprocess.run(["git", "add", "README.md"], cwd=worktree_root, check=True)
         subprocess.run(
@@ -544,7 +565,32 @@ def test_worker_out_of_scope_change_is_policy_denied(tmp_path: Path) -> None:
     assert attempt.out_of_scope_paths == ("README.md",)
 
 
-def test_worker_commit_is_policy_denied(tmp_path: Path) -> None:
+def test_worker_commit_within_scope_is_accepted_and_recorded(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
+    attempt = run_coding_agent(
+        FakeProvider("commit-allowed"),
+        _request(_head(worktree)),
+        worktree_root=worktree,
+        attempt_id="attempt-committed",
+    )
+
+    assert attempt.status is CodingAgentStatus.COMPLETED
+    assert attempt.changed_paths == ("src/change.py",)
+    assert attempt.out_of_scope_paths == ()
+    assert attempt.diff_fingerprint
+    assert attempt.worker_commit_sha == _head(worktree)
+    assert attempt.to_data()["worker_commit_sha"] == _head(worktree)
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert status.stdout.strip() == ""
+
+
+def test_worker_commit_outside_scope_is_policy_denied(tmp_path: Path) -> None:
     worktree = _git_repo(tmp_path)
     attempt = run_coding_agent(
         FakeProvider("commit"),
@@ -554,7 +600,9 @@ def test_worker_commit_is_policy_denied(tmp_path: Path) -> None:
     )
 
     assert attempt.status is CodingAgentStatus.POLICY_DENIED
-    assert attempt.error == "worker changed HEAD"
+    assert attempt.error == "worker changed paths outside the implementation request"
+    assert attempt.changed_paths == ("README.md",)
+    assert attempt.out_of_scope_paths == ("README.md",)
 
 
 def test_worker_rejects_worktree_at_wrong_base_commit(tmp_path: Path) -> None:

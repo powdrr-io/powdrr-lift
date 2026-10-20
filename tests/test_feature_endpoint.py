@@ -122,6 +122,7 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
     plan_path = tmp_path / "structrr-diff.yaml"
     plan_path.write_text("proposal-only-secret: do not include\n", encoding="utf-8")
     output_root = tmp_path / "artifacts"
+    worker_commit_shas: list[str] = []
     scenarios = (
         {
             "scenario_id": "selector",
@@ -181,6 +182,11 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
             "    assert module.public_api('value') == 'handled:value'\n",
             encoding="utf-8",
         )
+        _git(worktree_root, "add", "-f", "probe_suite.py")
+        _git(worktree_root, "commit", "-qm", "author probe suite")
+        worker_commit_shas.append(
+            _git(worktree_root, "rev-parse", "HEAD").stdout.strip()
+        )
         return subprocess.CompletedProcess(["mini"], 0, "", "")
 
     monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
@@ -220,6 +226,9 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
     assert suite["generation_method"] == "minisweagent_pre_coding"
+    assert (
+        suite["authoring_attempts"][0]["worker_commit_sha"] == (worker_commit_shas[0])
+    )
     assert suite["probes"][0]["scenario_id"] == "selector"
     assert "import module" in suite["probe_source"]
     assert suite["baseline_results"][0]["status"] == "failed"

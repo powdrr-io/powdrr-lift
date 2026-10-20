@@ -23,7 +23,10 @@ items:
   - id: foundational-change
     title: Foundational change
     objective: Add the reusable foundation.
-    scope: [src/foundation, tests/test_foundation.py]
+    scope:
+      - Parse the reviewed configuration contract.
+      - Report stable rejection codes for malformed input.
+    allowed_paths: [src/foundation, tests/test_foundation.py]
     implementation_steps:
       - Implement the parser for the reviewed configuration contract.
       - Add focused tests for valid input and malformed fields.
@@ -33,8 +36,11 @@ items:
     workflow_id: foundational-change
 ```
 
-Every item must have a unique stable ID, objective, scope, acceptance criteria,
-and an existing workflow definition. Dependencies must name items in the same
+Every item must have a unique stable ID, objective, scope, allowed paths,
+acceptance criteria, and an existing workflow definition. `scope` describes
+the product behavior in prose. `allowed_paths` is a list of repository-relative
+filesystem paths that bounds the worker's edits; use `["."]` when the plan
+does not identify narrower paths. Dependencies must name items in the same
 plan and form an acyclic graph. Publish only after the plan review PR merges;
 the publisher pins each issue to that merge commit.
 
@@ -42,8 +48,9 @@ the publisher pins each issue to that merge commit.
 using this schema. Each item also carries a bounded `implementation_steps`
 list (up to eight concrete code or test changes) so the worker receives the
 reviewed execution outline instead of reconstructing the intended slice from
-the objective alone. The generator targets at most five scope entries per item
-and splits broad work into dependent, independently verifiable PRs. The
+the objective alone. The generator targets at most five scope entries and
+twenty allowed paths per item and splits broad work into dependent,
+independently verifiable PRs. The
 top-level `source_document` field records the
 repository-relative path to the Markdown proposal, keeping the generated plan
 discoverably linked to its source. For every item, it writes one small workflow definition at
@@ -84,7 +91,8 @@ inputs:
     item_id: local-validation-attestation-v1-pr-02
     title: Add end-to-end attestation
     objective: Add an end-to-end validation attestation.
-    scope: [attestation scripts]
+    scope: [Verify the signed validation envelope and reject invalid evidence.]
+    allowed_paths: [attestation/verifier, attestation/tests]
     implementation_steps:
       - Implement the verifier behavior for the reviewed envelope.
       - Add focused valid and invalid envelope tests.

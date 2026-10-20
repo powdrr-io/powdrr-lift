@@ -16,12 +16,14 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     _ensure_ci_bootstrap,
     _plan_item_refinement_issues,
     generate_execution_plan_yaml,
+    generate_multi_pr_structrr_proposal,
     inspect_repository_ci,
     inspect_repository_code,
     load_plan_workflow_instance,
     publish_execution_plan_pull_request,
     write_execution_plan_artifacts,
 )
+from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_lift.workrr.multipr_structrr import compile_multi_pr_proposal
 
 
@@ -389,6 +391,68 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     )
     assert "scripts/verify-all.sh" in client.messages[1]["content"]
     assert "verify_signature" in client.messages[1]["content"]
+
+
+def test_structrr_proposal_repairs_content_identity_mismatch() -> None:
+    plan = ReviewedExecutionPlan(
+        plan_id="attestation-current-state",
+        items=(
+            PlannedWorkItem(
+                item_id="schema-contracts",
+                title="Define protocol schemas",
+                objective="Add the attestation schema contracts.",
+                scope=("Add JSON schemas for policy records.",),
+                acceptance_criteria=("The schemas validate all fixtures.",),
+                dependencies=(),
+                workflow_directory=None,
+                workflow_id="attestation-current-state-schema-contracts",
+                allowed_paths=("attestation/schemas",),
+            ),
+        ),
+    )
+    baseline: dict[str, Any] = {
+        "entities": [],
+        "entity_relationships": [],
+        "files": [],
+        "source_subjects": [],
+        "source_bindings": [],
+        "active_intent": {},
+        "human-decisions": [],
+        "invariants": [],
+    }
+    invalid_operation = {
+        "operation_id": "add-schema-package",
+        "item_id": "schema-contracts",
+        "section": "entities",
+        "subject_id": "entity:attestation-schemas",
+        "action": "added",
+        "content": {"id": "wrong-identity", "type": "Module"},
+    }
+    corrected_operation = {
+        **invalid_operation,
+        "content": {"id": "entity:attestation-schemas", "type": "Module"},
+    }
+    client = SequencedPlanningClient(
+        [
+            {"operations": [invalid_operation]},
+            {"operations": [corrected_operation]},
+        ]
+    )
+
+    proposal = generate_multi_pr_structrr_proposal(
+        plan=plan,
+        baseline_snapshot=baseline,
+        source_plan="# Attestation plan",
+        client=client,
+    )
+
+    assert len(client.messages) == 2
+    repair_prompt = client.messages[1][1]["content"]
+    assert "content identity differs from subject_id" in repair_prompt
+    assert "wrong-identity" in repair_prompt
+    assert proposal.item_proposals["schema-contracts"].operations[0].subject_id == (
+        "entity:attestation-schemas"
+    )
 
 
 def test_plan_can_append_a_final_review_dependent_on_all_implementation_items() -> None:

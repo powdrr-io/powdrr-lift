@@ -51,6 +51,7 @@ from powdrr_lift.workrr.task_agent import (
     _implementation_paths_against_base,
     _issue_worker_implementation_request,
     _list_worktree_files,
+    _open_final_workflow_pull_request,
     _publish_workflow_progress,
     _read_task_document,
     _select_ready_workflow_git_state,
@@ -1344,6 +1345,53 @@ def test_publish_workflow_progress_pushes_clean_worktree_commits(
 
     assert ["add", "--all"] in git_calls
     assert ["push", "--set-upstream", "origin", "powdrr/feature-17"] in git_calls
+
+
+def test_final_workflow_pull_request_leaves_branch_identity_to_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = WorkflowInstance.create(tmp_path / "workflow")
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch="powdrr/feature-17",
+        workflow_relative_directory="workflow",
+    )
+    gh_calls: list[Mapping[str, Any]] = []
+
+    def _record_gh(
+        _repo_root: Path,
+        parameters: Mapping[str, Any],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        gh_calls.append(parameters)
+        if parameters["operation"] == "pr_view":
+            return subprocess.CompletedProcess([], 1, stdout="", stderr="missing")
+        return subprocess.CompletedProcess(
+            [],
+            0,
+            stdout="https://github.com/example/repo/pull/17\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr("powdrr_lift.workrr.task_agent._gh_result", _record_gh)
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.task_agent._write_workflow_record",
+        lambda *_args, **_kwargs: None,
+    )
+
+    _open_final_workflow_pull_request(
+        tmp_path,
+        workflow,
+        state,
+        stdout=io.StringIO(),
+    )
+
+    create_request = gh_calls[-1]
+    assert create_request["operation"] == "pr_create"
+    assert "base" not in create_request
+    assert "head" not in create_request
 
 
 def test_process_workflow_task_persists_output_for_downstream_claim(

@@ -2854,11 +2854,6 @@ def _publish_workflow_progress(
         print(f"Published workflow progress on branch: {branch}", file=stdout)
         return commit_sha
 
-    default_branch = (
-        workflow_git_state.integration_branch
-        if workflow_git_state is not None
-        else _default_branch(repo_root, runtime=runtime)
-    )
     existing_pr = _gh_result(
         repo_root,
         {"operation": "pr_view", "pr_reference": branch, "json_fields": ["url"]},
@@ -2889,8 +2884,6 @@ def _publish_workflow_progress(
             "operation": "pr_create",
             "title": title,
             "body": body,
-            "base": default_branch,
-            "head": branch,
         },
         runtime=runtime,
     )
@@ -3035,8 +3028,6 @@ def _open_final_workflow_pull_request(
         repo_root,
         {
             "operation": "pr_create",
-            "base": workflow_git_state.base_branch,
-            "head": workflow_git_state.integration_branch,
             "title": f"Workflow: {workflow.directory.name}",
             "body": (
                 "Final integration pull request for durable workflow "

@@ -370,6 +370,34 @@ def test_bootstrap_records_detected_validation_tools(tmp_path: Path) -> None:
     assert result.document["validation_context"]["discovery_status"] == "partial"
 
 
+def test_bootstrap_uses_nested_validation_configuration_as_tool_source(
+    tmp_path: Path,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    verifier = repo / "attestation/verifier"
+    (verifier / "tests").mkdir(parents=True)
+    (verifier / "pyproject.toml").write_text(
+        "[project]\nname = 'attestation-verifier'\n"
+        "[tool.pytest.ini_options]\ntestpaths = ['tests']\n",
+        encoding="utf-8",
+    )
+    (verifier / "tests/test_policy.py").write_text(
+        "def test_policy():\n    assert True\n", encoding="utf-8"
+    )
+    _git(repo, "add", "attestation")
+    _git(repo, "commit", "-qm", "add nested verifier tests")
+
+    result = bootstrap_structrr(
+        repo, output_path=tmp_path / "nested-validation-bootstrap.yaml"
+    )
+
+    assert result.validation.successful, result.validation.issues
+    validation_tool = next(
+        item for item in result.document["tools"] if item["id"].endswith("-pytest")
+    )
+    assert validation_tool["source"] == "attestation/verifier/pyproject.toml"
+
+
 def test_bootstrap_sections_require_validation_inventory() -> None:
     document = {"section_versions": BOOTSTRAP_SECTION_VERSIONS}
 

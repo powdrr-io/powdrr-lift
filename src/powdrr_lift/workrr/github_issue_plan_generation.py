@@ -25,12 +25,14 @@ from powdrr_lift.workrr.github_issue_queue import (
     ReviewedExecutionPlan,
     parse_reviewed_plan_yaml,
 )
+from powdrr_lift.workrr.jev_classifier import preferred_semantic_classifier_client
 from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
 from powdrr_lift.workrr.multipr_structrr import (
     MultiPRStructrrProposal,
     compile_multi_pr_proposal,
     write_multi_pr_proposal,
 )
+from powdrr_lift.workrr.plan_sizing import PlanSizingError, size_plan_items
 
 MAX_SOURCE_PLAN_CHARS = 500_000
 MAX_PLAN_ITEMS = 100
@@ -46,6 +48,12 @@ MAX_CODE_LOOKUP_QUERY_CHARS = 120
 MAX_STRUCTRR_PROPOSAL_REPAIR_ATTEMPTS = 2
 PLAN_WORKFLOW_SCHEMA = "https://powdrr.io/schemas/plan-workflow-instance-v2"
 PLAN_WORKFLOW_PROCESS = "execute-proposed-pr-workflow"
+PLAN_GROUPING_APPROVAL_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["decision"],
+    "properties": {"decision": {"type": "string", "enum": ["approve", "veto"]}},
+}
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 _IMPLEMENTATION_RUNTIMES = re.compile(
     r"\b(?:python|swift|rust|golang|java|javascript|typescript|kotlin|ruby|php|"
@@ -1543,8 +1551,11 @@ def generate_execution_plan_yaml(
                     "allowed_paths, invent repository paths, or claim that work "
                     "is already implemented. Group work into coherent PRs; "
                     "do not make one item per bullet or acceptance criterion. "
-                    "Each item must be one small vertical slice a coding worker "
-                    "can implement, test, and review in one run. It must have one "
+                    "Aim for about 3 concrete implementation steps per PR, with "
+                    "4 as the hard maximum. A smaller cohesive slice is valid; "
+                    "never pad it with unrelated work just to reach the target. "
+                    "Each item must be one vertical slice a coding worker can "
+                    "implement, test, and review in one run. It must have one "
                     "primary deliverable and stay within one subsystem and one "
                     "language/runtime; split Python and Swift work into separate "
                     "dependent items even when they implement the same protocol. "
@@ -1625,8 +1636,9 @@ def generate_execution_plan_yaml(
                     "worker can implement and validate in one run. Split items "
                     "that span languages/runtimes, independently testable "
                     "subsystems, or multiple outputs. In particular, do not group "
-                    "Python and Swift implementations together. Keep each result "
-                    "to at most 3 scope entries, 4 implementation steps, and 5 "
+                    "Python and Swift implementations together. Aim for about 3 "
+                    "implementation steps, never more than 4; keep each result "
+                    "to at most 3 scope entries and 5 "
                     "acceptance criteria. Preserve all supported requirements, "
                     "and make dependencies point to the actual prerequisite item "
                     "IDs in dependency order. Keep `allowed_paths` as "
@@ -1928,6 +1940,22 @@ def generate_execution_plan_yaml(
                 + "; ".join(remaining_issues)
             )
 
+    try:
+        raw_items = size_plan_items(raw_items)
+    except PlanSizingError as error:
+        raise PlanGenerationError(f"could not size proposed PRs: {error}") from error
+    remaining_issues = _plan_item_refinement_issues(
+        raw_items,
+        require_ci_bootstrap=has_ci_configuration is False,
+        verification_command=verification_command,
+    )
+    if remaining_issues:
+        raise PlanGenerationError(
+            "deterministic PR sizing produced decomposition violations: "
+            + "; ".join(remaining_issues)
+        )
+    _require_jev_grouping_approval(raw_items, client)
+
     if include_final_review:
         if len(raw_items) >= MAX_PLAN_ITEMS:
             raise PlanGenerationError(
@@ -2087,6 +2115,66 @@ def generate_execution_plan_yaml(
         raise PlanGenerationError(f"proposed plan is invalid: {error}") from error
     _require_dependency_order(validated)
     return rendered, validated
+
+
+def _require_jev_grouping_approval(
+    items: list[dict[str, Any]], client: WorkflowLLMClient
+) -> None:
+    """Let configured Jev veto a deterministic grouping before it is published."""
+    judge = preferred_semantic_classifier_client(client, fail_closed=True)
+    if judge is None or judge.provider != "JEV":
+        return
+    try:
+        response = judge.complete_json(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Review the deterministic PR grouping and return its typed "
+                        "decision. Use `approve` only if every PR is a coherent "
+                        "increment of useful size, no PR exceeds four implementation "
+                        "steps, and no unrelated work was combined to meet the size "
+                        "target, "
+                        "runtime boundaries are respected, and dependencies remain "
+                        "valid. Use `veto` for mega changes, unrelated padding, or any "
+                        "other grouping defect."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": "Context:\n"
+                    + json.dumps(
+                        {
+                            "plan_grouping_review": {
+                                "allowed_values": ["approve", "veto"],
+                                "question": "Should these PR groups be approved?",
+                                "instructions": [
+                                    "Approve only if all size, cohesion, runtime, "
+                                    "and dependency constraints are satisfied."
+                                ],
+                                "criteria": {
+                                    "approve": (
+                                        "Every PR is coherent and appropriately sized, "
+                                        "with valid runtime and dependency boundaries."
+                                    ),
+                                    "veto": (
+                                        "At least one PR is oversized, padded with "
+                                        "unrelated work, or violates a hard boundary."
+                                    ),
+                                },
+                                "subject_text": json.dumps(items, ensure_ascii=False),
+                            }
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+            ],
+            response_schema=PLAN_GROUPING_APPROVAL_RESPONSE_SCHEMA,
+        )
+    except Exception as error:
+        raise PlanGenerationError("Jev grouping review failed closed") from error
+    if response.get("decision") != "approve":
+        raise PlanGenerationError("Jev vetoed the deterministic PR grouping")
 
 
 def write_execution_plan_artifacts(

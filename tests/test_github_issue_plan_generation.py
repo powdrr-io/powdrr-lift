@@ -13,6 +13,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     PLAN_ITEMS_RESPONSE_SCHEMA,
     PlanGenerationError,
     PlanPullRequest,
+    _ensure_ci_bootstrap,
     _plan_item_refinement_issues,
     generate_execution_plan_yaml,
     inspect_repository_ci,
@@ -115,6 +116,53 @@ def test_plan_requires_ci_bootstrap_and_dependency_when_repository_has_no_ci() -
         "foundation must establish continuous integration before the product work",
         "feature must depend on the initial CI item foundation",
     ]
+
+
+def test_planner_inserts_ci_bootstrap_when_model_omits_the_initial_gate() -> None:
+    items = [
+        _item("verifier"),
+        _item("cli", dependencies=["verifier"]),
+    ]
+
+    repaired = _ensure_ci_bootstrap(items, "bash attestation/scripts/verify-all.sh")
+
+    assert repaired[0]["id"] == "ci-bootstrap"
+    assert repaired[0]["allowed_paths"] == [".github/workflows/verify.yml"]
+    assert "bash attestation/scripts/verify-all.sh" in str(repaired[0])
+    assert repaired[1]["dependencies"] == ["ci-bootstrap"]
+    assert repaired[2]["dependencies"] == ["verifier", "ci-bootstrap"]
+    assert (
+        _plan_item_refinement_issues(
+            repaired,
+            require_ci_bootstrap=True,
+            verification_command="bash attestation/scripts/verify-all.sh",
+        )
+        == []
+    )
+
+
+def test_planner_repairs_ci_item_missing_exact_verification_command() -> None:
+    ci_item = _item("ci-bootstrap")
+    ci_item["title"] = "Set up continuous integration"
+    ci_item["implementation_steps"] = ["Add a GitHub Actions workflow."]
+    ci_item["allowed_paths"] = [".github/workflows/verify.yml"]
+    feature_item = _item("verifier")
+
+    repaired = _ensure_ci_bootstrap(
+        [ci_item, feature_item], "bash attestation/scripts/verify-all.sh"
+    )
+
+    assert len(repaired) == 2
+    assert "bash attestation/scripts/verify-all.sh" in str(repaired[0])
+    assert repaired[1]["dependencies"] == ["ci-bootstrap"]
+    assert (
+        _plan_item_refinement_issues(
+            repaired,
+            require_ci_bootstrap=True,
+            verification_command="bash attestation/scripts/verify-all.sh",
+        )
+        == []
+    )
 
 
 def test_inspect_repository_ci_reports_existing_workflow_and_missing_ci(
@@ -252,6 +300,34 @@ def test_planner_repairs_missing_ci_bootstrap_and_blocks_later_items() -> None:
     assert "continuous integration before the product work" in repair_prompt
     assert "scripts/verify-all.sh" in repair_prompt
     assert "partial signature verifier" in repair_prompt
+
+
+def test_plan_generation_repairs_persistent_missing_ci_gate() -> None:
+    uncorrected = {
+        "items": [
+            _item("verifier"),
+            _item("cli", dependencies=["verifier"]),
+        ]
+    }
+    client = SequencedPlanningClient([uncorrected] * 4)
+
+    _, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement the verifier and CLI.",
+        plan_id="validation-gate-v1",
+        client=client,
+        verification_command="bash attestation/scripts/verify-all.sh",
+        repository_ci_context="No recognized CI configuration files were found.",
+    )
+
+    assert [item.item_id for item in plan.items] == [
+        "ci-bootstrap",
+        "verifier",
+        "cli",
+    ]
+    assert plan.items[0].dependencies == ()
+    assert plan.items[1].dependencies == ("ci-bootstrap",)
+    assert plan.items[2].dependencies == ("verifier", "ci-bootstrap")
+    assert "bash attestation/scripts/verify-all.sh" in str(plan.items[0])
 
 
 def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:

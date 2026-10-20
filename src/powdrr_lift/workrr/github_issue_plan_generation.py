@@ -1068,6 +1068,8 @@ def generate_execution_plan_yaml(
     raw_items = response.get("items")
     if not isinstance(raw_items, list) or not raw_items:
         raise PlanGenerationError("planning response must contain at least one item")
+    if has_ci_configuration is False:
+        raw_items = _ensure_ci_bootstrap(raw_items, verification_command)
     if len(raw_items) > MAX_PLAN_ITEMS:
         raise PlanGenerationError(
             f"planning response exceeds the {MAX_PLAN_ITEMS}-item limit"
@@ -1493,3 +1495,93 @@ def _plan_item_refinement_issues(
                         f"CI item {first_id}"
                     )
     return issues
+
+
+def _ensure_ci_bootstrap(
+    items: list[Any], verification_command: str | None
+) -> list[Any]:
+    """Make the required initial CI gate explicit after model refinement."""
+    if len(items) <= 1 or not verification_command:
+        return items
+    first = items[0]
+    if not isinstance(first, Mapping):
+        return items
+    first_item = dict(first)
+    title = str(first_item.get("title", ""))
+    is_ci_bootstrap = bool(
+        re.search(r"\b(?:CI|continuous integration|GitHub Actions)\b", title, re.I)
+    )
+    workflow_path = ".github/workflows/verify.yml"
+    if is_ci_bootstrap:
+        steps = first_item.get("implementation_steps")
+        if isinstance(steps, list):
+            steps = [str(step) for step in steps]
+            if not any(verification_command in step for step in steps):
+                command_step = (
+                    f"Configure the CI workflow to run `{verification_command}` "
+                    "for pull requests."
+                )
+                if len(steps) < MAX_ITEM_IMPLEMENTATION_STEPS:
+                    steps.append(command_step)
+                else:
+                    steps[-1] = command_step
+            first_item["implementation_steps"] = steps
+        criteria = first_item.get("acceptance_criteria")
+        if isinstance(criteria, list) and not any(
+            verification_command in str(criterion) for criterion in criteria
+        ):
+            criteria = [str(criterion) for criterion in criteria]
+            criteria[-1:] = [
+                f"The CI workflow runs `{verification_command}` for pull requests."
+            ]
+            first_item["acceptance_criteria"] = criteria
+        allowed_paths = first_item.get("allowed_paths")
+        if isinstance(allowed_paths, list) and not any(
+            ".github/workflows" in str(path) for path in allowed_paths
+        ):
+            first_item["allowed_paths"] = [*allowed_paths[:19], workflow_path]
+        items[0] = first_item
+    else:
+        ids = {
+            str(item.get("id"))
+            for item in items
+            if isinstance(item, Mapping) and item.get("id") is not None
+        }
+        ci_item_id = "ci-bootstrap"
+        suffix = 2
+        while ci_item_id in ids:
+            ci_item_id = f"ci-bootstrap-{suffix}"
+            suffix += 1
+        items.insert(
+            0,
+            {
+                "id": ci_item_id,
+                "title": "Establish CI validation before implementation work",
+                "objective": (
+                    "Run the repository verification command on pull requests "
+                    "before feature work proceeds."
+                ),
+                "scope": [
+                    "Add a standalone GitHub Actions workflow for repository "
+                    "validation."
+                ],
+                "allowed_paths": [workflow_path],
+                "implementation_steps": [
+                    f"Add {workflow_path} to run `{verification_command}` for "
+                    "pull requests."
+                ],
+                "acceptance_criteria": [
+                    f"Pull requests run `{verification_command}` and fail when it "
+                    "returns a nonzero status."
+                ],
+                "dependencies": [],
+            },
+        )
+    ci_item_id = str(items[0].get("id", ""))
+    for item in items[1:]:
+        if not isinstance(item, dict):
+            continue
+        dependencies = item.get("dependencies")
+        if isinstance(dependencies, list) and ci_item_id not in dependencies:
+            item["dependencies"] = [*dependencies, ci_item_id]
+    return items

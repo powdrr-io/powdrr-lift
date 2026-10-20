@@ -519,8 +519,29 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
                     {
                         "requirement_id": "portable-verifier:scope-02",
                         "status": "missing",
-                        "existing_evidence": [],
-                        "remaining_requirement": "",
+                        "existing_evidence": [
+                            {
+                                "path": "src/verifier.py",
+                                "symbol": "verify_signature",
+                                "kind": "implementation",
+                                "rationale": (
+                                    "This helper verifies signatures but does not "
+                                    "provide stable rejection reasons."
+                                ),
+                            },
+                            {
+                                "path": "tests/test_verifier.py",
+                                "symbol": "test_verify_signature",
+                                "kind": "test",
+                                "rationale": (
+                                    "This test does not exercise authorization "
+                                    "rejection reasons."
+                                ),
+                            },
+                        ],
+                        "remaining_requirement": (
+                            "Add the missing stable rejection reason API."
+                        ),
                     },
                 ],
                 "remaining_work": "Add the missing authorization decision API.",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from argparse import Namespace
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,6 +16,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     _plan_item_refinement_issues,
     generate_execution_plan_yaml,
     inspect_repository_ci,
+    inspect_repository_code,
     load_plan_workflow_instance,
     publish_execution_plan_pull_request,
     write_execution_plan_artifacts,
@@ -129,6 +131,42 @@ def test_inspect_repository_ci_reports_existing_workflow_and_missing_ci(
     assert "scripts/verify-all.sh" in context
 
 
+def test_inspect_repository_code_selects_relevant_source_and_test_evidence(
+    tmp_path: Path,
+) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    source = tmp_path / "src/attestation/verifier.py"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "def verify_signature(payload):\n"
+        "    return verify_ed25519_signature(payload)\n",
+        encoding="utf-8",
+    )
+    test = tmp_path / "tests/test_verifier.py"
+    test.parent.mkdir(parents=True)
+    test.write_text(
+        "def test_ed25519_signature_rejects_invalid_payload():\n"
+        "    assert not verify_signature(b'invalid')\n",
+        encoding="utf-8",
+    )
+    unrelated = tmp_path / "src/catalog/colors.py"
+    unrelated.parent.mkdir(parents=True)
+    unrelated.write_text("def blue():\n    return 'blue'\n", encoding="utf-8")
+
+    context = inspect_repository_code(
+        tmp_path,
+        "Implement Ed25519 signature verification for attestation payloads.",
+    )
+
+    assert "src/attestation/verifier.py" in context
+    assert "tests/test_verifier.py" in context
+    assert "src/catalog/colors.py" not in context
+    assert "verify_ed25519_signature" in context
+    assert "Analyzed checkout: commit unborn HEAD" in context
+    assert "working tree has changes: yes" in context
+    assert "working-tree status ??; not in analyzed commit" in context
+
+
 def test_planner_repairs_missing_ci_bootstrap_and_blocks_later_items() -> None:
     original = {
         "items": [
@@ -159,6 +197,9 @@ def test_planner_repairs_missing_ci_bootstrap_and_blocks_later_items() -> None:
         client=client,
         verification_command="scripts/verify-all.sh",
         repository_ci_context=("No recognized CI configuration files were found."),
+        repository_code_context=(
+            "Existing source and tests include a partial signature verifier."
+        ),
     )
 
     assert len(client.messages) == 3
@@ -173,6 +214,7 @@ def test_planner_repairs_missing_ci_bootstrap_and_blocks_later_items() -> None:
     repair_prompt = client.messages[2][1]["content"]
     assert "continuous integration before the product work" in repair_prompt
     assert "scripts/verify-all.sh" in repair_prompt
+    assert "partial signature verifier" in repair_prompt
 
 
 def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
@@ -194,6 +236,10 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
             "Recognized CI configuration files:\n"
             "--- .github/workflows/verify.yml ---\n"
             "run: scripts/verify-all.sh"
+        ),
+        repository_code_context=(
+            "Existing repository evidence: src/attestation/verifier.py defines "
+            "verify_signature and tests cover invalid payloads."
         ),
     )
 
@@ -224,7 +270,12 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     assert "implementation step" in client.messages[0]["content"]
     assert "filesystem paths" in client.messages[0]["content"]
     assert "runs the supplied verification command" in client.messages[0]["content"]
+    assert "remove already implemented work" in client.messages[0]["content"]
+    assert (
+        "Test files do not establish a passing result" in client.messages[0]["content"]
+    )
     assert "scripts/verify-all.sh" in client.messages[1]["content"]
+    assert "verify_signature" in client.messages[1]["content"]
 
 
 @pytest.mark.parametrize(
@@ -553,6 +604,11 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
     monkeypatch.setattr(cli, "resolve_provider_credentials", lambda *_args: object())
     monkeypatch.setattr(cli, "build_workflow_client", lambda *_args, **_kwargs: client)
     monkeypatch.setattr(
+        cli,
+        "inspect_repository_code",
+        lambda *_args: "existing repository implementation evidence",
+    )
+    monkeypatch.setattr(
         cli, "_stage_generated_file", lambda _root, path: staged.append(path)
     )
     publications: list[dict[str, Any]] = []
@@ -632,6 +688,9 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
     assert client.messages is not None
     assert "scripts/verify-all.sh" in client.messages[1]["content"]
     assert "name: Verify" in client.messages[1]["content"]
+    assert (
+        "existing repository implementation evidence" in client.messages[1]["content"]
+    )
     assert "source_document: proposal.md" in output.read_text(encoding="utf-8")
     assert set(staged) == {output, workflow_file, dependent_workflow_file}
     response = capsys.readouterr().out

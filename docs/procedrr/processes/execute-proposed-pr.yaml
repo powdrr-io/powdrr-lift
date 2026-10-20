@@ -5,16 +5,28 @@ inputs:
 outputs:
   coding_attempt:
     type: object
-    required: [passed, changed_paths]
+    required: [passed, changed_paths, structrr]
     properties:
       passed: {type: boolean}
       changed_paths: {type: array, items: {type: string}}
+      structrr:
+        type: object
+        required: [passed]
+        properties:
+          passed: {type: boolean}
+          proposal_fingerprint: {type: string}
+          baseline_fingerprint: {type: string}
+          planning_decision_review: {type: array}
+          implementation_decision_review: {type: array}
+          repair_findings: {type: array}
       validation: {type: object}
       error: {type: [string, "null"]}
 description: >-
   Implement one reviewed plan item with the configured coding agent, run the
-  plan's verification command, and complete the durable workflow only after
-  implementation changed the repository and validation passed.
+  plan's verification command, and validate the re-bootstrapped candidate
+  against its accepted Structrr diff and inherited decision reviews. Complete
+  only after implementation, Structrr comparison, decision continuity, and
+  validation all pass.
 limits: {max_epochs: 1, context_chars: 12000, context_value_chars: 4000}
 steps:
   - operation:
@@ -25,6 +37,10 @@ steps:
       bind: coding_attempt
   - gate:
       subject: coding_attempt.passed
+      equals: true
+      on_failure: {terminal: failed}
+  - gate:
+      subject: coding_attempt.structrr.passed
       equals: true
       on_failure: {terminal: failed}
   - terminal: succeeded

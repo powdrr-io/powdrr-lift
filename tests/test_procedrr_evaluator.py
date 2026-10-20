@@ -403,6 +403,7 @@ steps:
             return {
                 "passed": implementation_passes,
                 "changed_paths": implementation_paths if implementation_passes else [],
+                "structrr": {"passed": True},
             }
         if command == "finish":
             return [{"command": "pytest", "status": "passed"}]
@@ -1577,7 +1578,11 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
             (tmp_path / "hello.py").write_text(
                 'print("Hello, World")\nprint("Here I Am")\n', encoding="utf-8"
             )
-            return {"passed": True, "changed_paths": ["hello.py"]}
+            return {
+                "passed": True,
+                "changed_paths": ["hello.py"],
+                "structrr": {"passed": True},
+            }
         raise AssertionError(f"unexpected operation: {tool}")
 
     result = Evaluator(HelloWorldLLM(), StructuredToolExecutor(execute)).evaluate(

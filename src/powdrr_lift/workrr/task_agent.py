@@ -77,6 +77,10 @@ from powdrr_lift.workrr.coding_agent_validation import (
     execute_coding_agent_attempt,
     parse_validation_profile,
 )
+from powdrr_lift.workrr.decision_continuity import (
+    decision_continuity_findings,
+    review_inherited_decisions,
+)
 from powdrr_lift.workrr.error_logging import record_workflow_llm_error
 from powdrr_lift.workrr.execution_loop import (
     _execute_shell_tool,
@@ -120,6 +124,7 @@ from powdrr_lift.workrr.llm import (
 )
 from powdrr_lift.workrr.multipr_structrr import (
     active_decision_drift_findings,
+    inherited_decision_records,
     load_multi_pr_proposal,
     rebase_final_plan_state,
     rebase_item_proposal,
@@ -406,6 +411,11 @@ def _issue_worker_structrr_context(
     raw_path = proposed.get("structrr_proposal_file")
     item_id = proposed.get("structrr_item_id", proposed.get("item_id"))
     if raw_path is None:
+        if proposed.get("require_structrr_proposal") is True:
+            raise PowdrrExecutionError(
+                "execute-proposed-pr requires a generated Structrr proposal so the "
+                "accepted diff can be validated before and after coding"
+            )
         return None
     if not isinstance(raw_path, str) or not raw_path.strip():
         raise PowdrrExecutionError("Structrr proposal path must be non-empty text")
@@ -607,6 +617,51 @@ def _implementation_paths_against_base(repo_root: Path) -> tuple[str, ...]:
             continue
         implementation_paths.append(path)
     return tuple(sorted(implementation_paths))
+
+
+def _bounded_candidate_diff(
+    repo_root: Path,
+    base_commit: str,
+    changed_paths: Sequence[str],
+    *,
+    max_chars: int = 50_000,
+) -> dict[str, Any]:
+    """Collect bounded source evidence for one-decision post-code reviews."""
+    if not changed_paths:
+        return {"status": "empty", "patch": "", "truncated": False}
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "diff",
+                "--no-ext-diff",
+                "--unified=3",
+                base_commit,
+                "--",
+                *changed_paths,
+            ],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return {
+            "status": "unavailable",
+            "patch": "",
+            "truncated": False,
+            "reason": str(error),
+        }
+    patch = result.stdout
+    truncated = len(patch) > max_chars
+    return {
+        "status": "available" if result.returncode == 0 else "unavailable",
+        "patch": patch[:max_chars],
+        "truncated": truncated,
+        "returncode": result.returncode,
+        "reason": result.stderr.strip() if result.returncode else "",
+    }
 
 
 def _select_workflow_instance(
@@ -1585,43 +1640,98 @@ class _TaskWorkflowExecutionStrategy:
         structrr_context = _issue_worker_structrr_context(
             self.repo_root, proposed, base_commit=base_commit
         )
-        if structrr_context is not None:
-            current_structrr, item_proposal, baseline_manifest, rebase_report = (
-                structrr_context
-            )
-            request = replace(
-                request,
-                prompt=(
-                    request.prompt
-                    + "\n\nAccepted Structrr proposal operations for this PR:\n"
-                    + json.dumps(
-                        [operation.to_data() for operation in item_proposal.operations],
-                        indent=2,
-                        sort_keys=True,
-                    )
-                    + "\nActive baseline intent and decisions to preserve:\n"
-                    + json.dumps(
-                        {
-                            "active_intent": current_structrr.get("active_intent", {}),
-                            "human_decisions": current_structrr.get(
-                                "human-decisions", []
-                            ),
-                            "invariants": current_structrr.get("invariants", []),
-                        },
-                        indent=2,
-                        sort_keys=True,
-                    )
-                    + "\nPreserve active decisions and unrelated repository changes. "
-                    "Do not edit the proposal artifact."
-                ),
-            )
-        else:
+        store_root = (
+            Path(tempfile.gettempdir()) / "powdrr-lift-issue-worker" / workflow_id
+        )
+        if structrr_context is None:
             current_structrr = None
             item_proposal = None
             baseline_manifest = None
             rebase_report = None
-        store_root = (
-            Path(tempfile.gettempdir()) / "powdrr-lift-issue-worker" / workflow_id
+        else:
+            current_structrr, item_proposal, baseline_manifest, rebase_report = (
+                structrr_context
+            )
+        inherited_decisions = (
+            inherited_decision_records(current_structrr)
+            if current_structrr is not None
+            else ()
+        )
+        plan_item_evidence = {
+            "plan_id": proposed.get("plan_id"),
+            "item_id": proposed.get("item_id"),
+            "title": proposed.get("title"),
+            "objective": proposed.get("objective"),
+            "scope": proposed.get("scope", []),
+            "implementation_steps": proposed.get("implementation_steps", []),
+            "acceptance_criteria": proposed.get("acceptance_criteria", []),
+            "allowed_paths": proposed.get("allowed_paths", []),
+        }
+        accepted_operations = (
+            [operation.to_data() for operation in item_proposal.operations]
+            if item_proposal is not None
+            else []
+        )
+        planning_decision_review = (
+            review_inherited_decisions(
+                self.client,
+                phase="planning",
+                decisions=inherited_decisions,
+                evidence={
+                    "plan_item": plan_item_evidence,
+                    "accepted_structrr_operations": accepted_operations,
+                    "baseline_fingerprint": snapshot_digest(current_structrr),
+                    "review_rule": (
+                        "The accepted baseline decision remains binding. Any planned "
+                        "conflict needs an explicit accepted Structrr amendment."
+                    ),
+                },
+            )
+            if current_structrr is not None and item_proposal is not None
+            else ()
+        )
+        planning_findings = decision_continuity_findings(planning_decision_review)
+        decision_review_path = (
+            store_root / "structrr" / "inherited-decision-review.json"
+        )
+        decision_review_path.parent.mkdir(parents=True, exist_ok=True)
+        planning_review_artifact = {
+            "phase": "planning",
+            "decisions": list(planning_decision_review),
+            "findings": list(planning_findings),
+        }
+        if current_structrr is not None and item_proposal is not None:
+            planning_review_artifact["baseline_fingerprint"] = snapshot_digest(
+                current_structrr
+            )
+            planning_review_artifact["proposal_fingerprint"] = item_proposal.fingerprint
+        decision_review_path.write_text(
+            json.dumps(
+                planning_review_artifact,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        if planning_findings:
+            raise PowdrrExecutionError(
+                "pre-coding inherited-decision review needs a plan correction: "
+                + "; ".join(planning_findings)
+            )
+        request = replace(
+            request,
+            prompt=(
+                request.prompt
+                + "\n\nAccepted Structrr proposal operations for this PR:\n"
+                + json.dumps(accepted_operations, indent=2, sort_keys=True)
+                + "\nInherited decisions and invariants from the Structrr baseline:\n"
+                + json.dumps(list(inherited_decisions), indent=2, sort_keys=True)
+                + "\nClause-by-clause planning review:\n"
+                + json.dumps(list(planning_decision_review), indent=2, sort_keys=True)
+                + "\nPreserve these decisions and unrelated repository changes. "
+                "Do not edit the proposal artifact."
+            ),
         )
         provider = build_coding_agent_provider(
             self.config.code_agent,
@@ -1724,6 +1834,7 @@ class _TaskWorkflowExecutionStrategy:
                         "bootstrap_successful": (
                             candidate_bootstrap.validation.successful
                         ),
+                        "passed": False,
                         "issues": [
                             issue.message
                             for issue in candidate_bootstrap.validation.issues
@@ -1744,13 +1855,63 @@ class _TaskWorkflowExecutionStrategy:
                             current_structrr, candidate_bootstrap.document
                         ),
                     )
+                    implementation_decision_review = review_inherited_decisions(
+                        self.client,
+                        phase="implementation",
+                        decisions=inherited_decisions,
+                        evidence={
+                            "plan_item": plan_item_evidence,
+                            "accepted_structrr_operations": accepted_operations,
+                            "candidate_changed_paths": list(implementation_paths),
+                            "candidate_diff": _bounded_candidate_diff(
+                                self.repo_root, base_commit, implementation_paths
+                            ),
+                            "actual_structrr_diff": actual_diff.to_data(),
+                            "proposal_comparison": comparison,
+                            "validation": validation.to_data(),
+                        },
+                    )
+                    continuity_findings = decision_continuity_findings(
+                        implementation_decision_review
+                    )
+                    structural_findings = (
+                        *structural_findings,
+                        *continuity_findings,
+                    )
                     structural_report = {
                         "bootstrap_successful": True,
+                        "passed": not structural_findings,
                         "rebase": rebase_report,
+                        "baseline_fingerprint": snapshot_digest(current_structrr),
+                        "proposal_fingerprint": item_proposal.fingerprint,
                         "actual_diff": actual_diff.to_data(),
                         "comparison": comparison,
+                        "planning_decision_review": list(planning_decision_review),
+                        "implementation_decision_review": list(
+                            implementation_decision_review
+                        ),
                         "repair_findings": list(structural_findings),
                     }
+            if (
+                structrr_context is not None
+                and structural_report is None
+                and current_structrr is not None
+                and item_proposal is not None
+            ):
+                structural_report = {
+                    "bootstrap_successful": False,
+                    "passed": False,
+                    "review_status": "not_run",
+                    "reason": (
+                        "The coding attempt did not produce a completed candidate "
+                        "with implementation paths to re-bootstrap."
+                    ),
+                    "baseline_fingerprint": snapshot_digest(current_structrr),
+                    "proposal_fingerprint": item_proposal.fingerprint,
+                    "planning_decision_review": list(planning_decision_review),
+                    "implementation_decision_review": [],
+                    "repair_findings": [],
+                }
             if proposed.get("final_integration_review") is True:
                 report_path = proposed.get("final_review_report_path")
                 if not isinstance(report_path, str) or not report_path.strip():
@@ -1835,6 +1996,9 @@ class _TaskWorkflowExecutionStrategy:
                                 if proposed.get("final_integration_review") is True
                                 else "per-PR proposal. "
                             )
+                            + "Preserve every inherited decision and invariant listed "
+                            "in the findings, and provide code or validation evidence "
+                            "for each one. "
                             + "Preserve unrelated interlaced changes and do not edit "
                             "or weaken the proposal artifact. Re-run the declared "
                             "verification command after the focused repair."

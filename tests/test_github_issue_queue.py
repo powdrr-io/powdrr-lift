@@ -57,6 +57,11 @@ def _write_process_workflow(
                         "acceptance_criteria": [f"{item_id} works."],
                         "dependencies": dependencies or [],
                         "verification_command": "pytest -q",
+                        "structrr_proposal_file": (
+                            f"docs/plans/{plan_id}-structrr-proposal.json"
+                        ),
+                        "structrr_item_id": item_id,
+                        "require_structrr_proposal": True,
                     },
                 },
             }

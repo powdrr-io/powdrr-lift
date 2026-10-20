@@ -341,6 +341,8 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from powdrr_lift.workrr import feature_endpoint
+
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "README.md").write_text("initial\n", encoding="utf-8")
     (tmp_path / "verify.py").write_text(
@@ -348,6 +350,33 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
         "assert 'value = 42' in Path('src/feature.py').read_text()\n",
         encoding="utf-8",
     )
+    baseline = {
+        "entities": [],
+        "entity_relationships": [],
+        "source_subjects": [],
+        "source_bindings": [],
+        "active_intent": [
+            {
+                "clause_id": "api-stable",
+                "intent_id": "api-stable",
+                "kind": "invariant",
+                "statement": "Keep the public API stable.",
+                "source_ref": "docs/decisions.md",
+                "active": True,
+            }
+        ],
+        "human-decisions": [],
+        "invariants": [],
+    }
+    proposal = compile_multi_pr_proposal(
+        plan_id="feature-v1",
+        baseline_snapshot=baseline,
+        items=[{"id": "feature-v1-pr-01", "allowed_paths": ["src"]}],
+        proposed_operations=[],
+        source_ref="docs/plans/feature-v1.md",
+    )
+    proposal_path = tmp_path / "docs/plans/feature-v1-structrr-proposal.json"
+    write_multi_pr_proposal(proposal_path, proposal)
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
     subprocess.run(
         [
@@ -371,6 +400,11 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
             "proposed_pr_context": {
                 "plan_id": "feature-v1",
                 "item_id": "feature-v1-pr-01",
+                "structrr_item_id": "feature-v1-pr-01",
+                "structrr_proposal_file": (
+                    "docs/plans/feature-v1-structrr-proposal.json"
+                ),
+                "require_structrr_proposal": True,
                 "objective": "Implement the feature value.",
                 "scope": ["src"],
                 "implementation_steps": ["Set the feature value to 42."],
@@ -409,6 +443,63 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
 
     monkeypatch.setattr(task_agent, "build_coding_agent_provider", build_provider)
     monkeypatch.setattr(task_agent.tempfile, "gettempdir", lambda: str(tmp_path))
+    manifest = SourceManifest(
+        submission_base="a" * 40,
+        source_revision="b" * 40,
+        extractor_version="test",
+        taxonomy_fingerprint="taxonomy",
+        excluded_paths=(),
+        files=(),
+        coverage_complete=True,
+        extraction_errors=(),
+        product_digest="empty-product",
+    )
+    monkeypatch.setattr(
+        feature_endpoint,
+        "_structrr_taxonomy_path",
+        lambda _root: tmp_path / "taxonomy.yaml",
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "bootstrap_structrr",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            document=baseline,
+            validation=SimpleNamespace(successful=True, issues=[]),
+            source_manifest=manifest,
+        ),
+    )
+    review_phases: list[str] = []
+    implementation_reviews = 0
+
+    def review_decisions(
+        _client: Any,
+        *,
+        phase: str,
+        decisions: Sequence[Mapping[str, Any]],
+        evidence: Mapping[str, Any],
+    ) -> tuple[dict[str, str], ...]:
+        nonlocal implementation_reviews
+        del evidence
+        review_phases.append(phase)
+        if phase == "implementation":
+            implementation_reviews += 1
+        outcome = (
+            "fail"
+            if phase == "implementation" and implementation_reviews == 1
+            else "pass"
+        )
+        return tuple(
+            {
+                "decision_id": str(item["decision_id"]),
+                "outcome": outcome,
+                "explanation": "The implementation did not yet prove API stability."
+                if outcome == "fail"
+                else "The candidate preserves the API invariant.",
+            }
+            for item in decisions
+        )
+
+    monkeypatch.setattr(task_agent, "review_inherited_decisions", review_decisions)
     config = WorkflowTaskAgentConfig(
         workflow_dir=workflow.directory,
         repo_root=tmp_path,
@@ -441,7 +532,12 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     assert len(result["attempts"]) == 2
     assert result["attempts"][0]["validation"]["status"] == "failed"
     assert result["attempts"][1]["validation"]["status"] == "passed"
+    assert result["structrr"]["passed"] is True
+    assert result["attempts"][0]["structrr"]["passed"] is False
+    assert review_phases == ["planning", "implementation", "implementation"]
     assert "Observed issue:" in provider_requests[1].prompt
+    assert "active_intent:api-stable" in provider_requests[1].prompt
+    assert "inherited decision" in provider_requests[1].prompt
     assert "validation" in provider_requests[1].prompt
     assert "Set the feature value to 42." in provider_requests[1].prompt
     assert provider_timeouts == [1800.0]

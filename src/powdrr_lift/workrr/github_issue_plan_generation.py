@@ -1293,6 +1293,26 @@ def load_plan_workflow_instance(path: str | Path) -> PlanWorkflowInstance:
         value = context.get(field)
         if not isinstance(value, str) or not value.strip():
             raise PlanGenerationError(f"proposed_pr_context.{field} must not be empty")
+    for field in ("structrr_proposal_file", "structrr_item_id"):
+        value = context.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise PlanGenerationError(
+                f"proposed_pr_context.{field} must not be empty; execute-proposed-pr "
+                "requires a reviewed Structrr diff"
+            )
+    if context.get("require_structrr_proposal") is not True:
+        raise PlanGenerationError(
+            "proposed_pr_context.require_structrr_proposal must be true"
+        )
+    proposal_path = Path(str(context["structrr_proposal_file"]))
+    if proposal_path.is_absolute() or ".." in proposal_path.parts:
+        raise PlanGenerationError(
+            "proposed_pr_context.structrr_proposal_file must be repository-relative"
+        )
+    if context["structrr_item_id"] != context["item_id"]:
+        raise PlanGenerationError(
+            "proposed_pr_context.structrr_item_id must match item_id"
+        )
     for field in ("scope", "acceptance_criteria", "dependencies"):
         value = context.get(field)
         if not isinstance(value, list) or not all(
@@ -2188,6 +2208,17 @@ def write_execution_plan_artifacts(
     structrr_proposal_path: Path | None = None,
 ) -> tuple[Path, ...]:
     """Write the queue plan and one compact Procedrr process reference per item."""
+    if structrr_proposal is None:
+        raise PlanGenerationError(
+            "execute-proposed-pr workflows require a generated Structrr proposal"
+        )
+    plan_item_ids = {item.item_id for item in plan.items}
+    if structrr_proposal.plan_id != plan.plan_id:
+        raise PlanGenerationError("Structrr proposal belongs to a different plan")
+    if set(structrr_proposal.item_proposals) != plan_item_ids:
+        raise PlanGenerationError(
+            "Structrr proposal must contain exactly one diff for every plan item"
+        )
     if not verification_command.strip():
         raise PlanGenerationError("verification_command must not be empty")
     output_path = output_path.resolve()
@@ -2288,6 +2319,13 @@ def write_execution_plan_artifacts(
                         "acceptance_criteria": list(item.acceptance_criteria),
                         "dependencies": list(item.dependencies),
                         "verification_command": verification_command,
+                        "structrr_proposal_file": (
+                            resolved_structrr_path.relative_to(repo_root).as_posix()
+                            if resolved_structrr_path is not None
+                            else ""
+                        ),
+                        "structrr_item_id": item.item_id,
+                        "require_structrr_proposal": True,
                         **(
                             {
                                 "final_integration_review": True,
@@ -2298,18 +2336,6 @@ def write_execution_plan_artifacts(
                                 ).as_posix(),
                             }
                             if item.item_id == "final-integration-review"
-                            else {}
-                        ),
-                        **(
-                            {
-                                "structrr_proposal_file": (
-                                    resolved_structrr_path.relative_to(
-                                        repo_root
-                                    ).as_posix()
-                                ),
-                                "structrr_item_id": item.item_id,
-                            }
-                            if resolved_structrr_path is not None
                             else {}
                         ),
                     },

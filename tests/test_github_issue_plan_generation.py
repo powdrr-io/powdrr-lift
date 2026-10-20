@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from powdrr_lift import cli
+from powdrr_lift.workrr import github_issue_plan_generation, jev_classifier
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
     PLAN_ITEMS_RESPONSE_SCHEMA,
@@ -17,6 +18,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     _apply_plan_coverage_assessments,
     _ensure_ci_bootstrap,
     _plan_item_refinement_issues,
+    _require_jev_grouping_approval,
     _validated_plan_coverage_assessments,
     generate_execution_plan_yaml,
     generate_multi_pr_structrr_proposal,
@@ -28,6 +30,13 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
 )
 from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_lift.workrr.multipr_structrr import compile_multi_pr_proposal
+from powdrr_lift.workrr.plan_sizing import size_plan_items
+
+
+@pytest.fixture(autouse=True)
+def _disable_live_semantic_providers(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
 
 
 class FakePlanningClient:
@@ -127,6 +136,129 @@ def test_plan_refinement_detects_cross_runtime_implementation_only() -> None:
         "protocol combines implementation runtimes: python, swift"
     ]
     assert _plan_item_refinement_issues([parity_only_item]) == []
+
+
+def test_plan_sizing_groups_cohesive_items_to_target_work_size() -> None:
+    first = _item("codec-model")
+    first["scope"] = ["component: codec", "Define codec model"]
+    first["allowed_paths"] = ["src/codec/model.py"]
+    first["implementation_steps"] = ["Define the typed codec model."]
+    second = _item("codec-parser", dependencies=["codec-model"])
+    second["scope"] = ["component: codec", "Parse codec input"]
+    second["allowed_paths"] = ["src/codec/parser.py"]
+    second["implementation_steps"] = [
+        "Parse codec input into the typed model.",
+        "Add focused parser tests.",
+    ]
+
+    sized = size_plan_items([first, second])
+
+    assert len(sized) == 1
+    assert sized[0]["id"] == "codec-model"
+    assert sized[0]["title"] == "Implement codec-model; Implement codec-parser"
+    assert len(sized[0]["implementation_steps"]) == 3
+    assert sized[0]["dependencies"] == []
+    assert size_plan_items([first, second]) == sized
+    assert sized[0]["allowed_paths"] == [
+        "src/codec/model.py",
+        "src/codec/parser.py",
+    ]
+
+
+def test_plan_sizing_keeps_incompatible_or_unrelated_items_separate() -> None:
+    python_item = _item("python-codec")
+    python_item["scope"] = ["component: codec", "Implement Python codec"]
+    python_item["allowed_paths"] = ["src/codec/python.py"]
+    swift_item = _item("swift-codec", dependencies=["python-codec"])
+    swift_item["scope"] = ["component: codec", "Implement Swift codec"]
+    swift_item["allowed_paths"] = ["src/codec/swift.swift"]
+    swift_item["implementation_steps"] = ["Implement Swift codec behavior."]
+
+    sized = size_plan_items([python_item, swift_item])
+
+    assert [item["id"] for item in sized] == ["python-codec", "swift-codec"]
+    assert sized[1]["dependencies"] == ["python-codec"]
+
+    first_component = _item("first-component")
+    first_component["scope"] = ["component: first"]
+    first_component["allowed_paths"] = ["src/first/feature.py"]
+    first_component["implementation_steps"] = ["Implement first component behavior."]
+    second_component = _item("second-component")
+    second_component["scope"] = ["component: second"]
+    second_component["allowed_paths"] = ["src/second/feature.py"]
+    second_component["implementation_steps"] = ["Implement second component behavior."]
+    unrelated = size_plan_items([first_component, second_component])
+
+    assert [item["id"] for item in unrelated] == [
+        "first-component",
+        "second-component",
+    ]
+
+
+def test_plan_sizing_never_merges_ci_bootstrap_with_product_work() -> None:
+    bootstrap = {
+        **_item("ci-bootstrap"),
+        "title": "Establish CI validation",
+        "scope": ["component: repository", "Add CI workflow"],
+        "allowed_paths": [".github/workflows/verify.yml"],
+        "implementation_steps": ["Run verification in pull request CI."],
+    }
+    product = _item("feature", dependencies=["ci-bootstrap"])
+    product["scope"] = ["component: repository", "Add the feature"]
+    product["allowed_paths"] = [".github/workflows/verify.yml"]
+    product["implementation_steps"] = ["Implement the feature."]
+
+    sized = size_plan_items([bootstrap, product])
+
+    assert [item["id"] for item in sized] == ["ci-bootstrap", "feature"]
+    assert sized[1]["dependencies"] == ["ci-bootstrap"]
+
+
+def test_jev_can_approve_or_veto_plan_grouping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    proposal = [_item("one")]
+    decisions = iter(["approve", "veto"])
+    requests: list[dict[str, Any]] = []
+
+    def classify(request: dict[str, Any], *_args: Any) -> dict[str, str]:
+        requests.append(request)
+        return {"choice": next(decisions)}
+
+    monkeypatch.setenv("TYPESAFEAI_API_KEY", "test-key")
+    monkeypatch.setattr(jev_classifier, "_call_jev", classify)
+
+    _require_jev_grouping_approval(proposal, FakePlanningClient({"items": proposal}))
+
+    assert requests[0]["allowed_values"] == ["approve", "veto"]
+    assert '"id": "one"' in requests[0]["state"]["source_text"]
+
+    with pytest.raises(PlanGenerationError, match="Jev vetoed"):
+        _require_jev_grouping_approval(
+            proposal, FakePlanningClient({"items": proposal})
+        )
+
+    class UnavailableJevJudge:
+        provider = "JEV"
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, str]:
+            del messages, response_schema
+            raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(
+        github_issue_plan_generation,
+        "preferred_semantic_classifier_client",
+        lambda *_args, **_kwargs: UnavailableJevJudge(),
+    )
+    with pytest.raises(PlanGenerationError, match="failed closed"):
+        _require_jev_grouping_approval(
+            proposal, FakePlanningClient({"items": proposal})
+        )
 
 
 def test_plan_requires_ci_bootstrap_and_dependency_when_repository_has_no_ci() -> None:
@@ -425,6 +557,31 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     )
     assert "scripts/verify-all.sh" in client.messages[1]["content"]
     assert "verify_signature" in client.messages[1]["content"]
+
+
+def test_generate_execution_plan_yaml_uses_deterministic_sizing() -> None:
+    first = _item("codec-model")
+    first["scope"] = ["component: codec", "Define codec model"]
+    first["allowed_paths"] = ["src/codec/model.py"]
+    first["implementation_steps"] = ["Define the typed codec model."]
+    second = _item("codec-parser", dependencies=["codec-model"])
+    second["scope"] = ["component: codec", "Parse codec input"]
+    second["allowed_paths"] = ["src/codec/parser.py"]
+    second["implementation_steps"] = [
+        "Parse codec input into the typed model.",
+        "Add focused parser tests.",
+    ]
+    client = FakePlanningClient({"items": [first, second]})
+
+    _rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nDefine and parse a codec.",
+        plan_id="codec-v1",
+        client=client,
+    )
+
+    assert [item.item_id for item in plan.items] == ["codec-model"]
+    assert len(plan.items[0].implementation_steps) == 3
+    assert plan.items[0].dependencies == ()
 
 
 def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(

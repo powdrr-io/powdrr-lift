@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -102,7 +103,7 @@ def test_workflow_git_state_round_trips_workflow_dependencies() -> None:
     assert WorkflowGitState.from_data(state.to_data()) == state
 
 
-def test_workflow_dependency_requires_merged_integration_pull_request(
+def test_workflow_dependency_requires_merged_implementation_pull_request(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -113,19 +114,33 @@ def test_workflow_dependency_requires_merged_integration_pull_request(
         workflow_relative_directory="docs/workflows/feature",
         depends_on_workflows=("core",),
     )
-    responses = [[{"state": "OPEN"}], [{"state": "MERGED"}]]
+    responses = [
+        [{"state": "OPEN"}, {"state": "OPEN"}],
+        [{"state": "OPEN"}, {"state": "MERGED"}],
+    ]
+    requested_branches: list[list[str]] = []
+
+    def related_pull_requests(
+        _repo_root: Path, branches: list[str]
+    ) -> tuple[list[dict[str, Any]], None]:
+        requested_branches.append(branches)
+        return responses.pop(0), None
 
     monkeypatch.setattr(
         workflow_git,
         "_related_pull_requests",
-        lambda _repo_root, _branches: (responses.pop(0), None),
+        related_pull_requests,
     )
 
     assert workflow_dependencies_completion(tmp_path, state) == (
         False,
-        ("core: integration PR for powdrr/core is not merged",),
+        ("core: implementation PR for powdrr/core is not merged",),
     )
     assert workflow_dependencies_completion(tmp_path, state) == (True, ())
+    assert requested_branches == [
+        ["powdrr/core", "powdrr/core-implementation"],
+        ["powdrr/core", "powdrr/core-implementation"],
+    ]
 
 
 def test_force_synchronization_resets_stale_integration_branch(

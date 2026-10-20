@@ -197,13 +197,36 @@ items:
     title: First
     objective: Do the first thing.
     scope: [src/first.py]
+    allowed_paths: [src/first.py, tests]
     acceptance_criteria: [The first thing works.]
     dependencies: []
     workflow_file: docs/workflows/feature/first.yaml
     workflow_id: feature-first
 """
 
-    assert _parse_plan(text).source_document == "docs/plans/proposal.md"
+    plan = _parse_plan(text)
+    assert plan.source_document == "docs/plans/proposal.md"
+    assert plan.items[0].allowed_paths == ("src/first.py", "tests")
+
+
+def test_plan_validation_rejects_traversing_allowed_paths() -> None:
+    text = """
+schema: https://powdrr.io/schemas/github-issue-execution-plan-v1
+plan_id: feature-v1
+items:
+  - id: first
+    title: First
+    objective: Do the first thing.
+    scope: [Implement the first behavior.]
+    allowed_paths: [../outside]
+    acceptance_criteria: [The first thing works.]
+    dependencies: []
+    workflow_file: docs/workflows/feature/first.yaml
+    workflow_id: feature-first
+"""
+
+    with pytest.raises(GitHubIssueQueueError, match="repository-relative"):
+        _parse_plan(text)
 
 
 def test_plan_validation_enforces_bounds_on_new_implementation_steps() -> None:

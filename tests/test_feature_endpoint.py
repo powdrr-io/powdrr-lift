@@ -107,7 +107,7 @@ from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
 
 
-def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
+def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repository = tmp_path / "repository"
@@ -120,16 +120,21 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
     _git(repository, "commit", "-qm", "baseline")
     base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
     plan_path = tmp_path / "structrr-diff.yaml"
-    plan_path.write_text("features: []\n", encoding="utf-8")
+    plan_path.write_text("proposal-only-secret: do not include\n", encoding="utf-8")
     output_root = tmp_path / "artifacts"
     scenarios = (
         {
             "scenario_id": "selector",
+            "given": "the public API receives a selector",
+            "when": "it processes a matching finding",
             "then": {"result": "value"},
-            "capability_matrix": {"verbose-provenance": "details " * 20000},
+            "evidence": ["The instruction defines this result."],
+            "related_requirements": ["selector parsing"],
+            "dimensions": {"normal_result": "ASSUMED DEFAULT: not an oracle"},
+            "assumptions": [{"resolution": "must not be sent as a requirement"}],
+            "faithfulness_ref": {"artifact_path": "large-review-metadata.json"},
         },
     )
-    authoring_attempt_ids: list[str] = []
 
     def author_probe_suite(
         self: MiniSWEAgentProvider,
@@ -138,40 +143,42 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
         worktree_root: Path,
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
-        authoring_attempt_ids.append(attempt_id)
-        if attempt_id.endswith("-1"):
-            assert "Implementation prompt and acceptance context" in request.prompt
-            assert "Relevant Proposal Structrr changes" in request.prompt
-            assert "capability_matrix" not in request.prompt
-            assert "never put `import`" in request.prompt
-            assert "complete statement in one body entry" in request.prompt
-            assert "call may be in setup or exception handling" in request.prompt
-            assert len(request.prompt.encode("utf-8")) < 64 * 1024
-            probe = {
-                "probe_id": "selector-result",
-                "scenario_id": "selector",
-                "oracle_basis": "The instruction defines this result.",
-                "imports": [],
-                "body": [
-                    "import module",
-                    "assert module.public_api('value') == 'value'",
-                ],
-            }
-        else:
-            assert (
-                "generated probe imports must be declared in imports" in request.prompt
-            )
-            assert "Move every import out of `body`" in request.prompt
-            assert "complete compound statement in one" in request.prompt
-            probe = {
-                "probe_id": "selector-result",
-                "scenario_id": "selector",
-                "oracle_basis": "The instruction defines this result.",
-                "imports": ["module"],
-                "body": ["assert module.public_api('value') == 'value'"],
-            }
-        (worktree_root / "probe-suite.json").write_text(
-            json.dumps({"probes": [probe]}),
+        assert "Task instruction:\nAdd selector handling." in request.prompt
+        assert '"scenario_id": "selector"' in request.prompt
+        assert '"given": "the public API receives a selector"' in request.prompt
+        assert '"when": "it processes a matching finding"' in request.prompt
+        assert '"then": {\n      "result": "value"' in request.prompt
+        assert '"evidence": [' in request.prompt
+        assert '"related_requirements": [' in request.prompt
+        assert "Implement the proposed selector handling." not in request.prompt
+        assert "proposal-only-secret" not in request.prompt
+        assert "ASSUMED DEFAULT" not in request.prompt
+        assert "must not be sent as a requirement" not in request.prompt
+        assert "large-review-metadata.json" not in request.prompt
+        assert "complete executable Python module" in request.prompt
+        assert "Do not return JSON" in request.prompt
+        obligation = {
+            "obligation_id": "selector-obligation",
+            "scenario_id": "selector",
+            "category": "transformation",
+            "rule": "other",
+            "supported": True,
+            "summary": "The selector returns its matching result.",
+            "condition": "A selector matches a finding.",
+            "operation": "Call the public API.",
+            "expected": "The matching result is returned.",
+            "operands": [],
+            "evidence": [{"source": "instruction", "quote": "Add selector handling."}],
+            "unresolved_reason": "",
+        }
+        (worktree_root / "probe_suite.py").write_text(
+            '"""' + json.dumps({"obligations": [obligation]}) + '"""\nimport module\n\n'
+            "def test_probe_selector():\n"
+            '    """{"probe_id": "selector-result", '
+            '"scenario_id": "selector", '
+            '"obligation_id": "selector-obligation", '
+            '"oracle_basis": "The instruction defines this result."}"""\n'
+            "    assert module.public_api('value') == 'handled:value'\n",
             encoding="utf-8",
         )
         return subprocess.CompletedProcess(["mini"], 0, "", "")
@@ -195,26 +202,264 @@ def test_miniswe_probe_authoring_uses_clean_baseline_and_persists_suite(
         context_refs=("structrr-diff:structrr-diff.yaml",),
     )
 
-    probes = _generate_miniswe_postrun_probes(
+    obligations, probes = _generate_miniswe_postrun_probes(
         config,
         runner=subprocess.run,
         worktree=repository,
         output_root=output_root,
         base_commit=base_commit,
-        plan_path=plan_path,
         request=request,
         scenarios=scenarios,
+        instruction="Add selector handling.",
+        repository_contract={},
     )
 
     assert [probe.probe_id for probe in probes] == ["selector-result"]
-    assert len(authoring_attempt_ids) == 2
+    assert obligations[0]["obligation_id"] == "selector-obligation"
     suite = json.loads(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
     assert suite["generation_method"] == "minisweagent_pre_coding"
     assert suite["probes"][0]["scenario_id"] == "selector"
+    assert "import module" in suite["probe_source"]
+    assert suite["baseline_results"][0]["status"] == "failed"
+    assert "AssertionError" in suite["baseline_results"][0]["output"]
+    assert "proposal_diff_path" not in suite
     assert not (output_root / "miniswe-probe-authoring" / "repository").exists()
     assert _git(repository, "status", "--porcelain").stdout == ""
+
+
+def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "module.py").write_text("def public_api(value): return value\n")
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.email", "test@example.com")
+    _git(repository, "config", "user.name", "Test")
+    _git(repository, "add", "module.py")
+    _git(repository, "commit", "-qm", "baseline")
+    base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
+    output_root = tmp_path / "artifacts"
+    instruction = "Special values are operands. Operators combine values."
+    scenarios = (
+        {"scenario_id": "special-value", "then": "all values are selected"},
+        {"scenario_id": "operator", "then": "difference removes values"},
+    )
+    interaction = {
+        "interaction_id": "special-value-difference",
+        "scenario_ids": ["special-value", "operator"],
+        "condition": "The special value is the left operand of difference.",
+        "operation": "Evaluate all minus one concrete value.",
+        "expected": (
+            "The concrete value remains selected out; another value is selected."
+        ),
+        "evidence_quotes": [
+            "Special values are operands.",
+            "Operators combine values.",
+        ],
+    }
+
+    class _PlanningClient:
+        calls = 0
+
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls == 1:
+                return {"interactions": [interaction]}
+            assert "proposed_interactions" in messages[1]["content"]
+            return {"interactions": []}
+
+    planning_client = _PlanningClient()
+
+    def author_probe_suite(
+        self: MiniSWEAgentProvider,
+        request: ImplementationRequest,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        assert "Required cross-requirement interactions" in request.prompt
+        assert "special-value-difference" in request.prompt
+        obligations = [
+            {
+                "obligation_id": f"obligation-{scenario_id}",
+                "scenario_id": scenario_id,
+                "category": "transformation",
+                "rule": "other",
+                "supported": True,
+                "summary": "The selected value is suppressed.",
+                "condition": "The selector applies to a finding.",
+                "operation": "Call the public API.",
+                "expected": "The result reflects the selector.",
+                "operands": [],
+                "evidence": [
+                    {
+                        "source": "instruction",
+                        "quote": "Special values are operands.",
+                    }
+                ],
+                "unresolved_reason": "",
+            }
+            for scenario_id in ("special-value", "operator")
+        ]
+        source = [
+            '"""' + json.dumps({"obligations": obligations}) + '"""',
+            "import module",
+        ]
+        for index, scenario_id in enumerate(("special-value", "operator")):
+            metadata = {
+                "probe_id": f"probe-{index}",
+                "scenario_id": scenario_id,
+                "obligation_id": f"obligation-{scenario_id}",
+                "oracle_basis": "Both instruction clauses define this interaction.",
+                "interaction_ids": (["special-value-difference"] if index == 0 else []),
+            }
+            source.extend(
+                [
+                    "",
+                    f"def test_probe_{index}():",
+                    f'    """{json.dumps(metadata)}"""',
+                    "    assert module.public_api('value') == 'implemented'",
+                ]
+            )
+        (worktree_root / "probe_suite.py").write_text(
+            "\n".join(source) + "\n", encoding="utf-8"
+        )
+        return subprocess.CompletedProcess(["mini"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
+    config = FeatureEndpointConfig(
+        feature_description=instruction,
+        work_item_name="interaction-probes",
+        repo_root=repository,
+        allowed_paths=("src", "tests"),
+    )
+    request = ImplementationRequest(
+        request_id="interaction-probe-test",
+        objective=instruction,
+        prompt="Implement the feature.",
+        base_commit=base_commit,
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("src", "tests"),
+        acceptance_criteria=("Implement the behavior.",),
+        validation_profiles=("pytest",),
+    )
+
+    _, probes = _generate_miniswe_postrun_probes(
+        config,
+        runner=subprocess.run,
+        worktree=repository,
+        output_root=output_root,
+        base_commit=base_commit,
+        request=request,
+        scenarios=scenarios,
+        instruction=instruction,
+        repository_contract={},
+        interaction_client=planning_client,
+    )
+
+    assert planning_client.calls == 2
+    assert probes[0].interaction_ids == ("special-value-difference",)
+    suite = json.loads(
+        (output_root / "postrun-probes" / "probe-suite.json").read_text()
+    )
+    assert suite["interaction_obligations"] == [interaction]
+    assert suite["baseline_results"][0]["status"] == "failed"
+
+
+def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "module.py").write_text("def public_api(value): return value\n")
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.email", "test@example.com")
+    _git(repository, "config", "user.name", "Test")
+    _git(repository, "add", "module.py")
+    _git(repository, "commit", "-qm", "baseline")
+    base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
+    output_root = tmp_path / "artifacts"
+    requests: list[ImplementationRequest] = []
+
+    def author_probe_suite(
+        self: MiniSWEAgentProvider,
+        request: ImplementationRequest,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        requests.append(request)
+        expected = "value" if len(requests) == 1 else "handled:value"
+        obligation = {
+            "obligation_id": "selector-obligation",
+            "scenario_id": "selector",
+            "category": "transformation",
+            "rule": "other",
+            "supported": True,
+            "summary": "The selector returns its matching result.",
+            "condition": "A selector matches a finding.",
+            "operation": "Call the public API.",
+            "expected": "The matching result is returned.",
+            "operands": [],
+            "evidence": [{"source": "instruction", "quote": "Add selector handling."}],
+            "unresolved_reason": "",
+        }
+        (worktree_root / "probe_suite.py").write_text(
+            '"""' + json.dumps({"obligations": [obligation]}) + '"""\nimport module\n\n'
+            "def test_probe_selector():\n"
+            '    """{"probe_id": "selector-result", '
+            '"scenario_id": "selector", '
+            '"obligation_id": "selector-obligation", '
+            '"oracle_basis": "The instruction defines this result."}"""\n'
+            f"    assert module.public_api('value') == '{expected}'\n",
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(["mini"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
+    config = FeatureEndpointConfig(
+        feature_description="Add selector handling.",
+        work_item_name="selector-handling",
+        repo_root=repository,
+        allowed_paths=("src", "tests"),
+    )
+    request = ImplementationRequest(
+        request_id="selector-implementation",
+        objective="Add selector handling.",
+        prompt="Implement selector handling.",
+        base_commit=base_commit,
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("src", "tests"),
+        acceptance_criteria=("Handle the selector contract.",),
+        validation_profiles=("pytest",),
+    )
+
+    obligations, probes = _generate_miniswe_postrun_probes(
+        config,
+        runner=subprocess.run,
+        worktree=repository,
+        output_root=output_root,
+        base_commit=base_commit,
+        request=request,
+        scenarios=({"scenario_id": "selector", "then": "return handled value"},),
+        instruction="Add selector handling.",
+        repository_contract={},
+    )
+
+    assert len(obligations) == 1
+    assert len(probes) == 1
+    assert len(requests) == 2
+    assert "baseline execution check" in requests[1].prompt
+    assert "AssertionError" in requests[1].prompt
+    suite = json.loads(
+        (output_root / "postrun-probes" / "probe-suite.json").read_text()
+    )
+    assert suite["baseline_results"][0]["status"] == "failed"
 
 
 def test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes(

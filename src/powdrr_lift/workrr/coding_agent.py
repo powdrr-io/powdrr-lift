@@ -30,6 +30,56 @@ from powdrr_lift.opencode_monitor import run_opencode
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v2"
 MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES = 64 * 1024
+DEFAULT_CODING_AGENT_TIMEOUT_SECONDS = 1800.0
+DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS = 1800.0
+DEFAULT_CODING_AGENT_RECOVERY_ATTEMPTS = 3
+
+
+@dataclass(frozen=True, slots=True)
+class CodingAgentRecoveryDecision:
+    """Caller-specific acceptance result for one shared worker iteration."""
+
+    passed: bool
+    terminal: bool = False
+    issue: Mapping[str, Any] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CodingAgentRecoveryResult:
+    """Results from one bounded coding and repair sequence."""
+
+    attempts: tuple[Any, ...]
+    recovery_issue: Mapping[str, Any] | None
+
+    @property
+    def continuations(self) -> int:
+        return max(0, len(self.attempts) - 1)
+
+
+def run_coding_agent_recovery(
+    run_attempt: Callable[[int, Mapping[str, Any] | None], Any],
+    evaluate_attempt: Callable[[Any], CodingAgentRecoveryDecision],
+    *,
+    max_attempts: int = DEFAULT_CODING_AGENT_RECOVERY_ATTEMPTS,
+) -> CodingAgentRecoveryResult:
+    """Run the shared bounded attempt, evaluate, and repair sequence.
+
+    Benchmark and proposed-PR workflows provide their own per-attempt work and
+    acceptance rules. This function owns the common retry policy and passes the
+    prior finding to the next attempt so each adapter can build a repair request.
+    """
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be positive")
+    attempts: list[Any] = []
+    recovery_issue: Mapping[str, Any] | None = None
+    for attempt_number in range(1, max_attempts + 1):
+        result = run_attempt(attempt_number, recovery_issue)
+        attempts.append(result)
+        decision = evaluate_attempt(result)
+        if decision.passed or decision.terminal:
+            break
+        recovery_issue = decision.issue
+    return CodingAgentRecoveryResult(tuple(attempts), recovery_issue)
 
 
 @dataclass(frozen=True, slots=True)
@@ -901,6 +951,7 @@ def build_coding_agent_provider(
             executable=opencode_executable,
             model=opencode_model,
             timeout_seconds=timeout_seconds,
+            absolute_timeout_seconds=max(timeout_seconds, 900.0),
             diagnostics_root=diagnostics_root,
             permission_policy=permission_policy,
             prompt_prefix=prompt_prefix,

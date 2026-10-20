@@ -47,6 +47,7 @@ class PlannedWorkItem:
     workflow_id: str
     workflow_file: str | None = None
     implementation_steps: tuple[str, ...] = ()
+    allowed_paths: tuple[str, ...] = (".",)
 
 
 @dataclass(frozen=True, slots=True)
@@ -850,7 +851,9 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             {"workflow_directory"},
             {"workflow_file"},
         )
-        optional_fields: tuple[set[str], set[str]] = (
+        optional_fields: tuple[set[str], ...] = (
+            {"implementation_steps", "allowed_paths"},
+            {"allowed_paths"},
             {"implementation_steps"},
             set(),
         )
@@ -896,6 +899,9 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
                 _string_list(raw, "implementation_steps", field)
                 if "implementation_steps" in raw
                 else ()
+            ),
+            allowed_paths=(
+                _repository_path_list(raw, field) if "allowed_paths" in raw else (".",)
             ),
         )
         if not item.scope or not item.acceptance_criteria:
@@ -945,6 +951,19 @@ def _string_list(
             f"{field}.{key} must be a list of non-empty strings"
         )
     return tuple(item.strip() for item in value)
+
+
+def _repository_path_list(raw: Mapping[str, Any], field: str) -> tuple[str, ...]:
+    paths = _string_list(raw, "allowed_paths", field)
+    if (
+        not paths
+        or len(set(paths)) != len(paths)
+        or any(Path(path).is_absolute() or ".." in Path(path).parts for path in paths)
+    ):
+        raise GitHubIssueQueueError(
+            f"{field}.allowed_paths must contain unique repository-relative paths"
+        )
+    return paths
 
 
 def _has_dependency_cycle(items: Sequence[PlannedWorkItem]) -> bool:

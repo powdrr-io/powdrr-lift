@@ -182,18 +182,22 @@ def workflow_dependencies_completion(
     repo_root: str | Path,
     state: WorkflowGitState,
 ) -> tuple[bool, tuple[str, ...]]:
-    """Return whether every predecessor workflow has a merged integration PR."""
+    """Return whether every predecessor workflow has a merged implementation PR."""
     incomplete: list[str] = []
     repo_root_path = Path(repo_root).resolve()
     for dependency in state.depends_on_workflows:
         branch = integration_branch_name(dependency)
-        pull_requests, error = _related_pull_requests(repo_root_path, [branch])
+        implementation_branch = f"{branch}-implementation"
+        pull_requests, error = _related_pull_requests(
+            repo_root_path,
+            [branch, implementation_branch],
+        )
         if error:
             incomplete.append(f"{dependency}: could not inspect pull request: {error}")
             continue
         if not any(item.get("state") == "MERGED" for item in pull_requests):
             incomplete.append(
-                f"{dependency}: integration PR for {branch} is not merged"
+                f"{dependency}: implementation PR for {branch} is not merged"
             )
     return not incomplete, tuple(incomplete)
 

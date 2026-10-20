@@ -3,11 +3,12 @@ from __future__ import annotations
 import io
 import json
 import subprocess
+import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -29,6 +30,7 @@ from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
 )
+from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.actions import WorkflowEdit
 from powdrr_lift.workrr.git import (
@@ -41,6 +43,10 @@ from powdrr_lift.workrr.llm import (
     WorkflowLLMHTTPError,
     complete_json_with_timeout_retry,
 )
+from powdrr_lift.workrr.multipr_structrr import (
+    compile_multi_pr_proposal,
+    write_multi_pr_proposal,
+)
 from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
     _apply_task_edits,
@@ -48,7 +54,10 @@ from powdrr_lift.workrr.task_agent import (
     _durable_task_action_output_state,
     _handle_exhausted_timeout,
     _implementation_paths_against_base,
+    _issue_worker_implementation_request,
+    _issue_worker_structrr_context,
     _list_worktree_files,
+    _open_final_workflow_pull_request,
     _publish_workflow_progress,
     _read_task_document,
     _select_ready_workflow_git_state,
@@ -99,6 +108,410 @@ def test_implementation_paths_include_committed_work_and_exclude_runtime_state(
     assert _implementation_paths_against_base(tmp_path) == (
         "src/implementation.py",
         "src/untracked.py",
+    )
+
+
+def test_issue_worker_compiles_the_benchmark_implementation_request() -> None:
+    request, validation = _issue_worker_implementation_request(
+        {
+            "plan_id": "feature-v1",
+            "item_id": "feature-v1-pr-01",
+            "objective": "Implement the feature.",
+            "scope": ["Implement the parser and report stable rejection codes."],
+            "implementation_steps": ["Add the parser."],
+            "acceptance_criteria": ["Valid input is parsed."],
+            "verification_command": f"{sys.executable} verify.py",
+        },
+        workflow_id="feature-v1-pr-01",
+        base_commit="a" * 40,
+    )
+
+    assert request.allowed_paths == (".",)
+    assert request.validation_profiles == ("verify",)
+    assert request.allowed_commands == (f"{sys.executable} verify.py",)
+    assert request.implementation_packet is not None
+    assert request.implementation_packet.repository.allowed_paths == (".",)
+    assert "Add the parser." in request.prompt
+    assert "Valid input is parsed." in request.prompt
+    assert "Implement the parser and report stable rejection codes." in request.prompt
+    assert "Do not create branches, commits, pull requests" in request.prompt
+    assert request.allow_existing_changes is True
+    assert validation.command == (sys.executable, "verify.py")
+
+
+def test_issue_worker_uses_explicit_repository_relative_allowed_paths() -> None:
+    request, _validation = _issue_worker_implementation_request(
+        {
+            "objective": "Implement the feature.",
+            "scope": ["Implement the parser."],
+            "allowed_paths": ["src/feature.py", "tests/"],
+            "implementation_steps": ["Add the parser."],
+            "acceptance_criteria": ["Valid input is parsed."],
+            "verification_command": f"{sys.executable} verify.py",
+        },
+        workflow_id="feature-v1-pr-01",
+        base_commit="a" * 40,
+    )
+
+    assert request.allowed_paths == ("src/feature.py", "tests/")
+
+
+def test_issue_worker_rejects_traversing_allowed_paths() -> None:
+    with pytest.raises(PowdrrExecutionError, match="repository-relative paths"):
+        _issue_worker_implementation_request(
+            {
+                "objective": "Implement the feature.",
+                "scope": ["Implement the parser."],
+                "allowed_paths": ["../outside.py"],
+                "implementation_steps": ["Add the parser."],
+                "acceptance_criteria": ["Valid input is parsed."],
+                "verification_command": f"{sys.executable} verify.py",
+            },
+            workflow_id="feature-v1-pr-01",
+            base_commit="a" * 40,
+        )
+
+
+def test_issue_worker_rebases_structrr_item_onto_unrelated_latest_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from powdrr_lift.workrr import feature_endpoint
+
+    baseline = {
+        "entities": [{"id": "existing", "type": "Module", "description": "old"}],
+        "entity_relationships": [],
+        "source_subjects": [],
+    }
+    proposal = compile_multi_pr_proposal(
+        plan_id="feature-v1",
+        baseline_snapshot=baseline,
+        items=[{"id": "feature", "allowed_paths": ["src/"]}],
+        proposed_operations=[
+            {
+                "operation_id": "update-module",
+                "item_id": "feature",
+                "section": "entities",
+                "subject_id": "existing",
+                "action": "changed",
+                "content": {
+                    "id": "existing",
+                    "type": "Module",
+                    "description": "new",
+                },
+            }
+        ],
+        source_ref="docs/plans/feature.md",
+    )
+    proposal_path = tmp_path / "docs/plans/feature-v1-structrr-proposal.json"
+    write_multi_pr_proposal(proposal_path, proposal)
+    latest = {
+        **baseline,
+        "entities": [
+            *baseline["entities"],
+            {"id": "other-feature", "type": "Module", "description": "landed"},
+        ],
+    }
+    manifest = SourceManifest(
+        submission_base="a" * 40,
+        source_revision="b" * 40,
+        extractor_version="test",
+        taxonomy_fingerprint="taxonomy",
+        excluded_paths=(),
+        files=(),
+        coverage_complete=True,
+        extraction_errors=(),
+        product_digest="empty-product",
+    )
+    monkeypatch.setattr(
+        feature_endpoint,
+        "_structrr_taxonomy_path",
+        lambda _root: tmp_path / "taxonomy.yaml",
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "bootstrap_structrr",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            document=latest,
+            validation=SimpleNamespace(successful=True, issues=[]),
+            source_manifest=manifest,
+        ),
+    )
+
+    result = _issue_worker_structrr_context(
+        tmp_path,
+        {
+            "plan_id": "feature-v1",
+            "item_id": "feature",
+            "structrr_item_id": "feature",
+            "structrr_proposal_file": "docs/plans/feature-v1-structrr-proposal.json",
+        },
+        base_commit="a" * 40,
+    )
+
+    assert result is not None
+    current, rebased_proposal, current_manifest, report = result
+    assert current == latest
+    assert rebased_proposal.structrr_baseline_fingerprint == task_agent.snapshot_digest(
+        latest
+    )
+    assert current_manifest is manifest
+    assert report["classification"] == "clean"
+
+
+def test_issue_worker_blocks_structrr_subject_changed_since_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from powdrr_lift.workrr import feature_endpoint
+
+    baseline = {
+        "entities": [{"id": "existing", "type": "Module", "description": "old"}],
+        "entity_relationships": [],
+        "source_subjects": [],
+    }
+    proposal = compile_multi_pr_proposal(
+        plan_id="feature-v1",
+        baseline_snapshot=baseline,
+        items=[{"id": "feature", "allowed_paths": ["src/"]}],
+        proposed_operations=[
+            {
+                "operation_id": "update-module",
+                "item_id": "feature",
+                "section": "entities",
+                "subject_id": "existing",
+                "action": "changed",
+                "content": {
+                    "id": "existing",
+                    "type": "Module",
+                    "description": "new",
+                },
+            }
+        ],
+        source_ref="docs/plans/feature.md",
+    )
+    proposal_path = tmp_path / "docs/plans/feature-v1-structrr-proposal.json"
+    write_multi_pr_proposal(proposal_path, proposal)
+    latest = {
+        **baseline,
+        "entities": [
+            {"id": "existing", "type": "Module", "description": "changed elsewhere"}
+        ],
+    }
+    manifest = SourceManifest(
+        submission_base="a" * 40,
+        source_revision="b" * 40,
+        extractor_version="test",
+        taxonomy_fingerprint="taxonomy",
+        excluded_paths=(),
+        files=(),
+        coverage_complete=True,
+        extraction_errors=(),
+        product_digest="empty-product",
+    )
+    monkeypatch.setattr(
+        feature_endpoint,
+        "_structrr_taxonomy_path",
+        lambda _root: tmp_path / "taxonomy.yaml",
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "bootstrap_structrr",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            document=latest,
+            validation=SimpleNamespace(successful=True, issues=[]),
+            source_manifest=manifest,
+        ),
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="intervening repository work"):
+        _issue_worker_structrr_context(
+            tmp_path,
+            {
+                "plan_id": "feature-v1",
+                "item_id": "feature",
+                "structrr_item_id": "feature",
+                "structrr_proposal_file": (
+                    "docs/plans/feature-v1-structrr-proposal.json"
+                ),
+            },
+            base_commit="a" * 40,
+        )
+
+
+def test_issue_worker_continues_after_nontrivial_validation_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "README.md").write_text("initial\n", encoding="utf-8")
+    (tmp_path / "verify.py").write_text(
+        "from pathlib import Path\n"
+        "assert 'value = 42' in Path('src/feature.py').read_text()\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "initial",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    task = replace(
+        _workflow(tmp_path).tasks[0],
+        input_state={
+            "proposed_pr_id": "feature-v1-pr-01",
+            "proposed_pr_context": {
+                "plan_id": "feature-v1",
+                "item_id": "feature-v1-pr-01",
+                "objective": "Implement the feature value.",
+                "scope": ["src"],
+                "implementation_steps": ["Set the feature value to 42."],
+                "acceptance_criteria": ["The feature value equals 42."],
+                "verification_command": f"{sys.executable} verify.py",
+            },
+        },
+    )
+    workflow = WorkflowInstance.from_directory(tmp_path / "workflow")
+    provider_requests: list[Any] = []
+    provider_timeouts: list[float] = []
+
+    class NontrivialProvider:
+        provider_name = "test-provider"
+
+        def run(
+            self,
+            request: Any,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            del attempt_id
+            provider_requests.append(request)
+            source = worktree_root / "src" / "feature.py"
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_text(
+                "value = 1\n" if len(provider_requests) == 1 else "value = 42\n",
+                encoding="utf-8",
+            )
+            return subprocess.CompletedProcess(["fake-agent"], 0, "done\n", "")
+
+    def build_provider(*_args: Any, **kwargs: Any) -> NontrivialProvider:
+        provider_timeouts.append(kwargs["timeout_seconds"])
+        return NontrivialProvider()
+
+    monkeypatch.setattr(task_agent, "build_coding_agent_provider", build_provider)
+    monkeypatch.setattr(task_agent.tempfile, "gettempdir", lambda: str(tmp_path))
+    config = WorkflowTaskAgentConfig(
+        workflow_dir=workflow.directory,
+        repo_root=tmp_path,
+        code_agent="minisweagent",
+        coding_agent_timeout_seconds=1800.0,
+        coding_agent_validation_timeout_seconds=1800.0,
+    )
+    strategy = task_agent._TaskWorkflowExecutionStrategy(
+        config=config,
+        workflow=workflow,
+        task=task,
+        repo_root=tmp_path,
+        error_log_root=tmp_path,
+        client=cast(Any, None),
+        compaction_client=cast(Any, None),
+        model="test-model",
+        mapping_provider="test-provider",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        action_engine=cast(Any, None),
+        events=[],
+        repair_fallback_client=None,
+        repair_fallback_model=None,
+    )
+
+    result = strategy._run_coding_agent()
+
+    assert result["passed"] is True
+    assert result["continuations"] == 1
+    assert len(result["attempts"]) == 2
+    assert result["attempts"][0]["validation"]["status"] == "failed"
+    assert result["attempts"][1]["validation"]["status"] == "passed"
+    assert "Observed issue:" in provider_requests[1].prompt
+    assert "validation" in provider_requests[1].prompt
+    assert "Set the feature value to 42." in provider_requests[1].prompt
+    assert provider_timeouts == [1800.0]
+
+
+def test_clean_pr_publish_result_is_recorded_like_pr_create(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = _workflow(tmp_path)
+    task = replace(
+        workflow.tasks[0],
+        input_state={"proposed_pr_id": "feature-v1-pr-01"},
+    )
+    url = "https://github.com/example/repo/pull/42"
+    recorded: list[object] = []
+    published_parameters: list[Mapping[str, Any]] = []
+
+    class RuntimeStub:
+        def require_publish_readiness(self) -> None:
+            pass
+
+    def publish(_tool: str, parameters: Mapping[str, Any], **_kwargs: Any) -> str:
+        published_parameters.append(dict(parameters))
+        return url
+
+    monkeypatch.setattr(task_agent, "invoke_intrinsic_capability", publish)
+    monkeypatch.setattr(
+        task_agent,
+        "_record_task_pull_request",
+        lambda *args, **_kwargs: recorded.append(args[5]),
+    )
+    strategy = task_agent._TaskWorkflowExecutionStrategy(
+        config=cast(Any, SimpleNamespace(verbose=False)),
+        workflow=workflow,
+        task=task,
+        repo_root=tmp_path,
+        error_log_root=tmp_path,
+        client=cast(Any, None),
+        compaction_client=cast(Any, None),
+        model="test-model",
+        mapping_provider="test-provider",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        action_engine=cast(Any, None),
+        events=[],
+        repair_fallback_client=None,
+        repair_fallback_model=None,
+        runtime=cast(Any, RuntimeStub()),
+    )
+
+    strategy._execute_tool(
+        WorkflowAction(
+            kind="invoke_tool",
+            tool="gh",
+            parameters={
+                "operation": "pr_publish_clean",
+                "files_to_publish": ["src/example.py"],
+                "publication_branch": "powdrr/feature-v1-pr-01",
+            },
+        )
+    )
+
+    assert len(recorded) == 1
+    assert isinstance(recorded[0], Mapping)
+    assert recorded[0]["stdout"] == url
+    assert recorded[0]["command"] == ["gh", "pr", "create"]
+    assert strategy.events[-1]["result"] == url
+    assert published_parameters[0]["publication_branch"] == (
+        "powdrr/feature-v1-pr-01-implementation"
     )
 
 
@@ -414,6 +827,62 @@ def test_process_workflow_task_completes_claimed_agent_task(
     assert ('"step_json"' in displayed) is verbose
     assert "received streamed LLM data" not in displayed
     assert "Completed workflow task: agent-task" in stdout.getvalue()
+
+
+def test_named_procedrr_process_outputs_complete_durable_task(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    task = replace(
+        workflow.tasks[0],
+        process_id="result-producing-process",
+        output_state_type="implementation-result",
+    )
+    workflow.update_task(task)
+    _write_procedrr_process(
+        tmp_path,
+        "result-producing-process",
+        [
+            {
+                "operation": {
+                    "tool": "respond",
+                    "parameters": {"text": "Published pull request."},
+                    "bind": "summary",
+                }
+            },
+            {"terminal": "succeeded"},
+        ],
+        inputs=[{"name": "task_context", "type": "object", "required": True}],
+        outputs={"summary": {"type": "object"}},
+    )
+
+    client = _ProcedrrFragmentClient(
+        [
+            {
+                "operation": {
+                    "tool": "respond",
+                    "parameters": {"text": "Published pull request."},
+                    "bind": "summary",
+                }
+            },
+            {"terminal": "succeeded"},
+        ]
+    )
+    stderr = io.StringIO()
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0, stderr.getvalue()
+    completed = WorkflowInstance.from_directory(workflow.directory).tasks[0]
+    assert completed.status is TaskStatus.COMPLETED
+    assert completed.output_state == {"summary": {"text": "Published pull request."}}
 
 
 def test_procedrr_task_handoff_persists_and_resumes_checkpoint(
@@ -891,9 +1360,11 @@ def test_process_workflow_task_propagates_verbose_to_nested_tools(
     assert observed_verbose == [True]
 
 
+@pytest.mark.parametrize("with_checkpoint_callback", [False, True])
 def test_process_workflow_task_uses_workflow_integration_worktree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    with_checkpoint_callback: bool,
 ) -> None:
     primary_root = tmp_path / "repo"
     primary_root.mkdir()
@@ -988,10 +1459,20 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         text=True,
     )
     published_roots: list[Path] = []
+    final_pr_calls: list[str] = []
+    checkpoints: list[tuple[str, str, object, str | None]] = []
+
+    def _record_checkpoint(
+        task_id: str,
+        state_type: str,
+        state: object,
+        commit_sha: str | None,
+    ) -> None:
+        checkpoints.append((task_id, state_type, state, commit_sha))
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.task_agent._open_final_workflow_pull_request",
-        lambda *_args, **_kwargs: None,
+        lambda *_args, **_kwargs: final_pr_calls.append("opened"),
     )
 
     def _record_publish(
@@ -1004,23 +1485,28 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         open_pull_request: bool = True,
         events: Sequence[Mapping[str, object]] = (),
         runtime: object = None,
-    ) -> None:
+    ) -> str:
         del workflow_id, reason, stdout, open_pull_request, events, runtime
         published_roots.append(repo_root)
         assert published_workflow.directory == (
             integration_root / "docs" / "workflows" / "feature"
         )
+        return "d" * 40
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.task_agent._publish_workflow_progress",
         _record_publish,
     )
 
-    exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(
-            workflow_dir=workflow_dir,
-            repo_root=primary_root,
+    config = WorkflowTaskAgentConfig(
+        workflow_dir=workflow_dir,
+        repo_root=primary_root,
+        task_checkpoint_callback=(
+            _record_checkpoint if with_checkpoint_callback else None
         ),
+    )
+    exit_code = run_workflow_task(
+        config,
         client=_FakeClient([{"action": "complete", "output_state": {"ok": True}}]),
         stdout=io.StringIO(),
         stderr=io.StringIO(),
@@ -1028,6 +1514,12 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
 
     assert exit_code == 0
     assert published_roots == [integration_root, integration_root]
+    assert final_pr_calls == []
+    assert checkpoints == (
+        [("feature-17-task-001", "state", {"ok": True}, "d" * 40)]
+        if with_checkpoint_callback
+        else []
+    )
     assert WorkflowInstance.from_directory(
         integration_root / "docs" / "workflows" / "feature"
     ).tasks[0].status is (TaskStatus.COMPLETED)
@@ -1094,6 +1586,53 @@ def test_publish_workflow_progress_pushes_clean_worktree_commits(
 
     assert ["add", "--all"] in git_calls
     assert ["push", "--set-upstream", "origin", "powdrr/feature-17"] in git_calls
+
+
+def test_final_workflow_pull_request_leaves_branch_identity_to_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = WorkflowInstance.create(tmp_path / "workflow")
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch="powdrr/feature-17",
+        workflow_relative_directory="workflow",
+    )
+    gh_calls: list[Mapping[str, Any]] = []
+
+    def _record_gh(
+        _repo_root: Path,
+        parameters: Mapping[str, Any],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        gh_calls.append(parameters)
+        if parameters["operation"] == "pr_view":
+            return subprocess.CompletedProcess([], 1, stdout="", stderr="missing")
+        return subprocess.CompletedProcess(
+            [],
+            0,
+            stdout="https://github.com/example/repo/pull/17\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr("powdrr_lift.workrr.task_agent._gh_result", _record_gh)
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.task_agent._write_workflow_record",
+        lambda *_args, **_kwargs: None,
+    )
+
+    _open_final_workflow_pull_request(
+        tmp_path,
+        workflow,
+        state,
+        stdout=io.StringIO(),
+    )
+
+    create_request = gh_calls[-1]
+    assert create_request["operation"] == "pr_create"
+    assert "base" not in create_request
+    assert "head" not in create_request
 
 
 def test_process_workflow_task_persists_output_for_downstream_claim(

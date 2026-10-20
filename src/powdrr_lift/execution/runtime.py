@@ -1164,10 +1164,10 @@ class ExecutionRuntime:
                 action_kind=request.semantic_action,
                 remediation="Use one of the capabilities declared for this step.",
             )
-        if (
-            request.tool_name == "repository"
-            and request.arguments.get("operation") == "pr_create"
-        ):
+        if request.tool_name == "repository" and request.arguments.get("operation") in {
+            "pr_create",
+            "pr_publish_clean",
+        }:
             self.require_publish_readiness()
         idempotency_key = request.arguments.get("idempotency_key")
         if (
@@ -1300,7 +1300,12 @@ class ExecutionRuntime:
         if request.tool_name != "repository":
             return request
         operation = request.arguments.get("operation")
-        if operation not in {"pr_create", "pr_edit", "pr_review_comment"}:
+        if operation not in {
+            "pr_create",
+            "pr_publish_clean",
+            "pr_edit",
+            "pr_review_comment",
+        }:
             return request
         if request.arguments.get("idempotency_key"):
             return request

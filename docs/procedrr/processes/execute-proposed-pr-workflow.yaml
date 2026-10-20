@@ -8,7 +8,7 @@ outputs:
     type: string
     minLength: 1
     pattern: ^https?://[^ ]+/pull/[0-9]+$
-limits: {llm_activations: 32, tool_calls: 120, context_chars: 60000, context_value_chars: 16000}
+limits: {context_chars: 60000, context_value_chars: 16000}
 steps:
   - call:
       process: execute-proposed-pr
@@ -19,29 +19,23 @@ steps:
   - gate:
       subject: implementation_result.passed
       equals: true
-      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      on_failure: {terminal: failed}
   - judge:
       kind: construct_one
-      question: Which exact implementation files and validation labels belong in the proposed PR?
+      question: Which repository validation labels apply to the implementation files?
       subject: implementation_result.changed_paths
       prompt_system: Return only the declared JSON object.
       instructions:
-        - Include every actual product implementation path reported in changed_paths and no generated runtime state, logs, caches, or unrelated files.
-        - Derive language_labels from the listed file extensions and include every applicable repository validation category.
-        - Return a non-empty files_to_publish list with repository-relative paths.
+        - Derive language_labels from the implementation file extensions and include every applicable repository validation category.
+        - Do not reconstruct, shorten, or omit the implementation file list; the workflow passes changed_paths directly to publication.
       context: [task_context, implementation_result]
       output:
         name: publication_scope
         schema:
           type: object
-          required: [files_to_publish, language_labels]
+          required: [language_labels]
           additionalProperties: false
           properties:
-            files_to_publish:
-              type: array
-              minItems: 1
-              uniqueItems: true
-              items: {type: string, minLength: 1}
             language_labels:
               type: array
               minItems: 1
@@ -51,7 +45,7 @@ steps:
   - call:
       process: finish-pr-prep
       inputs:
-        files_to_publish: {type: reference, value: publication_scope.files_to_publish}
+        files_to_publish: {type: reference, value: implementation_result.changed_paths}
         language_labels: {type: reference, value: publication_scope.language_labels}
       outputs:
         validation_results: validation_results
@@ -62,8 +56,11 @@ steps:
       prompt_system: Return only the declared JSON object.
       instructions:
         - Ground the request and every description claim in task_context, implementation_result, and validation_results.
-        - Include the proposed PR title, objective, scope, implementation details, acceptance criteria, and exact validation commands and results.
-        - Set files-to-publish to the exact publication_scope.files_to_publish list and base-branch to main.
+        - Set workflow_context.feature-name from task_context.proposed_pr_context.title. Prefer the reviewed item title verbatim; only shorten it when needed to fit the title limit.
+        - Make the feature-name a concise, human-readable description of the code change. Never use the plan ID, proposed PR ID, issue number, workflow ID, or a generic workflow label as the pull-request title.
+        - Include the objective, scope, implementation details, acceptance criteria, and exact validation commands and results in the PR description.
+        - Set base-branch to main.
+        - Set publication-branch to powdrr/<proposed-pr-id>-implementation, using task_context.proposed_pr_id exactly.
         - Provide a clear commit message and a complete populated PR description. Do not claim any unrun check passed.
       context: [task_context, implementation_result, publication_scope, validation_results]
       output:
@@ -80,24 +77,22 @@ steps:
                 - feature-name
                 - commit-message
                 - populated-pr-description
-                - files-to-publish
                 - base-branch
+                - publication-branch
               additionalProperties: true
               properties:
-                feature-name: {type: string, minLength: 1}
+                feature-name: {type: string, minLength: 1, maxLength: 100}
                 commit-message: {type: string, minLength: 1}
                 populated-pr-description: {type: string, minLength: 1}
-                files-to-publish:
-                  type: array
-                  minItems: 1
-                  items: {type: string, minLength: 1}
                 base-branch: {type: string, const: main}
+                publication-branch: {type: string, minLength: 1}
       validation: {kind: json_schema}
   - call:
       process: create-pull-request
       inputs:
         user_request: {type: reference, value: pull_request_request.user_request}
         workflow_context: {type: reference, value: pull_request_request.workflow_context}
+        files_to_publish: {type: reference, value: implementation_result.changed_paths}
       outputs:
         pull_request_url: pull_request_url
   - terminal: succeeded

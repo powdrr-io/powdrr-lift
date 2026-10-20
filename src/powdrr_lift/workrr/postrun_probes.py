@@ -19,35 +19,198 @@ from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.llm import complete_json
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
-POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v2"
-POSTRUN_PROBE_RESPONSE_SCHEMA: dict[str, Any] = {
+POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v4"
+_INTERACTION_PLAN_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
-        "probes": {
+        "interactions": {
             "type": "array",
             "items": {
                 "type": "object",
                 "properties": {
-                    "probe_id": {"type": "string"},
-                    "scenario_id": {"type": "string"},
-                    "oracle_basis": {"type": "string"},
-                    "imports": {"type": "array", "items": {"type": "string"}},
-                    "body": {"type": "array", "items": {"type": "string"}},
+                    "interaction_id": {"type": "string"},
+                    "scenario_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "condition": {"type": "string"},
+                    "operation": {"type": "string"},
+                    "expected": {"type": "string"},
+                    "evidence_quotes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
                 },
                 "required": [
-                    "probe_id",
-                    "scenario_id",
-                    "oracle_basis",
-                    "imports",
-                    "body",
+                    "interaction_id",
+                    "scenario_ids",
+                    "condition",
+                    "operation",
+                    "expected",
+                    "evidence_quotes",
                 ],
                 "additionalProperties": False,
             },
         }
     },
-    "required": ["probes"],
+    "required": ["interactions"],
     "additionalProperties": False,
 }
+
+
+def generate_probe_interaction_plan(
+    client: WorkflowLLMClient,
+    *,
+    instruction: str,
+    scenarios: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    """Plan source-grounded composition cases before probe code is authored."""
+    scenario_fields = (
+        "scenario_id",
+        "given",
+        "when",
+        "then",
+        "evidence",
+        "related_requirements",
+    )
+    compact_scenarios = [
+        {key: item[key] for key in scenario_fields if key in item} for item in scenarios
+    ]
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "Analyze the instruction and behavior scenarios for interactions "
+                "that a post-coding probe should exercise. Find combinations where "
+                "one requirement defines values, states, or inputs and another "
+                "defines an operation, precedence rule, resolution rule, or "
+                "classification applied to them. Include only combinations that "
+                "are entailed by the instruction; do not enumerate arbitrary pairs "
+                "or invent behavior. Each interaction must cite at least two exact, "
+                "distinct instruction quotes and refer to at least two scenario "
+                "IDs. State a concrete condition, operation, and observable "
+                "expected result. For selection or classification behavior, make "
+                "the result distinguish the included case from a relevant "
+                "excluded case. Return an empty interactions list when no "
+                "cross-requirement interaction is supported. Do not write code."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "instruction": instruction,
+                    "behavior_scenarios": compact_scenarios,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        },
+    ]
+    response = complete_json(client, messages, response_schema=_INTERACTION_PLAN_SCHEMA)
+    interactions = response.get("interactions")
+    if not isinstance(interactions, list):
+        raise ValueError("interaction plan must contain an interactions array")
+    planned = validate_probe_interaction_plan(
+        interactions, instruction=instruction, scenarios=scenarios
+    )
+    review_messages = [
+        {
+            "role": "system",
+            "content": (
+                "Audit the proposed interaction plan against the complete source "
+                "instruction and behavior scenarios. Find any materially distinct "
+                "cross-requirement combination that the plan omitted, especially "
+                "where a special value is used with a grammar operation or where "
+                "a composed result controls a later classification. Add only "
+                "source-entailed interactions, with exact quotes from at least "
+                "two distinct instruction clauses and at least two scenario IDs. "
+                "Do not repeat an interaction already covered by the plan. Return "
+                "an empty interactions list if the plan is complete. Do not write "
+                "code or probes."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "instruction": instruction,
+                    "behavior_scenarios": compact_scenarios,
+                    "proposed_interactions": planned,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        },
+    ]
+    review = complete_json(
+        client, review_messages, response_schema=_INTERACTION_PLAN_SCHEMA
+    ).get("interactions")
+    if not isinstance(review, list):
+        raise ValueError("interaction review must contain an interactions array")
+    additions = validate_probe_interaction_plan(
+        review, instruction=instruction, scenarios=scenarios
+    )
+    by_id = {item["interaction_id"]: item for item in planned}
+    for item in additions:
+        by_id.setdefault(item["interaction_id"], item)
+    return tuple(by_id.values())
+
+
+def validate_probe_interaction_plan(
+    interactions: Sequence[Any],
+    *,
+    instruction: str,
+    scenarios: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    """Check interaction references and require verbatim instruction evidence."""
+    known_scenarios = {str(item["scenario_id"]) for item in scenarios}
+    seen: set[str] = set()
+    validated: list[dict[str, Any]] = []
+    for raw in interactions:
+        if not isinstance(raw, Mapping):
+            raise ValueError("interaction plan contains a malformed entry")
+        item = dict(raw)
+        interaction_id = _required_text(item, "interaction_id")
+        if interaction_id in seen:
+            raise ValueError(f"duplicate interaction id {interaction_id!r}")
+        scenario_ids = item.get("scenario_ids")
+        if (
+            not isinstance(scenario_ids, list)
+            or any(not isinstance(value, str) for value in scenario_ids)
+            or len(scenario_ids) < 2
+            or len(set(scenario_ids)) != len(scenario_ids)
+        ):
+            raise ValueError(
+                f"interaction {interaction_id!r} must reference at least two "
+                "distinct scenarios"
+            )
+        unknown = set(scenario_ids) - known_scenarios
+        if unknown:
+            raise ValueError(
+                f"interaction {interaction_id!r} refers to unknown scenarios: "
+                + ", ".join(sorted(unknown))
+            )
+        for key in ("condition", "operation", "expected"):
+            _required_text(item, key)
+        quotes = item.get("evidence_quotes")
+        if (
+            not isinstance(quotes, list)
+            or any(
+                not isinstance(quote, str)
+                or not quote.strip()
+                or quote not in instruction
+                for quote in quotes
+            )
+            or len(set(quotes)) < 2
+        ):
+            raise ValueError(
+                f"interaction {interaction_id!r} must cite two distinct exact "
+                "quotes from the instruction"
+            )
+        seen.add(interaction_id)
+        validated.append(item)
+    return tuple(validated)
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,15 +219,23 @@ class PostRunProbe:
     scenario_id: str
     oracle_basis: str
     test_source: str
-    imports: tuple[str, ...] = ()
+    function_name: str
+    obligation_id: str = ""
+    obligation_category: str = "other"
+    obligation_rule: str = "not_applicable"
+    interaction_ids: tuple[str, ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         return {
             "probe_id": self.probe_id,
             "scenario_id": self.scenario_id,
             "oracle_basis": self.oracle_basis,
-            "imports": list(self.imports),
+            "function_name": self.function_name,
             "test_source": self.test_source,
+            "obligation_id": self.obligation_id,
+            "obligation_category": self.obligation_category,
+            "obligation_rule": self.obligation_rule,
+            "interaction_ids": list(self.interaction_ids),
         }
 
 
@@ -90,209 +261,349 @@ class PostRunProbeResult:
         }
 
 
-def generate_postrun_probes(
-    client: WorkflowLLMClient,
+def parse_generated_postrun_probe_source(
+    source: str,
+    scenarios: Sequence[Mapping[str, Any]],
     *,
     instruction: str,
-    scenarios: Sequence[Mapping[str, Any]],
     repository_contract: Mapping[str, Any] | None = None,
-) -> tuple[PostRunProbe, ...]:
-    """Ask for executable checks while the candidate implementation is absent."""
-    eligible = [
-        dict(item)
-        for item in scenarios
-        if isinstance(item.get("scenario_id"), str)
-        and item.get("routing", "include") == "include"
-        and not item.get("unresolved_dimensions")
-    ]
-    if not eligible:
-        return ()
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Create a small independent Python probe suite for software behavior. "
-                "Use only the source instruction, behavior scenarios, and baseline "
-                "repository contract supplied below. The candidate implementation "
-                "and task solution tests are intentionally unavailable. Each probe "
-                "must test one observable behavior and use a public API or stable "
-                "repository contract. Do not invent expected behavior: omit a "
-                "scenario if its oracle is unresolved. Every probe must import and "
-                "exercise the candidate software's public API or stable repository "
-                "contract, then assert the observed result. Never test that the "
-                "instruction text contains a requirement or copy source text into "
-                "an assertion. Return `imports` as module names and `body` as a "
-                "list of Python statement strings. The runner builds the import "
-                "statements and zero-argument test function from this structure; "
-                "do not put imports or a function definition in `body`. Use plain "
-                "Python assertions; do not use pytest fixtures or pytest-specific "
-                "helpers. The body must contain at least one assert and one call "
-                "to the software under test, and must not import pytest. Do not "
-                "write files, launch subprocesses, access the network, or alter "
-                "repository state. Keep probes minimal and deterministic."
-            ),
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                {
-                    "instruction": instruction,
-                    "behavior_scenarios": eligible,
-                    "baseline_repository_contract": repository_contract or {},
-                },
-                ensure_ascii=False,
-                sort_keys=True,
-            ),
-        },
-    ]
-    response = complete_json(
-        client, messages, response_schema=POSTRUN_PROBE_RESPONSE_SCHEMA
-    )
+    interaction_obligations: Sequence[Mapping[str, Any]] = (),
+) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
+    """Validate MiniSWE's executable probes and typed obligations in one module."""
+    if not isinstance(source, str) or not source.strip():
+        raise ValueError("probe suite source is empty")
     try:
-        return _parse_generated_probes(response, eligible)
-    except _RepairableGeneratedProbeErrors as error:
-        repair_messages = [
-            *messages,
-            {
-                "role": "assistant",
-                "content": json.dumps(response, ensure_ascii=False, sort_keys=True),
-            },
-            {
-                "role": "user",
-                "content": json.dumps(
-                    {
-                        "task": (
-                            "Repair the flagged probe validation issues. "
-                            "Preserve each probe's behavior, probe_id, scenario_id, "
-                            "oracle_basis, and imports. Change only body statements "
-                            "needed to satisfy the listed validation errors. Keep "
-                            "each assertion tied to its source-supported expected "
-                            "behavior. Return only the corrected "
-                            "probes in the array; do not repeat valid probes."
-                        ),
-                        "validation_error": str(error),
-                        "invalid_probe_ids": list(error.probe_ids),
-                    },
-                    ensure_ascii=False,
-                    sort_keys=True,
-                ),
-            },
-        ]
-        try:
-            repaired_response = complete_json(
-                client,
-                repair_messages,
-                response_schema=POSTRUN_PROBE_RESPONSE_SCHEMA,
-            )
-            repaired = _parse_generated_probes(repaired_response, eligible)
-        except Exception as repair_error:
-            raise ValueError(
-                "probe validation repair failed after one tailored retry: "
-                f"{type(repair_error).__name__}: {repair_error}"
-            ) from repair_error
-        original_by_id = {probe.probe_id: probe for probe in error.probes}
-        repaired_by_id = {probe.probe_id: probe for probe in repaired}
-        expected_repaired_ids = set(error.probe_ids)
-        if expected_repaired_ids != set(repaired_by_id):
-            raise ValueError(
-                "probe syntax repair did not return exactly the invalid probe IDs"
-            ) from None
-        for probe_id in error.probe_ids:
-            original = original_by_id[probe_id]
-            candidate = repaired_by_id[probe_id]
-            if (
-                candidate.scenario_id != original.scenario_id
-                or candidate.oracle_basis != original.oracle_basis
-                or candidate.imports != original.imports
-            ):
-                raise ValueError(
-                    "probe syntax repair changed probe provenance or imports for "
-                    f"{probe_id!r}"
-                ) from None
-        return tuple(
-            repaired_by_id[probe.probe_id]
-            if probe.probe_id in expected_repaired_ids
-            else probe
-            for probe in error.probes
+        tree = ast.parse(source)
+        compile(tree, "<miniswe-postrun-probes>", "exec")
+    except (SyntaxError, ValueError) as error:
+        raise ValueError(f"probe suite is not valid Python: {error}") from error
+
+    functions = [
+        item
+        for item in tree.body
+        if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and item.name.startswith("test_probe_")
+    ]
+    module_doc_node = tree.body[0] if tree.body else None
+    if not (
+        isinstance(module_doc_node, ast.Expr)
+        and isinstance(module_doc_node.value, ast.Constant)
+        and isinstance(module_doc_node.value.value, str)
+    ):
+        raise ValueError(
+            "probe suite must declare typed obligations in its module docstring"
         )
+    allowed_top_level = (ast.Import, ast.ImportFrom, ast.FunctionDef)
+    if any(
+        item is not module_doc_node and not isinstance(item, allowed_top_level)
+        for item in tree.body
+    ):
+        raise ValueError("probe suite has executable module-level statements")
 
+    module_doc = ast.get_docstring(tree, clean=False)
+    if module_doc is None:
+        raise ValueError(
+            "probe suite must declare typed obligations in its module docstring"
+        )
+    try:
+        module_metadata = json.loads(module_doc)
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            f"probe suite module docstring must be JSON: {error}"
+        ) from error
+    if not isinstance(module_metadata, Mapping) or not isinstance(
+        module_metadata.get("obligations"), list
+    ):
+        raise ValueError("probe suite module metadata must contain obligations")
+    obligations = _validate_probe_obligations(
+        module_metadata["obligations"],
+        scenarios,
+        instruction=instruction,
+        repository_contract=repository_contract or {},
+    )
+    if not functions and any(item["supported"] is True for item in obligations):
+        raise ValueError("probe suite must define probes for supported obligations")
+    obligation_by_id = {item["obligation_id"]: item for item in obligations}
 
-class _RepairableGeneratedProbeErrors(ValueError):
-    def __init__(
-        self,
-        message: str,
-        *,
-        probes: Sequence[PostRunProbe],
-        probe_ids: Sequence[str],
-    ) -> None:
-        super().__init__(message)
-        self.probes = tuple(probes)
-        self.probe_ids = tuple(probe_ids)
-
-
-def _parse_generated_probes(
-    response: Mapping[str, Any], scenarios: Sequence[Mapping[str, Any]]
-) -> tuple[PostRunProbe, ...]:
-    raw_probes = response.get("probes")
-    if not isinstance(raw_probes, list):
-        raise ValueError("probe generator response must contain a probes array")
-    probes: list[PostRunProbe] = []
-    repairable_errors: list[tuple[str, str]] = []
-    seen_ids: set[str] = set()
     known_scenarios = {str(item["scenario_id"]) for item in scenarios}
-    for raw in raw_probes:
-        if not isinstance(raw, Mapping):
-            raise ValueError("probe generator returned a malformed probe")
-        probe_id = _required_text(raw, "probe_id")
-        scenario_id = _required_text(raw, "scenario_id")
-        oracle_basis = _required_text(raw, "oracle_basis")
-        imports = _required_text_list(raw, "imports", allow_empty=True)
-        body = _required_text_list(raw, "body")
-        if probe_id in seen_ids:
-            raise ValueError(f"probe generator returned duplicate id {probe_id!r}")
+    seen_probe_ids: set[str] = set()
+    covered_obligations: set[str] = set()
+    known_interactions = {
+        str(item["interaction_id"]) for item in interaction_obligations
+    }
+    covered_interactions: set[str] = set()
+    probes: list[PostRunProbe] = []
+    for function in functions:
+        if isinstance(function, ast.AsyncFunctionDef):
+            raise ValueError("probe functions must be synchronous")
+        if (
+            function.args.args
+            or function.args.posonlyargs
+            or function.args.kwonlyargs
+            or function.args.vararg
+            or function.args.kwarg
+        ):
+            raise ValueError(f"{function.name} must take no arguments")
+        metadata = _probe_metadata(function)
+        probe_id = _required_text(metadata, "probe_id")
+        scenario_id = _required_text(metadata, "scenario_id")
+        oracle_basis = _required_text(metadata, "oracle_basis")
+        obligation_id = _required_text(metadata, "obligation_id")
+        raw_interaction_ids = metadata.get("interaction_ids", [])
+        if not isinstance(raw_interaction_ids, list) or any(
+            not isinstance(value, str) for value in raw_interaction_ids
+        ):
+            raise ValueError(f"{function.name} has malformed interaction_ids")
+        interaction_ids = tuple(dict.fromkeys(raw_interaction_ids))
+        if probe_id in seen_probe_ids:
+            raise ValueError(f"probe suite has duplicate probe id {probe_id!r}")
         if scenario_id not in known_scenarios:
             raise ValueError(f"probe refers to unknown scenario {scenario_id!r}")
-        seen_ids.add(probe_id)
-        try:
-            test_source = _render_test_source(imports, body)
-            _validate_test_source(test_source)
-        except ValueError as error:
-            if not _is_repairable_probe_error(str(error)):
-                raise
-            repairable_errors.append((probe_id, str(error)))
-            test_source = ""
+        obligation = obligation_by_id.get(obligation_id)
+        if obligation is None or obligation.get("supported") is not True:
+            raise ValueError(
+                f"probe refers to unsupported obligation {obligation_id!r}"
+            )
+        if obligation.get("scenario_id") != scenario_id:
+            raise ValueError(
+                f"probe {probe_id!r} does not match its obligation scenario"
+            )
+        unknown_interactions = set(interaction_ids) - known_interactions
+        if unknown_interactions:
+            raise ValueError(
+                f"probe {probe_id!r} refers to unknown interactions: "
+                + ", ".join(sorted(unknown_interactions))
+            )
+        for interaction_id in interaction_ids:
+            interaction = next(
+                item
+                for item in interaction_obligations
+                if item["interaction_id"] == interaction_id
+            )
+            if scenario_id not in interaction["scenario_ids"]:
+                raise ValueError(
+                    f"probe {probe_id!r} scenario is unrelated to interaction "
+                    f"{interaction_id!r}"
+                )
+        seen_probe_ids.add(probe_id)
+        covered_obligations.add(obligation_id)
+        covered_interactions.update(interaction_ids)
+        _validate_probe_function(function, tree)
         probes.append(
             PostRunProbe(
-                probe_id, scenario_id, oracle_basis, test_source, tuple(imports)
+                probe_id,
+                scenario_id,
+                oracle_basis,
+                source,
+                function.name,
+                obligation_id,
+                str(obligation["category"]),
+                str(obligation["rule"]),
+                interaction_ids,
             )
         )
-    if repairable_errors:
-        detail = "; ".join(
-            f"{probe_id}: {error}" for probe_id, error in repairable_errors
+    missing_obligations = {
+        str(item["obligation_id"]) for item in obligations if item["supported"] is True
+    } - covered_obligations
+    if missing_obligations:
+        raise ValueError(
+            "probe suite omitted supported obligations: "
+            + ", ".join(sorted(missing_obligations))
         )
-        raise _RepairableGeneratedProbeErrors(
-            detail,
-            probes=probes,
-            probe_ids=[probe_id for probe_id, _ in repairable_errors],
+    missing_interactions = known_interactions - covered_interactions
+    if missing_interactions:
+        raise ValueError(
+            "probe suite omitted required interactions: "
+            + ", ".join(sorted(missing_interactions))
         )
-    return tuple(probes)
+    return obligations, tuple(probes)
 
 
-def parse_generated_postrun_probes(
-    response: Mapping[str, Any], scenarios: Sequence[Mapping[str, Any]]
-) -> tuple[PostRunProbe, ...]:
-    """Validate a serialized probe document from any probe authoring agent."""
-    return _parse_generated_probes(response, scenarios)
+def _validate_probe_obligations(
+    raw_obligations: list[Any],
+    scenarios: Sequence[Mapping[str, Any]],
+    *,
+    instruction: str,
+    repository_contract: Mapping[str, Any],
+) -> tuple[dict[str, Any], ...]:
+    category_values = {
+        "transformation",
+        "validation",
+        "preservation",
+        "lifecycle",
+        "compatibility",
+        "presence",
+        "other",
+    }
+    rule_values = {
+        "reference_integrity",
+        "uniqueness",
+        "collision",
+        "mutual_exclusion",
+        "type_constraint",
+        "range_constraint",
+        "presence",
+        "format",
+        "other",
+        "not_applicable",
+        "unresolved",
+    }
+    operand_roles = {
+        "mapping_key",
+        "mapping_value",
+        "input",
+        "result",
+        "constraint",
+        "trigger",
+        "state",
+        "other",
+    }
+    known_scenarios = {str(item["scenario_id"]) for item in scenarios}
+    instruction_strings = (instruction,)
+    contract_strings = tuple(_string_leaves(repository_contract))
+    seen: set[str] = set()
+    covered: set[str] = set()
+    obligations: list[dict[str, Any]] = []
+    for raw in raw_obligations:
+        if not isinstance(raw, Mapping):
+            raise ValueError("probe suite contains a malformed obligation")
+        item = dict(raw)
+        obligation_id = _required_text(item, "obligation_id")
+        scenario_id = _required_text(item, "scenario_id")
+        if obligation_id in seen:
+            raise ValueError(f"duplicate obligation id {obligation_id!r}")
+        if scenario_id not in known_scenarios:
+            raise ValueError(f"obligation refers to unknown scenario {scenario_id!r}")
+        if (
+            item.get("category") not in category_values
+            or item.get("rule") not in rule_values
+        ):
+            raise ValueError(f"obligation {obligation_id!r} has an invalid type")
+        if not isinstance(item.get("supported"), bool):
+            raise ValueError(f"obligation {obligation_id!r} has invalid support status")
+        evidence = item.get("evidence")
+        if not isinstance(evidence, list):
+            raise ValueError(f"obligation {obligation_id!r} has malformed evidence")
+        for citation in evidence:
+            if not isinstance(citation, Mapping):
+                raise ValueError(f"obligation {obligation_id!r} has malformed evidence")
+            source, quote = citation.get("source"), citation.get("quote")
+            allowed_strings = (
+                instruction_strings if source == "instruction" else contract_strings
+            )
+            if (
+                source not in {"instruction", "repository_contract"}
+                or not isinstance(quote, str)
+                or not quote.strip()
+                or not any(quote in value for value in allowed_strings)
+            ):
+                raise ValueError(f"obligation {obligation_id!r} cites absent evidence")
+        if item["supported"]:
+            if item["rule"] == "unresolved" or not evidence:
+                raise ValueError(
+                    f"supported obligation {obligation_id!r} is not grounded"
+                )
+            for key in ("summary", "condition", "operation", "expected"):
+                _required_text(item, key)
+            operands = item.get("operands")
+            if not isinstance(operands, list):
+                raise ValueError(f"obligation {obligation_id!r} has malformed operands")
+            for operand in operands:
+                if (
+                    not isinstance(operand, Mapping)
+                    or operand.get("role") not in operand_roles
+                ):
+                    raise ValueError(
+                        f"obligation {obligation_id!r} has invalid operand roles"
+                    )
+                _required_text(operand, "name")
+                _required_text(operand, "meaning")
+        elif item["rule"] != "unresolved":
+            raise ValueError(
+                f"unsupported obligation {obligation_id!r} must be unresolved"
+            )
+        else:
+            _required_text(item, "unresolved_reason")
+        seen.add(obligation_id)
+        covered.add(scenario_id)
+        obligations.append(item)
+    missing = known_scenarios - covered
+    if missing:
+        raise ValueError("probe suite omitted scenarios: " + ", ".join(sorted(missing)))
+    return tuple(obligations)
 
 
-def _is_repairable_probe_error(error: str) -> bool:
-    return error.startswith(
-        (
-            "generated probe is not valid Python:",
-            "generated probe must contain an observable assertion",
-            "generated probe assertion must exercise a non-built-in software call",
-        )
-    )
+def _probe_metadata(function: ast.FunctionDef) -> Mapping[str, Any]:
+    docstring = ast.get_docstring(function, clean=False)
+    if docstring is None:
+        raise ValueError(f"{function.name} must have a JSON metadata docstring")
+    try:
+        metadata = json.loads(docstring)
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            f"{function.name} metadata docstring must be a JSON object: {error}"
+        ) from error
+    if not isinstance(metadata, Mapping):
+        raise ValueError(f"{function.name} metadata must be a JSON object")
+    return metadata
+
+
+def _validate_probe_function(function: ast.FunctionDef, tree: ast.Module) -> None:
+    builtin_names = set(dir(builtins))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id in {"open", "exec", "eval", "compile", "__import__"}:
+                raise ValueError(f"probe suite uses disallowed function {node.func.id}")
+        if isinstance(node, ast.Name) and node.id == "__builtins__":
+            raise ValueError("probe suite references __builtins__")
+        if isinstance(node, ast.Import):
+            roots = {alias.name.split(".", 1)[0] for alias in node.names}
+            _validate_import_roots(roots)
+        if isinstance(node, ast.ImportFrom):
+            _validate_import_roots({(node.module or "").split(".", 1)[0]})
+
+    if not any(isinstance(node, ast.Assert) for node in ast.walk(function)):
+        raise ValueError(f"{function.name} must contain an observable assertion")
+    function_calls = (node for node in ast.walk(function) if isinstance(node, ast.Call))
+    if not any(
+        not isinstance(call.func, ast.Name) or call.func.id not in builtin_names
+        for call in function_calls
+    ):
+        raise ValueError(f"{function.name} must exercise a non-built-in software call")
+
+
+def _validate_import_roots(roots: set[str]) -> None:
+    if "pytest" in roots:
+        raise ValueError("probe suite must not depend on pytest")
+    if roots & {
+        "os",
+        "socket",
+        "subprocess",
+        "shutil",
+        "urllib",
+        "requests",
+        "tempfile",
+        "importlib",
+        "ctypes",
+    }:
+        raise ValueError("probe suite imports a disallowed system module")
+
+
+def _required_text(value: Mapping[str, Any], key: str) -> str:
+    item = value.get(key)
+    if not isinstance(item, str) or not item.strip():
+        raise ValueError(f"probe metadata has an empty {key}")
+    return item.strip()
+
+
+def _string_leaves(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, Mapping):
+        return [leaf for item in value.values() for leaf in _string_leaves(item)]
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return [leaf for item in value for leaf in _string_leaves(item)]
+    return []
 
 
 def run_postrun_probes(
@@ -303,16 +614,27 @@ def run_postrun_probes(
     timeout_seconds: float = 180.0,
 ) -> tuple[PostRunProbeResult, ...]:
     """Run frozen probes independently of the repository's test framework."""
-    del profiles  # Probes have their own execution boundary and need no test profile.
+    del profiles
     results: list[PostRunProbeResult] = []
     with tempfile.TemporaryDirectory(prefix="powdrr-probes-") as temporary:
         probe_root = Path(temporary)
         runner_path = probe_root / "run_probe.py"
         runner_path.write_text(_PROBE_RUNNER, encoding="utf-8")
-        for index, probe in enumerate(probes):
-            test_path = probe_root / f"test_probe_{index:03d}.py"
-            test_path.write_text(probe.test_source.rstrip() + "\n", encoding="utf-8")
-            command = (sys.executable, str(runner_path), str(test_path))
+        suites: dict[str, Path] = {}
+        for probe in probes:
+            suite_path = suites.get(probe.test_source)
+            if suite_path is None:
+                suite_path = probe_root / f"suite_{len(suites):03d}.py"
+                suite_path.write_text(
+                    probe.test_source.rstrip() + "\n", encoding="utf-8"
+                )
+                suites[probe.test_source] = suite_path
+            command = (
+                sys.executable,
+                str(runner_path),
+                str(suite_path),
+                probe.function_name,
+            )
             environment = os.environ.copy()
             environment.pop("VIRTUAL_ENV", None)
             existing_pythonpath = environment.get("PYTHONPATH", "")
@@ -367,6 +689,21 @@ def run_postrun_probes(
     return tuple(results)
 
 
+def baseline_probe_failures(
+    results: Sequence[PostRunProbeResult],
+) -> list[str]:
+    """Return probes that did not execute and fail through an assertion."""
+    problems = []
+    for result in results:
+        if result.status != "failed" or "AssertionError" not in result.output:
+            problems.append(
+                f"{result.probe_id} ({result.scenario_id}) returned "
+                f"{result.status}; expected an AssertionError. "
+                f"{_truncate(result.output or result.error or '', 1600)}"
+            )
+    return problems
+
+
 def probe_failures(results: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]:
     """Convert failed probe results into focused coding-agent repair findings."""
     return [
@@ -386,154 +723,17 @@ _PROBE_RUNNER = """\
 import importlib.util
 import sys
 
-path = sys.argv[1]
+path, function_name = sys.argv[1:3]
 spec = importlib.util.spec_from_file_location("powdrr_generated_probe", path)
 if spec is None or spec.loader is None:
     raise RuntimeError(f"cannot load generated probe: {path}")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
-tests = [
-    value
-    for name, value in vars(module).items()
-    if name.startswith("test_probe_") and callable(value)
-]
-if len(tests) != 1:
-    raise RuntimeError(f"expected exactly one probe function, found {len(tests)}")
-tests[0]()
+function = getattr(module, function_name, None)
+if not callable(function):
+    raise RuntimeError(f"generated probe function not found: {function_name}")
+function()
 """
-
-
-def _validate_test_source(source: str) -> None:
-    try:
-        tree = ast.parse(source)
-        compile(tree, "<generated-postrun-probe>", "exec")
-    except (SyntaxError, ValueError) as error:
-        raise ValueError(f"generated probe is not valid Python: {error}") from error
-    functions = [item for item in tree.body if isinstance(item, ast.FunctionDef)]
-    if len(functions) != 1 or not functions[0].name.startswith("test_probe_"):
-        raise ValueError("each generated probe must contain one test_probe_ function")
-    function = functions[0]
-    if (
-        function.args.args
-        or function.args.posonlyargs
-        or function.args.kwonlyargs
-        or function.args.vararg
-        or function.args.kwarg
-    ):
-        raise ValueError("generated probe function must take no arguments")
-    if any(
-        not isinstance(item, (ast.Import, ast.ImportFrom, ast.FunctionDef))
-        for item in tree.body
-    ):
-        raise ValueError("generated probe has executable module-level statements")
-    if any(
-        isinstance(node, (ast.Import, ast.ImportFrom)) for node in ast.walk(function)
-    ):
-        raise ValueError("generated probe imports must be declared in imports")
-    for node in ast.walk(tree):
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if node.func.id in {"open", "exec", "eval", "compile", "__import__"}:
-                raise ValueError(
-                    f"generated probe uses disallowed function {node.func.id}"
-                )
-        if isinstance(node, ast.Name) and node.id == "__builtins__":
-            raise ValueError("generated probe references __builtins__")
-        if isinstance(node, ast.Import):
-            roots = {alias.name.split(".", 1)[0] for alias in node.names}
-            if "pytest" in roots:
-                raise ValueError("generated probe must not depend on pytest")
-            if roots & {
-                "os",
-                "socket",
-                "subprocess",
-                "shutil",
-                "urllib",
-                "requests",
-                "pathlib",
-                "tempfile",
-                "importlib",
-                "ctypes",
-            }:
-                raise ValueError("generated probe imports a disallowed system module")
-        if isinstance(node, ast.ImportFrom):
-            root = (node.module or "").split(".", 1)[0]
-            if root == "pytest":
-                raise ValueError("generated probe must not depend on pytest")
-            if root in {
-                "os",
-                "socket",
-                "subprocess",
-                "shutil",
-                "urllib",
-                "requests",
-                "pathlib",
-                "tempfile",
-                "importlib",
-                "ctypes",
-            }:
-                raise ValueError("generated probe imports a disallowed system module")
-    if not any(isinstance(node, ast.Assert) for node in ast.walk(function)):
-        raise ValueError("generated probe must contain an observable assertion")
-    builtin_names = set(dir(builtins))
-    function_calls = (node for node in ast.walk(function) if isinstance(node, ast.Call))
-    if not any(
-        not isinstance(call.func, ast.Name) or call.func.id not in builtin_names
-        for call in function_calls
-    ):
-        raise ValueError("generated probe must exercise a non-built-in software call")
-
-
-def _required_text(value: Mapping[str, Any], key: str) -> str:
-    item = value.get(key)
-    if not isinstance(item, str) or not item.strip():
-        raise ValueError(f"probe generator returned an empty {key}")
-    return item.strip()
-
-
-def _required_text_list(
-    value: Mapping[str, Any], key: str, *, allow_empty: bool = False
-) -> list[str]:
-    items = value.get(key)
-    if not isinstance(items, list) or not all(
-        isinstance(item, str) and item.strip() for item in items
-    ):
-        raise ValueError(f"probe generator returned an invalid {key} array")
-    normalized = [item.strip() for item in items]
-    if not normalized and not allow_empty:
-        raise ValueError(f"probe generator returned an empty {key}")
-    return normalized
-
-
-def _render_test_source(imports: Sequence[str], body: Sequence[str]) -> str:
-    for module_name in imports:
-        if not re.fullmatch(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*", module_name):
-            raise ValueError(
-                f"probe generator returned an invalid import module {module_name!r}"
-            )
-    body_nodes: list[ast.stmt] = []
-    for statement in body:
-        try:
-            parsed = ast.parse(statement)
-        except (SyntaxError, ValueError) as error:
-            raise ValueError(f"generated probe is not valid Python: {error}") from error
-        body_nodes.extend(parsed.body)
-    if not body_nodes:
-        raise ValueError("probe generator returned an empty body")
-    source_template = "\n".join(f"import {name}" for name in imports)
-    if source_template:
-        source_template += "\n\n"
-    source_template += "def test_probe_generated():\n    pass\n"
-    module = ast.parse(source_template)
-    test_function = next(
-        node for node in module.body if isinstance(node, ast.FunctionDef)
-    )
-    test_function.body = body_nodes
-    module = ast.fix_missing_locations(module)
-    try:
-        compile(module, "<generated-postrun-probe>", "exec")
-    except (SyntaxError, ValueError) as error:
-        raise ValueError(f"generated probe is not valid Python: {error}") from error
-    return ast.unparse(module) + "\n"
 
 
 def _output(stdout: str | bytes | None, stderr: str | bytes | None) -> str:
@@ -551,12 +751,13 @@ def _truncate(value: str, limit: int) -> str:
 
 
 __all__ = [
-    "POSTRUN_PROBE_RESPONSE_SCHEMA",
     "POSTRUN_PROBE_SCHEMA_VERSION",
     "PostRunProbe",
     "PostRunProbeResult",
-    "generate_postrun_probes",
-    "parse_generated_postrun_probes",
+    "baseline_probe_failures",
+    "generate_probe_interaction_plan",
+    "parse_generated_postrun_probe_source",
     "probe_failures",
     "run_postrun_probes",
+    "validate_probe_interaction_plan",
 ]

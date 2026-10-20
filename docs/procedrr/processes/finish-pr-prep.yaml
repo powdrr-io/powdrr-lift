@@ -1,8 +1,8 @@
 version: 1
 name: finish-pr-prep
 description: >-
-  Confirm the staged PR scope, discover validation commands from repository
-  guidance, run every declared command, and repair failures before succeeding.
+  Verify the complete implementation file list, discover validation commands from
+  repository guidance, run every declared command, and repair failures before succeeding.
 inputs:
   - {name: files_to_publish, type: array, required: true}
   - {name: language_labels, type: array, required: true}
@@ -10,51 +10,14 @@ outputs:
   validation_results:
     type: array
     items: {type: object}
-limits: {llm_activations: 24, tool_calls: 100, context_chars: 20000, context_value_chars: 8000}
+limits: {context_chars: 20000, context_value_chars: 8000}
 steps:
   - operation:
       tool: invoke_tool
       parameters:
-        tool: shell
-        parameters: {command: [git, status, --short]}
-      bind: repository_status_before
-  - operation:
-      tool: invoke_tool
-      parameters:
         tool: git
-        parameters: {operation: add, paths: "${files_to_publish}"}
-      bind: stage_result
-  - gate:
-      subject: stage_result.returncode
-      equals: 0
-      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
-  - operation:
-      tool: invoke_tool
-      parameters:
-        tool: shell
-        parameters: {command: [git, diff, --cached, --stat]}
-      bind: staged_diff_summary
-  - judge:
-      kind: construct_one
-      question: Does the staged pull-request scope match files_to_publish?
-      subject: staged_diff_summary
-      prompt_system: Return only the declared JSON object.
-      instructions:
-        - Compare staged_diff_summary with the exact files_to_publish input; the staged diff is authoritative for what will be committed.
-        - Confirm only when the staged set contains every files_to_publish path and no other path.
-        - repository_status_before is pre-staging context. Unstaged or untracked paths outside files_to_publish remain excluded from the commit and do not fail this scope check.
-        - Name every unexpected staged path or missing intended staged path in findings.
-      context: [files_to_publish, repository_status_before, staged_diff_summary]
-      output:
-        name: scope_review
-        schema:
-          type: object
-          required: [confirmed, findings]
-          additionalProperties: false
-          properties:
-            confirmed: {type: boolean}
-            findings: {type: array, items: {type: string}}
-      validation: {kind: json_schema}
+        parameters: {operation: verify_pr_scope, paths: "${files_to_publish}"}
+      bind: scope_review
   - gate:
       subject: scope_review.confirmed
       equals: true

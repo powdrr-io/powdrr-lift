@@ -25,6 +25,10 @@ def execute_intrinsic_git_gh_tool(
     if parameters.get("help") is True:
         return builtin_tool_help(tool)
     if tool == GIT_TOOL:
+        if parameters.get("operation") == "verify_pr_scope":
+            from powdrr_lift.clean_pr_publisher import verify_publication_scope
+
+            return verify_publication_scope(parameters, worktree_root=worktree_root)
         command = _git_command(parameters)
         executable = "git"
     elif tool == GH_TOOL:
@@ -55,6 +59,21 @@ def execute_intrinsic_git_gh_tool(
                 "stderr": "",
                 "no_op": True,
             }
+    if tool == GH_TOOL and parameters.get("operation") == "pr_publish_clean":
+        from powdrr_lift.clean_pr_publisher import publish_clean_pull_request
+
+        pull_request_url = publish_clean_pull_request(
+            parameters, worktree_root=worktree_root
+        )
+        return {
+            "tool": tool,
+            "command": ["gh", "pr", "publish-clean"],
+            "returncode": 0,
+            "stdout": pull_request_url,
+            "stderr": "",
+            "pull_request_url": pull_request_url,
+            "no_op": False,
+        }
     result = subprocess.run(
         [executable, *command],
         cwd=worktree_root,
@@ -190,6 +209,9 @@ def _git_command(parameters: Mapping[str, Any]) -> list[str]:
     elif operation == "show_ref":
         branch = _required_text(parameters.get("branch"), "branch")
         command = ["show-ref", "--verify", f"refs/heads/{branch}"]
+    elif operation == "verify_pr_scope":
+        _relative_paths(parameters.get("paths"), field="paths")
+        command = ["status", "--short"]
     elif operation == "switch":
         branch = _branch_name(parameters.get("branch"))
         command = ["switch", branch]
@@ -256,7 +278,7 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
             command.extend(["--json", ",".join(field.strip() for field in fields)])
             if parameters.get("jq") == ".url":
                 command.extend(["--jq", ".url"])
-    elif operation == "pr_create":
+    elif operation in {"pr_create", "pr_publish_clean"}:
         command = [
             "pr",
             "create",
@@ -268,8 +290,11 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
         ]
         if parameters.get("base") is not None:
             command.extend(["--base", _branch_name(parameters.get("base"))])
-        if parameters.get("head") is not None:
-            command.extend(["--head", _branch_name(parameters.get("head"))])
+        head = parameters.get(
+            "publication_branch" if operation == "pr_publish_clean" else "head"
+        )
+        if head is not None:
+            command.extend(["--head", _branch_name(head)])
     elif operation == "pr_edit":
         command = [
             "pr",

@@ -76,7 +76,7 @@ new file mode 100644
         },
     ]
     suite = {
-        "schema_version": "instruction-derived-probe-suite-v2",
+        "schema_version": "instruction-derived-probe-suite-v4",
         "generation_status": "generated",
         "source_instruction": instruction,
         "probes": probes,

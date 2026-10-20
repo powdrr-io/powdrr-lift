@@ -88,8 +88,11 @@ from powdrr_lift.structrr.verification_obligations import (
 from powdrr_lift.workrr.actualization import reconcile_actualization
 from powdrr_lift.workrr.candidate_checkpoint import checkpoint_candidate_changes
 from powdrr_lift.workrr.coding_agent import (
+    DEFAULT_CODING_AGENT_TIMEOUT_SECONDS,
+    DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
     CodingAgentAttempt,
     CodingAgentAttemptStore,
+    CodingAgentRecoveryDecision,
     CodingAgentRunner,
     CodingAgentStatus,
     ImplementationRequest,
@@ -97,6 +100,7 @@ from powdrr_lift.workrr.coding_agent import (
     OpenCodePermissionPolicy,
     OpenCodeProvider,
     build_coding_agent_provider,
+    run_coding_agent_recovery,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
@@ -105,6 +109,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationResult,
     ValidationResultStatus,
     ValidationRunner,
+    execute_coding_agent_attempt,
 )
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
@@ -121,8 +126,9 @@ from powdrr_lift.workrr.jev_classifier import (
 from powdrr_lift.workrr.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     PostRunProbe,
-    generate_postrun_probes,
-    parse_generated_postrun_probes,
+    baseline_probe_failures,
+    generate_probe_interaction_plan,
+    parse_generated_postrun_probe_source,
     probe_failures,
     run_postrun_probes,
 )
@@ -178,6 +184,10 @@ class FeatureEndpointConfig:
     prepared_worktree: Path | None = None
     prepared_branch: str | None = None
     agent_managed_git: bool = False
+    coding_agent_timeout_seconds: float = DEFAULT_CODING_AGENT_TIMEOUT_SECONDS
+    coding_agent_validation_timeout_seconds: float = (
+        DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -2689,52 +2699,6 @@ def _run_code_agent_phase(
         )
         state["behavior_probe_repair_path"] = repair_path
         state["behavior_probe_repair_status"] = repair_artifact.get("status")
-    if (
-        not config.capture_worker_prompts_only
-        and config.code_agent != "minisweagent"
-        and "postrun_probes" not in state
-        and implementation_packet.behavior_scenarios
-    ):
-        probe_client = state.get("probe_generation_client")
-        probes: tuple[PostRunProbe, ...] = ()
-        generation_error: str | None = None
-        try:
-            if probe_client is None or not callable(
-                getattr(probe_client, "complete_json", None)
-            ):
-                raise ValueError("planning client is unavailable")
-            probes = generate_postrun_probes(
-                probe_client,
-                instruction=feature_description,
-                scenarios=tuple(
-                    item.to_data() for item in implementation_packet.behavior_scenarios
-                ),
-                repository_contract=implementation_packet.contract_closure,
-            )
-        except Exception as error:
-            generation_error = str(error)
-        probe_artifact_root = output_root / "postrun-probes"
-        probe_artifact_root.mkdir(parents=True, exist_ok=True)
-        suite_document = {
-            "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
-            "generation_status": "generated"
-            if generation_error is None
-            else "unavailable",
-            "generation_error": generation_error,
-            "source_instruction": feature_description,
-            "probes": [item.to_data() for item in probes],
-            "scenarios_without_executable_probe": sorted(
-                {item.scenario_id for item in implementation_packet.behavior_scenarios}
-                - {item.scenario_id for item in probes}
-            ),
-        }
-        (probe_artifact_root / "probe-suite.json").write_text(
-            json.dumps(suite_document, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        state["postrun_probes"] = probes
-        state["postrun_probe_artifact_root"] = probe_artifact_root
-        state["postrun_probe_generation_error"] = generation_error
     implementation_packet_path = output_root / "implementation-packet.json"
     packet_document = implementation_packet.to_data()
     behavior_probe_repair_path = state.get("behavior_probe_repair_path")
@@ -2777,7 +2741,7 @@ def _run_code_agent_phase(
                 opencode_model=config.opencode_model,
                 minisweagent_executable=config.minisweagent_executable,
                 minisweagent_model=config.minisweagent_model,
-                timeout_seconds=300.0,
+                timeout_seconds=config.coding_agent_timeout_seconds,
                 diagnostics_root=output_root / config.code_agent,
                 permission_policy=OpenCodePermissionPolicy(
                     _allowed_validation_commands(state["validation_profiles"])
@@ -2905,26 +2869,62 @@ def _run_code_agent_phase(
             request = replace(request, allow_existing_changes=True)
         if (
             not config.capture_worker_prompts_only
-            and config.code_agent == "minisweagent"
             and not repair_mode
             and "postrun_probes" not in state
             and implementation_packet.behavior_scenarios
         ):
-            probes = _generate_miniswe_postrun_probes(
-                config,
-                runner=runner,
-                worktree=worktree,
-                output_root=output_root,
-                base_commit=base_commit,
-                plan_path=plan_path,
-                request=request,
-                scenarios=tuple(
-                    item.to_data() for item in implementation_packet.behavior_scenarios
-                ),
+            probe_scenarios = tuple(
+                item.to_data() for item in implementation_packet.behavior_scenarios
             )
+            obligations: tuple[dict[str, Any], ...] = ()
+            probes: tuple[PostRunProbe, ...] = ()
+            generation_error: str | None = None
+            try:
+                obligations, probes = _generate_miniswe_postrun_probes(
+                    config,
+                    runner=runner,
+                    worktree=worktree,
+                    output_root=output_root,
+                    base_commit=base_commit,
+                    request=request,
+                    scenarios=probe_scenarios,
+                    instruction=feature_description,
+                    repository_contract=implementation_packet.contract_closure or {},
+                    interaction_client=cast(
+                        WorkflowLLMClient | None,
+                        state.get("probe_generation_client"),
+                    ),
+                )
+            except Exception as error:
+                generation_error = str(error)
+                probe_root = output_root / "postrun-probes"
+                probe_root.mkdir(parents=True, exist_ok=True)
+                (probe_root / "probe-suite.json").write_text(
+                    json.dumps(
+                        {
+                            "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
+                            "generation_status": "unavailable",
+                            "generation_method": "minisweagent_pre_coding",
+                            "generation_error": generation_error,
+                            "source_instruction": feature_description,
+                            "obligations": [],
+                            "interaction_obligations": [],
+                            "interaction_plan_status": "unavailable",
+                            "probes": [],
+                            "scenarios_without_executable_probe": sorted(
+                                str(item["scenario_id"]) for item in probe_scenarios
+                            ),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            state["postrun_probe_obligations"] = obligations
             state["postrun_probes"] = probes
             state["postrun_probe_artifact_root"] = output_root / "postrun-probes"
-            state["postrun_probe_generation_error"] = None
+            state["postrun_probe_generation_error"] = generation_error
         probes_for_request = state.get("postrun_probes")
         if (
             isinstance(probes_for_request, tuple)
@@ -2963,7 +2963,13 @@ def _run_code_agent_phase(
         before_state_fingerprint = _worktree_state_fingerprint(runner, worktree)
         attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
         state["opencode_attempt_number"] = attempt_number
-        attempt = coding_runner.run(
+        validation_profiles = {
+            profile.name: ValidationProfile(profile.name, tuple(profile.command))
+            for profile in state.get("validation_profiles", ())
+            if isinstance(profile, DiscoveredValidationProfile)
+        }
+        execution = execute_coding_agent_attempt(
+            coding_runner,
             request,
             worktree_root=worktree,
             attempt_id=(
@@ -2971,7 +2977,12 @@ def _run_code_agent_phase(
                 if repair_mode
                 else f"{slug}-{unit.unit_id}-attempt-{attempt_number}"
             ),
+            profiles=validation_profiles,
+            validation_timeout_seconds=config.coding_agent_validation_timeout_seconds,
         )
+        attempt = execution.attempt
+        state["coding_validation_report"] = execution.validation
+        state["coding_validation_diff_check"] = execution.diff_check
         requests.append(request)
         attempts.append(attempt)
         checkpoint = _operation_checkpoint(
@@ -3069,13 +3080,22 @@ def _generate_miniswe_postrun_probes(
     worktree: Path,
     output_root: Path,
     base_commit: str,
-    plan_path: Path,
     request: ImplementationRequest,
     scenarios: Sequence[Mapping[str, Any]],
-) -> tuple[PostRunProbe, ...]:
+    instruction: str,
+    repository_contract: Mapping[str, Any],
+    interaction_client: WorkflowLLMClient | None = None,
+) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
     """Ask MiniSWE to author a frozen probe suite in a clean baseline worktree."""
     if not scenarios:
-        return ()
+        return (), ()
+    interaction_obligations = (
+        generate_probe_interaction_plan(
+            interaction_client, instruction=instruction, scenarios=scenarios
+        )
+        if interaction_client is not None
+        else ()
+    )
     probe_output = output_root / "postrun-probes"
     probe_output.mkdir(parents=True, exist_ok=True)
     authoring_root = output_root / "miniswe-probe-authoring"
@@ -3091,47 +3111,71 @@ def _generate_miniswe_postrun_probes(
         ["git", "worktree", "add", "--detach", str(probe_worktree), base_commit],
     )
     try:
-        try:
-            proposal_diff = _compact_miniswe_probe_proposal(
-                plan_path.read_text(encoding="utf-8")
-            )
-        except OSError as error:
-            raise PowdrrExecutionError(
-                f"cannot read proposal diff for probe authoring: {error}"
-            ) from error
-        scenario_context = _compact_miniswe_probe_scenarios(scenarios)
-        suite_path = probe_worktree / "probe-suite.json"
+        suite_path = probe_worktree / "probe_suite.py"
+        scenario_fields = (
+            "scenario_id",
+            "given",
+            "when",
+            "then",
+            "evidence",
+            "related_requirements",
+        )
+        compact_scenarios = [
+            {field: scenario[field] for field in scenario_fields if field in scenario}
+            for scenario in scenarios
+        ]
         probe_prompt = (
-            "Author executable post-coding behavior probes for the task below. "
+            "Classify the instruction into typed probe obligations and author "
+            "executable post-coding behavior probes for those obligations. "
             "This is a pre-coding step: the solution is intentionally absent. "
             "Do not implement the task or edit source/tests. Write exactly one "
-            "file, `probe-suite.json`, in the repository root. It must be JSON "
-            "with a top-level `probes` array. Each probe must contain `probe_id`, "
-            "`scenario_id`, `oracle_basis`, `imports` (module names), and `body` "
-            "(Python statement strings). Each body must call the public software "
+            "file, `probe_suite.py`, in the repository root. This must be the "
+            "Stage it with `git add -f probe_suite.py` so the workflow can "
+            "verify the authored artifact in repositories with ignore rules. "
+            "complete executable Python module: write normal Python imports and "
+            "function bodies directly. Do not return JSON, split imports from "
+            "function bodies, or ask Powdrr to assemble Python source. Define "
+            "zero-argument synchronous functions named `test_probe_*`. Put a JSON "
+            "object in the module docstring containing an `obligations` array. "
+            "Each obligation has obligation_id, scenario_id, category, rule, "
+            "supported, summary, condition, operation, expected, operands, "
+            "evidence, and unresolved_reason. Use category values transformation, "
+            "validation, preservation, lifecycle, compatibility, presence, other; "
+            "rule values reference_integrity, uniqueness, collision, "
+            "mutual_exclusion, type_constraint, range_constraint, presence, "
+            "format, other, not_applicable, unresolved; and operand roles "
+            "mapping_key, mapping_value, input, result, constraint, trigger, "
+            "state, other. Split independently falsifiable rules. Include each "
+            "scenario. Cite exact instruction or repository-contract substrings. "
+            "Mark unsupported behavior unresolved instead of guessing. Put a JSON "
+            "object in each function docstring with `probe_id`, `scenario_id`, "
+            "`obligation_id`, and `oracle_basis`. Each function must call the "
+            "public software "
             "under test and assert an instruction-supported outcome. Prefer "
             "boundary, negative, and interaction cases that are not merely "
             "restatements of the happy path. Do not assert against instruction "
             "text or private implementation details. Do not use pytest, write "
             "files, launch subprocesses, or access the network. Omit a scenario "
-            "when the supplied contract does not define a safe oracle. The "
-            "runner converts each module name in `imports` into a module-level "
-            "import. List every imported module there; never put `import` or "
-            "`from ... import ...` statements, function definitions, or class "
-            "definitions in `body`. Body entries are statements inside the "
-            "single generated test function and should use module-qualified "
-            "names. Put each complete statement in one body entry; a compound "
-            "statement such as `try`/`except` must be one multiline string, not "
-            "separate entries for its header and clauses. Include at least one "
-            "call to the public software under test somewhere in the test "
-            "function, and assert the resulting behavior (the call may be in "
-            "setup or exception handling before the assertion).\n\n"
-            f"Task objective:\n{request.objective}\n\n"
-            f"Implementation prompt and acceptance context:\n{request.prompt}\n\n"
-            f"Relevant Proposal Structrr changes:\n{proposal_diff}\n\n"
-            "Behavior scenarios (the scenario_id values are required provenance):\n"
-            f"{json.dumps(scenario_context, indent=2, sort_keys=True)}\n\n"
-            "Return from the agent after writing probe-suite.json."
+            "when the supplied contract does not define a safe oracle. A public "
+            "API call may happen in setup or exception handling before the "
+            "assertion; the assertion must observe the resulting behavior.\n\n"
+            f"Task instruction:\n{instruction}\n\n"
+            "Behavior scenarios. Treat each `then` as an oracle only when its "
+            "`evidence` supports it. Use `related_requirements` to identify "
+            "useful interactions; do not add behavior from assumptions or other "
+            "metadata. Preserve each `scenario_id` as provenance:\n"
+            f"{json.dumps(compact_scenarios, indent=2, sort_keys=True)}\n\n"
+            "Baseline repository contract (use for API shapes and operand roles, "
+            "not to invent normative behavior):\n"
+            f"{json.dumps(repository_contract, indent=2, sort_keys=True)}\n\n"
+            "Required cross-requirement interactions. For every entry below, "
+            "write at least one probe whose function docstring includes its ID "
+            "in `interaction_ids`. The probe must exercise the stated condition, "
+            "operation, and observable result, including the excluded case when "
+            "specified. Do not omit an interaction or claim coverage without an "
+            "assertion that observes it:\n"
+            f"{json.dumps(interaction_obligations, indent=2, sort_keys=True)}\n\n"
+            "Return from the agent after writing probe_suite.py."
         )
         probe_request = ImplementationRequest(
             request_id=f"{request.request_id}-probe-authoring",
@@ -3139,9 +3183,9 @@ def _generate_miniswe_postrun_probes(
             prompt=probe_prompt,
             base_commit=base_commit,
             plan_fingerprint=request.plan_fingerprint,
-            allowed_paths=("probe-suite.json",),
+            allowed_paths=("probe_suite.py",),
             acceptance_criteria=(
-                "Write a valid probe-suite.json containing source-grounded probes.",
+                "Write an executable Python module with source-grounded probes.",
                 "Do not modify implementation files or existing tests.",
             ),
             validation_profiles=(),
@@ -3159,30 +3203,30 @@ def _generate_miniswe_postrun_probes(
             store=CodingAgentAttemptStore(authoring_root / "attempts"),
         )
         authoring_attempts: list[dict[str, Any]] = []
+        obligations: tuple[dict[str, Any], ...] = ()
         probes: tuple[PostRunProbe, ...] = ()
-        validation_error: Exception | None = None
+        validation_error: str | None = None
+        baseline_results: tuple[Any, ...] = ()
         for attempt_number in range(1, 3):
             if attempt_number == 2:
                 probe_request = replace(
                     probe_request,
                     request_id=f"{request.request_id}-probe-authoring-repair",
                     prompt=(
-                        "Repair the pre-coding probe artifact only. The previous "
-                        "probe suite failed this exact validation:\n"
+                        probe_prompt
+                        + "\n\nRepair the complete pre-coding Python probe "
+                        "module only. "
+                        "The previous module failed this exact validation or "
+                        "baseline execution check:\n"
                         f"{validation_error}\n\n"
-                        "Rewrite `probe-suite.json` as valid JSON matching the "
-                        "required `probes` schema. Preserve valid probe meaning "
-                        "and IDs where possible. Use only the supplied task "
-                        "contract and scenario IDs. The runner creates each "
-                        "module-level import from the probe's `imports` array. "
-                        "Move every import out of `body` and list its module in "
-                        "`imports`; body entries must be statements inside the "
-                        "test function, with no import or function/class "
-                        "definitions. Put a complete compound statement in one "
-                        "multiline body entry. Include the tested software call "
-                        "inside the test function; it may be captured before an "
-                        "assertion. Do not edit implementation files or tests. "
-                        "Return after fixing the artifact."
+                        "Rewrite `probe_suite.py` as complete executable Python. "
+                        "Use ordinary Python imports and function bodies directly; "
+                        "do not split them into JSON fields. Preserve source-grounded "
+                        "behavior and scenario provenance. Every probe must run "
+                        "successfully as Python and fail on the untouched baseline "
+                        "through its assertion (not through syntax, import, or "
+                        "runtime errors). Use only the supplied contract and "
+                        "scenario IDs. Do not edit implementation files or tests."
                     ),
                     allow_existing_changes=True,
                 )
@@ -3197,39 +3241,58 @@ def _generate_miniswe_postrun_probes(
                     "MiniSWE probe authoring did not produce an in-scope result: "
                     f"{attempt.to_data()}"
                 )
-            if attempt.changed_paths != ("probe-suite.json",):
+            if attempt.changed_paths != ("probe_suite.py",):
                 raise PowdrrExecutionError(
-                    "MiniSWE probe authoring must create only probe-suite.json; "
+                    "MiniSWE probe authoring must create only probe_suite.py; "
                     f"changed {attempt.changed_paths}"
                 )
             try:
-                response = json.loads(suite_path.read_text(encoding="utf-8"))
-                if not isinstance(response, Mapping):
-                    raise ValueError("probe suite must be a JSON object")
-                probes = parse_generated_postrun_probes(response, scenarios)
-                if not probes:
-                    raise ValueError("probe suite contains no probes")
+                suite_source = suite_path.read_text(encoding="utf-8")
+                obligations, probes = parse_generated_postrun_probe_source(
+                    suite_source,
+                    scenarios,
+                    instruction=instruction,
+                    repository_contract=repository_contract,
+                    interaction_obligations=interaction_obligations,
+                )
+                baseline_results = run_postrun_probes(
+                    probes,
+                    root=probe_worktree,
+                    profiles=(),
+                )
+                baseline_problems = baseline_probe_failures(baseline_results)
+                if baseline_problems:
+                    raise ValueError(
+                        "baseline probe checks failed: " + "\n".join(baseline_problems)
+                    )
                 validation_error = None
                 break
-            except (OSError, json.JSONDecodeError, ValueError) as error:
-                validation_error = error
+            except (OSError, ValueError) as error:
+                validation_error = str(error)
                 if attempt_number == 2:
                     raise PowdrrExecutionError(
-                        "MiniSWE probe suite failed validation after one tailored "
-                        f"repair: {error}"
+                        "MiniSWE executable probe suite failed validation or did "
+                        "not fail on the baseline after one tailored repair: "
+                        f"{error}"
                     ) from error
-        if not probes:
+        if not obligations:
             raise PowdrrExecutionError(
-                "MiniSWE probe suite is empty after the validation repair"
+                "MiniSWE probe suite has no obligations after the validation repair"
             )
         suite_document = {
             "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
             "generation_status": "generated",
             "generation_method": "minisweagent_pre_coding",
-            "source_instruction": request.objective,
-            "proposal_diff_path": str(plan_path),
+            "source_instruction": instruction,
+            "obligations": list(obligations),
+            "interaction_obligations": list(interaction_obligations),
+            "interaction_plan_status": (
+                "generated" if interaction_client is not None else "not_configured"
+            ),
             "authoring_attempts": authoring_attempts,
+            "probe_source": suite_source,
             "probes": [item.to_data() for item in probes],
+            "baseline_results": [item.to_data() for item in baseline_results],
             "scenarios_without_executable_probe": sorted(
                 {str(item["scenario_id"]) for item in scenarios}
                 - {item.scenario_id for item in probes}
@@ -3242,7 +3305,7 @@ def _generate_miniswe_postrun_probes(
         (probe_output / "probe-authoring-prompt.md").write_text(
             probe_prompt.rstrip() + "\n", encoding="utf-8"
         )
-        return probes
+        return obligations, probes
     finally:
         _run(
             runner,
@@ -3251,65 +3314,26 @@ def _generate_miniswe_postrun_probes(
         )
 
 
-def _compact_miniswe_probe_proposal(proposal_diff: str) -> str:
-    """Keep only behavior-facing proposal text needed to author probes."""
-    try:
-        document = yaml.safe_load(proposal_diff)
-    except yaml.YAMLError as error:
-        raise PowdrrExecutionError(
-            f"cannot parse proposal diff for probe authoring: {error}"
-        ) from error
-    if not isinstance(document, Mapping):
-        raise PowdrrExecutionError("proposal diff for probe authoring is not a mapping")
-    summary: dict[str, list[dict[str, Any]]] = {}
-    for section in ("features", "invariants", "guidance"):
-        entries = document.get(section)
-        if not isinstance(entries, Sequence) or isinstance(entries, (str, bytes)):
-            continue
-        compact_entries: list[dict[str, Any]] = []
-        for entry in entries:
-            if not isinstance(entry, Mapping):
-                continue
-            compact = {
-                key: entry[key]
-                for key in ("id", "action", "description")
-                if isinstance(entry.get(key), str)
-            }
-            if compact:
-                compact_entries.append(compact)
-        if compact_entries:
-            summary[section] = compact_entries
-    return json.dumps(summary, indent=2, ensure_ascii=False, sort_keys=True)
-
-
-def _compact_miniswe_probe_scenarios(
-    scenarios: Sequence[Mapping[str, Any]],
-) -> list[dict[str, Any]]:
-    """Omit verbose provenance and dimensions already covered by the prompt."""
-    fields = ("scenario_id", "subject", "given", "when", "then", "assumptions")
-    return [
-        {key: scenario[key] for key in fields if key in scenario}
-        for scenario in scenarios
-    ]
-
-
 def _render_precode_probe_context(probes: Sequence[PostRunProbe]) -> str:
+    first = probes[0]
     rendered = [
         "## MiniSWE-authored post-coding probes",
-        "These frozen probes were authored before implementation from the task "
-        "instruction and proposal diff. Preserve their expected behavior; the "
-        "workflow will run these exact probes after coding.",
+        "These complete executable Python probes were authored before "
+        "implementation and run against the untouched baseline. Every probe "
+        "failed through its assertion before coding, so it detects behavior the "
+        "baseline lacks. Preserve their expected behavior; the workflow will run "
+        "this exact module again after coding.",
     ]
     for probe in probes:
         rendered.extend(
             [
                 f"### {probe.probe_id} ({probe.scenario_id})",
                 f"Oracle basis: {probe.oracle_basis}",
-                "```python",
-                probe.test_source.rstrip(),
-                "```",
             ]
         )
+    rendered.extend(
+        ["### Complete probe module", "```python", first.test_source.rstrip(), "```"]
+    )
     return "\n\n".join(rendered)
 
 
@@ -3933,7 +3957,11 @@ def _allowed_validation_commands(
 
 
 def _run_validation_profile(
-    parameters: Mapping[str, Any], *, worktree: Path, state: dict[str, Any]
+    parameters: Mapping[str, Any],
+    *,
+    worktree: Path,
+    state: dict[str, Any],
+    timeout_seconds: float = DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     profile = parameters.get("profile")
     if not isinstance(profile, Mapping):
@@ -3951,9 +3979,10 @@ def _run_validation_profile(
     # resolves every declared profile and returns a multi-result report for
     # this single-profile operation.
     request = replace(state["request"], validation_profiles=(name,))
-    report = ValidationRunner({name: ValidationProfile(name, tuple(command))}).run(
-        request, state["attempt"], worktree_root=worktree
-    )
+    report = ValidationRunner(
+        {name: ValidationProfile(name, tuple(command))},
+        timeout_seconds=timeout_seconds,
+    ).run(request, state["attempt"], worktree_root=worktree)
     if len(report.results) != 1:
         raise PowdrrExecutionError(
             f"validation profile {name!r} did not produce one result"
@@ -6664,18 +6693,20 @@ def _run_code_task_agent(
     # repair request. Passing only `repair_request` to _run_code_agent_phase
     # loses the baseline, plan, obligations, and proposal receipt bindings.
     state["code_task_agent_parameters"] = dict(forwarded)
+
     # A provider timeout is not a completed coding task.  It also must not
     # discard useful partial edits: the next session needs to inspect the
     # current tree and continue from the actual failure.  Keep this recovery
     # local to the coding-task operation so Procedrr can still make one
     # bounded decision about the resulting receipt.
-    attempt_results: list[dict[str, Any]] = []
-    recovery_issue: Mapping[str, Any] | None = None
-    for continuation in range(3):
+    def run_attempt(
+        attempt_number: int, recovery_issue: Mapping[str, Any] | None
+    ) -> dict[str, Any]:
+        del attempt_number
         current_parameters = dict(forwarded)
         if recovery_issue is not None:
             current_parameters["repair_issue"] = dict(recovery_issue)
-        result = _run_code_agent_phase(
+        return _run_code_agent_phase(
             config,
             runner=runner,
             worktree=worktree,
@@ -6685,16 +6716,26 @@ def _run_code_task_agent(
             state=state,
             parameters=current_parameters,
         )
-        attempt_results.append(result)
+
+    def evaluate_attempt(
+        result: dict[str, Any],
+    ) -> CodingAgentRecoveryDecision:
         if getattr(config, "capture_worker_prompts_only", False):
-            return {**result, "continuations": continuation}
+            return CodingAgentRecoveryDecision(passed=True, terminal=True)
         attempt = result.get("attempt")
         checkpoints = state.get("operation_checkpoints", ())
         checkpoint = checkpoints[-1] if checkpoints else None
-        focused_validation = _run_code_task_focused_validation(state, worktree=worktree)
+        focused_validation = _run_code_task_focused_validation(
+            state,
+            worktree=worktree,
+            timeout_seconds=getattr(
+                config,
+                "coding_agent_validation_timeout_seconds",
+                DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
+            ),
+        )
         if focused_validation is not None:
             result = {**result, "coding_validation": focused_validation}
-            attempt_results[-1] = result
         no_op = (
             isinstance(checkpoint, Mapping)
             and checkpoint.get("passed") is not True
@@ -6720,7 +6761,8 @@ def _run_code_task_agent(
                 state["operation_checkpoints"] = checkpoint_list
             checkpoint = skipped_checkpoint
             result = {**result, "no_op": True}
-            attempt_results[-1] = result
+        latest_result.clear()
+        latest_result.update(result)
         if (
             isinstance(attempt, Mapping)
             and attempt.get("status") == CodingAgentStatus.COMPLETED.value
@@ -6732,48 +6774,46 @@ def _run_code_task_agent(
                 == ValidationReportStatus.PASSED.value
             )
         ):
-            return {
-                **result,
-                "attempts": [
-                    attempt
-                    for item in attempt_results
-                    for attempt in item.get("attempts", [])
-                    if isinstance(attempt, Mapping)
-                ],
-                "continuations": continuation,
-            }
+            return CodingAgentRecoveryDecision(passed=True)
         if not isinstance(attempt, Mapping):
-            break
+            return CodingAgentRecoveryDecision(passed=False, terminal=True)
         if attempt.get("status") == CodingAgentStatus.POLICY_DENIED.value:
-            break
-        recovery_issue = {
-            "category": "coding_attempt_incomplete",
-            "status": attempt.get("status"),
-            "error": attempt.get("error"),
-            "changed_paths": attempt.get("changed_paths", []),
-            "validation": focused_validation,
-            "instruction": (
-                "Continue the existing implementation from the current worktree. "
-                "Inspect what the previous session changed, preserve correct edits, "
-                "and finish the requested task. Do not restart or re-plan "
-                "unrelated work."
-            ),
-        }
-    final = attempt_results[-1]
+            return CodingAgentRecoveryDecision(passed=False, terminal=True)
+        return CodingAgentRecoveryDecision(
+            passed=False,
+            issue={
+                "category": "coding_attempt_incomplete",
+                "status": attempt.get("status"),
+                "error": attempt.get("error"),
+                "changed_paths": attempt.get("changed_paths", []),
+                "validation": focused_validation,
+                "instruction": (
+                    "Continue the existing implementation from the current worktree. "
+                    "Inspect what the previous session changed, preserve correct "
+                    "edits, "
+                    "and finish the requested task. Do not restart or re-plan "
+                    "unrelated work."
+                ),
+            },
+        )
+
+    latest_result: dict[str, Any] = {}
+    recovery = run_coding_agent_recovery(run_attempt, evaluate_attempt)
+    final = latest_result or cast(dict[str, Any], recovery.attempts[-1])
     return {
         **final,
         "attempts": [
             attempt
-            for item in attempt_results
+            for item in recovery.attempts
             for attempt in item.get("attempts", [])
             if isinstance(attempt, Mapping)
         ],
-        "continuations": len(attempt_results) - 1,
+        "continuations": recovery.continuations,
     }
 
 
 def _run_code_task_focused_validation(
-    state: Mapping[str, Any], *, worktree: Path
+    state: Mapping[str, Any], *, worktree: Path, timeout_seconds: float
 ) -> dict[str, Any] | None:
     """Validate a completed coding attempt before accepting its task receipt."""
     request = state.get("request")
@@ -6785,6 +6825,12 @@ def _run_code_task_focused_validation(
         or not isinstance(profiles, Sequence)
     ):
         return None
+    cached_report = state.get("coding_validation_report")
+    if (
+        isinstance(cached_report, ValidationReport)
+        and cached_report.attempt_id == attempt.attempt_id
+    ):
+        return cached_report.to_data()
     discovered = {
         profile.name: ValidationProfile(profile.name, tuple(profile.command))
         for profile in profiles
@@ -6792,7 +6838,9 @@ def _run_code_task_focused_validation(
     }
     if not discovered:
         return None
-    report = ValidationRunner(discovered).run(request, attempt, worktree_root=worktree)
+    report = ValidationRunner(discovered, timeout_seconds=timeout_seconds).run(
+        request, attempt, worktree_root=worktree
+    )
     attempt_store = state.get("attempt_store")
     if isinstance(attempt_store, CodingAgentAttemptStore):
         attempt_store.save_validation_report(report)

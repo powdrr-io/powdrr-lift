@@ -326,18 +326,75 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
         .document
     )
     steps = process["steps"]
+    assert "tool_calls" not in process["limits"]
+    assert "llm_activations" not in process["limits"]
     process_calls = [step["call"]["process"] for step in steps if "call" in step]
     assert process_calls == [
         "execute-proposed-pr",
         "finish-pr-prep",
         "create-pull-request",
     ]
+    catalog = ProcessCatalog.load(
+        Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    )
+    for process_name in process_calls:
+        limits = catalog.get(process_name).document.get("limits", {})
+        assert "tool_calls" not in limits
+        assert "llm_activations" not in limits
     assert steps[0]["call"]["outputs"] == {"implementation_result": "coding_attempt"}
     assert steps[1]["gate"]["subject"] == "implementation_result.passed"
     assert steps[2]["judge"]["output"]["name"] == "publication_scope"
+    assert "files_to_publish" not in steps[2]["judge"]["output"]["schema"]["required"]
+    assert steps[3]["call"]["inputs"]["files_to_publish"] == {
+        "type": "reference",
+        "value": "implementation_result.changed_paths",
+    }
     assert steps[3]["call"]["outputs"] == {"validation_results": "validation_results"}
     assert steps[4]["judge"]["output"]["name"] == "pull_request_request"
+    title_judge = steps[4]["judge"]
+    assert any(
+        "task_context.proposed_pr_context.title" in instruction
+        and "Prefer the reviewed item title verbatim" in instruction
+        for instruction in title_judge["instructions"]
+    )
+    assert any(
+        "Never use the plan ID" in instruction
+        for instruction in title_judge["instructions"]
+    )
+    assert (
+        title_judge["output"]["schema"]["properties"]["workflow_context"]["properties"][
+            "feature-name"
+        ]["maxLength"]
+        == 100
+    )
+    assert steps[5]["call"]["inputs"]["files_to_publish"] == {
+        "type": "reference",
+        "value": "implementation_result.changed_paths",
+    }
     assert steps[5]["call"]["outputs"] == {"pull_request_url": "pull_request_url"}
+    assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
+
+
+def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files() -> (
+    None
+):
+    from procedrr import ProcessCatalog
+
+    process = (
+        ProcessCatalog.load(
+            Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+        )
+        .get("create-pull-request")
+        .document
+    )
+    operation = process["steps"][0]["operation"]
+    parameters = operation["parameters"]["parameters"]
+    assert parameters["operation"] == "pr_publish_clean"
+    assert parameters["files_to_publish"]["value"] == "files_to_publish"
+    assert (
+        parameters["publication_branch"]["value"]
+        == "workflow_context.publication-branch"
+    )
     assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
 
 

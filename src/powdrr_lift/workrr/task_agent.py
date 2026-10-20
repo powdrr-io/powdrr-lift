@@ -16,6 +16,11 @@ from typing import Any, TextIO
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
+from powdrr_lift.core.execution_plan import ExecutionUnit
+from powdrr_lift.core.implementation_packet import (
+    ImplementationPacket,
+    RepositoryContextPacket,
+)
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
     render_gather_context_report,
@@ -46,6 +51,9 @@ from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
 )
+from powdrr_lift.structrr.bootstrap import bootstrap_structrr
+from powdrr_lift.structrr.proposal import ProposalRevision
+from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.action_operations import (
     _apply_file_edits,
     _apply_yaml_operations,
@@ -53,15 +61,20 @@ from powdrr_lift.workrr.action_operations import (
     _resolve_pre_step_template,
 )
 from powdrr_lift.workrr.coding_agent import (
+    DEFAULT_CODING_AGENT_TIMEOUT_SECONDS,
+    DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
     CodingAgentAttemptStore,
+    CodingAgentRecoveryDecision,
     CodingAgentRunner,
     ImplementationRequest,
     OpenCodePermissionPolicy,
     build_coding_agent_provider,
+    run_coding_agent_recovery,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
+    ValidationProfile,
     ValidationReportStatus,
-    ValidationRunner,
+    execute_coding_agent_attempt,
     parse_validation_profile,
 )
 from powdrr_lift.workrr.error_logging import record_workflow_llm_error
@@ -104,6 +117,14 @@ from powdrr_lift.workrr.llm import (
     workflow_action_failure_signature,
     workflow_action_signature,
     workflow_action_summary,
+)
+from powdrr_lift.workrr.multipr_structrr import (
+    active_decision_drift_findings,
+    load_multi_pr_proposal,
+    rebase_final_plan_state,
+    rebase_item_proposal,
+    reconcile_item_candidate,
+    structural_repair_findings,
 )
 from powdrr_lift.workrr.observer import (
     ObserverActionRecommendation,
@@ -251,8 +272,10 @@ class WorkflowTaskAgentConfig:
     opencode_model: str | None = None
     minisweagent_executable: str = "mini"
     minisweagent_model: str | None = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
-    coding_agent_timeout_seconds: float = 1800.0
-    coding_agent_validation_timeout_seconds: float = 1800.0
+    coding_agent_timeout_seconds: float = DEFAULT_CODING_AGENT_TIMEOUT_SECONDS
+    coding_agent_validation_timeout_seconds: float = (
+        DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS
+    )
     allow_unmanaged_git: bool = False
     run_deterministic_invoke_tool_pre_steps: bool = False
     guidance: tuple[str, ...] = ()
@@ -273,6 +296,238 @@ def _issue_worker_string_list(value: object) -> tuple[str, ...]:
     ):
         return ()
     return tuple(item.strip() for item in value)
+
+
+def _issue_worker_implementation_request(
+    proposed: Mapping[str, Any], *, workflow_id: str, base_commit: str
+) -> tuple[ImplementationRequest, ValidationProfile]:
+    """Compile reviewed issue fields into the benchmark worker request shape."""
+    objective = str(proposed.get("objective", "")).strip()
+    if not objective:
+        raise PowdrrExecutionError("proposed PR objective must not be empty")
+    steps = _issue_worker_string_list(proposed.get("implementation_steps"))
+    scope = _issue_worker_string_list(proposed.get("scope"))
+    criteria = _issue_worker_string_list(proposed.get("acceptance_criteria"))
+    if not steps or not scope or not criteria:
+        raise PowdrrExecutionError(
+            "proposed PR must declare implementation_steps, scope, and "
+            "acceptance_criteria"
+        )
+    raw_allowed_paths = proposed.get("allowed_paths")
+    if raw_allowed_paths is None:
+        # Plan scope entries describe product behavior, not filesystem paths.
+        # Older published plans do not include a path allowlist, so keep the
+        # repository-wide request boundary while preserving the reviewed scope
+        # in the worker contract below.
+        allowed_paths: tuple[str, ...] = (".",)
+    else:
+        allowed_paths = _issue_worker_string_list(raw_allowed_paths)
+        if not allowed_paths or any(
+            Path(path).is_absolute() or ".." in Path(path).parts
+            for path in allowed_paths
+        ):
+            raise PowdrrExecutionError(
+                "proposed PR allowed_paths must be repository-relative paths"
+            )
+    verification_command = proposed.get("verification_command")
+    if not isinstance(verification_command, str) or not verification_command.strip():
+        raise PowdrrExecutionError("proposed PR must declare a verification_command")
+    try:
+        validation_profile = parse_validation_profile(f"verify={verification_command}")
+    except ValueError as error:
+        raise PowdrrExecutionError(str(error)) from error
+
+    item_id = str(proposed.get("item_id", workflow_id)).strip() or workflow_id
+    plan_id = str(proposed.get("plan_id", "")).strip()
+    source_refs = (f"{plan_id}/{item_id}" if plan_id else item_id,)
+    scoped_objective = f"{objective}\n\nReviewed implementation scope:\n" + "\n".join(
+        f"- {entry}" for entry in scope
+    )
+    path_changes = tuple(
+        {"id": f"step-{index:02d}", "description": step}
+        for index, step in enumerate(steps, start=1)
+    )
+    unit = ExecutionUnit(
+        unit_id=workflow_id,
+        objective=scoped_objective,
+        paths=allowed_paths,
+        validation_profiles=(validation_profile.name,),
+        acceptance_criteria=criteria,
+        planned_additions=path_changes,
+        must_preserve=criteria,
+        non_goals=(
+            "Do not implement product changes outside the reviewed implementation "
+            "scope listed in the objective.",
+        ),
+        source_refs=source_refs,
+    )
+    packet = ImplementationPacket(
+        objective=scoped_objective,
+        obligations=steps,
+        required_tests=tuple({"description": item} for item in criteria),
+        repository=RepositoryContextPacket(
+            allowed_paths=allowed_paths,
+            validation_profiles=(validation_profile.name,),
+        ),
+    )
+    plan_data = {
+        "workflow_id": workflow_id,
+        "item_id": item_id,
+        "plan_id": plan_id,
+        "objective": objective,
+        "scope": scope,
+        "allowed_paths": allowed_paths,
+        "implementation_steps": steps,
+        "acceptance_criteria": criteria,
+        "verification_command": verification_command,
+    }
+    fingerprint = hashlib.sha256(
+        json.dumps(plan_data, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    request = ImplementationRequest.from_execution_unit(
+        unit,
+        request_id=f"{workflow_id}-implementation",
+        base_commit=base_commit,
+        plan_fingerprint=fingerprint,
+        context_refs=source_refs,
+        allowed_commands=(verification_command,),
+        implementation_packet=packet,
+    )
+    return replace(request, allow_existing_changes=True), validation_profile
+
+
+def _issue_worker_structrr_context(
+    repo_root: Path,
+    proposed: Mapping[str, Any],
+    *,
+    base_commit: str,
+) -> tuple[Mapping[str, Any], ProposalRevision, Any, dict[str, Any]] | None:
+    """Load a plan proposal and rebase this item onto the latest repository state."""
+    raw_path = proposed.get("structrr_proposal_file")
+    item_id = proposed.get("structrr_item_id", proposed.get("item_id"))
+    if raw_path is None:
+        return None
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise PowdrrExecutionError("Structrr proposal path must be non-empty text")
+    if not isinstance(item_id, str) or not item_id.strip():
+        raise PowdrrExecutionError("Structrr proposal item ID must be non-empty text")
+    proposal_path = (repo_root / raw_path).resolve()
+    try:
+        proposal_path.relative_to(repo_root.resolve())
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            "Structrr proposal path must stay inside the repository"
+        ) from error
+    try:
+        plan_proposal = load_multi_pr_proposal(proposal_path)
+    except (OSError, ValueError) as error:
+        raise PowdrrExecutionError(
+            f"Structrr proposal is missing or invalid: {error}"
+        ) from error
+    if plan_proposal.plan_id != str(proposed.get("plan_id", "")):
+        raise PowdrrExecutionError("Structrr proposal belongs to a different plan")
+    final_review = proposed.get("final_integration_review") is True
+    item_proposal = (
+        plan_proposal.full_proposal
+        if final_review
+        else plan_proposal.item_proposals.get(item_id)
+    )
+    expected_baseline = plan_proposal.item_baselines.get(item_id)
+    if item_proposal is None or (expected_baseline is None and not final_review):
+        raise PowdrrExecutionError(
+            f"Structrr proposal has no baseline and diff for plan item {item_id!r}"
+        )
+
+    # Plan and workflow artifacts are inputs to this run, not product code. Keep
+    # them out of the repository snapshot so unrelated generated files do not
+    # look like changes interlaced with this feature.
+    plan_slug = slugify_workflow_id(plan_proposal.plan_id)
+    exclusions = (
+        f"docs/plans/{plan_slug}-execution-plan.yaml",
+        f"docs/plans/{plan_slug}-structrr-proposal.json",
+        f"docs/workflows/{plan_slug}/",
+        *(
+            (str(proposed["final_review_report_path"]),)
+            if isinstance(proposed.get("final_review_report_path"), str)
+            else ()
+        ),
+    )
+    from powdrr_lift.workrr.feature_endpoint import _structrr_taxonomy_path
+
+    bootstrap_path = (
+        Path(tempfile.gettempdir())
+        / "powdrr-lift-issue-worker"
+        / plan_slug
+        / f"bootstrap-{base_commit}.yaml"
+    )
+    current = bootstrap_structrr(
+        repo_root,
+        output_path=bootstrap_path,
+        taxonomy_path=_structrr_taxonomy_path(repo_root),
+        include_untracked=False,
+        artifact_exclusions=exclusions,
+        submission_base=base_commit,
+    )
+    if not current.validation.successful or current.source_manifest is None:
+        raise PowdrrExecutionError(
+            "current Structrr bootstrap failed before coding: "
+            f"{current.validation.issues}"
+        )
+    if final_review:
+        # Check the latest tree against the projected plan result. Unrelated
+        # interlaced work carries forward; changes to plan-owned subjects require
+        # a human plan review instead of an automatic repair that could overwrite it.
+        rebase = rebase_final_plan_state(
+            plan_proposal.expected_final_snapshot,
+            current.document,
+            item_proposal,
+        )
+        if rebase.get("classification") != "clean":
+            raise PowdrrExecutionError(
+                "final integration review is blocked because interlaced repository "
+                "work changed a subject owned by this plan; review and revise the "
+                "proposal before correcting code: "
+                f"{json.dumps(rebase, sort_keys=True)}"
+            )
+        decision_drift = active_decision_drift_findings(
+            plan_proposal.baseline_snapshot, current.document
+        )
+        if decision_drift:
+            raise PowdrrExecutionError(
+                "final integration review is blocked because accepted decisions "
+                "changed since the plan baseline; review the plan against current "
+                "intent before correcting code: " + "; ".join(decision_drift)
+            )
+    else:
+        assert expected_baseline is not None
+        try:
+            rebase = rebase_item_proposal(
+                expected_baseline, current.document, item_proposal
+            )
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"could not rebase Structrr proposal: {error}"
+            ) from error
+        if rebase.get("classification") != "clean":
+            raise PowdrrExecutionError(
+                "coding is blocked because intervening repository work affects this "
+                "PR's Structrr subjects; review and revise the plan proposal before "
+                f"continuing: {json.dumps(rebase, sort_keys=True)}"
+            )
+        decision_drift = active_decision_drift_findings(
+            expected_baseline, current.document
+        )
+        if decision_drift:
+            raise PowdrrExecutionError(
+                "coding is blocked because accepted decisions changed since the "
+                "plan baseline; review the plan against current intent before "
+                "continuing: " + "; ".join(decision_drift)
+            )
+    rebased_proposal = replace(
+        item_proposal,
+        structrr_baseline_fingerprint=snapshot_digest(current.document),
+    )
+    return current.document, rebased_proposal, current.source_manifest, rebase
 
 
 def _implementation_paths_against_base(repo_root: Path) -> tuple[str, ...]:
@@ -1151,6 +1406,7 @@ class _TaskWorkflowExecutionStrategy:
         return WorkflowActionOutcome(continue_running=False)
 
     def _execute_tool(self, action: WorkflowAction) -> None:
+        record_result: Any = None
         repaired_parameters = _repair_workflow_file_command(
             action.parameters,
             self.workflow.directory,
@@ -1166,6 +1422,28 @@ class _TaskWorkflowExecutionStrategy:
                 tool=action.tool,
                 parameters=repaired_parameters,
             )
+        if (
+            action.tool == GH_TOOL
+            and action.parameters.get("operation") == "pr_publish_clean"
+        ):
+            proposed_pr_id = self.task.input_state.get("proposed_pr_id")
+            if isinstance(proposed_pr_id, str) and proposed_pr_id.strip():
+                expected_branch = (
+                    f"powdrr/{slugify_workflow_id(proposed_pr_id)}-implementation"
+                )
+                if action.parameters.get("publication_branch") != expected_branch:
+                    corrected_parameters = dict(action.parameters)
+                    corrected_parameters["publication_branch"] = expected_branch
+                    action = WorkflowAction(
+                        kind=action.kind,
+                        tool=action.tool,
+                        parameters=corrected_parameters,
+                    )
+                    print(
+                        "Corrected clean publication branch to the deterministic "
+                        f"workflow branch {expected_branch}.",
+                        file=self.stderr,
+                    )
         command_error = _workflow_file_command_error(
             action.parameters,
             self.workflow.directory,
@@ -1204,7 +1482,8 @@ class _TaskWorkflowExecutionStrategy:
         elif action.tool in {GIT_TOOL, GH_TOOL}:
             if (
                 action.tool == GH_TOOL
-                and action.parameters.get("operation") == "pr_create"
+                and action.parameters.get("operation")
+                in {"pr_create", "pr_publish_clean"}
                 and self.runtime is not None
             ):
                 self.runtime.require_publish_readiness()
@@ -1214,10 +1493,31 @@ class _TaskWorkflowExecutionStrategy:
                 worktree_root=self.repo_root,
                 runtime=self.runtime,
             )
-            if result.get("stdout"):
-                print(str(result["stdout"]), end="", file=self.stdout)
-            if result.get("stderr"):
-                print(str(result["stderr"]), end="", file=self.stderr)
+            record_result = result
+            if (
+                action.tool == GH_TOOL
+                and action.parameters.get("operation") == "pr_publish_clean"
+                and isinstance(result, str)
+            ):
+                # The clean publisher returns its URL directly, unlike the
+                # subprocess-shaped result returned by the other git/gh
+                # operations. Normalize it so PR recording follows the same
+                # path as `gh pr create`.
+                record_result = {
+                    "tool": GH_TOOL,
+                    "command": ["gh", "pr", "create"],
+                    "returncode": 0,
+                    "stdout": result,
+                    "stderr": "",
+                    "pull_request_url": result,
+                }
+            if isinstance(result, Mapping):
+                if result.get("stdout"):
+                    print(str(result["stdout"]), end="", file=self.stdout)
+                if result.get("stderr"):
+                    print(str(result["stderr"]), end="", file=self.stderr)
+            elif isinstance(result, str):
+                print(result, end="", file=self.stdout)
         elif action.tool == "coding-agent":
             result = self._run_coding_agent()
         elif action.tool == "fuzzy-match":
@@ -1245,6 +1545,8 @@ class _TaskWorkflowExecutionStrategy:
             "parameters": action.parameters,
             "result": result,
         }
+        if record_result is None:
+            record_result = result
         if self.runtime is None:
             raise PowdrrExecutionError(
                 "Workflow task pull-request recording requires an execution runtime.",
@@ -1256,7 +1558,7 @@ class _TaskWorkflowExecutionStrategy:
             self.task.task_id,
             self.repo_root,
             self.events,
-            result,
+            record_result,
             runtime=self.runtime,
         )
         self.events.append(event)
@@ -1267,40 +1569,9 @@ class _TaskWorkflowExecutionStrategy:
             raise PowdrrExecutionError(
                 "coding-agent requires proposed_pr_context in task input"
             )
-        objective = str(proposed.get("objective", "")).strip()
-        if not objective:
-            raise PowdrrExecutionError("proposed PR objective must not be empty")
-        steps = _issue_worker_string_list(proposed.get("implementation_steps"))
-        scope = _issue_worker_string_list(proposed.get("scope"))
-        criteria = _issue_worker_string_list(proposed.get("acceptance_criteria"))
-        verification_command = proposed.get("verification_command")
-        if (
-            not isinstance(verification_command, str)
-            or not verification_command.strip()
-        ):
-            raise PowdrrExecutionError(
-                "proposed PR must declare a verification_command"
-            )
-        try:
-            validation_profile = parse_validation_profile(
-                f"verify={verification_command}"
-            )
-        except ValueError as error:
-            raise PowdrrExecutionError(str(error)) from error
         workflow_id = str(self.task.input_state.get("proposed_pr_id", ""))
-        plan_data = {
-            "workflow_id": workflow_id,
-            "objective": objective,
-            "scope": scope,
-            "implementation_steps": steps,
-            "acceptance_criteria": criteria,
-            "verification_command": verification_command,
-        }
-        fingerprint = hashlib.sha256(
-            json.dumps(plan_data, sort_keys=True).encode("utf-8")
-        ).hexdigest()
-        request_id = f"{workflow_id}-implementation"
-        attempt_id = f"{request_id}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
+        if not workflow_id.strip():
+            raise PowdrrExecutionError("proposed PR ID must not be empty")
         base_commit = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=self.repo_root,
@@ -1308,34 +1579,47 @@ class _TaskWorkflowExecutionStrategy:
             text=True,
             check=True,
         ).stdout.strip()
-        prompt_lines = [
-            "Implement this reviewed proposed PR in the current repository.",
-            "Make the actual product and test changes; do not return a plan, "
-            "review summary, or placeholder implementation.",
-            "Follow the implementation steps in order and satisfy every "
-            "acceptance criterion.",
-            "Do not edit workflow state or durable task files.",
-            "Objective:",
-            objective,
-            "Scope:",
-            *(f"- {value}" for value in scope),
-            "Implementation steps:",
-            *(f"- {value}" for value in steps),
-            "Acceptance criteria:",
-            *(f"- {value}" for value in criteria),
-        ]
-        request = ImplementationRequest(
-            request_id=request_id,
-            objective=objective,
-            prompt="\n".join(prompt_lines),
-            base_commit=base_commit,
-            plan_fingerprint=fingerprint,
-            allowed_paths=(".",),
-            acceptance_criteria=criteria,
-            validation_profiles=(validation_profile.name,),
-            allowed_commands=(verification_command,),
-            allow_existing_changes=True,
+        request, validation_profile = _issue_worker_implementation_request(
+            proposed, workflow_id=workflow_id, base_commit=base_commit
         )
+        structrr_context = _issue_worker_structrr_context(
+            self.repo_root, proposed, base_commit=base_commit
+        )
+        if structrr_context is not None:
+            current_structrr, item_proposal, baseline_manifest, rebase_report = (
+                structrr_context
+            )
+            request = replace(
+                request,
+                prompt=(
+                    request.prompt
+                    + "\n\nAccepted Structrr proposal operations for this PR:\n"
+                    + json.dumps(
+                        [operation.to_data() for operation in item_proposal.operations],
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\nActive baseline intent and decisions to preserve:\n"
+                    + json.dumps(
+                        {
+                            "active_intent": current_structrr.get("active_intent", {}),
+                            "human_decisions": current_structrr.get(
+                                "human-decisions", []
+                            ),
+                            "invariants": current_structrr.get("invariants", []),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\nPreserve active decisions and unrelated repository changes. "
+                    "Do not edit the proposal artifact."
+                ),
+            )
+        else:
+            current_structrr = None
+            item_proposal = None
+            baseline_manifest = None
+            rebase_report = None
         store_root = (
             Path(tempfile.gettempdir()) / "powdrr-lift-issue-worker" / workflow_id
         )
@@ -1353,33 +1637,243 @@ class _TaskWorkflowExecutionStrategy:
             provider=provider,
             store=CodingAgentAttemptStore(store_root),
         )
-        attempt = runner.run(
-            request,
-            worktree_root=self.repo_root,
-            attempt_id=attempt_id,
-        )
-        validation = ValidationRunner(
-            {validation_profile.name: validation_profile},
-            timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
-        ).run(request, attempt, worktree_root=self.repo_root)
-        runner.store.save_validation_report(validation)
-        implementation_paths = tuple(
-            sorted(
-                set(attempt.changed_paths)
-                | set(_implementation_paths_against_base(self.repo_root))
+
+        def run_attempt(
+            attempt_number: int, recovery_issue: Mapping[str, Any] | None
+        ) -> dict[str, Any]:
+            attempt_request = request
+            if recovery_issue is not None:
+                attempt_request = replace(
+                    request,
+                    prompt=(
+                        request.repair_prompt(recovery_issue)
+                        + "\n\nReviewed implementation steps:\n"
+                        + "\n".join(
+                            f"- {step.get('description', step)}"
+                            for step in request.planned_additions
+                        )
+                    ),
+                    allow_existing_changes=True,
+                )
+            attempt_id = (
+                f"{request.request_id}-attempt-{attempt_number:02d}-"
+                f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
             )
-        )
-        result = {
-            "passed": (
+            execution = execute_coding_agent_attempt(
+                runner,
+                attempt_request,
+                worktree_root=self.repo_root,
+                attempt_id=attempt_id,
+                profiles={validation_profile.name: validation_profile},
+                validation_timeout_seconds=(
+                    self.config.coding_agent_validation_timeout_seconds
+                ),
+            )
+            attempt = execution.attempt
+            validation = execution.validation
+            diff_check = execution.diff_check
+            implementation_paths = tuple(
+                sorted(
+                    set(attempt.changed_paths)
+                    | set(_implementation_paths_against_base(self.repo_root))
+                )
+            )
+            structural_report: dict[str, Any] | None = None
+            structural_findings: tuple[str, ...] = ()
+            if (
+                structrr_context is not None
+                and current_structrr is not None
+                and item_proposal is not None
+                and baseline_manifest is not None
+                and attempt.status.value == "completed"
+                and (
+                    implementation_paths
+                    or proposed.get("final_integration_review") is True
+                )
+            ):
+                from powdrr_lift.workrr.feature_endpoint import _structrr_taxonomy_path
+
+                candidate_bootstrap = bootstrap_structrr(
+                    self.repo_root,
+                    output_path=(
+                        store_root / "structrr" / f"candidate-{attempt_number:02d}.yaml"
+                    ),
+                    taxonomy_path=_structrr_taxonomy_path(self.repo_root),
+                    include_untracked=True,
+                    artifact_exclusions=(
+                        f"docs/plans/{slugify_workflow_id(str(proposed['plan_id']))}-execution-plan.yaml",
+                        f"docs/plans/{slugify_workflow_id(str(proposed['plan_id']))}-structrr-proposal.json",
+                        f"docs/workflows/{slugify_workflow_id(str(proposed['plan_id']))}/",
+                        *(
+                            (str(proposed["final_review_report_path"]),)
+                            if isinstance(proposed.get("final_review_report_path"), str)
+                            else ()
+                        ),
+                    ),
+                    submission_base=base_commit,
+                )
+                if (
+                    not candidate_bootstrap.validation.successful
+                    or candidate_bootstrap.source_manifest is None
+                ):
+                    structural_findings = (
+                        "candidate Structrr bootstrap is incomplete; "
+                        f"issues={candidate_bootstrap.validation.issues}",
+                    )
+                    structural_report = {
+                        "bootstrap_successful": (
+                            candidate_bootstrap.validation.successful
+                        ),
+                        "issues": [
+                            issue.message
+                            for issue in candidate_bootstrap.validation.issues
+                        ],
+                        "rebase": rebase_report,
+                    }
+                else:
+                    actual_diff, comparison = reconcile_item_candidate(
+                        proposal=item_proposal,
+                        baseline_snapshot=current_structrr,
+                        candidate_snapshot=candidate_bootstrap.document,
+                        baseline_manifest=baseline_manifest,
+                        candidate_manifest=candidate_bootstrap.source_manifest,
+                    )
+                    structural_findings = (
+                        *structural_repair_findings(comparison),
+                        *active_decision_drift_findings(
+                            current_structrr, candidate_bootstrap.document
+                        ),
+                    )
+                    structural_report = {
+                        "bootstrap_successful": True,
+                        "rebase": rebase_report,
+                        "actual_diff": actual_diff.to_data(),
+                        "comparison": comparison,
+                        "repair_findings": list(structural_findings),
+                    }
+            if proposed.get("final_integration_review") is True:
+                report_path = proposed.get("final_review_report_path")
+                if not isinstance(report_path, str) or not report_path.strip():
+                    raise PowdrrExecutionError(
+                        "final integration review has no report artifact path"
+                    )
+                resolved_report = (self.repo_root / report_path).resolve()
+                try:
+                    resolved_report.relative_to(self.repo_root.resolve())
+                except ValueError as error:
+                    raise PowdrrExecutionError(
+                        "final review report path must stay inside the repository"
+                    ) from error
+                resolved_report.parent.mkdir(parents=True, exist_ok=True)
+                resolved_report.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "multi-pr-final-structrr-review-v1",
+                            "plan_id": proposed.get("plan_id"),
+                            "item_id": proposed.get("item_id"),
+                            "attempt_id": attempt.attempt_id,
+                            "passed": not structural_findings
+                            and validation.status is ValidationReportStatus.PASSED,
+                            "structrr": structural_report,
+                            "validation": validation.to_data(),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                implementation_paths = tuple(
+                    sorted({*implementation_paths, report_path})
+                )
+            passed = (
                 attempt.status.value == "completed"
                 and bool(implementation_paths)
+                and diff_check.returncode == 0
                 and validation.status is ValidationReportStatus.PASSED
-            ),
-            "attempt_id": attempt.attempt_id,
-            "status": attempt.status.value,
-            "changed_paths": list(implementation_paths),
-            "validation": validation.to_data(),
-            "error": attempt.error,
+                and not structural_findings
+            )
+            return {
+                "attempt": attempt.to_data(),
+                "validation": validation.to_data(),
+                "diff_check": {
+                    "returncode": diff_check.returncode,
+                    "stdout": diff_check.stdout,
+                    "stderr": diff_check.stderr,
+                },
+                "changed_paths": list(implementation_paths),
+                "structrr": structural_report,
+                "structrr_repair_findings": list(structural_findings),
+                "passed": passed,
+            }
+
+        def evaluate_attempt(
+            record: Mapping[str, Any],
+        ) -> CodingAgentRecoveryDecision:
+            attempt_data = record.get("attempt")
+            if not isinstance(attempt_data, Mapping):
+                return CodingAgentRecoveryDecision(passed=False, terminal=True)
+            if record.get("passed") is True:
+                return CodingAgentRecoveryDecision(passed=True)
+            if attempt_data.get("status") == "policy_denied":
+                return CodingAgentRecoveryDecision(passed=False, terminal=True)
+            structural_findings = record.get("structrr_repair_findings", [])
+            if structural_findings:
+                return CodingAgentRecoveryDecision(
+                    passed=False,
+                    issue={
+                        "category": "structrr_proposal_mismatch",
+                        "plan_id": proposed.get("plan_id"),
+                        "item_id": proposed.get("item_id"),
+                        "proposal_file": proposed.get("structrr_proposal_file"),
+                        "findings": structural_findings,
+                        "instruction": (
+                            "Repair the implementation so its re-bootstrapped "
+                            "Structrr changes satisfy the accepted "
+                            + (
+                                "full plan proposal on the integrated repository. "
+                                if proposed.get("final_integration_review") is True
+                                else "per-PR proposal. "
+                            )
+                            + "Preserve unrelated interlaced changes and do not edit "
+                            "or weaken the proposal artifact. Re-run the declared "
+                            "verification command after the focused repair."
+                        ),
+                    },
+                )
+            return CodingAgentRecoveryDecision(
+                passed=False,
+                issue={
+                    "category": "coding_attempt_incomplete",
+                    "status": attempt_data.get("status"),
+                    "error": attempt_data.get("error"),
+                    "changed_paths": record.get("changed_paths", []),
+                    "validation": record.get("validation"),
+                    "diff_check": record.get("diff_check"),
+                    "instruction": (
+                        "Continue the reviewed implementation in the current worktree. "
+                        "Inspect and preserve useful edits, repair the reported "
+                        "validation failures, and satisfy every acceptance criterion. "
+                        "Do not re-plan unrelated work."
+                    ),
+                },
+            )
+
+        recovery = run_coding_agent_recovery(run_attempt, evaluate_attempt)
+        attempt_records = list(recovery.attempts)
+
+        final_attempt = attempt_records[-1]
+        attempt_data = final_attempt["attempt"]
+        result = {
+            "passed": bool(final_attempt["passed"]),
+            "attempt_id": attempt_data["attempt_id"],
+            "status": attempt_data["status"],
+            "changed_paths": final_attempt["changed_paths"],
+            "validation": final_attempt["validation"],
+            "structrr": final_attempt.get("structrr"),
+            "error": attempt_data.get("error"),
+            "attempts": attempt_records,
+            "continuations": len(attempt_records) - 1,
         }
         self.events.append({"kind": "coding_agent", "result": result})
         return result
@@ -2032,7 +2526,6 @@ def run_workflow_task(
         print(str(exc), file=stderr)
         return 2
 
-    last_runtime: ExecutionRuntime | None = None
     while True:
         task = _select_task(workflow, requested_task_id)
         requested_task_id = None
@@ -2050,13 +2543,9 @@ def run_workflow_task(
                 ):
                     return 0
                 if workflow_git_state is not None:
-                    _open_final_workflow_pull_request(
-                        repo_root,
-                        workflow,
-                        workflow_git_state,
-                        stdout=stdout,
-                        runtime=last_runtime,
-                    )
+                    # Workflow execution state is persisted at task boundaries;
+                    # issue-backed callers additionally record the checkpoint on
+                    # the issue. The workflow itself does not need a pull request.
                     return 0
                 if not _is_git_worktree(repo_root):
                     return 0
@@ -2110,7 +2599,6 @@ def run_workflow_task(
                 guidance,
                 source_ref=f"{task.task_id}:explicit-guidance",
             )
-        last_runtime = runtime
         try:
             if workflow_git_state is not None:
                 validate_workflow_git_state(
@@ -2407,15 +2895,59 @@ def run_workflow_task(
                 None,
             )
             if completed is None or completed.status is not TaskStatus.COMPLETED:
-                manifest["status"] = "failed"
-                manifest["failure"] = (
-                    "Procedrr task succeeded without completing its durable task "
-                    "record."
-                )
-                manifest["finished_at"] = datetime.now(UTC).isoformat()
-                _write_task_process_manifest(manifest_path, manifest)
-                print(manifest["failure"], file=stderr)
-                return 1
+                if process_id == "durable-task":
+                    manifest["status"] = "failed"
+                    manifest["failure"] = (
+                        "Procedrr task succeeded without completing its durable task "
+                        "record."
+                    )
+                    manifest["finished_at"] = datetime.now(UTC).isoformat()
+                    _write_task_process_manifest(manifest_path, manifest)
+                    print(manifest["failure"], file=stderr)
+                    return 1
+                try:
+                    process_outputs = process_catalog.get(process_id).document.get(
+                        "outputs", {}
+                    )
+                    if not isinstance(process_outputs, Mapping) or not process_outputs:
+                        raise PowdrrExecutionError(
+                            f"Procedrr process {process_id!r} succeeded without "
+                            "completing its durable task and declares no outputs to "
+                            "record."
+                        )
+                    missing_outputs = set(process_outputs).difference(result.bindings)
+                    if missing_outputs:
+                        raise PowdrrExecutionError(
+                            f"Procedrr process {process_id!r} did not return declared "
+                            f"outputs: {', '.join(sorted(missing_outputs))}."
+                        )
+                    output_state = {
+                        name: result.bindings[name] for name in process_outputs
+                    }
+                    operations._complete({"output_state": output_state})
+                    completed = next(
+                        (
+                            item
+                            for item in workflow.tasks
+                            if item.task_id == task.task_id
+                        ),
+                        None,
+                    )
+                    if (
+                        completed is None
+                        or completed.status is not TaskStatus.COMPLETED
+                    ):
+                        raise PowdrrExecutionError(
+                            f"Procedrr process {process_id!r} outputs were recorded, "
+                            "but the durable task remains incomplete."
+                        )
+                except (PowdrrExecutionError, RuntimeError, ValueError) as error:
+                    manifest["status"] = "failed"
+                    manifest["failure"] = f"{type(error).__name__}: {error}"
+                    manifest["finished_at"] = datetime.now(UTC).isoformat()
+                    _write_task_process_manifest(manifest_path, manifest)
+                    print(f"Procedrr task failed: {error}", file=stderr)
+                    return 1
         _write_task_process_manifest(manifest_path, manifest)
         workflow = _select_workflow_instance(
             WorkflowInstance.from_directory(workflow_dir),
@@ -2658,11 +3190,6 @@ def _publish_workflow_progress(
         print(f"Published workflow progress on branch: {branch}", file=stdout)
         return commit_sha
 
-    default_branch = (
-        workflow_git_state.integration_branch
-        if workflow_git_state is not None
-        else _default_branch(repo_root, runtime=runtime)
-    )
     existing_pr = _gh_result(
         repo_root,
         {"operation": "pr_view", "pr_reference": branch, "json_fields": ["url"]},
@@ -2693,8 +3220,6 @@ def _publish_workflow_progress(
             "operation": "pr_create",
             "title": title,
             "body": body,
-            "base": default_branch,
-            "head": branch,
         },
         runtime=runtime,
     )
@@ -2839,8 +3364,6 @@ def _open_final_workflow_pull_request(
         repo_root,
         {
             "operation": "pr_create",
-            "base": workflow_git_state.base_branch,
-            "head": workflow_git_state.integration_branch,
             "title": f"Workflow: {workflow.directory.name}",
             "body": (
                 "Final integration pull request for durable workflow "

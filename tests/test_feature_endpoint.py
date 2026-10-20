@@ -394,6 +394,7 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
     output_root = tmp_path / "artifacts"
     requests: list[ImplementationRequest] = []
+    worker_commit_shas: list[str] = []
 
     def author_probe_suite(
         self: MiniSWEAgentProvider,
@@ -403,6 +404,10 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
         requests.append(request)
+        if len(requests) == 1:
+            assert request.base_commit == base_commit
+        else:
+            assert request.base_commit == worker_commit_shas[0]
         expected = "value" if len(requests) == 1 else "handled:value"
         obligation = {
             "obligation_id": "selector-obligation",
@@ -428,6 +433,12 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
             f"    assert module.public_api('value') == '{expected}'\n",
             encoding="utf-8",
         )
+        if len(requests) == 1:
+            _git(worktree_root, "add", "-f", "probe_suite.py")
+            _git(worktree_root, "commit", "-qm", "author initial probe suite")
+            worker_commit_shas.append(
+                _git(worktree_root, "rev-parse", "HEAD").stdout.strip()
+            )
         return subprocess.CompletedProcess(["mini"], 0, "", "")
 
     monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
@@ -468,6 +479,10 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     suite = json.loads(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
+    assert (
+        suite["authoring_attempts"][0]["worker_commit_sha"] == (worker_commit_shas[0])
+    )
+    assert suite["authoring_attempts"][1]["status"] == "completed"
     assert suite["baseline_results"][0]["status"] == "failed"
 
 

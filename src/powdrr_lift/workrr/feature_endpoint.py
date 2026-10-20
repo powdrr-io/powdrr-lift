@@ -3210,6 +3210,9 @@ def _generate_miniswe_postrun_probes(
                 probe_request = replace(
                     probe_request,
                     request_id=f"{request.request_id}-probe-authoring-repair",
+                    base_commit=_git_output(
+                        runner, probe_worktree, ["git", "rev-parse", "HEAD"]
+                    ),
                     prompt=(
                         probe_prompt
                         + "\n\nRepair the complete pre-coding Python probe "

@@ -1,0 +1,390 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1060
+title: Enforce inherited Structrr decisions in PR execution
+intent:
+  problem: Execute-PR tasks could omit a proposed Structrr diff, and inherited decisions in the accepted Structrr
+    baseline were not consistently checked before and after coding.
+  goal: Require and validate a Structrr diff for each planned PR, review inherited decisions during planning and
+    after coding, and feed post-code failures into the existing repair loop.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/decision_continuity.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 158
+  summary: Review inherited Structrr decisions individually
+  rationale: Produce typed outcomes for planning and post-code evidence, with failures available to block or repair execution.
+- path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Update execute-PR Structrr completion gate
+  rationale: Require the workflow result to pass Structrr validation.
+- path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 23
+    end_line: 26
+  summary: Update execute-PR Structrr completion gate
+  rationale: Require the workflow result to pass Structrr validation.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Declare Structrr proposal and continuity validation
+  rationale: Make proposal validation and inherited-decision checks required execution outputs.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 12
+    end_line: 21
+  summary: Declare Structrr proposal and continuity validation
+  rationale: Make proposal validation and inherited-decision checks required execution outputs.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 26
+    end_line: 29
+  summary: Declare Structrr proposal and continuity validation
+  rationale: Make proposal validation and inherited-decision checks required execution outputs.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 42
+    end_line: 45
+  summary: Declare Structrr proposal and continuity validation
+  rationale: Make proposal validation and inherited-decision checks required execution outputs.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1296
+    end_line: 1315
+  summary: Require a complete per-PR Structrr proposal
+  rationale: Validate proposal coverage and attach proposal references to generated PR contexts.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 2211
+    end_line: 2221
+  summary: Require a complete per-PR Structrr proposal
+  rationale: Validate proposal coverage and attach proposal references to generated PR contexts.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 2303
+    end_line: 2314
+  summary: Require a complete per-PR Structrr proposal
+  rationale: Validate proposal coverage and attach proposal references to generated PR contexts.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 2322
+    end_line: 2328
+  summary: Require a complete per-PR Structrr proposal
+  rationale: Validate proposal coverage and attach proposal references to generated PR contexts.
+- path: src/powdrr_lift/workrr/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 401
+    end_line: 456
+  summary: Derive inherited decisions from Structrr state
+  rationale: Use the accepted bootstrap and applied proposal diffs as the decision source.
+- path: src/powdrr_lift/workrr/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 582
+    end_line: 582
+  summary: Derive inherited decisions from Structrr state
+  rationale: Use the accepted bootstrap and applied proposal diffs as the decision source.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 80
+    end_line: 83
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 127
+    end_line: 127
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 414
+    end_line: 418
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 622
+    end_line: 666
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1643
+    end_line: 1646
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1651
+    end_line: 1734
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1837
+    end_line: 1837
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1858
+    end_line: 1880
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1883
+    end_line: 1883
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1885
+    end_line: 1886
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1889
+    end_line: 1892
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1895
+    end_line: 1914
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1999
+    end_line: 2001
+  summary: Run Structrr continuity reviews around coding
+  rationale: Review inherited decisions before coding and after re-bootstrap, then route failures into repair.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 144
+  summary: Test proposal generation and validation
+  rationale: Cover required proposal references and complete per-PR proposal coverage.
+- path: tests/test_decision_continuity.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 88
+  summary: Test inherited-decision review outcomes
+  rationale: Verify baseline-derived inventory, separate judgments, and fail-closed behavior.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 993
+    end_line: 1009
+  summary: Test proposal generation and validation
+  rationale: Cover required proposal references and complete per-PR proposal coverage.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1025
+    end_line: 1025
+  summary: Test proposal generation and validation
+  rationale: Cover required proposal references and complete per-PR proposal coverage.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1072
+    end_line: 1073
+  summary: Test proposal generation and validation
+  rationale: Cover required proposal references and complete per-PR proposal coverage.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1093
+    end_line: 1093
+  summary: Test proposal generation and validation
+  rationale: Cover required proposal references and complete per-PR proposal coverage.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1155
+    end_line: 1155
+  summary: Test proposal generation and validation
+  rationale: Cover required proposal references and complete per-PR proposal coverage.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1405
+    end_line: 1405
+  summary: Test proposal generation and validation
+  rationale: Cover required proposal references and complete per-PR proposal coverage.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1656
+    end_line: 1656
+  summary: Test proposal generation and validation
+  rationale: Cover required proposal references and complete per-PR proposal coverage.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 60
+    end_line: 64
+  summary: Carry Structrr proposal data into queued tasks
+  rationale: Ensure queued PR contexts retain proposal file and item identifiers.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 406
+    end_line: 406
+  summary: Test Structrr workflow completion gating
+  rationale: Reject results without a passing Structrr validation status.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 1581
+    end_line: 1585
+  summary: Test Structrr workflow completion gating
+  rationale: Reject results without a passing Structrr validation status.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 344
+    end_line: 345
+  summary: Test continuity reviews and repair integration
+  rationale: Cover the review phases and corrective loop behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 353
+    end_line: 379
+  summary: Test continuity reviews and repair integration
+  rationale: Cover the review phases and corrective loop behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 403
+    end_line: 407
+  summary: Test continuity reviews and repair integration
+  rationale: Cover the review phases and corrective loop behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 446
+    end_line: 502
+  summary: Test continuity reviews and repair integration
+  rationale: Cover the review phases and corrective loop behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 535
+    end_line: 537
+  summary: Test continuity reviews and repair integration
+  rationale: Cover the review phases and corrective loop behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 539
+    end_line: 540
+  summary: Test continuity reviews and repair integration
+  rationale: Cover the review phases and corrective loop behavior.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 346
+    end_line: 349
+  summary: Test execute-PR Structrr requirements
+  rationale: Protect the declared proposal and validation requirements.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 353
+    end_line: 355
+  summary: Test execute-PR Structrr requirements
+  rationale: Protect the declared proposal and validation requirements.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 371
+    end_line: 371
+  summary: Test execute-PR Structrr requirements
+  rationale: Protect the declared proposal and validation requirements.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 375
+    end_line: 375
+  summary: Test execute-PR Structrr requirements
+  rationale: Protect the declared proposal and validation requirements.
+entities:
+- id: inherited-structrr-decision-review
+  type: Function
+  action: added
+- id: execute-pr-structrr-continuity-gates
+  type: Workflow
+  action: added
+- id: structrr-continuity-regression-tests
+  type: Regression test
+  action: added
+entity_relationships:
+- id: continuity-review-gates-execute-pr
+  type: exercises
+  source: execute-pr-structrr-continuity-gates
+  target: inherited-structrr-decision-review
+  action: added
+  description: Execute-PR planning and post-coding phases review inherited Structrr decisions and gate completion
+    on the results.
+- id: continuity-regression-tests-exercise-review
+  type: exercises
+  source: structrr-continuity-regression-tests
+  target: inherited-structrr-decision-review
+  action: added
+  description: Regression tests verify baseline-derived decisions, independent judgments, and repair after post-code
+    failures.
+invariants:
+- id: every-execute-pr-has-a-validated-structrr-proposal
+  description: Every generated execute-PR task has a valid proposal diff for its plan item, and missing or mismatched
+    proposals prevent execution from proceeding.
+  action: added
+- id: inherited-decisions-are-reviewed-before-and-after-coding
+  description: Each inherited decision in the accepted Structrr baseline is reviewed during planning and against
+    the post-code implementation evidence; fail or unknown outcomes block completion or enter repair.
+  action: added
+- id: structrr-bootstrap-and-applied-diffs-remain-the-decision-source
+  description: Inherited decisions are derived from the Structrr bootstrap plus accepted proposal diffs, without
+    creating a separate decision ledger.
+  action: added
+guidance:
+- id: repair-with-specific-inherited-decision-evidence
+  description: Post-code repair instructions identify the inherited decision at issue and require code or test evidence
+    showing how the correction preserves it.
+  action: added

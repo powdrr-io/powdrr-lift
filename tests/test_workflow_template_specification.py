@@ -351,6 +351,22 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     }
     assert steps[3]["call"]["outputs"] == {"validation_results": "validation_results"}
     assert steps[4]["judge"]["output"]["name"] == "pull_request_request"
+    title_judge = steps[4]["judge"]
+    assert any(
+        "task_context.proposed_pr_context.title" in instruction
+        and "Prefer the reviewed item title verbatim" in instruction
+        for instruction in title_judge["instructions"]
+    )
+    assert any(
+        "Never use the plan ID" in instruction
+        for instruction in title_judge["instructions"]
+    )
+    assert (
+        title_judge["output"]["schema"]["properties"]["workflow_context"]["properties"][
+            "feature-name"
+        ]["maxLength"]
+        == 100
+    )
     assert steps[5]["call"]["inputs"]["files_to_publish"] == {
         "type": "reference",
         "value": "implementation_result.changed_paths",

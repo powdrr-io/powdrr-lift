@@ -30,6 +30,7 @@ MAX_ITEM_SCOPE_ENTRIES = 3
 MAX_ITEM_IMPLEMENTATION_STEPS = 4
 MAX_ITEM_ACCEPTANCE_CRITERIA = 5
 MAX_PLAN_REFINEMENT_ATTEMPTS = 2
+MAX_CI_CONTEXT_CHARS = 60_000
 PLAN_WORKFLOW_SCHEMA = "https://powdrr.io/schemas/plan-workflow-instance-v2"
 PLAN_WORKFLOW_PROCESS = "execute-proposed-pr-workflow"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
@@ -46,6 +47,16 @@ _CODE_ARTIFACT = re.compile(
     r"\b(?:parser|package|library|module|record|service|daemon|cli|binary|target|"
     r"provider|client|worker|adapter|implementation)\w*\b",
     re.IGNORECASE,
+)
+_CI_CONFIG_GLOBS = (
+    ".github/workflows/**/*.yml",
+    ".github/workflows/**/*.yaml",
+    ".gitlab-ci.yml",
+    ".circleci/config.yml",
+    "azure-pipelines.yml",
+    ".buildkite/pipeline.yml",
+    "Jenkinsfile",
+    ".travis.yml",
 )
 
 PLAN_ITEMS_RESPONSE_SCHEMA: dict[str, Any] = {
@@ -139,6 +150,37 @@ PLAN_ITEMS_RESPONSE_SCHEMA: dict[str, Any] = {
 
 class PlanGenerationError(ValueError):
     """The model response cannot be compiled into a valid execution plan."""
+
+
+def inspect_repository_ci(repo_root: Path) -> str:
+    """Return bounded content for recognized CI configuration files."""
+    files = sorted(
+        {
+            path
+            for pattern in _CI_CONFIG_GLOBS
+            for path in repo_root.glob(pattern)
+            if path.is_file()
+        }
+    )
+    if not files:
+        return "No recognized CI configuration files were found."
+
+    sections = ["Recognized CI configuration files (current checkout):"]
+    remaining_chars = MAX_CI_CONTEXT_CHARS
+    for path in files:
+        relative_path = path.relative_to(repo_root).as_posix()
+        try:
+            content = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            content = "[could not read file]"
+        section = f"\n--- {relative_path} ---\n{content}\n"
+        if len(section) > remaining_chars:
+            section = section[:remaining_chars] + "\n[CI context truncated]\n"
+        sections.append(section)
+        remaining_chars -= len(section)
+        if remaining_chars <= 0:
+            break
+    return "".join(sections)
 
 
 @dataclass(frozen=True, slots=True)
@@ -425,6 +467,8 @@ def generate_execution_plan_yaml(
     plan_id: str,
     client: WorkflowLLMClient,
     source_document: str | None = None,
+    verification_command: str | None = None,
+    repository_ci_context: str | None = None,
 ) -> tuple[str, ReviewedExecutionPlan]:
     """Analyze source Markdown and compile a queue plan with workflow refs."""
     if not source_plan.strip():
@@ -443,6 +487,20 @@ def generate_execution_plan_yaml(
         raise PlanGenerationError(
             "source_document must be a repository-relative path without traversal"
         )
+    has_ci_configuration = (
+        None
+        if repository_ci_context is None
+        else not repository_ci_context.startswith(
+            "No recognized CI configuration files were found."
+        )
+    )
+    planning_context = {
+        "task": "Propose an execution plan from this source document.",
+        "plan_id": plan_id,
+        "source_plan_markdown": source_plan,
+        "repository_ci_context": repository_ci_context,
+        "verification_command": verification_command,
+    }
     initial_response = complete_json(
         client,
         [
@@ -457,7 +515,9 @@ def generate_execution_plan_yaml(
                     "by the plan. `scope` is product behavior in prose; "
                     "`allowed_paths` is a separate list of repository-relative "
                     "filesystem paths. Use only paths explicitly named by the "
-                    "source plan; if it names no implementation paths, set "
+                    "source plan, except for the standard CI workflow path needed "
+                    "by a required CI bootstrap. If it names no implementation "
+                    "paths, set "
                     'allowed_paths to ["."]. Do not put scope prose in '
                     "allowed_paths, invent repository paths, or claim that work "
                     "is already implemented. Group work into coherent PRs; "
@@ -480,6 +540,20 @@ def generate_execution_plan_yaml(
                     "change and its expected result. Include tests or executable "
                     "verification with the behavior they establish. The first "
                     "item must be a useful, independently verifiable foundation. "
+                    "Use the repository CI inventory and verification command in "
+                    "the user context. If CI is absent, make establishing a CI "
+                    "workflow that runs the supplied verification command the "
+                    "first item for a multi-item plan, keep it a small standalone "
+                    "slice, and make every later item depend on it so only that "
+                    "item is initially ready. Include the CI workflow path in "
+                    "that item's allowed_paths. If CI already exists, inspect "
+                    "whether it runs the supplied command; reuse or extend it in "
+                    "the earliest relevant item and add dependencies only where "
+                    "the work actually requires them. Do not add a duplicate or "
+                    "standalone CI item when existing CI already provides the "
+                    "needed gate. For a one-item plan with no CI, include the "
+                    "smallest appropriate CI setup with that item's behavior if "
+                    "it remains one cohesive deliverable. "
                     "Later items must name their actual prerequisite item IDs. "
                     "Dependencies must refer to earlier item IDs. Before "
                     "returning, check each item against these size and cohesion "
@@ -489,14 +563,7 @@ def generate_execution_plan_yaml(
             },
             {
                 "role": "user",
-                "content": json.dumps(
-                    {
-                        "task": "Propose an execution plan from this source document.",
-                        "plan_id": plan_id,
-                        "source_plan_markdown": source_plan,
-                    },
-                    ensure_ascii=False,
-                ),
+                "content": json.dumps(planning_context, ensure_ascii=False),
             },
         ],
         response_schema=PLAN_ITEMS_RESPONSE_SCHEMA,
@@ -524,7 +591,13 @@ def generate_execution_plan_yaml(
                     "and make dependencies point to the actual prerequisite item "
                     "IDs in dependency order. Keep `allowed_paths` as "
                     "repository-relative filesystem paths, separate from prose "
-                    "scope. Do not add unsupported work. Return "
+                    "scope. Verify the CI choice against repository_ci_context "
+                    "and verification_command. If the inventory says no CI is "
+                    "configured, a multi-item plan must start with a standalone "
+                    "CI bootstrap that runs the supplied verification command, "
+                    "and every later item must depend on it. If CI is already "
+                    "adequate, reuse it without adding a redundant CI item. Do not "
+                    "add unsupported work. Return "
                     "the complete revised item list in the required JSON schema; "
                     "return the draft unchanged only if every item passes."
                 ),
@@ -535,6 +608,8 @@ def generate_execution_plan_yaml(
                     {
                         "source_plan_markdown": source_plan,
                         "draft_items": initial_response["items"],
+                        "repository_ci_context": repository_ci_context,
+                        "verification_command": verification_command,
                         "task": "Review and refine this PR decomposition.",
                     },
                     ensure_ascii=False,
@@ -551,7 +626,11 @@ def generate_execution_plan_yaml(
             raise PlanGenerationError(
                 "planning response must contain at least one item"
             )
-        refinement_issues = _plan_item_refinement_issues(raw_items)
+        refinement_issues = _plan_item_refinement_issues(
+            raw_items,
+            require_ci_bootstrap=has_ci_configuration is False,
+            verification_command=verification_command,
+        )
         if not refinement_issues:
             break
         response = complete_json(
@@ -566,8 +645,12 @@ def generate_execution_plan_yaml(
                         "justify implementing multiple runtimes in the same PR; "
                         "preserve parity checks in the appropriate later item. "
                         "Preserve source requirements, use no more than 3 scope "
-                        "entries, 4 implementation steps, and 5 acceptance criteria "
-                        "per item, and keep all dependencies in order. Return the "
+                        "entries, 4 implementation steps, and 5 acceptance criteria. "
+                        "When no CI is configured, add a small first CI bootstrap "
+                        "item for multi-item plans using the supplied verification "
+                        "command, put the CI workflow in allowed_paths, and make "
+                        "all later items depend on it. Keep all dependencies in "
+                        "order. Return the "
                         "complete revised items using only the required JSON schema."
                     ),
                 },
@@ -578,6 +661,8 @@ def generate_execution_plan_yaml(
                             "source_plan_markdown": source_plan,
                             "draft_items": raw_items,
                             "violations": refinement_issues,
+                            "repository_ci_context": repository_ci_context,
+                            "verification_command": verification_command,
                             "task": (
                                 "Split the violating items and repair dependencies."
                             ),
@@ -597,10 +682,14 @@ def generate_execution_plan_yaml(
         raise PlanGenerationError(
             f"planning response exceeds the {MAX_PLAN_ITEMS}-item limit"
         )
-    remaining_issues = _plan_item_refinement_issues(raw_items)
+    remaining_issues = _plan_item_refinement_issues(
+        raw_items,
+        require_ci_bootstrap=has_ci_configuration is False,
+        verification_command=verification_command,
+    )
     if remaining_issues:
         raise PlanGenerationError(
-            "planning response still contains oversized work items after "
+            "planning response still has decomposition violations after "
             f"{MAX_PLAN_REFINEMENT_ATTEMPTS} correction attempts: "
             + "; ".join(remaining_issues)
         )
@@ -819,7 +908,12 @@ def _require_dependency_order(plan: ReviewedExecutionPlan) -> None:
             )
 
 
-def _plan_item_refinement_issues(items: list[Any]) -> list[str]:
+def _plan_item_refinement_issues(
+    items: list[Any],
+    *,
+    require_ci_bootstrap: bool = False,
+    verification_command: str | None = None,
+) -> list[str]:
     issues: list[str] = []
     for item in items:
         if not isinstance(item, Mapping):
@@ -850,4 +944,47 @@ def _plan_item_refinement_issues(items: list[Any]) -> list[str]:
             issues.append(
                 f"{item_id} combines implementation runtimes: {', '.join(runtimes)}"
             )
+    if require_ci_bootstrap and len(items) > 1 and items:
+        first_item = items[0]
+        if isinstance(first_item, Mapping):
+            first_id = str(first_item.get("id", "<unknown>"))
+            ci_text = " ".join(
+                str(value)
+                for field in (
+                    "title",
+                    "objective",
+                    "scope",
+                    "implementation_steps",
+                    "acceptance_criteria",
+                )
+                for value in (
+                    first_item.get(field, [])
+                    if isinstance(first_item.get(field, []), list)
+                    else [first_item.get(field, "")]
+                )
+            )
+            if not re.search(r"\b(?:CI|continuous integration)\b", ci_text, re.I):
+                issues.append(
+                    f"{first_id} must establish continuous integration before "
+                    "the product work"
+                )
+            elif verification_command and verification_command not in ci_text:
+                issues.append(
+                    f"{first_id} must run the supplied verification command in CI"
+                )
+            allowed_paths = first_item.get("allowed_paths", [])
+            if isinstance(allowed_paths, list) and not any(
+                path == "." or ".github/workflows" in str(path)
+                for path in allowed_paths
+            ):
+                issues.append(f"{first_id} must allow the repository CI workflow path")
+            for item in items[1:]:
+                if not isinstance(item, Mapping):
+                    continue
+                dependencies = item.get("dependencies", [])
+                if not isinstance(dependencies, list) or first_id not in dependencies:
+                    issues.append(
+                        f"{item.get('id', '<unknown>')} must depend on the initial "
+                        f"CI item {first_id}"
+                    )
     return issues

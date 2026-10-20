@@ -335,7 +335,7 @@ def test_plan_generation_repairs_persistent_missing_ci_gate() -> None:
             _item("cli", dependencies=["verifier"]),
         ]
     }
-    client = SequencedPlanningClient([uncorrected] * 6)
+    client = SequencedPlanningClient([uncorrected] * 8)
 
     _, plan = generate_execution_plan_yaml(
         source_plan="# Plan\nImplement the verifier and CLI.",

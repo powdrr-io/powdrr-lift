@@ -16,8 +16,201 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.structrr.validation import DiscoveredValidationProfile
+from powdrr_lift.workrr.llm import complete_json
+from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
-POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v3"
+POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v4"
+_INTERACTION_PLAN_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "interactions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "interaction_id": {"type": "string"},
+                    "scenario_ids": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                    "condition": {"type": "string"},
+                    "operation": {"type": "string"},
+                    "expected": {"type": "string"},
+                    "evidence_quotes": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    },
+                },
+                "required": [
+                    "interaction_id",
+                    "scenario_ids",
+                    "condition",
+                    "operation",
+                    "expected",
+                    "evidence_quotes",
+                ],
+                "additionalProperties": False,
+            },
+        }
+    },
+    "required": ["interactions"],
+    "additionalProperties": False,
+}
+
+
+def generate_probe_interaction_plan(
+    client: WorkflowLLMClient,
+    *,
+    instruction: str,
+    scenarios: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    """Plan source-grounded composition cases before probe code is authored."""
+    scenario_fields = (
+        "scenario_id",
+        "given",
+        "when",
+        "then",
+        "evidence",
+        "related_requirements",
+    )
+    compact_scenarios = [
+        {key: item[key] for key in scenario_fields if key in item} for item in scenarios
+    ]
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "Analyze the instruction and behavior scenarios for interactions "
+                "that a post-coding probe should exercise. Find combinations where "
+                "one requirement defines values, states, or inputs and another "
+                "defines an operation, precedence rule, resolution rule, or "
+                "classification applied to them. Include only combinations that "
+                "are entailed by the instruction; do not enumerate arbitrary pairs "
+                "or invent behavior. Each interaction must cite at least two exact, "
+                "distinct instruction quotes and refer to at least two scenario "
+                "IDs. State a concrete condition, operation, and observable "
+                "expected result. For selection or classification behavior, make "
+                "the result distinguish the included case from a relevant "
+                "excluded case. Return an empty interactions list when no "
+                "cross-requirement interaction is supported. Do not write code."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "instruction": instruction,
+                    "behavior_scenarios": compact_scenarios,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        },
+    ]
+    response = complete_json(client, messages, response_schema=_INTERACTION_PLAN_SCHEMA)
+    interactions = response.get("interactions")
+    if not isinstance(interactions, list):
+        raise ValueError("interaction plan must contain an interactions array")
+    planned = validate_probe_interaction_plan(
+        interactions, instruction=instruction, scenarios=scenarios
+    )
+    review_messages = [
+        {
+            "role": "system",
+            "content": (
+                "Audit the proposed interaction plan against the complete source "
+                "instruction and behavior scenarios. Find any materially distinct "
+                "cross-requirement combination that the plan omitted, especially "
+                "where a special value is used with a grammar operation or where "
+                "a composed result controls a later classification. Add only "
+                "source-entailed interactions, with exact quotes from at least "
+                "two distinct instruction clauses and at least two scenario IDs. "
+                "Do not repeat an interaction already covered by the plan. Return "
+                "an empty interactions list if the plan is complete. Do not write "
+                "code or probes."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "instruction": instruction,
+                    "behavior_scenarios": compact_scenarios,
+                    "proposed_interactions": planned,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        },
+    ]
+    review = complete_json(
+        client, review_messages, response_schema=_INTERACTION_PLAN_SCHEMA
+    ).get("interactions")
+    if not isinstance(review, list):
+        raise ValueError("interaction review must contain an interactions array")
+    additions = validate_probe_interaction_plan(
+        review, instruction=instruction, scenarios=scenarios
+    )
+    by_id = {item["interaction_id"]: item for item in planned}
+    for item in additions:
+        by_id.setdefault(item["interaction_id"], item)
+    return tuple(by_id.values())
+
+
+def validate_probe_interaction_plan(
+    interactions: Sequence[Any],
+    *,
+    instruction: str,
+    scenarios: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    """Check interaction references and require verbatim instruction evidence."""
+    known_scenarios = {str(item["scenario_id"]) for item in scenarios}
+    seen: set[str] = set()
+    validated: list[dict[str, Any]] = []
+    for raw in interactions:
+        if not isinstance(raw, Mapping):
+            raise ValueError("interaction plan contains a malformed entry")
+        item = dict(raw)
+        interaction_id = _required_text(item, "interaction_id")
+        if interaction_id in seen:
+            raise ValueError(f"duplicate interaction id {interaction_id!r}")
+        scenario_ids = item.get("scenario_ids")
+        if (
+            not isinstance(scenario_ids, list)
+            or any(not isinstance(value, str) for value in scenario_ids)
+            or len(scenario_ids) < 2
+            or len(set(scenario_ids)) != len(scenario_ids)
+        ):
+            raise ValueError(
+                f"interaction {interaction_id!r} must reference at least two "
+                "distinct scenarios"
+            )
+        unknown = set(scenario_ids) - known_scenarios
+        if unknown:
+            raise ValueError(
+                f"interaction {interaction_id!r} refers to unknown scenarios: "
+                + ", ".join(sorted(unknown))
+            )
+        for key in ("condition", "operation", "expected"):
+            _required_text(item, key)
+        quotes = item.get("evidence_quotes")
+        if (
+            not isinstance(quotes, list)
+            or any(
+                not isinstance(quote, str)
+                or not quote.strip()
+                or quote not in instruction
+                for quote in quotes
+            )
+            or len(set(quotes)) < 2
+        ):
+            raise ValueError(
+                f"interaction {interaction_id!r} must cite two distinct exact "
+                "quotes from the instruction"
+            )
+        seen.add(interaction_id)
+        validated.append(item)
+    return tuple(validated)
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +223,7 @@ class PostRunProbe:
     obligation_id: str = ""
     obligation_category: str = "other"
     obligation_rule: str = "not_applicable"
+    interaction_ids: tuple[str, ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -41,6 +235,7 @@ class PostRunProbe:
             "obligation_id": self.obligation_id,
             "obligation_category": self.obligation_category,
             "obligation_rule": self.obligation_rule,
+            "interaction_ids": list(self.interaction_ids),
         }
 
 
@@ -72,6 +267,7 @@ def parse_generated_postrun_probe_source(
     *,
     instruction: str,
     repository_contract: Mapping[str, Any] | None = None,
+    interaction_obligations: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
     """Validate MiniSWE's executable probes and typed obligations in one module."""
     if not isinstance(source, str) or not source.strip():
@@ -132,6 +328,10 @@ def parse_generated_postrun_probe_source(
     known_scenarios = {str(item["scenario_id"]) for item in scenarios}
     seen_probe_ids: set[str] = set()
     covered_obligations: set[str] = set()
+    known_interactions = {
+        str(item["interaction_id"]) for item in interaction_obligations
+    }
+    covered_interactions: set[str] = set()
     probes: list[PostRunProbe] = []
     for function in functions:
         if isinstance(function, ast.AsyncFunctionDef):
@@ -149,6 +349,12 @@ def parse_generated_postrun_probe_source(
         scenario_id = _required_text(metadata, "scenario_id")
         oracle_basis = _required_text(metadata, "oracle_basis")
         obligation_id = _required_text(metadata, "obligation_id")
+        raw_interaction_ids = metadata.get("interaction_ids", [])
+        if not isinstance(raw_interaction_ids, list) or any(
+            not isinstance(value, str) for value in raw_interaction_ids
+        ):
+            raise ValueError(f"{function.name} has malformed interaction_ids")
+        interaction_ids = tuple(dict.fromkeys(raw_interaction_ids))
         if probe_id in seen_probe_ids:
             raise ValueError(f"probe suite has duplicate probe id {probe_id!r}")
         if scenario_id not in known_scenarios:
@@ -162,8 +368,26 @@ def parse_generated_postrun_probe_source(
             raise ValueError(
                 f"probe {probe_id!r} does not match its obligation scenario"
             )
+        unknown_interactions = set(interaction_ids) - known_interactions
+        if unknown_interactions:
+            raise ValueError(
+                f"probe {probe_id!r} refers to unknown interactions: "
+                + ", ".join(sorted(unknown_interactions))
+            )
+        for interaction_id in interaction_ids:
+            interaction = next(
+                item
+                for item in interaction_obligations
+                if item["interaction_id"] == interaction_id
+            )
+            if scenario_id not in interaction["scenario_ids"]:
+                raise ValueError(
+                    f"probe {probe_id!r} scenario is unrelated to interaction "
+                    f"{interaction_id!r}"
+                )
         seen_probe_ids.add(probe_id)
         covered_obligations.add(obligation_id)
+        covered_interactions.update(interaction_ids)
         _validate_probe_function(function, tree)
         probes.append(
             PostRunProbe(
@@ -175,6 +399,7 @@ def parse_generated_postrun_probe_source(
                 obligation_id,
                 str(obligation["category"]),
                 str(obligation["rule"]),
+                interaction_ids,
             )
         )
     missing_obligations = {
@@ -184,6 +409,12 @@ def parse_generated_postrun_probe_source(
         raise ValueError(
             "probe suite omitted supported obligations: "
             + ", ".join(sorted(missing_obligations))
+        )
+    missing_interactions = known_interactions - covered_interactions
+    if missing_interactions:
+        raise ValueError(
+            "probe suite omitted required interactions: "
+            + ", ".join(sorted(missing_interactions))
         )
     return obligations, tuple(probes)
 
@@ -532,7 +763,9 @@ __all__ = [
     "PostRunProbe",
     "PostRunProbeResult",
     "baseline_probe_failures",
+    "generate_probe_interaction_plan",
     "parse_generated_postrun_probe_source",
     "probe_failures",
     "run_postrun_probes",
+    "validate_probe_interaction_plan",
 ]

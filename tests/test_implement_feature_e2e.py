@@ -697,6 +697,8 @@ class ProbeEnabledPlanningClient(DeterministicPlanningClient):
         response_schema: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         required = set((response_schema or {}).get("required", ()))
+        if required == {"interactions"}:
+            return {"interactions": []}
         if required == {"revisions"}:
             payload = json.loads(messages[-1]["content"])
             return {

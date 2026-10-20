@@ -1400,7 +1400,7 @@ def _build_document(
 
 
 def _validation_tool_source(root: Path, tracked_files: Sequence[str]) -> str | None:
-    for relative in (
+    preferred_sources = (
         "pyproject.toml",
         "setup.cfg",
         "tox.ini",
@@ -1409,9 +1409,21 @@ def _validation_tool_source(root: Path, tracked_files: Sequence[str]) -> str | N
         ".github/workflows/ci.yml",
         ".github/workflows/ci.yaml",
         "Makefile",
-    ):
+    )
+    for relative in preferred_sources:
         if relative in tracked_files:
             return relative
+    for name in (Path(source).name for source in preferred_sources):
+        nested_source = next(
+            (
+                relative
+                for relative in tracked_files
+                if relative != name and Path(relative).name == name
+            ),
+            None,
+        )
+        if nested_source is not None:
+            return nested_source
     workflow = next(
         (
             relative

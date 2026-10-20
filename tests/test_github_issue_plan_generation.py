@@ -393,6 +393,52 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     assert "verify_signature" in client.messages[1]["content"]
 
 
+def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    draft = {
+        "items": [
+            _item("schema-parsers"),
+            _item("portable-verifier", dependencies=["schema-parsers"]),
+        ]
+    }
+    reconciled = {"items": [_item("portable-verifier")]}
+    client = SequencedPlanningClient([draft, draft, reconciled])
+    inspected_contexts: list[str] = []
+
+    def inspect_draft(_repo_root: Path, source_plan: str, _client: Any) -> str:
+        inspected_contexts.append(source_plan)
+        return (
+            "Current checkout evidence: attestation/verifier/parsers.py implements "
+            "strict policy parsing; tests/test_parsers.py covers duplicate keys."
+        )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.github_issue_plan_generation.inspect_repository_code",
+        inspect_draft,
+    )
+    _, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement strict parsers and a portable verifier.",
+        plan_id="current-state-reconciliation-v1",
+        client=client,
+        repository_ci_context=(
+            "Recognized CI configuration files:\n"
+            "--- .github/workflows/verify.yml ---\n"
+            "run: bash attestation/scripts/verify-all.sh"
+        ),
+        repository_code_context="Initial evidence mentions the verifier package.",
+        repository_root=tmp_path,
+    )
+
+    assert len(client.messages) == 3
+    assert len(inspected_contexts) == 1
+    assert "schema-parsers" in inspected_contexts[0]
+    reconciliation_prompt = client.messages[2][1]["content"]
+    assert "Current checkout evidence" in reconciliation_prompt
+    assert "schema-parsers" in reconciliation_prompt
+    assert [item.item_id for item in plan.items] == ["portable-verifier"]
+
+
 def test_structrr_proposal_repairs_content_identity_mismatch() -> None:
     plan = ReviewedExecutionPlan(
         plan_id="attestation-current-state",
@@ -847,6 +893,10 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
         cli,
         "inspect_repository_code",
         lambda *_args: "existing repository implementation evidence",
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.github_issue_plan_generation.inspect_repository_code",
+        lambda *_args: "targeted implementation and test evidence",
     )
     monkeypatch.setattr(
         cli, "_stage_generated_file", lambda _root, path: staged.append(path)

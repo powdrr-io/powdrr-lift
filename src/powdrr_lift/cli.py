@@ -2608,6 +2608,7 @@ def _run_plan(args: argparse.Namespace) -> int:
             verification_command=args.verification_command,
             repository_ci_context=inspect_repository_ci(repo_root),
             include_final_review=True,
+            repository_root=repo_root,
             repository_code_context=inspect_repository_code(
                 repo_root, source_plan, planning_client
             ),

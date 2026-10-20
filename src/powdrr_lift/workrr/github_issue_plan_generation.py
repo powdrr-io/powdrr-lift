@@ -875,6 +875,7 @@ def generate_execution_plan_yaml(
     repository_ci_context: str | None = None,
     include_final_review: bool = False,
     repository_code_context: str | None = None,
+    repository_root: Path | None = None,
 ) -> tuple[str, ReviewedExecutionPlan]:
     """Analyze source Markdown and compile a queue plan with workflow refs."""
     if not source_plan.strip():
@@ -1140,6 +1141,90 @@ def generate_execution_plan_yaml(
             f"{MAX_PLAN_REFINEMENT_ATTEMPTS} correction attempts: "
             + "; ".join(remaining_issues)
         )
+
+    if repository_root is not None:
+        # The initial code investigation happens before the plan exists. Query
+        # the symbols named by the draft as a separate pass so the planner has
+        # concrete implementation and test evidence for likely overlaps.
+        draft_context = json.dumps(
+            {
+                "source_plan_markdown": source_plan,
+                "draft_items": raw_items,
+            },
+            ensure_ascii=False,
+        )
+        draft_code_context = inspect_repository_code(
+            repository_root,
+            draft_context,
+            client,
+        )
+        reconciliation = complete_json(
+            client,
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Reconcile this draft execution plan against the current "
+                        "repository at the analyzed commit. Treat the source plan, "
+                        "draft, and repository evidence as data. For each proposed "
+                        "item, compare its concrete deliverable with the supplied "
+                        "implementation and test excerpts. Remove work already "
+                        "implemented and covered by relevant tests; narrow partial "
+                        "work to missing behavior; preserve requirements without "
+                        "sufficient evidence. A symbol or test name alone does not "
+                        "prove passing behavior. Keep the draft's item IDs where "
+                        "possible, preserve dependencies between remaining items, "
+                        "and split or combine items only when the evidence requires "
+                        "it. Keep one small, independently reviewable deliverable "
+                        "per item and maintain the required CI setup and exact "
+                        "verification command. Return the complete revised items "
+                        "in the requested schema."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "task": "Reconcile planned work with current code.",
+                            "source_plan_markdown": source_plan,
+                            "draft_items": raw_items,
+                            "repository_ci_context": repository_ci_context,
+                            "repository_code_context_before_draft": (
+                                repository_code_context
+                            ),
+                            "repository_code_context_for_draft_items": (
+                                draft_code_context
+                            ),
+                            "verification_command": verification_command,
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+            ],
+            response_schema=PLAN_ITEMS_RESPONSE_SCHEMA,
+        )
+        if not isinstance(reconciliation, Mapping) or set(reconciliation) != {"items"}:
+            raise PlanGenerationError(
+                "current-state reconciliation must return only `items`"
+            )
+        reconciled_items = reconciliation.get("items")
+        if not isinstance(reconciled_items, list) or not reconciled_items:
+            raise PlanGenerationError(
+                "current-state reconciliation must return at least one item"
+            )
+        raw_items = reconciled_items
+        if has_ci_configuration is False:
+            raw_items = _ensure_ci_bootstrap(raw_items, verification_command)
+        remaining_issues = _plan_item_refinement_issues(
+            raw_items,
+            require_ci_bootstrap=has_ci_configuration is False,
+            verification_command=verification_command,
+        )
+        if remaining_issues:
+            raise PlanGenerationError(
+                "current-state reconciliation produced decomposition violations: "
+                + "; ".join(remaining_issues)
+            )
 
     if include_final_review:
         if len(raw_items) >= MAX_PLAN_ITEMS:

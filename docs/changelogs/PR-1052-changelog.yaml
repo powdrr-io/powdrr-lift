@@ -1,0 +1,63 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1052
+title: Challenge complexity during proposed PR planning
+intent:
+  problem: Proposed PR plans can introduce duplicated mechanisms, custom code where configuration would suffice, or library functionality without an explicit complexity review.
+  goal: Independently challenge each proposed PR design and require the final plan to address evidence-backed simplifications before effects are allocated.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 149
+    end_line: 150
+  summary: Require the proposed PR planner to output a reviewable design outline.
+  rationale: Give the independent reviewer the planned scope, files, tests, and existing components to challenge.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 168
+    end_line: 173
+  summary: Add a typed handoff for each proposed PR's design outline.
+  rationale: Ensure the complexity review covers every planned PR using structured inputs.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 180
+    end_line: 219
+  summary: Add an independent complexity review for reuse, duplication, configuration, library, and scope alternatives.
+  rationale: Require evidence-backed pushback before finalizing the plan.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 222
+    end_line: 227
+  summary: Require the final planner to address each concrete pushback.
+  rationale: Ensure valid simplifications change the plan and rejected alternatives receive evidence-based justification.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 798
+    end_line: 841
+  summary: Verify the pushback step follows the initial outline and precedes final plan formation.
+  rationale: Protect the phase ordering and required review handoff from regressions.
+entities:
+- id: proposed-pr-complexity-pushback-step
+  type: Step
+  action: added
+- id: complexity-pushback-workflow-test
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: every-proposed-pr-gets-complexity-review
+  description: Every proposed PR is reviewed for existing capability reuse, duplication, configuration alternatives, standard-library or library options, and the smallest sufficient scope.
+  action: added
+- id: final-plan-resolves-every-pushback
+  description: The final proposed PR plan addresses each concrete pushback by adopting a supported simplification or explaining with evidence why it does not fit.
+  action: added
+guidance:
+- id: substantiate-library-alternatives
+  description: Check package metadata or repository usage before recommending a library, and account for maintenance, compatibility, and security costs before introducing a dependency.
+  action: added

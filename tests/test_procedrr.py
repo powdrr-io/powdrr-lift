@@ -795,3 +795,47 @@ def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:
     assert "verify_code_task_decision" in flow_text
     assert "verify_implementation_decision" in flow_text
     assert "Does this one" in flow_text
+
+
+def test_feature_plan_gets_complexity_pushback_before_final_plan() -> None:
+    from pathlib import Path
+
+    import yaml
+
+    from procedrr import ProcessCatalog
+
+    processes_path = Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    catalog = ProcessCatalog.load(processes_path)
+    process = catalog.get("start-implementing-feature").document
+    question = process["steps"][0]["specialize"]["question"]
+    embedded = question.split("Embedded workflow document:\n---\n", 1)[1]
+    workflow = yaml.safe_load(embedded)
+    steps = workflow["steps"]
+    step_ids = [step["id"] for step in steps]
+    plan_index = step_ids.index("plan-proposed-prs")
+    challenge_index = step_ids.index("challenge-proposed-pr-complexity")
+    final_plan_index = step_ids.index("plan-proposed-pr-specification")
+    outline = steps[plan_index]["outputs"][1]
+    challenge = steps[challenge_index]
+    final_plan = steps[final_plan_index]
+
+    assert plan_index < challenge_index < final_plan_index
+    assert outline["name"] == "proposed_pr_designs"
+    assert {
+        "planned_files",
+        "planned_tests",
+        "existing_components_considered",
+    }.issubset(outline["schema"]["items"]["properties"])
+    assert "planning_pushback" in [item["name"] for item in challenge["outputs"]]
+    assert {
+        "existing_capability",
+        "duplication",
+        "configuration",
+        "standard_or_library",
+    }.issubset(
+        challenge["outputs"][0]["schema"]["properties"]["reviews"]["items"][
+            "properties"
+        ]
+    )
+    assert "planning_pushback" in [item["name"] for item in final_plan["inputs"]]
+    assert "Address every finding_id exactly once" in final_plan["details"]

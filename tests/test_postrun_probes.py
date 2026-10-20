@@ -79,6 +79,17 @@ def test_probe_imports_inside_function_are_valid_python() -> None:
     assert len(probes) == 1
 
 
+def test_probe_can_call_public_api_in_exception_handling_before_assertion() -> None:
+    source = _source(
+        "raised = False\n    try:\n        module.public_api('invalid')\n"
+        "    except ValueError:\n        raised = True\n    assert raised"
+    )
+
+    _, probes = _parse(source, ({"scenario_id": "selector"},))
+
+    assert len(probes) == 1
+
+
 @pytest.mark.parametrize(
     ("source", "expected_error"),
     [

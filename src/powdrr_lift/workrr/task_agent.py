@@ -51,6 +51,9 @@ from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
 )
+from powdrr_lift.structrr.bootstrap import bootstrap_structrr
+from powdrr_lift.structrr.proposal import ProposalRevision
+from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.action_operations import (
     _apply_file_edits,
     _apply_yaml_operations,
@@ -114,6 +117,14 @@ from powdrr_lift.workrr.llm import (
     workflow_action_failure_signature,
     workflow_action_signature,
     workflow_action_summary,
+)
+from powdrr_lift.workrr.multipr_structrr import (
+    active_decision_drift_findings,
+    load_multi_pr_proposal,
+    rebase_final_plan_state,
+    rebase_item_proposal,
+    reconcile_item_candidate,
+    structural_repair_findings,
 )
 from powdrr_lift.workrr.observer import (
     ObserverActionRecommendation,
@@ -383,6 +394,140 @@ def _issue_worker_implementation_request(
         implementation_packet=packet,
     )
     return replace(request, allow_existing_changes=True), validation_profile
+
+
+def _issue_worker_structrr_context(
+    repo_root: Path,
+    proposed: Mapping[str, Any],
+    *,
+    base_commit: str,
+) -> tuple[Mapping[str, Any], ProposalRevision, Any, dict[str, Any]] | None:
+    """Load a plan proposal and rebase this item onto the latest repository state."""
+    raw_path = proposed.get("structrr_proposal_file")
+    item_id = proposed.get("structrr_item_id", proposed.get("item_id"))
+    if raw_path is None:
+        return None
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        raise PowdrrExecutionError("Structrr proposal path must be non-empty text")
+    if not isinstance(item_id, str) or not item_id.strip():
+        raise PowdrrExecutionError("Structrr proposal item ID must be non-empty text")
+    proposal_path = (repo_root / raw_path).resolve()
+    try:
+        proposal_path.relative_to(repo_root.resolve())
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            "Structrr proposal path must stay inside the repository"
+        ) from error
+    try:
+        plan_proposal = load_multi_pr_proposal(proposal_path)
+    except (OSError, ValueError) as error:
+        raise PowdrrExecutionError(
+            f"Structrr proposal is missing or invalid: {error}"
+        ) from error
+    if plan_proposal.plan_id != str(proposed.get("plan_id", "")):
+        raise PowdrrExecutionError("Structrr proposal belongs to a different plan")
+    final_review = proposed.get("final_integration_review") is True
+    item_proposal = (
+        plan_proposal.full_proposal
+        if final_review
+        else plan_proposal.item_proposals.get(item_id)
+    )
+    expected_baseline = plan_proposal.item_baselines.get(item_id)
+    if item_proposal is None or (expected_baseline is None and not final_review):
+        raise PowdrrExecutionError(
+            f"Structrr proposal has no baseline and diff for plan item {item_id!r}"
+        )
+
+    # Plan and workflow artifacts are inputs to this run, not product code. Keep
+    # them out of the repository snapshot so unrelated generated files do not
+    # look like changes interlaced with this feature.
+    plan_slug = slugify_workflow_id(plan_proposal.plan_id)
+    exclusions = (
+        f"docs/plans/{plan_slug}-execution-plan.yaml",
+        f"docs/plans/{plan_slug}-structrr-proposal.json",
+        f"docs/workflows/{plan_slug}/",
+        *(
+            (str(proposed["final_review_report_path"]),)
+            if isinstance(proposed.get("final_review_report_path"), str)
+            else ()
+        ),
+    )
+    from powdrr_lift.workrr.feature_endpoint import _structrr_taxonomy_path
+
+    bootstrap_path = (
+        Path(tempfile.gettempdir())
+        / "powdrr-lift-issue-worker"
+        / plan_slug
+        / f"bootstrap-{base_commit}.yaml"
+    )
+    current = bootstrap_structrr(
+        repo_root,
+        output_path=bootstrap_path,
+        taxonomy_path=_structrr_taxonomy_path(repo_root),
+        include_untracked=False,
+        artifact_exclusions=exclusions,
+        submission_base=base_commit,
+    )
+    if not current.validation.successful or current.source_manifest is None:
+        raise PowdrrExecutionError(
+            "current Structrr bootstrap failed before coding: "
+            f"{current.validation.issues}"
+        )
+    if final_review:
+        # Check the latest tree against the projected plan result. Unrelated
+        # interlaced work carries forward; changes to plan-owned subjects require
+        # a human plan review instead of an automatic repair that could overwrite it.
+        rebase = rebase_final_plan_state(
+            plan_proposal.expected_final_snapshot,
+            current.document,
+            item_proposal,
+        )
+        if rebase.get("classification") != "clean":
+            raise PowdrrExecutionError(
+                "final integration review is blocked because interlaced repository "
+                "work changed a subject owned by this plan; review and revise the "
+                "proposal before correcting code: "
+                f"{json.dumps(rebase, sort_keys=True)}"
+            )
+        decision_drift = active_decision_drift_findings(
+            plan_proposal.baseline_snapshot, current.document
+        )
+        if decision_drift:
+            raise PowdrrExecutionError(
+                "final integration review is blocked because accepted decisions "
+                "changed since the plan baseline; review the plan against current "
+                "intent before correcting code: " + "; ".join(decision_drift)
+            )
+    else:
+        assert expected_baseline is not None
+        try:
+            rebase = rebase_item_proposal(
+                expected_baseline, current.document, item_proposal
+            )
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"could not rebase Structrr proposal: {error}"
+            ) from error
+        if rebase.get("classification") != "clean":
+            raise PowdrrExecutionError(
+                "coding is blocked because intervening repository work affects this "
+                "PR's Structrr subjects; review and revise the plan proposal before "
+                f"continuing: {json.dumps(rebase, sort_keys=True)}"
+            )
+        decision_drift = active_decision_drift_findings(
+            expected_baseline, current.document
+        )
+        if decision_drift:
+            raise PowdrrExecutionError(
+                "coding is blocked because accepted decisions changed since the "
+                "plan baseline; review the plan against current intent before "
+                "continuing: " + "; ".join(decision_drift)
+            )
+    rebased_proposal = replace(
+        item_proposal,
+        structrr_baseline_fingerprint=snapshot_digest(current.document),
+    )
+    return current.document, rebased_proposal, current.source_manifest, rebase
 
 
 def _implementation_paths_against_base(repo_root: Path) -> tuple[str, ...]:
@@ -1437,6 +1582,44 @@ class _TaskWorkflowExecutionStrategy:
         request, validation_profile = _issue_worker_implementation_request(
             proposed, workflow_id=workflow_id, base_commit=base_commit
         )
+        structrr_context = _issue_worker_structrr_context(
+            self.repo_root, proposed, base_commit=base_commit
+        )
+        if structrr_context is not None:
+            current_structrr, item_proposal, baseline_manifest, rebase_report = (
+                structrr_context
+            )
+            request = replace(
+                request,
+                prompt=(
+                    request.prompt
+                    + "\n\nAccepted Structrr proposal operations for this PR:\n"
+                    + json.dumps(
+                        [operation.to_data() for operation in item_proposal.operations],
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\nActive baseline intent and decisions to preserve:\n"
+                    + json.dumps(
+                        {
+                            "active_intent": current_structrr.get("active_intent", {}),
+                            "human_decisions": current_structrr.get(
+                                "human-decisions", []
+                            ),
+                            "invariants": current_structrr.get("invariants", []),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\nPreserve active decisions and unrelated repository changes. "
+                    "Do not edit the proposal artifact."
+                ),
+            )
+        else:
+            current_structrr = None
+            item_proposal = None
+            baseline_manifest = None
+            rebase_report = None
         store_root = (
             Path(tempfile.gettempdir()) / "powdrr-lift-issue-worker" / workflow_id
         )
@@ -1495,11 +1678,120 @@ class _TaskWorkflowExecutionStrategy:
                     | set(_implementation_paths_against_base(self.repo_root))
                 )
             )
+            structural_report: dict[str, Any] | None = None
+            structural_findings: tuple[str, ...] = ()
+            if (
+                structrr_context is not None
+                and current_structrr is not None
+                and item_proposal is not None
+                and baseline_manifest is not None
+                and attempt.status.value == "completed"
+                and (
+                    implementation_paths
+                    or proposed.get("final_integration_review") is True
+                )
+            ):
+                from powdrr_lift.workrr.feature_endpoint import _structrr_taxonomy_path
+
+                candidate_bootstrap = bootstrap_structrr(
+                    self.repo_root,
+                    output_path=(
+                        store_root / "structrr" / f"candidate-{attempt_number:02d}.yaml"
+                    ),
+                    taxonomy_path=_structrr_taxonomy_path(self.repo_root),
+                    include_untracked=True,
+                    artifact_exclusions=(
+                        f"docs/plans/{slugify_workflow_id(str(proposed['plan_id']))}-execution-plan.yaml",
+                        f"docs/plans/{slugify_workflow_id(str(proposed['plan_id']))}-structrr-proposal.json",
+                        f"docs/workflows/{slugify_workflow_id(str(proposed['plan_id']))}/",
+                        *(
+                            (str(proposed["final_review_report_path"]),)
+                            if isinstance(proposed.get("final_review_report_path"), str)
+                            else ()
+                        ),
+                    ),
+                    submission_base=base_commit,
+                )
+                if (
+                    not candidate_bootstrap.validation.successful
+                    or candidate_bootstrap.source_manifest is None
+                ):
+                    structural_findings = (
+                        "candidate Structrr bootstrap is incomplete; "
+                        f"issues={candidate_bootstrap.validation.issues}",
+                    )
+                    structural_report = {
+                        "bootstrap_successful": (
+                            candidate_bootstrap.validation.successful
+                        ),
+                        "issues": [
+                            issue.message
+                            for issue in candidate_bootstrap.validation.issues
+                        ],
+                        "rebase": rebase_report,
+                    }
+                else:
+                    actual_diff, comparison = reconcile_item_candidate(
+                        proposal=item_proposal,
+                        baseline_snapshot=current_structrr,
+                        candidate_snapshot=candidate_bootstrap.document,
+                        baseline_manifest=baseline_manifest,
+                        candidate_manifest=candidate_bootstrap.source_manifest,
+                    )
+                    structural_findings = (
+                        *structural_repair_findings(comparison),
+                        *active_decision_drift_findings(
+                            current_structrr, candidate_bootstrap.document
+                        ),
+                    )
+                    structural_report = {
+                        "bootstrap_successful": True,
+                        "rebase": rebase_report,
+                        "actual_diff": actual_diff.to_data(),
+                        "comparison": comparison,
+                        "repair_findings": list(structural_findings),
+                    }
+            if proposed.get("final_integration_review") is True:
+                report_path = proposed.get("final_review_report_path")
+                if not isinstance(report_path, str) or not report_path.strip():
+                    raise PowdrrExecutionError(
+                        "final integration review has no report artifact path"
+                    )
+                resolved_report = (self.repo_root / report_path).resolve()
+                try:
+                    resolved_report.relative_to(self.repo_root.resolve())
+                except ValueError as error:
+                    raise PowdrrExecutionError(
+                        "final review report path must stay inside the repository"
+                    ) from error
+                resolved_report.parent.mkdir(parents=True, exist_ok=True)
+                resolved_report.write_text(
+                    json.dumps(
+                        {
+                            "schema_version": "multi-pr-final-structrr-review-v1",
+                            "plan_id": proposed.get("plan_id"),
+                            "item_id": proposed.get("item_id"),
+                            "attempt_id": attempt.attempt_id,
+                            "passed": not structural_findings
+                            and validation.status is ValidationReportStatus.PASSED,
+                            "structrr": structural_report,
+                            "validation": validation.to_data(),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                implementation_paths = tuple(
+                    sorted({*implementation_paths, report_path})
+                )
             passed = (
                 attempt.status.value == "completed"
                 and bool(implementation_paths)
                 and diff_check.returncode == 0
                 and validation.status is ValidationReportStatus.PASSED
+                and not structural_findings
             )
             return {
                 "attempt": attempt.to_data(),
@@ -1510,6 +1802,8 @@ class _TaskWorkflowExecutionStrategy:
                     "stderr": diff_check.stderr,
                 },
                 "changed_paths": list(implementation_paths),
+                "structrr": structural_report,
+                "structrr_repair_findings": list(structural_findings),
                 "passed": passed,
             }
 
@@ -1523,6 +1817,30 @@ class _TaskWorkflowExecutionStrategy:
                 return CodingAgentRecoveryDecision(passed=True)
             if attempt_data.get("status") == "policy_denied":
                 return CodingAgentRecoveryDecision(passed=False, terminal=True)
+            structural_findings = record.get("structrr_repair_findings", [])
+            if structural_findings:
+                return CodingAgentRecoveryDecision(
+                    passed=False,
+                    issue={
+                        "category": "structrr_proposal_mismatch",
+                        "plan_id": proposed.get("plan_id"),
+                        "item_id": proposed.get("item_id"),
+                        "proposal_file": proposed.get("structrr_proposal_file"),
+                        "findings": structural_findings,
+                        "instruction": (
+                            "Repair the implementation so its re-bootstrapped "
+                            "Structrr changes satisfy the accepted "
+                            + (
+                                "full plan proposal on the integrated repository. "
+                                if proposed.get("final_integration_review") is True
+                                else "per-PR proposal. "
+                            )
+                            + "Preserve unrelated interlaced changes and do not edit "
+                            "or weaken the proposal artifact. Re-run the declared "
+                            "verification command after the focused repair."
+                        ),
+                    },
+                )
             return CodingAgentRecoveryDecision(
                 passed=False,
                 issue={
@@ -1552,6 +1870,7 @@ class _TaskWorkflowExecutionStrategy:
             "status": attempt_data["status"],
             "changed_paths": final_attempt["changed_paths"],
             "validation": final_attempt["validation"],
+            "structrr": final_attempt.get("structrr"),
             "error": attempt_data.get("error"),
             "attempts": attempt_records,
             "continuations": len(attempt_records) - 1,

@@ -564,20 +564,12 @@ def _validate_probe_function(function: ast.FunctionDef, tree: ast.Module) -> Non
 
     if not any(isinstance(node, ast.Assert) for node in ast.walk(function)):
         raise ValueError(f"{function.name} must contain an observable assertion")
-    assert_calls = (
-        call
-        for assertion in ast.walk(function)
-        if isinstance(assertion, ast.Assert)
-        for call in ast.walk(assertion.test)
-        if isinstance(call, ast.Call)
-    )
+    function_calls = (node for node in ast.walk(function) if isinstance(node, ast.Call))
     if not any(
         not isinstance(call.func, ast.Name) or call.func.id not in builtin_names
-        for call in assert_calls
+        for call in function_calls
     ):
-        raise ValueError(
-            f"{function.name} assertion must exercise a non-built-in software call"
-        )
+        raise ValueError(f"{function.name} must exercise a non-built-in software call")
 
 
 def _validate_import_roots(roots: set[str]) -> None:

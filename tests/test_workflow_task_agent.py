@@ -30,6 +30,7 @@ from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
 )
+from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.actions import WorkflowEdit
 from powdrr_lift.workrr.git import (
@@ -42,6 +43,10 @@ from powdrr_lift.workrr.llm import (
     WorkflowLLMHTTPError,
     complete_json_with_timeout_retry,
 )
+from powdrr_lift.workrr.multipr_structrr import (
+    compile_multi_pr_proposal,
+    write_multi_pr_proposal,
+)
 from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
     _apply_task_edits,
@@ -50,6 +55,7 @@ from powdrr_lift.workrr.task_agent import (
     _handle_exhausted_timeout,
     _implementation_paths_against_base,
     _issue_worker_implementation_request,
+    _issue_worker_structrr_context,
     _list_worktree_files,
     _open_final_workflow_pull_request,
     _publish_workflow_progress,
@@ -162,6 +168,171 @@ def test_issue_worker_rejects_traversing_allowed_paths() -> None:
                 "verification_command": f"{sys.executable} verify.py",
             },
             workflow_id="feature-v1-pr-01",
+            base_commit="a" * 40,
+        )
+
+
+def test_issue_worker_rebases_structrr_item_onto_unrelated_latest_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from powdrr_lift.workrr import feature_endpoint
+
+    baseline = {
+        "entities": [{"id": "existing", "type": "Module", "description": "old"}],
+        "entity_relationships": [],
+        "source_subjects": [],
+    }
+    proposal = compile_multi_pr_proposal(
+        plan_id="feature-v1",
+        baseline_snapshot=baseline,
+        items=[{"id": "feature", "allowed_paths": ["src/"]}],
+        proposed_operations=[
+            {
+                "operation_id": "update-module",
+                "item_id": "feature",
+                "section": "entities",
+                "subject_id": "existing",
+                "action": "changed",
+                "content": {
+                    "id": "existing",
+                    "type": "Module",
+                    "description": "new",
+                },
+            }
+        ],
+        source_ref="docs/plans/feature.md",
+    )
+    proposal_path = tmp_path / "docs/plans/feature-v1-structrr-proposal.json"
+    write_multi_pr_proposal(proposal_path, proposal)
+    latest = {
+        **baseline,
+        "entities": [
+            *baseline["entities"],
+            {"id": "other-feature", "type": "Module", "description": "landed"},
+        ],
+    }
+    manifest = SourceManifest(
+        submission_base="a" * 40,
+        source_revision="b" * 40,
+        extractor_version="test",
+        taxonomy_fingerprint="taxonomy",
+        excluded_paths=(),
+        files=(),
+        coverage_complete=True,
+        extraction_errors=(),
+        product_digest="empty-product",
+    )
+    monkeypatch.setattr(
+        feature_endpoint,
+        "_structrr_taxonomy_path",
+        lambda _root: tmp_path / "taxonomy.yaml",
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "bootstrap_structrr",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            document=latest,
+            validation=SimpleNamespace(successful=True, issues=[]),
+            source_manifest=manifest,
+        ),
+    )
+
+    result = _issue_worker_structrr_context(
+        tmp_path,
+        {
+            "plan_id": "feature-v1",
+            "item_id": "feature",
+            "structrr_item_id": "feature",
+            "structrr_proposal_file": "docs/plans/feature-v1-structrr-proposal.json",
+        },
+        base_commit="a" * 40,
+    )
+
+    assert result is not None
+    current, rebased_proposal, current_manifest, report = result
+    assert current == latest
+    assert rebased_proposal.structrr_baseline_fingerprint == task_agent.snapshot_digest(
+        latest
+    )
+    assert current_manifest is manifest
+    assert report["classification"] == "clean"
+
+
+def test_issue_worker_blocks_structrr_subject_changed_since_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from powdrr_lift.workrr import feature_endpoint
+
+    baseline = {
+        "entities": [{"id": "existing", "type": "Module", "description": "old"}],
+        "entity_relationships": [],
+        "source_subjects": [],
+    }
+    proposal = compile_multi_pr_proposal(
+        plan_id="feature-v1",
+        baseline_snapshot=baseline,
+        items=[{"id": "feature", "allowed_paths": ["src/"]}],
+        proposed_operations=[
+            {
+                "operation_id": "update-module",
+                "item_id": "feature",
+                "section": "entities",
+                "subject_id": "existing",
+                "action": "changed",
+                "content": {
+                    "id": "existing",
+                    "type": "Module",
+                    "description": "new",
+                },
+            }
+        ],
+        source_ref="docs/plans/feature.md",
+    )
+    proposal_path = tmp_path / "docs/plans/feature-v1-structrr-proposal.json"
+    write_multi_pr_proposal(proposal_path, proposal)
+    latest = {
+        **baseline,
+        "entities": [
+            {"id": "existing", "type": "Module", "description": "changed elsewhere"}
+        ],
+    }
+    manifest = SourceManifest(
+        submission_base="a" * 40,
+        source_revision="b" * 40,
+        extractor_version="test",
+        taxonomy_fingerprint="taxonomy",
+        excluded_paths=(),
+        files=(),
+        coverage_complete=True,
+        extraction_errors=(),
+        product_digest="empty-product",
+    )
+    monkeypatch.setattr(
+        feature_endpoint,
+        "_structrr_taxonomy_path",
+        lambda _root: tmp_path / "taxonomy.yaml",
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "bootstrap_structrr",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            document=latest,
+            validation=SimpleNamespace(successful=True, issues=[]),
+            source_manifest=manifest,
+        ),
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="intervening repository work"):
+        _issue_worker_structrr_context(
+            tmp_path,
+            {
+                "plan_id": "feature-v1",
+                "item_id": "feature",
+                "structrr_item_id": "feature",
+                "structrr_proposal_file": (
+                    "docs/plans/feature-v1-structrr-proposal.json"
+                ),
+            },
             base_commit="a" * 40,
         )
 

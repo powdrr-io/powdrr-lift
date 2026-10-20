@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from argparse import Namespace
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,10 +16,12 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     _plan_item_refinement_issues,
     generate_execution_plan_yaml,
     inspect_repository_ci,
+    inspect_repository_code,
     load_plan_workflow_instance,
     publish_execution_plan_pull_request,
     write_execution_plan_artifacts,
 )
+from powdrr_lift.workrr.multipr_structrr import compile_multi_pr_proposal
 
 
 class FakePlanningClient:
@@ -129,6 +132,78 @@ def test_inspect_repository_ci_reports_existing_workflow_and_missing_ci(
     assert "scripts/verify-all.sh" in context
 
 
+def test_inspect_repository_code_follows_up_with_symbol_and_test_lookups(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    source = tmp_path / "src/attestation/verifier.py"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "def verify_signature(payload):\n"
+        "    return verify_ed25519_signature(payload)\n",
+        encoding="utf-8",
+    )
+    test = tmp_path / "tests/test_verifier.py"
+    test.parent.mkdir(parents=True)
+    test.write_text(
+        "def test_ed25519_signature_rejects_invalid_payload():\n"
+        "    assert not verify_signature(b'invalid')\n",
+        encoding="utf-8",
+    )
+    unrelated = tmp_path / "src/catalog/colors.py"
+    unrelated.parent.mkdir(parents=True)
+    unrelated.write_text("def blue():\n    return 'blue'\n", encoding="utf-8")
+
+    lookups: list[str] = []
+
+    def lookup(
+        queries: list[str], *, worktree_root: Path, limit: int
+    ) -> dict[str, list[dict[str, Any]]]:
+        assert worktree_root == tmp_path
+        assert limit == 20
+        lookups.extend(queries)
+        return {
+            query: [
+                {
+                    "name": query,
+                    "path": (
+                        "src/attestation/verifier.py"
+                        if query == "verify_signature"
+                        else "tests/test_verifier.py"
+                    ),
+                    "range": {"start_line": 1, "end_line": 2},
+                }
+            ]
+            for query in queries
+        }
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.github_issue_plan_generation.find_workspace_symbols",
+        lookup,
+    )
+    client = SequencedPlanningClient(
+        [
+            {"queries": ["verify_signature"], "done": False},
+            {"queries": ["test_verify_signature"], "done": True},
+        ]
+    )
+    context = inspect_repository_code(
+        tmp_path,
+        "Implement Ed25519 signature verification for attestation payloads.",
+        client,
+    )
+
+    assert lookups == ["verify_signature", "test_verify_signature"]
+    assert len(client.messages) == 2
+    assert "verify_signature" in client.messages[1][1]["content"]
+    assert "src/attestation/verifier.py" in context
+    assert "tests/test_verifier.py" in context
+    assert "verify_ed25519_signature" in context
+    assert "Analyzed checkout: commit unborn HEAD" in context
+    assert "working tree has changes: yes" in context
+    assert "working-tree status ??; not in analyzed commit" in context
+
+
 def test_planner_repairs_missing_ci_bootstrap_and_blocks_later_items() -> None:
     original = {
         "items": [
@@ -159,6 +234,9 @@ def test_planner_repairs_missing_ci_bootstrap_and_blocks_later_items() -> None:
         client=client,
         verification_command="scripts/verify-all.sh",
         repository_ci_context=("No recognized CI configuration files were found."),
+        repository_code_context=(
+            "Existing source and tests include a partial signature verifier."
+        ),
     )
 
     assert len(client.messages) == 3
@@ -173,6 +251,7 @@ def test_planner_repairs_missing_ci_bootstrap_and_blocks_later_items() -> None:
     repair_prompt = client.messages[2][1]["content"]
     assert "continuous integration before the product work" in repair_prompt
     assert "scripts/verify-all.sh" in repair_prompt
+    assert "partial signature verifier" in repair_prompt
 
 
 def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
@@ -194,6 +273,10 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
             "Recognized CI configuration files:\n"
             "--- .github/workflows/verify.yml ---\n"
             "run: scripts/verify-all.sh"
+        ),
+        repository_code_context=(
+            "Existing repository evidence: src/attestation/verifier.py defines "
+            "verify_signature and tests cover invalid payloads."
         ),
     )
 
@@ -224,7 +307,51 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     assert "implementation step" in client.messages[0]["content"]
     assert "filesystem paths" in client.messages[0]["content"]
     assert "runs the supplied verification command" in client.messages[0]["content"]
+    assert "remove already implemented work" in client.messages[0]["content"]
+    assert (
+        "Test files do not establish a passing result" in client.messages[0]["content"]
+    )
     assert "scripts/verify-all.sh" in client.messages[1]["content"]
+    assert "verify_signature" in client.messages[1]["content"]
+
+
+def test_plan_can_append_a_final_review_dependent_on_all_implementation_items() -> None:
+    client = FakePlanningClient({"items": [_item("foundation")]})
+
+    rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement a foundation.",
+        plan_id="feature-v1",
+        client=client,
+        verification_command="make test",
+        include_final_review=True,
+    )
+
+    assert [item.item_id for item in plan.items] == [
+        "foundation",
+        "final-integration-review",
+    ]
+    final = plan.items[-1]
+    assert final.dependencies == ("foundation",)
+    assert "docs/plans/feature-v1-final-structrr-review.json" in final.allowed_paths
+    assert "final-integration-review" in rendered
+
+
+def test_final_review_can_cover_paths_from_multiple_implementation_items() -> None:
+    first = _item("foundation")
+    first["allowed_paths"] = [f"src/foundation/{index}.py" for index in range(15)]
+    second = _item("integration", dependencies=["foundation"])
+    second["allowed_paths"] = [f"src/integration/{index}.py" for index in range(15)]
+
+    _rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement foundation and integration.",
+        plan_id="multi-path-v1",
+        client=FakePlanningClient({"items": [first, second]}),
+        include_final_review=True,
+    )
+
+    final = plan.items[-1]
+    assert final.item_id == "final-integration-review"
+    assert len(final.allowed_paths) == 31
 
 
 @pytest.mark.parametrize(
@@ -552,6 +679,35 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
     )
     monkeypatch.setattr(cli, "resolve_provider_credentials", lambda *_args: object())
     monkeypatch.setattr(cli, "build_workflow_client", lambda *_args, **_kwargs: client)
+    baseline_snapshot: dict[str, Any] = {
+        "entities": [],
+        "entity_relationships": [],
+        "source_subjects": [],
+    }
+    monkeypatch.setattr(
+        cli,
+        "bootstrap_structrr",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            document=baseline_snapshot,
+            validation=SimpleNamespace(successful=True, issues=[]),
+        ),
+    )
+    monkeypatch.setattr(
+        cli,
+        "generate_multi_pr_structrr_proposal",
+        lambda *, plan, baseline_snapshot, **_kwargs: compile_multi_pr_proposal(
+            plan_id=plan.plan_id,
+            baseline_snapshot=baseline_snapshot,
+            items=[{"id": item.item_id} for item in plan.items],
+            proposed_operations=[],
+            source_ref=f"plan:{plan.plan_id}",
+        ),
+    )
+    monkeypatch.setattr(
+        cli,
+        "inspect_repository_code",
+        lambda *_args: "existing repository implementation evidence",
+    )
     monkeypatch.setattr(
         cli, "_stage_generated_file", lambda _root, path: staged.append(path)
     )
@@ -588,10 +744,17 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
     dependent_workflow_file = (
         tmp_path / "docs/workflows/proposal-v1/proposal-v1-integration.yaml"
     )
+    final_review_file = (
+        tmp_path
+        / "docs/workflows/proposal-v1/proposal-v1-final-integration-review.yaml"
+    )
+    structrr_proposal_file = tmp_path / "docs/plans/proposal-v1-structrr-proposal.json"
     assert status == 0
     assert output.is_file()
     assert workflow_file.is_file()
     assert dependent_workflow_file.is_file()
+    assert final_review_file.is_file()
+    assert structrr_proposal_file.is_file()
     workflow_definition = workflow_file.read_text(encoding="utf-8")
     assert "process_id: execute-proposed-pr-workflow" in workflow_definition
     assert "proposed_pr_id: proposal-v1-foundation" in workflow_definition
@@ -620,22 +783,42 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
             ],
             "dependencies": [],
             "verification_command": "scripts/verify-all.sh",
+            "structrr_proposal_file": "docs/plans/proposal-v1-structrr-proposal.json",
+            "structrr_item_id": "foundation",
         },
     }
     assert not list((tmp_path / "docs/workflows/proposal-v1").glob("*-task-*.yaml"))
     dependent_instance = load_plan_workflow_instance(dependent_workflow_file)
     assert dependent_instance.dependencies == ("proposal-v1-foundation",)
-    assert len(staged) == 3
+    final_review_instance = load_plan_workflow_instance(final_review_file)
+    assert final_review_instance.dependencies == (
+        "proposal-v1-foundation",
+        "proposal-v1-integration",
+    )
+    assert (
+        final_review_instance.inputs["proposed_pr_context"]["final_integration_review"]
+        is True
+    )
+    assert len(staged) == 5
     assert publications[0]["repo_root"] == tmp_path
     assert publications[0]["generated_files"] == tuple(staged)
     assert publications[0]["source_plan_path"] == "proposal.md"
     assert client.messages is not None
     assert "scripts/verify-all.sh" in client.messages[1]["content"]
     assert "name: Verify" in client.messages[1]["content"]
+    assert (
+        "existing repository implementation evidence" in client.messages[1]["content"]
+    )
     assert "source_document: proposal.md" in output.read_text(encoding="utf-8")
-    assert set(staged) == {output, workflow_file, dependent_workflow_file}
+    assert set(staged) == {
+        output,
+        workflow_file,
+        dependent_workflow_file,
+        final_review_file,
+        structrr_proposal_file,
+    }
     response = capsys.readouterr().out
-    assert '"workflow_count": 2' in response
+    assert '"workflow_count": 3' in response
     assert '"pull_request_url": "https://github.com/example/repo/pull/42"' in response
     assert '"status": "pull_request_opened"' in response
     assert '"published_issues": false' in response

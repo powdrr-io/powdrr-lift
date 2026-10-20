@@ -1239,10 +1239,20 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         text=True,
     )
     published_roots: list[Path] = []
+    final_pr_calls: list[str] = []
+    checkpoints: list[tuple[str, str, object, str | None]] = []
+
+    def _record_checkpoint(
+        task_id: str,
+        state_type: str,
+        state: object,
+        commit_sha: str | None,
+    ) -> None:
+        checkpoints.append((task_id, state_type, state, commit_sha))
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.task_agent._open_final_workflow_pull_request",
-        lambda *_args, **_kwargs: None,
+        lambda *_args, **_kwargs: final_pr_calls.append("opened"),
     )
 
     def _record_publish(
@@ -1255,12 +1265,13 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         open_pull_request: bool = True,
         events: Sequence[Mapping[str, object]] = (),
         runtime: object = None,
-    ) -> None:
+    ) -> str:
         del workflow_id, reason, stdout, open_pull_request, events, runtime
         published_roots.append(repo_root)
         assert published_workflow.directory == (
             integration_root / "docs" / "workflows" / "feature"
         )
+        return "d" * 40
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.task_agent._publish_workflow_progress",
@@ -1271,6 +1282,7 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         WorkflowTaskAgentConfig(
             workflow_dir=workflow_dir,
             repo_root=primary_root,
+            task_checkpoint_callback=_record_checkpoint,
         ),
         client=_FakeClient([{"action": "complete", "output_state": {"ok": True}}]),
         stdout=io.StringIO(),
@@ -1279,6 +1291,8 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
 
     assert exit_code == 0
     assert published_roots == [integration_root, integration_root]
+    assert final_pr_calls == []
+    assert checkpoints == [("feature-17-task-001", "state", {"ok": True}, "d" * 40)]
     assert WorkflowInstance.from_directory(
         integration_root / "docs" / "workflows" / "feature"
     ).tasks[0].status is (TaskStatus.COMPLETED)

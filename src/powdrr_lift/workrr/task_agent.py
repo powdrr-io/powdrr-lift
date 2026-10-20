@@ -2202,13 +2202,20 @@ def run_workflow_task(
                 ):
                     return 0
                 if workflow_git_state is not None:
-                    _open_final_workflow_pull_request(
-                        repo_root,
-                        workflow,
-                        workflow_git_state,
-                        stdout=stdout,
-                        runtime=last_runtime,
-                    )
+                    if config.task_checkpoint_callback is None:
+                        _open_final_workflow_pull_request(
+                            repo_root,
+                            workflow,
+                            workflow_git_state,
+                            stdout=stdout,
+                            runtime=last_runtime,
+                        )
+                    else:
+                        print(
+                            "Workflow completed; task state was recorded on its "
+                            "GitHub issue.",
+                            file=stdout,
+                        )
                     return 0
                 if not _is_git_worktree(repo_root):
                     return 0

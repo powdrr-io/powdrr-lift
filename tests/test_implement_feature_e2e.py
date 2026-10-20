@@ -616,25 +616,21 @@ class ProbeEnabledPlanningClient(DeterministicPlanningClient):
                     for _ in payload["requests"]
                 ]
             }
-        if required == {"probes"}:
+        if required == {"source"}:
             return {
-                "probes": [
-                    {
-                        "probe_id": "greeting-output",
-                        "scenario_id": "scenario:instruction-001",
-                        "oracle_basis": (
-                            "The instruction explicitly names both output lines."
-                        ),
-                        "imports": ["contextlib", "io", "runpy"],
-                        "body": [
-                            "output = io.StringIO()",
-                            "with contextlib.redirect_stdout(output):\n"
-                            "    runpy.run_path('hello_world.py')",
-                            "assert output.getvalue().splitlines() == "
-                            "['Hello, world!', 'Hello from Powdrr!']",
-                        ],
-                    }
-                ]
+                "source": (
+                    "import contextlib\nimport io\nimport runpy\n\n"
+                    "def test_probe_output():\n"
+                    '    """{"probe_id": "greeting-output", '
+                    '"scenario_id": "scenario:instruction-001", '
+                    '"oracle_basis": '
+                    '"The instruction explicitly names both output lines."}"""\n'
+                    "    output = io.StringIO()\n"
+                    "    with contextlib.redirect_stdout(output):\n"
+                    "        runpy.run_path('hello_world.py')\n"
+                    "    assert output.getvalue().splitlines() == "
+                    "['Hello, world!', 'Hello from Powdrr!']\n"
+                )
             }
         return super().complete_json(messages, response_schema=response_schema)
 
@@ -670,17 +666,9 @@ class InvalidSyntaxProbePlanningClient(ProbeEnabledPlanningClient):
         response_schema: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         required = set((response_schema or {}).get("required", ()))
-        if required == {"probes"}:
+        if required == {"source"}:
             return {
-                "probes": [
-                    {
-                        "probe_id": "invalid-python",
-                        "scenario_id": "scenario:instruction-001",
-                        "oracle_basis": "The probe generator response is malformed.",
-                        "imports": [],
-                        "body": ["assert True\n  assert False"],
-                    }
-                ]
+                "source": "def test_probe_bad(:\n    assert True\n",
             }
         return super().complete_json(messages, response_schema=response_schema)
 
@@ -695,19 +683,17 @@ class RepairProbePlanningClient(ProbeEnabledPlanningClient):
         response_schema: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         required = set((response_schema or {}).get("required", ()))
-        if required == {"probes"}:
+        if required == {"source"}:
             return {
-                "probes": [
-                    {
-                        "probe_id": "greeting-count",
-                        "scenario_id": "scenario:instruction-001",
-                        "oracle_basis": (
-                            "The instruction requires greeting_count() to return 2."
-                        ),
-                        "imports": ["hello_world"],
-                        "body": ["assert hello_world.greeting_count() == 2"],
-                    }
-                ]
+                "source": (
+                    "import hello_world\n\n"
+                    "def test_probe_greeting_count():\n"
+                    '    """{"probe_id": "greeting-count", '
+                    '"scenario_id": "scenario:instruction-001", '
+                    '"oracle_basis": '
+                    '"The instruction requires greeting_count() to return 2."}"""\n'
+                    "    assert hello_world.greeting_count() == 2\n"
+                )
             }
         return super().complete_json(messages, response_schema=response_schema)
 
@@ -1122,7 +1108,7 @@ def test_implement_feature_records_invalid_generated_probe_and_continues(
     )
     assert result.review["postrun_probe_generation"]["status"] == "unavailable"
     assert (
-        "generated probe is not valid Python"
+        "probe suite is not valid Python"
         in result.review["postrun_probe_generation"]["error"]
     )
     suite_path = Path(result.review["postrun_probe_generation"]["suite_path"])

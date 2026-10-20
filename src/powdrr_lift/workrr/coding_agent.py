@@ -521,6 +521,7 @@ class CodingAgentAttempt:
     stdout: str = ""
     stderr: str = ""
     error: str | None = None
+    worker_commit_sha: str | None = None
     schema_version: str = CODING_AGENT_ATTEMPT_SCHEMA_VERSION
 
     def to_data(self) -> dict[str, Any]:
@@ -540,6 +541,7 @@ class CodingAgentAttempt:
             "stdout": self.stdout,
             "stderr": self.stderr,
             "error": self.error,
+            "worker_commit_sha": self.worker_commit_sha,
         }
 
 
@@ -1103,6 +1105,7 @@ class CodingAgentAttemptStore:
             stdout=cast(str, data.get("stdout", "")),
             stderr=cast(str, data.get("stderr", "")),
             error=cast(str | None, data.get("error")),
+            worker_commit_sha=cast(str | None, data.get("worker_commit_sha")),
             schema_version=cast(str, data["schema_version"]),
         )
 
@@ -1247,6 +1250,7 @@ def run_coding_agent(
         stdout=completed.stdout,
         stderr=completed.stderr,
         error=terminal_error,
+        worker_commit_sha=after_head if before_head != after_head else None,
     )
 
 

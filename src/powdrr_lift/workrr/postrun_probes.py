@@ -16,68 +16,8 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.structrr.validation import DiscoveredValidationProfile
-from powdrr_lift.workrr.llm import complete_json
-from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
 POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v3"
-_PROBE_SOURCE_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {"source": {"type": "string"}},
-    "required": ["source"],
-    "additionalProperties": False,
-}
-
-
-def generate_postrun_probes(
-    client: WorkflowLLMClient,
-    *,
-    instruction: str,
-    scenarios: Sequence[Mapping[str, Any]],
-    repository_contract: Mapping[str, Any] | None = None,
-) -> tuple[PostRunProbe, ...]:
-    """Ask for complete executable Python probe source, without source assembly."""
-    eligible = [
-        dict(item)
-        for item in scenarios
-        if isinstance(item.get("scenario_id"), str)
-        and item.get("routing", "include") == "include"
-        and not item.get("unresolved_dimensions")
-    ]
-    if not eligible:
-        return ()
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Write one complete Python module containing independent behavior "
-                "probes. The module must define zero-argument synchronous functions "
-                "named test_probe_*. Put a JSON object in each function's docstring "
-                "with probe_id, scenario_id, and oracle_basis. Include ordinary "
-                "Python imports wherever they belong. Each probe must call the "
-                "candidate software's public API or stable repository contract and "
-                "assert an instruction-supported outcome. Do not invent behavior, "
-                "test instruction wording, or use private implementation details. "
-                "Do not import pytest, access the network, write files, or launch "
-                "subprocesses. Return the entire executable module in `source`."
-            ),
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                {
-                    "instruction": instruction,
-                    "behavior_scenarios": eligible,
-                    "baseline_repository_contract": repository_contract or {},
-                },
-                ensure_ascii=False,
-                sort_keys=True,
-            ),
-        },
-    ]
-    response = complete_json(client, messages, response_schema=_PROBE_SOURCE_SCHEMA)
-    return parse_generated_postrun_probe_source(
-        str(response.get("source", "")), eligible
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +27,9 @@ class PostRunProbe:
     oracle_basis: str
     test_source: str
     function_name: str
+    obligation_id: str = ""
+    obligation_category: str = "other"
+    obligation_rule: str = "not_applicable"
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -95,6 +38,9 @@ class PostRunProbe:
             "oracle_basis": self.oracle_basis,
             "function_name": self.function_name,
             "test_source": self.test_source,
+            "obligation_id": self.obligation_id,
+            "obligation_category": self.obligation_category,
+            "obligation_rule": self.obligation_rule,
         }
 
 
@@ -121,9 +67,13 @@ class PostRunProbeResult:
 
 
 def parse_generated_postrun_probe_source(
-    source: str, scenarios: Sequence[Mapping[str, Any]]
-) -> tuple[PostRunProbe, ...]:
-    """Validate MiniSWE-authored executable Python without rebuilding its code."""
+    source: str,
+    scenarios: Sequence[Mapping[str, Any]],
+    *,
+    instruction: str,
+    repository_contract: Mapping[str, Any] | None = None,
+) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
+    """Validate MiniSWE's executable probes and typed obligations in one module."""
     if not isinstance(source, str) or not source.strip():
         raise ValueError("probe suite source is empty")
     try:
@@ -138,16 +88,50 @@ def parse_generated_postrun_probe_source(
         if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
         and item.name.startswith("test_probe_")
     ]
-    if not functions:
-        raise ValueError("probe suite must define at least one test_probe_ function")
+    module_doc_node = tree.body[0] if tree.body else None
+    if not (
+        isinstance(module_doc_node, ast.Expr)
+        and isinstance(module_doc_node.value, ast.Constant)
+        and isinstance(module_doc_node.value.value, str)
+    ):
+        raise ValueError(
+            "probe suite must declare typed obligations in its module docstring"
+        )
+    allowed_top_level = (ast.Import, ast.ImportFrom, ast.FunctionDef)
     if any(
-        not isinstance(item, (ast.Import, ast.ImportFrom, ast.FunctionDef))
+        item is not module_doc_node and not isinstance(item, allowed_top_level)
         for item in tree.body
     ):
         raise ValueError("probe suite has executable module-level statements")
 
+    module_doc = ast.get_docstring(tree, clean=False)
+    if module_doc is None:
+        raise ValueError(
+            "probe suite must declare typed obligations in its module docstring"
+        )
+    try:
+        module_metadata = json.loads(module_doc)
+    except json.JSONDecodeError as error:
+        raise ValueError(
+            f"probe suite module docstring must be JSON: {error}"
+        ) from error
+    if not isinstance(module_metadata, Mapping) or not isinstance(
+        module_metadata.get("obligations"), list
+    ):
+        raise ValueError("probe suite module metadata must contain obligations")
+    obligations = _validate_probe_obligations(
+        module_metadata["obligations"],
+        scenarios,
+        instruction=instruction,
+        repository_contract=repository_contract or {},
+    )
+    if not functions and any(item["supported"] is True for item in obligations):
+        raise ValueError("probe suite must define probes for supported obligations")
+    obligation_by_id = {item["obligation_id"]: item for item in obligations}
+
     known_scenarios = {str(item["scenario_id"]) for item in scenarios}
     seen_probe_ids: set[str] = set()
+    covered_obligations: set[str] = set()
     probes: list[PostRunProbe] = []
     for function in functions:
         if isinstance(function, ast.AsyncFunctionDef):
@@ -164,16 +148,158 @@ def parse_generated_postrun_probe_source(
         probe_id = _required_text(metadata, "probe_id")
         scenario_id = _required_text(metadata, "scenario_id")
         oracle_basis = _required_text(metadata, "oracle_basis")
+        obligation_id = _required_text(metadata, "obligation_id")
         if probe_id in seen_probe_ids:
             raise ValueError(f"probe suite has duplicate probe id {probe_id!r}")
         if scenario_id not in known_scenarios:
             raise ValueError(f"probe refers to unknown scenario {scenario_id!r}")
+        obligation = obligation_by_id.get(obligation_id)
+        if obligation is None or obligation.get("supported") is not True:
+            raise ValueError(
+                f"probe refers to unsupported obligation {obligation_id!r}"
+            )
+        if obligation.get("scenario_id") != scenario_id:
+            raise ValueError(
+                f"probe {probe_id!r} does not match its obligation scenario"
+            )
         seen_probe_ids.add(probe_id)
+        covered_obligations.add(obligation_id)
         _validate_probe_function(function, tree)
         probes.append(
-            PostRunProbe(probe_id, scenario_id, oracle_basis, source, function.name)
+            PostRunProbe(
+                probe_id,
+                scenario_id,
+                oracle_basis,
+                source,
+                function.name,
+                obligation_id,
+                str(obligation["category"]),
+                str(obligation["rule"]),
+            )
         )
-    return tuple(probes)
+    missing_obligations = {
+        str(item["obligation_id"]) for item in obligations if item["supported"] is True
+    } - covered_obligations
+    if missing_obligations:
+        raise ValueError(
+            "probe suite omitted supported obligations: "
+            + ", ".join(sorted(missing_obligations))
+        )
+    return obligations, tuple(probes)
+
+
+def _validate_probe_obligations(
+    raw_obligations: list[Any],
+    scenarios: Sequence[Mapping[str, Any]],
+    *,
+    instruction: str,
+    repository_contract: Mapping[str, Any],
+) -> tuple[dict[str, Any], ...]:
+    category_values = {
+        "transformation",
+        "validation",
+        "preservation",
+        "lifecycle",
+        "compatibility",
+        "presence",
+        "other",
+    }
+    rule_values = {
+        "reference_integrity",
+        "uniqueness",
+        "collision",
+        "mutual_exclusion",
+        "type_constraint",
+        "range_constraint",
+        "presence",
+        "format",
+        "other",
+        "not_applicable",
+        "unresolved",
+    }
+    operand_roles = {
+        "mapping_key",
+        "mapping_value",
+        "input",
+        "result",
+        "constraint",
+        "trigger",
+        "state",
+        "other",
+    }
+    known_scenarios = {str(item["scenario_id"]) for item in scenarios}
+    instruction_strings = (instruction,)
+    contract_strings = tuple(_string_leaves(repository_contract))
+    seen: set[str] = set()
+    covered: set[str] = set()
+    obligations: list[dict[str, Any]] = []
+    for raw in raw_obligations:
+        if not isinstance(raw, Mapping):
+            raise ValueError("probe suite contains a malformed obligation")
+        item = dict(raw)
+        obligation_id = _required_text(item, "obligation_id")
+        scenario_id = _required_text(item, "scenario_id")
+        if obligation_id in seen:
+            raise ValueError(f"duplicate obligation id {obligation_id!r}")
+        if scenario_id not in known_scenarios:
+            raise ValueError(f"obligation refers to unknown scenario {scenario_id!r}")
+        if (
+            item.get("category") not in category_values
+            or item.get("rule") not in rule_values
+        ):
+            raise ValueError(f"obligation {obligation_id!r} has an invalid type")
+        if not isinstance(item.get("supported"), bool):
+            raise ValueError(f"obligation {obligation_id!r} has invalid support status")
+        evidence = item.get("evidence")
+        if not isinstance(evidence, list):
+            raise ValueError(f"obligation {obligation_id!r} has malformed evidence")
+        for citation in evidence:
+            if not isinstance(citation, Mapping):
+                raise ValueError(f"obligation {obligation_id!r} has malformed evidence")
+            source, quote = citation.get("source"), citation.get("quote")
+            allowed_strings = (
+                instruction_strings if source == "instruction" else contract_strings
+            )
+            if (
+                source not in {"instruction", "repository_contract"}
+                or not isinstance(quote, str)
+                or not quote.strip()
+                or not any(quote in value for value in allowed_strings)
+            ):
+                raise ValueError(f"obligation {obligation_id!r} cites absent evidence")
+        if item["supported"]:
+            if item["rule"] == "unresolved" or not evidence:
+                raise ValueError(
+                    f"supported obligation {obligation_id!r} is not grounded"
+                )
+            for key in ("summary", "condition", "operation", "expected"):
+                _required_text(item, key)
+            operands = item.get("operands")
+            if not isinstance(operands, list):
+                raise ValueError(f"obligation {obligation_id!r} has malformed operands")
+            for operand in operands:
+                if (
+                    not isinstance(operand, Mapping)
+                    or operand.get("role") not in operand_roles
+                ):
+                    raise ValueError(
+                        f"obligation {obligation_id!r} has invalid operand roles"
+                    )
+                _required_text(operand, "name")
+                _required_text(operand, "meaning")
+        elif item["rule"] != "unresolved":
+            raise ValueError(
+                f"unsupported obligation {obligation_id!r} must be unresolved"
+            )
+        else:
+            _required_text(item, "unresolved_reason")
+        seen.add(obligation_id)
+        covered.add(scenario_id)
+        obligations.append(item)
+    missing = known_scenarios - covered
+    if missing:
+        raise ValueError("probe suite omitted scenarios: " + ", ".join(sorted(missing)))
+    return tuple(obligations)
 
 
 def _probe_metadata(function: ast.FunctionDef) -> Mapping[str, Any]:
@@ -245,6 +371,16 @@ def _required_text(value: Mapping[str, Any], key: str) -> str:
     if not isinstance(item, str) or not item.strip():
         raise ValueError(f"probe metadata has an empty {key}")
     return item.strip()
+
+
+def _string_leaves(value: Any) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, Mapping):
+        return [leaf for item in value.values() for leaf in _string_leaves(item)]
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return [leaf for item in value for leaf in _string_leaves(item)]
+    return []
 
 
 def run_postrun_probes(

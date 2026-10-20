@@ -127,7 +127,6 @@ from powdrr_lift.workrr.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     PostRunProbe,
     baseline_probe_failures,
-    generate_postrun_probes,
     parse_generated_postrun_probe_source,
     probe_failures,
     run_postrun_probes,
@@ -2699,52 +2698,6 @@ def _run_code_agent_phase(
         )
         state["behavior_probe_repair_path"] = repair_path
         state["behavior_probe_repair_status"] = repair_artifact.get("status")
-    if (
-        not config.capture_worker_prompts_only
-        and config.code_agent != "minisweagent"
-        and "postrun_probes" not in state
-        and implementation_packet.behavior_scenarios
-    ):
-        probe_client = state.get("probe_generation_client")
-        probes: tuple[PostRunProbe, ...] = ()
-        generation_error: str | None = None
-        try:
-            if probe_client is None or not callable(
-                getattr(probe_client, "complete_json", None)
-            ):
-                raise ValueError("planning client is unavailable")
-            probes = generate_postrun_probes(
-                probe_client,
-                instruction=feature_description,
-                scenarios=tuple(
-                    item.to_data() for item in implementation_packet.behavior_scenarios
-                ),
-                repository_contract=implementation_packet.contract_closure,
-            )
-        except Exception as error:
-            generation_error = str(error)
-        probe_artifact_root = output_root / "postrun-probes"
-        probe_artifact_root.mkdir(parents=True, exist_ok=True)
-        suite_document = {
-            "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
-            "generation_status": "generated"
-            if generation_error is None
-            else "unavailable",
-            "generation_error": generation_error,
-            "source_instruction": feature_description,
-            "probes": [item.to_data() for item in probes],
-            "scenarios_without_executable_probe": sorted(
-                {item.scenario_id for item in implementation_packet.behavior_scenarios}
-                - {item.scenario_id for item in probes}
-            ),
-        }
-        (probe_artifact_root / "probe-suite.json").write_text(
-            json.dumps(suite_document, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        state["postrun_probes"] = probes
-        state["postrun_probe_artifact_root"] = probe_artifact_root
-        state["postrun_probe_generation_error"] = generation_error
     implementation_packet_path = output_root / "implementation-packet.json"
     packet_document = implementation_packet.to_data()
     behavior_probe_repair_path = state.get("behavior_probe_repair_path")
@@ -2915,25 +2868,56 @@ def _run_code_agent_phase(
             request = replace(request, allow_existing_changes=True)
         if (
             not config.capture_worker_prompts_only
-            and config.code_agent == "minisweagent"
             and not repair_mode
             and "postrun_probes" not in state
             and implementation_packet.behavior_scenarios
         ):
-            probes = _generate_miniswe_postrun_probes(
-                config,
-                runner=runner,
-                worktree=worktree,
-                output_root=output_root,
-                base_commit=base_commit,
-                request=request,
-                scenarios=tuple(
-                    item.to_data() for item in implementation_packet.behavior_scenarios
-                ),
+            probe_scenarios = tuple(
+                item.to_data() for item in implementation_packet.behavior_scenarios
             )
+            obligations: tuple[dict[str, Any], ...] = ()
+            probes: tuple[PostRunProbe, ...] = ()
+            generation_error: str | None = None
+            try:
+                obligations, probes = _generate_miniswe_postrun_probes(
+                    config,
+                    runner=runner,
+                    worktree=worktree,
+                    output_root=output_root,
+                    base_commit=base_commit,
+                    request=request,
+                    scenarios=probe_scenarios,
+                    instruction=feature_description,
+                    repository_contract=implementation_packet.contract_closure or {},
+                )
+            except Exception as error:
+                generation_error = str(error)
+                probe_root = output_root / "postrun-probes"
+                probe_root.mkdir(parents=True, exist_ok=True)
+                (probe_root / "probe-suite.json").write_text(
+                    json.dumps(
+                        {
+                            "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
+                            "generation_status": "unavailable",
+                            "generation_method": "minisweagent_pre_coding",
+                            "generation_error": generation_error,
+                            "source_instruction": feature_description,
+                            "obligations": [],
+                            "probes": [],
+                            "scenarios_without_executable_probe": sorted(
+                                str(item["scenario_id"]) for item in probe_scenarios
+                            ),
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            state["postrun_probe_obligations"] = obligations
             state["postrun_probes"] = probes
             state["postrun_probe_artifact_root"] = output_root / "postrun-probes"
-            state["postrun_probe_generation_error"] = None
+            state["postrun_probe_generation_error"] = generation_error
         probes_for_request = state.get("postrun_probes")
         if (
             isinstance(probes_for_request, tuple)
@@ -3091,10 +3075,12 @@ def _generate_miniswe_postrun_probes(
     base_commit: str,
     request: ImplementationRequest,
     scenarios: Sequence[Mapping[str, Any]],
-) -> tuple[PostRunProbe, ...]:
+    instruction: str,
+    repository_contract: Mapping[str, Any],
+) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
     """Ask MiniSWE to author a frozen probe suite in a clean baseline worktree."""
     if not scenarios:
-        return ()
+        return (), ()
     probe_output = output_root / "postrun-probes"
     probe_output.mkdir(parents=True, exist_ok=True)
     authoring_root = output_root / "miniswe-probe-authoring"
@@ -3124,28 +3110,47 @@ def _generate_miniswe_postrun_probes(
             for scenario in scenarios
         ]
         probe_prompt = (
-            "Author executable post-coding behavior probes for the task below. "
+            "Classify the instruction into typed probe obligations and author "
+            "executable post-coding behavior probes for those obligations. "
             "This is a pre-coding step: the solution is intentionally absent. "
             "Do not implement the task or edit source/tests. Write exactly one "
             "file, `probe_suite.py`, in the repository root. This must be the "
+            "Stage it with `git add -f probe_suite.py` so the workflow can "
+            "verify the authored artifact in repositories with ignore rules. "
             "complete executable Python module: write normal Python imports and "
             "function bodies directly. Do not return JSON, split imports from "
             "function bodies, or ask Powdrr to assemble Python source. Define "
             "zero-argument synchronous functions named `test_probe_*`. Put a JSON "
+            "object in the module docstring containing an `obligations` array. "
+            "Each obligation has obligation_id, scenario_id, category, rule, "
+            "supported, summary, condition, operation, expected, operands, "
+            "evidence, and unresolved_reason. Use category values transformation, "
+            "validation, preservation, lifecycle, compatibility, presence, other; "
+            "rule values reference_integrity, uniqueness, collision, "
+            "mutual_exclusion, type_constraint, range_constraint, presence, "
+            "format, other, not_applicable, unresolved; and operand roles "
+            "mapping_key, mapping_value, input, result, constraint, trigger, "
+            "state, other. Split independently falsifiable rules. Include each "
+            "scenario. Cite exact instruction or repository-contract substrings. "
+            "Mark unsupported behavior unresolved instead of guessing. Put a JSON "
             "object in each function docstring with `probe_id`, `scenario_id`, "
-            "and `oracle_basis`. Each function must call the public software "
+            "`obligation_id`, and `oracle_basis`. Each function must call the "
+            "public software "
             "under test and assert an instruction-supported outcome. Prefer "
             "boundary, negative, and interaction cases that are not merely "
             "restatements of the happy path. Do not assert against instruction "
             "text or private implementation details. Do not use pytest, write "
             "files, launch subprocesses, or access the network. Omit a scenario "
             "when the supplied contract does not define a safe oracle.\n\n"
-            f"Task instruction:\n{request.objective}\n\n"
+            f"Task instruction:\n{instruction}\n\n"
             "Behavior scenarios. Treat each `then` as an oracle only when its "
             "`evidence` supports it. Use `related_requirements` to identify "
             "useful interactions; do not add behavior from assumptions or other "
             "metadata. Preserve each `scenario_id` as provenance:\n"
             f"{json.dumps(compact_scenarios, indent=2, sort_keys=True)}\n\n"
+            "Baseline repository contract (use for API shapes and operand roles, "
+            "not to invent normative behavior):\n"
+            f"{json.dumps(repository_contract, indent=2, sort_keys=True)}\n\n"
             "Return from the agent after writing probe_suite.py."
         )
         probe_request = ImplementationRequest(
@@ -3174,6 +3179,7 @@ def _generate_miniswe_postrun_probes(
             store=CodingAgentAttemptStore(authoring_root / "attempts"),
         )
         authoring_attempts: list[dict[str, Any]] = []
+        obligations: tuple[dict[str, Any], ...] = ()
         probes: tuple[PostRunProbe, ...] = ()
         validation_error: str | None = None
         baseline_results: tuple[Any, ...] = ()
@@ -3183,7 +3189,9 @@ def _generate_miniswe_postrun_probes(
                     probe_request,
                     request_id=f"{request.request_id}-probe-authoring-repair",
                     prompt=(
-                        "Repair the complete pre-coding Python probe module only. "
+                        probe_prompt
+                        + "\n\nRepair the complete pre-coding Python probe "
+                        "module only. "
                         "The previous module failed this exact validation or "
                         "baseline execution check:\n"
                         f"{validation_error}\n\n"
@@ -3216,9 +3224,12 @@ def _generate_miniswe_postrun_probes(
                 )
             try:
                 suite_source = suite_path.read_text(encoding="utf-8")
-                probes = parse_generated_postrun_probe_source(suite_source, scenarios)
-                if not probes:
-                    raise ValueError("probe suite contains no probes")
+                obligations, probes = parse_generated_postrun_probe_source(
+                    suite_source,
+                    scenarios,
+                    instruction=instruction,
+                    repository_contract=repository_contract,
+                )
                 baseline_results = run_postrun_probes(
                     probes,
                     root=probe_worktree,
@@ -3239,26 +3250,19 @@ def _generate_miniswe_postrun_probes(
                         "not fail on the baseline after one tailored repair: "
                         f"{error}"
                     ) from error
-        if not probes:
+        if not obligations:
             raise PowdrrExecutionError(
-                "MiniSWE probe suite is empty after the validation repair"
+                "MiniSWE probe suite has no obligations after the validation repair"
             )
         suite_document = {
             "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
             "generation_status": "generated",
             "generation_method": "minisweagent_pre_coding",
-            "source_instruction": request.objective,
+            "source_instruction": instruction,
+            "obligations": list(obligations),
             "authoring_attempts": authoring_attempts,
             "probe_source": suite_source,
-            "probes": [
-                {
-                    "probe_id": item.probe_id,
-                    "scenario_id": item.scenario_id,
-                    "oracle_basis": item.oracle_basis,
-                    "function_name": item.function_name,
-                }
-                for item in probes
-            ],
+            "probes": [item.to_data() for item in probes],
             "baseline_results": [item.to_data() for item in baseline_results],
             "scenarios_without_executable_probe": sorted(
                 {str(item["scenario_id"]) for item in scenarios}
@@ -3272,7 +3276,7 @@ def _generate_miniswe_postrun_probes(
         (probe_output / "probe-authoring-prompt.md").write_text(
             probe_prompt.rstrip() + "\n", encoding="utf-8"
         )
-        return probes
+        return obligations, probes
     finally:
         _run(
             runner,

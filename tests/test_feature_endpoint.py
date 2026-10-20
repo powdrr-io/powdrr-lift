@@ -157,11 +157,26 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         assert "large-review-metadata.json" not in request.prompt
         assert "complete executable Python module" in request.prompt
         assert "Do not return JSON" in request.prompt
+        obligation = {
+            "obligation_id": "selector-obligation",
+            "scenario_id": "selector",
+            "category": "transformation",
+            "rule": "other",
+            "supported": True,
+            "summary": "The selector returns its matching result.",
+            "condition": "A selector matches a finding.",
+            "operation": "Call the public API.",
+            "expected": "The matching result is returned.",
+            "operands": [],
+            "evidence": [{"source": "instruction", "quote": "Add selector handling."}],
+            "unresolved_reason": "",
+        }
         (worktree_root / "probe_suite.py").write_text(
-            "import module\n\n"
+            '"""' + json.dumps({"obligations": [obligation]}) + '"""\nimport module\n\n'
             "def test_probe_selector():\n"
             '    """{"probe_id": "selector-result", '
             '"scenario_id": "selector", '
+            '"obligation_id": "selector-obligation", '
             '"oracle_basis": "The instruction defines this result."}"""\n'
             "    assert module.public_api('value') == 'handled:value'\n",
             encoding="utf-8",
@@ -187,7 +202,7 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         context_refs=("structrr-diff:structrr-diff.yaml",),
     )
 
-    probes = _generate_miniswe_postrun_probes(
+    obligations, probes = _generate_miniswe_postrun_probes(
         config,
         runner=subprocess.run,
         worktree=repository,
@@ -195,9 +210,12 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         base_commit=base_commit,
         request=request,
         scenarios=scenarios,
+        instruction="Add selector handling.",
+        repository_contract={},
     )
 
     assert [probe.probe_id for probe in probes] == ["selector-result"]
+    assert obligations[0]["obligation_id"] == "selector-obligation"
     suite = json.loads(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
@@ -235,11 +253,26 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     ) -> subprocess.CompletedProcess[str]:
         requests.append(request)
         expected = "value" if len(requests) == 1 else "handled:value"
+        obligation = {
+            "obligation_id": "selector-obligation",
+            "scenario_id": "selector",
+            "category": "transformation",
+            "rule": "other",
+            "supported": True,
+            "summary": "The selector returns its matching result.",
+            "condition": "A selector matches a finding.",
+            "operation": "Call the public API.",
+            "expected": "The matching result is returned.",
+            "operands": [],
+            "evidence": [{"source": "instruction", "quote": "Add selector handling."}],
+            "unresolved_reason": "",
+        }
         (worktree_root / "probe_suite.py").write_text(
-            "import module\n\n"
+            '"""' + json.dumps({"obligations": [obligation]}) + '"""\nimport module\n\n'
             "def test_probe_selector():\n"
             '    """{"probe_id": "selector-result", '
             '"scenario_id": "selector", '
+            '"obligation_id": "selector-obligation", '
             '"oracle_basis": "The instruction defines this result."}"""\n'
             f"    assert module.public_api('value') == '{expected}'\n",
             encoding="utf-8",
@@ -264,7 +297,7 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
         validation_profiles=("pytest",),
     )
 
-    probes = _generate_miniswe_postrun_probes(
+    obligations, probes = _generate_miniswe_postrun_probes(
         config,
         runner=subprocess.run,
         worktree=repository,
@@ -272,8 +305,11 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
         base_commit=base_commit,
         request=request,
         scenarios=({"scenario_id": "selector", "then": "return handled value"},),
+        instruction="Add selector handling.",
+        repository_contract={},
     )
 
+    assert len(obligations) == 1
     assert len(probes) == 1
     assert len(requests) == 2
     assert "baseline execution check" in requests[1].prompt

@@ -1,0 +1,730 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1044
+title: Use MiniSWE as the sole typed probe author
+intent:
+  problem: Probe suites were authored through different paths depending on the coding
+    agent, and the MiniSWE path did not classify instruction-derived obligations.
+  goal: Use MiniSWE to classify typed obligations and author executable probes in
+    one baseline-checked module for every coding-agent mode.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/deepswe_probe_evaluation.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Accept v3 instruction-derived probe suite artifacts.
+  rationale: Keep DeepSWE evaluation compatible with the new suite metadata.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 130
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2702
+    end_line: 2747
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2918
+    end_line: 2918
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2875
+    end_line: 2876
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2878
+    end_line: 2917
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2920
+    end_line: 2920
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3078
+    end_line: 3080
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3083
+    end_line: 3083
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3113
+    end_line: 3114
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3118
+    end_line: 3119
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3124
+    end_line: 3135
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3137
+    end_line: 3138
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3145
+    end_line: 3145
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3151
+    end_line: 3153
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3182
+    end_line: 3182
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3192
+    end_line: 3194
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3227
+    end_line: 3232
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3253
+    end_line: 3253
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3255
+    end_line: 3255
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3261
+    end_line: 3262
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3265
+    end_line: 3265
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3279
+    end_line: 3279
+  summary: Route probe classification and authoring through MiniSWE for every coding-agent
+    mode.
+  rationale: Keep one authoring path and preserve typed obligations, validation, and
+    baseline checks in the workflow.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 20
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 80
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 32
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 43
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 76
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 91
+    end_line: 100
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 102
+    end_line: 102
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 107
+    end_line: 131
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 134
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 151
+    end_line: 151
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 156
+    end_line: 164
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 166
+    end_line: 166
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 169
+    end_line: 186
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 188
+    end_line: 302
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span:
+    start_line: 376
+    end_line: 385
+  summary: Validate MiniSWE module metadata, typed obligations, and obligation-linked
+    probes.
+  rationale: Reject unsupported or ungrounded obligations and require complete probe
+    coverage before freezing the suite.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 160
+    end_line: 173
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 175
+    end_line: 175
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 179
+    end_line: 179
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 205
+    end_line: 205
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 213
+    end_line: 214
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 256
+    end_line: 269
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 271
+    end_line: 271
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 275
+    end_line: 275
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 300
+    end_line: 300
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 308
+    end_line: 309
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 312
+    end_line: 312
+  summary: Verify MiniSWE authoring, typed metadata, and baseline assertion repair.
+  rationale: Cover source-grounding and the baseline execution boundary.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 82
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 97
+    end_line: 146
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1063
+    end_line: 1063
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1067
+    end_line: 1097
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1142
+    end_line: 1145
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1218
+    end_line: 1218
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1222
+    end_line: 1243
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1288
+    end_line: 1288
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1294
+    end_line: 1322
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1350
+    end_line: 1353
+  summary: Exercise MiniSWE-authored probes in complete feature workflows.
+  rationale: Prove probes are generated before coding, run after coding, and invalid
+    suites are handled.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 29
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 36
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 43
+    end_line: 43
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 49
+    end_line: 59
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 62
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 68
+    end_line: 69
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 76
+    end_line: 76
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 98
+    end_line: 98
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 106
+    end_line: 106
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 111
+    end_line: 111
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 114
+    end_line: 136
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 138
+    end_line: 155
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 164
+    end_line: 186
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 189
+    end_line: 189
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 194
+    end_line: 194
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 198
+    end_line: 201
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 236
+    end_line: 238
+  summary: Cover typed obligation validation, operand roles, and probe execution.
+  rationale: Prevent invalid evidence and missing obligation probes from entering
+    the suite.
+entities:
+- id: miniswe-probe-authoring
+  type: Function
+  action: added
+- id: typed-probe-suite-validation
+  type: Function
+  action: added
+- id: miniswe-probe-workflow-end-to-end-tests
+  type: End-to-end test
+  action: added
+- id: probe-suite-evaluation-version
+  type: Constant
+  action: added
+entity_relationships:
+- id: probe-suite-e2e-tests-verify-miniswe-authoring
+  type: verifies
+  source: miniswe-probe-workflow-end-to-end-tests
+  target: miniswe-probe-authoring
+  action: added
+  description: End-to-end tests verify MiniSWE authors the suite and the feature workflow
+    executes those probes after coding.
+- id: suite-validator-checks-typed-obligations
+  type: verifies
+  source: typed-probe-suite-validation
+  target: miniswe-probe-authoring
+  action: added
+  description: The validator checks obligation categories, rules, exact source quotes,
+    scenario links, and probe coverage.
+invariants:
+- id: miniswe-is-the-only-probe-author
+  description: Every coding-agent mode uses MiniSWE to classify obligations and author
+    the executable probe module before implementation begins.
+  action: added
+- id: probe-obligations-are-source-grounded
+  description: Supported obligations cite exact instruction or baseline repository-contract
+    text; unsupported obligations are marked unresolved, and verifier tests are not
+    generation input.
+  action: added
+- id: baseline-probes-fail-by-assertion
+  description: A generated probe suite is frozen only after each probe executes against
+    the untouched baseline and fails through an assertion.
+  action: added
+guidance:
+- id: classify-independent-rules
+  description: Split an instruction scenario into independently falsifiable obligations
+    and preserve operand roles such as mapping keys and mapping values.
+  action: added

@@ -51,6 +51,7 @@ from powdrr_lift.workrr.task_agent import (
     _implementation_paths_against_base,
     _issue_worker_implementation_request,
     _list_worktree_files,
+    _open_final_workflow_pull_request,
     _publish_workflow_progress,
     _read_task_document,
     _select_ready_workflow_git_state,
@@ -239,6 +240,74 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     assert "validation" in provider_requests[1].prompt
     assert "Set the feature value to 42." in provider_requests[1].prompt
     assert provider_timeouts == [1800.0]
+
+
+def test_clean_pr_publish_result_is_recorded_like_pr_create(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = _workflow(tmp_path)
+    task = replace(
+        workflow.tasks[0],
+        input_state={"proposed_pr_id": "feature-v1-pr-01"},
+    )
+    url = "https://github.com/example/repo/pull/42"
+    recorded: list[object] = []
+    published_parameters: list[Mapping[str, Any]] = []
+
+    class RuntimeStub:
+        def require_publish_readiness(self) -> None:
+            pass
+
+    def publish(_tool: str, parameters: Mapping[str, Any], **_kwargs: Any) -> str:
+        published_parameters.append(dict(parameters))
+        return url
+
+    monkeypatch.setattr(task_agent, "invoke_intrinsic_capability", publish)
+    monkeypatch.setattr(
+        task_agent,
+        "_record_task_pull_request",
+        lambda *args, **_kwargs: recorded.append(args[5]),
+    )
+    strategy = task_agent._TaskWorkflowExecutionStrategy(
+        config=cast(Any, SimpleNamespace(verbose=False)),
+        workflow=workflow,
+        task=task,
+        repo_root=tmp_path,
+        error_log_root=tmp_path,
+        client=cast(Any, None),
+        compaction_client=cast(Any, None),
+        model="test-model",
+        mapping_provider="test-provider",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        action_engine=cast(Any, None),
+        events=[],
+        repair_fallback_client=None,
+        repair_fallback_model=None,
+        runtime=cast(Any, RuntimeStub()),
+    )
+
+    strategy._execute_tool(
+        WorkflowAction(
+            kind="invoke_tool",
+            tool="gh",
+            parameters={
+                "operation": "pr_publish_clean",
+                "files_to_publish": ["src/example.py"],
+                "publication_branch": "powdrr/feature-v1-pr-01",
+            },
+        )
+    )
+
+    assert len(recorded) == 1
+    assert isinstance(recorded[0], Mapping)
+    assert recorded[0]["stdout"] == url
+    assert recorded[0]["command"] == ["gh", "pr", "create"]
+    assert strategy.events[-1]["result"] == url
+    assert published_parameters[0]["publication_branch"] == (
+        "powdrr/feature-v1-pr-01-implementation"
+    )
 
 
 def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:
@@ -553,6 +622,62 @@ def test_process_workflow_task_completes_claimed_agent_task(
     assert ('"step_json"' in displayed) is verbose
     assert "received streamed LLM data" not in displayed
     assert "Completed workflow task: agent-task" in stdout.getvalue()
+
+
+def test_named_procedrr_process_outputs_complete_durable_task(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    task = replace(
+        workflow.tasks[0],
+        process_id="result-producing-process",
+        output_state_type="implementation-result",
+    )
+    workflow.update_task(task)
+    _write_procedrr_process(
+        tmp_path,
+        "result-producing-process",
+        [
+            {
+                "operation": {
+                    "tool": "respond",
+                    "parameters": {"text": "Published pull request."},
+                    "bind": "summary",
+                }
+            },
+            {"terminal": "succeeded"},
+        ],
+        inputs=[{"name": "task_context", "type": "object", "required": True}],
+        outputs={"summary": {"type": "object"}},
+    )
+
+    client = _ProcedrrFragmentClient(
+        [
+            {
+                "operation": {
+                    "tool": "respond",
+                    "parameters": {"text": "Published pull request."},
+                    "bind": "summary",
+                }
+            },
+            {"terminal": "succeeded"},
+        ]
+    )
+    stderr = io.StringIO()
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0, stderr.getvalue()
+    completed = WorkflowInstance.from_directory(workflow.directory).tasks[0]
+    assert completed.status is TaskStatus.COMPLETED
+    assert completed.output_state == {"summary": {"text": "Published pull request."}}
 
 
 def test_procedrr_task_handoff_persists_and_resumes_checkpoint(
@@ -1030,9 +1155,11 @@ def test_process_workflow_task_propagates_verbose_to_nested_tools(
     assert observed_verbose == [True]
 
 
+@pytest.mark.parametrize("with_checkpoint_callback", [False, True])
 def test_process_workflow_task_uses_workflow_integration_worktree(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    with_checkpoint_callback: bool,
 ) -> None:
     primary_root = tmp_path / "repo"
     primary_root.mkdir()
@@ -1127,10 +1254,20 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         text=True,
     )
     published_roots: list[Path] = []
+    final_pr_calls: list[str] = []
+    checkpoints: list[tuple[str, str, object, str | None]] = []
+
+    def _record_checkpoint(
+        task_id: str,
+        state_type: str,
+        state: object,
+        commit_sha: str | None,
+    ) -> None:
+        checkpoints.append((task_id, state_type, state, commit_sha))
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.task_agent._open_final_workflow_pull_request",
-        lambda *_args, **_kwargs: None,
+        lambda *_args, **_kwargs: final_pr_calls.append("opened"),
     )
 
     def _record_publish(
@@ -1143,23 +1280,28 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         open_pull_request: bool = True,
         events: Sequence[Mapping[str, object]] = (),
         runtime: object = None,
-    ) -> None:
+    ) -> str:
         del workflow_id, reason, stdout, open_pull_request, events, runtime
         published_roots.append(repo_root)
         assert published_workflow.directory == (
             integration_root / "docs" / "workflows" / "feature"
         )
+        return "d" * 40
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.task_agent._publish_workflow_progress",
         _record_publish,
     )
 
-    exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(
-            workflow_dir=workflow_dir,
-            repo_root=primary_root,
+    config = WorkflowTaskAgentConfig(
+        workflow_dir=workflow_dir,
+        repo_root=primary_root,
+        task_checkpoint_callback=(
+            _record_checkpoint if with_checkpoint_callback else None
         ),
+    )
+    exit_code = run_workflow_task(
+        config,
         client=_FakeClient([{"action": "complete", "output_state": {"ok": True}}]),
         stdout=io.StringIO(),
         stderr=io.StringIO(),
@@ -1167,6 +1309,12 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
 
     assert exit_code == 0
     assert published_roots == [integration_root, integration_root]
+    assert final_pr_calls == []
+    assert checkpoints == (
+        [("feature-17-task-001", "state", {"ok": True}, "d" * 40)]
+        if with_checkpoint_callback
+        else []
+    )
     assert WorkflowInstance.from_directory(
         integration_root / "docs" / "workflows" / "feature"
     ).tasks[0].status is (TaskStatus.COMPLETED)
@@ -1233,6 +1381,53 @@ def test_publish_workflow_progress_pushes_clean_worktree_commits(
 
     assert ["add", "--all"] in git_calls
     assert ["push", "--set-upstream", "origin", "powdrr/feature-17"] in git_calls
+
+
+def test_final_workflow_pull_request_leaves_branch_identity_to_runtime(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = WorkflowInstance.create(tmp_path / "workflow")
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch="powdrr/feature-17",
+        workflow_relative_directory="workflow",
+    )
+    gh_calls: list[Mapping[str, Any]] = []
+
+    def _record_gh(
+        _repo_root: Path,
+        parameters: Mapping[str, Any],
+        **_kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        gh_calls.append(parameters)
+        if parameters["operation"] == "pr_view":
+            return subprocess.CompletedProcess([], 1, stdout="", stderr="missing")
+        return subprocess.CompletedProcess(
+            [],
+            0,
+            stdout="https://github.com/example/repo/pull/17\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr("powdrr_lift.workrr.task_agent._gh_result", _record_gh)
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.task_agent._write_workflow_record",
+        lambda *_args, **_kwargs: None,
+    )
+
+    _open_final_workflow_pull_request(
+        tmp_path,
+        workflow,
+        state,
+        stdout=io.StringIO(),
+    )
+
+    create_request = gh_calls[-1]
+    assert create_request["operation"] == "pr_create"
+    assert "base" not in create_request
+    assert "head" not in create_request
 
 
 def test_process_workflow_task_persists_output_for_downstream_claim(

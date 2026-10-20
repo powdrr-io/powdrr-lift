@@ -1238,6 +1238,7 @@ class _TaskWorkflowExecutionStrategy:
         return WorkflowActionOutcome(continue_running=False)
 
     def _execute_tool(self, action: WorkflowAction) -> None:
+        record_result: Any = None
         repaired_parameters = _repair_workflow_file_command(
             action.parameters,
             self.workflow.directory,
@@ -1253,6 +1254,28 @@ class _TaskWorkflowExecutionStrategy:
                 tool=action.tool,
                 parameters=repaired_parameters,
             )
+        if (
+            action.tool == GH_TOOL
+            and action.parameters.get("operation") == "pr_publish_clean"
+        ):
+            proposed_pr_id = self.task.input_state.get("proposed_pr_id")
+            if isinstance(proposed_pr_id, str) and proposed_pr_id.strip():
+                expected_branch = (
+                    f"powdrr/{slugify_workflow_id(proposed_pr_id)}-implementation"
+                )
+                if action.parameters.get("publication_branch") != expected_branch:
+                    corrected_parameters = dict(action.parameters)
+                    corrected_parameters["publication_branch"] = expected_branch
+                    action = WorkflowAction(
+                        kind=action.kind,
+                        tool=action.tool,
+                        parameters=corrected_parameters,
+                    )
+                    print(
+                        "Corrected clean publication branch to the deterministic "
+                        f"workflow branch {expected_branch}.",
+                        file=self.stderr,
+                    )
         command_error = _workflow_file_command_error(
             action.parameters,
             self.workflow.directory,
@@ -1302,10 +1325,31 @@ class _TaskWorkflowExecutionStrategy:
                 worktree_root=self.repo_root,
                 runtime=self.runtime,
             )
-            if result.get("stdout"):
-                print(str(result["stdout"]), end="", file=self.stdout)
-            if result.get("stderr"):
-                print(str(result["stderr"]), end="", file=self.stderr)
+            record_result = result
+            if (
+                action.tool == GH_TOOL
+                and action.parameters.get("operation") == "pr_publish_clean"
+                and isinstance(result, str)
+            ):
+                # The clean publisher returns its URL directly, unlike the
+                # subprocess-shaped result returned by the other git/gh
+                # operations. Normalize it so PR recording follows the same
+                # path as `gh pr create`.
+                record_result = {
+                    "tool": GH_TOOL,
+                    "command": ["gh", "pr", "create"],
+                    "returncode": 0,
+                    "stdout": result,
+                    "stderr": "",
+                    "pull_request_url": result,
+                }
+            if isinstance(result, Mapping):
+                if result.get("stdout"):
+                    print(str(result["stdout"]), end="", file=self.stdout)
+                if result.get("stderr"):
+                    print(str(result["stderr"]), end="", file=self.stderr)
+            elif isinstance(result, str):
+                print(result, end="", file=self.stdout)
         elif action.tool == "coding-agent":
             result = self._run_coding_agent()
         elif action.tool == "fuzzy-match":
@@ -1333,6 +1377,8 @@ class _TaskWorkflowExecutionStrategy:
             "parameters": action.parameters,
             "result": result,
         }
+        if record_result is None:
+            record_result = result
         if self.runtime is None:
             raise PowdrrExecutionError(
                 "Workflow task pull-request recording requires an execution runtime.",
@@ -1344,7 +1390,7 @@ class _TaskWorkflowExecutionStrategy:
             self.task.task_id,
             self.repo_root,
             self.events,
-            result,
+            record_result,
             runtime=self.runtime,
         )
         self.events.append(event)
@@ -2138,7 +2184,6 @@ def run_workflow_task(
         print(str(exc), file=stderr)
         return 2
 
-    last_runtime: ExecutionRuntime | None = None
     while True:
         task = _select_task(workflow, requested_task_id)
         requested_task_id = None
@@ -2156,13 +2201,9 @@ def run_workflow_task(
                 ):
                     return 0
                 if workflow_git_state is not None:
-                    _open_final_workflow_pull_request(
-                        repo_root,
-                        workflow,
-                        workflow_git_state,
-                        stdout=stdout,
-                        runtime=last_runtime,
-                    )
+                    # Workflow execution state is persisted at task boundaries;
+                    # issue-backed callers additionally record the checkpoint on
+                    # the issue. The workflow itself does not need a pull request.
                     return 0
                 if not _is_git_worktree(repo_root):
                     return 0
@@ -2216,7 +2257,6 @@ def run_workflow_task(
                 guidance,
                 source_ref=f"{task.task_id}:explicit-guidance",
             )
-        last_runtime = runtime
         try:
             if workflow_git_state is not None:
                 validate_workflow_git_state(
@@ -2513,15 +2553,59 @@ def run_workflow_task(
                 None,
             )
             if completed is None or completed.status is not TaskStatus.COMPLETED:
-                manifest["status"] = "failed"
-                manifest["failure"] = (
-                    "Procedrr task succeeded without completing its durable task "
-                    "record."
-                )
-                manifest["finished_at"] = datetime.now(UTC).isoformat()
-                _write_task_process_manifest(manifest_path, manifest)
-                print(manifest["failure"], file=stderr)
-                return 1
+                if process_id == "durable-task":
+                    manifest["status"] = "failed"
+                    manifest["failure"] = (
+                        "Procedrr task succeeded without completing its durable task "
+                        "record."
+                    )
+                    manifest["finished_at"] = datetime.now(UTC).isoformat()
+                    _write_task_process_manifest(manifest_path, manifest)
+                    print(manifest["failure"], file=stderr)
+                    return 1
+                try:
+                    process_outputs = process_catalog.get(process_id).document.get(
+                        "outputs", {}
+                    )
+                    if not isinstance(process_outputs, Mapping) or not process_outputs:
+                        raise PowdrrExecutionError(
+                            f"Procedrr process {process_id!r} succeeded without "
+                            "completing its durable task and declares no outputs to "
+                            "record."
+                        )
+                    missing_outputs = set(process_outputs).difference(result.bindings)
+                    if missing_outputs:
+                        raise PowdrrExecutionError(
+                            f"Procedrr process {process_id!r} did not return declared "
+                            f"outputs: {', '.join(sorted(missing_outputs))}."
+                        )
+                    output_state = {
+                        name: result.bindings[name] for name in process_outputs
+                    }
+                    operations._complete({"output_state": output_state})
+                    completed = next(
+                        (
+                            item
+                            for item in workflow.tasks
+                            if item.task_id == task.task_id
+                        ),
+                        None,
+                    )
+                    if (
+                        completed is None
+                        or completed.status is not TaskStatus.COMPLETED
+                    ):
+                        raise PowdrrExecutionError(
+                            f"Procedrr process {process_id!r} outputs were recorded, "
+                            "but the durable task remains incomplete."
+                        )
+                except (PowdrrExecutionError, RuntimeError, ValueError) as error:
+                    manifest["status"] = "failed"
+                    manifest["failure"] = f"{type(error).__name__}: {error}"
+                    manifest["finished_at"] = datetime.now(UTC).isoformat()
+                    _write_task_process_manifest(manifest_path, manifest)
+                    print(f"Procedrr task failed: {error}", file=stderr)
+                    return 1
         _write_task_process_manifest(manifest_path, manifest)
         workflow = _select_workflow_instance(
             WorkflowInstance.from_directory(workflow_dir),
@@ -2764,11 +2848,6 @@ def _publish_workflow_progress(
         print(f"Published workflow progress on branch: {branch}", file=stdout)
         return commit_sha
 
-    default_branch = (
-        workflow_git_state.integration_branch
-        if workflow_git_state is not None
-        else _default_branch(repo_root, runtime=runtime)
-    )
     existing_pr = _gh_result(
         repo_root,
         {"operation": "pr_view", "pr_reference": branch, "json_fields": ["url"]},
@@ -2799,8 +2878,6 @@ def _publish_workflow_progress(
             "operation": "pr_create",
             "title": title,
             "body": body,
-            "base": default_branch,
-            "head": branch,
         },
         runtime=runtime,
     )
@@ -2945,8 +3022,6 @@ def _open_final_workflow_pull_request(
         repo_root,
         {
             "operation": "pr_create",
-            "base": workflow_git_state.base_branch,
-            "head": workflow_git_state.integration_branch,
             "title": f"Workflow: {workflow.directory.name}",
             "body": (
                 "Final integration pull request for durable workflow "

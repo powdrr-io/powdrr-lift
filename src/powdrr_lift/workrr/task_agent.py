@@ -2559,15 +2559,59 @@ def run_workflow_task(
                 None,
             )
             if completed is None or completed.status is not TaskStatus.COMPLETED:
-                manifest["status"] = "failed"
-                manifest["failure"] = (
-                    "Procedrr task succeeded without completing its durable task "
-                    "record."
-                )
-                manifest["finished_at"] = datetime.now(UTC).isoformat()
-                _write_task_process_manifest(manifest_path, manifest)
-                print(manifest["failure"], file=stderr)
-                return 1
+                if process_id == "durable-task":
+                    manifest["status"] = "failed"
+                    manifest["failure"] = (
+                        "Procedrr task succeeded without completing its durable task "
+                        "record."
+                    )
+                    manifest["finished_at"] = datetime.now(UTC).isoformat()
+                    _write_task_process_manifest(manifest_path, manifest)
+                    print(manifest["failure"], file=stderr)
+                    return 1
+                try:
+                    process_outputs = process_catalog.get(process_id).document.get(
+                        "outputs", {}
+                    )
+                    if not isinstance(process_outputs, Mapping) or not process_outputs:
+                        raise PowdrrExecutionError(
+                            f"Procedrr process {process_id!r} succeeded without "
+                            "completing its durable task and declares no outputs to "
+                            "record."
+                        )
+                    missing_outputs = set(process_outputs).difference(result.bindings)
+                    if missing_outputs:
+                        raise PowdrrExecutionError(
+                            f"Procedrr process {process_id!r} did not return declared "
+                            f"outputs: {', '.join(sorted(missing_outputs))}."
+                        )
+                    output_state = {
+                        name: result.bindings[name] for name in process_outputs
+                    }
+                    operations._complete({"output_state": output_state})
+                    completed = next(
+                        (
+                            item
+                            for item in workflow.tasks
+                            if item.task_id == task.task_id
+                        ),
+                        None,
+                    )
+                    if (
+                        completed is None
+                        or completed.status is not TaskStatus.COMPLETED
+                    ):
+                        raise PowdrrExecutionError(
+                            f"Procedrr process {process_id!r} outputs were recorded, "
+                            "but the durable task remains incomplete."
+                        )
+                except (PowdrrExecutionError, RuntimeError, ValueError) as error:
+                    manifest["status"] = "failed"
+                    manifest["failure"] = f"{type(error).__name__}: {error}"
+                    manifest["finished_at"] = datetime.now(UTC).isoformat()
+                    _write_task_process_manifest(manifest_path, manifest)
+                    print(f"Procedrr task failed: {error}", file=stderr)
+                    return 1
         _write_task_process_manifest(manifest_path, manifest)
         workflow = _select_workflow_instance(
             WorkflowInstance.from_directory(workflow_dir),

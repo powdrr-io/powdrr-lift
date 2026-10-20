@@ -623,6 +623,49 @@ def test_process_workflow_task_completes_claimed_agent_task(
     assert "Completed workflow task: agent-task" in stdout.getvalue()
 
 
+def test_named_procedrr_process_outputs_complete_durable_task(
+    tmp_path: Path,
+) -> None:
+    workflow = _workflow(tmp_path)
+    task = replace(
+        workflow.tasks[0],
+        process_id="result-producing-process",
+        output_state_type="implementation-result",
+    )
+    workflow.update_task(task)
+    _write_procedrr_process(
+        tmp_path,
+        "result-producing-process",
+        [
+            {
+                "operation": {
+                    "tool": "respond",
+                    "parameters": {"text": "Published pull request."},
+                    "bind": "summary",
+                }
+            },
+            {"terminal": "succeeded"},
+        ],
+        inputs=[{"name": "task_context", "type": "object", "required": True}],
+        outputs={"summary": {"type": "object"}},
+    )
+
+    stderr = io.StringIO()
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=tmp_path,
+        ),
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0, stderr.getvalue()
+    completed = WorkflowInstance.from_directory(workflow.directory).tasks[0]
+    assert completed.status is TaskStatus.COMPLETED
+    assert completed.output_state == {"summary": {"text": "Published pull request."}}
+
+
 def test_procedrr_task_handoff_persists_and_resumes_checkpoint(
     tmp_path: Path,
 ) -> None:

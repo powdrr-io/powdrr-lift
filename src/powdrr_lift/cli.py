@@ -217,6 +217,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     generate_execution_plan_yaml,
     generate_multi_pr_structrr_proposal,
     inspect_repository_ci,
+    inspect_repository_code,
     load_plan_workflow_instance,
     publish_execution_plan_pull_request,
     write_execution_plan_artifacts,
@@ -346,8 +347,8 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser = subparsers.add_parser(
         "plan",
         help=(
-            "Analyze a Markdown plan, generate per-item PR workflows, and open "
-            "a review pull request."
+            "Analyze a Markdown plan against the current checkout, generate "
+            "per-item PR workflows, and open a review pull request."
         ),
     )
     plan_parser.add_argument("--source", type=Path, required=True)
@@ -2607,6 +2608,9 @@ def _run_plan(args: argparse.Namespace) -> int:
             verification_command=args.verification_command,
             repository_ci_context=inspect_repository_ci(repo_root),
             include_final_review=True,
+            repository_code_context=inspect_repository_code(
+                repo_root, source_plan, planning_client
+            ),
         )
         structrr_proposal = generate_multi_pr_structrr_proposal(
             plan=plan,

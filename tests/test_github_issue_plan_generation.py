@@ -10,6 +10,7 @@ import pytest
 
 from powdrr_lift import cli
 from powdrr_lift.workrr.github_issue_plan_generation import (
+    PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
     PLAN_ITEMS_RESPONSE_SCHEMA,
     PlanGenerationError,
     PlanPullRequest,
@@ -41,6 +42,18 @@ class FakePlanningClient:
     ) -> dict[str, Any]:
         self.messages = messages
         self.response_schema = response_schema
+        if response_schema == PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA:
+            return {
+                "assessments": [
+                    {
+                        "item_id": str(item["id"]),
+                        "status": "missing",
+                        "existing_evidence": [],
+                        "remaining_work": "",
+                    }
+                    for item in self.response.get("items", [])
+                ]
+            }
         return self.response
 
 
@@ -397,6 +410,15 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
 def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    implementation = tmp_path / "src/schema.py"
+    implementation.parent.mkdir(parents=True)
+    implementation.write_text("def parse_policy(): pass\n", encoding="utf-8")
+    test_file = tmp_path / "tests/test_parsers.py"
+    test_file.parent.mkdir(parents=True)
+    test_file.write_text(
+        "def test_parse_policy():\n    assert parse_policy() is None\n",
+        encoding="utf-8",
+    )
     draft = {
         "items": [
             _item("schema-parsers"),
@@ -404,7 +426,36 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
         ]
     }
     reconciled = {"items": [_item("portable-verifier")]}
-    client = SequencedPlanningClient([draft, draft, reconciled])
+    audit = {
+        "assessments": [
+            {
+                "item_id": "schema-parsers",
+                "status": "complete",
+                "existing_evidence": [
+                    {
+                        "path": "src/schema.py",
+                        "symbol": "parse_policy",
+                        "kind": "implementation",
+                        "rationale": "The current parser implements the contract.",
+                    },
+                    {
+                        "path": "tests/test_parsers.py",
+                        "symbol": "test_parse_policy",
+                        "kind": "test",
+                        "rationale": "The parser behavior has a focused test.",
+                    },
+                ],
+                "remaining_work": "",
+            },
+            {
+                "item_id": "portable-verifier",
+                "status": "missing",
+                "existing_evidence": [],
+                "remaining_work": "",
+            },
+        ]
+    }
+    client = SequencedPlanningClient([draft, draft, audit, reconciled])
     inspected_contexts: list[str] = []
 
     def inspect_draft(_repo_root: Path, source_plan: str, _client: Any) -> str:
@@ -431,10 +482,12 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
         repository_root=tmp_path,
     )
 
-    assert len(client.messages) == 3
+    assert len(client.messages) == 4
     assert len(inspected_contexts) == 1
     assert "schema-parsers" in inspected_contexts[0]
-    reconciliation_prompt = client.messages[2][1]["content"]
+    audit_prompt = client.messages[2][1]["content"]
+    assert "Classify the draft work by existing coverage" in audit_prompt
+    reconciliation_prompt = client.messages[3][1]["content"]
     assert "Current checkout evidence" in reconciliation_prompt
     assert "schema-parsers" in reconciliation_prompt
     assert [item.item_id for item in plan.items] == ["portable-verifier"]

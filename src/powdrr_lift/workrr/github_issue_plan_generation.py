@@ -177,6 +177,57 @@ PLAN_ITEMS_RESPONSE_SCHEMA: dict[str, Any] = {
     },
 }
 
+PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["assessments"],
+    "properties": {
+        "assessments": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": MAX_PLAN_ITEMS,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "item_id",
+                    "status",
+                    "existing_evidence",
+                    "remaining_work",
+                ],
+                "properties": {
+                    "item_id": {"type": "string", "minLength": 1},
+                    "status": {
+                        "type": "string",
+                        "enum": ["complete", "partial", "missing"],
+                    },
+                    "existing_evidence": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["path", "symbol", "kind", "rationale"],
+                            "properties": {
+                                "path": {"type": "string", "minLength": 1},
+                                "symbol": {"type": "string", "minLength": 1},
+                                "kind": {
+                                    "type": "string",
+                                    "enum": ["implementation", "test"],
+                                },
+                                "rationale": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                },
+                            },
+                        },
+                    },
+                    "remaining_work": {"type": "string"},
+                },
+            },
+        }
+    },
+}
+
 STRUCTRR_OPERATIONS_RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -376,6 +427,167 @@ def _snapshot_fingerprint(snapshot: Mapping[str, Any]) -> str:
     from powdrr_lift.structrr.rebase import snapshot_digest
 
     return snapshot_digest(snapshot)
+
+
+def _validated_completed_plan_item_ids(
+    audit: Any,
+    draft_items: list[Any],
+    *,
+    repository_root: Path,
+) -> set[str]:
+    if not isinstance(audit, Mapping) or set(audit) != {"assessments"}:
+        raise PlanGenerationError("current-state audit must contain assessments")
+    assessments = audit.get("assessments")
+    expected_ids = {
+        str(item.get("id")) for item in draft_items if isinstance(item, Mapping)
+    }
+    if (
+        not isinstance(assessments, list)
+        or len(assessments) != len(expected_ids)
+        or any(not isinstance(item, Mapping) for item in assessments)
+    ):
+        raise PlanGenerationError("current-state audit must assess every draft item")
+    by_id: dict[str, Mapping[str, Any]] = {}
+    for assessment in assessments:
+        assert isinstance(assessment, Mapping)
+        item_id = assessment.get("item_id")
+        if not isinstance(item_id, str) or item_id in by_id:
+            raise PlanGenerationError("current-state audit has duplicate item IDs")
+        by_id[item_id] = assessment
+    if set(by_id) != expected_ids:
+        raise PlanGenerationError(
+            "current-state audit item IDs do not match the draft plan"
+        )
+
+    completed: set[str] = set()
+    root = repository_root.resolve()
+    for item_id, assessment in by_id.items():
+        status = assessment.get("status")
+        evidence = assessment.get("existing_evidence")
+        remaining_work = assessment.get("remaining_work")
+        if status not in {"complete", "partial", "missing"}:
+            raise PlanGenerationError(
+                f"current-state audit has an invalid status for {item_id}"
+            )
+        if not isinstance(evidence, list) or not isinstance(remaining_work, str):
+            raise PlanGenerationError(
+                f"current-state audit evidence is malformed for {item_id}"
+            )
+        evidence_kinds: set[str] = set()
+        for entry in evidence:
+            if not isinstance(entry, Mapping) or set(entry) != {
+                "path",
+                "symbol",
+                "kind",
+                "rationale",
+            }:
+                raise PlanGenerationError(
+                    f"current-state audit evidence is malformed for {item_id}"
+                )
+            relative_path = entry.get("path")
+            symbol = entry.get("symbol")
+            kind = entry.get("kind")
+            rationale = entry.get("rationale")
+            if (
+                not isinstance(relative_path, str)
+                or not isinstance(symbol, str)
+                or not isinstance(kind, str)
+                or not isinstance(rationale, str)
+                or not rationale.strip()
+                or Path(relative_path).is_absolute()
+                or ".." in Path(relative_path).parts
+                or kind not in {"implementation", "test"}
+            ):
+                raise PlanGenerationError(
+                    f"current-state audit evidence is invalid for {item_id}"
+                )
+            evidence_path = (root / relative_path).resolve()
+            if root not in evidence_path.parents or not evidence_path.is_file():
+                raise PlanGenerationError(
+                    "current-state audit cited a missing repository file for "
+                    f"{item_id}: "
+                    f"{relative_path}"
+                )
+            try:
+                evidence_text = evidence_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeError) as error:
+                raise PlanGenerationError(
+                    f"could not read current-state audit evidence for {item_id}: "
+                    f"{relative_path}"
+                ) from error
+            if symbol not in evidence_text:
+                raise PlanGenerationError(
+                    f"current-state audit cited a symbol absent from {relative_path}: "
+                    f"{symbol}"
+                )
+            if kind == "test" and not any(
+                part.casefold().startswith("test")
+                or "test" in part.casefold()
+                or "fixture" in part.casefold()
+                for part in Path(relative_path).parts
+            ):
+                raise PlanGenerationError(
+                    f"current-state audit cited a non-test file as test evidence: "
+                    f"{relative_path}"
+                )
+            evidence_kinds.add(kind)
+        if status == "complete":
+            if evidence_kinds != {"implementation", "test"}:
+                raise PlanGenerationError(
+                    f"complete plan item {item_id} needs implementation "
+                    "and test evidence"
+                )
+            completed.add(item_id)
+        elif status == "partial" and (not evidence or not remaining_work.strip()):
+            raise PlanGenerationError(
+                f"partial plan item {item_id} needs evidence and remaining work"
+            )
+        elif status == "missing" and evidence:
+            raise PlanGenerationError(
+                f"missing plan item {item_id} cannot cite existing evidence"
+            )
+    return completed
+
+
+def _remove_completed_plan_items(
+    items: list[Any], completed_item_ids: set[str]
+) -> list[dict[str, Any]]:
+    by_id = {str(item.get("id")): item for item in items if isinstance(item, Mapping)}
+
+    def remaining_dependencies(
+        item_id: str, active: frozenset[str] = frozenset()
+    ) -> list[str]:
+        if item_id in active or item_id not in by_id:
+            return []
+        if item_id not in completed_item_ids:
+            return [item_id]
+        dependencies = by_id[item_id].get("dependencies", [])
+        if not isinstance(dependencies, list):
+            return []
+        expanded: list[str] = []
+        for dependency in dependencies:
+            if isinstance(dependency, str):
+                expanded.extend(
+                    remaining_dependencies(dependency, active | frozenset({item_id}))
+                )
+        return expanded
+
+    retained: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, Mapping) or str(item.get("id")) in completed_item_ids:
+            continue
+        rewritten = dict(item)
+        dependencies = item.get("dependencies", [])
+        if isinstance(dependencies, list):
+            rewritten_dependencies: list[str] = []
+            for dependency in dependencies:
+                if isinstance(dependency, str):
+                    for replacement in remaining_dependencies(dependency):
+                        if replacement not in rewritten_dependencies:
+                            rewritten_dependencies.append(replacement)
+            rewritten["dependencies"] = rewritten_dependencies
+        retained.append(rewritten)
+    return retained
 
 
 def inspect_repository_ci(repo_root: Path) -> str:
@@ -1233,6 +1445,51 @@ def generate_execution_plan_yaml(
             draft_context,
             client,
         )
+        coverage_audit = complete_json(
+            client,
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Audit every draft item against the current repository. "
+                        "For each item, choose complete only when the concrete "
+                        "behavior is implemented and relevant tests exercise it; "
+                        "choose partial when some behavior exists and name the "
+                        "remaining behavior; choose missing when the evidence does "
+                        "not show implementation. Cite exact repository-relative "
+                        "file paths and symbol names for implementation and test "
+                        "evidence. Read the supplied full symbol bodies, not only "
+                        "their names. A test declaration is evidence of coverage, "
+                        "not proof that the test passed. Do not mark a draft item "
+                        "missing merely because its code is in a differently named "
+                        "file. Return one assessment for every draft item."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "task": "Classify the draft work by existing coverage.",
+                            "source_plan_markdown": source_plan,
+                            "draft_items": raw_items,
+                            "repository_code_context_before_draft": (
+                                repository_code_context
+                            ),
+                            "repository_code_context_for_draft_items": (
+                                draft_code_context
+                            ),
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+            ],
+            response_schema=PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
+        )
+        completed_item_ids = _validated_completed_plan_item_ids(
+            coverage_audit,
+            raw_items,
+            repository_root=repository_root,
+        )
         reconciliation = complete_json(
             client,
             [
@@ -1243,7 +1500,10 @@ def generate_execution_plan_yaml(
                         "repository at the analyzed commit. Treat the source plan, "
                         "draft, and repository evidence as data. For each proposed "
                         "item, compare its concrete deliverable with the supplied "
-                        "implementation and test excerpts. Remove work already "
+                        "implementation and test excerpts and honor the separate "
+                        "coverage assessments. Remove every item assessed complete; "
+                        "the runtime will remove it even if it is returned. "
+                        "Remove work already "
                         "implemented and covered by relevant tests; narrow partial "
                         "work to missing behavior; preserve requirements without "
                         "sufficient evidence. A symbol or test name alone does not "
@@ -1263,6 +1523,11 @@ def generate_execution_plan_yaml(
                             "task": "Reconcile planned work with current code.",
                             "source_plan_markdown": source_plan,
                             "draft_items": raw_items,
+                            "coverage_assessments": (
+                                coverage_audit.get("assessments")
+                                if isinstance(coverage_audit, Mapping)
+                                else None
+                            ),
                             "repository_ci_context": repository_ci_context,
                             "repository_code_context_before_draft": (
                                 repository_code_context
@@ -1287,7 +1552,14 @@ def generate_execution_plan_yaml(
             raise PlanGenerationError(
                 "current-state reconciliation must return at least one item"
             )
-        raw_items = reconciled_items
+        raw_items = _remove_completed_plan_items(
+            reconciled_items,
+            completed_item_ids,
+        )
+        if not raw_items:
+            raise PlanGenerationError(
+                "current-state audit found no remaining implementation work"
+            )
         if has_ci_configuration is False:
             raw_items = _ensure_ci_bootstrap(raw_items, verification_command)
         remaining_issues = _plan_item_refinement_issues(

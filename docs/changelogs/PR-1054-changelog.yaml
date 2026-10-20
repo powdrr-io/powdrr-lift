@@ -54,34 +54,14 @@ files:
   rationale: Preserve coverage while adding the code quality review.
 - path: tests/test_procedrr.py
   type: modified
-  span: {start_line: 842, end_line: 858}
-  summary: Verify the code quality review fields, categories, and instructions.
-  rationale: Require explicit examination of reuse, command style dispatch, and legacy behavior.
+  span: {start_line: 842, end_line: 880}
+  summary: Verify the structured code quality review fields, categories, and conditional quality guidance.
+  rationale: Require explicit examination of reuse, command style dispatch, legacy behavior, and applicable reliability and security risks.
 - path: tests/test_procedrr.py
   type: modified
-  span: {start_line: 849, end_line: 854}
-  summary: Require structured review fields for error handling, contracts, test quality, lifecycle, concurrency, and security.
-  rationale: Keep the added review dimensions explicit in its output contract.
-- path: tests/test_procedrr.py
-  type: modified
-  span: {start_line: 861, end_line: 866}
-  summary: Allow actionable pushbacks for the added code quality dimensions.
-  rationale: Ensure concrete findings can flow to final planning.
-- path: tests/test_procedrr.py
-  type: modified
-  span: {start_line: 871, end_line: 880}
-  summary: Verify the additional checks are conditional and evidence-based.
-  rationale: Avoid manufacturing findings for paths the change does not affect.
-- path: tests/test_procedrr.py
-  type: modified
-  span: {start_line: 884, end_line: 886}
-  summary: Verify final planning receives and resolves the additional quality findings.
-  rationale: Ensure scoped fixes and validation are included when those findings apply.
-- path: tests/test_procedrr.py
-  type: modified
-  span: {start_line: 860, end_line: 865}
+  span: {start_line: 882, end_line: 891}
   summary: Verify final planning receives and resolves both review outputs.
-  rationale: Ensure findings from both reviewers are reconciled before the plan is finalized.
+  rationale: Ensure findings from both reviewers, including the added quality dimensions, are reconciled before finalizing the plan.
 entities:
 - id: proposed-pr-code-quality-review-step
   type: Step

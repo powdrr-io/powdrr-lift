@@ -48,9 +48,9 @@ def _scenario() -> dict[str, Any]:
     }
 
 
-def _revision() -> dict[str, str]:
+def _revision(scenario_id: str = "instruction-001") -> dict[str, str]:
     return {
-        "scenario_id": "instruction-001",
+        "scenario_id": scenario_id,
         "given": "An initial payload contains a user object without an email field.",
         "when": "The iterator processes a deferred payload at the user path.",
         "then": "The accumulated user object contains the deferred email field.",
@@ -93,7 +93,7 @@ def test_probe_repair_revises_only_flagged_scenario_after_faithfulness(
     assert artifact["used_scenarios"] == list(revised)
     assert artifact["initial_findings"]
     assert artifact["final_findings"] == []
-    assert "Do not add intermediate payload details" in str(client.messages)
+    assert "Do not add details or assumptions" in str(client.messages)
     assert "authoritative_source_clause" in str(client.messages)
     assert "instruction-001" in str(client.messages)
     assert "source_instruction" not in str(client.messages)
@@ -128,7 +128,7 @@ def test_probe_repair_discards_candidate_rejected_by_faithfulness(
     assert artifact["faithfulness_reviews"][0]["status"] == "rejected"
 
 
-def test_probe_repair_fails_open_when_repair_response_is_malformed(
+def test_probe_repair_records_empty_response_as_partial_not_failure(
     tmp_path: Path,
 ) -> None:
     client = RepairClient([])
@@ -143,8 +143,130 @@ def test_probe_repair_fails_open_when_repair_response_is_malformed(
     )
 
     assert revised == (_scenario(),)
+    assert artifact["status"] == "partial"
+    assert artifact["missing_scenario_ids"] == ["instruction-001"]
+    assert "instruction-001" in artifact["error"]
+    assert artifact["repair_batches"][0]["error"] is None
+
+
+def test_probe_repair_keeps_valid_revisions_from_partial_batches(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    class PartialBatchClient:
+        def __init__(self) -> None:
+            self.requested_batches: list[list[str]] = []
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: Mapping[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            assert response_schema is not None
+            payload = json.loads(messages[1]["content"])
+            requested = [
+                item["scenario"]["scenario_id"] for item in payload["flagged_scenarios"]
+            ]
+            self.requested_batches.append(requested)
+            revised_id = requested[0]
+            return {"revisions": [_revision(revised_id)]}
+
+    client = PartialBatchClient()
+    monkeypatch.setattr(probe_repair, "PROBE_REPAIR_BATCH_SIZE", 2)
+    monkeypatch.setattr(
+        probe_repair,
+        "_check_revised_scenario_faithfulness",
+        lambda original, candidate, **_: (
+            True,
+            {"scenario_id": candidate["scenario_id"], "status": "accepted"},
+        ),
+    )
+    scenarios = (
+        _scenario(),
+        {**_scenario(), "scenario_id": "instruction-002"},
+        {**_scenario(), "scenario_id": "instruction-003"},
+    )
+
+    revised, artifact = probe_repair.repair_behavior_probes(
+        client,
+        instruction="Deferred fields merge at the path given.",
+        scenarios=scenarios,
+        contract_directory=tmp_path,
+        ledger_clauses=(),
+        faithfulness_client=client,
+    )
+
+    assert len(client.requested_batches) == 2
+    assert [len(batch) for batch in client.requested_batches] == [2, 1]
+    returned_ids = [batch[0] for batch in client.requested_batches]
+    omitted_ids = [batch[1] for batch in client.requested_batches if len(batch) > 1]
+    revised_by_id = {str(item["scenario_id"]): item for item in revised}
+    for scenario_id in returned_ids:
+        assert revised_by_id[scenario_id]["given"] == _revision(scenario_id)["given"]
+    for scenario_id in omitted_ids:
+        original = next(
+            item for item in scenarios if item["scenario_id"] == scenario_id
+        )
+        assert revised_by_id[scenario_id] == original
+    assert artifact["status"] == "partial"
+    assert artifact["missing_scenario_ids"] == omitted_ids
+    assert len(artifact["proposed_revisions"]) == len(returned_ids)
+    assert artifact["repair_batches"][0]["revised_scenario_ids"] == [returned_ids[0]]
+    assert artifact["repair_batches"][0]["missing_scenario_ids"] == omitted_ids
+
+
+def test_probe_repair_marks_failed_response_unavailable(
+    tmp_path: Path,
+) -> None:
+    class FailedClient:
+        def complete_json(
+            self,
+            _: list[dict[str, str]],
+            *,
+            response_schema: Mapping[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            raise RuntimeError("repair service unavailable")
+
+    revised, artifact = probe_repair.repair_behavior_probes(
+        FailedClient(),
+        instruction="Deferred fields merge at the path given.",
+        scenarios=(_scenario(),),
+        contract_directory=tmp_path,
+        ledger_clauses=(),
+        faithfulness_client=None,
+    )
+
+    assert revised == (_scenario(),)
     assert artifact["status"] == "unavailable"
-    assert "omitted" in artifact["error"]
+    assert "repair service unavailable" in artifact["error"]
+    assert artifact["missing_scenario_ids"] == ["instruction-001"]
+
+
+def test_probe_repair_keeps_original_when_revision_fails_validation(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    client = RepairClient([_revision()])
+    compile_scenarios = probe_repair.compile_behavior_scenarios
+
+    def reject_revision(scenarios: Any) -> Any:
+        if scenarios[0]["given"] == _revision()["given"]:
+            raise ValueError("invalid compiled scenario")
+        return compile_scenarios(scenarios)
+
+    monkeypatch.setattr(probe_repair, "compile_behavior_scenarios", reject_revision)
+    revised, artifact = probe_repair.repair_behavior_probes(
+        client,
+        instruction="Deferred fields merge at the path given.",
+        scenarios=(_scenario(),),
+        contract_directory=tmp_path,
+        ledger_clauses=(),
+        faithfulness_client=client,
+    )
+
+    assert revised == (_scenario(),)
+    assert artifact["status"] == "partial"
+    assert artifact["missing_scenario_ids"] == ["instruction-001"]
+    assert "invalid compiled scenario" in artifact["error"]
 
 
 def test_faithfulness_recheck_accepts_canonicalized_original_scenario(

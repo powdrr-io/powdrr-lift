@@ -20,7 +20,8 @@ from powdrr_lift.core.semantic_faithfulness import (
 from powdrr_lift.workrr.llm import complete_json
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
-PROBE_REPAIR_SCHEMA_VERSION = "behavior-probe-repair-v1"
+PROBE_REPAIR_SCHEMA_VERSION = "behavior-probe-repair-v2"
+PROBE_REPAIR_BATCH_SIZE = 8
 PROBE_REPAIR_RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -92,6 +93,8 @@ def repair_behavior_probes(
         "initial_findings": initial_findings,
         "final_findings": initial_findings,
         "faithfulness_reviews": [],
+        "repair_batches": [],
+        "missing_scenario_ids": [],
         "error": None,
     }
     if not initial_findings:
@@ -103,42 +106,179 @@ def repair_behavior_probes(
     by_id = {str(item.get("scenario_id", "")): item for item in originals}
     finding_ids = {item["scenario_id"] for item in initial_findings}
     repairable = {
-        scenario_id: by_id[scenario_id]
-        for scenario_id in finding_ids
-        if scenario_id in by_id
+        scenario_id: scenario
+        for scenario_id, scenario in by_id.items()
+        if scenario_id in finding_ids
         and all(
-            isinstance(by_id[scenario_id].get(field), str)
-            for field in ("given", "when", "then")
+            isinstance(scenario.get(field), str) for field in ("given", "when", "then")
         )
     }
-    if len(repairable) != len(finding_ids):
+    missing_source_ids = sorted(finding_ids - set(repairable))
+    artifact["missing_scenario_ids"] = missing_source_ids
+    if not repairable:
         artifact["status"] = "partial"
-        artifact["error"] = "some degraded scenarios have non-text probe fields"
+        artifact["error"] = "no flagged scenarios had repairable text fields"
         return tuple(originals), artifact
 
-    messages = [
+    findings_by_id = {str(item["scenario_id"]): item for item in initial_findings}
+    revisions: dict[str, Mapping[str, Any]] = {}
+    repair_errors: list[str] = []
+    requested_ids = list(repairable)
+    successful_batches = 0
+    batch_size = max(1, PROBE_REPAIR_BATCH_SIZE)
+
+    for offset in range(0, len(requested_ids), batch_size):
+        batch_ids = requested_ids[offset : offset + batch_size]
+        batch_findings = [
+            findings_by_id[scenario_id]
+            for scenario_id in batch_ids
+            if scenario_id in findings_by_id
+        ]
+        batch_scenarios = {
+            scenario_id: repairable[scenario_id] for scenario_id in batch_ids
+        }
+        messages = _build_repair_messages(
+            repository_contract=repository_contract or {},
+            findings=batch_findings,
+            scenarios=batch_scenarios,
+            ledger_clauses=ledger_clauses,
+        )
+        batch_record: dict[str, Any] = {
+            "requested_scenario_ids": batch_ids,
+            "revised_scenario_ids": [],
+            "missing_scenario_ids": [],
+            "error": None,
+        }
+        try:
+            response = complete_json(
+                client, messages, response_schema=PROBE_REPAIR_RESPONSE_SCHEMA
+            )
+            batch_revisions, parse_errors = _parse_revision_batch(
+                response, set(batch_ids)
+            )
+            successful_batches += 1
+            revisions.update(batch_revisions)
+            batch_record["revised_scenario_ids"] = list(batch_revisions)
+            batch_record["missing_scenario_ids"] = sorted(
+                set(batch_ids) - set(batch_revisions)
+            )
+            if parse_errors:
+                batch_record["error"] = "; ".join(parse_errors)
+                repair_errors.extend(parse_errors)
+        except Exception as error:
+            message = (
+                f"batch {offset // batch_size + 1}: {type(error).__name__}: {error}"
+            )
+            batch_record["error"] = message
+            batch_record["missing_scenario_ids"] = batch_ids
+            repair_errors.append(message)
+        artifact["repair_batches"].append(batch_record)
+
+    all_missing_ids = set(missing_source_ids)
+    all_missing_ids.update(
+        scenario_id
+        for batch in artifact["repair_batches"]
+        for scenario_id in batch["missing_scenario_ids"]
+    )
+    artifact["missing_scenario_ids"] = sorted(all_missing_ids)
+    artifact["proposed_revisions"] = [dict(item) for item in revisions.values()]
+    if repair_errors:
+        artifact["error"] = "; ".join(repair_errors)
+    elif artifact["missing_scenario_ids"]:
+        artifact["error"] = (
+            "repair omitted or could not revise scenarios: "
+            + ", ".join(artifact["missing_scenario_ids"])
+        )
+
+    if successful_batches == 0:
+        artifact["status"] = "unavailable"
+        return tuple(originals), artifact
+
+    candidates: list[dict[str, Any]] = []
+    for original in originals:
+        scenario_id = str(original.get("scenario_id", ""))
+        revision = revisions.get(scenario_id)
+        if revision is None:
+            candidates.append(original)
+            continue
+        candidate = {
+            **original,
+            "given": revision["given"],
+            "when": revision["when"],
+            "then": revision["then"],
+        }
+        try:
+            compile_behavior_scenarios((candidate,))
+        except Exception as error:
+            message = f"scenario {scenario_id}: {type(error).__name__}: {error}"
+            repair_errors.append(message)
+            artifact["missing_scenario_ids"] = sorted(
+                {*artifact["missing_scenario_ids"], scenario_id}
+            )
+            artifact["error"] = "; ".join(repair_errors)
+            candidates.append(original)
+            continue
+        if candidate != original:
+            accepted, review = _check_revised_scenario_faithfulness(
+                original,
+                candidate,
+                contract_directory=contract_directory,
+                ledger_clauses=ledger_clauses,
+                client=faithfulness_client,
+            )
+            artifact["faithfulness_reviews"].append(review)
+            candidates.append(candidate if accepted else original)
+        else:
+            candidates.append(original)
+    try:
+        compile_behavior_scenarios(candidates)
+    except Exception as error:
+        repair_errors.append(f"revised scenario set: {type(error).__name__}: {error}")
+        artifact["error"] = "; ".join(repair_errors)
+        candidates = originals
+    final_findings = behavior_scenario_probe_findings(candidates)
+    artifact["used_scenarios"] = candidates
+    artifact["final_findings"] = final_findings
+    artifact["status"] = (
+        "repaired"
+        if not final_findings
+        and not repair_errors
+        and not artifact["missing_scenario_ids"]
+        else "partial"
+    )
+    return tuple(candidates), artifact
+
+
+def _build_repair_messages(
+    *,
+    repository_contract: Mapping[str, Any],
+    findings: Sequence[Mapping[str, Any]],
+    scenarios: Mapping[str, Mapping[str, Any]],
+    ledger_clauses: Sequence[Mapping[str, Any]],
+) -> list[dict[str, str]]:
+    return [
         {
             "role": "system",
             "content": (
                 "Revise only the flagged behavior probes so each has a concrete "
-                "setup, operation, and observable result. Each probe includes its "
+                "setup, operation, and observable result. Return one revision for "
+                "each supplied scenario ID in this batch. Each probe includes its "
                 "authoritative source clause; treat that clause as the sole source "
-                "for the probe's required behavior. Make the `then` field one "
-                "observable outcome strictly entailed by that clause. Do not add "
-                "intermediate payload details, transport behavior, edge cases, or "
-                "assumptions unless the clause states them. Use the supplied "
-                "repository contract only to make the setup concrete. Keep scenario "
-                "IDs unchanged. If the clause does not support a more concrete "
-                "probe, return its fields unchanged."
+                "for the required behavior. Make `then` one observable outcome "
+                "strictly entailed by that clause. Do not add details or assumptions "
+                "unless the clause states them. Use the supplied repository contract "
+                "only to make setup concrete. Keep scenario IDs unchanged. If the "
+                "clause does not support a more concrete probe, return its fields "
+                "unchanged."
             ),
         },
         {
             "role": "user",
             "content": json.dumps(
                 {
-                    "repository_contract": repository_contract or {},
+                    "repository_contract": repository_contract,
                     "flagged_scenarios": _flagged_scenarios_with_sources(
-                        initial_findings, repairable, ledger_clauses
+                        findings, scenarios, ledger_clauses
                     ),
                 },
                 ensure_ascii=False,
@@ -146,72 +286,40 @@ def repair_behavior_probes(
             ),
         },
     ]
-    try:
-        response = complete_json(
-            client, messages, response_schema=PROBE_REPAIR_RESPONSE_SCHEMA
-        )
-        revisions = _parse_revisions(response, set(repairable))
-        artifact["proposed_revisions"] = [dict(item) for item in revisions.values()]
-        candidates: list[dict[str, Any]] = []
-        for original in originals:
-            scenario_id = str(original.get("scenario_id", ""))
-            revision = revisions.get(scenario_id)
-            if revision is None:
-                candidates.append(original)
-                continue
-            candidate = {
-                **original,
-                "given": revision["given"],
-                "when": revision["when"],
-                "then": revision["then"],
-            }
-            compile_behavior_scenarios((candidate,))
-            if candidate != original:
-                accepted, review = _check_revised_scenario_faithfulness(
-                    original,
-                    candidate,
-                    contract_directory=contract_directory,
-                    ledger_clauses=ledger_clauses,
-                    client=faithfulness_client,
-                )
-                artifact["faithfulness_reviews"].append(review)
-                candidates.append(candidate if accepted else original)
-            else:
-                candidates.append(original)
-        compile_behavior_scenarios(candidates)
-        final_findings = behavior_scenario_probe_findings(candidates)
-        artifact["used_scenarios"] = candidates
-        artifact["final_findings"] = final_findings
-        artifact["status"] = "repaired" if not final_findings else "partial"
-        return tuple(candidates), artifact
-    except Exception as error:
-        artifact["status"] = "unavailable"
-        artifact["error"] = f"{type(error).__name__}: {error}"
-        return tuple(originals), artifact
 
 
-def _parse_revisions(
+def _parse_revision_batch(
     response: Mapping[str, Any], expected_ids: set[str]
-) -> dict[str, Mapping[str, Any]]:
+) -> tuple[dict[str, Mapping[str, Any]], list[str]]:
     raw = response.get("revisions")
-    if not isinstance(raw, list) or not all(isinstance(item, Mapping) for item in raw):
-        raise ValueError("probe repair response must contain revision objects")
+    if not isinstance(raw, list):
+        raise ValueError("probe repair response must contain a revisions array")
     revisions: dict[str, Mapping[str, Any]] = {}
-    for item in raw:
+    errors: list[str] = []
+    duplicates: set[str] = set()
+    for index, item in enumerate(raw):
+        if not isinstance(item, Mapping):
+            errors.append(f"revision at index {index} is not an object")
+            continue
         scenario_id = item.get("scenario_id")
         if not isinstance(scenario_id, str) or scenario_id not in expected_ids:
-            raise ValueError("probe repair returned an unknown scenario")
+            errors.append(f"revision at index {index} has an unknown scenario ID")
+            continue
         if scenario_id in revisions:
-            raise ValueError("probe repair returned a duplicate scenario")
+            duplicates.add(scenario_id)
+            errors.append(f"duplicate revision for {scenario_id}")
+            revisions.pop(scenario_id, None)
+            continue
         if set(item) != {"scenario_id", "given", "when", "then"} or not all(
             isinstance(item.get(field), str) and item[field].strip()
             for field in ("given", "when", "then")
         ):
-            raise ValueError(f"probe repair fields are invalid for {scenario_id}")
+            errors.append(f"revision fields are invalid for {scenario_id}")
+            continue
         revisions[scenario_id] = item
-    if set(revisions) != expected_ids:
-        raise ValueError("probe repair omitted one or more flagged scenarios")
-    return revisions
+    for scenario_id in duplicates:
+        revisions.pop(scenario_id, None)
+    return revisions, errors
 
 
 def _flagged_scenarios_with_sources(

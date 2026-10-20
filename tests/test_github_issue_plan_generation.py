@@ -43,6 +43,7 @@ def _item(item_id: str, *, dependencies: list[str] | None = None) -> dict[str, A
         "title": f"Implement {item_id}",
         "objective": f"Deliver {item_id} from the plan.",
         "scope": [f"component: {item_id}"],
+        "allowed_paths": ["."],
         "implementation_steps": [
             f"Implement the smallest behavior for {item_id}.",
             f"Add focused tests proving {item_id} works.",
@@ -93,6 +94,7 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
     assert "Implement a foundation" in client.messages[1]["content"]
     assert [item.item_id for item in plan.items] == ["foundation", "integration"]
     assert plan.items[1].dependencies == ("foundation",)
+    assert plan.items[0].allowed_paths == (".",)
     assert plan.items[0].implementation_steps == (
         "Implement the smallest behavior for foundation.",
         "Add focused tests proving foundation works.",
@@ -109,8 +111,10 @@ def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
         "schema: https://powdrr.io/schemas/github-issue-execution-plan-v1" in rendered
     )
     assert "implementation_steps:" in rendered
+    assert "allowed_paths:" in rendered
     assert "Implement the smallest behavior for foundation." in rendered
     assert "implementation step" in client.messages[0]["content"]
+    assert "filesystem paths" in client.messages[0]["content"]
 
 
 @pytest.mark.parametrize(
@@ -493,6 +497,7 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
             "title": "Implement foundation",
             "objective": "Deliver foundation from the plan.",
             "scope": ["component: foundation"],
+            "allowed_paths": ["."],
             "implementation_steps": [
                 "Implement the smallest behavior for foundation.",
                 "Add focused tests proving foundation works.",

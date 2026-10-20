@@ -111,7 +111,7 @@ def test_issue_worker_compiles_the_benchmark_implementation_request() -> None:
             "plan_id": "feature-v1",
             "item_id": "feature-v1-pr-01",
             "objective": "Implement the feature.",
-            "scope": ["src/feature.py"],
+            "scope": ["Implement the parser and report stable rejection codes."],
             "implementation_steps": ["Add the parser."],
             "acceptance_criteria": ["Valid input is parsed."],
             "verification_command": f"{sys.executable} verify.py",
@@ -120,16 +120,50 @@ def test_issue_worker_compiles_the_benchmark_implementation_request() -> None:
         base_commit="a" * 40,
     )
 
-    assert request.allowed_paths == ("src/feature.py",)
+    assert request.allowed_paths == (".",)
     assert request.validation_profiles == ("verify",)
     assert request.allowed_commands == (f"{sys.executable} verify.py",)
     assert request.implementation_packet is not None
-    assert request.implementation_packet.repository.allowed_paths == ("src/feature.py",)
+    assert request.implementation_packet.repository.allowed_paths == (".",)
     assert "Add the parser." in request.prompt
     assert "Valid input is parsed." in request.prompt
+    assert "Implement the parser and report stable rejection codes." in request.prompt
     assert "Do not create branches, commits, pull requests" in request.prompt
     assert request.allow_existing_changes is True
     assert validation.command == (sys.executable, "verify.py")
+
+
+def test_issue_worker_uses_explicit_repository_relative_allowed_paths() -> None:
+    request, _validation = _issue_worker_implementation_request(
+        {
+            "objective": "Implement the feature.",
+            "scope": ["Implement the parser."],
+            "allowed_paths": ["src/feature.py", "tests/"],
+            "implementation_steps": ["Add the parser."],
+            "acceptance_criteria": ["Valid input is parsed."],
+            "verification_command": f"{sys.executable} verify.py",
+        },
+        workflow_id="feature-v1-pr-01",
+        base_commit="a" * 40,
+    )
+
+    assert request.allowed_paths == ("src/feature.py", "tests/")
+
+
+def test_issue_worker_rejects_traversing_allowed_paths() -> None:
+    with pytest.raises(PowdrrExecutionError, match="repository-relative paths"):
+        _issue_worker_implementation_request(
+            {
+                "objective": "Implement the feature.",
+                "scope": ["Implement the parser."],
+                "allowed_paths": ["../outside.py"],
+                "implementation_steps": ["Add the parser."],
+                "acceptance_criteria": ["Valid input is parsed."],
+                "verification_command": f"{sys.executable} verify.py",
+            },
+            workflow_id="feature-v1-pr-01",
+            base_commit="a" * 40,
+        )
 
 
 def test_issue_worker_continues_after_nontrivial_validation_failure(

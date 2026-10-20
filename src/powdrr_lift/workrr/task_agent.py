@@ -302,6 +302,22 @@ def _issue_worker_implementation_request(
             "proposed PR must declare implementation_steps, scope, and "
             "acceptance_criteria"
         )
+    raw_allowed_paths = proposed.get("allowed_paths")
+    if raw_allowed_paths is None:
+        # Plan scope entries describe product behavior, not filesystem paths.
+        # Older published plans do not include a path allowlist, so keep the
+        # repository-wide request boundary while preserving the reviewed scope
+        # in the worker contract below.
+        allowed_paths: tuple[str, ...] = (".",)
+    else:
+        allowed_paths = _issue_worker_string_list(raw_allowed_paths)
+        if not allowed_paths or any(
+            Path(path).is_absolute() or ".." in Path(path).parts
+            for path in allowed_paths
+        ):
+            raise PowdrrExecutionError(
+                "proposed PR allowed_paths must be repository-relative paths"
+            )
     verification_command = proposed.get("verification_command")
     if not isinstance(verification_command, str) or not verification_command.strip():
         raise PowdrrExecutionError("proposed PR must declare a verification_command")
@@ -313,27 +329,33 @@ def _issue_worker_implementation_request(
     item_id = str(proposed.get("item_id", workflow_id)).strip() or workflow_id
     plan_id = str(proposed.get("plan_id", "")).strip()
     source_refs = (f"{plan_id}/{item_id}" if plan_id else item_id,)
+    scoped_objective = f"{objective}\n\nReviewed implementation scope:\n" + "\n".join(
+        f"- {entry}" for entry in scope
+    )
     path_changes = tuple(
         {"id": f"step-{index:02d}", "description": step}
         for index, step in enumerate(steps, start=1)
     )
     unit = ExecutionUnit(
         unit_id=workflow_id,
-        objective=objective,
-        paths=scope,
+        objective=scoped_objective,
+        paths=allowed_paths,
         validation_profiles=(validation_profile.name,),
         acceptance_criteria=criteria,
         planned_additions=path_changes,
         must_preserve=criteria,
-        non_goals=("Do not implement product changes outside the reviewed scope.",),
+        non_goals=(
+            "Do not implement product changes outside the reviewed implementation "
+            "scope listed in the objective.",
+        ),
         source_refs=source_refs,
     )
     packet = ImplementationPacket(
-        objective=objective,
+        objective=scoped_objective,
         obligations=steps,
         required_tests=tuple({"description": item} for item in criteria),
         repository=RepositoryContextPacket(
-            allowed_paths=scope,
+            allowed_paths=allowed_paths,
             validation_profiles=(validation_profile.name,),
         ),
     )
@@ -343,6 +365,7 @@ def _issue_worker_implementation_request(
         "plan_id": plan_id,
         "objective": objective,
         "scope": scope,
+        "allowed_paths": allowed_paths,
         "implementation_steps": steps,
         "acceptance_criteria": criteria,
         "verification_command": verification_command,

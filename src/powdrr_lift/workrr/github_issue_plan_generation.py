@@ -503,12 +503,10 @@ def _validated_plan_coverage_assessments(
     expected_ids = {
         str(item.get("id")) for item in draft_items if isinstance(item, Mapping)
     }
-    if (
-        not isinstance(assessments, list)
-        or len(assessments) != len(expected_ids)
-        or any(not isinstance(item, Mapping) for item in assessments)
+    if not isinstance(assessments, list) or any(
+        not isinstance(item, Mapping) for item in assessments
     ):
-        raise PlanGenerationError("current-state audit must assess every draft item")
+        raise PlanGenerationError("current-state audit assessments are malformed")
     by_id: dict[str, Mapping[str, Any]] = {}
     for assessment in assessments:
         assert isinstance(assessment, Mapping)
@@ -516,10 +514,26 @@ def _validated_plan_coverage_assessments(
         if not isinstance(item_id, str) or item_id in by_id:
             raise PlanGenerationError("current-state audit has duplicate item IDs")
         by_id[item_id] = assessment
-    if set(by_id) != expected_ids:
+    if set(by_id) - expected_ids:
         raise PlanGenerationError(
-            "current-state audit item IDs do not match the draft plan"
+            "current-state audit contains an item ID outside the draft plan"
         )
+    empty_remaining_item = {
+        "title": "",
+        "objective": "",
+        "scope": [],
+        "allowed_paths": [],
+        "implementation_steps": [],
+        "acceptance_criteria": [],
+    }
+    for item_id in expected_ids - set(by_id):
+        by_id[item_id] = {
+            "item_id": item_id,
+            "status": "missing",
+            "existing_evidence": [],
+            "remaining_work": "",
+            "remaining_item": empty_remaining_item,
+        }
 
     root = repository_root.resolve()
     for item_id, assessment in by_id.items():

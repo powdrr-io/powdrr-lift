@@ -16,6 +16,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanPullRequest,
     _ensure_ci_bootstrap,
     _plan_item_refinement_issues,
+    _validated_plan_coverage_assessments,
     generate_execution_plan_yaml,
     generate_multi_pr_structrr_proposal,
     inspect_repository_ci,
@@ -543,6 +544,37 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
     assert plan.items[0].scope == (
         "Implement stable authorization rejection decisions.",
     )
+
+
+def test_incomplete_coverage_audit_preserves_unassessed_items(tmp_path: Path) -> None:
+    audit = {
+        "assessments": [
+            {
+                "item_id": "reviewed",
+                "status": "missing",
+                "existing_evidence": [],
+                "remaining_work": "",
+                "remaining_item": {
+                    "title": "",
+                    "objective": "",
+                    "scope": [],
+                    "allowed_paths": [],
+                    "implementation_steps": [],
+                    "acceptance_criteria": [],
+                },
+            }
+        ]
+    }
+
+    assessments = _validated_plan_coverage_assessments(
+        audit,
+        [_item("reviewed"), _item("unassessed")],
+        repository_root=tmp_path,
+    )
+
+    assert assessments["reviewed"]["status"] == "missing"
+    assert assessments["unassessed"]["status"] == "missing"
+    assert assessments["unassessed"]["existing_evidence"] == []
 
 
 def test_structrr_proposal_normalizes_content_identity_from_subject_id() -> None:

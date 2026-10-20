@@ -797,7 +797,7 @@ def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:
     assert "Does this one" in flow_text
 
 
-def test_feature_plan_gets_complexity_pushback_before_final_plan() -> None:
+def test_feature_plan_gets_complexity_and_quality_reviews_before_final_plan() -> None:
     from pathlib import Path
 
     import yaml
@@ -813,29 +813,53 @@ def test_feature_plan_gets_complexity_pushback_before_final_plan() -> None:
     steps = workflow["steps"]
     step_ids = [step["id"] for step in steps]
     plan_index = step_ids.index("plan-proposed-prs")
-    challenge_index = step_ids.index("challenge-proposed-pr-complexity")
+    complexity_index = step_ids.index("challenge-proposed-pr-complexity")
+    quality_index = step_ids.index("challenge-proposed-pr-code-quality")
     final_plan_index = step_ids.index("plan-proposed-pr-specification")
     outline = steps[plan_index]["outputs"][1]
-    challenge = steps[challenge_index]
+    complexity = steps[complexity_index]
+    quality = steps[quality_index]
     final_plan = steps[final_plan_index]
 
-    assert plan_index < challenge_index < final_plan_index
+    assert plan_index < complexity_index < quality_index < final_plan_index
     assert outline["name"] == "proposed_pr_designs"
     assert {
         "planned_files",
         "planned_tests",
         "existing_components_considered",
     }.issubset(outline["schema"]["items"]["properties"])
-    assert "planning_pushback" in [item["name"] for item in challenge["outputs"]]
+    assert "planning_pushback" in [item["name"] for item in complexity["outputs"]]
     assert {
         "existing_capability",
         "duplication",
         "configuration",
         "standard_or_library",
     }.issubset(
-        challenge["outputs"][0]["schema"]["properties"]["reviews"]["items"][
+        complexity["outputs"][0]["schema"]["properties"]["reviews"]["items"][
             "properties"
         ]
     )
+    assert "code_quality_review" in [item["name"] for item in quality["outputs"]]
+    quality_review = quality["outputs"][0]["schema"]["properties"]
+    assert {"reviews", "pushbacks"}.issubset(quality_review)
+    assert {
+        "duplication_and_reuse",
+        "conditional_dispatch",
+        "legacy_compatibility",
+        "recommended_design",
+    }.issubset(quality_review["reviews"]["items"]["properties"])
+    assert quality_review["pushbacks"]["items"]["properties"]["category"]["enum"] == [
+        "duplication",
+        "command_pattern",
+        "legacy_compatibility",
+    ]
+    assert "long if/elif/else sequences" in quality["details"]
+    assert "command pattern" in quality["details"]
+    assert "explicit feature requirement" in quality["details"]
     assert "planning_pushback" in [item["name"] for item in final_plan["inputs"]]
-    assert "Address every finding_id exactly once" in final_plan["details"]
+    assert "code_quality_review" in [item["name"] for item in final_plan["inputs"]]
+    assert "Address every code-quality finding_id exactly once" in final_plan["details"]
+    assert (
+        "Then address each planning-complexity finding_id exactly once"
+        in final_plan["details"]
+    )

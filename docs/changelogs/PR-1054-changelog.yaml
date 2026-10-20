@@ -1,0 +1,52 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1054
+title: Add planning code quality review
+intent:
+  problem: Proposed implementation plans can duplicate existing behavior, preserve legacy paths without a requirement, or use long conditional dispatch instead of a command structure.
+  goal: Independently review each proposed PR for these code quality risks and require the final plan to resolve concrete findings.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 217
+    end_line: 219
+  summary: Add an independent code quality review between complexity review and final plan formation.
+  rationale: Check reuse, long conditional dispatch, and legacy behavior against planned changes and explicit feature requirements.
+- path: docs/procedrr/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 219
+    end_line: 227
+  summary: Pass code quality findings into final plan formation and require each finding to be resolved.
+  rationale: Make supported refactoring, command pattern recommendations, and legacy removal part of the proposed plan.
+- path: tests/test_procedrr.py
+  type: modified
+  span:
+    start_line: 800
+    end_line: 870
+  summary: Verify the code quality review schema, ordering, recommendations, and final plan handoff.
+  rationale: Prevent regressions that skip review or fail to reconcile its findings.
+entities:
+- id: proposed-pr-code-quality-review-step
+  type: Step
+  action: added
+- id: planning-code-quality-review-test
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: every-proposed-pr-gets-code-quality-review
+  description: Every proposed PR receives a review of duplicate behavior, long operation dispatch, and planned legacy compatibility paths, with concrete source or requirement evidence.
+  action: added
+- id: final-plan-resolves-code-quality-findings
+  description: The final plan resolves each concrete code quality finding by adopting it or providing evidence in the affected PR justification; legacy behavior remains only for explicit feature requirements or acceptance criteria.
+  action: added
+guidance:
+- id: use-command-pattern-for-long-dispatch
+  description: For long conditionals that dispatch among distinct operations or modes, plan one command per operation behind a shared execution interface; do not impose the pattern on short local conditions.
+  action: added
+- id: avoid-unrequired-legacy-support
+  description: Do not preserve legacy, fallback, or compatibility behavior unless an explicit feature requirement or acceptance criterion calls for it.
+  action: added

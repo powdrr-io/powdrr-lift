@@ -1,0 +1,56 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1065
+title: Normalize inherited decision review responses
+intent:
+  problem: Inherited-decision reviews could return the equivalent verdict/reason response shape, but the worker treated it as invalid and blocked before coding.
+  goal: Accept both supported response shapes and state the required review fields explicitly.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/decision_continuity.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 78
+  summary: Normalize inherited-decision review results
+  rationale: State the required response fields so providers return the review contract expected by the worker.
+- path: src/powdrr_lift/workrr/decision_continuity.py
+  type: modified
+  span:
+    start_line: 119
+    end_line: 124
+  summary: Accept equivalent review response fields
+  rationale: Normalize verdict/reason aliases and reject mismatched decision IDs while retaining strict outcome validation.
+- path: src/powdrr_lift/workrr/decision_continuity.py
+  type: modified
+  span:
+    start_line: 126
+    end_line: 127
+  summary: Preserve unknown results for malformed reviews
+  rationale: Keep malformed or mismatched review output fail-closed.
+- path: tests/test_decision_continuity.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 119
+  summary: Cover legacy review response shape
+  rationale: Verify that a valid verdict/reason response becomes a passing normalized review result.
+entities:
+- id: inherited-decision-review-response-normalization
+  type: Function
+  action: added
+- id: inherited-decision-review-response-test
+  type: Regression test
+  action: added
+entity_relationships:
+- id: regression-test-covers-review-normalization
+  type: exercises
+  source: inherited-decision-review-response-test
+  target: inherited-decision-review-response-normalization
+  action: added
+  description: The regression test verifies legacy response normalization and the passing outcome.
+invariants:
+- id: inherited-decision-review-shapes-normalize-consistently
+  description: Review results use normalized outcome and explanation fields, and mismatched decision IDs or invalid outcomes remain unknown.
+  action: added
+guidance: []

@@ -1639,7 +1639,6 @@ def test_nested_procedrr_operation_returns_action_result_binding() -> None:
 
 
 def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None:
-    raw_result = {"error": "invalid test coverage contract", "retryable": True}
     strategy: Any = SimpleNamespace(
         workflow=SimpleNamespace(),
         task=SimpleNamespace(task_id="task-001", process_checkpoint=None),
@@ -1647,15 +1646,8 @@ def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None
         events=[],
     )
 
-    def execute_action(action: Any) -> SimpleNamespace:
-        strategy.events.append(
-            {
-                "kind": action.kind,
-                "tool": action.tool,
-                "result": raw_result,
-            }
-        )
-        return SimpleNamespace(continue_running=True)
+    def execute_action(_action: Any) -> SimpleNamespace:
+        raise PowdrrExecutionError("invalid test coverage contract")
 
     strategy.execute_action = execute_action
     operations = _TaskProcedrrOperations(
@@ -1676,6 +1668,99 @@ def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None
         "error": "invalid test coverage contract",
         "retryable": True,
     }
+
+
+def test_coding_agent_exception_binds_and_reaches_parent_workflow_review(
+    tmp_path: Path,
+) -> None:
+    """Carry the adapter's raised-error path through the real parent process."""
+    from procedrr import parse_and_validate
+    from procedrr_evaluator import Evaluator
+
+    (tmp_path / "execute-proposed-pr.yaml").write_text(
+        """\
+version: 1
+name: execute-proposed-pr
+inputs: [{name: task_context, type: object, required: true}]
+outputs:
+  coding_attempt:
+    type: object
+    required: [passed, changed_paths, error, retryable]
+    properties:
+      passed: {type: boolean}
+      changed_paths: {type: array, items: {type: string}}
+      error: {type: [string, "null"]}
+      retryable: {type: boolean}
+steps:
+  - operation:
+      tool: invoke_tool
+      parameters: {tool: coding-agent, parameters: {}}
+      bind: coding_attempt
+  - terminal: succeeded
+""",
+        encoding="utf-8",
+    )
+    repository_processes = (
+        Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    )
+    for name in ("finish-implementation-pr", "amend-plan-and-open-pr"):
+        (tmp_path / f"{name}.yaml").write_text(
+            (repository_processes / f"{name}.yaml").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+    classified_contexts: list[str] = []
+
+    class WorkflowLLM:
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            question = messages[1]["content"]
+            assert "Does the recorded failure demonstrate" in question
+            classified_contexts.append(question)
+            return {
+                "classification": "unclear",
+                "evidence": ["The coding agent raised a retryable execution error."],
+                "explanation": "The failure does not establish a plan defect.",
+            }
+
+    strategy: Any = SimpleNamespace(
+        workflow=SimpleNamespace(),
+        task=SimpleNamespace(task_id="task-001", process_checkpoint=None),
+        stdout=io.StringIO(),
+        events=[],
+    )
+
+    def raise_coding_agent_error(_action: Any) -> Any:
+        raise PowdrrExecutionError("invalid test coverage contract")
+
+    strategy.execute_action = raise_coding_agent_error
+    operations = _TaskProcedrrOperations(
+        strategy,
+        process_id="execute-proposed-pr-workflow",
+        process_catalog=cast(Any, SimpleNamespace()),
+        process_client=cast(Any, SimpleNamespace()),
+    )
+    operation_calls: list[tuple[str, Mapping[str, Any]]] = []
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        operation_calls.append((tool, parameters))
+        return operations.execute(tool, parameters)
+
+    workflow = parse_and_validate(
+        (repository_processes / "execute-proposed-pr-workflow.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    result = Evaluator(WorkflowLLM(), execute, process_directory=tmp_path).evaluate(
+        workflow, {"task_context": {"objective": "Implement a feature"}}
+    )
+
+    assert result.events[-1].data["status"] == "failed"
+    assert len(operation_calls) == 1
+    assert operation_calls[0][0] == "invoke_tool"
+    assert "invalid test coverage contract" in classified_contexts[0]
+    assert "unknown binding" not in classified_contexts[0]
 
 
 def test_nested_atomic_tool_step_advances_without_llm_confirmation(

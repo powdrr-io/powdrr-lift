@@ -1,0 +1,51 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1075
+title: Normalize coding-agent execution exceptions
+intent:
+  problem: Coding-agent exceptions return early from the operation adapter, bypassing normalization and leaving the parent workflow without a passed binding.
+  goal: Normalize coding-agent exception results before returning them to Procedrr while preserving other operation error behavior.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 3392, end_line: 3395}
+    summary: Normalize coding-agent failures inside the exception handler
+    rationale: Ensure raised coverage-contract errors carry the boolean status required by the parent workflow branch.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1642, end_line: 1642}
+    summary: Remove the simulated result from the operation-boundary test
+    rationale: The failure must be exercised as an exception, matching the actual worker path.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1649, end_line: 1650}
+    summary: Raise the coverage-contract error in the regression test
+    rationale: Verify the early exception return now produces a normalized failed attempt.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1673, end_line: 1765}
+    summary: Exercise coding-agent exceptions through the parent workflow
+    rationale: Verify normalized failures bind successfully and reach the workflow's review branch instead of failing on a missing binding.
+entities:
+  - id: coding-agent-operation-error-normalization
+    type: Function
+    action: modified
+  - id: coding-agent-exception-normalization-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: coding-agent-exception-test-exercises-normalizer
+    type: exercises
+    source: coding-agent-exception-normalization-test
+    target: coding-agent-operation-error-normalization
+    action: added
+    description: The regression test makes the operation raise a coverage-contract error and verifies the normalized failed-attempt mapping.
+invariants:
+  - id: coding-agent-exceptions-produce-process-status
+    description: A caught coding-agent exception returns a boolean passed field before Procedrr binds the operation output.
+    action: added
+guidance:
+  - id: normalize-caught-errors-before-return
+    description: Apply required process-output normalization inside exception handlers as well as normal result handling.
+    action: added

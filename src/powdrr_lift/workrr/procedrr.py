@@ -271,17 +271,10 @@ class WorkrrProcedrrClient:
             }
         )
 
-    def complete_json(
-        self,
-        messages: list[dict[str, str]],
-        *,
-        response_schema: Mapping[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        if response_schema is None:
-            raise ProcedrrResponseError("Procedrr judges require an output schema.")
-
-        replay_key = self.replay_key(messages)
-
+    @staticmethod
+    def _structured_messages(
+        messages: list[dict[str, str]], response_schema: Mapping[str, Any]
+    ) -> list[dict[str, str]]:
         schema_example = json.dumps(
             _schema_example(response_schema), ensure_ascii=False, separators=(",", ":")
         )
@@ -290,7 +283,7 @@ class WorkrrProcedrrClient:
             ensure_ascii=False,
             separators=(",", ":"),
         )
-        messages = [
+        return [
             {
                 "role": "system",
                 "content": (
@@ -305,6 +298,86 @@ class WorkrrProcedrrClient:
             },
             *messages,
         ]
+
+    def complete_json_batch(
+        self,
+        requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]],
+    ) -> list[dict[str, Any]]:
+        """Complete a declared group of judge requests while preserving replay."""
+        if not requests:
+            return []
+        replay_keys = [self.replay_key(messages) for messages, _ in requests]
+        outputs: list[dict[str, Any] | None] = [None] * len(requests)
+        pending: list[tuple[int, list[dict[str, str]], Mapping[str, Any], str]] = []
+        for index, ((messages, schema), replay_key) in enumerate(
+            zip(requests, replay_keys, strict=True)
+        ):
+            replay = self._replay_responses.get(replay_key)
+            if replay is not None:
+                validate_json(replay, schema)
+                outputs[index] = dict(replay)
+            else:
+                pending.append(
+                    (
+                        index,
+                        self._structured_messages(messages, schema),
+                        schema,
+                        replay_key,
+                    )
+                )
+        if pending:
+            batch_method = getattr(self._client, "complete_json_batch", None)
+            if not callable(batch_method):
+                for index, _, schema, _ in pending:
+                    outputs[index] = self.complete_json(
+                        requests[index][0], response_schema=schema
+                    )
+            else:
+                started = time.monotonic()
+                try:
+                    batch_outputs = batch_method(
+                        [(messages, schema) for _, messages, schema, _ in pending]
+                    )
+                    if len(batch_outputs) != len(pending):
+                        raise ProcedrrResponseError(
+                            "JEV returned a different number of results than requests"
+                        )
+                    for (index, _, schema, _), output in zip(
+                        pending, batch_outputs, strict=True
+                    ):
+                        validate_json(output, schema)
+                        outputs[index] = output
+                except Exception:
+                    # The batch boundary is an optimization. Preserve the
+                    # established individual structured-repair path on error.
+                    for index, _, schema, _ in pending:
+                        outputs[index] = self.complete_json(
+                            requests[index][0], response_schema=schema
+                        )
+                finally:
+                    for _, _, _, trace_id in pending:
+                        self._record_provider_attempt(
+                            trace_id,
+                            0,
+                            started,
+                            outcome="succeeded"
+                            if all(output is not None for output in outputs)
+                            else "failed",
+                        )
+        return [output for output in outputs if output is not None]
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if response_schema is None:
+            raise ProcedrrResponseError("Procedrr judges require an output schema.")
+
+        replay_key = self.replay_key(messages)
+
+        messages = self._structured_messages(messages, response_schema)
 
         def parse(payload: dict[str, Any]) -> dict[str, Any]:
             validate_json(payload, response_schema)
@@ -342,6 +415,11 @@ class WorkrrProcedrrClient:
         raise ProcedrrResponseError(
             "Workrr exhausted structured repair for a procedrr judge: " + last_error
         )
+
+    @property
+    def supports_batch(self) -> bool:
+        """Whether the wrapped provider has a native batch completion API."""
+        return callable(getattr(self._client, "complete_json_batch", None))
 
 
 def _is_retryable_provider_failure(error: Exception) -> bool:

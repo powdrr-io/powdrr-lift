@@ -109,6 +109,68 @@ steps:
     assert result.llm_activations == 2
 
 
+def test_for_each_batches_judgments_without_parallel_execution() -> None:
+    from procedrr import parse_and_validate
+
+    class BatchLLM:
+        def __init__(self) -> None:
+            self.batch_sizes: list[int] = []
+
+        def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:
+            raise AssertionError("individual completion should not be called")
+
+        def complete_json_batch(
+            self, requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]]
+        ) -> list[dict[str, Any]]:
+            self.batch_sizes.append(len(requests))
+            return [
+                {"positive": "yes" in messages[1]["content"]}
+                for messages, _ in requests
+            ]
+
+    document = parse_and_validate(
+        """\
+name: batch-classification
+inputs:
+  - {name: clauses, type: array, required: true}
+steps:
+  - for_each:
+      snapshot: {name: clauses, max_items: 2}
+      item_binding: clause
+      collect: {binding: decisions, mode: list, value: decision}
+      body:
+        - judge:
+            kind: classify_one
+            provider: planning
+            question: Is this clause positive?
+            subject: clause
+            prompt_system: Return only JSON.
+            instructions: [Judge this clause alone.]
+            context: [clause]
+            output:
+              name: decision
+              schema:
+                type: object
+                required: [positive]
+                additionalProperties: false
+                properties:
+                  positive: {type: boolean}
+            validation: {kind: json_schema}
+"""
+    )
+    client = BatchLLM()
+    result = Evaluator(client, lambda *_: None).evaluate(
+        document, {"clauses": ["yes, include this", "no, exclude this"]}
+    )
+
+    assert client.batch_sizes == [2]
+    assert result.bindings["decisions"] == [
+        {"item": "yes, include this", "result": {"positive": True}},
+        {"item": "no, exclude this", "result": {"positive": False}},
+    ]
+    assert result.llm_activations == 2
+
+
 def test_parallel_judge_failures_preserve_each_failed_item_event() -> None:
     class FailingLLM:
         def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:

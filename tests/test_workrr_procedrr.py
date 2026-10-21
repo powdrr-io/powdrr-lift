@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, cast
 
@@ -133,6 +134,36 @@ def test_procedrr_uses_workrr_schema_repair_transport(tmp_path: Path) -> None:
 
     assert result == {"complete": True}
     assert provider.calls == 2
+
+
+def test_procedrr_batch_preserves_order_and_replay_responses(tmp_path: Path) -> None:
+    class BatchClient:
+        def __init__(self) -> None:
+            self.batch_sizes: list[int] = []
+
+        def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:
+            raise AssertionError("individual completion should not be called")
+
+        def complete_json_batch(
+            self,
+            requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]],
+        ) -> list[dict[str, Any]]:
+            self.batch_sizes.append(len(requests))
+            return [{"complete": True} for _ in requests]
+
+    first = [{"role": "user", "content": "first"}]
+    second = [{"role": "user", "content": "second"}]
+    provider = BatchClient()
+    client = WorkrrProcedrrClient(
+        cast(Any, provider),
+        process_directory=tmp_path,
+        replay_responses={WorkrrProcedrrClient.replay_key(first): {"complete": False}},
+    )
+
+    result = client.complete_json_batch([(first, SCHEMA), (second, SCHEMA)])
+
+    assert result == [{"complete": False}, {"complete": True}]
+    assert provider.batch_sizes == [1]
 
 
 def test_procedrr_repairs_non_object_json_provider_response(tmp_path: Path) -> None:

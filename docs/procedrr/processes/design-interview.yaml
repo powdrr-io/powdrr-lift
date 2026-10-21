@@ -411,7 +411,6 @@ steps:
             bind: dependent_semantic_decision_plan
         - for_each:
             snapshot: {name: dependent_semantic_decision_plan.pending_specs, max_items: 16}
-            max_parallel: 8
             item_binding: dependent_decision_request
             collect: {binding: dependent_decision_results, mode: list, value: dependent_decision_result}
             body:

@@ -1,0 +1,85 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1067
+title: Continue after MiniSWE probe authoring commits
+intent:
+  problem: Probe authoring ran in a detached worktree while MiniSWE edited the task checkout, so Powdrr missed the authored suite and left implementation requests pinned to a stale base commit.
+  goal: Run probe authoring in the task checkout, record allowed probe-suite commits, advance implementation requests to the accepted HEAD, and keep uncommitted probe artifacts from dirtying the worktree.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2882, end_line: 2882}
+    summary: Track the accepted probe-authoring commit
+    rationale: Keep the accepted probe commit visible in the generation outcome.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2904, end_line: 2915}
+    summary: Advance implementation requests to the authoring HEAD
+    rationale: Let coding continue from the commit MiniSWE created for the scoped probe suite.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2917, end_line: 2951}
+    summary: Preserve the base after probe-validation failures
+    rationale: Allow a validated probe-only commit to remain the implementation base even if parsing or baseline execution later fails.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 2980, end_line: 2980}
+    summary: Record a retained probe-authoring commit on failure
+    rationale: Make the commit SHA visible in the unavailable probe artifact.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3154, end_line: 3154}
+    summary: Use the task checkout for probe authoring
+    rationale: Align MiniSWE's actual workspace with the checkout Powdrr monitors.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3166, end_line: 3166}
+    summary: Reject an existing probe authoring file
+    rationale: Avoid overwriting a task checkout file that predates this authoring attempt.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3185, end_line: 3185}
+    summary: Describe the task-checkout authoring boundary
+    rationale: Keep the probe authoring contract explicit about its workspace.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3204, end_line: 3207}
+    summary: Bind probe authoring to the active task checkout
+    rationale: Ensure writes and commits are observed by the coding-agent boundary.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3226, end_line: 3228}
+    summary: Direct MiniSWE to remain in its supplied checkout
+    rationale: Prevent probe files from being authored in a different repository path.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3392, end_line: 3399}
+    summary: Persist authored commit metadata
+    rationale: Record accepted probe commit SHAs alongside the frozen suite.
+  - path: src/powdrr_lift/workrr/feature_endpoint.py
+    type: modified
+    span: {start_line: 3417, end_line: 3475}
+    summary: Clean temporary probe authoring edits
+    rationale: Retain accepted commits while removing uncommitted suite edits after the source is frozen.
+  - path: src/powdrr_lift/workrr/postrun_probes.py
+    type: modified
+    span: {start_line: 676, end_line: 676}
+    summary: Prevent probe imports from writing bytecode into the task checkout
+    rationale: Avoid creating untracked cache files while validating probes in the active repository.
+entities:
+  - id: task-checkout-probe-authoring
+    type: Function
+    action: added
+  - id: probe-execution-without-bytecode
+    type: Function
+    action: added
+entity_relationships: []
+invariants:
+  - id: probe-authoring-commit-is-preserved
+    description: A MiniSWE commit that changes only probe_suite.py is recorded and becomes the implementation request base.
+    action: added
+  - id: uncommitted-probe-artifacts-do-not-dirty-implementation
+    description: After the frozen suite is persisted, uncommitted probe_suite.py and Python bytecode caches do not leave the task checkout dirty.
+    action: added
+guidance: []

@@ -2879,6 +2879,7 @@ def _run_code_agent_phase(
             obligations: tuple[dict[str, Any], ...] = ()
             probes: tuple[PostRunProbe, ...] = ()
             generation_error: str | None = None
+            probe_authoring_commit: dict[str, Any] | None = None
             interaction_plan: dict[str, Any] = {
                 "status": "not_run",
                 "error": None,
@@ -2900,7 +2901,54 @@ def _run_code_agent_phase(
                         state.get("probe_generation_client"),
                     ),
                 )
+                # MiniSWE may commit the authored probe suite. The coding
+                # request must then use that accepted commit as its base.
+                authoring_head = _git_output(
+                    runner, worktree, ["git", "rev-parse", "HEAD"]
+                )
+                if authoring_head != base_commit:
+                    probe_authoring_commit = {
+                        "sha": authoring_head,
+                        "changed_paths": ["probe_suite.py"],
+                    }
+                base_commit = authoring_head
+                request = replace(request, base_commit=base_commit)
             except Exception as error:
+                # A scoped probe commit remains part of the worktree even if
+                # probe validation later fails. Keep the implementation base
+                # aligned so the failed probe stage cannot block coding.
+                authoring_head = _git_output(
+                    runner, worktree, ["git", "rev-parse", "HEAD"]
+                )
+                authoring_paths = set(
+                    _git_output(
+                        runner,
+                        worktree,
+                        [
+                            "git",
+                            "diff",
+                            "--name-only",
+                            "--no-renames",
+                            f"{base_commit}..{authoring_head}",
+                        ],
+                    ).splitlines()
+                )
+                status_paths = _changed_paths(runner, worktree)
+                merge_base = _git_output(
+                    runner, worktree, ["git", "merge-base", base_commit, authoring_head]
+                )
+                if (
+                    authoring_head != base_commit
+                    and merge_base == base_commit
+                    and authoring_paths == {"probe_suite.py"}
+                    and status_paths <= {"probe_suite.py"}
+                ):
+                    probe_authoring_commit = {
+                        "sha": authoring_head,
+                        "changed_paths": sorted(authoring_paths),
+                    }
+                    base_commit = authoring_head
+                    request = replace(request, base_commit=base_commit)
                 generation_error = str(error)
                 probe_root = output_root / "postrun-probes"
                 probe_root.mkdir(parents=True, exist_ok=True)
@@ -2929,6 +2977,7 @@ def _run_code_agent_phase(
                             "generation_status": "unavailable",
                             "generation_method": "minisweagent_pre_coding",
                             "generation_error": generation_error,
+                            "probe_authoring_commit": probe_authoring_commit,
                             "source_instruction": feature_description,
                             "obligations": [],
                             "interaction_obligations": interaction_plan["interactions"],
@@ -3133,7 +3182,7 @@ def _generate_miniswe_postrun_probes(
     repository_contract: Mapping[str, Any],
     interaction_client: WorkflowLLMClient | None = None,
 ) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
-    """Ask MiniSWE to author a frozen probe suite in a clean baseline worktree."""
+    """Ask MiniSWE to author a frozen probe suite in the clean task worktree."""
     if not scenarios:
         return (), ()
     interaction_plan = resolve_probe_interaction_plan(
@@ -3151,19 +3200,12 @@ def _generate_miniswe_postrun_probes(
         encoding="utf-8",
     )
     authoring_root = output_root / "miniswe-probe-authoring"
-    probe_worktree = authoring_root / "repository"
     authoring_root.mkdir(parents=True, exist_ok=True)
-    if probe_worktree.exists():
-        raise PowdrrExecutionError(
-            f"probe-authoring worktree already exists: {probe_worktree}"
-        )
-    _run(
-        runner,
-        worktree,
-        ["git", "worktree", "add", "--detach", str(probe_worktree), base_commit],
-    )
+    probe_worktree = worktree
+    suite_path = probe_worktree / "probe_suite.py"
+    if suite_path.exists():
+        raise PowdrrExecutionError(f"probe authoring path already exists: {suite_path}")
     try:
-        suite_path = probe_worktree / "probe_suite.py"
         scenario_fields = (
             "scenario_id",
             "given",
@@ -3181,7 +3223,9 @@ def _generate_miniswe_postrun_probes(
             "executable post-coding behavior probes for those obligations. "
             "This is a pre-coding step: the solution is intentionally absent. "
             "Do not implement the task or edit source/tests. Write exactly one "
-            "file, `probe_suite.py`, in the repository root. This must be the "
+            "file, `probe_suite.py`, in the current task checkout at "
+            f"`{probe_worktree.resolve()}`. Stay in this checkout and do not "
+            "change directories. This must be the "
             "Stage it with `git add -f probe_suite.py` so the workflow can "
             "verify the authored artifact in repositories with ignore rules. "
             "complete executable Python module: write normal Python imports and "
@@ -3345,6 +3389,14 @@ def _generate_miniswe_postrun_probes(
             "interaction_plan_status": interaction_plan.status,
             "interaction_plan_error": interaction_plan.error,
             "authoring_attempts": authoring_attempts,
+            "authoring_commits": [
+                {
+                    "sha": attempt["worker_commit_sha"],
+                    "changed_paths": attempt.get("changed_paths", []),
+                }
+                for attempt in authoring_attempts
+                if attempt.get("worker_commit_sha")
+            ],
             "probe_source": suite_source,
             "probes": [item.to_data() for item in probes],
             "baseline_results": [item.to_data() for item in baseline_results],
@@ -3362,11 +3414,65 @@ def _generate_miniswe_postrun_probes(
         )
         return obligations, probes
     finally:
-        _run(
-            runner,
-            worktree,
-            ["git", "worktree", "remove", "--force", str(probe_worktree)],
-        )
+        current_head = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
+        if current_head == base_commit:
+            # The frozen source is persisted in probe-suite.json. Remove an
+            # uncommitted copy so implementation starts with a clean worktree.
+            _run(
+                runner,
+                worktree,
+                [
+                    "git",
+                    "rm",
+                    "--cached",
+                    "--ignore-unmatch",
+                    "--force",
+                    "--",
+                    "probe_suite.py",
+                ],
+            )
+            suite_path.unlink(missing_ok=True)
+        else:
+            tracked_suite = (
+                subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", "--", "probe_suite.py"],
+                    cwd=worktree,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                ).returncode
+                == 0
+            )
+            if tracked_suite:
+                # Keep an accepted authoring commit, but discard any uncommitted
+                # repair edits after their validated source is frozen above.
+                _run(
+                    runner,
+                    worktree,
+                    [
+                        "git",
+                        "restore",
+                        "--staged",
+                        "--worktree",
+                        "--",
+                        "probe_suite.py",
+                    ],
+                )
+            else:
+                _run(
+                    runner,
+                    worktree,
+                    [
+                        "git",
+                        "rm",
+                        "--cached",
+                        "--ignore-unmatch",
+                        "--force",
+                        "--",
+                        "probe_suite.py",
+                    ],
+                )
+                suite_path.unlink(missing_ok=True)
 
 
 def _render_precode_probe_context(probes: Sequence[PostRunProbe]) -> str:

@@ -673,6 +673,7 @@ def run_postrun_probes(
             )
             environment = os.environ.copy()
             environment.pop("VIRTUAL_ENV", None)
+            environment["PYTHONDONTWRITEBYTECODE"] = "1"
             existing_pythonpath = environment.get("PYTHONPATH", "")
             import_paths = [str(root), str(root / "src")]
             if existing_pythonpath:

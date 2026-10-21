@@ -464,9 +464,12 @@ def parse_generated_postrun_probe_source(
     *,
     instruction: str,
     repository_contract: Mapping[str, Any] | None = None,
-    interaction_obligations: Sequence[Mapping[str, Any]] = (),
-) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
-    """Validate MiniSWE's executable probes and typed obligations in one module."""
+) -> tuple[
+    tuple[dict[str, Any], ...],
+    tuple[dict[str, Any], ...],
+    tuple[PostRunProbe, ...],
+]:
+    """Validate MiniSWE's executable probes and Python-literal metadata."""
     if not isinstance(source, str) or not source.strip():
         raise ValueError("probe suite source is empty")
     try:
@@ -481,45 +484,37 @@ def parse_generated_postrun_probe_source(
         if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef))
         and item.name.startswith("test_probe_")
     ]
-    module_doc_node = tree.body[0] if tree.body else None
-    if not (
-        isinstance(module_doc_node, ast.Expr)
-        and isinstance(module_doc_node.value, ast.Constant)
-        and isinstance(module_doc_node.value.value, str)
+    module_metadata = _probe_module_metadata(tree)
+    raw_obligations = module_metadata["OBLIGATIONS"]
+    raw_interactions = module_metadata["INTERACTIONS"]
+    raw_probe_metadata = module_metadata["PROBE_METADATA"]
+    if not isinstance(raw_obligations, list):
+        raise ValueError("OBLIGATIONS must be a Python list")
+    if not isinstance(raw_interactions, list):
+        raise ValueError("INTERACTIONS must be a Python list")
+    if not isinstance(raw_probe_metadata, Mapping) or any(
+        not isinstance(key, str) or not isinstance(value, Mapping)
+        for key, value in raw_probe_metadata.items()
     ):
-        raise ValueError(
-            "probe suite must declare typed obligations in its module docstring"
-        )
-    allowed_top_level = (ast.Import, ast.ImportFrom, ast.FunctionDef)
-    if any(
-        item is not module_doc_node and not isinstance(item, allowed_top_level)
-        for item in tree.body
-    ):
-        raise ValueError("probe suite has executable module-level statements")
-
-    module_doc = ast.get_docstring(tree, clean=False)
-    if module_doc is None:
-        raise ValueError(
-            "probe suite must declare typed obligations in its module docstring"
-        )
-    try:
-        module_metadata = json.loads(module_doc)
-    except json.JSONDecodeError as error:
-        raise ValueError(
-            f"probe suite module docstring must be JSON: {error}"
-        ) from error
-    if not isinstance(module_metadata, Mapping) or not isinstance(
-        module_metadata.get("obligations"), list
-    ):
-        raise ValueError("probe suite module metadata must contain obligations")
+        raise ValueError("PROBE_METADATA must map function names to Python dictionaries")
+    interaction_obligations = validate_probe_interaction_plan(
+        raw_interactions,
+        instruction=instruction,
+        scenarios=scenarios,
+    )
     obligations = _validate_probe_obligations(
-        module_metadata["obligations"],
+        raw_obligations,
         scenarios,
         instruction=instruction,
         repository_contract=repository_contract or {},
     )
     if not functions and any(item["supported"] is True for item in obligations):
         raise ValueError("probe suite must define probes for supported obligations")
+    function_names = {item.name for item in functions}
+    if set(raw_probe_metadata) != function_names:
+        raise ValueError(
+            "PROBE_METADATA function names must match the test_probe_* functions"
+        )
     obligation_by_id = {item["obligation_id"]: item for item in obligations}
 
     known_scenarios = {str(item["scenario_id"]) for item in scenarios}
@@ -541,7 +536,7 @@ def parse_generated_postrun_probe_source(
             or function.args.kwarg
         ):
             raise ValueError(f"{function.name} must take no arguments")
-        metadata = _probe_metadata(function)
+        metadata = raw_probe_metadata[function.name]
         probe_id = _required_text(metadata, "probe_id")
         scenario_id = _required_text(metadata, "scenario_id")
         oracle_basis = _required_text(metadata, "oracle_basis")
@@ -613,7 +608,53 @@ def parse_generated_postrun_probe_source(
             "probe suite omitted required interactions: "
             + ", ".join(sorted(missing_interactions))
         )
-    return obligations, tuple(probes)
+    return obligations, interaction_obligations, tuple(probes)
+
+
+def _probe_module_metadata(tree: ast.Module) -> dict[str, Any]:
+    """Read only literal metadata assignments; never execute model-authored code."""
+    metadata: dict[str, Any] = {}
+    expected_names = {"OBLIGATIONS", "INTERACTIONS", "PROBE_METADATA"}
+    for index, node in enumerate(tree.body):
+        if (
+            index == 0
+            and isinstance(node, ast.Expr)
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ):
+            continue
+        if isinstance(
+            node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
+            continue
+        if isinstance(node, ast.Assign):
+            if (
+                len(node.targets) != 1
+                or not isinstance(node.targets[0], ast.Name)
+                or node.targets[0].id not in expected_names
+            ):
+                raise ValueError(
+                    "probe suite may assign only OBLIGATIONS, INTERACTIONS, "
+                    "and PROBE_METADATA at module scope"
+                )
+            name = node.targets[0].id
+            if name in metadata:
+                raise ValueError(f"probe suite assigns {name} more than once")
+            try:
+                metadata[name] = ast.literal_eval(node.value)
+            except (ValueError, TypeError, SyntaxError) as error:
+                raise ValueError(
+                    f"{name} must be a literal Python value (lists, dictionaries, "
+                    "strings, numbers, and booleans only)"
+                ) from error
+            continue
+        raise ValueError("probe suite has executable module-level statements")
+    missing = expected_names - set(metadata)
+    if missing:
+        raise ValueError(
+            "probe suite must define Python literals for: " + ", ".join(sorted(missing))
+        )
+    return metadata
 
 
 def _validate_probe_obligations(

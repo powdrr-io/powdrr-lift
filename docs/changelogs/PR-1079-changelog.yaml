@@ -1,0 +1,51 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1079
+title: Fall back when provider grammar rejects valid schemas
+intent:
+  problem: Procedrr validation can stop before local schema validation when an OpenAI-compatible provider rejects a standard JSON Schema keyword in constrained decoding.
+  goal: Retry the structured response as JSON and continue enforcing the original schema locally.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 194, end_line: 209}
+    summary: Retry unsupported constrained schemas without provider-side grammar
+    rationale: Procedrr already validates each decoded response against the complete original schema before accepting it.
+  - path: src/powdrr_lift/workrr/procedrr.py
+    type: modified
+    span: {start_line: 475, end_line: 477}
+    summary: Identify provider grammar errors for unimplemented schema keywords
+    rationale: Limit the fallback to errors that explicitly report an unsupported grammar keyword.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 201, end_line: 258}
+    summary: Verify JSON fallback still enforces the original schema locally
+    rationale: Simulate a provider rejecting contains, return an invalid object once, and confirm local validation retries until a valid object is produced.
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 37, end_line: 50}
+    summary: Refresh source spans after extending the Procedrr client
+    rationale: Keep the repository bootstrap golden aligned with the changed client class and method spans.
+entities:
+  - id: unsupported-schema-grammar-fallback
+    type: Function
+    action: added
+  - id: unsupported-schema-grammar-fallback-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: fallback-test-proves-local-schema-enforcement
+    type: verifies
+    source: unsupported-schema-grammar-fallback-test
+    target: unsupported-schema-grammar-fallback
+    action: added
+    description: The regression proves unsupported provider grammar falls back to plain JSON without bypassing local JSON Schema validation.
+invariants:
+  - id: provider-grammar-fallback-keeps-local-validation
+    description: When provider grammar cannot encode a JSON Schema keyword, Procedrr must validate the response against the original complete schema before accepting it.
+    action: added
+guidance:
+  - id: fallback-only-on-unsupported-schema-grammar
+    description: Retry without provider structured-output grammar only for an explicit unimplemented-schema-keyword error; keep ordinary provider failures unchanged.
+    action: added

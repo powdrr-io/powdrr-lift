@@ -14,6 +14,7 @@ from typing import Any, cast
 from jsonschema import ValidationError as JsonSchemaError
 from jsonschema import validate as validate_json
 
+from powdrr_lift.errors import ProviderExecutionError
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from procedrr.fragments import apply_fragment_step_json, start_fragment
 
@@ -197,6 +198,14 @@ class WorkrrProcedrrClient:
                 except TypeError as error:
                     if "response_schema" not in str(error):
                         raise
+                    result = self._client.complete_json(messages)
+                except ProviderExecutionError as error:
+                    if not _is_unsupported_schema_keyword(error):
+                        raise
+                    # Keep the full schema for local validation in parse();
+                    # retry only the provider transport without constrained
+                    # decoding when its grammar backend rejects a standard
+                    # JSON Schema keyword.
                     result = self._client.complete_json(messages)
                 self._record_provider_attempt(
                     trace_id, attempt, started, outcome="succeeded"
@@ -461,6 +470,11 @@ def _is_invalid_json_response(error: Exception) -> bool:
         or "invalid json" in message
         or "must be a json object" in message
     )
+
+
+def _is_unsupported_schema_keyword(error: ProviderExecutionError) -> bool:
+    """Recognize providers that reject a JSON Schema keyword in grammar mode."""
+    return "grammar error: unimplemented keys:" in str(error).casefold()
 
 
 __all__ = [

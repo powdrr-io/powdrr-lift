@@ -8,6 +8,7 @@ import subprocess
 import sys
 from collections.abc import Mapping
 from pathlib import Path
+from pprint import pformat
 from typing import Any
 
 import pytest
@@ -36,6 +37,7 @@ def _write_supported_probe_module(
 ) -> None:
     obligations = []
     functions = []
+    probe_metadata = {}
     for index, scenario in enumerate(scenarios):
         scenario_id = scenario["scenario_id"]
         obligation_id = f"obligation-{scenario_id}"
@@ -61,16 +63,16 @@ def _write_supported_probe_module(
             "obligation_id": obligation_id,
             "oracle_basis": evidence,
         }
+        probe_metadata[f"test_probe_{index}"] = metadata
         function_body = body.format(index=index)
         functions.append(
             f"def test_probe_{index}():\n"
-            f'    """{json.dumps(metadata)}"""\n'
             + "\n".join(f"    {line}" for line in function_body.splitlines())
         )
     source = (
-        '"""'
-        + json.dumps({"obligations": obligations})
-        + '"""\n'
+        f"OBLIGATIONS = {pformat(obligations)}\n"
+        "INTERACTIONS = []\n"
+        f"PROBE_METADATA = {pformat(probe_metadata)}\n"
         + "\n".join(f"import {name}" for name in imports)
         + "\n\n"
         + "\n\n".join(functions)
@@ -133,7 +135,9 @@ def keep_probe_authoring_on_deterministic_miniswe(
             for item in scenarios
         ]
         (worktree_root / "probe_suite.py").write_text(
-            '"""' + json.dumps({"obligations": obligations}) + '"""\n',
+            f"OBLIGATIONS = {pformat(obligations)}\n"
+            "INTERACTIONS = []\n"
+            "PROBE_METADATA = {}\n",
             encoding="utf-8",
         )
         subprocess.run(
@@ -731,11 +735,24 @@ class ProbeEnabledPlanningClient(DeterministicPlanningClient):
             return {
                 "source": (
                     "import contextlib\nimport io\nimport runpy\n\n"
+                    "OBLIGATIONS = [{'obligation_id': 'obl-output', "
+                    "'scenario_id': 'scenario:instruction-001', "
+                    "'category': 'transformation', 'rule': 'other', "
+                    "'supported': True, 'summary': 'Both lines are printed.', "
+                    "'condition': 'Run hello_world.py.', "
+                    "'operation': 'Capture standard output.', "
+                    "'expected': 'Both required lines appear in order.', "
+                    "'operands': [], 'evidence': [{'source': 'instruction', "
+                    "'quote': 'Add a second greeting to hello_world.py.'}], "
+                    "'unresolved_reason': ''}]\nINTERACTIONS = []\n"
+                    "PROBE_METADATA = {'test_probe_output': {"
+                    "'probe_id': 'greeting-output', "
+                    "'scenario_id': 'scenario:instruction-001', "
+                    "'obligation_id': 'obl-output', "
+                    "'oracle_basis': 'The instruction explicitly names both "
+                    "output lines.'"
+                    "}}\n\n"
                     "def test_probe_output():\n"
-                    '    """{"probe_id": "greeting-output", '
-                    '"scenario_id": "scenario:instruction-001", '
-                    '"oracle_basis": '
-                    '"The instruction explicitly names both output lines."}"""\n'
                     "    output = io.StringIO()\n"
                     "    with contextlib.redirect_stdout(output):\n"
                     "        runpy.run_path('hello_world.py')\n"
@@ -798,11 +815,25 @@ class RepairProbePlanningClient(ProbeEnabledPlanningClient):
             return {
                 "source": (
                     "import hello_world\n\n"
+                    "OBLIGATIONS = [{'obligation_id': 'obl-greeting-count', "
+                    "'scenario_id': 'scenario:instruction-001', "
+                    "'category': 'transformation', 'rule': 'other', "
+                    "'supported': True, 'summary': 'The function returns two.', "
+                    "'condition': 'Call greeting_count().', "
+                    "'operation': 'Read its return value.', "
+                    "'expected': 'The value is 2.', 'operands': [], "
+                    "'evidence': [{'source': 'instruction', "
+                    "'quote': 'greeting_count() to hello_world.py and have it "
+                    "return 2.'}], "
+                    "'unresolved_reason': ''}]\nINTERACTIONS = []\n"
+                    "PROBE_METADATA = {'test_probe_greeting_count': {"
+                    "'probe_id': 'greeting-count', "
+                    "'scenario_id': 'scenario:instruction-001', "
+                    "'obligation_id': 'obl-greeting-count', "
+                    "'oracle_basis': 'The instruction requires greeting_count() "
+                    "to return 2.'"
+                    "}}\n\n"
                     "def test_probe_greeting_count():\n"
-                    '    """{"probe_id": "greeting-count", '
-                    '"scenario_id": "scenario:instruction-001", '
-                    '"oracle_basis": '
-                    '"The instruction requires greeting_count() to return 2."}"""\n'
                     "    assert hello_world.greeting_count() == 2\n"
                 )
             }
@@ -1217,12 +1248,13 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     )
 
 
-def test_implement_feature_records_invalid_generated_probe_and_continues(
+def test_implement_feature_records_invalid_generated_probe_as_issue(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo = _fixture_repo(tmp_path)
     fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
+    output_root = tmp_path / "feature-output"
     authoring_calls = 0
 
     def author_invalid_probe(
@@ -1254,6 +1286,7 @@ def test_implement_feature_records_invalid_generated_probe_and_continues(
             work_item_name="hello-world-invalid-generated-probe",
             repo_root=repo,
             allowed_paths=("hello_world.py",),
+            output_root=output_root,
             validation_command=(
                 sys.executable,
                 "-m",
@@ -1270,18 +1303,17 @@ def test_implement_feature_records_invalid_generated_probe_and_continues(
         )
     )
 
-    assert result.status == "completed", (
+    assert result.status == "completed_with_issues", (
         result.failure.message if result.failure else None
     )
-    assert result.review["postrun_probe_generation"]["status"] == "unavailable"
-    assert (
-        "probe suite is not valid Python"
-        in result.review["postrun_probe_generation"]["error"]
-    )
-    suite_path = Path(result.review["postrun_probe_generation"]["suite_path"])
+    assert result.failure is not None
+    assert "cannot open a PR before a passing review" in result.failure.message
+    suite_path = output_root / "postrun-probes" / "probe-suite.json"
     suite = json.loads(suite_path.read_text(encoding="utf-8"))
     assert suite["probes"] == []
     assert suite["generation_status"] == "unavailable"
+    assert suite["interaction_plan_status"] == "failed"
+    assert "probe suite is not valid Python" in suite["generation_error"]
     assert (repo / "hello_world.py").read_text(encoding="utf-8") == (
         'print("Hello, world!")\nprint("Hello from Powdrr!")\n'
     )

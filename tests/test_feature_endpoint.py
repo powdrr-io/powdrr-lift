@@ -103,7 +103,6 @@ from powdrr_lift.workrr.feature_endpoint import (
     run_feature_endpoint,
     run_feature_in_place,
 )
-from powdrr_lift.workrr.postrun_probes import ProbeInteractionPlan
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
@@ -147,17 +146,10 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
         if worker_commit_shas:
-            assert "probe suite has executable module-level statements" in (
-                request.prompt
-            )
-            assert "move all setup into the `test_probe_*` functions" in (
-                request.prompt
-            )
+            assert "probe suite may assign only OBLIGATIONS" in request.prompt
+            assert "required literal assignments" in request.prompt
         else:
-            assert (
-                "only the module docstring, imports, and function definitions "
-                "at module scope"
-            ) in request.prompt
+            assert ("three Python literal values at module scope") in request.prompt
         assert "Task instruction:\nAdd selector handling." in request.prompt
         assert '"scenario_id": "selector"' in request.prompt
         assert '"given": "the public API receives a selector"' in request.prompt
@@ -171,7 +163,7 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         assert "must not be sent as a requirement" not in request.prompt
         assert "large-review-metadata.json" not in request.prompt
         assert "complete executable Python module" in request.prompt
-        assert "Do not return JSON" in request.prompt
+        assert "Do not encode metadata as JSON" in request.prompt
         obligation = {
             "obligation_id": "selector-obligation",
             "scenario_id": "selector",
@@ -187,17 +179,16 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
             "unresolved_reason": "",
         }
         source = (
-            '"""' + json.dumps({"obligations": [obligation]}) + '"""\nimport module\n\n'
-            "def test_probe_selector():\n"
-            '    """{"probe_id": "selector-result", '
-            '"scenario_id": "selector", '
-            '"obligation_id": "selector-obligation", '
-            '"oracle_basis": "The instruction defines this result."}"""\n'
+            f"OBLIGATIONS = {[obligation]!r}\nINTERACTIONS = []\n"
+            "PROBE_METADATA = {'test_probe_selector': {'probe_id': 'selector-result', "
+            "'scenario_id': 'selector', 'obligation_id': 'selector-obligation', "
+            "'oracle_basis': 'The instruction defines this result.'}}\n"
+            "import module\n\ndef test_probe_selector():\n"
             "    assert module.public_api('value') == 'handled:value'\n"
         )
         if not worker_commit_shas:
             source = source.replace(
-                "import module", "import module\nMODULE_SETUP = True"
+                "import module", "UNSAFE_MODULE_SETUP = True\nimport module"
             )
         (worktree_root / "probe_suite.py").write_text(source, encoding="utf-8")
         _git(worktree_root, "add", "-f", "probe_suite.py")
@@ -284,23 +275,9 @@ def test_interaction_plan_final_gate_distinguishes_empty_and_failed() -> None:
     }
 
 
-@pytest.mark.parametrize(
-    ("plan", "expected_status"),
-    [
-        (ProbeInteractionPlan("empty"), "empty"),
-        (
-            ProbeInteractionPlan(
-                "failed", error="ValueError: invalid interaction evidence"
-            ),
-            "failed",
-        ),
-    ],
-)
 def test_miniswe_authors_individual_probes_for_empty_or_failed_interaction_plan(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    plan: ProbeInteractionPlan,
-    expected_status: str,
 ) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
@@ -316,11 +293,6 @@ def test_miniswe_authors_individual_probes_for_empty_or_failed_interaction_plan(
     output_root = tmp_path / "artifacts"
     scenarios = ({"scenario_id": "single-requirement"},)
 
-    monkeypatch.setattr(
-        "powdrr_lift.workrr.feature_endpoint.resolve_probe_interaction_plan",
-        lambda *_args, **_kwargs: plan,
-    )
-
     def author_probe_suite(
         self: MiniSWEAgentProvider,
         request: ImplementationRequest,
@@ -328,8 +300,8 @@ def test_miniswe_authors_individual_probes_for_empty_or_failed_interaction_plan(
         worktree_root: Path,
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
-        assert f"Interaction-plan status: {expected_status}" in request.prompt
-        assert "Required cross-requirement interactions" not in request.prompt
+        assert "Plan interactions as part of this same artifact" in request.prompt
+        assert "Use an empty list when no interaction is supported" in request.prompt
         obligation = {
             "obligation_id": "single-obligation",
             "scenario_id": "single-requirement",
@@ -345,13 +317,12 @@ def test_miniswe_authors_individual_probes_for_empty_or_failed_interaction_plan(
             "unresolved_reason": "",
         }
         source = (
-            '"""' + json.dumps({"obligations": [obligation]}) + '"""\n'
-            "import module\n\n"
+            f"OBLIGATIONS = {[obligation]!r}\nINTERACTIONS = []\n"
+            "PROBE_METADATA = {'test_probe_value': {'probe_id': 'value', "
+            "'scenario_id': 'single-requirement', "
+            "'obligation_id': 'single-obligation', "
+            "'oracle_basis': 'Keep values.'}}\nimport module\n\n"
             "def test_probe_value():\n"
-            '    """{"probe_id": "value", '
-            '"scenario_id": "single-requirement", '
-            '"obligation_id": "single-obligation", '
-            '"oracle_basis": "Keep values."}"""\n'
             "    assert module.public_api('value') == 'kept:value'\n"
         )
         (worktree_root / "probe_suite.py").write_text(source, encoding="utf-8")
@@ -388,7 +359,6 @@ def test_miniswe_authors_individual_probes_for_empty_or_failed_interaction_plan(
         scenarios=scenarios,
         instruction="Keep values.",
         repository_contract={},
-        interaction_client=None,
     )
 
     assert len(obligations) == 1
@@ -400,11 +370,9 @@ def test_miniswe_authors_individual_probes_for_empty_or_failed_interaction_plan(
         (output_root / "postrun-probes" / "interaction-plan.json").read_text()
     )
     assert suite["generation_status"] == "generated"
-    assert suite["interaction_plan_status"] == expected_status
-    assert plan_artifact["status"] == expected_status
-    assert (suite["interaction_plan_error"] is not None) is (
-        expected_status == "failed"
-    )
+    assert suite["interaction_plan_status"] == "empty"
+    assert plan_artifact["status"] == "empty"
+    assert suite["interaction_plan_error"] is None
 
 
 def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
@@ -439,31 +407,6 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
         ],
     }
 
-    class _PlanningClient:
-        calls = 0
-
-        def complete_json(
-            self, messages: list[dict[str, str]], **_: Any
-        ) -> dict[str, Any]:
-            self.calls += 1
-            if self.calls == 1:
-                return {
-                    "interactions": [
-                        {
-                            **{
-                                key: value
-                                for key, value in interaction.items()
-                                if key != "evidence_quotes"
-                            },
-                            "evidence_quote_ids": ["quote-001", "quote-002"],
-                        }
-                    ]
-                }
-            assert "proposed_interactions" in messages[1]["content"]
-            return {"interactions": []}
-
-    planning_client = _PlanningClient()
-
     def author_probe_suite(
         self: MiniSWEAgentProvider,
         request: ImplementationRequest,
@@ -471,8 +414,7 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
         worktree_root: Path,
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
-        assert "Interaction-plan status: generated" in request.prompt
-        assert "special-value-difference" in request.prompt
+        assert "Plan interactions as part of this same artifact" in request.prompt
         obligations = [
             {
                 "obligation_id": f"obligation-{scenario_id}",
@@ -495,10 +437,19 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
             }
             for scenario_id in ("special-value", "operator")
         ]
+        model_interaction = {
+            "interaction_id": "special-value-difference",
+            "scenario_ids": ["special-value", "operator"],
+            "condition": interaction["condition"],
+            "operation": interaction["operation"],
+            "expected": interaction["expected"],
+            "evidence_quote_ids": ["quote-001", "quote-002"],
+        }
         source = [
-            '"""' + json.dumps({"obligations": obligations}) + '"""',
-            "import module",
+            f"OBLIGATIONS = {obligations!r}",
+            f"INTERACTIONS = {[model_interaction]!r}",
         ]
+        probe_metadata = {}
         for index, scenario_id in enumerate(("special-value", "operator")):
             metadata = {
                 "probe_id": f"probe-{index}",
@@ -507,14 +458,16 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
                 "oracle_basis": "Both instruction clauses define this interaction.",
                 "interaction_ids": (["special-value-difference"] if index == 0 else []),
             }
+            probe_metadata[f"test_probe_{index}"] = metadata
             source.extend(
                 [
                     "",
                     f"def test_probe_{index}():",
-                    f'    """{json.dumps(metadata)}"""',
                     "    assert module.public_api('value') == 'implemented'",
                 ]
             )
+        source.insert(2, f"PROBE_METADATA = {probe_metadata!r}")
+        source.insert(3, "import module")
         (worktree_root / "probe_suite.py").write_text(
             "\n".join(source) + "\n", encoding="utf-8"
         )
@@ -548,15 +501,16 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
         scenarios=scenarios,
         instruction=instruction,
         repository_contract={},
-        interaction_client=planning_client,
     )
 
-    assert planning_client.calls == 2
     assert probes[0].interaction_ids == ("special-value-difference",)
     suite = json.loads(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
-    assert suite["interaction_obligations"] == [interaction]
+    assert suite["interaction_obligations"] == [
+        {key: value for key, value in interaction.items() if key != "evidence_quotes"}
+        | {"evidence_quotes": interaction["evidence_quotes"]}
+    ]
     assert suite["interaction_plan_status"] == "generated"
     assert suite["baseline_results"][0]["status"] == "failed"
 
@@ -605,12 +559,11 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
             "unresolved_reason": "",
         }
         (worktree_root / "probe_suite.py").write_text(
-            '"""' + json.dumps({"obligations": [obligation]}) + '"""\nimport module\n\n'
-            "def test_probe_selector():\n"
-            '    """{"probe_id": "selector-result", '
-            '"scenario_id": "selector", '
-            '"obligation_id": "selector-obligation", '
-            '"oracle_basis": "The instruction defines this result."}"""\n'
+            f"OBLIGATIONS = {[obligation]!r}\nINTERACTIONS = []\n"
+            "PROBE_METADATA = {'test_probe_selector': {'probe_id': 'selector-result', "
+            "'scenario_id': 'selector', 'obligation_id': 'selector-obligation', "
+            "'oracle_basis': 'The instruction defines this result.'}}\n"
+            "import module\n\ndef test_probe_selector():\n"
             f"    assert module.public_api('value') == '{expected}'\n",
             encoding="utf-8",
         )

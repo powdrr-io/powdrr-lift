@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import json
+import ast
 import sys
 from pathlib import Path
 from typing import Any
@@ -11,14 +11,11 @@ from powdrr_lift.workrr.postrun_probes import (
     PostRunProbe,
     PostRunProbeResult,
     baseline_probe_failures,
-    generate_probe_interaction_plan,
     parse_generated_postrun_probe_source,
     probe_failures,
-    resolve_probe_interaction_plan,
     run_postrun_probes,
     validate_probe_interaction_plan,
 )
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 
 
 def _source(body: str = "assert module.public_api('value') == 'handled:value'") -> str:
@@ -39,20 +36,25 @@ def _source(body: str = "assert module.public_api('value') == 'handled:value'") 
         }
     ]
     return (
-        f'"""{json.dumps({"obligations": obligations})}"""\n'
+        f"OBLIGATIONS = {obligations!r}\n"
+        "INTERACTIONS = []\n"
+        "PROBE_METADATA = {'test_probe_selector': "
+        "{'probe_id': 'selector-result', 'scenario_id': 'selector', "
+        "'obligation_id': 'selector-obligation', "
+        "'oracle_basis': 'The instruction defines this result.'}}\n"
         "import module\n\n"
         "def test_probe_selector():\n"
-        '    """{"probe_id": "selector-result", '
-        '"scenario_id": "selector", '
-        '"obligation_id": "selector-obligation", '
-        '"oracle_basis": "The instruction defines this result."}"""\n'
         f"    {body}\n"
     )
 
 
 def _parse(
     source: str, scenarios: tuple[dict[str, object], ...]
-) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
+) -> tuple[
+    tuple[dict[str, Any], ...],
+    tuple[dict[str, Any], ...],
+    tuple[PostRunProbe, ...],
+]:
     return parse_generated_postrun_probe_source(
         source,
         scenarios,
@@ -63,13 +65,14 @@ def _parse(
 
 def test_parse_generated_probe_source_preserves_complete_code_and_metadata() -> None:
     source = _source()
-    obligations, probes = _parse(source, ({"scenario_id": "selector"},))
+    obligations, interactions, probes = _parse(source, ({"scenario_id": "selector"},))
 
     assert len(probes) == 1
     assert probes[0].probe_id == "selector-result"
     assert probes[0].function_name == "test_probe_selector"
     assert probes[0].test_source == source
     assert obligations[0]["category"] == "transformation"
+    assert interactions == ()
     assert probes[0].obligation_id == "selector-obligation"
 
 
@@ -77,7 +80,7 @@ def test_probe_imports_inside_function_are_valid_python() -> None:
     source = _source(
         "import module\n    assert module.public_api('value') == 'handled:value'"
     )
-    _, probes = _parse(source, ({"scenario_id": "selector"},))
+    _, _, probes = _parse(source, ({"scenario_id": "selector"},))
     assert len(probes) == 1
 
 
@@ -87,7 +90,7 @@ def test_probe_can_call_public_api_in_exception_handling_before_assertion() -> N
         "    except ValueError:\n        raised = True\n    assert raised"
     )
 
-    _, probes = _parse(source, ({"scenario_id": "selector"},))
+    _, _, probes = _parse(source, ({"scenario_id": "selector"},))
 
     assert len(probes) == 1
 
@@ -110,7 +113,7 @@ def test_probe_can_call_public_api_in_exception_handling_before_assertion() -> N
         ),
         (
             "def test_probe_selector():\n    assert module.public_api('x')\n",
-            "module docstring",
+            "Python literals",
         ),
     ],
 )
@@ -162,238 +165,12 @@ def test_interaction_plan_requires_multiple_scenarios_and_exact_evidence() -> No
         )
 
 
-def test_interaction_plan_is_generated_as_structured_metadata() -> None:
-    class _PlanningClient:
-        def complete_json(
-            self, messages: list[dict[str, str]], **_: Any
-        ) -> dict[str, Any]:
-            assert "interactions" in messages[0]["content"]
-            if "proposed_interactions" in messages[1]["content"]:
-                return {
-                    "interactions": [
-                        {
-                            "interaction_id": "special-value-with-operator",
-                            "scenario_ids": ["special-value", "operator"],
-                            "condition": "A special value is an operand.",
-                            "operation": "Evaluate the expression.",
-                            "expected": "Only selected results are suppressed.",
-                            "evidence_quote_ids": ["quote-001", "quote-002"],
-                        }
-                    ]
-                }
-            return {"interactions": []}
-
-    interactions = generate_probe_interaction_plan(
-        _PlanningClient(),
-        instruction="all values are selected; operators are supported",
-        scenarios=(
-            {"scenario_id": "special-value"},
-            {"scenario_id": "operator"},
-        ),
-    )
-
-    assert interactions[0]["interaction_id"] == "special-value-with-operator"
-
-
-def test_interaction_plan_repairs_invalid_initial_and_review_responses() -> None:
-    interaction = {
-        "interaction_id": "special-value-with-operator",
-        "scenario_ids": ["special-value", "operator"],
-        "condition": "A special value is used as an operator operand.",
-        "operation": "Apply the operator to the special value.",
-        "expected": "The result follows the operator rule.",
-        "evidence_quotes": ["all values are selected;", "operators are supported"],
-    }
-    model_interaction = {
-        **{
-            key: value for key, value in interaction.items() if key != "evidence_quotes"
-        },
-        "evidence_quote_ids": ["quote-001", "quote-002"],
-    }
-
-    class _RepairingClient:
-        calls = 0
-
-        def complete_json(
-            self, messages: list[dict[str, str]], **_: Any
-        ) -> dict[str, Any]:
-            self.calls += 1
-            if self.calls == 1:
-                return {
-                    "interactions": [
-                        {
-                            **model_interaction,
-                            "evidence_quote_ids": ["quote-999", "quote-002"],
-                        }
-                    ]
-                }
-            if self.calls == 2:
-                repair = json.loads(messages[1]["content"])
-                assert repair["invalid_interactions"][0]["validation_error"]
-                return {"interactions": [model_interaction]}
-            if self.calls == 3:
-                assert "proposed_interactions" in messages[1]["content"]
-                return {
-                    "interactions": [
-                        {
-                            **model_interaction,
-                            "evidence_quote_ids": ["quote-999", "quote-002"],
-                        }
-                    ]
-                }
-            repair = json.loads(messages[1]["content"])
-            assert repair["invalid_interactions"][0]["validation_error"]
-            return {"interactions": [model_interaction]}
-
-    client = _RepairingClient()
-    interactions = generate_probe_interaction_plan(
-        client,
-        instruction="all values are selected; operators are supported",
-        scenarios=(
-            {"scenario_id": "special-value"},
-            {"scenario_id": "operator"},
-        ),
-    )
-
-    assert client.calls == 4
-    assert interactions == (interaction,)
-
-
-def test_missing_evidence_ids_reach_targeted_interaction_repair(
-    tmp_path: Path,
-) -> None:
-    instruction = "all values are selected; operators are supported"
-    scenarios = (
-        {"scenario_id": "special-value"},
-        {"scenario_id": "operator"},
-    )
-    interaction = {
-        "interaction_id": "special-value-with-operator",
-        "scenario_ids": ["special-value", "operator"],
-        "condition": "A special value is an operator operand.",
-        "operation": "Apply the operator to the special value.",
-        "expected": "The result follows the operator rule.",
-        "evidence_quote_ids": ["quote-001", "quote-002"],
-    }
-
-    class _Provider:
-        calls = 0
-
-        def complete_json(
-            self,
-            _messages: list[dict[str, str]],
-            *,
-            response_schema: dict[str, Any] | None = None,
-        ) -> dict[str, Any]:
-            self.calls += 1
-            assert response_schema is not None
-            item_schema = response_schema["properties"]["interactions"]["items"]
-            assert "evidence_quote_ids" not in item_schema["required"]
-            if self.calls == 1:
-                return {
-                    "interactions": [
-                        {
-                            key: value
-                            for key, value in interaction.items()
-                            if key != "evidence_quote_ids"
-                        }
-                    ]
-                }
-            if self.calls == 2:
-                return {"interactions": [interaction]}
-            return {"interactions": []}
-
-    provider = _Provider()
-    client = WorkrrProcedrrClient(
-        provider,
-        process_directory=tmp_path,
-        max_retries=0,
-        provider_retry_attempts=0,
-    )
-
-    interactions = generate_probe_interaction_plan(
-        client,
-        instruction=instruction,
-        scenarios=scenarios,
-    )
-
-    assert provider.calls == 3
-    assert interactions == (
-        {
-            **{
-                key: value
-                for key, value in interaction.items()
-                if key != "evidence_quote_ids"
-            },
-            "evidence_quotes": ["all values are selected;", "operators are supported"],
-        },
-    )
-
-
-def test_interaction_plan_result_distinguishes_empty_from_failure() -> None:
-    class _EmptyClient:
-        def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:
-            return {"interactions": []}
-
-    class _InvalidClient:
-        def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:
-            return {
-                "interactions": [
-                    {
-                        "interaction_id": "bad-interaction",
-                        "scenario_ids": ["special-value", "operator"],
-                        "condition": "The requirements are combined.",
-                        "operation": "Apply the operation.",
-                        "expected": "The combined result is returned.",
-                        "evidence_quote_ids": ["quote-999", "quote-998"],
-                    }
-                ]
-            }
-
-    scenarios = (
-        {"scenario_id": "special-value"},
-        {"scenario_id": "operator"},
-    )
-    instruction = "Special values are operands. Operators combine values."
-
-    empty = resolve_probe_interaction_plan(
-        _EmptyClient(),
-        instruction=instruction,
-        scenarios=scenarios,
-    )
-    failed = resolve_probe_interaction_plan(
-        _InvalidClient(),
-        instruction=instruction,
-        scenarios=scenarios,
-    )
-    unconfigured = resolve_probe_interaction_plan(
-        None, instruction=instruction, scenarios=scenarios
-    )
-
-    assert empty.status == "empty"
-    assert empty.interactions == ()
-    assert empty.error is None
-    assert failed.status == "failed"
-    assert failed.interactions == ()
-    assert failed.error is not None and "evidence_quote_ids" in failed.error
-    assert unconfigured.status == "not_configured"
-    assert unconfigured.error is None
-
-
 def test_probe_suite_must_cover_each_required_interaction() -> None:
     instruction = "all values are selected; difference removes a value"
     scenarios = (
         {"scenario_id": "special-value"},
         {"scenario_id": "operator"},
     )
-    interaction = {
-        "interaction_id": "special-value-with-operator",
-        "scenario_ids": ["special-value", "operator"],
-        "condition": "A special value is used as an operator operand.",
-        "operation": "Apply the operator to the special value and a concrete value.",
-        "expected": "The result contains only the values selected by the operation.",
-        "evidence_quotes": ["all values are selected", "difference removes a value"],
-    }
     obligations = [
         {
             "obligation_id": f"obligation-{scenario_id}",
@@ -412,10 +189,20 @@ def test_probe_suite_must_cover_each_required_interaction() -> None:
         for scenario_id in ("special-value", "operator")
     ]
 
+    model_interaction = {
+        "interaction_id": "special-value-with-operator",
+        "scenario_ids": ["special-value", "operator"],
+        "condition": "A special value is used as an operator operand.",
+        "operation": "Apply the operator to the special value and a concrete value.",
+        "expected": "The result contains only the values selected by the operation.",
+        "evidence_quote_ids": ["quote-001", "quote-002"],
+    }
+
     def source(interaction_ids: list[str]) -> str:
+        metadata_by_function = {}
         lines = [
-            f'"""{json.dumps({"obligations": obligations})}"""',
-            "import module",
+            f"OBLIGATIONS = {obligations!r}",
+            f"INTERACTIONS = {[model_interaction]!r}",
         ]
         for index, scenario_id in enumerate(("special-value", "operator")):
             metadata = {
@@ -425,31 +212,24 @@ def test_probe_suite_must_cover_each_required_interaction() -> None:
                 "oracle_basis": "The instruction defines the interaction.",
                 "interaction_ids": interaction_ids if index == 0 else [],
             }
+            metadata_by_function[f"test_probe_{index}"] = metadata
             lines.extend(
                 [
                     "",
                     f"def test_probe_{index}():",
-                    f'    """{json.dumps(metadata)}"""',
                     "    assert module.public_api('value') == 'handled:value'",
                 ]
             )
+        lines.insert(2, f"PROBE_METADATA = {metadata_by_function!r}")
+        lines.insert(3, "import module")
         return "\n".join(lines) + "\n"
 
-    model_interaction = {
-        **{
-            key: value for key, value in interaction.items() if key != "evidence_quotes"
-        },
-        "evidence_quote_ids": ["quote-001", "quote-002"],
-    }
-    interactions = validate_probe_interaction_plan(
-        [model_interaction], instruction=instruction, scenarios=scenarios
-    )
-    _, probes = parse_generated_postrun_probe_source(
+    _, interactions, probes = parse_generated_postrun_probe_source(
         source(["special-value-with-operator"]),
         scenarios,
         instruction=instruction,
-        interaction_obligations=interactions,
     )
+    assert len(interactions) == 1
     assert probes[0].interaction_ids == ("special-value-with-operator",)
 
     with pytest.raises(ValueError, match="omitted required interactions"):
@@ -457,14 +237,14 @@ def test_probe_suite_must_cover_each_required_interaction() -> None:
             source([]),
             scenarios,
             instruction=instruction,
-            interaction_obligations=interactions,
         )
 
 
 def test_probe_parser_preserves_mapping_key_and_value_roles() -> None:
     source = _source()
-    document = json.loads(source.split('"""', 2)[1])
-    base = document["obligations"][0]
+    obligation_literal = source.split("OBLIGATIONS = ", 1)[1].split("\n", 1)[0]
+    document = ast.literal_eval(obligation_literal)
+    base = document[0]
     base.update(
         {
             "obligation_id": "rename-source-key",
@@ -485,18 +265,18 @@ def test_probe_parser_preserves_mapping_key_and_value_roles() -> None:
             "evidence": [{"source": "instruction", "quote": "invalid rename keys"}],
         }
     )
-    source = source.replace(
-        '"obligation_id": "selector-obligation"',
-        '"obligation_id": "rename-source-key"',
-    ).replace('"scenario_id": "selector"', '"scenario_id": "rename"')
-    module_doc = json.dumps(document)
-    first = source.index('"""')
-    last = source.index('"""', first + 3)
-    source = source[: first + 3] + module_doc + source[last:]
-    source = source.replace(
-        '"obligation_id": "selector-obligation"', '"obligation_id": "rename-source-key"'
+    source = (
+        source.replace(
+            "OBLIGATIONS = " + obligation_literal,
+            "OBLIGATIONS = " + repr(document),
+        )
+        .replace("'scenario_id': 'selector'", "'scenario_id': 'rename'")
+        .replace(
+            "'obligation_id': 'selector-obligation'",
+            "'obligation_id': 'rename-source-key'",
+        )
     )
-    obligations, probes = parse_generated_postrun_probe_source(
+    obligations, _, probes = parse_generated_postrun_probe_source(
         source,
         ({"scenario_id": "rename"},),
         instruction="invalid rename keys",
@@ -510,42 +290,36 @@ def test_run_postrun_probes_executes_each_function_from_same_module(
 ) -> None:
     module = tmp_path / "module.py"
     module.write_text("def public_api(value): return 'handled:' + value\n")
+    obligation_data = [
+        {
+            "obligation_id": f"obligation-{scenario}",
+            "scenario_id": scenario,
+            "category": "other",
+            "rule": "other",
+            "supported": True,
+            "summary": "Check the result.",
+            "condition": "The API receives a value.",
+            "operation": "Call the public API.",
+            "expected": "The documented result is returned.",
+            "operands": [],
+            "evidence": [{"source": "instruction", "quote": "explicit"}],
+            "unresolved_reason": "",
+        }
+        for scenario in ("good", "bad")
+    ]
     source = (
-        '"""'
-        + json.dumps(
-            {
-                "obligations": [
-                    {
-                        "obligation_id": f"obligation-{scenario}",
-                        "scenario_id": scenario,
-                        "category": "other",
-                        "rule": "other",
-                        "supported": True,
-                        "summary": "Check the result.",
-                        "condition": "The API receives a value.",
-                        "operation": "Call the public API.",
-                        "expected": "The documented result is returned.",
-                        "operands": [],
-                        "evidence": [{"source": "instruction", "quote": "explicit"}],
-                        "unresolved_reason": "",
-                    }
-                    for scenario in ("good", "bad")
-                ]
-            }
-        )
-        + '"""\nimport module\n\n'
+        f"OBLIGATIONS = {obligation_data!r}\nINTERACTIONS = []\n"
+        "PROBE_METADATA = {'test_probe_good': {'probe_id': 'good', "
+        "'scenario_id': 'good', "
+        "'obligation_id': 'obligation-good', 'oracle_basis': 'explicit'}, "
+        "'test_probe_bad': {'probe_id': 'bad', 'scenario_id': 'bad', "
+        "'obligation_id': 'obligation-bad', 'oracle_basis': 'explicit'}}\n"
+        "import module\n\n"
         "def test_probe_good():\n"
-        '    """{"probe_id": "good", "scenario_id": "good", '
-        '"obligation_id": "obligation-good", '
-        '"oracle_basis": "explicit"}"""\n'
         "    assert module.public_api('value') == 'handled:value'\n\n"
-        "def test_probe_bad():\n"
-        '    """{"probe_id": "bad", "scenario_id": "bad", '
-        '"obligation_id": "obligation-bad", '
-        '"oracle_basis": "explicit"}"""\n'
-        "    assert module.public_api('value') == 'wrong'\n"
+        "def test_probe_bad():\n    assert module.public_api('value') == 'wrong'\n"
     )
-    _, probes = parse_generated_postrun_probe_source(
+    _, _, probes = parse_generated_postrun_probe_source(
         source,
         ({"scenario_id": "good"}, {"scenario_id": "bad"}),
         instruction="explicit",

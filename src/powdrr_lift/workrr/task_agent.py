@@ -628,6 +628,16 @@ def _issue_worker_structrr_context(
             f"Structrr proposal has no baseline and diff for plan item {item_id!r}"
         )
 
+    file_overlap_findings = _preflight_proposed_file_additions(
+        repo_root, item_proposal, base_commit=base_commit
+    )
+    if file_overlap_findings:
+        raise PowdrrExecutionError(
+            "pre-coding plan feasibility check found existing files that the "
+            "accepted proposal plans to add; correct the plan before generating "
+            "a test plan: " + "; ".join(file_overlap_findings)
+        )
+
     # Plan and workflow artifacts are inputs to this run, not product code. Keep
     # them out of the repository snapshot so unrelated generated files do not
     # look like changes interlaced with this feature.
@@ -718,6 +728,79 @@ def _issue_worker_structrr_context(
         structrr_baseline_fingerprint=snapshot_digest(current.document),
     )
     return current.document, rebased_proposal, current.source_manifest, rebase
+
+
+def _preflight_proposed_file_additions(
+    repo_root: Path,
+    proposal: ProposalRevision,
+    *,
+    base_commit: str,
+) -> tuple[str, ...]:
+    """Find accepted file additions that already collide with the base tree."""
+    root = repo_root.resolve()
+    findings: list[str] = []
+    for operation in proposal.operations:
+        if operation.section != "files" or operation.action != "add":
+            continue
+        raw_path = operation.content.get("path")
+        proposed_content = operation.content.get("content")
+        if not isinstance(raw_path, str) or not raw_path.strip():
+            findings.append(
+                f"{operation.operation_id} has no repository-relative file path"
+            )
+            continue
+        relative_path = PurePosixPath(raw_path)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            findings.append(
+                f"{operation.operation_id} uses unsafe file path {raw_path!r}"
+            )
+            continue
+        candidate_path = root.joinpath(*relative_path.parts)
+        try:
+            candidate_path.resolve().relative_to(root)
+        except ValueError:
+            findings.append(
+                f"{operation.operation_id} resolves outside the repository: {raw_path}"
+            )
+            continue
+
+        base_file = subprocess.run(
+            ["git", "show", f"{base_commit}:{relative_path.as_posix()}"],
+            cwd=root,
+            capture_output=True,
+            check=False,
+        )
+        if base_file.returncode == 0:
+            current_bytes = base_file.stdout
+        elif candidate_path.is_file():
+            current_bytes = candidate_path.read_bytes()
+        elif candidate_path.exists():
+            findings.append(
+                f"{raw_path} already exists in the base tree but is not a regular file"
+            )
+            continue
+        else:
+            continue
+
+        current_digest = hashlib.sha256(current_bytes).hexdigest()
+        if isinstance(proposed_content, str):
+            proposed_digest = hashlib.sha256(
+                proposed_content.encode("utf-8")
+            ).hexdigest()
+            if current_bytes == proposed_content.encode("utf-8"):
+                state = "already exists with the proposed content"
+            else:
+                state = "already exists with different content"
+            findings.append(
+                f"{raw_path} {state} (base sha256={current_digest}, "
+                f"proposal sha256={proposed_digest})"
+            )
+        else:
+            findings.append(
+                f"{raw_path} already exists in the base tree "
+                f"(base sha256={current_digest})"
+            )
+    return tuple(findings)
 
 
 def _implementation_paths_against_base(repo_root: Path) -> tuple[str, ...]:

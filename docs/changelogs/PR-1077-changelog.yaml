@@ -1,0 +1,46 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1077
+title: Check proposed file additions before test planning
+intent:
+  problem: Execute-PR workers can spend time generating tests and implementation for a plan that proposes adding a file already present in the repository.
+  goal: Detect accepted file-addition overlaps against the task base commit before generating a test plan and report concrete content evidence for plan correction.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 631, end_line: 640}
+    summary: Stop before test planning when an accepted addition collides with an existing file
+    rationale: The parent workflow can review a concrete plan defect before the worker authors tests or code.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 733, end_line: 805}
+    summary: Compare proposed file additions with the task base tree
+    rationale: Report whether the path already exists with the proposed content or conflicting content, including hashes as evidence.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 471, end_line: 558}
+    summary: Verify file overlap blocks before Structrr bootstrap
+    rationale: Ensure an existing verifier conflicting with a proposed placeholder is detected before downstream planning and implementation work.
+entities:
+  - id: execute-pr-file-addition-preflight
+    type: Function
+    action: added
+  - id: execute-pr-file-addition-preflight-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: preflight-test-covers-before-test-plan-gate
+    type: verifies
+    source: execute-pr-file-addition-preflight-test
+    target: execute-pr-file-addition-preflight
+    action: added
+    description: The regression test proves an accepted add operation targeting an existing verifier is rejected before repository bootstrap.
+invariants:
+  - id: execute-pr-file-additions-must-be-new-at-base
+    description: An accepted file-add operation must target a path absent from the task base commit before execute-PR test planning begins.
+    action: added
+guidance:
+  - id: check-plan-file-operations-before-test-planning
+    description: Compare accepted file additions with the repository base before authoring integration tests so stale or conflicting plans are corrected first.
+    action: added

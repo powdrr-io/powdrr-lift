@@ -198,6 +198,66 @@ def test_procedrr_repairs_non_object_json_provider_response(tmp_path: Path) -> N
     assert "previous response was invalid" in provider.messages[1][-1]["content"]
 
 
+def test_procedrr_falls_back_for_unsupported_schema_grammar_and_validates_locally(
+    tmp_path: Path,
+) -> None:
+    class LimitedGrammarProvider:
+        def __init__(self) -> None:
+            self.calls: list[tuple[bool, list[dict[str, str]]]] = []
+            self.unconstrained_outputs = iter(
+                [{"labels": ["python"]}, {"labels": ["pr-prep"]}]
+            )
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: Mapping[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            self.calls.append((response_schema is not None, messages))
+            if response_schema is not None:
+                raise ProviderExecutionError(
+                    "OpenAI-compatible provider returned an error event: "
+                    '{"type":"invalid_request_error","code":400,'
+                    '"message":"Grammar error: Unimplemented keys: [\\"contains\\"]"}'
+                )
+            return next(self.unconstrained_outputs)
+
+    schema = {
+        "type": "object",
+        "required": ["labels"],
+        "properties": {
+            "labels": {
+                "type": "array",
+                "minItems": 1,
+                "contains": {"const": "pr-prep"},
+                "items": {"type": "string"},
+            }
+        },
+    }
+    provider = LimitedGrammarProvider()
+    client = WorkrrProcedrrClient(
+        cast(Any, provider),
+        process_directory=tmp_path,
+        max_retries=1,
+        provider_retry_attempts=0,
+    )
+
+    result = client.complete_json(
+        [{"role": "user", "content": "Choose validation labels."}],
+        response_schema=schema,
+    )
+
+    assert result == {"labels": ["pr-prep"]}
+    assert [has_schema for has_schema, _messages in provider.calls] == [
+        True,
+        False,
+        True,
+        False,
+    ]
+    assert "previous response was invalid" in provider.calls[2][1][-1]["content"]
+
+
 def test_provider_marks_non_object_json_as_repairable_output() -> None:
     with pytest.raises(PowdrrExecutionError) as error:
         _parse_json_object('"not an object"', "OpenAI response content")

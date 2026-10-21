@@ -1,0 +1,90 @@
+version: 1
+name: finish-implementation-pr
+inputs:
+  - {name: task_context, type: object, required: true}
+  - {name: implementation_result, type: object, required: true}
+outputs:
+  pull_request_url:
+    type: string
+    minLength: 1
+    pattern: ^https?://[^ ]+/pull/[0-9]+$
+steps:
+  - gate:
+      subject: implementation_result.structrr.passed
+      equals: true
+      on_failure: {terminal: failed}
+  - gate:
+      subject: implementation_result.integration_tests.passed
+      equals: true
+      on_failure: {terminal: failed}
+  - judge:
+      kind: construct_one
+      question: Which repository validation labels apply to the implementation files?
+      subject: implementation_result.changed_paths
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Derive language_labels from the implementation file extensions and include every applicable repository validation category.
+        - Do not reconstruct, shorten, or omit the implementation file list; the workflow passes changed_paths directly to publication.
+      context: [task_context, implementation_result]
+      output:
+        name: publication_scope
+        schema:
+          type: object
+          required: [language_labels]
+          additionalProperties: false
+          properties:
+            language_labels:
+              type: array
+              minItems: 1
+              uniqueItems: true
+              items: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - call:
+      process: finish-pr-prep
+      inputs:
+        files_to_publish: {type: reference, value: implementation_result.changed_paths}
+        language_labels: {type: reference, value: publication_scope.language_labels}
+      outputs:
+        validation_results: validation_results
+  - judge:
+      kind: construct_one
+      question: What populated pull-request request and workflow context describe the implemented plan item?
+      subject: implementation_result
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Ground the request and every description claim in task_context, implementation_result, and validation_results.
+        - Set workflow_context.feature-name from task_context.proposed_pr_context.title. Prefer the reviewed item title verbatim; only shorten it when needed to fit the title limit.
+        - Make the feature-name a concise, human-readable description of the code change. Never use the plan ID, proposed PR ID, issue number, workflow ID, or a generic workflow label as the pull-request title.
+        - Include the objective, scope, implementation details, acceptance criteria, and exact validation commands and results in the PR description.
+        - Set base-branch to main.
+        - Set publication-branch to powdrr/<proposed-pr-id>-implementation, using task_context.proposed_pr_id exactly.
+        - Provide a clear commit message and a complete populated PR description. Do not claim any unrun check passed.
+      context: [task_context, implementation_result, publication_scope, validation_results]
+      output:
+        name: pull_request_request
+        schema:
+          type: object
+          required: [user_request, workflow_context]
+          additionalProperties: false
+          properties:
+            user_request: {type: string, minLength: 1}
+            workflow_context:
+              type: object
+              required: [feature-name, commit-message, populated-pr-description, base-branch, publication-branch]
+              additionalProperties: true
+              properties:
+                feature-name: {type: string, minLength: 1, maxLength: 100}
+                commit-message: {type: string, minLength: 1}
+                populated-pr-description: {type: string, minLength: 1}
+                base-branch: {type: string, const: main}
+                publication-branch: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - call:
+      process: create-pull-request
+      inputs:
+        user_request: {type: reference, value: pull_request_request.user_request}
+        workflow_context: {type: reference, value: pull_request_request.workflow_context}
+        files_to_publish: {type: reference, value: implementation_result.changed_paths}
+      outputs:
+        pull_request_url: pull_request_url
+  - terminal: succeeded

@@ -13,6 +13,8 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, TextIO
 
+import yaml
+
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.core.delivery_profile import PhaseType, load_delivery_profile
@@ -76,6 +78,7 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
     ValidationReportStatus,
     ValidationRunner,
+    execute_coding_agent_attempt,
     parse_validation_profile,
 )
 from powdrr_lift.workrr.decision_continuity import (
@@ -409,6 +412,168 @@ def _issue_worker_implementation_request(
         implementation_packet=packet,
     )
     return replace(request, allow_existing_changes=True), validation_profile
+
+
+def _issue_worker_plan_amendment_paths(
+    repo_root: Path, proposed: Mapping[str, Any], *, workflow_id: str
+) -> tuple[str, ...]:
+    """Return the generated plan artifacts that may change in an amendment PR."""
+    plan_id = str(proposed.get("plan_id", "")).strip()
+    item_id = str(proposed.get("item_id", "")).strip()
+    proposal_path_value = proposed.get("structrr_proposal_file")
+    if not plan_id or not item_id:
+        raise PowdrrExecutionError(
+            "plan amendment requires plan_id and item_id in proposed PR context"
+        )
+    if not isinstance(proposal_path_value, str) or not proposal_path_value.strip():
+        raise PowdrrExecutionError(
+            "plan amendment requires the generated Structrr proposal path"
+        )
+    plan_slug = slugify_workflow_id(plan_id)
+    raw_plan_path = proposed.get("execution_plan_file")
+    plan_path = (
+        Path(raw_plan_path)
+        if isinstance(raw_plan_path, str) and raw_plan_path.strip()
+        else Path("docs") / "plans" / f"{plan_slug}-execution-plan.yaml"
+    )
+    proposal_path = Path(proposal_path_value)
+    for label, path in (
+        ("execution plan", plan_path),
+        ("Structrr proposal", proposal_path),
+    ):
+        if path.is_absolute() or ".." in path.parts:
+            raise PowdrrExecutionError(f"{label} path must be repository-relative")
+        try:
+            (repo_root / path).resolve().relative_to(repo_root.resolve())
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"{label} path must stay inside the repository"
+            ) from error
+    try:
+        plan_data = yaml.safe_load((repo_root / plan_path).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        raise PowdrrExecutionError(
+            f"could not load execution plan for amendment: {error}"
+        ) from error
+    items = plan_data.get("items") if isinstance(plan_data, Mapping) else None
+    if not isinstance(items, list):
+        raise PowdrrExecutionError("execution plan has no item list")
+    matched = [
+        item
+        for item in items
+        if isinstance(item, Mapping)
+        and item.get("id") == item_id
+        and item.get("workflow_id") == workflow_id
+    ]
+    if len(matched) != 1:
+        raise PowdrrExecutionError(
+            "execution plan does not contain exactly one matching item and workflow"
+        )
+    raw_workflow_path = matched[0].get("workflow_file")
+    if not isinstance(raw_workflow_path, str) or not raw_workflow_path.strip():
+        raise PowdrrExecutionError("plan item has no generated workflow file")
+    workflow_path = Path(raw_workflow_path)
+    if workflow_path.is_absolute() or ".." in workflow_path.parts:
+        raise PowdrrExecutionError("plan workflow path must be repository-relative")
+    try:
+        (repo_root / workflow_path).resolve().relative_to(repo_root.resolve())
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            "plan workflow path must stay inside the repository"
+        ) from error
+    paths = tuple(
+        dict.fromkeys(
+            (plan_path.as_posix(), proposal_path.as_posix(), workflow_path.as_posix())
+        )
+    )
+    for artifact_path in paths:
+        if not (repo_root / artifact_path).is_file():
+            raise PowdrrExecutionError(
+                f"plan amendment artifact is missing: {artifact_path}"
+            )
+    return paths
+
+
+def _validate_issue_worker_plan_amendment(
+    repo_root: Path,
+    proposed: Mapping[str, Any],
+    *,
+    workflow_id: str,
+    baselines: Mapping[str, str],
+) -> tuple[str, ...]:
+    """Validate the revised plan and its linked artifacts before publication."""
+    from powdrr_lift.workrr.github_issue_plan_generation import (
+        load_plan_workflow_instance,
+    )
+    from powdrr_lift.workrr.github_issue_queue import parse_reviewed_plan_yaml
+
+    paths = _issue_worker_plan_amendment_paths(
+        repo_root, proposed, workflow_id=workflow_id
+    )
+    plan_path, proposal_path, workflow_path = (repo_root / path for path in paths)
+    try:
+        plan = parse_reviewed_plan_yaml(plan_path.read_text(encoding="utf-8"))
+        original_plan = parse_reviewed_plan_yaml(baselines[paths[0]])
+    except (OSError, ValueError) as error:
+        return (f"execution plan is invalid: {error}",)
+    try:
+        proposal = load_multi_pr_proposal(proposal_path)
+    except (OSError, ValueError) as error:
+        return (f"Structrr proposal is invalid: {error}",)
+    try:
+        workflow = load_plan_workflow_instance(workflow_path)
+    except (OSError, ValueError) as error:
+        return (f"generated workflow is invalid: {error}",)
+
+    item_id = str(proposed.get("item_id", ""))
+    item = next(
+        (candidate for candidate in plan.items if candidate.item_id == item_id), None
+    )
+    if item is None:
+        return (f"execution plan no longer contains item {item_id!r}",)
+    original_other_items = tuple(
+        candidate for candidate in original_plan.items if candidate.item_id != item_id
+    )
+    amended_other_items = tuple(
+        candidate for candidate in plan.items if candidate.item_id != item_id
+    )
+    findings: list[str] = []
+    if amended_other_items != original_other_items:
+        findings.append("plan amendment changed unrelated plan items")
+    if plan.plan_id != str(proposed.get("plan_id", "")):
+        findings.append("execution plan ID changed")
+    if proposal.plan_id != plan.plan_id:
+        findings.append("Structrr proposal plan ID does not match the execution plan")
+    if item_id not in proposal.item_proposals:
+        findings.append("Structrr proposal no longer contains the affected plan item")
+    if workflow.workflow_id != workflow_id:
+        findings.append("generated workflow ID changed")
+    context = workflow.inputs.get("proposed_pr_context")
+    if not isinstance(context, Mapping):
+        findings.append("generated workflow has no proposed PR context")
+        return tuple(findings)
+    if context.get("plan_id") != plan.plan_id or context.get("item_id") != item_id:
+        findings.append("generated workflow points to a different plan item")
+    if context.get("dependencies") != list(item.dependencies):
+        findings.append("generated workflow dependency list disagrees with the plan")
+    item_by_id = {candidate.item_id: candidate for candidate in plan.items}
+    expected_dependencies = [
+        item_by_id[dependency].workflow_id for dependency in item.dependencies
+    ]
+    if list(workflow.dependencies) != expected_dependencies:
+        findings.append("workflow dependency edges disagree with the plan")
+    for context_field, expected in (
+        ("title", item.title),
+        ("objective", item.objective),
+        ("scope", list(item.scope)),
+        ("implementation_steps", list(item.implementation_steps)),
+        ("acceptance_criteria", list(item.acceptance_criteria)),
+    ):
+        if context.get(context_field) != expected:
+            findings.append(
+                f"generated workflow {context_field} disagrees with the plan"
+            )
+    return tuple(findings)
 
 
 def _issue_worker_structrr_context(
@@ -1687,8 +1852,16 @@ class _TaskWorkflowExecutionStrategy:
         ):
             proposed_pr_id = self.task.input_state.get("proposed_pr_id")
             if isinstance(proposed_pr_id, str) and proposed_pr_id.strip():
+                publication_kind = (
+                    "plan-amendment"
+                    if any(
+                        event.get("kind") == "plan_amendment_agent"
+                        for event in self.events
+                    )
+                    else "implementation"
+                )
                 expected_branch = (
-                    f"powdrr/{slugify_workflow_id(proposed_pr_id)}-implementation"
+                    f"powdrr/{slugify_workflow_id(proposed_pr_id)}-{publication_kind}"
                 )
                 if action.parameters.get("publication_branch") != expected_branch:
                     corrected_parameters = dict(action.parameters)
@@ -1778,7 +1951,16 @@ class _TaskWorkflowExecutionStrategy:
             elif isinstance(result, str):
                 print(result, end="", file=self.stdout)
         elif action.tool == "coding-agent":
-            result = self._run_coding_agent()
+            result = self._run_coding_agent(
+                mode=(
+                    str(action.parameters.get("mode", "implementation"))
+                    if isinstance(action.parameters, Mapping)
+                    else "implementation"
+                ),
+                mode_context=(
+                    action.parameters if isinstance(action.parameters, Mapping) else {}
+                ),
+            )
         elif action.tool == "fuzzy-match":
             result = invoke_fuzzy_match_capability(
                 action.parameters,
@@ -1822,7 +2004,227 @@ class _TaskWorkflowExecutionStrategy:
         )
         self.events.append(event)
 
-    def _run_coding_agent(self) -> dict[str, Any]:
+    def _run_plan_amendment_agent(
+        self, mode_context: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        task_context = mode_context.get("task_context")
+        failure_review = mode_context.get("failure_review")
+        implementation_result = mode_context.get("implementation_result")
+        if not isinstance(task_context, Mapping):
+            raise PowdrrExecutionError("plan amendment requires task_context")
+        proposed = task_context.get("proposed_pr_context")
+        if not isinstance(proposed, Mapping):
+            raise PowdrrExecutionError("plan amendment requires proposed_pr_context")
+        if not isinstance(failure_review, Mapping) or not isinstance(
+            implementation_result, Mapping
+        ):
+            raise PowdrrExecutionError(
+                "plan amendment requires failure review and implementation evidence"
+            )
+        workflow_id = str(task_context.get("proposed_pr_id", "")).strip()
+        if not workflow_id:
+            raise PowdrrExecutionError("plan amendment requires proposed_pr_id")
+        base_commit = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        request, _validation_profile = _issue_worker_implementation_request(
+            proposed, workflow_id=workflow_id, base_commit=base_commit
+        )
+        allowed_paths = _issue_worker_plan_amendment_paths(
+            self.repo_root, proposed, workflow_id=workflow_id
+        )
+        baselines = {
+            path: (self.repo_root / path).read_text(encoding="utf-8")
+            for path in allowed_paths
+        }
+        failure_review_json = json.dumps(
+            dict(failure_review), indent=2, sort_keys=True, default=str
+        )
+        implementation_result_json = json.dumps(
+            dict(implementation_result), indent=2, sort_keys=True, default=str
+        )
+        request = replace(
+            request,
+            request_id=f"{workflow_id}-plan-amendment",
+            objective=(
+                f"Correct plan item {proposed.get('item_id')} from "
+                f"{proposed.get('plan_id')} using the recorded failure evidence."
+            ),
+            prompt="\n\n".join(
+                (
+                    "This is a plan-amendment task, not an implementation task.",
+                    "Edit only the generated execution plan YAML, its Structrr "
+                    "proposal JSON, and the affected generated workflow YAML "
+                    "listed in allowed_paths. Keep the source plan document and "
+                    "all product code unchanged.",
+                    "Make the smallest correction supported by the evidence. "
+                    "Preserve the plan ID, item ID, workflow ID, unrelated plan "
+                    "items, and dependency graph unless the failure evidence "
+                    "proves one is defective. Keep the corrected item and "
+                    "workflow aligned on title, scope, acceptance criteria, "
+                    "implementation steps, and dependencies.",
+                    "Do not implement planned product changes. Produce a "
+                    "reviewable plan amendment so a later worker run can execute "
+                    "the corrected plan.",
+                    f"Failure classification and evidence:\n{failure_review_json}",
+                    f"Failed implementation evidence:\n{implementation_result_json}",
+                    "Allowed plan artifact paths:\n"
+                    f"{json.dumps(list(allowed_paths), indent=2)}",
+                )
+            ),
+            allowed_paths=allowed_paths,
+            validation_profiles=(),
+            acceptance_criteria=(
+                "The revised execution plan, Structrr proposal, and affected "
+                "workflow are valid and consistent.",
+                "Only the affected plan item and its linked proposal/workflow "
+                "are changed.",
+                "No source-plan or product-code file is changed.",
+            ),
+            planned_additions=tuple(
+                {"id": f"plan-artifact-{index:02d}", "description": path}
+                for index, path in enumerate(allowed_paths, start=1)
+            ),
+            implementation_packet=None,
+            allow_existing_changes=True,
+        )
+        store_root = (
+            Path(tempfile.gettempdir())
+            / "powdrr-lift-issue-worker"
+            / workflow_id
+            / "plan-amendment"
+        )
+        provider = build_coding_agent_provider(
+            self.config.code_agent,
+            opencode_executable=self.config.opencode_executable,
+            opencode_model=self.config.opencode_model,
+            minisweagent_executable=self.config.minisweagent_executable,
+            minisweagent_model=self.config.minisweagent_model,
+            timeout_seconds=self.config.coding_agent_timeout_seconds,
+            diagnostics_root=store_root / self.config.code_agent,
+            permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
+        )
+        runner = CodingAgentRunner(
+            provider=provider,
+            store=CodingAgentAttemptStore(store_root),
+        )
+
+        def run_attempt(
+            attempt_number: int, recovery_issue: Mapping[str, Any] | None
+        ) -> dict[str, Any]:
+            attempt_request = request
+            if recovery_issue is not None:
+                attempt_request = replace(
+                    request,
+                    prompt=request.repair_prompt(recovery_issue),
+                    allow_existing_changes=True,
+                )
+            attempt_id = (
+                f"{request.request_id}-attempt-{attempt_number:02d}-"
+                f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
+            )
+            execution = execute_coding_agent_attempt(
+                runner,
+                attempt_request,
+                worktree_root=self.repo_root,
+                attempt_id=attempt_id,
+                profiles={},
+                validation_timeout_seconds=(
+                    self.config.coding_agent_validation_timeout_seconds
+                ),
+            )
+            attempt = execution.attempt
+            validation = execution.validation
+            all_changed_paths = _implementation_paths_against_base(self.repo_root)
+            paths = tuple(path for path in all_changed_paths if path in allowed_paths)
+            unauthorized_paths = tuple(
+                path for path in all_changed_paths if path not in allowed_paths
+            )
+            findings = (
+                (f"plan amendment changed unauthorized paths: {unauthorized_paths}",)
+                if unauthorized_paths
+                else ()
+            )
+            if attempt.status.value == "completed" and paths:
+                findings = (
+                    *findings,
+                    *_validate_issue_worker_plan_amendment(
+                        self.repo_root,
+                        proposed,
+                        workflow_id=workflow_id,
+                        baselines=baselines,
+                    ),
+                )
+            passed = (
+                attempt.status.value == "completed"
+                and bool(paths)
+                and execution.diff_check.returncode == 0
+                and validation.status is ValidationReportStatus.PASSED
+                and not findings
+            )
+            return {
+                "attempt": attempt.to_data(),
+                "changed_paths": list(paths),
+                "validation": validation.to_data(),
+                "findings": list(findings),
+                "passed": passed,
+            }
+
+        def evaluate_attempt(record: Mapping[str, Any]) -> CodingAgentRecoveryDecision:
+            if record.get("passed") is True:
+                return CodingAgentRecoveryDecision(passed=True)
+            attempt = record.get("attempt")
+            if not isinstance(attempt, Mapping) or attempt.get("status") in {
+                "policy_denied",
+                "timed_out",
+            }:
+                return CodingAgentRecoveryDecision(passed=False, terminal=True)
+            return CodingAgentRecoveryDecision(
+                passed=False,
+                issue={
+                    "category": (
+                        "invalid_plan_amendment"
+                        if record.get("findings")
+                        else "amendment_validation_failed"
+                    ),
+                    "findings": record.get("findings", []),
+                    "validation": record.get("validation"),
+                    "instruction": (
+                        "Correct only the allowed plan artifacts. Ensure the plan, "
+                        "Structrr proposal, and workflow validate and agree. Do not "
+                        "change product code or unrelated plan items."
+                    ),
+                },
+            )
+
+        recovery = run_coding_agent_recovery(run_attempt, evaluate_attempt)
+        final = recovery.attempts[-1]
+        result = {
+            "passed": bool(final["passed"]),
+            "attempt_id": final["attempt"]["attempt_id"],
+            "status": final["attempt"]["status"],
+            "changed_paths": final["changed_paths"],
+            "validation": final["validation"],
+            "findings": final["findings"],
+            "attempts": list(recovery.attempts),
+        }
+        self.events.append({"kind": "plan_amendment_agent", "result": result})
+        return result
+
+    def _run_coding_agent(
+        self,
+        *,
+        mode: str = "implementation",
+        mode_context: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if mode == "plan-amendment":
+            return self._run_plan_amendment_agent(mode_context or {})
+        if mode != "implementation":
+            raise PowdrrExecutionError(f"unsupported coding-agent mode: {mode!r}")
         proposed = self.task.input_state.get("proposed_pr_context")
         if not isinstance(proposed, Mapping):
             raise PowdrrExecutionError(

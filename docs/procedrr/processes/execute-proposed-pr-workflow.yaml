@@ -1,6 +1,6 @@
 version: 1
 name: execute-proposed-pr-workflow
-description: Generate baseline-red integration tests, implement one reviewed plan item, validate the tests and accepted Structrr diff, then publish an implementation pull request.
+description: Implement one reviewed plan item and publish either an implementation PR or a plan-amendment PR when execution proves the plan defective.
 inputs:
   - {name: task_context, type: object, required: true}
 outputs:
@@ -16,91 +16,58 @@ steps:
         task_context: {type: reference, value: task_context}
       outputs:
         implementation_result: coding_attempt
-  - gate:
+  - branch:
       subject: implementation_result.passed
-      equals: true
-      on_failure: {terminal: failed}
-  - gate:
-      subject: implementation_result.structrr.passed
-      equals: true
-      on_failure: {terminal: failed}
-  - gate:
-      subject: implementation_result.integration_tests.passed
-      equals: true
-      on_failure: {terminal: failed}
-  - judge:
-      kind: construct_one
-      question: Which repository validation labels apply to the implementation files?
-      subject: implementation_result.changed_paths
-      prompt_system: Return only the declared JSON object.
-      instructions:
-        - Derive language_labels from the implementation file extensions and include every applicable repository validation category.
-        - Do not reconstruct, shorten, or omit the implementation file list; the workflow passes changed_paths directly to publication.
-      context: [task_context, implementation_result]
-      output:
-        name: publication_scope
-        schema:
-          type: object
-          required: [language_labels]
-          additionalProperties: false
-          properties:
-            language_labels:
-              type: array
-              minItems: 1
-              uniqueItems: true
-              items: {type: string, minLength: 1}
-      validation: {kind: json_schema}
-  - call:
-      process: finish-pr-prep
-      inputs:
-        files_to_publish: {type: reference, value: implementation_result.changed_paths}
-        language_labels: {type: reference, value: publication_scope.language_labels}
-      outputs:
-        validation_results: validation_results
-  - judge:
-      kind: construct_one
-      question: What populated pull-request request and workflow context describe the implemented plan item?
-      subject: implementation_result
-      prompt_system: Return only the declared JSON object.
-      instructions:
-        - Ground the request and every description claim in task_context, implementation_result, and validation_results.
-        - Set workflow_context.feature-name from task_context.proposed_pr_context.title. Prefer the reviewed item title verbatim; only shorten it when needed to fit the title limit.
-        - Make the feature-name a concise, human-readable description of the code change. Never use the plan ID, proposed PR ID, issue number, workflow ID, or a generic workflow label as the pull-request title.
-        - Include the objective, scope, implementation details, acceptance criteria, and exact validation commands and results in the PR description.
-        - Set base-branch to main.
-        - Set publication-branch to powdrr/<proposed-pr-id>-implementation, using task_context.proposed_pr_id exactly.
-        - Provide a clear commit message and a complete populated PR description. Do not claim any unrun check passed.
-      context: [task_context, implementation_result, publication_scope, validation_results]
-      output:
-        name: pull_request_request
-        schema:
-          type: object
-          required: [user_request, workflow_context]
-          additionalProperties: false
-          properties:
-            user_request: {type: string, minLength: 1}
-            workflow_context:
-              type: object
-              required:
-                - feature-name
-                - commit-message
-                - populated-pr-description
-                - base-branch
-                - publication-branch
-              additionalProperties: true
-              properties:
-                feature-name: {type: string, minLength: 1, maxLength: 100}
-                commit-message: {type: string, minLength: 1}
-                populated-pr-description: {type: string, minLength: 1}
-                base-branch: {type: string, const: main}
-                publication-branch: {type: string, minLength: 1}
-      validation: {kind: json_schema}
-  - call:
-      process: create-pull-request
-      inputs:
-        user_request: {type: reference, value: pull_request_request.user_request}
-        workflow_context: {type: reference, value: pull_request_request.workflow_context}
-        files_to_publish: {type: reference, value: implementation_result.changed_paths}
-      outputs:
-        pull_request_url: pull_request_url
+      cases:
+        true:
+          - call:
+              process: finish-implementation-pr
+              inputs:
+                task_context: {type: reference, value: task_context}
+                implementation_result: {type: reference, value: implementation_result}
+              outputs:
+                pull_request_url: pull_request_url
+        false:
+          - judge:
+              kind: construct_one
+              question: Does the recorded failure demonstrate that the reviewed plan item is defective?
+              subject: implementation_result
+              prompt_system: Return only the declared JSON object.
+              instructions:
+                - Classify plan_defect only when concrete repository evidence or contradictory acceptance criteria show that the reviewed plan cannot be implemented as written.
+                - Classify implementation_defect when the failure is caused by incomplete, incorrect, or insufficiently verified implementation work.
+                - Use unclear when the evidence does not establish which is true; unclear must stop for human review.
+                - Cite the exact attempt, validation, baseline test, or Structrr finding that supports the classification. Never infer a plan defect only from a failed attempt.
+              context: [task_context, implementation_result]
+              output:
+                name: failure_review
+                schema:
+                  type: object
+                  required: [classification, evidence, explanation]
+                  additionalProperties: false
+                  properties:
+                    classification: {type: string, enum: [plan_defect, implementation_defect, unclear]}
+                    evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                    explanation: {type: string, minLength: 1}
+              validation: {kind: json_schema}
+          - branch:
+              subject: failure_review.classification
+              cases:
+                plan_defect:
+                  - call:
+                      process: amend-plan-and-open-pr
+                      inputs:
+                        task_context: {type: reference, value: task_context}
+                        implementation_result: {type: reference, value: implementation_result}
+                        failure_review: {type: reference, value: failure_review}
+                      outputs:
+                        pull_request_url: pull_request_url
+                implementation_defect:
+                  - terminal: failed
+                unclear:
+                  - terminal: failed
+              default:
+                - terminal: failed
+      default:
+        - terminal: failed
   - terminal: succeeded

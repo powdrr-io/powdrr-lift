@@ -18,6 +18,7 @@ from powdrr_lift.workrr.postrun_probes import (
     run_postrun_probes,
     validate_probe_interaction_plan,
 )
+from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 
 
 def _source(body: str = "assert module.public_api('value') == 'handled:value'") -> str:
@@ -228,7 +229,7 @@ def test_interaction_plan_repairs_invalid_initial_and_review_responses() -> None
                 }
             if self.calls == 2:
                 repair = json.loads(messages[1]["content"])
-                assert "validation_error" in repair
+                assert repair["invalid_interactions"][0]["validation_error"]
                 return {"interactions": [model_interaction]}
             if self.calls == 3:
                 assert "proposed_interactions" in messages[1]["content"]
@@ -241,9 +242,8 @@ def test_interaction_plan_repairs_invalid_initial_and_review_responses() -> None
                     ]
                 }
             repair = json.loads(messages[1]["content"])
-            assert "proposed_interactions" in repair
-            assert "validation_error" in repair
-            return {"interactions": []}
+            assert repair["invalid_interactions"][0]["validation_error"]
+            return {"interactions": [model_interaction]}
 
     client = _RepairingClient()
     interactions = generate_probe_interaction_plan(
@@ -257,6 +257,77 @@ def test_interaction_plan_repairs_invalid_initial_and_review_responses() -> None
 
     assert client.calls == 4
     assert interactions == (interaction,)
+
+
+def test_missing_evidence_ids_reach_targeted_interaction_repair(
+    tmp_path: Path,
+) -> None:
+    instruction = "all values are selected; operators are supported"
+    scenarios = (
+        {"scenario_id": "special-value"},
+        {"scenario_id": "operator"},
+    )
+    interaction = {
+        "interaction_id": "special-value-with-operator",
+        "scenario_ids": ["special-value", "operator"],
+        "condition": "A special value is an operator operand.",
+        "operation": "Apply the operator to the special value.",
+        "expected": "The result follows the operator rule.",
+        "evidence_quote_ids": ["quote-001", "quote-002"],
+    }
+
+    class _Provider:
+        calls = 0
+
+        def complete_json(
+            self,
+            _messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            self.calls += 1
+            assert response_schema is not None
+            item_schema = response_schema["properties"]["interactions"]["items"]
+            assert "evidence_quote_ids" not in item_schema["required"]
+            if self.calls == 1:
+                return {
+                    "interactions": [
+                        {
+                            key: value
+                            for key, value in interaction.items()
+                            if key != "evidence_quote_ids"
+                        }
+                    ]
+                }
+            if self.calls == 2:
+                return {"interactions": [interaction]}
+            return {"interactions": []}
+
+    provider = _Provider()
+    client = WorkrrProcedrrClient(
+        provider,
+        process_directory=tmp_path,
+        max_retries=0,
+        provider_retry_attempts=0,
+    )
+
+    interactions = generate_probe_interaction_plan(
+        client,
+        instruction=instruction,
+        scenarios=scenarios,
+    )
+
+    assert provider.calls == 3
+    assert interactions == (
+        {
+            **{
+                key: value
+                for key, value in interaction.items()
+                if key != "evidence_quote_ids"
+            },
+            "evidence_quotes": ["all values are selected;", "operators are supported"],
+        },
+    )
 
 
 def test_interaction_plan_result_distinguishes_empty_from_failure() -> None:

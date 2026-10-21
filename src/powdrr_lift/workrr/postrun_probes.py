@@ -47,8 +47,9 @@ _INTERACTION_PLAN_SCHEMA: dict[str, Any] = {
                     "condition",
                     "operation",
                     "expected",
-                    "evidence_quote_ids",
                 ],
+                # Missing evidence IDs must reach semantic validation so its
+                # targeted repair can use the exact candidate list.
                 "additionalProperties": False,
             },
         }
@@ -174,75 +175,128 @@ def _complete_valid_interaction_plan(
     evidence_candidates: Sequence[Mapping[str, str]],
     phase: str,
 ) -> tuple[dict[str, Any], ...]:
-    """Repair one semantically invalid structured interaction response."""
-    last_error: ValueError | None = None
-    previous_response: Any = None
-    for attempt_number in range(1, 3):
-        request_messages = messages
-        if attempt_number == 2:
-            try:
-                repair_context = json.loads(messages[-1]["content"])
-            except (KeyError, json.JSONDecodeError):
-                repair_context = {
+    """Validate each interaction and repair only invalid entries once."""
+    response = complete_json(client, messages, response_schema=_INTERACTION_PLAN_SCHEMA)
+    interactions = response.get("interactions")
+    if not isinstance(interactions, list):
+        raise ValueError(f"{phase} must contain an interactions array")
+
+    valid, invalid = _validate_interaction_entries(
+        interactions,
+        instruction=instruction,
+        scenarios=scenarios,
+        evidence_candidates=evidence_candidates,
+    )
+    if not invalid:
+        return tuple(item for _, item in valid)
+
+    repair_messages = [
+        {
+            "role": "system",
+            "content": (
+                "Repair only the invalid interaction entries supplied below. "
+                "Do not repeat or rewrite valid interactions. Preserve each "
+                "existing interaction_id. Return only source-entailed entries. "
+                "Each repaired entry needs two distinct evidence_quote_ids from "
+                "instruction_evidence_candidates and two distinct scenario IDs. "
+                "Do not invent IDs or copy quote text."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
                     "instruction": instruction,
                     "instruction_evidence_candidates": list(evidence_candidates),
                     "behavior_scenarios": [dict(item) for item in scenarios],
-                }
-            if not isinstance(repair_context, Mapping):
-                repair_context = {
-                    "instruction": instruction,
-                    "instruction_evidence_candidates": list(evidence_candidates),
-                    "behavior_scenarios": [dict(item) for item in scenarios],
-                }
-            repair_payload = {
-                **repair_context,
-                "previous_response": previous_response,
-                "validation_error": str(last_error),
-                "repair_phase": phase,
-            }
-            request_messages = [
-                {
-                    "role": "system",
-                    "content": (
-                        "Repair the interaction plan using only the supplied "
-                        "instruction and scenarios. Correct the reported validation "
-                        "error. Return only source-entailed interactions; use an "
-                        "empty list when none can satisfy the evidence requirements. "
-                        "Each interaction needs two distinct evidence_quote_ids "
-                        "from instruction_evidence_candidates and two distinct "
-                        "scenario IDs. Do not invent IDs or copy quote text."
-                    ),
+                    "invalid_interactions": [
+                        {
+                            "index": index,
+                            "interaction": raw,
+                            "validation_error": error,
+                        }
+                        for index, raw, error in invalid
+                    ],
+                    "repair_phase": phase,
                 },
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        repair_payload,
-                        ensure_ascii=False,
-                        sort_keys=True,
-                    ),
-                },
-            ]
-        response = complete_json(
-            client, request_messages, response_schema=_INTERACTION_PLAN_SCHEMA
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        },
+    ]
+    repair_response = complete_json(
+        client, repair_messages, response_schema=_INTERACTION_PLAN_SCHEMA
+    )
+    repaired = repair_response.get("interactions")
+    if not isinstance(repaired, list) or len(repaired) != len(invalid):
+        raise ValueError(
+            f"{phase} repair must return exactly {len(invalid)} corrected "
+            "interaction entries"
         )
-        previous_response = response
+    repaired_valid, repaired_invalid = _validate_interaction_entries(
+        repaired,
+        instruction=instruction,
+        scenarios=scenarios,
+        evidence_candidates=evidence_candidates,
+    )
+    if repaired_invalid:
+        reasons = "; ".join(error for _, _, error in repaired_invalid)
+        raise ValueError(f"{phase} repair remained invalid: {reasons}")
+
+    by_position = dict(valid)
+    valid_ids = {item["interaction_id"] for _, item in valid}
+    for (position, original, _), (_, replacement) in zip(
+        invalid, repaired_valid, strict=True
+    ):
+        original_id = (
+            original.get("interaction_id") if isinstance(original, Mapping) else None
+        )
+        replacement_id = replacement["interaction_id"]
+        if original_id and replacement_id != original_id:
+            raise ValueError(
+                f"{phase} repair changed interaction id {original_id!r} "
+                f"to {replacement_id!r}"
+            )
+        if replacement_id in valid_ids:
+            raise ValueError(
+                f"{phase} repair duplicated interaction id {replacement_id!r}"
+            )
+        valid_ids.add(replacement_id)
+        by_position[position] = replacement
+    return tuple(by_position[index] for index in sorted(by_position))
+
+
+def _validate_interaction_entries(
+    interactions: Sequence[Any],
+    *,
+    instruction: str,
+    scenarios: Sequence[Mapping[str, Any]],
+    evidence_candidates: Sequence[Mapping[str, str]],
+) -> tuple[
+    list[tuple[int, dict[str, Any]]],
+    list[tuple[int, Any, str]],
+]:
+    """Keep valid entries and report invalid entries with their original positions."""
+    valid: list[tuple[int, dict[str, Any]]] = []
+    invalid: list[tuple[int, Any, str]] = []
+    seen: set[str] = set()
+    for index, raw in enumerate(interactions):
         try:
-            interactions = response.get("interactions")
-            if not isinstance(interactions, list):
-                raise ValueError(f"{phase} must contain an interactions array")
-            return validate_probe_interaction_plan(
-                interactions,
+            item = validate_probe_interaction_plan(
+                [raw],
                 instruction=instruction,
                 scenarios=scenarios,
                 evidence_candidates=evidence_candidates,
-            )
-        except ValueError as error:
-            last_error = error
-            if attempt_number == 2:
-                raise ValueError(
-                    f"{phase} remained invalid after one repair: {error}"
-                ) from error
-    raise AssertionError("interaction-plan repair loop completed without a result")
+            )[0]
+            interaction_id = item["interaction_id"]
+            if interaction_id in seen:
+                raise ValueError(f"duplicate interaction id {interaction_id!r}")
+        except (ValueError, KeyError) as error:
+            invalid.append((index, raw, str(error)))
+        else:
+            seen.add(interaction_id)
+            valid.append((index, item))
+    return valid, invalid
 
 
 def validate_probe_interaction_plan(

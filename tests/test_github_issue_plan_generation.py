@@ -1757,6 +1757,10 @@ def test_publish_execution_plan_pull_request_commits_only_generated_files(
     generated_file = tmp_path / "docs/plans/proposal-v1-execution-plan.yaml"
     generated_file.parent.mkdir(parents=True)
     generated_file.write_text("generated", encoding="utf-8")
+    source_plan = tmp_path / "docs/plans/proposal.md"
+    source_plan.write_text(
+        "# Attestation Implementation Plan\n\nPlan details.\n", encoding="utf-8"
+    )
     commands: list[list[str]] = []
 
     def runner(
@@ -1803,7 +1807,13 @@ def test_publish_execution_plan_pull_request_commits_only_generated_files(
     )
     assert pr_command[pr_command.index("--base") + 1] == "main"
     assert pr_command[pr_command.index("--head") + 1] == pull_request.branch_name
-    assert "docs/plans/proposal.md" in pr_command[pr_command.index("--body") + 1]
+    assert pr_command[pr_command.index("--title") + 1] == "Review plan: Attestation"
+    pr_body = pr_command[pr_command.index("--body") + 1]
+    assert "This pull request contains the generated implementation plan" in pr_body
+    assert "- Implementation plan: `docs/plans/proposal-v1-execution-plan.yaml`" in (
+        pr_body
+    )
+    assert "docs/plans/proposal.md" in pr_body
 
 
 def test_publish_execution_plan_pull_request_rejects_detached_head(

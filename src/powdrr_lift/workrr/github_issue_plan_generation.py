@@ -1494,7 +1494,11 @@ def publish_execution_plan_pull_request(
         ["git", "push", "--set-upstream", remote, branch_name],
     )
 
-    title = f"Review execution plan: {plan.plan_id}"
+    title = _plan_pull_request_title(
+        repo_root=repo_root,
+        source_plan_path=source_plan_path,
+        plan_id=plan.plan_id,
+    )
     body = _render_plan_pull_request_body(
         plan,
         source_plan_path=source_plan_path,
@@ -1537,6 +1541,34 @@ def publish_execution_plan_pull_request(
     )
 
 
+def _plan_pull_request_title(
+    *, repo_root: Path, source_plan_path: str, plan_id: str
+) -> str:
+    source_path = Path(source_plan_path)
+    heading: str | None = None
+    if not source_path.is_absolute() and ".." not in source_path.parts:
+        try:
+            for line in (
+                (repo_root / source_path).read_text(encoding="utf-8").splitlines()
+            ):
+                match = re.match(r"^#\s+(.+?)\s*#*\s*$", line)
+                if match:
+                    heading = match.group(1)
+                    break
+        except OSError:
+            pass
+    if heading is None:
+        heading = source_path.stem.replace("-", " ").replace("_", " ").title()
+    heading = " ".join(heading.split())
+    heading = re.sub(
+        r"\s+(?:(?:implementation|execution)\s+)?plan$",
+        "",
+        heading,
+        flags=re.IGNORECASE,
+    ).strip()
+    return f"Review plan: {heading or plan_id}"
+
+
 def _render_plan_pull_request_body(
     plan: ReviewedExecutionPlan, *, source_plan_path: str, plan_path: str
 ) -> str:
@@ -1550,10 +1582,11 @@ def _render_plan_pull_request_body(
         [
             "## Review this execution plan",
             "",
-            "This pull request contains the generated queue plan, structured context "
+            "This pull request contains the generated implementation plan, "
+            "structured context "
             "documents, and one Procedrr process-backed workflow per item.",
             f"- Source plan: `{source_plan_path}`",
-            f"- Queue plan: `{plan_path}`",
+            f"- Implementation plan: `{plan_path}`",
             "Review and revise these files together. After this PR merges, publish "
             "the reviewed plan items as GitHub issues.",
             "",

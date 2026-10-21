@@ -1264,7 +1264,15 @@ def test_final_review_can_cover_paths_from_multiple_implementation_items() -> No
             lambda item: item.update(
                 implementation_steps=[f"step {index}" for index in range(9)]
             ),
-            "between 1 and 8 implementation steps",
+            "between 1 and 4 non-empty string implementation steps",
+        ),
+        (
+            lambda item: item.update(
+                implementation_steps=[
+                    {"Configure the workflow command": "bash verify.sh"}
+                ]
+            ),
+            "non-empty string implementation steps",
         ),
     ],
 )
@@ -1314,10 +1322,15 @@ def test_execute_pr_artifact_writer_requires_structrr_proposal(tmp_path: Path) -
 def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> None:
     from powdrr_lift.process.templates import instantiate_procedrr_process_workflow
 
+    colon_step = (
+        "Configure the workflow command: bash attestation/scripts/verify-all.sh."
+    )
+    item = _item("foundation")
+    item["implementation_steps"][0] = colon_step
     rendered, plan = generate_execution_plan_yaml(
         source_plan="# Plan\nImplement the feature.",
         plan_id="procedrr-process-v1",
-        client=FakePlanningClient({"items": [_item("foundation")]}),
+        client=FakePlanningClient({"items": [item]}),
     )
     assert plan.items[0].workflow_file is not None
     write_execution_plan_artifacts(
@@ -1351,7 +1364,7 @@ def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> No
         "scripts/verify-all.sh"
     )
     assert tasks[0].input_state["proposed_pr_context"]["implementation_steps"] == [
-        "Implement the smallest behavior for foundation.",
+        colon_step,
         "Add focused tests proving foundation works.",
     ]
 

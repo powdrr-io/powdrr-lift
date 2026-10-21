@@ -1302,10 +1302,21 @@ class PlanWorkflowInstance:
 def load_plan_workflow_instance(path: str | Path) -> PlanWorkflowInstance:
     """Load and validate a generated plan workflow descriptor."""
     try:
-        data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        text = Path(path).read_text(encoding="utf-8")
     except (OSError, yaml.YAMLError) as error:
         raise PlanGenerationError(
             f"could not read workflow definition: {error}"
+        ) from error
+    return parse_plan_workflow_instance_yaml(text)
+
+
+def parse_plan_workflow_instance_yaml(text: str) -> PlanWorkflowInstance:
+    """Parse and validate a generated plan workflow descriptor from YAML."""
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError as error:
+        raise PlanGenerationError(
+            f"workflow definition is invalid YAML: {error}"
         ) from error
     if not isinstance(data, Mapping) or set(data) != {
         "schema",
@@ -2210,10 +2221,14 @@ def generate_execution_plan_yaml(
         if (
             not isinstance(implementation_steps, list)
             or not 1 <= len(implementation_steps) <= MAX_ITEM_IMPLEMENTATION_STEPS
+            or not all(
+                isinstance(step, str) and step.strip() for step in implementation_steps
+            )
         ):
             raise PlanGenerationError(
-                "each proposed work item must have between 1 and 8 implementation "
-                f"steps; the executable-slice limit is {MAX_ITEM_IMPLEMENTATION_STEPS}"
+                "each proposed work item must have between 1 and "
+                f"{MAX_ITEM_IMPLEMENTATION_STEPS} non-empty string implementation "
+                "steps"
             )
         acceptance_criteria = item.get("acceptance_criteria")
         if (
@@ -2411,9 +2426,14 @@ def write_execution_plan_artifacts(
                     },
                 },
             }
-            workflow_file.write_text(
-                yaml.safe_dump(definition, sort_keys=False), encoding="utf-8"
-            )
+            workflow_yaml = yaml.safe_dump(definition, sort_keys=False)
+            try:
+                parse_plan_workflow_instance_yaml(workflow_yaml)
+            except PlanGenerationError as error:
+                raise PlanGenerationError(
+                    f"generated workflow {item.workflow_id!r} did not validate: {error}"
+                ) from error
+            workflow_file.write_text(workflow_yaml, encoding="utf-8")
             created_files.append(workflow_file)
             generated_files.append(workflow_file)
 

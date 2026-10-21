@@ -10,6 +10,7 @@ outputs:
       changed_paths: {type: array, items: {type: string}}
       error: {type: [string, "null"]}
       retryable: {type: boolean}
+      plan_defect_evidence: {type: array, items: {type: string}}
       structrr:
         type: object
         required: [passed]

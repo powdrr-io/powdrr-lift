@@ -803,6 +803,49 @@ def _preflight_proposed_file_additions(
     return tuple(findings)
 
 
+def _preflight_reviewed_file_creation_conflicts(
+    repo_root: Path,
+    proposed: Mapping[str, Any],
+    *,
+    base_commit: str,
+) -> tuple[str, ...]:
+    """Find reviewed steps that say to create an allowed path already in the base."""
+    allowed_paths = _issue_worker_string_list(proposed.get("allowed_paths"))
+    implementation_steps = _issue_worker_string_list(
+        proposed.get("implementation_steps")
+    )
+    creation_terms = ("create ", "add ", "new ", "introduce ")
+    findings: list[str] = []
+    for raw_path in allowed_paths:
+        relative_path = PurePosixPath(raw_path)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            continue
+        matching_steps = tuple(
+            step
+            for step in implementation_steps
+            if raw_path in step
+            and any(term in step.casefold() for term in creation_terms)
+        )
+        if not matching_steps:
+            continue
+        existing = subprocess.run(
+            ["git", "show", f"{base_commit}:{relative_path.as_posix()}"],
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+        )
+        if existing.returncode != 0:
+            continue
+        digest = hashlib.sha256(existing.stdout).hexdigest()
+        findings.append(
+            f"reviewed plan directs creating {raw_path}, but that file already "
+            f"exists in base commit {base_commit} (sha256={digest}); amend the "
+            "plan to reuse or deliberately update the existing file. Evidence: "
+            + "; ".join(matching_steps)
+        )
+    return tuple(findings)
+
+
 def _implementation_paths_against_base(repo_root: Path) -> tuple[str, ...]:
     """Find candidate implementation files already present on this work branch.
 
@@ -2563,6 +2606,21 @@ class _TaskWorkflowExecutionStrategy:
             text=True,
             check=True,
         ).stdout.strip()
+        plan_defect_evidence = _preflight_reviewed_file_creation_conflicts(
+            self.repo_root,
+            proposed,
+            base_commit=base_commit,
+        )
+        if plan_defect_evidence:
+            return {
+                "passed": False,
+                "changed_paths": [],
+                "error": (
+                    "reviewed plan conflicts with files in the repository baseline"
+                ),
+                "retryable": False,
+                "plan_defect_evidence": list(plan_defect_evidence),
+            }
         request, validation_profile = _issue_worker_implementation_request(
             proposed, workflow_id=workflow_id, base_commit=base_commit
         )

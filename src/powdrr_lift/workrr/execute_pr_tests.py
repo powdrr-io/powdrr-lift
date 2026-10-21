@@ -18,6 +18,161 @@ class ExecutePrTestError(ValueError):
     """Generated execute-PR tests are invalid or did not prove behavior."""
 
 
+def validate_coverage_plan(
+    plan: Mapping[str, Any], acceptance_criteria: Sequence[Any]
+) -> dict[str, Any]:
+    """Require an explicit, test-linked partition plan for every criterion."""
+    criteria = plan.get("criteria")
+    if not isinstance(criteria, list):
+        raise ExecutePrTestError("test coverage plan must contain criteria")
+    expected_ids = {f"AC-{index:02d}" for index, _ in enumerate(acceptance_criteria, 1)}
+    by_id: dict[str, dict[str, Any]] = {}
+    assigned_test_ids: set[str] = set()
+    for raw in criteria:
+        if not isinstance(raw, Mapping):
+            raise ExecutePrTestError(
+                "test coverage plan contains a malformed criterion"
+            )
+        criterion_id = raw.get("criterion_id")
+        partitions = raw.get("partitions")
+        if (
+            not isinstance(criterion_id, str)
+            or criterion_id not in expected_ids
+            or criterion_id in by_id
+            or not isinstance(raw.get("criterion"), str)
+            or not raw["criterion"].strip()
+            or not isinstance(partitions, list)
+            or not partitions
+        ):
+            raise ExecutePrTestError(
+                "test coverage plan has missing or invalid criterion IDs"
+            )
+        checked_partitions: list[dict[str, Any]] = []
+        partition_ids: set[str] = set()
+        for partition in partitions:
+            if not isinstance(partition, Mapping):
+                raise ExecutePrTestError(f"{criterion_id} has a malformed partition")
+            partition_id = partition.get("partition_id")
+            test_ids = partition.get("test_ids")
+            if (
+                not isinstance(partition_id, str)
+                or not partition_id
+                or partition_id in partition_ids
+                or not isinstance(partition.get("behavior_class"), str)
+                or not partition["behavior_class"].strip()
+                or not isinstance(partition.get("observable_oracle"), str)
+                or not partition["observable_oracle"].strip()
+                or not isinstance(partition.get("case_strategy"), str)
+                or not partition["case_strategy"].strip()
+                or not isinstance(partition.get("minimum_case_count"), int)
+                or isinstance(partition.get("minimum_case_count"), bool)
+                or partition["minimum_case_count"] < 1
+                or not isinstance(test_ids, list)
+                or not test_ids
+                or any(not isinstance(value, str) or not value for value in test_ids)
+                or len(set(test_ids)) != len(test_ids)
+                or assigned_test_ids.intersection(test_ids)
+            ):
+                raise ExecutePrTestError(f"{criterion_id} has an incomplete partition")
+            partition_ids.add(partition_id)
+            assigned_test_ids.update(test_ids)
+            checked_partitions.append(dict(partition))
+        by_id[criterion_id] = {**dict(raw), "partitions": checked_partitions}
+    if set(by_id) != expected_ids:
+        missing = sorted(expected_ids - set(by_id))
+        extra = sorted(set(by_id) - expected_ids)
+        raise ExecutePrTestError(
+            "coverage plan must represent every acceptance criterion; "
+            f"missing={missing}, extra={extra}"
+        )
+    return {"criteria": [by_id[key] for key in sorted(by_id)]}
+
+
+def validate_coverage_references(
+    files: Mapping[str, str], plan: Mapping[str, Any]
+) -> dict[str, int]:
+    """Check every planned partition is explicitly linked to authored tests."""
+    tests = {
+        node.name
+        for source in files.values()
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("test_")
+    }
+    references: dict[str, int] = {}
+    for criterion in plan["criteria"]:
+        criterion_id = criterion["criterion_id"]
+        for partition in criterion["partitions"]:
+            reference = f"{criterion_id}.{partition['partition_id']}"
+            referenced = 0
+            for source in files.values():
+                for test_id in partition["test_ids"]:
+                    if test_id in tests and re.search(
+                        rf"(?m)^\s*#\s*Covers:\s*{re.escape(reference)}\s+{re.escape(test_id)}\s*$",
+                        source,
+                    ):
+                        referenced += 1
+            if referenced == 0:
+                raise ExecutePrTestError(
+                    f"coverage partition {reference} is not linked to an actual test; "
+                    "add '# Covers: <partition-id> <test_function>' above its test"
+                )
+            references[reference] = referenced
+    return references
+
+
+def pytest_execution_evidence(result: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract actual collected and executed test counts from pytest output."""
+    output = "\n".join(str(result.get(key, "")) for key in ("stdout", "stderr"))
+    summaries = re.findall(
+        r"(?m)^\s*=*\s*((?:\d+\s+(?:passed|failed|errors?|skipped|xfailed|xpassed)"
+        r"(?:,\s*)?)+)\s+in\s+[\d.]+s\s*=*\s*$",
+        output,
+    )
+    if not summaries:
+        raise ExecutePrTestError(
+            "pytest output has no terminal summary for test-count evidence"
+        )
+    summary = summaries[-1]
+    counts = {
+        status: int(count)
+        for count, status in re.findall(
+            r"(\d+)\s+(passed|failed|error|errors|skipped|xfailed|xpassed)", summary
+        )
+    }
+    executed = sum(
+        counts.get(status, 0) for status in ("passed", "failed", "error", "errors")
+    )
+    if executed == 0:
+        raise ExecutePrTestError("pytest reported no executed tests")
+    return {"summary": summary, "counts": counts, "executed": executed}
+
+
+def validate_quality_review(review: Mapping[str, Any]) -> dict[str, Any]:
+    """Accept only an explicit clean verdict from the independent test reviewer."""
+    outcome = review.get("outcome")
+    findings = review.get("findings")
+    if outcome not in {"pass", "fail"} or not isinstance(findings, list):
+        raise ExecutePrTestError("test-quality review has an invalid verdict")
+    normalized: list[dict[str, str]] = []
+    for finding in findings:
+        if not isinstance(finding, Mapping) or any(
+            not isinstance(finding.get(key), str) or not finding[key].strip()
+            for key in ("test_id", "issue", "evidence")
+        ):
+            raise ExecutePrTestError("test-quality review contains an invalid finding")
+        normalized.append(
+            {key: finding[key].strip() for key in ("test_id", "issue", "evidence")}
+        )
+    if outcome == "pass" and normalized:
+        raise ExecutePrTestError(
+            "test-quality reviewer passed while reporting findings"
+        )
+    if outcome == "fail" and not normalized:
+        raise ExecutePrTestError("test-quality reviewer failed without explaining why")
+    return {"outcome": outcome, "findings": normalized}
+
+
 def validate_generated_test_files(
     files: Mapping[str, str],
 ) -> dict[str, str]:

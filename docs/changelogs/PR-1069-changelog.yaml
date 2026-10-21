@@ -1,0 +1,213 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1069
+title: Require broad, reviewed execute-PR test coverage
+intent:
+  problem: Independently authored execute-PR tests could be narrow or mock-heavy while still passing the baseline-red check.
+  goal: Plan test partitions for every acceptance criterion, review the actual suite independently, and verify that the candidate executes the required number of cases.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/execute_pr_tests.py
+    type: modified
+    span:
+      start_line: 21
+      end_line: 175
+    summary: Validate coverage plans, test links, review verdicts, and pytest case-count evidence
+    rationale: Enforce a structured contract that connects each acceptance criterion and behavior partition to executable tests and measurable runtime evidence.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 91
+      end_line: 91
+    summary: Import execute-PR quality evidence helpers
+    rationale: Make deterministic coverage validation and execution evidence available to the workflow.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 94
+      end_line: 95
+    summary: Import coverage and quality validation helpers
+    rationale: Enforce the plan-to-test contract in test authoring.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 97
+      end_line: 97
+    summary: Import generated test file coverage validation
+    rationale: Validate references from coverage partitions to test functions.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 134
+      end_line: 134
+    summary: Import schema-validated workflow LLM requests
+    rationale: Request structured coverage plans and test-quality reviews.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 693
+      end_line: 693
+    summary: Add an independent quality-review client to test authoring
+    rationale: Separate review of MiniSWE-authored tests from implementation.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 721
+      end_line: 811
+    summary: Generate and validate a criterion-by-criterion coverage contract
+    rationale: Define relevant behavior partitions, observable oracles, proposed tests, and minimum case counts.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 833
+      end_line: 836
+    summary: Give the test author the coverage contract
+    rationale: Require source-linked coverage markers for each partition.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 868
+      end_line: 869
+    summary: Preserve test coverage findings in the repair request
+    rationale: Make the test author's repair address the exact rejected coverage gap.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 884
+      end_line: 887
+    summary: Track coverage links and reviewer results
+    rationale: Persist the evidence needed to audit authoring attempts.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 919
+      end_line: 921
+    summary: Check coverage references before baseline execution
+    rationale: Reject planned partitions without corresponding pytest functions.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 940
+      end_line: 1009
+    summary: Independently review test breadth and realism before coding
+    rationale: Reject tautologies, mock-only tests, missing behavior classes, and inadequate generated-case counts.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 1028
+      end_line: 1030
+    summary: Store coverage plan and review evidence
+    rationale: Keep the pre-coding audit in the execute-PR artifact.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 1032
+      end_line: 1032
+    summary: Store baseline case-count evidence
+    rationale: Record tests actually executed against the untouched baseline.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 2133
+      end_line: 2133
+    summary: Supply the independent reviewer to test authoring
+    rationale: Review test suite quality before starting implementation.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 2246
+      end_line: 2274
+    summary: Verify candidate execution meets the planned case count
+    rationale: Reject a candidate when pytest runs fewer cases than required by its coverage partitions.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 2458
+      end_line: 2463
+    summary: Include coverage and review evidence in the result
+    rationale: Make acceptance criteria, partition links, reviewer outcome, and baseline execution auditable.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 2477
+      end_line: 2484
+    summary: Report case-count contract failures for repair
+    rationale: Give the implementation workflow concrete evidence when planned tests did not execute.
+  - path: tests/test_execute_pr_tests.py
+    type: modified
+    span:
+      start_line: 15
+      end_line: 15
+    summary: Import pytest execution evidence helper
+    rationale: Assert parsed runtime case counts.
+  - path: tests/test_execute_pr_tests.py
+    type: modified
+    span:
+      start_line: 17
+      end_line: 18
+    summary: Import coverage-plan validation helpers
+    rationale: Exercise partition and test-reference validation.
+  - path: tests/test_execute_pr_tests.py
+    type: modified
+    span:
+      start_line: 20
+      end_line: 20
+    summary: Import test-quality verdict validation
+    rationale: Verify malformed and failed reviews are rejected.
+  - path: tests/test_execute_pr_tests.py
+    type: modified
+    span:
+      start_line: 38
+      end_line: 112
+    summary: Test coverage-plan and pytest evidence validation
+    rationale: Cover missing criteria, unlinked partitions, invalid verdicts, and actual execution counts.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span:
+      start_line: 470
+      end_line: 492
+    summary: Add coverage contract to execute-PR integration fixture
+    rationale: Keep end-to-end workflow evidence aligned with the new candidate case-count gate.
+entities:
+  - id: execute-pr-test-coverage-contract
+    type: Test suite
+    action: added
+  - id: execute-pr-coverage-plan-validation
+    type: Function
+    action: added
+  - id: execute-pr-test-quality-review
+    type: Workflow
+    action: added
+  - id: execute-pr-case-count-evidence
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: coverage-contract-requires-partition-tests
+    type: exercises
+    source: execute-pr-test-coverage-contract
+    target: execute-pr-coverage-plan-validation
+    action: added
+    description: Each criterion and behavior partition must map to named tests and an explicit case-generation strategy.
+  - id: execute-pr-review-precedes-coding
+    type: validates
+    source: execute-pr-test-quality-review
+    target: execute-pr-test-coverage-contract
+    action: added
+    description: An independent reviewer rejects tautological, mock-only, narrow, or inadequately scoped tests before implementation.
+  - id: case-count-evidence-protects-coverage
+    type: validates
+    source: execute-pr-case-count-evidence
+    target: execute-pr-test-coverage-contract
+    action: added
+    description: Candidate pytest output must show at least the case count declared by the planned partitions.
+invariants:
+  - id: every-acceptance-criterion-has-planned-tests
+    description: The coverage contract represents every acceptance criterion and maps each partition to one or more real pytest functions.
+    action: added
+  - id: candidate-executes-planned-case-volume
+    description: Execute-PR succeeds only when pytest reports at least the total minimum case count declared in the coverage plan.
+    action: added
+guidance:
+  - id: review-real-behavior-not-mock-activity
+    description: Review test bodies for observable public behavior, realistic application wiring, useful boundary/error partitions, and broad generated cases where the domain warrants them.
+    action: added

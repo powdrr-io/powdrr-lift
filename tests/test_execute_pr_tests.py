@@ -12,8 +12,12 @@ from powdrr_lift.workrr.execute_pr_tests import (
     fingerprint_test_files,
     install_frozen_test_files,
     pytest_command_for_files,
+    pytest_execution_evidence,
     require_behavioral_red_result,
+    validate_coverage_plan,
+    validate_coverage_references,
     validate_generated_test_files,
+    validate_quality_review,
 )
 
 
@@ -29,6 +33,81 @@ def test_generated_pytest_files_require_assertive_tests_under_test_root() -> Non
     )
 
     assert tuple(result) == ("tests/integration/test_public_api.py",)
+
+
+def test_coverage_plan_must_cover_each_criterion_and_link_real_tests() -> None:
+    criteria = ["Returns computed values", "Rejects malformed expressions"]
+    plan = {
+        "criteria": [
+            {
+                "criterion_id": "AC-01",
+                "criterion": criteria[0],
+                "partitions": [
+                    {
+                        "partition_id": "P01",
+                        "behavior_class": "operator precedence",
+                        "case_strategy": "parameterized expressions across operators",
+                        "minimum_case_count": 12,
+                        "observable_oracle": "numeric evaluation result",
+                        "test_ids": ["test_precedence"],
+                    }
+                ],
+            },
+            {
+                "criterion_id": "AC-02",
+                "criterion": criteria[1],
+                "partitions": [
+                    {
+                        "partition_id": "P01",
+                        "behavior_class": "invalid syntax",
+                        "case_strategy": "multiple malformed tokens",
+                        "minimum_case_count": 5,
+                        "observable_oracle": "documented parse error",
+                        "test_ids": ["test_rejects_invalid_syntax"],
+                    }
+                ],
+            },
+        ]
+    }
+    validated = validate_coverage_plan(plan, criteria)
+    files = {
+        "tests/test_parser.py": (
+            "# Covers: AC-01.P01 test_precedence\n"
+            "def test_precedence():\n    assert evaluate('4 + 3') == 7\n\n"
+            "# Covers: AC-02.P01 test_rejects_invalid_syntax\n"
+            "def test_rejects_invalid_syntax():\n"
+            "    with pytest.raises(ParseError):\n        evaluate('4 +')\n"
+        )
+    }
+    assert validate_coverage_references(files, validated) == {
+        "AC-01.P01": 1,
+        "AC-02.P01": 1,
+    }
+    with pytest.raises(ExecutePrTestError, match="every acceptance criterion"):
+        validate_coverage_plan({"criteria": plan["criteria"][:1]}, criteria)
+    with pytest.raises(ExecutePrTestError, match="not linked"):
+        validate_coverage_references(
+            {"tests/test_parser.py": "def test_precedence():\n    assert True\n"},
+            validated,
+        )
+
+
+def test_quality_review_and_pytest_execution_evidence_fail_closed() -> None:
+    assert validate_quality_review({"outcome": "pass", "findings": []}) == {
+        "outcome": "pass",
+        "findings": [],
+    }
+    with pytest.raises(ExecutePrTestError, match="without explaining"):
+        validate_quality_review({"outcome": "fail", "findings": []})
+    assert pytest_execution_evidence(
+        {"stdout": "14 passed, 2 skipped in 0.50s", "stderr": ""}
+    ) == {
+        "summary": "14 passed, 2 skipped",
+        "counts": {"passed": 14, "skipped": 2},
+        "executed": 14,
+    }
+    with pytest.raises(ExecutePrTestError, match="no terminal summary"):
+        pytest_execution_evidence({"stdout": "", "stderr": ""})
 
 
 @pytest.mark.parametrize(

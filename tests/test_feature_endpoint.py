@@ -130,7 +130,7 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
             "given": "the public API receives a selector",
             "when": "it processes a matching finding",
             "then": {"result": "value"},
-            "evidence": ["The instruction defines this result."],
+            "evidence": ["Add selector handling."],
             "related_requirements": ["selector parsing"],
             "dimensions": {"normal_result": "ASSUMED DEFAULT: not an oracle"},
             "assumptions": [{"resolution": "must not be sent as a requirement"}],
@@ -150,6 +150,8 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
             assert "required literal assignments" in request.prompt
         else:
             assert ("three Python literal values at module scope") in request.prompt
+        assert "Omit evidence fields" in request.prompt
+        assert "Powdrr attaches scenario evidence deterministically" in request.prompt
         assert "Task instruction:\nAdd selector handling." in request.prompt
         assert '"scenario_id": "selector"' in request.prompt
         assert '"given": "the public API receives a selector"' in request.prompt
@@ -175,7 +177,6 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
             "operation": "Call the public API.",
             "expected": "The matching result is returned.",
             "operands": [],
-            "evidence": [{"source": "instruction", "quote": "Add selector handling."}],
             "unresolved_reason": "",
         }
         source = (
@@ -291,7 +292,7 @@ def test_miniswe_authors_individual_probes_for_empty_or_failed_interaction_plan(
     _git(repository, "commit", "-qm", "baseline")
     base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
     output_root = tmp_path / "artifacts"
-    scenarios = ({"scenario_id": "single-requirement"},)
+    scenarios = ({"scenario_id": "single-requirement", "evidence": ["Keep values."]},)
 
     def author_probe_suite(
         self: MiniSWEAgentProvider,
@@ -313,7 +314,6 @@ def test_miniswe_authors_individual_probes_for_empty_or_failed_interaction_plan(
             "operation": "Call the public API with that value.",
             "expected": "The API returns the value.",
             "operands": [],
-            "evidence": [{"source": "instruction", "quote": "Keep values."}],
             "unresolved_reason": "",
         }
         source = (
@@ -390,8 +390,16 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
     output_root = tmp_path / "artifacts"
     instruction = "Special values are operands. Operators combine values."
     scenarios = (
-        {"scenario_id": "special-value", "then": "all values are selected"},
-        {"scenario_id": "operator", "then": "difference removes values"},
+        {
+            "scenario_id": "special-value",
+            "then": "all values are selected",
+            "evidence": ["Special values are operands."],
+        },
+        {
+            "scenario_id": "operator",
+            "then": "difference removes values",
+            "evidence": ["Operators combine values."],
+        },
     )
     interaction = {
         "interaction_id": "special-value-difference",
@@ -427,12 +435,6 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
                 "operation": "Call the public API.",
                 "expected": "The result reflects the selector.",
                 "operands": [],
-                "evidence": [
-                    {
-                        "source": "instruction",
-                        "quote": "Special values are operands.",
-                    }
-                ],
                 "unresolved_reason": "",
             }
             for scenario_id in ("special-value", "operator")
@@ -443,7 +445,6 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
             "condition": interaction["condition"],
             "operation": interaction["operation"],
             "expected": interaction["expected"],
-            "evidence_quote_ids": ["quote-001", "quote-002"],
         }
         source = [
             f"OBLIGATIONS = {obligations!r}",
@@ -555,7 +556,6 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
             "operation": "Call the public API.",
             "expected": "The matching result is returned.",
             "operands": [],
-            "evidence": [{"source": "instruction", "quote": "Add selector handling."}],
             "unresolved_reason": "",
         }
         (worktree_root / "probe_suite.py").write_text(
@@ -600,7 +600,13 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
         output_root=output_root,
         base_commit=base_commit,
         request=request,
-        scenarios=({"scenario_id": "selector", "then": "return handled value"},),
+        scenarios=(
+            {
+                "scenario_id": "selector",
+                "then": "return handled value",
+                "evidence": ["Add selector handling."],
+            },
+        ),
         instruction="Add selector handling.",
         repository_contract={},
     )

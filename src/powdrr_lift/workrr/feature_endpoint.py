@@ -127,7 +127,6 @@ from powdrr_lift.workrr.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     PostRunProbe,
     baseline_probe_failures,
-    instruction_evidence_candidates,
     parse_generated_postrun_probe_source,
     probe_failures,
     run_postrun_probes,
@@ -2896,6 +2895,7 @@ def _run_code_agent_phase(
                     scenarios=probe_scenarios,
                     instruction=feature_description,
                     repository_contract=implementation_packet.contract_closure or {},
+                    instruction_ledger_clauses=ledger_clauses,
                 )
                 # MiniSWE may commit the authored probe suite. The coding
                 # request must then use that accepted commit as its base.
@@ -3181,6 +3181,7 @@ def _generate_miniswe_postrun_probes(
     scenarios: Sequence[Mapping[str, Any]],
     instruction: str,
     repository_contract: Mapping[str, Any],
+    instruction_ledger_clauses: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
     """Ask MiniSWE to author a frozen probe suite in the clean task worktree."""
     if not scenarios:
@@ -3211,9 +3212,6 @@ def _generate_miniswe_postrun_probes(
             {field: scenario[field] for field in scenario_fields if field in scenario}
             for scenario in scenarios
         ]
-        instruction_evidence_candidates_json = json.dumps(
-            instruction_evidence_candidates(instruction), indent=2, sort_keys=True
-        )
         probe_prompt = (
             "Classify the instruction into typed probe obligations and author "
             "executable post-coding behavior probes for those obligations. "
@@ -3237,14 +3235,17 @@ def _generate_miniswe_postrun_probes(
             "dictionaries. "
             "Each obligation has obligation_id, scenario_id, category, rule, "
             "supported, summary, condition, operation, expected, operands, "
-            "evidence, and unresolved_reason. Use category values transformation, "
+            "and unresolved_reason. Omit evidence fields; Powdrr attaches scenario "
+            "evidence deterministically from the scenario ID and instruction "
+            "ledger. Use category values transformation, "
             "validation, preservation, lifecycle, compatibility, presence, other; "
             "rule values reference_integrity, uniqueness, collision, "
             "mutual_exclusion, type_constraint, range_constraint, presence, "
             "format, other, not_applicable, unresolved; and operand roles "
             "mapping_key, mapping_value, input, result, constraint, trigger, "
             "state, other. Split independently falsifiable rules. Include each "
-            "scenario. Cite exact instruction or repository-contract substrings. "
+            "scenario. If the scenario has no resolvable source evidence, mark "
+            "the obligation unsupported and unresolved. "
             "Mark unsupported behavior unresolved instead of guessing. "
             "`PROBE_METADATA` maps each function name to a dictionary with "
             "`probe_id`, `scenario_id`, `obligation_id`, `oracle_basis`, and "
@@ -3269,13 +3270,12 @@ def _generate_miniswe_postrun_probes(
             f"{json.dumps(repository_contract, indent=2, sort_keys=True)}\n\n"
             "Plan interactions as part of this same artifact. Each `INTERACTIONS` "
             "entry has interaction_id, scenario_ids, condition, operation, "
-            "expected, and evidence_quote_ids. Use only source-grounded "
-            "combinations with at least two distinct scenario IDs and two "
-            "distinct instruction evidence candidate IDs. Use an empty list when "
+            "and expected. Use only source-grounded combinations with at least "
+            "two distinct scenario IDs. Powdrr attaches evidence from those "
+            "scenarios and the instruction ledger; do not emit evidence fields. "
+            "Use an empty list when "
             "no interaction is supported. Author at least one probe for each "
-            "interaction, listing its ID in `interaction_ids`. Exact instruction "
-            "evidence candidates (copy IDs exactly):\n"
-            f"{instruction_evidence_candidates_json}\n\n"
+            "interaction, listing its ID in `interaction_ids`.\n\n"
             "Return from the agent after writing probe_suite.py."
         )
         probe_request = ImplementationRequest(
@@ -3333,7 +3333,10 @@ def _generate_miniswe_postrun_probes(
                         "runtime errors). At module scope, allow only the three "
                         "required literal assignments, imports, an optional module "
                         "docstring, and function definitions. Fix "
-                        "the exact validation error above before returning. Use "
+                        "the exact validation error above before returning. Do "
+                        "not emit evidence fields; Powdrr derives obligation "
+                        "evidence from the scenario ID and instruction ledger. "
+                        "Use "
                         "only the supplied contract and "
                         "scenario IDs. Do not edit implementation files or tests."
                     ),
@@ -3363,6 +3366,7 @@ def _generate_miniswe_postrun_probes(
                         scenarios,
                         instruction=instruction,
                         repository_contract=repository_contract,
+                        instruction_ledger_clauses=instruction_ledger_clauses,
                     )
                 )
                 interaction_plan = {

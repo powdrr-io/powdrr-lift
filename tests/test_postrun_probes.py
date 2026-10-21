@@ -31,7 +31,6 @@ def _source(body: str = "assert module.public_api('value') == 'handled:value'") 
             "operation": "Call the public API.",
             "expected": "The matching result is returned.",
             "operands": [],
-            "evidence": [{"source": "instruction", "quote": "Add selector handling."}],
             "unresolved_reason": "",
         }
     ]
@@ -49,7 +48,11 @@ def _source(body: str = "assert module.public_api('value') == 'handled:value'") 
 
 
 def _parse(
-    source: str, scenarios: tuple[dict[str, object], ...]
+    source: str,
+    scenarios: tuple[dict[str, Any], ...],
+    *,
+    instruction: str = "Add selector handling.",
+    instruction_ledger_clauses: tuple[dict[str, object], ...] = (),
 ) -> tuple[
     tuple[dict[str, Any], ...],
     tuple[dict[str, Any], ...],
@@ -57,9 +60,16 @@ def _parse(
 ]:
     return parse_generated_postrun_probe_source(
         source,
-        scenarios,
-        instruction="Add selector handling.",
+        tuple(
+            {
+                **scenario,
+                "evidence": scenario.get("evidence", [instruction]),
+            }
+            for scenario in scenarios
+        ),
+        instruction=instruction,
         repository_contract={},
+        instruction_ledger_clauses=instruction_ledger_clauses,
     )
 
 
@@ -74,6 +84,50 @@ def test_parse_generated_probe_source_preserves_complete_code_and_metadata() -> 
     assert obligations[0]["category"] == "transformation"
     assert interactions == ()
     assert probes[0].obligation_id == "selector-obligation"
+
+
+def test_probe_obligation_evidence_resolves_from_scenario_deterministically() -> None:
+    obligations, _, _ = _parse(_source(), ({"scenario_id": "selector"},))
+    assert obligations[0]["evidence"] == [
+        {"source": "instruction", "quote": "Add selector handling."}
+    ]
+
+
+def test_probe_obligation_evidence_uses_instruction_ledger_by_scenario_id() -> None:
+    source = _source().replace(
+        "'scenario_id': 'selector'", "'scenario_id': 'scenario:instruction-001'"
+    )
+    scenario = {
+        "scenario_id": "scenario:instruction-001",
+        "evidence": ["generated rationale is not a source quote"],
+    }
+
+    obligations, _, _ = _parse(
+        source,
+        (scenario,),
+        instruction="Add selector handling.",
+        instruction_ledger_clauses=(
+            {"clause_id": "instruction-001", "text": "Add selector handling."},
+        ),
+    )
+
+    assert obligations[0]["evidence"] == [
+        {"source": "instruction", "quote": "Add selector handling."}
+    ]
+
+
+def test_miniswe_cannot_override_deterministically_bound_evidence() -> None:
+    source = _source().replace(
+        "'operands': []",
+        "'operands': [], 'evidence': "
+        "[{'source': 'instruction', 'quote': 'fabricated'}]",
+    )
+
+    obligations, _, _ = _parse(source, ({"scenario_id": "selector"},))
+
+    assert obligations[0]["evidence"] == [
+        {"source": "instruction", "quote": "Add selector handling."}
+    ]
 
 
 def test_probe_imports_inside_function_are_valid_python() -> None:
@@ -131,8 +185,11 @@ def test_probe_parser_rejects_unknown_scenario() -> None:
 
 def test_interaction_plan_requires_multiple_scenarios_and_exact_evidence() -> None:
     scenarios = (
-        {"scenario_id": "special-value"},
-        {"scenario_id": "operator"},
+        {
+            "scenario_id": "special-value",
+            "evidence": ["all values are selected;"],
+        },
+        {"scenario_id": "operator", "evidence": ["difference removes a value"]},
     )
     interaction = {
         "interaction_id": "special-value-with-operator",
@@ -146,7 +203,6 @@ def test_interaction_plan_requires_multiple_scenarios_and_exact_evidence() -> No
         **{
             key: value for key, value in interaction.items() if key != "evidence_quotes"
         },
-        "evidence_quote_ids": ["quote-001", "quote-002"],
     }
 
     validated = validate_probe_interaction_plan(
@@ -156,8 +212,8 @@ def test_interaction_plan_requires_multiple_scenarios_and_exact_evidence() -> No
     )
 
     assert validated == (interaction,)
-    invalid = {**model_interaction, "evidence_quote_ids": ["quote-999", "quote-002"]}
-    with pytest.raises(ValueError, match="evidence_quote_ids"):
+    invalid = {**model_interaction, "scenario_ids": ["special-value"]}
+    with pytest.raises(ValueError, match="distinct scenarios"):
         validate_probe_interaction_plan(
             [invalid],
             instruction="all values are selected; difference removes a value",
@@ -168,8 +224,11 @@ def test_interaction_plan_requires_multiple_scenarios_and_exact_evidence() -> No
 def test_probe_suite_must_cover_each_required_interaction() -> None:
     instruction = "all values are selected; difference removes a value"
     scenarios = (
-        {"scenario_id": "special-value"},
-        {"scenario_id": "operator"},
+        {
+            "scenario_id": "special-value",
+            "evidence": ["all values are selected"],
+        },
+        {"scenario_id": "operator", "evidence": ["difference removes a value"]},
     )
     obligations = [
         {
@@ -183,7 +242,6 @@ def test_probe_suite_must_cover_each_required_interaction() -> None:
             "operation": "Call the public API.",
             "expected": "The selected result is returned.",
             "operands": [],
-            "evidence": [{"source": "instruction", "quote": "all values are selected"}],
             "unresolved_reason": "",
         }
         for scenario_id in ("special-value", "operator")
@@ -195,7 +253,6 @@ def test_probe_suite_must_cover_each_required_interaction() -> None:
         "condition": "A special value is used as an operator operand.",
         "operation": "Apply the operator to the special value and a concrete value.",
         "expected": "The result contains only the values selected by the operation.",
-        "evidence_quote_ids": ["quote-001", "quote-002"],
     }
 
     def source(interaction_ids: list[str]) -> str:
@@ -262,7 +319,6 @@ def test_probe_parser_preserves_mapping_key_and_value_roles() -> None:
                     "meaning": "child field",
                 }
             ],
-            "evidence": [{"source": "instruction", "quote": "invalid rename keys"}],
         }
     )
     source = (
@@ -278,7 +334,7 @@ def test_probe_parser_preserves_mapping_key_and_value_roles() -> None:
     )
     obligations, _, probes = parse_generated_postrun_probe_source(
         source,
-        ({"scenario_id": "rename"},),
+        ({"scenario_id": "rename", "evidence": ["invalid rename keys"]},),
         instruction="invalid rename keys",
     )
     assert obligations[0]["operands"][0]["role"] == "mapping_key"
@@ -302,7 +358,6 @@ def test_run_postrun_probes_executes_each_function_from_same_module(
             "operation": "Call the public API.",
             "expected": "The documented result is returned.",
             "operands": [],
-            "evidence": [{"source": "instruction", "quote": "explicit"}],
             "unresolved_reason": "",
         }
         for scenario in ("good", "bad")
@@ -321,7 +376,10 @@ def test_run_postrun_probes_executes_each_function_from_same_module(
     )
     _, _, probes = parse_generated_postrun_probe_source(
         source,
-        ({"scenario_id": "good"}, {"scenario_id": "bad"}),
+        (
+            {"scenario_id": "good", "evidence": ["explicit"]},
+            {"scenario_id": "bad", "evidence": ["explicit"]},
+        ),
         instruction="explicit",
     )
 

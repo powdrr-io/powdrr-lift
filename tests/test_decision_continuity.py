@@ -86,3 +86,34 @@ def test_missing_reviewer_is_unknown_and_blocks_continuity() -> None:
 
     assert results[0]["outcome"] == "unknown"
     assert decision_continuity_findings(results)
+
+
+def test_provider_legacy_verdict_reason_shape_is_normalized() -> None:
+    class ReviewClient:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            return {
+                "decision_id": "guidance:bootstrap-review-before-edit",
+                "verdict": "pass",
+                "reason": "The proposed additions do not use the snapshot.",
+            }
+
+    result = review_inherited_decisions(
+        ReviewClient(),
+        phase="planning",
+        decisions=(
+            {
+                "decision_id": "guidance:bootstrap-review-before-edit",
+                "record": {"description": "Review inferred entities first."},
+            },
+        ),
+        evidence={"plan_item": {"objective": "Add CI."}},
+    )
+
+    assert result == (
+        {
+            "decision_id": "guidance:bootstrap-review-before-edit",
+            "outcome": "pass",
+            "explanation": "The proposed additions do not use the snapshot.",
+        },
+    )
+    assert decision_continuity_findings(result) == ()

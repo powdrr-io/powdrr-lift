@@ -1,0 +1,41 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1078
+title: Preserve plan context during amendment recovery
+intent:
+  problem: Execute-PR workers detect plan defects but can fail to create an amendment because a nested Procedrr call omits the reviewed proposal context.
+  goal: Recover the authoritative proposal context from the claimed task so concrete plan defects can proceed to a reviewable amendment.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2329, end_line: 2340}
+    summary: Fall back to the durable task input when nested amendment context is incomplete
+    rationale: The claimed task retains the complete reviewed proposal needed to prepare an amendment request.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 985, end_line: 1166}
+    summary: Exercise amendment recovery with a concrete plan defect and incomplete nested context
+    rationale: Ensure the amendment agent receives the proposal and recorded failure evidence and can produce the allowed plan artifact changes.
+entities:
+  - id: plan-amendment-context-recovery
+    type: Function behavior
+    action: modified
+  - id: plan-amendment-context-recovery-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: context-recovery-test-verifies-amendment-input
+    type: verifies
+    source: plan-amendment-context-recovery-test
+    target: plan-amendment-context-recovery
+    action: added
+    description: The test proves the amendment path recovers the reviewed proposal when nested process context is incomplete.
+invariants:
+  - id: amendment-uses-durable-proposal-context
+    description: Plan amendments must use the claimed task's reviewed proposal context when nested Procedrr context does not include it.
+    action: added
+guidance:
+  - id: preserve-review-evidence-for-amendment
+    description: Keep the classified failure evidence from the nested process and source plan identity and proposal details from durable task input.
+    action: added

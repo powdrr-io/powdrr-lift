@@ -2326,8 +2326,15 @@ class _TaskWorkflowExecutionStrategy:
         task_context = mode_context.get("task_context")
         failure_review = mode_context.get("failure_review")
         implementation_result = mode_context.get("implementation_result")
-        if not isinstance(task_context, Mapping):
-            raise PowdrrExecutionError("plan amendment requires task_context")
+        if not isinstance(task_context, Mapping) or not isinstance(
+            task_context.get("proposed_pr_context"), Mapping
+        ):
+            # The task input is the durable source of the reviewed plan item.
+            # Procedrr passes it through the parent process, but a nested
+            # amendment call may omit or truncate that binding. Keep the
+            # recorded failure evidence from the child call while recovering
+            # the authoritative proposal context from the claimed task.
+            task_context = self.task.input_state
         proposed = task_context.get("proposed_pr_context")
         if not isinstance(proposed, Mapping):
             raise PowdrrExecutionError("plan amendment requires proposed_pr_context")

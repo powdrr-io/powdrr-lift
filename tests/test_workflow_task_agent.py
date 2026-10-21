@@ -982,6 +982,191 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
     )
 
 
+def test_plan_amendment_recovers_reviewed_context_for_nested_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Test User")
+    git("config", "user.email", "test@example.invalid")
+
+    workflow_id = "feature-v1-pr-01"
+    plan_path = Path("docs/plans/feature-v1-execution-plan.yaml")
+    proposal_path = Path("docs/plans/feature-v1-structrr-proposal.json")
+    workflow_path = Path("docs/workflows/feature-v1/feature-v1-pr-01.yaml")
+    artifacts = {
+        plan_path: yaml.safe_dump(
+            {
+                "items": [
+                    {
+                        "id": "PR-01",
+                        "workflow_id": workflow_id,
+                        "workflow_file": workflow_path.as_posix(),
+                    }
+                ]
+            }
+        ),
+        proposal_path: '{"items": []}\n',
+        workflow_path: "schema: plan-workflow-instance-v1\n",
+    }
+    for path, content in artifacts.items():
+        artifact = tmp_path / path
+        artifact.parent.mkdir(parents=True, exist_ok=True)
+        artifact.write_text(content, encoding="utf-8")
+    git("add", ".")
+    git("commit", "-qm", "Add generated plan artifacts")
+
+    proposed_pr_context = {
+        "plan_id": "feature-v1",
+        "item_id": "PR-01",
+        "proposed_pr_id": workflow_id,
+        "title": "Bootstrap CI",
+        "objective": "Add the CI workflow while preserving the existing verifier.",
+        "scope": ["Add the CI workflow."],
+        "implementation_steps": ["Edit the CI workflow."],
+        "acceptance_criteria": ["CI runs the existing verifier."],
+        "verification_command": "bash attestation/scripts/verify-all.sh",
+        "structrr_proposal_file": proposal_path.as_posix(),
+        "execution_plan_file": plan_path.as_posix(),
+    }
+    task_context = {
+        "proposed_pr_id": workflow_id,
+        "proposed_pr_context": proposed_pr_context,
+    }
+    workflow = _workflow(tmp_path)
+    task = replace(workflow.tasks[0], input_state=task_context)
+    workflow.update_task(task)
+    strategy = task_agent._TaskWorkflowExecutionStrategy(
+        config=cast(
+            Any,
+            SimpleNamespace(
+                code_agent="minisweagent",
+                opencode_executable=None,
+                opencode_model=None,
+                minisweagent_executable=None,
+                minisweagent_model=None,
+                coding_agent_timeout_seconds=1800.0,
+                coding_agent_validation_timeout_seconds=1800.0,
+            ),
+        ),
+        workflow=workflow,
+        task=task,
+        repo_root=tmp_path,
+        error_log_root=tmp_path,
+        client=cast(Any, None),
+        compaction_client=cast(Any, None),
+        model="test-model",
+        mapping_provider="test-provider",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        action_engine=cast(Any, None),
+        events=[],
+        repair_fallback_client=None,
+        repair_fallback_model=None,
+    )
+
+    captured_requests: list[Any] = []
+    expected_paths = [
+        plan_path.as_posix(),
+        proposal_path.as_posix(),
+        workflow_path.as_posix(),
+    ]
+    monkeypatch.setattr(
+        task_agent, "build_coding_agent_provider", lambda *_a, **_k: object()
+    )
+    monkeypatch.setattr(task_agent, "CodingAgentRunner", lambda *_a, **_k: object())
+
+    def execute_attempt(
+        _runner: object,
+        request: Any,
+        *,
+        attempt_id: str,
+        **_kwargs: Any,
+    ) -> Any:
+        captured_requests.append(request)
+        for path in expected_paths:
+            artifact = tmp_path / path
+            artifact.write_text(
+                artifact.read_text(encoding="utf-8") + "# amended\n",
+                encoding="utf-8",
+            )
+        attempt = SimpleNamespace(
+            status=SimpleNamespace(value="completed"),
+            to_data=lambda: {"attempt_id": attempt_id, "status": "completed"},
+        )
+        validation = SimpleNamespace(
+            status=task_agent.ValidationReportStatus.PASSED,
+            to_data=lambda: {"status": "passed"},
+        )
+        return SimpleNamespace(
+            attempt=attempt,
+            validation=validation,
+            diff_check=SimpleNamespace(returncode=0),
+        )
+
+    monkeypatch.setattr(task_agent, "execute_coding_agent_attempt", execute_attempt)
+    monkeypatch.setattr(
+        task_agent,
+        "_implementation_paths_against_base",
+        lambda _root: tuple(expected_paths),
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "_validate_issue_worker_plan_amendment",
+        lambda *_args, **_kwargs: (),
+    )
+
+    def one_amendment_attempt(run_attempt: Any, _evaluate_attempt: Any) -> Any:
+        return SimpleNamespace(attempts=[run_attempt(1, None)])
+
+    monkeypatch.setattr(task_agent, "run_coding_agent_recovery", one_amendment_attempt)
+    failure_review = {
+        "classification": "plan_defect",
+        "evidence": [
+            "verify-all.sh already exists with different content "
+            "than the proposed placeholder."
+        ],
+        "explanation": "The accepted plan contradicts the repository baseline.",
+    }
+    implementation_result = {
+        "passed": False,
+        "changed_paths": [],
+        "error": "pre-coding feasibility check rejected the file addition",
+    }
+
+    result = strategy._run_coding_agent(
+        mode="plan-amendment",
+        mode_context={
+            # Simulate the nested Procedrr call that carried identity metadata
+            # but dropped proposed_pr_context.
+            "task_context": {"proposed_pr_id": workflow_id},
+            "failure_review": failure_review,
+            "implementation_result": implementation_result,
+        },
+    )
+
+    assert result["passed"] is True
+    assert result["changed_paths"] == expected_paths
+    assert len(captured_requests) == 1
+    request = captured_requests[0]
+    assert request.objective == (
+        "Correct plan item PR-01 from feature-v1 using the recorded failure evidence."
+    )
+    assert request.allowed_paths == tuple(expected_paths)
+    assert "verify-all.sh already exists with different content" in request.prompt
+    assert "pre-coding feasibility check rejected the file addition" in request.prompt
+
+
 def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:
     action = WorkflowAction(
         kind="edit",

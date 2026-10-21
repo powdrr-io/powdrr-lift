@@ -467,6 +467,29 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
                 "generation_method": "miniswe_pre_coding",
                 "test_sha256": {"tests/integration/test_feature_e2e.py": "a" * 64},
                 "authoring_attempts": [{"status": "completed"}],
+                "coverage_plan": {
+                    "criteria": [
+                        {
+                            "criterion_id": "AC-01",
+                            "criterion": "The feature value equals 42.",
+                            "partitions": [
+                                {
+                                    "partition_id": "P01",
+                                    "behavior_class": "public value",
+                                    "case_strategy": "read public feature value",
+                                    "minimum_case_count": 1,
+                                    "observable_oracle": "value equals 42",
+                                    "test_ids": [
+                                        "test_public_feature_value_is_implemented"
+                                    ],
+                                }
+                            ],
+                        }
+                    ]
+                },
+                "coverage_references": {"AC-01.P01": 1},
+                "quality_review": {"outcome": "pass", "findings": []},
+                "baseline_execution_evidence": {"executed": 1},
                 "baseline_result": {
                     "command": ["pytest", "tests/integration/test_feature_e2e.py"],
                     "returncode": 1,

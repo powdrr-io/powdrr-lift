@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 
 from powdrr_lift import cli
-from powdrr_lift.workrr import github_issue_plan_generation, jev_classifier
+from powdrr_lift.workrr import jev_classifier
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
     PLAN_ITEMS_RESPONSE_SCHEMA,
@@ -18,7 +18,6 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     _apply_plan_coverage_assessments,
     _ensure_ci_bootstrap,
     _plan_item_refinement_issues,
-    _require_jev_grouping_approval,
     _validated_plan_coverage_assessments,
     _validated_plan_coverage_assessments_with_repair,
     generate_execution_plan_yaml,
@@ -367,53 +366,6 @@ def test_plan_sizing_never_merges_ci_bootstrap_with_product_work() -> None:
     assert sized[1]["dependencies"] == ["ci-bootstrap"]
 
 
-def test_jev_can_approve_or_veto_plan_grouping(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    proposal = [_item("one")]
-    decisions = iter(["approve", "veto"])
-    requests: list[dict[str, Any]] = []
-
-    def classify(request: dict[str, Any], *_args: Any) -> dict[str, str]:
-        requests.append(request)
-        return {"choice": next(decisions)}
-
-    monkeypatch.setenv("TYPESAFEAI_API_KEY", "test-key")
-    monkeypatch.setattr(jev_classifier, "_call_jev", classify)
-
-    _require_jev_grouping_approval(proposal, FakePlanningClient({"items": proposal}))
-
-    assert requests[0]["allowed_values"] == ["approve", "veto"]
-    assert '"id": "one"' in requests[0]["state"]["source_text"]
-
-    with pytest.raises(PlanGenerationError, match="Jev vetoed"):
-        _require_jev_grouping_approval(
-            proposal, FakePlanningClient({"items": proposal})
-        )
-
-    class UnavailableJevJudge:
-        provider = "JEV"
-
-        def complete_json(
-            self,
-            messages: list[dict[str, str]],
-            *,
-            response_schema: dict[str, Any] | None = None,
-        ) -> dict[str, str]:
-            del messages, response_schema
-            raise RuntimeError("provider unavailable")
-
-    monkeypatch.setattr(
-        github_issue_plan_generation,
-        "preferred_semantic_classifier_client",
-        lambda *_args, **_kwargs: UnavailableJevJudge(),
-    )
-    with pytest.raises(PlanGenerationError, match="failed closed"):
-        _require_jev_grouping_approval(
-            proposal, FakePlanningClient({"items": proposal})
-        )
-
-
 def test_plan_requires_ci_bootstrap_and_dependency_when_repository_has_no_ci() -> None:
     ci_item = _item("ci-bootstrap")
     ci_item["title"] = "Set up CI validation"
@@ -651,7 +603,14 @@ def test_plan_generation_repairs_persistent_missing_ci_gate() -> None:
     assert "bash attestation/scripts/verify-all.sh" in str(plan.items[0])
 
 
-def test_generate_execution_plan_yaml_compiles_valid_ordered_plan() -> None:
+def test_generate_execution_plan_yaml_compiles_without_jev(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_called(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        raise AssertionError("plan generation must not call Jev")
+
+    monkeypatch.setenv("TYPESAFEAI_API_KEY", "test-key")
+    monkeypatch.setattr(jev_classifier, "_call_jev", fail_if_called)
     client = FakePlanningClient(
         {
             "items": [

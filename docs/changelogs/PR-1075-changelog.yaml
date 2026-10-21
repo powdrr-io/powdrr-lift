@@ -22,6 +22,11 @@ files:
     span: {start_line: 1649, end_line: 1650}
     summary: Raise the coverage-contract error in the regression test
     rationale: Verify the early exception return now produces a normalized failed attempt.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1673, end_line: 1765}
+    summary: Exercise coding-agent exceptions through the parent workflow
+    rationale: Verify normalized failures bind successfully and reach the workflow's review branch instead of failing on a missing binding.
 entities:
   - id: coding-agent-operation-error-normalization
     type: Function

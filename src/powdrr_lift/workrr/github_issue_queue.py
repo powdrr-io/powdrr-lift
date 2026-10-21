@@ -32,6 +32,7 @@ QUEUE_LABELS = {
 _MARKER_START = "<!-- powdrr-queue-item:v1 "
 _MARKER_END = " -->"
 _TASK_CHECKPOINT_START = "<!-- powdrr-task-checkpoint:v1 -->"
+_PLAN_AMENDMENT_TITLE_PREFIX = "Correct plan:"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 
 
@@ -285,6 +286,29 @@ class GitHubIssueClient:
             f"body={body}",
         )
 
+    def list_comments(self, issue_number: int) -> tuple[Mapping[str, Any], ...]:
+        result = self._invoke(
+            [
+                "api",
+                "--paginate",
+                "--slurp",
+                f"repos/{self.repository}/issues/{issue_number}/comments?per_page=100",
+            ]
+        )
+        try:
+            pages = json.loads(result.stdout)
+        except json.JSONDecodeError as error:
+            raise GitHubIssueQueueError(
+                "gh returned malformed issue comments"
+            ) from error
+        return tuple(
+            value for value in _flatten_pages(pages) if isinstance(value, Mapping)
+        )
+
+    def pull_request(self, number: int) -> Mapping[str, Any]:
+        result = self._api("GET", f"repos/{self.repository}/pulls/{number}")
+        return _json_mapping(result.stdout, "pull request")
+
     def _api(
         self, method: str, endpoint: str, *arguments: str
     ) -> subprocess.CompletedProcess[str]:
@@ -502,6 +526,11 @@ def run_worker_once(
     """Claim and execute the first ready item whose dependencies are closed."""
     root = Path(repo_root).resolve()
     with _worker_lock(root):
+        _requeue_merged_plan_amendments(
+            client=client,
+            repo_root=root,
+            plan_loader=plan_loader,
+        )
         _promote_unblocked_issues(
             client=client,
             repo_root=root,
@@ -783,6 +812,128 @@ def _promote_unblocked_issues(
                 issue,
                 labels=_replace_queue_status(issue.labels, "ready"),
             )
+
+
+def _requeue_merged_plan_amendments(
+    *,
+    client: GitHubIssueClient,
+    repo_root: Path,
+    plan_loader: Callable[..., ReviewedExecutionPlan],
+) -> None:
+    """Repin work items after a reviewed plan-amendment PR merges."""
+    awaiting = client.list_issues(
+        labels=(QUEUE_LABELS["awaiting_review"],), state="open"
+    )
+    for issue in sorted(awaiting, key=lambda value: value.number):
+        if issue.state != "open" or QUEUE_LABELS["awaiting_review"] not in issue.labels:
+            continue
+        pointer = parse_issue_pointer(issue.body)
+        if pointer is None:
+            continue
+        pull_request_url = _latest_checkpoint_pull_request_url(
+            client.list_comments(issue.number)
+        )
+        pull_request_number = _same_repository_pull_request_number(
+            pull_request_url, client.repository
+        )
+        if pull_request_number is None:
+            continue
+        pull_request = client.pull_request(pull_request_number)
+        title = pull_request.get("title")
+        if not isinstance(title, str) or not title.startswith(
+            _PLAN_AMENDMENT_TITLE_PREFIX
+        ):
+            continue
+        if pull_request.get("merged") is not True:
+            continue
+        merge_commit = pull_request.get("merge_commit_sha")
+        if not isinstance(merge_commit, str) or not re.fullmatch(
+            r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit
+        ):
+            raise GitHubIssueQueueError(
+                f"merged plan-amendment PR #{pull_request_number} has no merge commit"
+            )
+        plan = plan_loader(pointer["plan_path"], merge_commit, repo_root=repo_root)
+        if plan.plan_id != pointer["plan_id"]:
+            raise GitHubIssueQueueError(
+                f"merged plan-amendment PR #{pull_request_number} changed the plan ID"
+            )
+        item = next(
+            (
+                candidate
+                for candidate in plan.items
+                if candidate.item_id == pointer["item_id"]
+            ),
+            None,
+        )
+        if item is None:
+            raise GitHubIssueQueueError(
+                "merged plan-amendment PR "
+                f"#{pull_request_number} removed the issue item"
+            )
+        client.ensure_plan_commit_merged(merge_commit)
+        updated_body = _issue_pointer_body(
+            pointer["plan_id"],
+            pointer["item_id"],
+            pointer["plan_path"],
+            merge_commit,
+            repository=client.repository,
+        )
+        indexed = _plan_issue_index(
+            client.list_issues(labels=(_plan_label(plan.plan_id),))
+        )
+        by_number = {value.number: value for value in indexed.values()}
+        dependencies_closed = all(
+            _dependency_is_closed(indexed.get((plan.plan_id, dependency)), by_number)
+            for dependency in item.dependencies
+        )
+        status = "ready" if dependencies_closed else "blocked_on_dependency"
+        client.update_issue(
+            issue,
+            body=updated_body,
+            labels=_replace_queue_status(issue.labels, status),
+        )
+        client.add_comment(
+            issue,
+            "Powdrr detected that plan-amendment PR "
+            f"https://github.com/{client.repository}/pull/{pull_request_number} "
+            f"merged. This issue now points to the amended plan at `{merge_commit}` "
+            f"and was requeued as `{status.replace('_', ' ')}` for execution.",
+        )
+
+
+def _latest_checkpoint_pull_request_url(
+    comments: Sequence[Mapping[str, Any]],
+) -> str | None:
+    for comment in reversed(comments):
+        body = comment.get("body")
+        if not isinstance(body, str) or _TASK_CHECKPOINT_START not in body:
+            continue
+        try:
+            payload_text = body.split("```json\n", 1)[1].split("\n```", 1)[0]
+            payload = json.loads(payload_text)
+        except (IndexError, json.JSONDecodeError):
+            continue
+        if not isinstance(payload, Mapping) or payload.get("status") != "completed":
+            continue
+        output_state = payload.get("output_state")
+        if not isinstance(output_state, Mapping):
+            continue
+        pull_request_url = output_state.get("pull_request_url")
+        if isinstance(pull_request_url, str):
+            return pull_request_url
+    return None
+
+
+def _same_repository_pull_request_number(
+    url: str | None, repository: str
+) -> int | None:
+    if url is None:
+        return None
+    match = re.fullmatch(
+        rf"https://github\.com/{re.escape(repository)}/pull/(\d+)", url
+    )
+    return int(match.group(1)) if match else None
 
 
 def parse_issue_pointer(body: str) -> dict[str, str] | None:

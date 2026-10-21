@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1081
+title: Requeue plan items after amendment merges
+intent:
+  problem: A plan-amendment PR can merge while its work issue remains awaiting review and pinned to the defective plan revision.
+  goal: Detect merged plan-amendment PRs, repin the affected issue to the amended plan commit, and return it to the queue according to its dependencies.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 35
+  summary: Define the amendment PR title marker.
+  rationale: Match the established title convention used by plan-amendment PRs.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 289
+    end_line: 311
+  summary: Read issue checkpoint comments and pull request metadata.
+  rationale: Reconcile issue state with the amendment PR recorded by the completed workflow.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 529
+    end_line: 533
+  summary: Reconcile merged plan amendments before selecting ready work.
+  rationale: Let a merged amendment update the issue before the worker attempts execution.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 817
+    end_line: 938
+  summary: Repin and requeue issues whose plan-amendment PR has merged.
+  rationale: Keep the issue open for implementation while ensuring retries use the reviewed amended plan.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 78
+  summary: Add pull request fixtures to the queue client fake.
+  rationale: Exercise merge detection through the worker's GitHub issue adapter.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 148
+  summary: Expose pull requests and comments through the queue client fake.
+  rationale: Model issue checkpoints and amendment PR metadata in queue tests.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 830
+    end_line: 976
+  summary: Cover merged amendment requeue and pending amendment review.
+  rationale: Verify the issue is repinned before execution and remains awaiting review until its amendment merges.

@@ -75,6 +75,7 @@ class FakeIssueClient:
         self.repository = "example/project"
         self.issues = list(issues)
         self.comments: list[tuple[int, str]] = []
+        self.pull_requests: dict[int, dict[str, object]] = {}
         self.labels_ensured = False
         self.merged_commit: str | None = None
         self._next_number = 100
@@ -136,6 +137,14 @@ class FakeIssueClient:
 
     def add_comment(self, issue: QueueIssue, body: str) -> None:
         self.comments.append((issue.number, body))
+
+    def list_comments(self, issue_number: int) -> tuple[dict[str, str], ...]:
+        return tuple(
+            {"body": body} for number, body in self.comments if number == issue_number
+        )
+
+    def pull_request(self, number: int) -> dict[str, object]:
+        return self.pull_requests[number]
 
 
 def plan() -> ReviewedExecutionPlan:
@@ -816,6 +825,153 @@ def test_worker_persists_task_checkpoint_as_issue_comment(tmp_path: Path) -> Non
         "task_id": "base-task-02",
         "workflow_id": "base",
     }
+
+
+def test_worker_repins_and_requeues_issue_when_plan_amendment_merges(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "docs/workflows/base").mkdir(parents=True)
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    issue = client.issues[0]
+    client.issues[0] = QueueIssue(
+        issue.number,
+        issue.title,
+        issue.body,
+        issue.state,
+        (QUEUE_LABELS["awaiting_review"], _plan_label("feature-v1")),
+        issue.url,
+    )
+    amended_commit = "c" * 40
+    client.comments.append(
+        (
+            issue.number,
+            render_task_checkpoint_comment(
+                TaskCheckpoint(
+                    plan_id="feature-v1",
+                    item_id="base",
+                    workflow_id="base",
+                    task_id="amend-plan-task-01",
+                    output_state_type="execute-proposed-pr-workflow-result-state",
+                    output_state={
+                        "pull_request_url": "https://github.com/example/project/pull/77"
+                    },
+                )
+            ),
+        )
+    )
+    client.pull_requests[77] = {
+        "title": "Correct plan: Reuse the existing verifier",
+        "merged": True,
+        "merge_commit_sha": amended_commit,
+    }
+    loaded_commits: list[str] = []
+
+    def load_plan(
+        _path: str, commit: str, *, repo_root: str | Path
+    ) -> ReviewedExecutionPlan:
+        assert Path(repo_root) == tmp_path
+        loaded_commits.append(commit)
+        return plan()
+
+    executed_commits: list[str] = []
+
+    def run_task(
+        _directory: Path,
+        _workflow_id: str,
+        _worker_id: str,
+        _item: PlannedWorkItem,
+        reviewed_plan: ReviewedExecutionPlan,
+        _checkpoint: TaskCheckpointCallback,
+    ) -> int:
+        executed_commits.append(loaded_commits[-1])
+        assert reviewed_plan.plan_id == "feature-v1"
+        return 1
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-after-amendment",
+        run_task=run_task,
+        plan_loader=load_plan,
+    )
+
+    assert report.outcome == "blocked"
+    assert amended_commit in loaded_commits
+    assert executed_commits == [amended_commit]
+    assert parse_issue_pointer(client.issues[0].body) == {
+        "plan_id": "feature-v1",
+        "item_id": "base",
+        "plan_path": "docs/plans/feature.yaml",
+        "plan_commit": amended_commit,
+    }
+    assert client.merged_commit == amended_commit
+    assert any(
+        "plan-amendment PR https://github.com/example/project/pull/77 merged" in body
+        and "requeued" in body
+        for number, body in client.comments
+        if number == issue.number
+    )
+
+
+def test_worker_does_not_requeue_unmerged_plan_amendment(tmp_path: Path) -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    issue = client.issues[0]
+    client.issues[0] = QueueIssue(
+        issue.number,
+        issue.title,
+        issue.body,
+        issue.state,
+        (QUEUE_LABELS["awaiting_review"], _plan_label("feature-v1")),
+        issue.url,
+    )
+    client.comments.append(
+        (
+            issue.number,
+            render_task_checkpoint_comment(
+                TaskCheckpoint(
+                    plan_id="feature-v1",
+                    item_id="base",
+                    workflow_id="base",
+                    task_id="amend-plan-task-01",
+                    output_state_type="execute-proposed-pr-workflow-result-state",
+                    output_state={
+                        "pull_request_url": "https://github.com/example/project/pull/77"
+                    },
+                )
+            ),
+        )
+    )
+    client.pull_requests[77] = {
+        "title": "Correct plan: Reuse the existing verifier",
+        "merged": False,
+        "merge_commit_sha": None,
+    }
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-before-amendment-merge",
+        run_task=lambda *_args: pytest.fail("issue must remain awaiting review"),
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    assert report.outcome == "no_eligible_work"
+    pointer = parse_issue_pointer(client.issues[0].body)
+    assert pointer is not None
+    assert pointer["plan_commit"] == PLAN_COMMIT
+    assert QUEUE_LABELS["awaiting_review"] in client.issues[0].labels
 
 
 def test_task_checkpoint_comment_is_readable_and_structured() -> None:

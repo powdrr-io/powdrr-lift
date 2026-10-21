@@ -814,7 +814,6 @@ def _preflight_reviewed_file_creation_conflicts(
     implementation_steps = _issue_worker_string_list(
         proposed.get("implementation_steps")
     )
-    creation_terms = ("create ", "add ", "new ", "introduce ")
     findings: list[str] = []
     for raw_path in allowed_paths:
         relative_path = PurePosixPath(raw_path)
@@ -823,8 +822,7 @@ def _preflight_reviewed_file_creation_conflicts(
         matching_steps = tuple(
             step
             for step in implementation_steps
-            if raw_path in step
-            and any(term in step.casefold() for term in creation_terms)
+            if _implementation_step_creates_path(step, raw_path)
         )
         if not matching_steps:
             continue
@@ -844,6 +842,26 @@ def _preflight_reviewed_file_creation_conflicts(
             + "; ".join(matching_steps)
         )
     return tuple(findings)
+
+
+def _implementation_step_creates_path(step: str, raw_path: str) -> bool:
+    """Return whether a creation instruction targets this path specifically."""
+    path_pattern = re.compile(rf"(?<![\w./-]){re.escape(raw_path)}(?![\w./-])")
+    creation_pattern = re.compile(
+        r"\b(?:create|add|introduce|write|generate|new)\b", re.I
+    )
+    clause_break = re.compile(
+        r"\b(?:and|then|that|which|while|when|runs?|executes?|references?|calls?)\b",
+        re.I,
+    )
+    for path_match in path_pattern.finditer(step):
+        prefix = step[: path_match.start()]
+        for creation_match in reversed(tuple(creation_pattern.finditer(prefix))):
+            between = prefix[creation_match.end() :]
+            if len(between) > 96 or clause_break.search(between):
+                continue
+            return True
+    return False
 
 
 def _implementation_paths_against_base(repo_root: Path) -> tuple[str, ...]:

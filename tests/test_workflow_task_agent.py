@@ -158,6 +158,48 @@ def test_reviewed_plan_creation_conflict_detects_existing_verifier(
     assert "initial no-op check" in evidence[0]
 
 
+def test_reviewed_plan_reference_to_existing_allowed_file_is_not_creation(
+    tmp_path: Path,
+) -> None:
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-b", "main")
+    git("config", "user.name", "Test User")
+    git("config", "user.email", "test@example.invalid")
+    verifier = tmp_path / "attestation/scripts/verify-all.sh"
+    verifier.parent.mkdir(parents=True)
+    verifier.write_text("#!/usr/bin/env bash\nset -euo pipefail\necho real checks\n")
+    git("add", "attestation/scripts/verify-all.sh")
+    git("commit", "-m", "add existing verifier")
+    base_commit = git("rev-parse", "HEAD")
+
+    evidence = task_agent._preflight_reviewed_file_creation_conflicts(
+        tmp_path,
+        {
+            "allowed_paths": [
+                ".github/workflows/ci.yml",
+                "attestation/scripts/verify-all.sh",
+            ],
+            "implementation_steps": [
+                "Add .github/workflows/ci.yml that triggers on pull_request and push "
+                "to the default branch and runs bash "
+                "attestation/scripts/verify-all.sh."
+            ],
+        },
+        base_commit=base_commit,
+    )
+
+    assert evidence == ()
+
+
 def test_execute_pr_coverage_plan_repairs_empty_criteria_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

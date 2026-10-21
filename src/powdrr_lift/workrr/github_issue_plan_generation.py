@@ -459,7 +459,11 @@ def generate_multi_pr_structrr_proposal(
                         "subject_id. For files, content.stable_key must equal "
                         "subject_id. For changed or removed records, subject_id must "
                         "exist in the supplied baseline. Keep assignments within the "
-                        "listed plan item IDs. Return only the complete operations "
+                        "listed plan item IDs. If an earlier plan item adds a "
+                        "subject, a later item that updates that same subject must use "
+                        "action `changed`, not another `added` operation. Treat each "
+                        "item baseline as the repository state after all earlier "
+                        "items have been applied. Return only the complete operations "
                         "object in the requested schema."
                     ),
                 },

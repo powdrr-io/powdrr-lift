@@ -1081,6 +1081,99 @@ def test_structrr_proposal_normalizes_content_identity_from_subject_id() -> None
     )
 
 
+def test_structrr_repair_changes_a_subject_added_by_an_earlier_item() -> None:
+    plan = ReviewedExecutionPlan(
+        plan_id="duplicate-file-plan",
+        items=(
+            PlannedWorkItem(
+                item_id="schema",
+                title="Add policy schema",
+                objective="Define the policy schema.",
+                scope=("Add the policy schema.",),
+                acceptance_criteria=("The schema is valid.",),
+                dependencies=(),
+                workflow_directory=None,
+                workflow_id="duplicate-file-plan-schema",
+                allowed_paths=("attestation/schemas",),
+            ),
+            PlannedWorkItem(
+                item_id="schema-tests",
+                title="Test policy schema",
+                objective="Add schema validation tests.",
+                scope=("Test the policy schema.",),
+                acceptance_criteria=("Invalid policy data is rejected.",),
+                dependencies=("schema",),
+                workflow_directory=None,
+                workflow_id="duplicate-file-plan-schema-tests",
+                allowed_paths=("attestation/schemas", "tests"),
+            ),
+        ),
+    )
+    baseline: dict[str, Any] = {
+        "entities": [],
+        "entity_relationships": [],
+        "files": [],
+        "source_subjects": [],
+        "source_bindings": [],
+        "active_intent": {},
+        "human-decisions": [],
+        "invariants": [],
+    }
+    file_key = "file:attestation/schemas/policy-v1.schema.json"
+    initial = {
+        "operations": [
+            {
+                "operation_id": "add-policy-schema",
+                "item_id": "schema",
+                "section": "files",
+                "subject_id": file_key,
+                "action": "added",
+                "content": {
+                    "stable_key": file_key,
+                    "path": "attestation/schemas/policy-v1.schema.json",
+                },
+            },
+            {
+                "operation_id": "add-policy-schema-again",
+                "item_id": "schema-tests",
+                "section": "files",
+                "subject_id": file_key,
+                "action": "added",
+                "content": {
+                    "stable_key": file_key,
+                    "path": "attestation/schemas/policy-v1.schema.json",
+                },
+            },
+        ]
+    }
+    repaired = {
+        "operations": [
+            initial["operations"][0],
+            {
+                **initial["operations"][1],
+                "action": "changed",
+                "content": {
+                    "stable_key": file_key,
+                    "path": "attestation/schemas/policy-v1.schema.json",
+                    "validation_tests": ["tests/test_policy_schema.py"],
+                },
+            },
+        ]
+    }
+    client = SequencedPlanningClient([initial, repaired])
+
+    proposal = generate_multi_pr_structrr_proposal(
+        plan=plan,
+        baseline_snapshot=baseline,
+        source_plan="# Policy schema plan",
+        client=client,
+    )
+
+    assert len(client.messages) == 2
+    assert "later item" in client.messages[1][0]["content"]
+    assert proposal.item_proposals["schema-tests"].operations[0].action == "change"
+
+
 def test_plan_can_append_a_final_review_dependent_on_all_implementation_items() -> None:
     client = FakePlanningClient({"items": [_item("foundation")]})
 

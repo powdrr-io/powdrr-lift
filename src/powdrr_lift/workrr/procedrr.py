@@ -416,6 +416,11 @@ class WorkrrProcedrrClient:
             "Workrr exhausted structured repair for a procedrr judge: " + last_error
         )
 
+    @property
+    def supports_batch(self) -> bool:
+        """Whether the wrapped provider has a native batch completion API."""
+        return callable(getattr(self._client, "complete_json_batch", None))
+
 
 def _is_retryable_provider_failure(error: Exception) -> bool:
     """Identify transient provider failures that warrant backoff and retry."""

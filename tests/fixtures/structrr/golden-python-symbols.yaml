@@ -40,7 +40,7 @@ symbols:
     stable_key: python::src.powdrr_lift.workrr.procedrr.WorkrrProcedrrClient
     span:
       start_line: 156
-      end_line: 417
+      end_line: 422
   - path: src/powdrr_lift/workrr/procedrr.py
     kind: method
     qualified_name: src.powdrr_lift.workrr.procedrr.WorkrrProcedrrClient.complete_json

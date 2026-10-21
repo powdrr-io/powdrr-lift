@@ -135,7 +135,6 @@ inputs:
 steps:
   - for_each:
       snapshot: {name: clauses, max_items: 2}
-      batch_provider: planning
       item_binding: clause
       collect: {binding: decisions, mode: list, value: decision}
       body:

@@ -866,7 +866,6 @@ def _validate_steps(
                         "max_admissions",
                         "max_epochs",
                         "max_parallel",
-                        "batch_provider",
                     },
                     f"{step_path}.{control}",
                     diagnostics,
@@ -1510,18 +1509,6 @@ def _validate_loop_declaration(
             )
         )
     max_parallel = declaration.get("max_parallel", 1)
-    batch_provider = declaration.get("batch_provider")
-    if batch_provider is not None and (
-        kind != "for_each"
-        or not isinstance(batch_provider, str)
-        or not batch_provider.strip()
-    ):
-        diagnostics.append(
-            DocumentDiagnostic(
-                f"{path}.{kind}.batch_provider",
-                "batch_provider must be a non-empty provider name on for_each",
-            )
-        )
     if (
         not isinstance(max_parallel, int)
         or isinstance(max_parallel, bool)

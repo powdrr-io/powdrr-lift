@@ -1149,21 +1149,22 @@ class Evaluator:
         )
         collected: dict[str, Any] = {}
         collected_list: list[Any] = []
-        batch_provider = declaration.get("batch_provider")
-        if batch_provider is not None:
-            if (
-                kind != "for_each"
-                or not isinstance(batch_provider, str)
-                or len(body) != 1
-                or not isinstance(body[0], Mapping)
-                or set(body[0]) != {"judge"}
-                or not isinstance(body[0]["judge"], Mapping)
-                or body[0]["judge"].get("provider") != batch_provider
-            ):
-                raise EvaluationError(
-                    f"{path}.{kind}.batch_provider requires one judge-only body "
-                    "using the same provider"
-                )
+        batch_judge = (
+            body[0].get("judge")
+            if kind == "for_each"
+            and len(body) == 1
+            and isinstance(body[0], Mapping)
+            and set(body[0]) == {"judge"}
+            else None
+        )
+        if isinstance(batch_judge, Mapping):
+            provider = str(batch_judge.get("provider", ""))
+            client = self.judge_clients.get(provider, self.llm)
+            batch_method = getattr(client, "complete_json_batch", None)
+            supports_batch = getattr(client, "supports_batch", callable(batch_method))
+        else:
+            supports_batch = False
+        if isinstance(batch_judge, Mapping) and supports_batch:
             binding = declaration.get("item_binding", declaration.get("item"))
             if not isinstance(binding, str):
                 raise EvaluationError(f"{path}.{kind}.item_binding is required")
@@ -1172,7 +1173,7 @@ class Evaluator:
                 item_state = dict(state)
                 item_state[binding] = item
                 item_states.append((item_state, f"{path}.{kind}[0][{index}][0]"))
-            self._judge_batch(body[0]["judge"], item_states, events, usage, limits)
+            self._judge_batch(batch_judge, item_states, events, usage, limits)
             if isinstance(collect, Mapping):
                 value_binding = collect.get("value")
                 for (item_state, _), item in zip(item_states, items, strict=True):

@@ -1,0 +1,46 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1072
+title: Normalize coding-agent errors before workflow binding
+intent:
+  problem: A coding-agent error response can reach a Procedrr output binding without a passed field, so the parent workflow fails before it can classify the execution result.
+  goal: Normalize error-only coding-agent responses into explicit failed attempts before Procedrr binds them.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 3394, end_line: 3394}
+    summary: Capture the coding-agent operation result before returning it
+    rationale: Inspect the result at the operation boundary where the nested workflow consumes it.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 3404, end_line: 3406}
+    summary: Normalize error-only coding-agent responses
+    rationale: Supply the passed status and error details expected by the parent process branch.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1641, end_line: 1680}
+    summary: Exercise normalization through the coding-agent operation adapter
+    rationale: Reproduce the response Gaterr returned and verify the parent receives an explicit failed attempt.
+entities:
+  - id: coding-agent-operation-error-normalization
+    type: Function
+    action: added
+  - id: coding-agent-operation-error-normalization-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: coding-agent-error-test-exercises-normalization
+    type: exercises
+    source: coding-agent-operation-error-normalization-test
+    target: coding-agent-operation-error-normalization
+    action: added
+    description: The regression test supplies an error-only coding-agent response and checks the normalized failure mapping.
+invariants:
+  - id: coding-agent-process-results-have-explicit-status
+    description: Error-only coding-agent results are normalized to include a boolean passed field before Procedrr binds the process output.
+    action: added
+guidance:
+  - id: normalize-at-operation-boundary
+    description: Normalize tool results before binding them into parent process state so branch subjects are always available.
+    action: added

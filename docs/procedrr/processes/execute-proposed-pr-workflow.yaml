@@ -1,6 +1,6 @@
 version: 1
 name: execute-proposed-pr-workflow
-description: Implement one reviewed plan item, validate the accepted Structrr diff and inherited decisions, then publish an implementation pull request.
+description: Generate baseline-red integration tests, implement one reviewed plan item, validate the tests and accepted Structrr diff, then publish an implementation pull request.
 inputs:
   - {name: task_context, type: object, required: true}
 outputs:
@@ -22,6 +22,10 @@ steps:
       on_failure: {terminal: failed}
   - gate:
       subject: implementation_result.structrr.passed
+      equals: true
+      on_failure: {terminal: failed}
+  - gate:
+      subject: implementation_result.integration_tests.passed
       equals: true
       on_failure: {terminal: failed}
   - judge:

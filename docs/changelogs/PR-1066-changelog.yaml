@@ -1,0 +1,259 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1066
+title: Add independent integration tests to execute PR
+intent:
+  problem: Execute-PR completion relied on the implementation agent's verification and repository tests, which can miss failures in requested public behavior.
+  goal: Have a separate MiniSWE step write tests before implementation, prove they fail behaviorally on the untouched baseline, freeze and run them during coding, and repair failures before completion.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Declare the independent integration-test workflow gate
+  rationale: Make test generation and passing candidate tests part of execute-PR completion.
+- path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 27, end_line: 30}
+  summary: Gate execute-PR completion on integration tests
+  rationale: Prevent publishing an implementation whose frozen behavior tests fail.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Require integration-test evidence in the process output
+  rationale: Expose the independent tests and their candidate result to workflow evaluation.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span: {start_line: 22, end_line: 34}
+  summary: Define the integration-test evidence contract
+  rationale: Record test generation, hashes, baseline behavior, candidate results, and repairs.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span: {start_line: 38, end_line: 43}
+  summary: Require baseline-red independent tests before implementation
+  rationale: Describe the pre-coding authoring and post-coding validation gates.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span: {start_line: 60, end_line: 63}
+  summary: Gate the process on passing independent tests
+  rationale: Block successful completion when generated integration tests fail.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: added
+  span: {start_line: 1, end_line: 261}
+  summary: Validate and run frozen pre-coding tests
+  rationale: Require safe pytest files, assertion-based baseline failures, test fingerprints, and staged immutable test sources.
+- path: src/powdrr_lift/workrr/postrun_probes.py
+  type: modified
+  span: {start_line: 754, end_line: 754}
+  summary: Fail closed when a post-run probe is unavailable
+  rationale: Treat unavailable probe execution as a validation failure instead of silently accepting incomplete evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 70, end_line: 70}
+  summary: Import the pre-coding test author
+  rationale: Use MiniSWE as a separate test-authoring step in execute-PR.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 78, end_line: 78}
+  summary: Import full verification execution
+  rationale: Run the declared verification command after frozen tests are installed.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 86, end_line: 94}
+  summary: Import integration-test validation helpers
+  rationale: Share deterministic test validation, installation, and execution in the PR workflow.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 598, end_line: 598}
+  summary: Include staged test files in implementation changes
+  rationale: Ensure frozen tests are included in the published change set.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 678, end_line: 870}
+  summary: Author and verify tests on a clean baseline worktree
+  rationale: Ask a separate MiniSWE run for tests, allow one tailored repair, and require behavioral assertion failures before coding.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1940, end_line: 2000}
+  summary: Install and freeze tests before implementation
+  rationale: Give the coding agent the exact baseline-red tests in its worktree and avoid embedding their full source in the prompt.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2015, end_line: 2015}
+  summary: Track installed frozen tests across attempts
+  rationale: Detect test edits or deletion during implementation and repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2020, end_line: 2020}
+  summary: Detect coding-agent changes to frozen tests
+  rationale: Compare the worktree with the pre-coding test sources after each attempt.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2039, end_line: 2040}
+  summary: Restore the exact generated tests
+  rationale: Preserve test integrity when the coding agent edits the frozen files.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1777, end_line: 1780}
+  summary: Stage restored frozen tests
+  rationale: Keep the independent suite in the final implementation diff.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2045, end_line: 2074}
+  summary: Run frozen tests and the declared verification suite
+  rationale: Require both focused integration behavior and the plan's full verification command to pass.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2240, end_line: 2265}
+  summary: Record integration-test completion and repair evidence
+  rationale: Gate a coding attempt on passing tests and report any test tampering.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2271, end_line: 2271}
+  summary: Include integration-test status in attempt results
+  rationale: Make the workflow gate consume the test result.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2284, end_line: 2285}
+  summary: Require tests to pass for implementation success
+  rationale: Prevent successful status while independent tests are failing.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2300, end_line: 2332}
+  summary: Tailor repair prompts to integration-test failures
+  rationale: Give MiniSWE the exact failures and preserve tests, full-suite results, and inherited-decision findings.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2390, end_line: 2390}
+  summary: Return final integration-test evidence
+  rationale: Expose the final test result to the execute-PR workflow.
+- path: tests/test_execute_pr_tests.py
+  type: added
+  span: {start_line: 1, end_line: 152}
+  summary: Test generated test validation and freezing
+  rationale: Cover safe pytest test files, behavioral red results, command selection, staged installation, and unsafe paths.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span: {start_line: 434, end_line: 449}
+  summary: Test unavailable probes fail closed
+  rationale: Prevent post-run probe validation from passing when a required probe did not execute.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 407, end_line: 413}
+  summary: Test integration-test process requirements
+  rationale: Ensure the process specification requires the new evidence output.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 1592, end_line: 1598}
+  summary: Test successful execution with integration-test evidence
+  rationale: Keep the evaluator fixture aligned with the required completion contract.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 348, end_line: 350}
+  summary: Configure a realistic test repository
+  rationale: Run generated tests with source imports as the project would.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 356, end_line: 357}
+  summary: Configure pytest source imports
+  rationale: Ensure full verification can collect the integration test in the fixture repository.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 385, end_line: 385}
+  summary: Commit workflow configuration in the fixture
+  rationale: Exercise the clean-worktree gate against a committed baseline.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 403, end_line: 403}
+  summary: Commit the workflow fixture before execution
+  rationale: Keep the synthetic implementation worktree clean before frozen tests are installed.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 418, end_line: 418}
+  summary: Reuse the committed workflow fixture
+  rationale: Keep workflow setup stable across test runs.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 416, end_line: 416}
+  summary: Keep test artifacts outside the repository
+  rationale: Ensure the clean-worktree guard sees only product changes.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 436, end_line: 436}
+  summary: Provide an independent test-author artifact
+  rationale: Simulate a baseline-red test suite in the workflow test.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 451, end_line: 481}
+  summary: Verify coding sees and preserves pre-coding tests
+  rationale: Assert the tests are installed before coding and their hashes and authoring evidence reach the result.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 529, end_line: 529}
+  summary: Verify tailored integration-test repair
+  rationale: Keep integration failures and inherited-decision evidence in the focused repair prompt.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 571, end_line: 581}
+  summary: Verify integration-test report evidence
+  rationale: Assert the final output includes the test status, hashes, authoring attempt, and path.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span: {start_line: 347, end_line: 352}
+  summary: Test integration-test workflow output schema
+  rationale: Require baseline, candidate, authoring, fingerprint, and repair evidence.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span: {start_line: 356, end_line: 358}
+  summary: Test independent integration-test workflow description
+  rationale: Protect the baseline-red-before-coding behavior.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span: {start_line: 374, end_line: 374}
+  summary: Test integration-test completion gate
+  rationale: Require the generated tests to pass before process success.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span: {start_line: 378, end_line: 378}
+  summary: Test integration-test completion gate
+  rationale: Prevent execute-PR completion without the independent test check.
+entities:
+- id: execute-pr-test-authoring
+  type: Function
+  action: added
+- id: execute-pr-baseline-red-test-gate
+  type: Workflow
+  action: added
+- id: execute-pr-structrr-continuity-gates
+  type: Workflow
+  action: modified
+- id: execute-pr-independent-test-regression-coverage
+  type: Regression test
+  action: added
+entity_relationships:
+- id: execute-pr-test-authoring-produces-gate-evidence
+  type: supports
+  source: execute-pr-test-authoring
+  target: execute-pr-baseline-red-test-gate
+  action: added
+  description: A separate MiniSWE step authors and baseline-checks frozen integration tests before the implementation agent runs.
+- id: execute-pr-tests-cover-test-authoring
+  type: exercises
+  source: execute-pr-independent-test-regression-coverage
+  target: execute-pr-test-authoring
+  action: added
+  description: Regression tests verify baseline-red validation, frozen test installation, and the post-coding repair gate.
+invariants:
+- id: execute-pr-requires-independent-baseline-red-tests
+  description: Execute-PR cannot reach implementation until separate MiniSWE-authored pytest tests execute on the untouched baseline and fail through a behavior assertion.
+  action: added
+- id: execute-pr-freezes-tests-through-coding-and-repair
+  description: Exact pre-coding test sources remain installed and are restored if the coding agent edits or removes them; tests must pass with the declared verification command before completion.
+  action: added
+- id: unavailable-postrun-probes-fail-validation
+  description: An unavailable required post-run probe is a validation failure and cannot be treated as successful evidence.
+  action: added
+guidance:
+- id: repair-independent-test-failures-with-evidence
+  description: Tailor repair prompts with the independent test failures, full verification results, and inherited-decision findings while requiring the frozen tests to remain unchanged.
+  action: added

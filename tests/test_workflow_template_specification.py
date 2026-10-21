@@ -344,15 +344,18 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     assert steps[0]["call"]["outputs"] == {"implementation_result": "coding_attempt"}
     assert steps[1]["gate"]["subject"] == "implementation_result.passed"
     assert steps[2]["gate"]["subject"] == "implementation_result.structrr.passed"
-    assert steps[3]["judge"]["output"]["name"] == "publication_scope"
-    assert "files_to_publish" not in steps[3]["judge"]["output"]["schema"]["required"]
-    assert steps[4]["call"]["inputs"]["files_to_publish"] == {
+    assert (
+        steps[3]["gate"]["subject"] == "implementation_result.integration_tests.passed"
+    )
+    assert steps[4]["judge"]["output"]["name"] == "publication_scope"
+    assert "files_to_publish" not in steps[4]["judge"]["output"]["schema"]["required"]
+    assert steps[5]["call"]["inputs"]["files_to_publish"] == {
         "type": "reference",
         "value": "implementation_result.changed_paths",
     }
-    assert steps[4]["call"]["outputs"] == {"validation_results": "validation_results"}
-    assert steps[5]["judge"]["output"]["name"] == "pull_request_request"
-    title_judge = steps[5]["judge"]
+    assert steps[5]["call"]["outputs"] == {"validation_results": "validation_results"}
+    assert steps[6]["judge"]["output"]["name"] == "pull_request_request"
+    title_judge = steps[6]["judge"]
     assert any(
         "task_context.proposed_pr_context.title" in instruction
         and "Prefer the reviewed item title verbatim" in instruction
@@ -368,11 +371,11 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
         ]["maxLength"]
         == 100
     )
-    assert steps[6]["call"]["inputs"]["files_to_publish"] == {
+    assert steps[7]["call"]["inputs"]["files_to_publish"] == {
         "type": "reference",
         "value": "implementation_result.changed_paths",
     }
-    assert steps[6]["call"]["outputs"] == {"pull_request_url": "pull_request_url"}
+    assert steps[7]["call"]["outputs"] == {"pull_request_url": "pull_request_url"}
     assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
 
 

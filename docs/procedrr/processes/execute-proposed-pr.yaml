@@ -5,7 +5,7 @@ inputs:
 outputs:
   coding_attempt:
     type: object
-    required: [passed, changed_paths, structrr]
+    required: [passed, changed_paths, structrr, integration_tests]
     properties:
       passed: {type: boolean}
       changed_paths: {type: array, items: {type: string}}
@@ -19,14 +19,28 @@ outputs:
           planning_decision_review: {type: array}
           implementation_decision_review: {type: array}
           repair_findings: {type: array}
+      integration_tests:
+        type: object
+        required:
+          [passed, generation_method, paths, test_sha256, authoring_attempts, baseline, candidate, repair_findings]
+        properties:
+          passed: {type: boolean}
+          generation_method: {type: string}
+          paths: {type: array, items: {type: string}}
+          test_sha256: {type: object}
+          authoring_attempts: {type: array, items: {type: object}}
+          baseline: {type: object}
+          candidate: {type: object}
+          repair_findings: {type: array, items: {type: string}}
       validation: {type: object}
       error: {type: [string, "null"]}
 description: >-
-  Implement one reviewed plan item with the configured coding agent, run the
-  plan's verification command, and validate the re-bootstrapped candidate
-  against its accepted Structrr diff and inherited decision reviews. Complete
-  only after implementation, Structrr comparison, decision continuity, and
-  validation all pass.
+  Have MiniSWE author independent integration tests before coding and prove
+  they fail by behavioral assertion on the untouched baseline. Implement one
+  reviewed plan item, run those exact frozen tests and the plan's verification
+  command, and validate the re-bootstrapped candidate against its accepted
+  Structrr diff and inherited decision reviews. Complete only after the tests,
+  implementation, Structrr comparison, decision continuity, and validation pass.
 limits: {max_epochs: 1, context_chars: 12000, context_value_chars: 4000}
 steps:
   - operation:
@@ -41,6 +55,10 @@ steps:
       on_failure: {terminal: failed}
   - gate:
       subject: coding_attempt.structrr.passed
+      equals: true
+      on_failure: {terminal: failed}
+  - gate:
+      subject: coding_attempt.integration_tests.passed
       equals: true
       on_failure: {terminal: failed}
   - terminal: succeeded

@@ -1638,6 +1638,46 @@ def test_nested_procedrr_operation_returns_action_result_binding() -> None:
     assert output == result
 
 
+def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None:
+    raw_result = {"error": "invalid test coverage contract", "retryable": True}
+    strategy: Any = SimpleNamespace(
+        workflow=SimpleNamespace(),
+        task=SimpleNamespace(task_id="task-001", process_checkpoint=None),
+        stdout=io.StringIO(),
+        events=[],
+    )
+
+    def execute_action(action: Any) -> SimpleNamespace:
+        strategy.events.append(
+            {
+                "kind": action.kind,
+                "tool": action.tool,
+                "result": raw_result,
+            }
+        )
+        return SimpleNamespace(continue_running=True)
+
+    strategy.execute_action = execute_action
+    operations = _TaskProcedrrOperations(
+        strategy,
+        process_id="execute-proposed-pr-workflow",
+        process_catalog=cast(Any, SimpleNamespace()),
+        process_client=cast(Any, SimpleNamespace()),
+    )
+
+    output = operations.execute(
+        "invoke_tool",
+        {"tool": "coding-agent", "parameters": {}},
+    )
+
+    assert output == {
+        "passed": False,
+        "changed_paths": [],
+        "error": "invalid test coverage contract",
+        "retryable": True,
+    }
+
+
 def test_nested_atomic_tool_step_advances_without_llm_confirmation(
     tmp_path: Path,
 ) -> None:

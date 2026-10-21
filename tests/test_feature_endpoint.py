@@ -146,6 +146,18 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         worktree_root: Path,
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
+        if worker_commit_shas:
+            assert "probe suite has executable module-level statements" in (
+                request.prompt
+            )
+            assert "move all setup into the `test_probe_*` functions" in (
+                request.prompt
+            )
+        else:
+            assert (
+                "only the module docstring, imports, and function definitions "
+                "at module scope"
+            ) in request.prompt
         assert "Task instruction:\nAdd selector handling." in request.prompt
         assert '"scenario_id": "selector"' in request.prompt
         assert '"given": "the public API receives a selector"' in request.prompt
@@ -174,16 +186,20 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
             "evidence": [{"source": "instruction", "quote": "Add selector handling."}],
             "unresolved_reason": "",
         }
-        (worktree_root / "probe_suite.py").write_text(
+        source = (
             '"""' + json.dumps({"obligations": [obligation]}) + '"""\nimport module\n\n'
             "def test_probe_selector():\n"
             '    """{"probe_id": "selector-result", '
             '"scenario_id": "selector", '
             '"obligation_id": "selector-obligation", '
             '"oracle_basis": "The instruction defines this result."}"""\n'
-            "    assert module.public_api('value') == 'handled:value'\n",
-            encoding="utf-8",
+            "    assert module.public_api('value') == 'handled:value'\n"
         )
+        if not worker_commit_shas:
+            source = source.replace(
+                "import module", "import module\nMODULE_SETUP = True"
+            )
+        (worktree_root / "probe_suite.py").write_text(source, encoding="utf-8")
         _git(worktree_root, "add", "-f", "probe_suite.py")
         _git(worktree_root, "commit", "-qm", "author probe suite")
         worker_commit_shas.append(
@@ -228,9 +244,11 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
     assert suite["generation_method"] == "minisweagent_pre_coding"
+    assert len(suite["authoring_attempts"]) == 2
     assert (
         suite["authoring_attempts"][0]["worker_commit_sha"] == (worker_commit_shas[0])
     )
+    assert suite["authoring_attempts"][1]["worker_commit_sha"] == worker_commit_shas[1]
     assert suite["probes"][0]["scenario_id"] == "selector"
     assert "import module" in suite["probe_source"]
     assert suite["baseline_results"][0]["status"] == "failed"

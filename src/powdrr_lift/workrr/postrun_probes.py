@@ -107,12 +107,12 @@ def generate_probe_interaction_plan(
             ),
         },
     ]
-    response = complete_json(client, messages, response_schema=_INTERACTION_PLAN_SCHEMA)
-    interactions = response.get("interactions")
-    if not isinstance(interactions, list):
-        raise ValueError("interaction plan must contain an interactions array")
-    planned = validate_probe_interaction_plan(
-        interactions, instruction=instruction, scenarios=scenarios
+    planned = _complete_valid_interaction_plan(
+        client,
+        messages,
+        instruction=instruction,
+        scenarios=scenarios,
+        phase="initial interaction plan",
     )
     review_messages = [
         {
@@ -143,18 +143,91 @@ def generate_probe_interaction_plan(
             ),
         },
     ]
-    review = complete_json(
-        client, review_messages, response_schema=_INTERACTION_PLAN_SCHEMA
-    ).get("interactions")
-    if not isinstance(review, list):
-        raise ValueError("interaction review must contain an interactions array")
-    additions = validate_probe_interaction_plan(
-        review, instruction=instruction, scenarios=scenarios
+    additions = _complete_valid_interaction_plan(
+        client,
+        review_messages,
+        instruction=instruction,
+        scenarios=scenarios,
+        phase="interaction-plan review",
     )
     by_id = {item["interaction_id"]: item for item in planned}
     for item in additions:
         by_id.setdefault(item["interaction_id"], item)
     return tuple(by_id.values())
+
+
+def _complete_valid_interaction_plan(
+    client: WorkflowLLMClient,
+    messages: list[dict[str, str]],
+    *,
+    instruction: str,
+    scenarios: Sequence[Mapping[str, Any]],
+    phase: str,
+) -> tuple[dict[str, Any], ...]:
+    """Repair one semantically invalid structured interaction response."""
+    last_error: ValueError | None = None
+    previous_response: Any = None
+    for attempt_number in range(1, 3):
+        request_messages = messages
+        if attempt_number == 2:
+            try:
+                repair_context = json.loads(messages[-1]["content"])
+            except (KeyError, json.JSONDecodeError):
+                repair_context = {
+                    "instruction": instruction,
+                    "behavior_scenarios": [dict(item) for item in scenarios],
+                }
+            if not isinstance(repair_context, Mapping):
+                repair_context = {
+                    "instruction": instruction,
+                    "behavior_scenarios": [dict(item) for item in scenarios],
+                }
+            repair_payload = {
+                **repair_context,
+                "previous_response": previous_response,
+                "validation_error": str(last_error),
+                "repair_phase": phase,
+            }
+            request_messages = [
+                {
+                    "role": "system",
+                    "content": (
+                        "Repair the interaction plan using only the supplied "
+                        "instruction and scenarios. Correct the reported validation "
+                        "error. Return only source-entailed interactions; use an "
+                        "empty list when none can satisfy the evidence requirements. "
+                        "Each interaction needs two distinct verbatim quotes from "
+                        "different instruction clauses and two distinct scenario "
+                        "IDs. Do not invent, paraphrase, or duplicate quotes."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        repair_payload,
+                        ensure_ascii=False,
+                        sort_keys=True,
+                    ),
+                },
+            ]
+        response = complete_json(
+            client, request_messages, response_schema=_INTERACTION_PLAN_SCHEMA
+        )
+        previous_response = response
+        try:
+            interactions = response.get("interactions")
+            if not isinstance(interactions, list):
+                raise ValueError(f"{phase} must contain an interactions array")
+            return validate_probe_interaction_plan(
+                interactions, instruction=instruction, scenarios=scenarios
+            )
+        except ValueError as error:
+            last_error = error
+            if attempt_number == 2:
+                raise ValueError(
+                    f"{phase} remained invalid after one repair: {error}"
+                ) from error
+    raise AssertionError("interaction-plan repair loop completed without a result")
 
 
 def validate_probe_interaction_plan(

@@ -191,6 +191,65 @@ def test_interaction_plan_is_generated_as_structured_metadata() -> None:
     assert interactions[0]["interaction_id"] == "special-value-with-operator"
 
 
+def test_interaction_plan_repairs_invalid_initial_and_review_responses() -> None:
+    interaction = {
+        "interaction_id": "special-value-with-operator",
+        "scenario_ids": ["special-value", "operator"],
+        "condition": "A special value is used as an operator operand.",
+        "operation": "Apply the operator to the special value.",
+        "expected": "The result follows the operator rule.",
+        "evidence_quotes": ["all values are selected", "operators are supported"],
+    }
+
+    class _RepairingClient:
+        calls = 0
+
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls == 1:
+                return {
+                    "interactions": [
+                        {
+                            **interaction,
+                            "evidence_quotes": ["invented", "operators are supported"],
+                        }
+                    ]
+                }
+            if self.calls == 2:
+                repair = json.loads(messages[1]["content"])
+                assert "validation_error" in repair
+                return {"interactions": [interaction]}
+            if self.calls == 3:
+                assert "proposed_interactions" in messages[1]["content"]
+                return {
+                    "interactions": [
+                        {
+                            **interaction,
+                            "evidence_quotes": ["invented", "operators are supported"],
+                        }
+                    ]
+                }
+            repair = json.loads(messages[1]["content"])
+            assert "proposed_interactions" in repair
+            assert "validation_error" in repair
+            return {"interactions": []}
+
+    client = _RepairingClient()
+    interactions = generate_probe_interaction_plan(
+        client,
+        instruction="all values are selected; operators are supported",
+        scenarios=(
+            {"scenario_id": "special-value"},
+            {"scenario_id": "operator"},
+        ),
+    )
+
+    assert client.calls == 4
+    assert interactions == (interaction,)
+
+
 def test_interaction_plan_result_distinguishes_empty_from_failure() -> None:
     class _EmptyClient:
         def complete_json(self, *_: Any, **__: Any) -> dict[str, Any]:

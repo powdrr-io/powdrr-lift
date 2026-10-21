@@ -3391,7 +3391,7 @@ class _TaskProcedrrOperations:
             self.strategy.events.append(failure)
             return {"error": str(error), "retryable": True}
         observed = self.strategy.events[before:]
-        return next(
+        result = next(
             (
                 event["result"]
                 for event in reversed(observed)
@@ -3401,6 +3401,9 @@ class _TaskProcedrrOperations:
             ),
             None,
         )
+        if operation == "invoke_tool" and parameters.get("tool") == "coding-agent":
+            return _normalize_execute_pr_coding_attempt(result)
+        return result
 
     def _run_nested_process(self, parameters: Mapping[str, Any]) -> dict[str, Any]:
         process_id = parameters.get("process_id")

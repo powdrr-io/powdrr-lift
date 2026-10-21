@@ -1,0 +1,423 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1068
+title: Open plan amendment PRs for proven plan defects
+intent:
+  problem: Execute-PR failures stop without a durable correction path even when execution
+    evidence proves the reviewed plan item is defective.
+  goal: Classify failed execution with evidence and create a separate PR that amends
+    the affected generated plan artifacts when the plan is at fault.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/procedrr/processes/amend-plan-and-open-pr.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 75
+  summary: Amend plan artifacts and publish a dedicated correction PR
+  rationale: Make plan defects reviewable and durable without mixing plan edits into
+    the failed implementation PR.
+- path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Route failed execution through evidence-based failure classification
+  rationale: Open a plan amendment PR only for a supported plan defect while keeping
+    implementation defects and unclear results blocked.
+- path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Route failed execution through evidence-based failure classification
+  rationale: Open a plan amendment PR only for a supported plan defect while keeping
+    implementation defects and unclear results blocked.
+- path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 21
+    end_line: 72
+  summary: Route failed execution through evidence-based failure classification
+  rationale: Open a plan amendment PR only for a supported plan defect while keeping
+    implementation defects and unclear results blocked.
+- path: docs/procedrr/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 52
+    end_line: 63
+  summary: Return failed implementation results to the parent workflow
+  rationale: Let the parent classify failures and choose the appropriate recovery
+    route.
+- path: docs/procedrr/processes/finish-implementation-pr.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 90
+  summary: Preserve the successful implementation PR path and validation gates
+  rationale: Keep normal implementation publication separate from plan correction.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 2380
+    end_line: 2382
+  summary: Include the generated execution plan path in each workflow context
+  rationale: Give the worker a stable link to the plan artifact it may need to amend.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 17
+  summary: Run constrained plan-amendment coding attempts
+  rationale: Use failure evidence to amend and validate plan artifacts without implementing
+    product changes, then expose changed paths to PR creation.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 81
+  summary: Run constrained plan-amendment coding attempts
+  rationale: Use failure evidence to amend and validate plan artifacts without implementing
+    product changes, then expose changed paths to PR creation.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 417
+    end_line: 578
+  summary: Run constrained plan-amendment coding attempts
+  rationale: Use failure evidence to amend and validate plan artifacts without implementing
+    product changes, then expose changed paths to PR creation.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1855
+    end_line: 1862
+  summary: Run constrained plan-amendment coding attempts
+  rationale: Use failure evidence to amend and validate plan artifacts without implementing
+    product changes, then expose changed paths to PR creation.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1864
+    end_line: 1864
+  summary: Run constrained plan-amendment coding attempts
+  rationale: Use failure evidence to amend and validate plan artifacts without implementing
+    product changes, then expose changed paths to PR creation.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1954
+    end_line: 1963
+  summary: Run constrained plan-amendment coding attempts
+  rationale: Use failure evidence to amend and validate plan artifacts without implementing
+    product changes, then expose changed paths to PR creation.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2007
+    end_line: 2227
+  summary: Run constrained plan-amendment coding attempts
+  rationale: Use failure evidence to amend and validate plan artifacts without implementing
+    product changes, then expose changed paths to PR creation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1371
+    end_line: 1371
+  summary: Verify generated workflow context carries the execution plan path
+  rationale: Ensure generated tasks can identify the source plan artifact deterministically.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1373
+    end_line: 1373
+  summary: Verify generated workflow context carries the execution plan path
+  rationale: Ensure generated tasks can identify the source plan artifact deterministically.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1689
+    end_line: 1689
+  summary: Verify generated workflow context carries the execution plan path
+  rationale: Ensure generated tasks can identify the source plan artifact deterministically.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 299
+    end_line: 299
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 301
+    end_line: 304
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 316
+    end_line: 316
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 320
+    end_line: 327
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 321
+    end_line: 324
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 374
+    end_line: 381
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 392
+    end_line: 409
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 424
+    end_line: 434
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 444
+    end_line: 458
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 485
+    end_line: 485
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 493
+    end_line: 502
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 505
+    end_line: 526
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 528
+    end_line: 528
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 549
+    end_line: 549
+  summary: Exercise the plan-defect routing and amendment PR request
+  rationale: Verify a non-trivial classified plan defect reaches the amendment publisher
+    while other failure classes stop.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 58
+  summary: Verify deterministic branch names for both PR types
+  rationale: Keep implementation and plan-amendment branches distinguishable.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 66
+    end_line: 66
+  summary: Verify deterministic branch names for both PR types
+  rationale: Keep implementation and plan-amendment branches distinguishable.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 177
+    end_line: 292
+  summary: Verify deterministic branch names for both PR types
+  rationale: Keep implementation and plan-amendment branches distinguishable.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 710
+    end_line: 710
+  summary: Verify deterministic branch names for both PR types
+  rationale: Keep implementation and plan-amendment branches distinguishable.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 714
+    end_line: 714
+  summary: Verify deterministic branch names for both PR types
+  rationale: Keep implementation and plan-amendment branches distinguishable.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 752
+    end_line: 752
+  summary: Verify deterministic branch names for both PR types
+  rationale: Keep implementation and plan-amendment branches distinguishable.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 776
+    end_line: 778
+  summary: Verify deterministic branch names for both PR types
+  rationale: Keep implementation and plan-amendment branches distinguishable.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 331
+    end_line: 346
+  summary: Validate the parent and child process contracts
+  rationale: Protect failure routing, amendment parameters, and preserved implementation
+    gates.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 348
+    end_line: 349
+  summary: Validate the parent and child process contracts
+  rationale: Protect failure routing, amendment parameters, and preserved implementation
+    gates.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 336
+    end_line: 338
+  summary: Validate the parent and child process contracts
+  rationale: Protect failure routing, amendment parameters, and preserved implementation
+    gates.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 358
+    end_line: 363
+  summary: Validate the parent and child process contracts
+  rationale: Protect failure routing, amendment parameters, and preserved implementation
+    gates.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 365
+    end_line: 366
+  summary: Validate the parent and child process contracts
+  rationale: Protect failure routing, amendment parameters, and preserved implementation
+    gates.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 368
+    end_line: 373
+  summary: Validate the parent and child process contracts
+  rationale: Protect failure routing, amendment parameters, and preserved implementation
+    gates.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 377
+    end_line: 381
+  summary: Validate the parent and child process contracts
+  rationale: Protect failure routing, amendment parameters, and preserved implementation
+    gates.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 397
+  summary: Validate the parent and child process contracts
+  rationale: Protect failure routing, amendment parameters, and preserved implementation
+    gates.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 401
+    end_line: 403
+  summary: Validate the parent and child process contracts
+  rationale: Protect failure routing, amendment parameters, and preserved implementation
+    gates.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 405
+    end_line: 408
+  summary: Validate the parent and child process contracts
+  rationale: Protect failure routing, amendment parameters, and preserved implementation
+    gates.
+entities:
+- id: execute-pr-plan-defect-recovery
+  type: Workflow
+  action: added
+- id: execute-pr-plan-amendment-agent
+  type: Function
+  action: added
+- id: execute-pr-plan-amendment-tests
+  type: Regression test
+  action: added
+entity_relationships:
+- id: plan-defect-classification-routes-to-amendment
+  type: triggers
+  source: execute-pr-plan-defect-recovery
+  target: execute-pr-plan-amendment-agent
+  action: added
+  description: A failure classified as a plan defect with concrete evidence invokes
+    the constrained amendment agent and opens a separate PR.
+- id: amendment-tests-exercise-recovery
+  type: exercises
+  source: execute-pr-plan-amendment-tests
+  target: execute-pr-plan-defect-recovery
+  action: added
+  description: Workflow tests verify that supported plan defects reach PR creation
+    and other failure classes do not.
+invariants:
+- id: plan-amendment-requires-concrete-plan-defect-evidence
+  description: Failed implementation alone is insufficient to amend a plan; the workflow
+    requires a plan-defect classification supported by concrete evidence.
+  action: added
+- id: plan-amendment-isolated-from-product-implementation
+  description: A plan amendment may change only the execution plan, its Structrr proposal,
+    and the affected generated workflow; unrelated plan items and dependency edges
+    are preserved.
+  action: added
+guidance:
+- id: review-plan-amendment-separately
+  description: Publish plan corrections as a separate PR so the plan defect and its
+    correction are reviewed before a subsequent worker executes the corrected item.
+  action: added

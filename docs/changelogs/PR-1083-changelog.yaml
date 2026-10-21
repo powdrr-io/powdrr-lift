@@ -1,0 +1,37 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1083
+title: Pin integration test author to its isolated worktree
+intent:
+  problem: The pre-coding test author can write generated tests into the caller's checkout instead of the temporary baseline worktree.
+  goal: Tell the test author the exact worktree path and require it to verify that path before inspecting or editing files.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1125
+    end_line: 1166
+  summary: Pin the test-author prompt to the temporary baseline worktree.
+  rationale: Prevent generated tests from being staged in the caller's checkout and require a workspace check before edits.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1213
+    end_line: 1216
+  summary: Build the test-author request with the isolated worktree path.
+  rationale: Ensure each authoring attempt receives the exact root it must verify.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 94
+  summary: Verify the test-author prompt identifies and checks its isolated worktree.
+  rationale: Keep the execution boundary explicit while retaining baseline-red test authoring.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 55
+    end_line: 55
+  summary: Import the test-author prompt builder for regression coverage.
+  rationale: Exercise the prompt contract directly without invoking an agent.

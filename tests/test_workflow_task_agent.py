@@ -52,6 +52,7 @@ from powdrr_lift.workrr.task_agent import (
     _apply_task_edits,
     _build_workflow_client,
     _durable_task_action_output_state,
+    _execute_pr_test_author_prompt,
     _handle_exhausted_timeout,
     _implementation_paths_against_base,
     _issue_worker_implementation_request,
@@ -69,6 +70,26 @@ from powdrr_lift.workrr.task_agent import (
     _workflow_file_command_error,
     run_workflow_task,
 )
+
+
+def test_execute_pr_test_author_prompt_pins_authoring_worktree(
+    tmp_path: Path,
+) -> None:
+    authoring_worktree = tmp_path / "isolated" / "authoring-worktree"
+    prompt = _execute_pr_test_author_prompt(
+        authoring_worktree=authoring_worktree,
+        plan_context={"acceptance_criteria": ["The workflow runs on pull requests."]},
+        coverage_plan={"criteria": []},
+    )
+
+    assert f"exact, only workspace for this attempt is:\n{authoring_worktree}" in prompt
+    assert "run `pwd` and `git rev-parse --show-toplevel`" in prompt
+    assert "stop without making or staging any changes" in prompt
+    assert (
+        "Do not use the parent checkout or any path outside this workspace." in prompt
+    )
+    assert "implementation is intentionally absent" in prompt
+    assert "fail through a behavioral assertion" in prompt
 
 
 def test_implementation_paths_include_committed_work_and_exclude_runtime_state(

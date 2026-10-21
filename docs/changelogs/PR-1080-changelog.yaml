@@ -1,0 +1,80 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1080
+title: Route existing-file plan conflicts to amendments
+intent:
+  problem: A reviewed plan can instruct the worker to create a repository path that already exists without that path appearing in the accepted Structrr additions, so execution may fail before recognizing the plan defect.
+  goal: Detect explicit create-existing-file conflicts against the base commit and carry concrete evidence into the plan-amendment decision.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 806, end_line: 848}
+    summary: Detect planned file creation that collides with the repository baseline
+    rationale: Compare reviewed creation steps with allowed paths in the base commit, even when the accepted Structrr proposal omits the path.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2609, end_line: 2623}
+    summary: Return concrete plan-defect evidence before test authoring
+    rationale: Stop implementation work on a proven plan conflict and give the parent process evidence for amendment routing.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Declare plan-defect evidence on failed coding attempts
+    rationale: Preserve deterministic repository conflict evidence in the process result.
+  - path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+    type: modified
+    span: {start_line: 37, end_line: 37}
+    summary: Route concrete file conflicts to plan amendment
+    rationale: Require the failure classifier to use the explicit evidence before choosing the amendment path.
+  - path: tests/test_workflow_task_agent.py
+    type: added
+    span: {start_line: 117, end_line: 160}
+    summary: Reproduce an existing verifier conflicting with a create step
+    rationale: Verify the base-tree preflight catches the exact kind of conflict that blocked Gaterr issue 62.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 386, end_line: 386}
+    summary: Carry file-conflict evidence through the process contract
+    rationale: Keep the concrete preflight result available to the plan-defect decision.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 460, end_line: 462}
+    summary: Assert the plan-defect review receives the existing-file evidence
+    rationale: Protect the path from deterministic conflict detection through amendment routing.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 552, end_line: 560}
+    summary: Model a reviewed plan that asks to recreate an existing verifier
+    rationale: Exercise the amendment branch with concrete, repository-specific evidence.
+entities:
+  - id: reviewed-file-creation-conflict-preflight
+    type: Function
+    action: added
+  - id: existing-verifier-plan-conflict-regression
+    type: Regression test
+    action: added
+  - id: execute-pr-plan-defect-evidence-routing
+    type: Workflow
+    action: added
+entity_relationships:
+  - id: existing-verifier-test-verifies-preflight
+    type: verifies
+    source: existing-verifier-plan-conflict-regression
+    target: reviewed-file-creation-conflict-preflight
+    action: added
+    description: The regression test proves a planned create step is flagged when its allowed path is already tracked in the base commit.
+  - id: preflight-evidence-routes-to-amendment
+    type: informs
+    source: reviewed-file-creation-conflict-preflight
+    target: execute-pr-plan-defect-evidence-routing
+    action: added
+    description: Concrete preflight findings are carried through the process result so plan defects reach the amendment path.
+invariants:
+  - id: existing-planned-create-is-amended
+    description: When a reviewed implementation step directs creating an allowed path that exists in the base commit, execution must report the conflict as plan-defect evidence before authoring tests or code.
+    action: added
+guidance:
+  - id: base-tree-file-conflict-evidence
+    description: Include the exact reviewed step, repository path, and base commit evidence when routing an existing-file conflict to plan amendment.
+    action: added

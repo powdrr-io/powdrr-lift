@@ -136,18 +136,24 @@ def test_interaction_plan_requires_multiple_scenarios_and_exact_evidence() -> No
         "condition": "A special value is used as an operator operand.",
         "operation": "Apply the operator to the special value and a concrete value.",
         "expected": "The result contains only the values selected by the operation.",
-        "evidence_quotes": ["all values are selected", "difference removes a value"],
+        "evidence_quotes": ["all values are selected;", "difference removes a value"],
+    }
+    model_interaction = {
+        **{
+            key: value for key, value in interaction.items() if key != "evidence_quotes"
+        },
+        "evidence_quote_ids": ["quote-001", "quote-002"],
     }
 
     validated = validate_probe_interaction_plan(
-        [interaction],
+        [model_interaction],
         instruction="all values are selected; difference removes a value",
         scenarios=scenarios,
     )
 
     assert validated == (interaction,)
-    invalid = {**interaction, "evidence_quotes": ["invented", "difference"]}
-    with pytest.raises(ValueError, match="exact quotes"):
+    invalid = {**model_interaction, "evidence_quote_ids": ["quote-999", "quote-002"]}
+    with pytest.raises(ValueError, match="evidence_quote_ids"):
         validate_probe_interaction_plan(
             [invalid],
             instruction="all values are selected; difference removes a value",
@@ -170,10 +176,7 @@ def test_interaction_plan_is_generated_as_structured_metadata() -> None:
                             "condition": "A special value is an operand.",
                             "operation": "Evaluate the expression.",
                             "expected": "Only selected results are suppressed.",
-                            "evidence_quotes": [
-                                "all values",
-                                "operators are supported",
-                            ],
+                            "evidence_quote_ids": ["quote-001", "quote-002"],
                         }
                     ]
                 }
@@ -198,7 +201,13 @@ def test_interaction_plan_repairs_invalid_initial_and_review_responses() -> None
         "condition": "A special value is used as an operator operand.",
         "operation": "Apply the operator to the special value.",
         "expected": "The result follows the operator rule.",
-        "evidence_quotes": ["all values are selected", "operators are supported"],
+        "evidence_quotes": ["all values are selected;", "operators are supported"],
+    }
+    model_interaction = {
+        **{
+            key: value for key, value in interaction.items() if key != "evidence_quotes"
+        },
+        "evidence_quote_ids": ["quote-001", "quote-002"],
     }
 
     class _RepairingClient:
@@ -212,22 +221,22 @@ def test_interaction_plan_repairs_invalid_initial_and_review_responses() -> None
                 return {
                     "interactions": [
                         {
-                            **interaction,
-                            "evidence_quotes": ["invented", "operators are supported"],
+                            **model_interaction,
+                            "evidence_quote_ids": ["quote-999", "quote-002"],
                         }
                     ]
                 }
             if self.calls == 2:
                 repair = json.loads(messages[1]["content"])
                 assert "validation_error" in repair
-                return {"interactions": [interaction]}
+                return {"interactions": [model_interaction]}
             if self.calls == 3:
                 assert "proposed_interactions" in messages[1]["content"]
                 return {
                     "interactions": [
                         {
-                            **interaction,
-                            "evidence_quotes": ["invented", "operators are supported"],
+                            **model_interaction,
+                            "evidence_quote_ids": ["quote-999", "quote-002"],
                         }
                     ]
                 }
@@ -265,7 +274,7 @@ def test_interaction_plan_result_distinguishes_empty_from_failure() -> None:
                         "condition": "The requirements are combined.",
                         "operation": "Apply the operation.",
                         "expected": "The combined result is returned.",
-                        "evidence_quotes": ["invented quote", "another invented quote"],
+                        "evidence_quote_ids": ["quote-999", "quote-998"],
                     }
                 ]
             }
@@ -295,7 +304,7 @@ def test_interaction_plan_result_distinguishes_empty_from_failure() -> None:
     assert empty.error is None
     assert failed.status == "failed"
     assert failed.interactions == ()
-    assert failed.error is not None and "exact quotes" in failed.error
+    assert failed.error is not None and "evidence_quote_ids" in failed.error
     assert unconfigured.status == "not_configured"
     assert unconfigured.error is None
 
@@ -355,8 +364,14 @@ def test_probe_suite_must_cover_each_required_interaction() -> None:
             )
         return "\n".join(lines) + "\n"
 
+    model_interaction = {
+        **{
+            key: value for key, value in interaction.items() if key != "evidence_quotes"
+        },
+        "evidence_quote_ids": ["quote-001", "quote-002"],
+    }
     interactions = validate_probe_interaction_plan(
-        [interaction], instruction=instruction, scenarios=scenarios
+        [model_interaction], instruction=instruction, scenarios=scenarios
     )
     _, probes = parse_generated_postrun_probe_source(
         source(["special-value-with-operator"]),

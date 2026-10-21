@@ -345,11 +345,16 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
 
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "README.md").write_text("initial\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.pytest.ini_options]\npythonpath = ['src']\n", encoding="utf-8"
+    )
     (tmp_path / "verify.py").write_text(
         "from pathlib import Path\n"
         "assert 'value = 42' in Path('src/feature.py').read_text()\n",
         encoding="utf-8",
     )
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "feature.py").write_text("value = 1\n", encoding="utf-8")
     baseline = {
         "entities": [],
         "entity_relationships": [],
@@ -377,6 +382,7 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     )
     proposal_path = tmp_path / "docs/plans/feature-v1-structrr-proposal.json"
     write_multi_pr_proposal(proposal_path, proposal)
+    workflow = _workflow(tmp_path)
     subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
     subprocess.run(
         [
@@ -394,7 +400,7 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
         capture_output=True,
     )
     task = replace(
-        _workflow(tmp_path).tasks[0],
+        workflow.tasks[0],
         input_state={
             "proposed_pr_id": "feature-v1-pr-01",
             "proposed_pr_context": {
@@ -409,11 +415,10 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
                 "scope": ["src"],
                 "implementation_steps": ["Set the feature value to 42."],
                 "acceptance_criteria": ["The feature value equals 42."],
-                "verification_command": f"{sys.executable} verify.py",
+                "verification_command": "pytest",
             },
         },
     )
-    workflow = WorkflowInstance.from_directory(tmp_path / "workflow")
     provider_requests: list[Any] = []
     provider_timeouts: list[float] = []
 
@@ -428,6 +433,7 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
             attempt_id: str,
         ) -> subprocess.CompletedProcess[str]:
             del attempt_id
+            assert (worktree_root / "tests/integration/test_feature_e2e.py").is_file()
             provider_requests.append(request)
             source = worktree_root / "src" / "feature.py"
             source.parent.mkdir(parents=True, exist_ok=True)
@@ -442,7 +448,37 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
         return NontrivialProvider()
 
     monkeypatch.setattr(task_agent, "build_coding_agent_provider", build_provider)
-    monkeypatch.setattr(task_agent.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(
+        task_agent.tempfile,
+        "gettempdir",
+        lambda: str(tmp_path.parent / f"{tmp_path.name}-artifacts"),
+    )
+    generated_test_source = (
+        "from feature import value\n\n"
+        "def test_public_feature_value_is_implemented():\n"
+        "    assert value == 42\n"
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "_author_execute_pr_tests",
+        lambda *_args, **_kwargs: (
+            {"tests/integration/test_feature_e2e.py": generated_test_source},
+            {
+                "generation_method": "miniswe_pre_coding",
+                "test_sha256": {"tests/integration/test_feature_e2e.py": "a" * 64},
+                "authoring_attempts": [{"status": "completed"}],
+                "baseline_result": {
+                    "command": ["pytest", "tests/integration/test_feature_e2e.py"],
+                    "returncode": 1,
+                    "stdout": (
+                        "FAILED tests/integration/test_feature_e2e.py::"
+                        "test_public_feature_value_is_implemented"
+                    ),
+                    "stderr": "AssertionError: expected value 42, got 1",
+                },
+            },
+        ),
+    )
     manifest = SourceManifest(
         submission_base="a" * 40,
         source_revision="b" * 40,
@@ -526,13 +562,23 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     )
 
     result = strategy._run_coding_agent()
-
     assert result["passed"] is True
     assert result["continuations"] == 1
     assert len(result["attempts"]) == 2
     assert result["attempts"][0]["validation"]["status"] == "failed"
     assert result["attempts"][1]["validation"]["status"] == "passed"
     assert result["structrr"]["passed"] is True
+    assert result["integration_tests"]["passed"] is True
+    assert result["integration_tests"]["generation_method"] == "miniswe_pre_coding"
+    assert result["integration_tests"]["test_sha256"] == {
+        "tests/integration/test_feature_e2e.py": "a" * 64
+    }
+    assert result["integration_tests"]["authoring_attempts"] == [
+        {"status": "completed"}
+    ]
+    assert result["integration_tests"]["paths"] == [
+        "tests/integration/test_feature_e2e.py"
+    ]
     assert result["attempts"][0]["structrr"]["passed"] is False
     assert review_phases == ["planning", "implementation", "implementation"]
     assert "Observed issue:" in provider_requests[1].prompt

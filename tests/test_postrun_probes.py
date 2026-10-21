@@ -431,6 +431,22 @@ def test_baseline_requires_assertion_failure_not_a_pass_or_execution_error() -> 
     assert any("import" in item for item in problems)
 
 
+def test_unavailable_postrun_probe_is_a_repair_finding() -> None:
+    failures = probe_failures(
+        [
+            {
+                "probe_id": "public-api",
+                "scenario_id": "public-api-works",
+                "status": "unavailable",
+                "error": "probe runner could not start",
+            }
+        ]
+    )
+
+    assert len(failures) == 1
+    assert failures[0]["scenario_id"] == "public-api-works"
+
+
 def test_postrun_probe_execution_reports_runtime_failure(tmp_path: Path) -> None:
     probe = PostRunProbe(
         "bad",

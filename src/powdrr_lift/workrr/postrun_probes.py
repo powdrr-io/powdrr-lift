@@ -751,7 +751,7 @@ def probe_failures(results: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]
             ),
         }
         for item in results
-        if item.get("status") in {"failed", "timed_out"}
+        if item.get("status") in {"failed", "timed_out", "unavailable"}
     ]
 
 

@@ -67,6 +67,7 @@ from powdrr_lift.workrr.coding_agent import (
     CodingAgentRecoveryDecision,
     CodingAgentRunner,
     ImplementationRequest,
+    MiniSWEAgentProvider,
     OpenCodePermissionPolicy,
     build_coding_agent_provider,
     run_coding_agent_recovery,
@@ -74,7 +75,7 @@ from powdrr_lift.workrr.coding_agent import (
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
     ValidationReportStatus,
-    execute_coding_agent_attempt,
+    ValidationRunner,
     parse_validation_profile,
 )
 from powdrr_lift.workrr.decision_continuity import (
@@ -82,6 +83,15 @@ from powdrr_lift.workrr.decision_continuity import (
     review_inherited_decisions,
 )
 from powdrr_lift.workrr.error_logging import record_workflow_llm_error
+from powdrr_lift.workrr.execute_pr_tests import (
+    ExecutePrTestError,
+    candidate_test_changes,
+    fingerprint_test_files,
+    install_frozen_test_files,
+    require_behavioral_red_result,
+    run_generated_pytest,
+    validate_generated_test_files,
+)
 from powdrr_lift.workrr.execution_loop import (
     _execute_shell_tool,
     _run_coding_loop_verification,
@@ -585,6 +595,7 @@ def _implementation_paths_against_base(repo_root: Path) -> tuple[str, ...]:
             )
     for command in (
         ["git", "diff", "--name-only", "-z", "HEAD"],
+        ["git", "diff", "--cached", "--name-only", "-z", "HEAD"],
         ["git", "ls-files", "--others", "--exclude-standard", "-z"],
     ):
         result = subprocess.run(
@@ -662,6 +673,199 @@ def _bounded_candidate_diff(
         "returncode": result.returncode,
         "reason": result.stderr.strip() if result.returncode else "",
     }
+
+
+def _author_execute_pr_tests(
+    repo_root: Path,
+    *,
+    base_commit: str,
+    request: ImplementationRequest,
+    proposed: Mapping[str, Any],
+    workflow_id: str,
+    config: WorkflowTaskAgentConfig,
+    store_root: Path,
+    validation_profile: ValidationProfile,
+) -> tuple[dict[str, str], dict[str, Any]]:
+    """Ask MiniSWE to write and baseline-check independent integration tests."""
+    test_root = store_root / "integration-tests"
+    authoring_worktree = test_root / "authoring-worktree"
+    test_root.mkdir(parents=True, exist_ok=True)
+    if authoring_worktree.exists():
+        raise PowdrrExecutionError(
+            f"integration-test worktree already exists: {authoring_worktree}"
+        )
+    subprocess.run(
+        ["git", "worktree", "add", "--detach", str(authoring_worktree), base_commit],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    try:
+        plan_context = {
+            "title": proposed.get("title"),
+            "objective": proposed.get("objective"),
+            "scope": proposed.get("scope", []),
+            "implementation_steps": proposed.get("implementation_steps", []),
+            "acceptance_criteria": proposed.get("acceptance_criteria", []),
+            "accepted_structrr_operations": proposed.get(
+                "accepted_structrr_operations", []
+            ),
+        }
+        prompt = (
+            "Write independent executable pytest integration or end-to-end tests "
+            "for this reviewed PR before implementation starts. Inspect the "
+            "untouched repository and its public entry points. Add only new test "
+            "files under `tests/` (or `test/` if that is the repository's test "
+            "root); do not edit implementation, existing tests, configuration, "
+            "or documentation. Use realistic setup and real application wiring. "
+            "Exercise public behavior at the narrowest end-to-end or integration "
+            "boundary that proves the acceptance criterion. Do not mock the entry "
+            "point or behavior under test. Do not use private implementation "
+            "details as the oracle. Every test must make a specific observable "
+            "assertion grounded in the supplied acceptance criteria. Avoid "
+            "tautologies, constant-only assertions, unconditional passes, skips, "
+            "and expected failures. Stage every new test file with `git add -f` "
+            "so ignored paths remain visible. Do not commit. Stop after creating "
+            "the tests.\n\n"
+            "The implementation is intentionally absent. Tests must execute "
+            "against the baseline and fail through a behavioral assertion, not "
+            "through syntax, import, collection, or environment errors.\n\n"
+            "Reviewed PR contract:\n"
+            f"{json.dumps(plan_context, indent=2, sort_keys=True)}\n"
+        )
+        author_request = ImplementationRequest(
+            request_id=f"{workflow_id}-integration-test-author",
+            objective="Author independent PR integration tests before implementation",
+            prompt=prompt,
+            base_commit=base_commit,
+            plan_fingerprint=request.plan_fingerprint,
+            allowed_paths=("tests", "test"),
+            acceptance_criteria=(
+                "Add pytest tests for observable PR acceptance criteria.",
+                "Do not modify implementation or existing tests.",
+                "New tests fail on the untouched baseline through behavior assertions.",
+            ),
+            validation_profiles=(),
+            context_refs=request.context_refs,
+        )
+        test_provider = MiniSWEAgentProvider(
+            executable=config.minisweagent_executable,
+            model=config.minisweagent_model,
+            timeout_seconds=min(config.coding_agent_timeout_seconds, 600.0),
+            diagnostics_root=test_root / "diagnostics",
+        )
+        test_runner = CodingAgentRunner(
+            provider=test_provider,
+            store=CodingAgentAttemptStore(test_root / "attempts"),
+        )
+        attempts: list[dict[str, Any]] = []
+        validation_error: str | None = None
+        test_paths: set[str] = set()
+        test_sources: dict[str, str] = {}
+        baseline_report: dict[str, Any] | None = None
+        for attempt_number in (1, 2):
+            current_head = _git_output(authoring_worktree, ["rev-parse", "HEAD"])
+            if attempt_number == 2:
+                author_request = replace(
+                    author_request,
+                    request_id=f"{workflow_id}-integration-test-author-repair",
+                    base_commit=current_head,
+                    prompt=(
+                        prompt
+                        + "\n\nRepair the test-only change. The previous attempt "
+                        "failed this exact validation:\n"
+                        + str(validation_error)
+                        + "\nRewrite only new pytest files under tests/ or test/. "
+                        "Every test must run and fail on the untouched baseline "
+                        "through an assertion about requested behavior. Do not "
+                        "commit, edit implementation files, or weaken the contract."
+                    ),
+                    allow_existing_changes=True,
+                )
+            attempt = test_runner.run(
+                author_request,
+                worktree_root=authoring_worktree,
+                attempt_id=f"{workflow_id}-test-author-{attempt_number:02d}",
+            )
+            attempts.append(attempt.to_data())
+            if attempt.status.value != "completed":
+                validation_error = (
+                    f"test author status was {attempt.status.value}: {attempt.error}"
+                )
+                continue
+            changed = set(attempt.changed_paths)
+            if not changed or any(
+                not (path.startswith("tests/") or path.startswith("test/"))
+                for path in changed
+            ):
+                validation_error = (
+                    "test author must add only new files under tests/ or test/; "
+                    f"changed {sorted(changed)}"
+                )
+                continue
+            test_paths.update(changed)
+            try:
+                raw_sources = {
+                    path: (authoring_worktree / path).read_text(encoding="utf-8")
+                    for path in sorted(test_paths)
+                }
+                test_sources = validate_generated_test_files(raw_sources)
+                for path in test_sources:
+                    tracked = subprocess.run(
+                        ["git", "cat-file", "-e", f"{base_commit}:{path}"],
+                        cwd=authoring_worktree,
+                        capture_output=True,
+                        check=False,
+                    )
+                    if tracked.returncode == 0:
+                        raise ExecutePrTestError(
+                            f"integration test must be new, not replace {path}"
+                        )
+                baseline_report = run_generated_pytest(
+                    validation_profile,
+                    root=authoring_worktree,
+                    paths=tuple(test_sources),
+                    timeout_seconds=config.coding_agent_validation_timeout_seconds,
+                )
+                require_behavioral_red_result(baseline_report)
+                validation_error = None
+                break
+            except (OSError, ExecutePrTestError) as error:
+                validation_error = str(error)
+        if validation_error is not None or baseline_report is None:
+            raise PowdrrExecutionError(
+                "MiniSWE could not produce integration tests that execute against "
+                "the untouched baseline and fail through behavior assertions "
+                f"after one tailored repair: {validation_error}"
+            )
+        artifact = {
+            "schema_version": "execute-pr-integration-tests-v1",
+            "generation_method": "miniswe_pre_coding",
+            "status": "baseline_red",
+            "base_commit": base_commit,
+            "paths": sorted(test_sources),
+            "test_sources": test_sources,
+            "test_sha256": fingerprint_test_files(test_sources),
+            "baseline_result": baseline_report,
+            "authoring_attempts": attempts,
+        }
+        (test_root / "suite.json").write_text(
+            json.dumps(artifact, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        (test_root / "authoring-prompt.md").write_text(
+            prompt.rstrip() + "\n", encoding="utf-8"
+        )
+        return test_sources, artifact
+    finally:
+        subprocess.run(
+            ["git", "worktree", "remove", "--force", str(authoring_worktree)],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
 
 
 def _select_workflow_instance(
@@ -1733,6 +1937,67 @@ class _TaskWorkflowExecutionStrategy:
                 "Do not edit the proposal artifact."
             ),
         )
+        test_authoring_context = dict(proposed)
+        test_authoring_context["accepted_structrr_operations"] = accepted_operations
+        integration_test_sources, integration_test_authoring = _author_execute_pr_tests(
+            self.repo_root,
+            base_commit=base_commit,
+            request=request,
+            proposed=test_authoring_context,
+            workflow_id=workflow_id,
+            config=self.config,
+            store_root=store_root,
+            validation_profile=validation_profile,
+        )
+        status_before_test_install = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=all"],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if status_before_test_install.returncode:
+            raise PowdrrExecutionError(
+                "could not verify a clean implementation worktree before "
+                "installing integration tests: "
+                + status_before_test_install.stderr.strip()
+            )
+        if status_before_test_install.stdout.strip():
+            raise PowdrrExecutionError(
+                "implementation worktree must be clean before installing the "
+                "independently authored integration tests: "
+                + status_before_test_install.stdout.strip()
+            )
+        try:
+            install_frozen_test_files(self.repo_root, integration_test_sources)
+        except ExecutePrTestError as error:
+            raise PowdrrExecutionError(str(error)) from error
+        request = replace(request, allow_existing_changes=True)
+        rendered_tests = [
+            "## Independent pre-coding integration tests",
+            "A separate MiniSWE test author created these tests before the "
+            "implementation. They were run against the untouched baseline and "
+            "failed through behavior assertions. The workflow has installed these "
+            "exact files in the worktree for you to run. Read and run them there. "
+            "Do not edit, weaken, skip, or replace them; make the implementation "
+            "satisfy them.",
+            "Baseline test command: `"
+            + " ".join(
+                str(token)
+                for token in integration_test_authoring["baseline_result"]["command"]
+            )
+            + "`",
+            "Baseline result: behavioral assertion failure, as required.",
+            "Frozen test files:",
+        ]
+        rendered_tests.extend(
+            f"- `{path}` (SHA-256: `{digest}`)"
+            for path, digest in integration_test_authoring["test_sha256"].items()
+        )
+        request = replace(
+            request,
+            prompt=request.prompt + "\n\n" + "\n\n".join(rendered_tests),
+        )
         provider = build_coding_agent_provider(
             self.config.code_agent,
             opencode_executable=self.config.opencode_executable,
@@ -1747,10 +2012,12 @@ class _TaskWorkflowExecutionStrategy:
             provider=provider,
             store=CodingAgentAttemptStore(store_root),
         )
+        test_files_installed = True
 
         def run_attempt(
             attempt_number: int, recovery_issue: Mapping[str, Any] | None
         ) -> dict[str, Any]:
+            nonlocal test_files_installed
             attempt_request = request
             if recovery_issue is not None:
                 attempt_request = replace(
@@ -1769,19 +2036,42 @@ class _TaskWorkflowExecutionStrategy:
                 f"{request.request_id}-attempt-{attempt_number:02d}-"
                 f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
             )
-            execution = execute_coding_agent_attempt(
-                runner,
+            frozen_test_tampering: list[str] = []
+            attempt = runner.run(
                 attempt_request,
                 worktree_root=self.repo_root,
                 attempt_id=attempt_id,
-                profiles={validation_profile.name: validation_profile},
-                validation_timeout_seconds=(
-                    self.config.coding_agent_validation_timeout_seconds
-                ),
             )
-            attempt = execution.attempt
-            validation = execution.validation
-            diff_check = execution.diff_check
+            if test_files_installed and integration_test_sources:
+                frozen_test_tampering.extend(
+                    candidate_test_changes(self.repo_root, integration_test_sources)
+                )
+            try:
+                install_frozen_test_files(self.repo_root, integration_test_sources)
+            except ExecutePrTestError as error:
+                raise PowdrrExecutionError(str(error)) from error
+            integration_test_result = run_generated_pytest(
+                validation_profile,
+                root=self.repo_root,
+                paths=tuple(integration_test_sources),
+                timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
+            )
+            if frozen_test_tampering:
+                integration_test_result["frozen_tests_modified_by_coder"] = sorted(
+                    set(frozen_test_tampering)
+                )
+            validation = ValidationRunner(
+                {validation_profile.name: validation_profile},
+                timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
+            ).run(attempt_request, attempt, worktree_root=self.repo_root)
+            runner.store.save_validation_report(validation)
+            diff_check = subprocess.run(
+                ["git", "diff", "--check", "HEAD"],
+                cwd=self.repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
             implementation_paths = tuple(
                 sorted(
                     set(attempt.changed_paths)
@@ -1947,11 +2237,38 @@ class _TaskWorkflowExecutionStrategy:
                 implementation_paths = tuple(
                     sorted({*implementation_paths, report_path})
                 )
+            integration_test_findings: list[str] = []
+            if integration_test_result.get("passed") is not True:
+                integration_test_findings.append(
+                    "frozen pre-coding integration tests did not pass: "
+                    + json.dumps(integration_test_result, sort_keys=True)
+                )
+            if frozen_test_tampering:
+                integration_test_findings.append(
+                    "coding agent edited or removed frozen independently authored "
+                    "tests; the workflow restored the original test sources: "
+                    + ", ".join(sorted(set(frozen_test_tampering)))
+                )
+            integration_test_report = {
+                "passed": not integration_test_findings,
+                "generation_method": integration_test_authoring.get(
+                    "generation_method", "miniswe_pre_coding"
+                ),
+                "paths": sorted(integration_test_sources),
+                "test_sha256": integration_test_authoring.get("test_sha256", {}),
+                "authoring_attempts": integration_test_authoring.get(
+                    "authoring_attempts", []
+                ),
+                "baseline": integration_test_authoring["baseline_result"],
+                "candidate": integration_test_result,
+                "repair_findings": integration_test_findings,
+            }
             passed = (
                 attempt.status.value == "completed"
                 and bool(implementation_paths)
                 and diff_check.returncode == 0
                 and validation.status is ValidationReportStatus.PASSED
+                and not integration_test_findings
                 and not structural_findings
             )
             return {
@@ -1964,6 +2281,8 @@ class _TaskWorkflowExecutionStrategy:
                 },
                 "changed_paths": list(implementation_paths),
                 "structrr": structural_report,
+                "integration_tests": integration_test_report,
+                "integration_test_repair_findings": integration_test_findings,
                 "structrr_repair_findings": list(structural_findings),
                 "passed": passed,
             }
@@ -1978,6 +2297,39 @@ class _TaskWorkflowExecutionStrategy:
                 return CodingAgentRecoveryDecision(passed=True)
             if attempt_data.get("status") == "policy_denied":
                 return CodingAgentRecoveryDecision(passed=False, terminal=True)
+            integration_test_findings = record.get(
+                "integration_test_repair_findings", []
+            )
+            if integration_test_findings:
+                return CodingAgentRecoveryDecision(
+                    passed=False,
+                    issue={
+                        "category": "independent_integration_test_failure",
+                        "plan_id": proposed.get("plan_id"),
+                        "item_id": proposed.get("item_id"),
+                        "tests": integration_test_findings,
+                        "baseline_evidence": integration_test_authoring.get(
+                            "baseline_result"
+                        ),
+                        "candidate_evidence": record.get("integration_tests"),
+                        "validation_evidence": record.get("validation"),
+                        "inherited_decision_findings": record.get(
+                            "structrr_repair_findings", []
+                        ),
+                        "instruction": (
+                            "Repair the implementation so the independently "
+                            "authored integration tests pass against real public "
+                            "behavior. These tests failed by assertion on the "
+                            "untouched baseline and their exact sources are frozen. "
+                            "Do not edit, delete, skip, xfail, mock around, or weaken "
+                            "the tests. Also repair any declared verification "
+                            "failures and preserve every inherited decision and "
+                            "invariant listed in the findings. Fix the product "
+                            "behavior or its runtime wiring, then rerun the focused "
+                            "integration tests and the declared verification command."
+                        ),
+                    },
+                )
             structural_findings = record.get("structrr_repair_findings", [])
             if structural_findings:
                 return CodingAgentRecoveryDecision(
@@ -2035,6 +2387,7 @@ class _TaskWorkflowExecutionStrategy:
             "changed_paths": final_attempt["changed_paths"],
             "validation": final_attempt["validation"],
             "structrr": final_attempt.get("structrr"),
+            "integration_tests": final_attempt.get("integration_tests"),
             "error": attempt_data.get("error"),
             "attempts": attempt_records,
             "continuations": len(attempt_records) - 1,

@@ -404,6 +404,13 @@ steps:
                 "passed": implementation_passes,
                 "changed_paths": implementation_paths if implementation_passes else [],
                 "structrr": {"passed": True},
+                "integration_tests": {
+                    "passed": True,
+                    "paths": ["tests/test_feature.py"],
+                    "baseline": {},
+                    "candidate": {},
+                    "repair_findings": [],
+                },
             }
         if command == "finish":
             return [{"command": "pytest", "status": "passed"}]
@@ -1582,6 +1589,13 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
                 "passed": True,
                 "changed_paths": ["hello.py"],
                 "structrr": {"passed": True},
+                "integration_tests": {
+                    "passed": True,
+                    "paths": ["tests/test_hello.py"],
+                    "baseline": {},
+                    "candidate": {},
+                    "repair_findings": [],
+                },
             }
         raise AssertionError(f"unexpected operation: {tool}")
 

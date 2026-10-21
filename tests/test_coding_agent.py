@@ -395,6 +395,12 @@ def test_minisweagent_provider_wraps_protected_runs_in_macos_sandbox(
     protected_checkout.mkdir()
     provider = MiniSWEAgentProvider(write_denied_paths=(protected_checkout,))
     monkeypatch.setattr("powdrr_lift.workrr.coding_agent.sys.platform", "darwin")
+    real_is_file = Path.is_file
+    monkeypatch.setattr(
+        Path,
+        "is_file",
+        lambda path: path == Path("/usr/bin/sandbox-exec") or real_is_file(path),
+    )
     captured: dict[str, object] = {}
 
     def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:

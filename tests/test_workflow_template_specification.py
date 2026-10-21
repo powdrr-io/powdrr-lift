@@ -328,34 +328,57 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     steps = process["steps"]
     assert "tool_calls" not in process["limits"]
     assert "llm_activations" not in process["limits"]
-    process_calls = [step["call"]["process"] for step in steps if "call" in step]
-    assert process_calls == [
-        "execute-proposed-pr",
-        "finish-pr-prep",
-        "create-pull-request",
-    ]
+    assert steps[0]["call"]["process"] == "execute-proposed-pr"
+    branch = steps[1]["branch"]
+    assert branch["subject"] == "implementation_result.passed"
+    assert branch["cases"][True][0]["call"]["process"] == "finish-implementation-pr"
+    failure_steps = branch["cases"][False]
+    assert failure_steps[0]["judge"]["output"]["schema"]["properties"][
+        "classification"
+    ]["enum"] == ["plan_defect", "implementation_defect", "unclear"]
+    assert (
+        failure_steps[1]["branch"]["cases"]["plan_defect"][0]["call"]["process"]
+        == "amend-plan-and-open-pr"
+    )
     catalog = ProcessCatalog.load(
         Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    )
+    process_calls = (
+        "execute-proposed-pr",
+        "finish-implementation-pr",
+        "amend-plan-and-open-pr",
+        "finish-pr-prep",
+        "create-pull-request",
     )
     for process_name in process_calls:
         limits = catalog.get(process_name).document.get("limits", {})
         assert "tool_calls" not in limits
         assert "llm_activations" not in limits
     assert steps[0]["call"]["outputs"] == {"implementation_result": "coding_attempt"}
-    assert steps[1]["gate"]["subject"] == "implementation_result.passed"
-    assert steps[2]["gate"]["subject"] == "implementation_result.structrr.passed"
+    implementation_process = catalog.get("finish-implementation-pr").document
+    implementation_steps = implementation_process["steps"]
     assert (
-        steps[3]["gate"]["subject"] == "implementation_result.integration_tests.passed"
+        implementation_steps[0]["gate"]["subject"]
+        == "implementation_result.structrr.passed"
     )
-    assert steps[4]["judge"]["output"]["name"] == "publication_scope"
-    assert "files_to_publish" not in steps[4]["judge"]["output"]["schema"]["required"]
-    assert steps[5]["call"]["inputs"]["files_to_publish"] == {
+    assert (
+        implementation_steps[1]["gate"]["subject"]
+        == "implementation_result.integration_tests.passed"
+    )
+    assert implementation_steps[2]["judge"]["output"]["name"] == "publication_scope"
+    assert (
+        "files_to_publish"
+        not in implementation_steps[2]["judge"]["output"]["schema"]["required"]
+    )
+    assert implementation_steps[3]["call"]["inputs"]["files_to_publish"] == {
         "type": "reference",
         "value": "implementation_result.changed_paths",
     }
-    assert steps[5]["call"]["outputs"] == {"validation_results": "validation_results"}
-    assert steps[6]["judge"]["output"]["name"] == "pull_request_request"
-    title_judge = steps[6]["judge"]
+    assert implementation_steps[3]["call"]["outputs"] == {
+        "validation_results": "validation_results"
+    }
+    assert implementation_steps[4]["judge"]["output"]["name"] == "pull_request_request"
+    title_judge = implementation_steps[4]["judge"]
     assert any(
         "task_context.proposed_pr_context.title" in instruction
         and "Prefer the reviewed item title verbatim" in instruction
@@ -371,12 +394,18 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
         ]["maxLength"]
         == 100
     )
-    assert steps[7]["call"]["inputs"]["files_to_publish"] == {
+    assert implementation_steps[5]["call"]["inputs"]["files_to_publish"] == {
         "type": "reference",
         "value": "implementation_result.changed_paths",
     }
-    assert steps[7]["call"]["outputs"] == {"pull_request_url": "pull_request_url"}
+    assert implementation_steps[5]["call"]["outputs"] == {
+        "pull_request_url": "pull_request_url"
+    }
     assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
+    amendment_process = catalog.get("amend-plan-and-open-pr").document
+    amendment_call = amendment_process["steps"][0]["operation"]["parameters"]
+    assert amendment_call["parameters"]["mode"] == "plan-amendment"
+    assert amendment_process["steps"][1]["gate"]["subject"] == "amendment_result.passed"
 
 
 def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files() -> (

@@ -55,6 +55,7 @@ from powdrr_lift.workrr.task_agent import (
     _handle_exhausted_timeout,
     _implementation_paths_against_base,
     _issue_worker_implementation_request,
+    _issue_worker_plan_amendment_paths,
     _issue_worker_structrr_context,
     _list_worktree_files,
     _open_final_workflow_pull_request,
@@ -62,6 +63,7 @@ from powdrr_lift.workrr.task_agent import (
     _read_task_document,
     _select_ready_workflow_git_state,
     _TaskProcedrrOperations,
+    _validate_issue_worker_plan_amendment,
     _validate_workflow_task_state,
     _workflow_file_command_error,
     run_workflow_task,
@@ -170,6 +172,122 @@ def test_issue_worker_rejects_traversing_allowed_paths() -> None:
             workflow_id="feature-v1-pr-01",
             base_commit="a" * 40,
         )
+
+
+def test_plan_amendment_artifacts_validate_without_touching_other_items(
+    tmp_path: Path,
+) -> None:
+    plan_path = tmp_path / "docs/plans/feature-v1-execution-plan.yaml"
+    plan_path.parent.mkdir(parents=True)
+    plan_path.write_text(
+        """\
+schema: https://powdrr.io/schemas/github-issue-execution-plan-v1
+plan_id: feature-v1
+source_document: docs/plans/feature.md
+items:
+  - id: first
+    title: First implementation
+    objective: Add the first feature.
+    scope: [Add the first feature.]
+    allowed_paths: [src/]
+    implementation_steps: [Implement the first feature.]
+    acceptance_criteria: [The first feature works.]
+    dependencies: []
+    workflow_file: docs/workflows/feature-v1/feature-v1-first.yaml
+    workflow_id: feature-v1-first
+  - id: second
+    title: Second implementation
+    objective: Add the second feature.
+    scope: [Add the second feature.]
+    allowed_paths: [src/]
+    implementation_steps: [Implement the second feature.]
+    acceptance_criteria: [The second feature works.]
+    dependencies: [first]
+    workflow_file: docs/workflows/feature-v1/feature-v1-second.yaml
+    workflow_id: feature-v1-second
+""",
+        encoding="utf-8",
+    )
+    proposal_path = tmp_path / "docs/plans/feature-v1-structrr-proposal.json"
+    proposal = compile_multi_pr_proposal(
+        plan_id="feature-v1",
+        baseline_snapshot={
+            "entities": [],
+            "entity_relationships": [],
+            "source_subjects": [],
+        },
+        items=[
+            {"id": "first", "allowed_paths": ["src/"]},
+            {"id": "second", "allowed_paths": ["src/"]},
+        ],
+        proposed_operations=[],
+        source_ref="docs/plans/feature.md",
+    )
+    write_multi_pr_proposal(proposal_path, proposal)
+    workflows = tmp_path / "docs/workflows/feature-v1"
+    workflows.mkdir(parents=True)
+    first_workflow = workflows / "feature-v1-first.yaml"
+    first_workflow.write_text(
+        """\
+schema: https://powdrr.io/schemas/plan-workflow-instance-v2
+workflow_id: feature-v1-first
+process_id: execute-proposed-pr-workflow
+dependencies: []
+inputs:
+  work_item_name: feature-v1
+  proposed_pr_id: feature-v1-first
+  feature_description: Add the first feature.
+  proposed_pr_context:
+    plan_id: feature-v1
+    item_id: first
+    title: First implementation
+    objective: Add the first feature.
+    scope: [Add the first feature.]
+    allowed_paths: [src/]
+    implementation_steps: [Implement the first feature.]
+    acceptance_criteria: [The first feature works.]
+    dependencies: []
+    verification_command: bash verify.sh
+    structrr_proposal_file: docs/plans/feature-v1-structrr-proposal.json
+    structrr_item_id: first
+    require_structrr_proposal: true
+""",
+        encoding="utf-8",
+    )
+    (workflows / "feature-v1-second.yaml").write_text(
+        "second workflow\n", encoding="utf-8"
+    )
+    proposed = {
+        "plan_id": "feature-v1",
+        "item_id": "first",
+        "structrr_proposal_file": "docs/plans/feature-v1-structrr-proposal.json",
+    }
+    workflow_id = "feature-v1-first"
+
+    paths = _issue_worker_plan_amendment_paths(
+        tmp_path, proposed, workflow_id=workflow_id
+    )
+    assert paths == (
+        "docs/plans/feature-v1-execution-plan.yaml",
+        "docs/plans/feature-v1-structrr-proposal.json",
+        "docs/workflows/feature-v1/feature-v1-first.yaml",
+    )
+    baselines = {path: (tmp_path / path).read_text(encoding="utf-8") for path in paths}
+    assert (
+        _validate_issue_worker_plan_amendment(
+            tmp_path, proposed, workflow_id=workflow_id, baselines=baselines
+        )
+        == ()
+    )
+
+    changed_plan = baselines[paths[0]].replace(
+        "title: Second implementation", "title: Changed unrelated item"
+    )
+    (tmp_path / paths[0]).write_text(changed_plan, encoding="utf-8")
+    findings = _validate_issue_worker_plan_amendment(
+        tmp_path, proposed, workflow_id=workflow_id, baselines=baselines
+    )
+    assert "plan amendment changed unrelated plan items" in findings
 
 
 def test_issue_worker_rebases_structrr_item_onto_unrelated_latest_changes(
@@ -589,9 +707,11 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     assert provider_timeouts == [1800.0]
 
 
+@pytest.mark.parametrize("plan_amendment", [False, True])
 def test_clean_pr_publish_result_is_recorded_like_pr_create(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    plan_amendment: bool,
 ) -> None:
     workflow = _workflow(tmp_path)
     task = replace(
@@ -629,7 +749,7 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
         stdout=io.StringIO(),
         stderr=io.StringIO(),
         action_engine=cast(Any, None),
-        events=[],
+        events=[{"kind": "plan_amendment_agent"}] if plan_amendment else [],
         repair_fallback_client=None,
         repair_fallback_model=None,
         runtime=cast(Any, RuntimeStub()),
@@ -653,7 +773,9 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
     assert recorded[0]["command"] == ["gh", "pr", "create"]
     assert strategy.events[-1]["result"] == url
     assert published_parameters[0]["publication_branch"] == (
-        "powdrr/feature-v1-pr-01-implementation"
+        "powdrr/feature-v1-pr-01-plan-amendment"
+        if plan_amendment
+        else "powdrr/feature-v1-pr-01-implementation"
     )
 
 

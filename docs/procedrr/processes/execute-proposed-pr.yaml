@@ -49,16 +49,4 @@ steps:
         tool: coding-agent
         parameters: {}
       bind: coding_attempt
-  - gate:
-      subject: coding_attempt.passed
-      equals: true
-      on_failure: {terminal: failed}
-  - gate:
-      subject: coding_attempt.structrr.passed
-      equals: true
-      on_failure: {terminal: failed}
-  - gate:
-      subject: coding_attempt.integration_tests.passed
-      equals: true
-      on_failure: {terminal: failed}
   - terminal: succeeded

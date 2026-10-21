@@ -1,0 +1,75 @@
+version: 1
+name: amend-plan-and-open-pr
+inputs:
+  - {name: task_context, type: object, required: true}
+  - {name: implementation_result, type: object, required: true}
+  - {name: failure_review, type: object, required: true}
+outputs:
+  pull_request_url:
+    type: string
+    minLength: 1
+    pattern: ^https?://[^ ]+/pull/[0-9]+$
+steps:
+  - operation:
+      tool: invoke_tool
+      parameters:
+        tool: coding-agent
+        parameters:
+          mode: plan-amendment
+          task_context: {type: reference, value: task_context}
+          implementation_result: {type: reference, value: implementation_result}
+          failure_review: {type: reference, value: failure_review}
+      bind: amendment_result
+  - gate:
+      subject: amendment_result.passed
+      equals: true
+      on_failure: {terminal: failed}
+  - call:
+      process: finish-pr-prep
+      inputs:
+        files_to_publish: {type: reference, value: amendment_result.changed_paths}
+        language_labels: [yaml, json]
+      outputs:
+        validation_results: validation_results
+  - judge:
+      kind: construct_one
+      question: What review request describes this plan amendment?
+      subject: amendment_result
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - Ground the amendment in failure_review.evidence and the files changed by amendment_result.
+        - Explain the defect, the exact correction, its effect on the affected plan item, and the validation performed.
+        - State that this is a plan amendment PR linked to the original plan and the affected proposed PR issue.
+        - Preserve the existing plan ID, item ID, workflow ID, and dependency graph unless the evidence proves one of those fields itself is defective.
+        - "Set workflow_context.feature-name to a clear title beginning with `Correct plan:` and describing the affected item. Do not use IDs as the title."
+        - Set base-branch to main and publication-branch to powdrr/<proposed-pr-id>-plan-amendment.
+        - Provide a clear commit message and populated PR description. Do not claim any unrun check passed.
+      context: [task_context, implementation_result, failure_review, amendment_result, validation_results]
+      output:
+        name: amendment_pull_request_request
+        schema:
+          type: object
+          required: [user_request, workflow_context]
+          additionalProperties: false
+          properties:
+            user_request: {type: string, minLength: 1}
+            workflow_context:
+              type: object
+              required: [feature-name, commit-message, populated-pr-description, base-branch, publication-branch]
+              additionalProperties: true
+              properties:
+                feature-name: {type: string, minLength: 1, maxLength: 100}
+                commit-message: {type: string, minLength: 1}
+                populated-pr-description: {type: string, minLength: 1}
+                base-branch: {type: string, const: main}
+                publication-branch: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - call:
+      process: create-pull-request
+      inputs:
+        user_request: {type: reference, value: amendment_pull_request_request.user_request}
+        workflow_context: {type: reference, value: amendment_pull_request_request.workflow_context}
+        files_to_publish: {type: reference, value: amendment_result.changed_paths}
+      outputs:
+        pull_request_url: pull_request_url
+  - terminal: succeeded

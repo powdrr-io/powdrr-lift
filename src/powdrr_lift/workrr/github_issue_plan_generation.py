@@ -2377,6 +2377,9 @@ def write_execution_plan_artifacts(
                     "feature_description": item.objective,
                     "proposed_pr_context": {
                         "plan_id": plan.plan_id,
+                        "execution_plan_file": output_path.relative_to(
+                            repo_root
+                        ).as_posix(),
                         "item_id": item.item_id,
                         "title": item.title,
                         "objective": item.objective,

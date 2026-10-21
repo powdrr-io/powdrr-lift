@@ -1368,13 +1368,9 @@ def test_execute_proposed_pr_process_runs_coding_agent_before_completion() -> No
     )
     process = yaml.safe_load(process_path.read_text(encoding="utf-8"))
     coding_step = process["steps"][0]["operation"]["parameters"]
-    completion_gate = process["steps"][1]["gate"]
 
     assert coding_step["tool"] == "coding-agent"
-    assert completion_gate["subject"] == "coding_attempt.passed"
-    assert completion_gate["equals"] is True
-    assert process["steps"][2]["gate"]["subject"] == "coding_attempt.structrr.passed"
-    assert process["steps"][2]["gate"]["equals"] is True
+    assert len(process["steps"]) == 2
     assert process["steps"][-1] == {"terminal": "succeeded"}
 
 
@@ -1690,6 +1686,7 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
         "feature_description": "Deliver foundation from the plan.",
         "proposed_pr_context": {
             "plan_id": "proposal-v1",
+            "execution_plan_file": "docs/plans/proposal-v1-execution-plan.yaml",
             "item_id": "foundation",
             "title": "Implement foundation",
             "objective": "Deliver foundation from the plan.",

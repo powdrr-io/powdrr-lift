@@ -296,8 +296,12 @@ steps:
 
 @pytest.mark.parametrize("implementation_passes", [True, False])
 @pytest.mark.parametrize("pull_request_url_valid", [True, False])
+@pytest.mark.parametrize("plan_defect_detected", [True, False])
 def test_execute_proposed_pr_workflow_enforces_implementation_and_pr_calls(
-    tmp_path: Path, implementation_passes: bool, pull_request_url_valid: bool
+    tmp_path: Path,
+    implementation_passes: bool,
+    pull_request_url_valid: bool,
+    plan_defect_detected: bool,
 ) -> None:
     from procedrr import parse_and_validate
 
@@ -309,19 +313,23 @@ inputs: [{name: task_context, type: object, required: true}]
 outputs:
   coding_attempt:
     type: object
-    required: [passed, changed_paths]
+    required: [passed, changed_paths, structrr, integration_tests]
     properties:
       passed: {type: boolean}
       changed_paths: {type: array, items: {type: string}}
+      structrr:
+        type: object
+        required: [passed]
+        properties: {passed: {type: boolean}}
+      integration_tests:
+        type: object
+        required: [passed]
+        properties: {passed: {type: boolean}}
 steps:
   - operation:
       tool: internal
       parameters: {command: [implement]}
       bind: coding_attempt
-  - gate:
-      subject: coding_attempt.passed
-      equals: true
-      on_failure: {terminal: failed}
   - terminal: succeeded
 """,
         "finish-pr-prep": """\
@@ -363,6 +371,14 @@ steps:
     }
     for name, source in processes.items():
         (tmp_path / f"{name}.yaml").write_text(source, encoding="utf-8")
+    repository_processes = (
+        Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    )
+    for name in ("finish-implementation-pr", "amend-plan-and-open-pr"):
+        (tmp_path / f"{name}.yaml").write_text(
+            (repository_processes / f"{name}.yaml").read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
 
     class WorkflowLLM:
         def complete_json(
@@ -372,6 +388,24 @@ steps:
             if "Which repository validation labels" in question:
                 return {
                     "language_labels": ["python"],
+                }
+            if "Does the recorded failure demonstrate" in question:
+                return {
+                    "classification": (
+                        "plan_defect"
+                        if plan_defect_detected
+                        else "implementation_defect"
+                    ),
+                    "evidence": [
+                        "The accepted plan conflicts with a concrete repository fact."
+                        if plan_defect_detected
+                        else "The coding attempt did not pass validation."
+                    ],
+                    "explanation": (
+                        "The accepted plan cannot be implemented as written."
+                        if plan_defect_detected
+                        else "The available evidence does not show a plan defect."
+                    ),
                 }
             if "What populated pull-request request" in question:
                 return {
@@ -387,6 +421,17 @@ steps:
                         "publication-branch": "powdrr/pr-01-implementation",
                     },
                 }
+            if "What review request describes this plan amendment" in question:
+                return {
+                    "user_request": "Correct the reviewed plan item.",
+                    "workflow_context": {
+                        "feature-name": "Correct plan: verifier scope",
+                        "commit-message": "Correct reviewed plan scope",
+                        "populated-pr-description": "Corrects the plan scope.",
+                        "base-branch": "main",
+                        "publication-branch": "powdrr/pr-01-plan-amendment",
+                    },
+                }
             raise AssertionError(f"Unexpected judge question: {question}")
 
     calls: list[str] = []
@@ -396,6 +441,21 @@ steps:
     ]
 
     def execute(_tool: str, parameters: Mapping[str, Any]) -> Any:
+        if _tool == "invoke_tool" and parameters.get("tool") == "coding-agent":
+            calls.append("amend")
+            assert parameters["parameters"]["mode"] == "plan-amendment"
+            return {
+                "passed": True,
+                "changed_paths": [
+                    "docs/plans/feature-v1-execution-plan.yaml",
+                    "docs/plans/feature-v1-structrr-proposal.json",
+                    "docs/workflows/feature-v1/feature-v1-pr-01.yaml",
+                ],
+                "structrr": {"passed": True},
+                "integration_tests": {"passed": True},
+            }
+        if _tool == "invoke_tool":
+            parameters = parameters["parameters"]
         command = parameters["command"][0]
         calls.append(command)
         call_parameters.append(parameters)
@@ -422,7 +482,7 @@ steps:
             )
         raise AssertionError(f"Unexpected operation: {command}")
 
-    process_directory = Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    process_directory = repository_processes
     workflow = parse_and_validate(
         (process_directory / "execute-proposed-pr-workflow.yaml").read_text(
             encoding="utf-8"
@@ -430,11 +490,42 @@ steps:
     )
     evaluator = Evaluator(WorkflowLLM(), execute, process_directory=tmp_path)
     if not implementation_passes:
-        with pytest.raises(ValidationGateError):
-            evaluator.evaluate(
+        if plan_defect_detected:
+            if not pull_request_url_valid:
+                with pytest.raises(EvaluationError):
+                    evaluator.evaluate(
+                        workflow,
+                        {"task_context": {"objective": "Implement a feature"}},
+                    )
+                assert calls == ["implement", "amend", "finish", "publish"]
+                return
+            result = evaluator.evaluate(
                 workflow, {"task_context": {"objective": "Implement a feature"}}
             )
+            process_calls = [
+                event.data["name"] for event in result.events if event.kind == "process"
+            ]
+            assert process_calls == [
+                "execute-proposed-pr",
+                "finish-pr-prep",
+                "create-pull-request",
+                "amend-plan-and-open-pr",
+            ]
+            assert calls == ["implement", "amend", "finish", "publish"]
+            assert result.bindings["pull_request_url"] == (
+                "https://github.com/example/repo/pull/123"
+            )
+            assert call_parameters[-1]["files_to_publish"] == [
+                "docs/plans/feature-v1-execution-plan.yaml",
+                "docs/plans/feature-v1-structrr-proposal.json",
+                "docs/workflows/feature-v1/feature-v1-pr-01.yaml",
+            ]
+            return
+        failed = evaluator.evaluate(
+            workflow, {"task_context": {"objective": "Implement a feature"}}
+        )
         assert calls == ["implement"]
+        assert failed.events[-1].data["status"] == "failed"
         return
 
     if not pull_request_url_valid:
@@ -455,6 +546,7 @@ steps:
         "execute-proposed-pr",
         "finish-pr-prep",
         "create-pull-request",
+        "finish-implementation-pr",
     ]
     assert calls == ["implement", "finish", "publish"]
     assert result.bindings["pull_request_url"] == (

@@ -36,7 +36,7 @@ _INTERACTION_PLAN_SCHEMA: dict[str, Any] = {
                     "condition": {"type": "string"},
                     "operation": {"type": "string"},
                     "expected": {"type": "string"},
-                    "evidence_quotes": {
+                    "evidence_quote_ids": {
                         "type": "array",
                         "items": {"type": "string"},
                     },
@@ -47,7 +47,7 @@ _INTERACTION_PLAN_SCHEMA: dict[str, Any] = {
                     "condition",
                     "operation",
                     "expected",
-                    "evidence_quotes",
+                    "evidence_quote_ids",
                 ],
                 "additionalProperties": False,
             },
@@ -76,6 +76,7 @@ def generate_probe_interaction_plan(
     compact_scenarios = [
         {key: item[key] for key in scenario_fields if key in item} for item in scenarios
     ]
+    evidence_candidates = _instruction_evidence_candidates(instruction)
     messages = [
         {
             "role": "system",
@@ -86,10 +87,13 @@ def generate_probe_interaction_plan(
                 "defines an operation, precedence rule, resolution rule, or "
                 "classification applied to them. Include only combinations that "
                 "are entailed by the instruction; do not enumerate arbitrary pairs "
-                "or invent behavior. Each interaction must cite at least two exact, "
-                "distinct instruction quotes and refer to at least two scenario "
-                "IDs. State a concrete condition, operation, and observable "
-                "expected result. For selection or classification behavior, make "
+                "or invent behavior. Each interaction must cite at least two "
+                "distinct instruction evidence candidates and refer to at least "
+                "two scenario IDs. State a concrete condition, operation, and "
+                "observable expected result. Choose at least two distinct "
+                "evidence_quote_ids "
+                "from the supplied exact instruction clauses; do not copy or "
+                "rewrite quote text. For selection or classification behavior, make "
                 "the result distinguish the included case from a relevant "
                 "excluded case. Return an empty interactions list when no "
                 "cross-requirement interaction is supported. Do not write code."
@@ -100,6 +104,7 @@ def generate_probe_interaction_plan(
             "content": json.dumps(
                 {
                     "instruction": instruction,
+                    "instruction_evidence_candidates": evidence_candidates,
                     "behavior_scenarios": compact_scenarios,
                 },
                 ensure_ascii=False,
@@ -112,6 +117,7 @@ def generate_probe_interaction_plan(
         messages,
         instruction=instruction,
         scenarios=scenarios,
+        evidence_candidates=evidence_candidates,
         phase="initial interaction plan",
     )
     review_messages = [
@@ -123,8 +129,9 @@ def generate_probe_interaction_plan(
                 "cross-requirement combination that the plan omitted, especially "
                 "where a special value is used with a grammar operation or where "
                 "a composed result controls a later classification. Add only "
-                "source-entailed interactions, with exact quotes from at least "
-                "two distinct instruction clauses and at least two scenario IDs. "
+                "source-entailed interactions, using at least two distinct "
+                "evidence_quote_ids from the supplied exact instruction clauses "
+                "and at least two scenario IDs. Do not copy or rewrite quote text. "
                 "Do not repeat an interaction already covered by the plan. Return "
                 "an empty interactions list if the plan is complete. Do not write "
                 "code or probes."
@@ -135,6 +142,7 @@ def generate_probe_interaction_plan(
             "content": json.dumps(
                 {
                     "instruction": instruction,
+                    "instruction_evidence_candidates": evidence_candidates,
                     "behavior_scenarios": compact_scenarios,
                     "proposed_interactions": planned,
                 },
@@ -148,6 +156,7 @@ def generate_probe_interaction_plan(
         review_messages,
         instruction=instruction,
         scenarios=scenarios,
+        evidence_candidates=evidence_candidates,
         phase="interaction-plan review",
     )
     by_id = {item["interaction_id"]: item for item in planned}
@@ -162,6 +171,7 @@ def _complete_valid_interaction_plan(
     *,
     instruction: str,
     scenarios: Sequence[Mapping[str, Any]],
+    evidence_candidates: Sequence[Mapping[str, str]],
     phase: str,
 ) -> tuple[dict[str, Any], ...]:
     """Repair one semantically invalid structured interaction response."""
@@ -175,11 +185,13 @@ def _complete_valid_interaction_plan(
             except (KeyError, json.JSONDecodeError):
                 repair_context = {
                     "instruction": instruction,
+                    "instruction_evidence_candidates": list(evidence_candidates),
                     "behavior_scenarios": [dict(item) for item in scenarios],
                 }
             if not isinstance(repair_context, Mapping):
                 repair_context = {
                     "instruction": instruction,
+                    "instruction_evidence_candidates": list(evidence_candidates),
                     "behavior_scenarios": [dict(item) for item in scenarios],
                 }
             repair_payload = {
@@ -196,9 +208,9 @@ def _complete_valid_interaction_plan(
                         "instruction and scenarios. Correct the reported validation "
                         "error. Return only source-entailed interactions; use an "
                         "empty list when none can satisfy the evidence requirements. "
-                        "Each interaction needs two distinct verbatim quotes from "
-                        "different instruction clauses and two distinct scenario "
-                        "IDs. Do not invent, paraphrase, or duplicate quotes."
+                        "Each interaction needs two distinct evidence_quote_ids "
+                        "from instruction_evidence_candidates and two distinct "
+                        "scenario IDs. Do not invent IDs or copy quote text."
                     ),
                 },
                 {
@@ -219,7 +231,10 @@ def _complete_valid_interaction_plan(
             if not isinstance(interactions, list):
                 raise ValueError(f"{phase} must contain an interactions array")
             return validate_probe_interaction_plan(
-                interactions, instruction=instruction, scenarios=scenarios
+                interactions,
+                instruction=instruction,
+                scenarios=scenarios,
+                evidence_candidates=evidence_candidates,
             )
         except ValueError as error:
             last_error = error
@@ -235,8 +250,13 @@ def validate_probe_interaction_plan(
     *,
     instruction: str,
     scenarios: Sequence[Mapping[str, Any]],
+    evidence_candidates: Sequence[Mapping[str, str]] | None = None,
 ) -> tuple[dict[str, Any], ...]:
-    """Check interaction references and require verbatim instruction evidence."""
+    """Check references and materialize model-selected exact instruction quotes."""
+    candidates = tuple(
+        evidence_candidates or _instruction_evidence_candidates(instruction)
+    )
+    candidate_quotes = {str(item["id"]): str(item["quote"]) for item in candidates}
     known_scenarios = {str(item["scenario_id"]) for item in scenarios}
     seen: set[str] = set()
     validated: list[dict[str, Any]] = []
@@ -266,24 +286,38 @@ def validate_probe_interaction_plan(
             )
         for key in ("condition", "operation", "expected"):
             _required_text(item, key)
-        quotes = item.get("evidence_quotes")
+        quote_ids = item.get("evidence_quote_ids")
         if (
-            not isinstance(quotes, list)
+            not isinstance(quote_ids, list)
             or any(
-                not isinstance(quote, str)
-                or not quote.strip()
-                or quote not in instruction
-                for quote in quotes
+                not isinstance(quote_id, str) or quote_id not in candidate_quotes
+                for quote_id in quote_ids
             )
-            or len(set(quotes)) < 2
+            or len(set(quote_ids)) < 2
         ):
             raise ValueError(
-                f"interaction {interaction_id!r} must cite two distinct exact "
-                "quotes from the instruction"
+                f"interaction {interaction_id!r} must cite two distinct "
+                "instruction evidence_quote_ids"
             )
+        item.pop("evidence_quote_ids")
+        item["evidence_quotes"] = [candidate_quotes[quote_id] for quote_id in quote_ids]
         seen.add(interaction_id)
         validated.append(item)
     return tuple(validated)
+
+
+def _instruction_evidence_candidates(instruction: str) -> list[dict[str, str]]:
+    """Split instruction text into exact, selectable evidence clauses."""
+    clauses = re.split(r"(?<=[.!?;])(?:[ \t]+|\n+)|\n+", instruction)
+    candidates: list[dict[str, str]] = []
+    seen: set[str] = set()
+    for clause in clauses:
+        quote = clause.strip()
+        if not quote or quote in seen:
+            continue
+        seen.add(quote)
+        candidates.append({"id": f"quote-{len(candidates) + 1:03d}", "quote": quote})
+    return candidates
 
 
 @dataclass(frozen=True, slots=True)

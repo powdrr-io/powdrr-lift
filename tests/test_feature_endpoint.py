@@ -447,7 +447,18 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
         ) -> dict[str, Any]:
             self.calls += 1
             if self.calls == 1:
-                return {"interactions": [interaction]}
+                return {
+                    "interactions": [
+                        {
+                            **{
+                                key: value
+                                for key, value in interaction.items()
+                                if key != "evidence_quotes"
+                            },
+                            "evidence_quote_ids": ["quote-001", "quote-002"],
+                        }
+                    ]
+                }
             assert "proposed_interactions" in messages[1]["content"]
             return {"interactions": []}
 

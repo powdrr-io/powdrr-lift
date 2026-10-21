@@ -845,6 +845,139 @@ def _bounded_candidate_diff(
     }
 
 
+def _build_execute_pr_coverage_plan(
+    quality_client: WorkflowLLMClient,
+    plan_context: Mapping[str, Any],
+    acceptance_criteria: Sequence[Any],
+) -> tuple[dict[str, Any], list[str]]:
+    """Generate coverage for every criterion, repairing one invalid response."""
+    coverage_schema: dict[str, Any] = {
+        "type": "object",
+        "properties": {
+            "criteria": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "criterion_id": {"type": "string"},
+                        "criterion": {"type": "string"},
+                        "partitions": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "partition_id": {"type": "string"},
+                                    "behavior_class": {"type": "string"},
+                                    "case_strategy": {"type": "string"},
+                                    "minimum_case_count": {
+                                        "type": "integer",
+                                        "minimum": 1,
+                                    },
+                                    "observable_oracle": {"type": "string"},
+                                    "test_ids": {
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "items": {"type": "string"},
+                                    },
+                                },
+                                "required": [
+                                    "partition_id",
+                                    "behavior_class",
+                                    "case_strategy",
+                                    "minimum_case_count",
+                                    "observable_oracle",
+                                    "test_ids",
+                                ],
+                                "additionalProperties": False,
+                            },
+                        },
+                    },
+                    "required": ["criterion_id", "criterion", "partitions"],
+                    "additionalProperties": False,
+                },
+            }
+        },
+        "required": ["criteria"],
+        "additionalProperties": False,
+    }
+    system_prompt = "\n".join(
+        (
+            "Create the test coverage contract for a separate author.",
+            "Represent every supplied acceptance criterion, in input order,",
+            "using criterion IDs AC-01, AC-02, and so on. Find defect-revealing",
+            "partitions for each criterion: normal, boundary, invalid,",
+            "interaction, or state when relevant. Do not force irrelevant",
+            "categories. Each partition needs a concrete or generated input",
+            "strategy, observable oracle, proposed pytest names, and minimum",
+            "runtime case count. For broad domains, require generated cases with",
+            "a meaningful range and enough examples to sample it. Do not claim",
+            "a handful exhausts a domain. Avoid a global case minimum. Do not",
+            "write tests. The criteria array must not be empty.",
+        )
+    )
+    initial_messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": json.dumps(plan_context, indent=2, sort_keys=True)},
+    ]
+    first_response = complete_json(
+        quality_client, initial_messages, response_schema=coverage_schema
+    )
+    try:
+        return validate_coverage_plan(first_response, acceptance_criteria), []
+    except ExecutePrTestError as first_error:
+        repair_messages = [
+            {
+                "role": "system",
+                "content": (
+                    system_prompt
+                    + " Repair the prior response using the validation error. "
+                    "Return a complete coverage plan for every acceptance criterion."
+                ),
+            },
+            {
+                "role": "user",
+                "content": json.dumps(
+                    {
+                        "reviewed_pr_contract": plan_context,
+                        "invalid_coverage_response": first_response,
+                        "validation_error": str(first_error),
+                    },
+                    indent=2,
+                    sort_keys=True,
+                ),
+            },
+        ]
+        repaired_response = complete_json(
+            quality_client, repair_messages, response_schema=coverage_schema
+        )
+        try:
+            return (
+                validate_coverage_plan(repaired_response, acceptance_criteria),
+                [str(first_error)],
+            )
+        except ExecutePrTestError as repair_error:
+            raise PowdrrExecutionError(
+                f"invalid test coverage contract after one repair: {repair_error}"
+            ) from repair_error
+
+
+def _normalize_execute_pr_coding_attempt(value: Any) -> dict[str, Any]:
+    """Give failed execute-PR attempts the status field consumed by the workflow."""
+    if isinstance(value, Mapping) and isinstance(value.get("passed"), bool):
+        return dict(value)
+    error = value.get("error") if isinstance(value, Mapping) else None
+    message = str(error) if error else "execute-PR process returned no pass status"
+    retryable = value.get("retryable") if isinstance(value, Mapping) else None
+    return {
+        "passed": False,
+        "changed_paths": [],
+        "error": message,
+        "retryable": retryable if isinstance(retryable, bool) else False,
+    }
+
+
 def _author_execute_pr_tests(
     repo_root: Path,
     *,
@@ -888,92 +1021,9 @@ def _author_execute_pr_tests(
             raise PowdrrExecutionError(
                 "execute-PR test coverage requires explicit acceptance criteria"
             )
-        coverage_schema: dict[str, Any] = {
-            "type": "object",
-            "properties": {
-                "criteria": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "criterion_id": {"type": "string"},
-                            "criterion": {"type": "string"},
-                            "partitions": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "partition_id": {"type": "string"},
-                                        "behavior_class": {"type": "string"},
-                                        "case_strategy": {"type": "string"},
-                                        "minimum_case_count": {
-                                            "type": "integer",
-                                            "minimum": 1,
-                                        },
-                                        "observable_oracle": {"type": "string"},
-                                        "test_ids": {
-                                            "type": "array",
-                                            "items": {"type": "string"},
-                                        },
-                                    },
-                                    "required": [
-                                        "partition_id",
-                                        "behavior_class",
-                                        "case_strategy",
-                                        "minimum_case_count",
-                                        "observable_oracle",
-                                        "test_ids",
-                                    ],
-                                    "additionalProperties": False,
-                                },
-                            },
-                        },
-                        "required": ["criterion_id", "criterion", "partitions"],
-                        "additionalProperties": False,
-                    },
-                }
-            },
-            "required": ["criteria"],
-            "additionalProperties": False,
-        }
-        coverage_plan = complete_json(
-            quality_client,
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        "\n".join(
-                            (
-                                "Create the test coverage contract for a",
-                                "separate author. Number criteria AC-01, AC-02,",
-                                "in input order. Find defect-revealing",
-                                "partitions for each criterion: normal,",
-                                "boundary, invalid, interaction, or state",
-                                "when relevant. Do not force irrelevant categories.",
-                                "Each partition needs a concrete or generated input",
-                                "strategy, observable oracle, proposed pytest names,",
-                                "and a minimum runtime case count. For broad",
-                                "domains, require generated cases with a",
-                                "meaningful range and enough examples to sample it.",
-                                "Do not claim a handful exhausts a domain.",
-                                "Avoid a global case minimum. Do not write tests.",
-                            )
-                        )
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(plan_context, indent=2, sort_keys=True),
-                },
-            ],
-            response_schema=coverage_schema,
+        coverage_plan, coverage_plan_repairs = _build_execute_pr_coverage_plan(
+            quality_client, plan_context, acceptance_criteria
         )
-        try:
-            coverage_plan = validate_coverage_plan(coverage_plan, acceptance_criteria)
-        except ExecutePrTestError as error:
-            raise PowdrrExecutionError(
-                f"invalid test coverage contract: {error}"
-            ) from error
         prompt = (
             "Write independent executable pytest integration or end-to-end tests "
             "for this reviewed PR before implementation starts. Inspect the "
@@ -1191,6 +1241,7 @@ def _author_execute_pr_tests(
             "test_sources": test_sources,
             "test_sha256": fingerprint_test_files(test_sources),
             "coverage_plan": coverage_plan,
+            "coverage_plan_repairs": coverage_plan_repairs,
             "coverage_references": coverage_references,
             "quality_review": quality_report,
             "baseline_result": baseline_report,
@@ -3410,9 +3461,14 @@ class _TaskProcedrrOperations:
                 f"nested process {process_id!r} ended with "
                 f"{result.terminal_status.value}"
             )
+        result_bindings = dict(result.bindings)
+        if process_id == "execute-proposed-pr":
+            result_bindings["coding_attempt"] = _normalize_execute_pr_coding_attempt(
+                result_bindings.get("coding_attempt")
+            )
         return {
             "process_id": process_id,
-            "bindings": dict(result.bindings),
+            "bindings": result_bindings,
             "terminal_status": result.terminal_status.value,
         }
 

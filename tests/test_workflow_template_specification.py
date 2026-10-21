@@ -318,13 +318,10 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
 def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     from procedrr import ProcessCatalog
 
-    process = (
-        ProcessCatalog.load(
-            Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
-        )
-        .get("execute-proposed-pr-workflow")
-        .document
+    catalog = ProcessCatalog.load(
+        Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
     )
+    process = catalog.get("execute-proposed-pr-workflow").document
     steps = process["steps"]
     assert "tool_calls" not in process["limits"]
     assert "llm_activations" not in process["limits"]
@@ -332,16 +329,18 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     branch = steps[1]["branch"]
     assert branch["subject"] == "implementation_result.passed"
     assert branch["cases"][True][0]["call"]["process"] == "finish-implementation-pr"
-    failure_steps = branch["cases"][False]
+    failure_steps = branch["default"]
+    execute_process = catalog.get("execute-proposed-pr").document
+    execute_output = execute_process["outputs"]["coding_attempt"]
+    assert "required" not in execute_output
+    assert execute_output["properties"]["error"] == {"type": ["string", "null"]}
+    assert execute_output["properties"]["retryable"] == {"type": "boolean"}
     assert failure_steps[0]["judge"]["output"]["schema"]["properties"][
         "classification"
     ]["enum"] == ["plan_defect", "implementation_defect", "unclear"]
     assert (
         failure_steps[1]["branch"]["cases"]["plan_defect"][0]["call"]["process"]
         == "amend-plan-and-open-pr"
-    )
-    catalog = ProcessCatalog.load(
-        Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
     )
     process_calls = (
         "execute-proposed-pr",

@@ -1,0 +1,183 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1071
+title: Route execute PR errors into plan review
+intent:
+  problem: A retryable execute-PR error can omit the passed field and stop the parent workflow before it classifies the failure.
+  goal: Repair one invalid coverage-plan response and route failed execute-PR results through the existing evidence-based recovery decision.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+    type: modified
+    span: {start_line: 30, end_line: 70}
+    summary: Send failed or unshaped attempts to evidence-based classification
+    rationale: Allow the workflow to choose a plan amendment only when evidence supports that classification.
+  - path: docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+    type: modified
+    span: {start_line: 31, end_line: 70}
+    summary: Route failed attempts to classification and plan amendment
+    rationale: Keep plan correction separate from implementation failure handling.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Allow failed coding attempts to omit success-only fields
+    rationale: Preserve an output for failures that happen before implementation checks run.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 11, end_line: 12}
+    summary: Declare error details on coding attempts
+    rationale: Keep retryable execution errors available to the parent process.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 24, end_line: 25}
+    summary: Make integration-test evidence optional on early failure
+    rationale: The test stage may not run when coverage-plan generation fails.
+  - path: docs/procedrr/processes/execute-proposed-pr.yaml
+    type: modified
+    span: {start_line: 36, end_line: 36}
+    summary: Remove the duplicate error declaration
+    rationale: Keep the child output contract unambiguous.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 848, end_line: 980}
+    summary: Repair one invalid generated test coverage contract and normalize failed attempts
+    rationale: Give coverage planning one bounded correction and ensure every failed attempt has the status consumed by the parent workflow.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1024, end_line: 1025}
+    summary: Use the bounded coverage-plan repair helper during test authoring
+    rationale: Apply the same validated, repairable contract path to execute-PR test generation.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 971, end_line: 976}
+    summary: Return errors with an explicit failed status
+    rationale: Let the parent branch inspect the failed attempt instead of failing on a missing binding.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 1244, end_line: 1244}
+    summary: Record whether the coverage-plan response needed repair
+    rationale: Keep the correction auditable with the integration-test authoring artifact.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 3464, end_line: 3468}
+    summary: Normalize nested execute-PR output before returning it to the parent
+    rationale: Convert missing or error-only coding results into an explicit failed attempt.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 3471, end_line: 3471}
+    summary: Return normalized nested process bindings
+    rationale: Ensure the parent workflow receives the normalized coding-attempt status.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 17, end_line: 17}
+    summary: Reuse the execute-PR error normalizer in workflow tests
+    rationale: Exercise the same result shape used by the task process adapter.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 301, end_line: 301}
+    summary: Add coverage for unshaped execution failures
+    rationale: Ensure an error-only result reaches a safe failure route.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 307, end_line: 307}
+    summary: Parameterize workflow behavior for error-only results
+    rationale: Verify both regular and unshaped outcomes.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 316, end_line: 316}
+    summary: Relax the test child output contract for failures
+    rationale: Model early errors before success-only artifacts are produced.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 322, end_line: 323}
+    summary: Declare error and retryability in the test contract
+    rationale: Mirror the execute-PR process output schema.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 399, end_line: 401}
+    summary: Classify error-only results as unclear
+    rationale: Prevent a contract error from being mistaken for proof of a plan defect.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 406, end_line: 411}
+    summary: Provide evidence specific to each failure class
+    rationale: Verify the classifier receives the observed error details.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 416, end_line: 418}
+    summary: Describe why an error-only result is inconclusive
+    rationale: Keep the failure explanation consistent with its unclear classification.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 476, end_line: 482}
+    summary: Return a normalized error-only attempt from the fake child
+    rationale: Exercise parent workflow routing with the normalized failure contract.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 512, end_line: 519}
+    summary: Assert that inconclusive errors stop before PR creation
+    rationale: Ensure a retryable contract error does not publish an implementation or amendment PR.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 61, end_line: 61}
+    summary: Import the shared failure normalizer for testing
+    rationale: Keep the unit test aligned with the implementation used by nested processes.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 117, end_line: 207}
+    summary: Cover coverage-plan repair and failed-result normalization
+    rationale: Check the one-repair bound and the status shape required by the parent workflow.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 321, end_line: 322}
+    summary: Load the process catalog for child and parent assertions
+    rationale: Validate both sides of the execute-PR contract.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 324, end_line: 324}
+    summary: Select the parent execute-PR workflow
+    rationale: Keep checks focused on the workflow that classifies failures.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 332, end_line: 337}
+    summary: Assert failed child attempts can return normalized errors
+    rationale: Protect the error fields and default failure route.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 343, end_line: 345}
+    summary: Reuse the loaded process catalog
+    rationale: Avoid redundant setup while checking the workflow contracts.
+entities:
+  - id: execute-pr-failure-recovery
+    type: Workflow
+    action: added
+  - id: execute-pr-coverage-plan-repair
+    type: Function
+    action: added
+  - id: execute-pr-failure-routing-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: execute-pr-failure-routes-to-review
+    type: triggers
+    source: execute-pr-failure-recovery
+    target: execute-pr-coverage-plan-repair
+    action: added
+    description: Invalid coverage plans receive one repair attempt, and errors that remain are returned in a shape the parent workflow can classify.
+  - id: execute-pr-failure-tests-cover-recovery
+    type: exercises
+    source: execute-pr-failure-routing-regression-tests
+    target: execute-pr-failure-recovery
+    action: added
+    description: Regression tests exercise retryable errors and confirm that only evidence-backed plan defects reach amendment publication.
+invariants:
+  - id: failed-execute-pr-results-have-explicit-status
+    description: Every nested execute-PR result consumed by the parent workflow contains a boolean passed field.
+    action: added
+  - id: coverage-plan-repair-is-bounded
+    description: An invalid generated test coverage plan receives at most one repair call before the attempt fails.
+    action: added
+guidance:
+  - id: classify-only-with-evidence
+    description: A normalized execution error is not itself proof of a plan defect; the parent workflow requires concrete evidence before opening a plan amendment PR.
+    action: added

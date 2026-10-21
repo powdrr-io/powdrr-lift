@@ -5,10 +5,11 @@ inputs:
 outputs:
   coding_attempt:
     type: object
-    required: [passed, changed_paths, structrr, integration_tests]
     properties:
       passed: {type: boolean}
       changed_paths: {type: array, items: {type: string}}
+      error: {type: [string, "null"]}
+      retryable: {type: boolean}
       structrr:
         type: object
         required: [passed]
@@ -21,8 +22,6 @@ outputs:
           repair_findings: {type: array}
       integration_tests:
         type: object
-        required:
-          [passed, generation_method, paths, test_sha256, authoring_attempts, baseline, candidate, repair_findings]
         properties:
           passed: {type: boolean}
           generation_method: {type: string}
@@ -33,7 +32,6 @@ outputs:
           candidate: {type: object}
           repair_findings: {type: array, items: {type: string}}
       validation: {type: object}
-      error: {type: [string, "null"]}
 description: >-
   Have MiniSWE author independent integration tests before coding and prove
   they fail by behavioral assertion on the untouched baseline. Implement one

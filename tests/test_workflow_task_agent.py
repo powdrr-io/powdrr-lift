@@ -58,6 +58,7 @@ from powdrr_lift.workrr.task_agent import (
     _issue_worker_plan_amendment_paths,
     _issue_worker_structrr_context,
     _list_worktree_files,
+    _normalize_execute_pr_coding_attempt,
     _open_final_workflow_pull_request,
     _publish_workflow_progress,
     _read_task_document,
@@ -111,6 +112,97 @@ def test_implementation_paths_include_committed_work_and_exclude_runtime_state(
         "src/implementation.py",
         "src/untracked.py",
     )
+
+
+def test_execute_pr_coverage_plan_repairs_empty_criteria_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses: list[dict[str, Any]] = [
+        {"criteria": []},
+        {
+            "criteria": [
+                {
+                    "criterion_id": "AC-01",
+                    "criterion": "The signature is accepted only for a trusted key.",
+                    "partitions": [
+                        {
+                            "partition_id": "P01",
+                            "behavior_class": "trusted-key acceptance",
+                            "case_strategy": (
+                                "verify a valid envelope against a registered key"
+                            ),
+                            "minimum_case_count": 1,
+                            "observable_oracle": "the verifier accepts the signature",
+                            "test_ids": ["test_accepts_registered_signing_key"],
+                        },
+                        {
+                            "partition_id": "P02",
+                            "behavior_class": "untrusted-key rejection",
+                            "case_strategy": (
+                                "verify an envelope signed by an unregistered key"
+                            ),
+                            "minimum_case_count": 1,
+                            "observable_oracle": (
+                                "the verifier returns the untrusted-key rejection code"
+                            ),
+                            "test_ids": ["test_rejects_unregistered_signing_key"],
+                        },
+                    ],
+                }
+            ]
+        },
+    ]
+    calls: list[list[dict[str, str]]] = []
+
+    def complete_json(
+        _client: Any,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        assert response_schema is not None
+        calls.append(messages)
+        return responses.pop(0)
+
+    monkeypatch.setattr(task_agent, "complete_json", complete_json)
+    acceptance_criteria = [
+        "The signature is accepted only for a trusted key.",
+    ]
+    plan, repairs = task_agent._build_execute_pr_coverage_plan(
+        cast(Any, object()),
+        {
+            "acceptance_criteria": acceptance_criteria,
+            "title": "Verify trusted signing keys",
+        },
+        acceptance_criteria,
+    )
+
+    assert len(calls) == 2
+    assert "Repair the prior response" in calls[1][0]["content"]
+    assert (
+        "coverage plan must represent every acceptance criterion"
+        in calls[1][1]["content"]
+    )
+    assert plan["criteria"][0]["criterion_id"] == "AC-01"
+    assert [item["partition_id"] for item in plan["criteria"][0]["partitions"]] == [
+        "P01",
+        "P02",
+    ]
+    assert repairs == [
+        "coverage plan must represent every acceptance criterion; "
+        "missing=['AC-01'], extra=[]"
+    ]
+
+
+def test_normalize_execute_pr_coding_attempt_marks_unshaped_error_failed() -> None:
+    assert _normalize_execute_pr_coding_attempt(
+        {"error": "coverage contract failed", "retryable": True}
+    ) == {
+        "passed": False,
+        "changed_paths": [],
+        "error": "coverage contract failed",
+        "retryable": True,
+    }
 
 
 def test_issue_worker_compiles_the_benchmark_implementation_request() -> None:

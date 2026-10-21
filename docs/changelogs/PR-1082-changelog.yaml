@@ -1,0 +1,37 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1082
+title: Match existing-file conflicts to the created path
+intent:
+  problem: The plan preflight treats an existing path mentioned later in a sentence as the file being created earlier in that sentence.
+  goal: Report a plan defect only when the creation instruction targets the existing path, allowing plans to reference existing files they reuse.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 817
+    end_line: 817
+  summary: Remove sentence-wide creation keyword matching.
+  rationale: Prevent an unrelated creation verb from qualifying a later path reference.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 825
+    end_line: 825
+  summary: Match creation evidence to the specific allowed path.
+  rationale: Avoid turning a path reference later in an implementation step into a false file-creation conflict.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 847
+    end_line: 866
+  summary: Recognize path-targeting creation phrases and stop at clause changes.
+  rationale: Preserve detection for real collisions while ignoring paths merely used by a newly created workflow.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 161
+    end_line: 202
+  summary: Cover reuse references alongside a different file creation.
+  rationale: Reproduce Gaterr PR-01 and prove the existing verifier reference does not block its CI workflow.

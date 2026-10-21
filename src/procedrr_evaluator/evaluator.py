@@ -933,46 +933,7 @@ class Evaluator:
                 judge["output"]["schema"]
             )
             return
-        context = judge.get("context", [])
-        if not isinstance(context, list):
-            raise EvaluationError(f"{path}.judge.context must be a list")
-        value_limit = _positive_limit(limits, "context_value_chars", 6000)
-        resolved_context = {name: _resolve_binding(state, name) for name in context}
-        context_data = {
-            name: _compact_value(value, max_chars=value_limit)
-            for name, value in resolved_context.items()
-        }
-        raw_binding_chars = {
-            name: len(_json_text(value)) for name, value in resolved_context.items()
-        }
-        compact_binding_chars = {
-            name: len(_json_text(value)) for name, value in context_data.items()
-        }
-        context_limit = _positive_limit(limits, "context_chars", 24000)
-        context_text = _bounded_context_text(
-            context_data,
-            context_limit,
-        )
-        instructions = _resolve_prompt_instructions(
-            judge.get("instructions", []),
-            judge.get("prompt_rules", []),
-            state,
-            path,
-        )
-        messages = [
-            {"role": "system", "content": str(judge["prompt_system"])},
-            {
-                "role": "user",
-                "content": (
-                    "Instructions:\n- "
-                    + "\n- ".join(instructions)
-                    + "\n\nQuestion:\n"
-                    + str(judge["question"])
-                    + "\n\nContext:\n"
-                    + context_text
-                ),
-            },
-        ]
+        messages, context_metrics = self._prepare_judge(judge, state, limits, path)
         usage["llm"] += 1
         self._limit(usage, limits, "llm_activations", "LLM activations")
         schema = judge["output"]["schema"]
@@ -1014,25 +975,141 @@ class Evaluator:
                 path,
                 {
                     "output": judge["output"]["name"],
-                    # Preserve the validated intermediate result so live
-                    # validation can inspect classification and contract
-                    # quality, rather than checking only final artifacts.
                     "value": output,
                     "replay_value": output,
                     "messages": messages,
-                    "context_metrics": {
-                        "raw_chars": sum(raw_binding_chars.values()),
-                        "compacted_chars": sum(compact_binding_chars.values()),
-                        "serialized_chars": len(context_text),
-                        "limit_chars": context_limit,
-                        "truncated": len(context_text) >= context_limit
-                        and not _context_fits(context_data, context_limit),
-                        "raw_binding_chars": raw_binding_chars,
-                        "compacted_binding_chars": compact_binding_chars,
-                    },
+                    "context_metrics": context_metrics,
                 },
             )
         )
+
+    def _prepare_judge(
+        self,
+        judge: Mapping[str, Any],
+        state: dict[str, Any],
+        limits: Mapping[str, Any],
+        path: str,
+    ) -> tuple[list[dict[str, str]], dict[str, Any]]:
+        context = judge.get("context", [])
+        if not isinstance(context, list):
+            raise EvaluationError(f"{path}.judge.context must be a list")
+        value_limit = _positive_limit(limits, "context_value_chars", 6000)
+        resolved_context = {name: _resolve_binding(state, name) for name in context}
+        context_data = {
+            name: _compact_value(value, max_chars=value_limit)
+            for name, value in resolved_context.items()
+        }
+        raw_binding_chars = {
+            name: len(_json_text(value)) for name, value in resolved_context.items()
+        }
+        compact_binding_chars = {
+            name: len(_json_text(value)) for name, value in context_data.items()
+        }
+        context_limit = _positive_limit(limits, "context_chars", 24000)
+        context_text = _bounded_context_text(
+            context_data,
+            context_limit,
+        )
+        instructions = _resolve_prompt_instructions(
+            judge.get("instructions", []),
+            judge.get("prompt_rules", []),
+            state,
+            path,
+        )
+        messages = [
+            {"role": "system", "content": str(judge["prompt_system"])},
+            {
+                "role": "user",
+                "content": (
+                    "Instructions:\n- "
+                    + "\n- ".join(instructions)
+                    + "\n\nQuestion:\n"
+                    + str(judge["question"])
+                    + "\n\nContext:\n"
+                    + context_text
+                ),
+            },
+        ]
+        return messages, {
+            "raw_chars": sum(raw_binding_chars.values()),
+            "compacted_chars": sum(compact_binding_chars.values()),
+            "serialized_chars": len(context_text),
+            "limit_chars": context_limit,
+            "truncated": len(context_text) >= context_limit
+            and not _context_fits(context_data, context_limit),
+            "raw_binding_chars": raw_binding_chars,
+            "compacted_binding_chars": compact_binding_chars,
+        }
+
+    def _judge_batch(
+        self,
+        judge: Mapping[str, Any],
+        item_states: list[tuple[dict[str, Any], str]],
+        events: list[EvaluationEvent],
+        usage: dict[str, int],
+        limits: Mapping[str, Any],
+    ) -> None:
+        schema = judge["output"]["schema"]
+        provider = str(judge.get("provider", ""))
+        client = self.judge_clients.get(provider, self.llm)
+        batch_complete = getattr(client, "complete_json_batch", None)
+        if not callable(batch_complete):
+            for state, path in item_states:
+                self._judge(judge, state, events, usage, limits, path)
+            return
+
+        pending: list[
+            tuple[dict[str, Any], str, list[dict[str, str]], dict[str, Any]]
+        ] = []
+        for state, path in item_states:
+            cached = self._replay_events.get(("judge", path))
+            if cached is not None:
+                output_name = cached.data.get("output")
+                output = cached.data.get("value")
+                if not isinstance(output_name, str):
+                    raise EvaluationError(f"{path}.judge checkpoint is malformed")
+                validate_json(output, schema)
+                state[output_name] = output
+                self._schemas_for_state(state)[output_name] = dict(schema)
+                continue
+            messages, metrics = self._prepare_judge(judge, state, limits, path)
+            pending.append((state, path, messages, metrics))
+        if not pending:
+            return
+        usage["llm"] += len(pending)
+        self._limit(usage, limits, "llm_activations", "LLM activations")
+        try:
+            outputs = batch_complete(
+                [(messages, schema) for _, _, messages, _ in pending]
+            )
+            if len(outputs) != len(pending):
+                raise EvaluationError("batch judge returned an unexpected result count")
+        except Exception as exc:
+            first_path = pending[0][1]
+            raise EvaluationError(
+                f"{first_path}.judge provider={provider or 'default'} batch "
+                f"failed with {type(exc).__name__}: {exc}"
+            ) from exc
+        for (state, path, messages, metrics), output in zip(
+            pending, outputs, strict=True
+        ):
+            validate_json(output, schema)
+            output_name = str(judge["output"]["name"])
+            state[output_name] = output
+            self._schemas_for_state(state)[output_name] = dict(schema)
+            events.append(
+                EvaluationEvent(
+                    "judge",
+                    path,
+                    {
+                        "output": output_name,
+                        "value": output,
+                        "replay_value": output,
+                        "messages": messages,
+                        "context_metrics": metrics,
+                    },
+                )
+            )
 
     def _loop(
         self,
@@ -1072,6 +1149,52 @@ class Evaluator:
         )
         collected: dict[str, Any] = {}
         collected_list: list[Any] = []
+        batch_provider = declaration.get("batch_provider")
+        if batch_provider is not None:
+            if (
+                kind != "for_each"
+                or not isinstance(batch_provider, str)
+                or len(body) != 1
+                or not isinstance(body[0], Mapping)
+                or set(body[0]) != {"judge"}
+                or not isinstance(body[0]["judge"], Mapping)
+                or body[0]["judge"].get("provider") != batch_provider
+            ):
+                raise EvaluationError(
+                    f"{path}.{kind}.batch_provider requires one judge-only body "
+                    "using the same provider"
+                )
+            binding = declaration.get("item_binding", declaration.get("item"))
+            if not isinstance(binding, str):
+                raise EvaluationError(f"{path}.{kind}.item_binding is required")
+            item_states: list[tuple[dict[str, Any], str]] = []
+            for index, item in enumerate(items):
+                item_state = dict(state)
+                item_state[binding] = item
+                item_states.append((item_state, f"{path}.{kind}[0][{index}][0]"))
+            self._judge_batch(body[0]["judge"], item_states, events, usage, limits)
+            if isinstance(collect, Mapping):
+                value_binding = collect.get("value")
+                for (item_state, _), item in zip(item_states, items, strict=True):
+                    output = (
+                        item_state.get(value_binding)
+                        if isinstance(value_binding, str)
+                        else item
+                    )
+                    if output is not None:
+                        if collect_mode == "list":
+                            key_name = collect.get("key", "item")
+                            collected_list.append(
+                                {str(key_name): item, "result": output}
+                            )
+                        else:
+                            collected[str(item)] = output
+                if isinstance(collect.get("binding"), str):
+                    state[collect["binding"]] = (
+                        collected_list if collect_mode == "list" else collected
+                    )
+            self._limit(usage, limits, "llm_activations", "LLM activations")
+            return
         max_parallel = declaration.get("max_parallel", 1)
         if (
             not isinstance(max_parallel, int)

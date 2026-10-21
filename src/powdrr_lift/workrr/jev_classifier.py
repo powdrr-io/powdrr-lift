@@ -8,6 +8,8 @@ import os
 import time
 import uuid
 from collections.abc import Mapping
+from concurrent.futures import Future
+from dataclasses import dataclass
 from typing import Any
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
@@ -20,6 +22,17 @@ JEV_MODEL = "jev-latest"
 JEV_DEFAULT_BASE_URL = "https://api.typesafe.ai/v1/systemone"
 SUBQ_MODEL = "subq-snap-preview"
 SUBQ_DEFAULT_BASE_URL = "https://api.subq.ai/v1/systemone"
+
+
+@dataclass(slots=True)
+class _PendingDecision:
+    result_index: int
+    request_id: str
+    request_data: Mapping[str, Any]
+    messages: list[dict[str, str]]
+    response_schema: Mapping[str, Any] | None
+    started_at: float
+    future: Future[dict[str, Any]]
 
 
 class _DecisionApiSemanticClassifierClient:
@@ -138,6 +151,138 @@ class _DecisionApiSemanticClassifierClient:
         )
         return result
 
+    def _execute_batch(self, batch: list[_PendingDecision]) -> None:
+        batch_id = uuid.uuid4().hex
+        endpoint_host = urlsplit(self._endpoint).hostname or "unknown"
+        started_at = min(item.started_at for item in batch)
+        response: Mapping[str, Any] | None = None
+        phase = "request"
+        try:
+            if len(batch) > 1:
+                LOGGER.warning(
+                    "%s_BATCH_REQUEST_STARTED batch_id=%s batch_size=%d "
+                    "endpoint_host=%s model=%s",
+                    self.provider,
+                    batch_id,
+                    len(batch),
+                    endpoint_host,
+                    self._model,
+                )
+            if len(batch) == 1:
+                item = batch[0]
+                single_response = self._call(
+                    item.request_data, self._api_key or "", self._endpoint
+                )
+                answer = single_response.get("answer", single_response)
+                response = {
+                    "answers": {item.request_id: answer},
+                    "model": single_response.get("model", self._model),
+                }
+            else:
+                response = self._call_batch(batch, self._api_key or "", self._endpoint)
+            phase = "response_mapping"
+            returned_model = response.get("model", self._model)
+            answers = response.get("answers")
+            if not isinstance(answers, Mapping):
+                raise ValueError("Decision API batch response has no answers object")
+            LOGGER.warning(
+                "%s_BATCH_RESPONSE_RECEIVED batch_id=%s batch_size=%d "
+                "endpoint_host=%s model=%s duration_ms=%d",
+                self.provider,
+                batch_id,
+                len(batch),
+                endpoint_host,
+                returned_model,
+                round((time.monotonic() - started_at) * 1000),
+            )
+            for item in batch:
+                item_started = item.started_at
+                try:
+                    answer = answers.get(item.request_id)
+                    if not isinstance(answer, Mapping):
+                        raise ValueError(
+                            "Decision API batch omitted this decision's answer"
+                        )
+                    result = _format_classifier_result(
+                        answer.get("choice"),
+                        item.request_data,
+                        item.response_schema,
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    self._log_batch_fallback(
+                        item,
+                        batch_id,
+                        endpoint_host,
+                        phase="response_mapping",
+                        error=exc,
+                        started_at=item_started,
+                    )
+                    self._complete_fallback(item)
+                    continue
+                LOGGER.warning(
+                    "%s_RESPONSE_RECEIVED request_id=%s batch_id=%s "
+                    "endpoint_host=%s model=%s duration_ms=%d",
+                    self.provider,
+                    item.request_id,
+                    batch_id,
+                    endpoint_host,
+                    returned_model,
+                    round((time.monotonic() - item_started) * 1000),
+                )
+                LOGGER.warning(
+                    "%s_RESULT_ACCEPTED request_id=%s batch_id=%s "
+                    "endpoint_host=%s model=%s duration_ms=%d",
+                    self.provider,
+                    item.request_id,
+                    batch_id,
+                    endpoint_host,
+                    returned_model,
+                    round((time.monotonic() - item_started) * 1000),
+                )
+                item.future.set_result(result)
+        except Exception as exc:  # noqa: BLE001
+            for item in batch:
+                self._log_batch_fallback(
+                    item,
+                    batch_id,
+                    endpoint_host,
+                    phase=phase,
+                    error=exc,
+                    started_at=item.started_at,
+                )
+                self._complete_fallback(item)
+
+    def _complete_fallback(self, item: _PendingDecision) -> None:
+        try:
+            result = self._fallback_or_false(item.messages, item.response_schema)
+        except Exception as exc:  # noqa: BLE001
+            item.future.set_exception(exc)
+        else:
+            item.future.set_result(result)
+
+    def _log_batch_fallback(
+        self,
+        item: _PendingDecision,
+        batch_id: str,
+        endpoint_host: str,
+        *,
+        phase: str,
+        error: Exception,
+        started_at: float,
+    ) -> None:
+        LOGGER.warning(
+            "%s_FALLBACK request_id=%s batch_id=%s endpoint_host=%s "
+            "phase=%s error_type=%s http_status=%s duration_ms=%d",
+            self.provider,
+            item.request_id,
+            batch_id,
+            endpoint_host,
+            phase,
+            type(error).__name__,
+            getattr(error, "code", "none"),
+            round((time.monotonic() - started_at) * 1000),
+        )
+
     def _fallback_or_false(
         self,
         messages: list[dict[str, str]],
@@ -154,6 +299,14 @@ class _DecisionApiSemanticClassifierClient:
 
     def _call(
         self, request_data: Mapping[str, Any], api_key: str, endpoint: str
+    ) -> Mapping[str, Any]:
+        raise NotImplementedError
+
+    def _call_batch(
+        self,
+        batch: list[_PendingDecision],
+        api_key: str,
+        endpoint: str,
     ) -> Mapping[str, Any]:
         raise NotImplementedError
 
@@ -189,10 +342,52 @@ class JevSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
             _model_env="SYSTEM_ONE_MODEL",
         )
 
+    def complete_json_batch(
+        self,
+        requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]],
+    ) -> list[dict[str, Any]]:
+        """Complete independent classifier requests in explicit JEV batches."""
+        results: list[dict[str, Any] | None] = [None] * len(requests)
+        pending: list[_PendingDecision] = []
+        for index, (messages, response_schema) in enumerate(requests):
+            request_id = uuid.uuid4().hex
+            request_data = _classifier_request(messages, response_schema)
+            if not self._api_key or request_data is None:
+                results[index] = _fallback(self._fallback, messages, response_schema)
+                continue
+            pending.append(
+                _PendingDecision(
+                    result_index=index,
+                    request_id=request_id,
+                    request_data=request_data,
+                    messages=messages,
+                    response_schema=response_schema,
+                    started_at=time.monotonic(),
+                    future=Future(),
+                )
+            )
+
+        for offset in range(0, len(pending), 8):
+            batch = pending[offset : offset + 8]
+            self._execute_batch(batch)
+            for item in batch:
+                results[item.result_index] = item.future.result()
+        if any(result is None for result in results):
+            raise RuntimeError("JEV batch did not produce every requested result")
+        return [result for result in results if result is not None]
+
     def _call(
         self, request_data: Mapping[str, Any], api_key: str, endpoint: str
     ) -> Mapping[str, Any]:
         return _call_jev(request_data, api_key, endpoint, self._model)
+
+    def _call_batch(
+        self,
+        batch: list[_PendingDecision],
+        api_key: str,
+        endpoint: str,
+    ) -> Mapping[str, Any]:
+        return _call_jev_batch(batch, api_key, endpoint, self._model)
 
 
 class SubQSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
@@ -467,6 +662,44 @@ def _call_jev(
     return _call_decision_api(classifier, api_key, endpoint, model)
 
 
+def _call_jev_batch(
+    batch: list[_PendingDecision],
+    api_key: str,
+    endpoint: str,
+    model: str = JEV_MODEL,
+) -> Mapping[str, Any]:
+    items = {item.request_id: item.request_data for item in batch}
+    state = {item_id: item_data["state"] for item_id, item_data in items.items()}
+    questions = {
+        item_id: _decision_question(item_data, item_id=item_id)
+        for item_id, item_data in items.items()
+    }
+    body = {
+        "model": model,
+        "state": {"items": state},
+        "questions": questions,
+    }
+    request = Request(
+        endpoint,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urlopen(request, timeout=10) as response:
+        result = json.loads(response.read().decode("utf-8"))
+    answers = result.get("answers")
+    if not isinstance(answers, Mapping):
+        raise ValueError("Decision API batch response has no answers object")
+    return {
+        "answers": answers,
+        "model": result.get("model", model),
+        "usage": result.get("usage"),
+    }
+
+
 def _call_subq(
     classifier: Mapping[str, Any], api_key: str, endpoint: str, model: str
 ) -> Mapping[str, Any]:
@@ -477,26 +710,10 @@ def _call_subq(
 def _call_decision_api(
     classifier: Mapping[str, Any], api_key: str, endpoint: str, model: str
 ) -> Mapping[str, Any]:
-    labels = classifier["allowed_values"]
-    instructions = classifier["instructions"]
     body = {
         "model": model,
         "state": classifier["state"],
-        "questions": {
-            "decision": {
-                "type": "choice",
-                "instructions": str(classifier["question"])
-                + "\n\n"
-                + "\n".join(f"- {item}" for item in instructions)
-                + "\nChoose unresolved if the proposition does not support a label.",
-                "criteria": {
-                    label: classifier.get("criteria", {}).get(label) for label in labels
-                }
-                | {
-                    "unresolved": "The proposition does not support a defensible label."
-                },
-            }
-        },
+        "questions": {"decision": _decision_question(classifier)},
     }
     request = Request(
         endpoint,
@@ -516,4 +733,27 @@ def _call_decision_api(
         "answer": answer,
         "model": result.get("model", model),
         "usage": result.get("usage"),
+    }
+
+
+def _decision_question(
+    classifier: Mapping[str, Any], *, item_id: str | None = None
+) -> dict[str, Any]:
+    labels = classifier["allowed_values"]
+    instructions = list(classifier["instructions"])
+    if item_id is not None:
+        instructions.insert(
+            0,
+            f"Evaluate only input item {item_id} in state.items.{item_id}.",
+        )
+    return {
+        "type": "choice",
+        "instructions": str(classifier["question"])
+        + "\n\n"
+        + "\n".join(f"- {item}" for item in instructions)
+        + "\nChoose unresolved if the proposition does not support a label.",
+        "criteria": {
+            label: classifier.get("criteria", {}).get(label) for label in labels
+        }
+        | {"unresolved": "The proposition does not support a defensible label."},
     }

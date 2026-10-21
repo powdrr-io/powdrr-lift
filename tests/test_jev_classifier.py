@@ -119,6 +119,44 @@ def test_jev_uses_valid_choice_regardless_of_confidence(monkeypatch: Any) -> Non
     assert fallback.calls == 0
 
 
+def test_jev_explicit_batch_maps_answers_back_to_each_input(monkeypatch: Any) -> None:
+    fallback = _Fallback()
+    batch_calls: list[list[str]] = []
+
+    def call_batch(
+        batch: list[Any], api_key: str, endpoint: str, model: str
+    ) -> dict[str, Any]:
+        assert (api_key, endpoint, model) == (
+            "key",
+            jev_classifier.JEV_DEFAULT_BASE_URL,
+            jev_classifier.JEV_MODEL,
+        )
+        batch_calls.append([item.request_id for item in batch])
+        return {
+            "answers": {
+                item.request_id: {"choice": item.request_data["allowed_values"][index]}
+                for index, item in enumerate(batch)
+            }
+        }
+
+    monkeypatch.setattr(jev_classifier, "_call_jev_batch", call_batch)
+    client = JevSemanticClassifierClient(fallback, api_key="key")
+    requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]] = [
+        (_messages("has_exception"), _decision_schema()),
+        (_messages("has_exception"), _decision_schema()),
+    ]
+
+    results = client.complete_json_batch(requests)
+
+    assert len(batch_calls) == 1
+    assert len(batch_calls[0]) == 2
+    assert results == [
+        {"status": "resolved", "value": "absent", "reason_code": None},
+        {"status": "resolved", "value": "present", "reason_code": None},
+    ]
+    assert fallback.calls == 0
+
+
 def test_subq_uses_typed_choice_and_maps_to_workflow_result(monkeypatch: Any) -> None:
     fallback = _Fallback()
     calls: list[tuple[str, str, str]] = []

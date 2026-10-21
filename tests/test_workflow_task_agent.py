@@ -468,6 +468,94 @@ def test_issue_worker_rebases_structrr_item_onto_unrelated_latest_changes(
     assert report["classification"] == "clean"
 
 
+def test_issue_worker_blocks_file_addition_overlap_before_structrr_bootstrap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Test User")
+    git("config", "user.email", "test@example.com")
+    existing_file = repo_root / "attestation/scripts/verify-all.sh"
+    existing_file.parent.mkdir(parents=True)
+    existing_file.write_text(
+        "#!/usr/bin/env bash\nset -euo pipefail\npytest attestation/tests\n",
+        encoding="utf-8",
+    )
+    git("add", "attestation/scripts/verify-all.sh")
+    git("commit", "-qm", "Add existing verifier")
+    base_commit = git("rev-parse", "HEAD")
+
+    proposal = compile_multi_pr_proposal(
+        plan_id="feature-v1",
+        baseline_snapshot={
+            "entities": [],
+            "entity_relationships": [],
+            "source_subjects": [],
+        },
+        items=[
+            {
+                "id": "feature",
+                "allowed_paths": ["attestation/scripts/verify-all.sh"],
+            }
+        ],
+        proposed_operations=[
+            {
+                "operation_id": "add-placeholder-verifier",
+                "item_id": "feature",
+                "section": "files",
+                "subject_id": "file:attestation/scripts/verify-all.sh",
+                "action": "added",
+                "content": {
+                    "path": "attestation/scripts/verify-all.sh",
+                    "content": "#!/usr/bin/env bash\necho placeholder\n",
+                },
+            }
+        ],
+        source_ref="docs/plans/feature.md",
+    )
+    write_multi_pr_proposal(
+        repo_root / "docs/plans/feature-v1-structrr-proposal.json", proposal
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "bootstrap_structrr",
+        lambda *_args, **_kwargs: pytest.fail(
+            "proposal overlap must be found before Structrr bootstrap"
+        ),
+    )
+
+    with pytest.raises(PowdrrExecutionError) as error:
+        _issue_worker_structrr_context(
+            repo_root,
+            {
+                "plan_id": "feature-v1",
+                "item_id": "feature",
+                "structrr_item_id": "feature",
+                "structrr_proposal_file": (
+                    "docs/plans/feature-v1-structrr-proposal.json"
+                ),
+                "require_structrr_proposal": True,
+            },
+            base_commit=base_commit,
+        )
+
+    message = str(error.value)
+    assert "before generating a test plan" in message
+    assert "verify-all.sh already exists with different content" in message
+
+
 def test_issue_worker_blocks_structrr_subject_changed_since_plan(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

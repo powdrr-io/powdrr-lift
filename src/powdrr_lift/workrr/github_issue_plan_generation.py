@@ -1846,6 +1846,13 @@ def generate_execution_plan_yaml(
     raw_items = response.get("items")
     if not isinstance(raw_items, list) or not raw_items:
         raise PlanGenerationError("planning response must contain at least one item")
+    try:
+        raw_items = split_mixed_runtime_items(raw_items)
+    except (KeyError, PlanSizingError, TypeError) as error:
+        raise PlanGenerationError(
+            "final planning response could not be split into runtime-homogeneous "
+            f"work: {error}"
+        ) from error
     if has_ci_configuration is False:
         raw_items = _ensure_ci_bootstrap(raw_items, verification_command)
     remaining_issues = _plan_item_refinement_issues(

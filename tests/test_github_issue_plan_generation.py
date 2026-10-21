@@ -327,6 +327,43 @@ def test_plan_generation_splits_mixed_runtime_response_before_refinement() -> No
     assert plan.items[3].dependencies == ("PR-03", "PR-03-swift")
 
 
+def test_final_planning_correction_is_split_before_validation() -> None:
+    unsplittable = _item("PR-03")
+    unsplittable["scope"] = [
+        "component: protocol",
+        "Implement the Python and Swift parser modules.",
+    ]
+    unsplittable["allowed_paths"] = [
+        "src/protocol/parser.py",
+        "Sources/Protocol/Parser.swift",
+    ]
+    unsplittable["implementation_steps"] = [
+        "Implement the Python parser module.",
+        "Add tests for the Python parser.",
+        "Implement the Swift parser module.",
+        "Add tests for the Swift parser.",
+    ]
+    corrected = dict(unsplittable)
+    corrected["scope"] = [
+        "component: protocol",
+        "Implement the Python parser.",
+        "Implement the Swift parser.",
+    ]
+    client = SequencedPlanningClient(
+        [{"items": [unsplittable]}] * 6 + [{"items": [corrected]}]
+    )
+
+    _, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement Python and Swift parsers.",
+        plan_id="final-runtime-split-v1",
+        client=client,
+        repository_ci_context="Recognized CI runs make test.",
+    )
+
+    assert [item.item_id for item in plan.items] == ["PR-03", "PR-03-swift"]
+    assert len(client.messages) == 7
+
+
 def test_plan_sizing_rejects_ambiguous_mixed_runtime_steps() -> None:
     mixed = {
         "id": "protocol",

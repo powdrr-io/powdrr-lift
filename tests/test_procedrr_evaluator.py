@@ -383,6 +383,7 @@ outputs:
       changed_paths: {type: array, items: {type: string}}
       error: {type: [string, "null"]}
       retryable: {type: boolean}
+      plan_defect_evidence: {type: array, items: {type: string}}
       structrr:
         type: object
         required: [passed]
@@ -456,6 +457,9 @@ steps:
                     "language_labels": ["python"],
                 }
             if "Does the recorded failure demonstrate" in question:
+                if plan_defect_detected and not unshaped_execution_error:
+                    assert "plan_defect_evidence" in question
+                    assert "attestation/scripts/verify-all.sh" in question
                 return {
                     "classification": (
                         "unclear"
@@ -545,6 +549,15 @@ steps:
             return {
                 "passed": implementation_passes,
                 "changed_paths": implementation_paths if implementation_passes else [],
+                "plan_defect_evidence": (
+                    [
+                        "The reviewed plan directs creating "
+                        "attestation/scripts/verify-all.sh, "
+                        "which already exists in the repository baseline."
+                    ]
+                    if plan_defect_detected
+                    else []
+                ),
                 "structrr": {"passed": True},
                 "integration_tests": {
                     "passed": True,

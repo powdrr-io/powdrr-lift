@@ -114,6 +114,50 @@ def test_implementation_paths_include_committed_work_and_exclude_runtime_state(
     )
 
 
+def test_reviewed_plan_creation_conflict_detects_existing_verifier(
+    tmp_path: Path,
+) -> None:
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-b", "main")
+    git("config", "user.name", "Test User")
+    git("config", "user.email", "test@example.invalid")
+    verifier = tmp_path / "attestation/scripts/verify-all.sh"
+    verifier.parent.mkdir(parents=True)
+    verifier.write_text("#!/usr/bin/env bash\nset -euo pipefail\necho real checks\n")
+    git("add", "attestation/scripts/verify-all.sh")
+    git("commit", "-m", "add existing verifier")
+    base_commit = git("rev-parse", "HEAD")
+
+    evidence = task_agent._preflight_reviewed_file_creation_conflicts(
+        tmp_path,
+        {
+            "allowed_paths": [
+                ".github/workflows/ci.yml",
+                "attestation/scripts/verify-all.sh",
+            ],
+            "implementation_steps": [
+                "Create attestation/scripts/verify-all.sh with an initial no-op check.",
+                "Add .github/workflows/ci.yml to run the verifier.",
+            ],
+        },
+        base_commit=base_commit,
+    )
+
+    assert len(evidence) == 1
+    assert "attestation/scripts/verify-all.sh" in evidence[0]
+    assert "already exists in base commit" in evidence[0]
+    assert "initial no-op check" in evidence[0]
+
+
 def test_execute_pr_coverage_plan_repairs_empty_criteria_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

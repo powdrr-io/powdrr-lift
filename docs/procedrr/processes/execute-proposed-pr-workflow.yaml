@@ -34,6 +34,7 @@ steps:
             subject: implementation_result
             prompt_system: Return only the declared JSON object.
             instructions:
+              - If implementation_result.plan_defect_evidence is non-empty, classify plan_defect and cite that concrete repository evidence.
               - Classify plan_defect only when concrete repository evidence or contradictory acceptance criteria show that the reviewed plan cannot be implemented as written.
               - Classify implementation_defect when the failure is caused by incomplete, incorrect, or insufficiently verified implementation work.
               - Use unclear when the evidence does not establish which is true; unclear must stop for human review.

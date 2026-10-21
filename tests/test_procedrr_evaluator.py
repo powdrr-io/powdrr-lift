@@ -14,6 +14,7 @@ import pytest
 
 from powdrr_lift.workrr.provider_config import DEEPINFRA_CHEAP_MODEL
 from powdrr_lift.workrr.procedrr import StructuredToolExecutor
+from powdrr_lift.workrr.task_agent import _normalize_execute_pr_coding_attempt
 from procedrr_evaluator import EvaluationError, Evaluator
 from procedrr_evaluator.evaluator import EvaluationEvent, ValidationGateError
 
@@ -297,11 +298,13 @@ steps:
 @pytest.mark.parametrize("implementation_passes", [True, False])
 @pytest.mark.parametrize("pull_request_url_valid", [True, False])
 @pytest.mark.parametrize("plan_defect_detected", [True, False])
+@pytest.mark.parametrize("unshaped_execution_error", [False, True])
 def test_execute_proposed_pr_workflow_enforces_implementation_and_pr_calls(
     tmp_path: Path,
     implementation_passes: bool,
     pull_request_url_valid: bool,
     plan_defect_detected: bool,
+    unshaped_execution_error: bool,
 ) -> None:
     from procedrr import parse_and_validate
 
@@ -313,10 +316,11 @@ inputs: [{name: task_context, type: object, required: true}]
 outputs:
   coding_attempt:
     type: object
-    required: [passed, changed_paths, structrr, integration_tests]
     properties:
       passed: {type: boolean}
       changed_paths: {type: array, items: {type: string}}
+      error: {type: [string, "null"]}
+      retryable: {type: boolean}
       structrr:
         type: object
         required: [passed]
@@ -392,17 +396,26 @@ steps:
             if "Does the recorded failure demonstrate" in question:
                 return {
                     "classification": (
-                        "plan_defect"
+                        "unclear"
+                        if unshaped_execution_error
+                        else "plan_defect"
                         if plan_defect_detected
                         else "implementation_defect"
                     ),
                     "evidence": [
-                        "The accepted plan conflicts with a concrete repository fact."
+                        "The child process returned a retryable contract error."
+                        if unshaped_execution_error
+                        else (
+                            "The accepted plan conflicts with a concrete "
+                            "repository fact."
+                        )
                         if plan_defect_detected
                         else "The coding attempt did not pass validation."
                     ],
                     "explanation": (
-                        "The accepted plan cannot be implemented as written."
+                        "The error does not establish whether the plan is defective."
+                        if unshaped_execution_error
+                        else "The accepted plan cannot be implemented as written."
                         if plan_defect_detected
                         else "The available evidence does not show a plan defect."
                     ),
@@ -460,6 +473,13 @@ steps:
         calls.append(command)
         call_parameters.append(parameters)
         if command == "implement":
+            if unshaped_execution_error:
+                return _normalize_execute_pr_coding_attempt(
+                    {
+                        "error": "invalid test coverage contract",
+                        "retryable": True,
+                    }
+                )
             return {
                 "passed": implementation_passes,
                 "changed_paths": implementation_paths if implementation_passes else [],
@@ -489,6 +509,14 @@ steps:
         )
     )
     evaluator = Evaluator(WorkflowLLM(), execute, process_directory=tmp_path)
+    if unshaped_execution_error:
+        failed = evaluator.evaluate(
+            workflow, {"task_context": {"objective": "Implement a feature"}}
+        )
+        assert calls == ["implement"]
+        assert failed.events[-1].data["status"] == "failed"
+        return
+
     if not implementation_passes:
         if plan_defect_detected:
             if not pull_request_url_valid:

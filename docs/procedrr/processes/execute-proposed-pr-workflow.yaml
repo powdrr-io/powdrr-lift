@@ -27,47 +27,45 @@ steps:
                 implementation_result: {type: reference, value: implementation_result}
               outputs:
                 pull_request_url: pull_request_url
-        false:
-          - judge:
-              kind: construct_one
-              question: Does the recorded failure demonstrate that the reviewed plan item is defective?
-              subject: implementation_result
-              prompt_system: Return only the declared JSON object.
-              instructions:
-                - Classify plan_defect only when concrete repository evidence or contradictory acceptance criteria show that the reviewed plan cannot be implemented as written.
-                - Classify implementation_defect when the failure is caused by incomplete, incorrect, or insufficiently verified implementation work.
-                - Use unclear when the evidence does not establish which is true; unclear must stop for human review.
-                - Cite the exact attempt, validation, baseline test, or Structrr finding that supports the classification. Never infer a plan defect only from a failed attempt.
-              context: [task_context, implementation_result]
-              output:
-                name: failure_review
-                schema:
-                  type: object
-                  required: [classification, evidence, explanation]
-                  additionalProperties: false
-                  properties:
-                    classification: {type: string, enum: [plan_defect, implementation_defect, unclear]}
-                    evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
-                    explanation: {type: string, minLength: 1}
-              validation: {kind: json_schema}
-          - branch:
-              subject: failure_review.classification
-              cases:
-                plan_defect:
-                  - call:
-                      process: amend-plan-and-open-pr
-                      inputs:
-                        task_context: {type: reference, value: task_context}
-                        implementation_result: {type: reference, value: implementation_result}
-                        failure_review: {type: reference, value: failure_review}
-                      outputs:
-                        pull_request_url: pull_request_url
-                implementation_defect:
-                  - terminal: failed
-                unclear:
-                  - terminal: failed
-              default:
-                - terminal: failed
       default:
-        - terminal: failed
+        - judge:
+            kind: construct_one
+            question: Does the recorded failure demonstrate that the reviewed plan item is defective?
+            subject: implementation_result
+            prompt_system: Return only the declared JSON object.
+            instructions:
+              - Classify plan_defect only when concrete repository evidence or contradictory acceptance criteria show that the reviewed plan cannot be implemented as written.
+              - Classify implementation_defect when the failure is caused by incomplete, incorrect, or insufficiently verified implementation work.
+              - Use unclear when the evidence does not establish which is true; unclear must stop for human review.
+              - Cite the exact attempt, validation, baseline test, or Structrr finding that supports the classification. Never infer a plan defect only from a failed attempt.
+            context: [task_context, implementation_result]
+            output:
+              name: failure_review
+              schema:
+                type: object
+                required: [classification, evidence, explanation]
+                additionalProperties: false
+                properties:
+                  classification: {type: string, enum: [plan_defect, implementation_defect, unclear]}
+                  evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                  explanation: {type: string, minLength: 1}
+            validation: {kind: json_schema}
+        - branch:
+            subject: failure_review.classification
+            cases:
+              plan_defect:
+                - call:
+                    process: amend-plan-and-open-pr
+                    inputs:
+                      task_context: {type: reference, value: task_context}
+                      implementation_result: {type: reference, value: implementation_result}
+                      failure_review: {type: reference, value: failure_review}
+                    outputs:
+                      pull_request_url: pull_request_url
+              implementation_defect:
+                - terminal: failed
+              unclear:
+                - terminal: failed
+            default:
+              - terminal: failed
   - terminal: succeeded

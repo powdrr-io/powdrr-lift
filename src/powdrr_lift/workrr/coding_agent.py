@@ -721,6 +721,7 @@ class MiniSWEAgentProvider:
     prompt_prefix: str = ""
     prompt_suffix: str = ""
     progress_callback: Callable[[str], None] | None = None
+    write_denied_paths: tuple[Path, ...] = ()
     session_trajectory: Path | None = field(default=None, init=False)
 
     def prepare_request(self, request: ImplementationRequest) -> ImplementationRequest:
@@ -859,6 +860,31 @@ class MiniSWEAgentProvider:
             last_reported_signature = signature
             last_reported_at = snapshot.elapsed_seconds
 
+        sandbox_profile: Path | None = None
+        if self.write_denied_paths:
+            if sys.platform != "darwin":
+                raise RuntimeError(
+                    "MiniSWE write protection is supported only on macOS; "
+                    "refusing to start the test author without an OS sandbox"
+                )
+            sandbox_executable = "/usr/bin/sandbox-exec"
+            if not Path(sandbox_executable).is_file():
+                raise RuntimeError(
+                    "macOS sandbox-exec is unavailable; refusing to start the "
+                    "test author without an OS sandbox"
+                )
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                prefix="powdrr-miniswe-sandbox-",
+                suffix=".sb",
+                delete=False,
+            ) as profile_stream:
+                profile_stream.write(
+                    _seatbelt_write_deny_profile(self.write_denied_paths)
+                )
+                sandbox_profile = Path(profile_stream.name)
+            command = [sandbox_executable, "-f", str(sandbox_profile), *command]
         try:
             completed = run_minisweagent(
                 command,
@@ -882,6 +908,8 @@ class MiniSWEAgentProvider:
         finally:
             if task_file is not None:
                 task_file.unlink(missing_ok=True)
+            if sandbox_profile is not None:
+                sandbox_profile.unlink(missing_ok=True)
         if output_path is not None and output_path.exists():
             self.session_trajectory = output_path
         if completed.returncode == 0 and self.diagnostics_root is not None:
@@ -900,6 +928,18 @@ class MiniSWEAgentProvider:
                     stderr,
                 )
         return completed
+
+
+def _seatbelt_write_deny_profile(paths: Sequence[Path]) -> str:
+    """Build a macOS profile that denies writes under protected paths."""
+    denied_paths = sorted({str(path.resolve()) for path in paths})
+    if not denied_paths:
+        raise ValueError("at least one protected path is required")
+    rules = ["(version 1)", "(allow default)"]
+    rules.extend(
+        f"(deny file-write* (subpath {json.dumps(path)}))" for path in denied_paths
+    )
+    return "\n".join(rules) + "\n"
 
 
 def _miniswe_builtin_config(executable: str) -> Path | None:

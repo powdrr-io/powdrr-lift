@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -1122,6 +1123,70 @@ def _normalize_execute_pr_coding_attempt(value: Any) -> dict[str, Any]:
     }
 
 
+def _execute_pr_test_author_prompt(
+    *,
+    authoring_worktree: Path,
+    plan_context: Mapping[str, Any],
+    coverage_plan: Mapping[str, Any],
+) -> str:
+    workspace_root = authoring_worktree.resolve()
+    return (
+        "Write independent executable pytest integration or end-to-end tests "
+        "for this reviewed PR before implementation starts. The exact, only "
+        "workspace for this attempt is:\n"
+        f"{workspace_root}\n"
+        "Before inspecting or editing anything, run `pwd` and "
+        "`git rev-parse --show-toplevel`. Both must identify this workspace. "
+        "If either command reports a different directory, stop without making "
+        "or staging any changes and report the observed paths. Do not use the "
+        "parent checkout or any path outside this workspace.\n\n"
+        "Inspect the untouched repository and its public entry points. Add only "
+        "new test files under `tests/` (or `test/` if that is the repository's "
+        "test root); do not edit implementation, existing tests, configuration, "
+        "or documentation. Use realistic setup and real application wiring. "
+        "Exercise public behavior at the narrowest end-to-end or integration "
+        "boundary that proves the acceptance criterion. Do not mock the entry "
+        "point or behavior under test. Do not use private implementation "
+        "details as the oracle. Every test must make a specific observable "
+        "assertion grounded in the supplied acceptance criteria. Avoid "
+        "tautologies, constant-only assertions, unconditional passes, skips, "
+        "and expected failures. Stage every new test file with `git add -f` "
+        "so ignored paths remain visible. Do not commit. Stop after creating "
+        "the tests.\n\n"
+        "The implementation is intentionally absent. Tests must execute "
+        "against the baseline and fail through a behavioral assertion, not "
+        "through syntax, import, collection, or environment errors.\n\n"
+        "Reviewed PR contract:\n"
+        f"{json.dumps(plan_context, indent=2, sort_keys=True)}\n"
+        "Coverage contract (link every partition using a source comment of the "
+        "form `# Covers: AC-01.P01 test_function_name` immediately above its "
+        "test):\n"
+        f"{json.dumps(coverage_plan, indent=2, sort_keys=True)}\n"
+    )
+
+
+def _execute_pr_test_author_write_denied_paths(repo_root: Path) -> tuple[Path, ...]:
+    """Protect both the task checkout and its primary checkout/git metadata."""
+    root = repo_root.resolve()
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        raise PowdrrExecutionError(
+            "could not identify the Git common directory to protect the test "
+            "author sandbox: " + result.stderr.strip()
+        )
+    common_dir = Path(result.stdout.strip())
+    if not common_dir.is_absolute():
+        common_dir = root / common_dir
+    common_dir = common_dir.resolve()
+    return tuple(sorted({root, common_dir, common_dir.parent}, key=str))
+
+
 def _author_execute_pr_tests(
     repo_root: Path,
     *,
@@ -1142,13 +1207,31 @@ def _author_execute_pr_tests(
         raise PowdrrExecutionError(
             f"integration-test worktree already exists: {authoring_worktree}"
         )
-    subprocess.run(
-        ["git", "worktree", "add", "--detach", str(authoring_worktree), base_commit],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--shared",
+                "--no-checkout",
+                str(repo_root),
+                str(authoring_worktree),
+            ],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "checkout", "--detach", base_commit],
+            cwd=authoring_worktree,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        shutil.rmtree(authoring_worktree, ignore_errors=True)
+        raise
     try:
         plan_context = {
             "title": proposed.get("title"),
@@ -1168,31 +1251,10 @@ def _author_execute_pr_tests(
         coverage_plan, coverage_plan_repairs = _build_execute_pr_coverage_plan(
             quality_client, plan_context, acceptance_criteria
         )
-        prompt = (
-            "Write independent executable pytest integration or end-to-end tests "
-            "for this reviewed PR before implementation starts. Inspect the "
-            "untouched repository and its public entry points. Add only new test "
-            "files under `tests/` (or `test/` if that is the repository's test "
-            "root); do not edit implementation, existing tests, configuration, "
-            "or documentation. Use realistic setup and real application wiring. "
-            "Exercise public behavior at the narrowest end-to-end or integration "
-            "boundary that proves the acceptance criterion. Do not mock the entry "
-            "point or behavior under test. Do not use private implementation "
-            "details as the oracle. Every test must make a specific observable "
-            "assertion grounded in the supplied acceptance criteria. Avoid "
-            "tautologies, constant-only assertions, unconditional passes, skips, "
-            "and expected failures. Stage every new test file with `git add -f` "
-            "so ignored paths remain visible. Do not commit. Stop after creating "
-            "the tests.\n\n"
-            "The implementation is intentionally absent. Tests must execute "
-            "against the baseline and fail through a behavioral assertion, not "
-            "through syntax, import, collection, or environment errors.\n\n"
-            "Reviewed PR contract:\n"
-            f"{json.dumps(plan_context, indent=2, sort_keys=True)}\n"
-            "Coverage contract (link every partition using a source comment of the "
-            "form `# Covers: AC-01.P01 test_function_name` immediately above its "
-            "test):\n"
-            f"{json.dumps(coverage_plan, indent=2, sort_keys=True)}\n"
+        prompt = _execute_pr_test_author_prompt(
+            authoring_worktree=authoring_worktree,
+            plan_context=plan_context,
+            coverage_plan=coverage_plan,
         )
         author_request = ImplementationRequest(
             request_id=f"{workflow_id}-integration-test-author",
@@ -1214,6 +1276,7 @@ def _author_execute_pr_tests(
             model=config.minisweagent_model,
             timeout_seconds=min(config.coding_agent_timeout_seconds, 600.0),
             diagnostics_root=test_root / "diagnostics",
+            write_denied_paths=_execute_pr_test_author_write_denied_paths(repo_root),
         )
         test_runner = CodingAgentRunner(
             provider=test_provider,
@@ -1401,13 +1464,7 @@ def _author_execute_pr_tests(
         )
         return test_sources, artifact
     finally:
-        subprocess.run(
-            ["git", "worktree", "remove", "--force", str(authoring_worktree)],
-            cwd=repo_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        shutil.rmtree(authoring_worktree, ignore_errors=True)
 
 
 def _select_workflow_instance(

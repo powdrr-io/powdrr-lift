@@ -1,0 +1,51 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1084
+title: Sandbox integration test author from the primary checkout
+intent:
+  problem: The pre-coding test author followed instructions into the caller's primary checkout and staged a generated test there.
+  goal: Enforce a filesystem write boundary around the test author and keep its baseline repository metadata isolated.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1168
+    end_line: 1228
+  summary: Create an independent baseline clone and protect the task checkout, primary checkout, and shared Git metadata from writes.
+  rationale: Prevent test-author changes from escaping into the caller's checkout or shared repository metadata.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1279
+    end_line: 1282
+  summary: Configure test-author MiniSWE runs with denied write paths.
+  rationale: Ensure the operating system refuses writes to the protected checkouts.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 713
+    end_line: 946
+  summary: Wrap protected MiniSWE runs in a macOS Seatbelt write-deny profile and fail closed when the sandbox is unavailable.
+  rationale: Make the test-author boundary enforceable by the operating system.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 390
+    end_line: 451
+  summary: Verify protected MiniSWE runs are wrapped with a profile that denies writes.
+  rationale: Catch regressions in sandbox command construction and cleanup.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 116
+  summary: Verify the prompt pins the workspace and write denials include the primary checkout and common Git directory.
+  rationale: Cover both agent guidance and protected paths derived from a linked worktree.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 55
+    end_line: 56
+  summary: Import test-author sandbox helpers for regression coverage.
+  rationale: Exercise protected path resolution directly without invoking an agent.

@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import tempfile
 import time
@@ -1164,6 +1165,28 @@ def _execute_pr_test_author_prompt(
     )
 
 
+def _execute_pr_test_author_write_denied_paths(repo_root: Path) -> tuple[Path, ...]:
+    """Protect both the task checkout and its primary checkout/git metadata."""
+    root = repo_root.resolve()
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode:
+        raise PowdrrExecutionError(
+            "could not identify the Git common directory to protect the test "
+            "author sandbox: " + result.stderr.strip()
+        )
+    common_dir = Path(result.stdout.strip())
+    if not common_dir.is_absolute():
+        common_dir = root / common_dir
+    common_dir = common_dir.resolve()
+    return tuple(sorted({root, common_dir, common_dir.parent}, key=str))
+
+
 def _author_execute_pr_tests(
     repo_root: Path,
     *,
@@ -1184,13 +1207,31 @@ def _author_execute_pr_tests(
         raise PowdrrExecutionError(
             f"integration-test worktree already exists: {authoring_worktree}"
         )
-    subprocess.run(
-        ["git", "worktree", "add", "--detach", str(authoring_worktree), base_commit],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        subprocess.run(
+            [
+                "git",
+                "clone",
+                "--shared",
+                "--no-checkout",
+                str(repo_root),
+                str(authoring_worktree),
+            ],
+            cwd=repo_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "checkout", "--detach", base_commit],
+            cwd=authoring_worktree,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        shutil.rmtree(authoring_worktree, ignore_errors=True)
+        raise
     try:
         plan_context = {
             "title": proposed.get("title"),
@@ -1235,6 +1276,7 @@ def _author_execute_pr_tests(
             model=config.minisweagent_model,
             timeout_seconds=min(config.coding_agent_timeout_seconds, 600.0),
             diagnostics_root=test_root / "diagnostics",
+            write_denied_paths=_execute_pr_test_author_write_denied_paths(repo_root),
         )
         test_runner = CodingAgentRunner(
             provider=test_provider,
@@ -1422,13 +1464,7 @@ def _author_execute_pr_tests(
         )
         return test_sources, artifact
     finally:
-        subprocess.run(
-            ["git", "worktree", "remove", "--force", str(authoring_worktree)],
-            cwd=repo_root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        shutil.rmtree(authoring_worktree, ignore_errors=True)
 
 
 def _select_workflow_instance(

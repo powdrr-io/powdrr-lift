@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from powdrr_lift.workrr.coding_agent import (
     MiniSWEAgentProvider,
     OpenCodePermissionPolicy,
     OpenCodeProvider,
+    _seatbelt_write_deny_profile,
     classify_coding_agent_attempt,
     run_coding_agent,
 )
@@ -383,6 +385,85 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
         "MiniSWE started.",
         "MiniSWE active (0m 10s elapsed; 2 model calls, 1 tool call).",
     ]
+
+
+def test_minisweagent_provider_wraps_protected_runs_in_macos_sandbox(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worktree = _git_repo(tmp_path)
+    protected_checkout = tmp_path / "primary-checkout"
+    protected_checkout.mkdir()
+    provider = MiniSWEAgentProvider(write_denied_paths=(protected_checkout,))
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.sys.platform", "darwin")
+    captured: dict[str, object] = {}
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        captured["command"] = command
+        profile = Path(command[2])
+        captured["profile"] = profile.read_text(encoding="utf-8")
+        captured["profile_path"] = profile
+        return subprocess.CompletedProcess(command, 0, "done\n", "")
+
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_minisweagent", fake_run)
+    provider.run(_request(_head(worktree)), worktree_root=worktree, attempt_id="safe")
+
+    command = captured["command"]
+    assert isinstance(command, list)
+    assert command[:2] == ["/usr/bin/sandbox-exec", "-f"]
+    assert command[3] == "mini"
+    profile = captured["profile"]
+    assert isinstance(profile, str)
+    assert f'(deny file-write* (subpath "{protected_checkout}"))' in profile
+    profile_path = captured["profile_path"]
+    assert isinstance(profile_path, Path)
+    assert not profile_path.exists()
+
+
+@pytest.mark.skipif(
+    sys.platform != "darwin" or not Path("/usr/bin/sandbox-exec").is_file(),
+    reason="macOS Seatbelt is unavailable",
+)
+def test_macos_seatbelt_profile_allows_workspace_and_blocks_primary_checkout(
+    tmp_path: Path,
+) -> None:
+    protected = tmp_path / "primary-checkout"
+    workspace = tmp_path / "authoring-workspace"
+    protected.mkdir()
+    workspace.mkdir()
+    profile = tmp_path / "write-deny.sb"
+    profile.write_text(_seatbelt_write_deny_profile((protected,)), encoding="utf-8")
+
+    allowed = subprocess.run(
+        [
+            "/usr/bin/sandbox-exec",
+            "-f",
+            str(profile),
+            "/usr/bin/touch",
+            str(workspace / "test.py"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if "sandbox_apply: Operation not permitted" in allowed.stderr:
+        pytest.skip("outer process sandbox does not permit nested Seatbelt profiles")
+    assert allowed.returncode == 0, allowed.stderr
+    assert (workspace / "test.py").is_file()
+
+    denied = subprocess.run(
+        [
+            "/usr/bin/sandbox-exec",
+            "-f",
+            str(profile),
+            "/usr/bin/touch",
+            str(protected / "escaped.py"),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert denied.returncode != 0
+    assert not (protected / "escaped.py").exists()
 
 
 def test_minisweagent_provider_reads_large_task_prompt_from_file(

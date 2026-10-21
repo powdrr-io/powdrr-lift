@@ -53,6 +53,7 @@ from powdrr_lift.workrr.task_agent import (
     _build_workflow_client,
     _durable_task_action_output_state,
     _execute_pr_test_author_prompt,
+    _execute_pr_test_author_write_denied_paths,
     _handle_exhausted_timeout,
     _implementation_paths_against_base,
     _issue_worker_implementation_request,
@@ -90,6 +91,43 @@ def test_execute_pr_test_author_prompt_pins_authoring_worktree(
     )
     assert "implementation is intentionally absent" in prompt
     assert "fail through a behavioral assertion" in prompt
+
+
+def test_execute_pr_test_author_write_denials_cover_primary_checkout(
+    tmp_path: Path,
+) -> None:
+    primary = tmp_path / "primary"
+    primary.mkdir()
+    subprocess.run(["git", "init", str(primary)], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(primary),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "initial",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    worker = tmp_path / "worker"
+    subprocess.run(
+        ["git", "-C", str(primary), "worktree", "add", "--detach", str(worker)],
+        check=True,
+        capture_output=True,
+    )
+
+    denied_paths = _execute_pr_test_author_write_denied_paths(worker)
+
+    assert worker.resolve() in denied_paths
+    assert primary.resolve() in denied_paths
+    assert (primary / ".git").resolve() in denied_paths
 
 
 def test_implementation_paths_include_committed_work_and_exclude_runtime_state(

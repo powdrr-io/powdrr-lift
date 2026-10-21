@@ -30,7 +30,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
 )
 from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_lift.workrr.multipr_structrr import compile_multi_pr_proposal
-from powdrr_lift.workrr.plan_sizing import size_plan_items
+from powdrr_lift.workrr.plan_sizing import PlanSizingError, size_plan_items
 
 
 @pytest.fixture(autouse=True)
@@ -217,6 +217,134 @@ def test_plan_sizing_keeps_incompatible_or_unrelated_items_separate() -> None:
         "first-component",
         "second-component",
     ]
+
+
+def test_plan_sizing_splits_mixed_runtime_items_before_optimizing() -> None:
+    mixed = {
+        "id": "PR-03",
+        "title": "Implement portable protocol parsers",
+        "objective": "Provide compatible parser implementations.",
+        "scope": [
+            "component: protocol",
+            "Implement the Python parser.",
+            "Implement the Swift parser.",
+        ],
+        "allowed_paths": [
+            "src/protocol/parser.py",
+            "Sources/Protocol/Parser.swift",
+        ],
+        "implementation_steps": [
+            "Implement the Python parser module.",
+            "Add tests for the Python parser.",
+            "Implement the Swift parser module.",
+            "Add tests for the Swift parser.",
+        ],
+        "acceptance_criteria": [
+            "The Python parser rejects duplicate keys.",
+            "The Swift parser rejects duplicate keys.",
+            "Both parsers reject unsupported fields.",
+        ],
+        "dependencies": ["PR-01"],
+    }
+    downstream = _item("PR-04", dependencies=["PR-03"])
+    downstream["scope"] = ["component: docs", "Document parser behavior"]
+    downstream["allowed_paths"] = ["docs/protocol.md"]
+    downstream["implementation_steps"] = ["Document parser configuration."]
+
+    sized = size_plan_items([mixed, downstream])
+
+    assert [item["id"] for item in sized] == ["PR-03", "PR-03-swift", "PR-04"]
+    assert [item["implementation_steps"] for item in sized[:2]] == [
+        [
+            "Implement the Python parser module.",
+            "Add tests for the Python parser.",
+        ],
+        [
+            "Implement the Swift parser module.",
+            "Add tests for the Swift parser.",
+        ],
+    ]
+    assert [item["dependencies"] for item in sized] == [
+        ["PR-01"],
+        ["PR-01"],
+        ["PR-03", "PR-03-swift"],
+    ]
+    assert all(len(_plan_item_refinement_issues([item])) == 0 for item in sized)
+
+
+def test_plan_generation_splits_mixed_runtime_response_before_refinement() -> None:
+    foundation = _item("PR-01")
+    foundation["scope"] = ["component: setup", "Establish shared protocol fixtures"]
+    foundation["allowed_paths"] = ["fixtures/protocol.json"]
+    foundation["implementation_steps"] = ["Add the shared protocol fixture."]
+    mixed = {
+        "id": "PR-03",
+        "title": "Implement portable protocol parsers",
+        "objective": "Provide compatible parser implementations.",
+        "scope": [
+            "component: protocol",
+            "Implement the Python parser.",
+            "Implement the Swift parser.",
+        ],
+        "allowed_paths": [
+            "src/protocol/parser.py",
+            "Sources/Protocol/Parser.swift",
+        ],
+        "implementation_steps": [
+            "Implement the Python parser module.",
+            "Add tests for the Python parser.",
+            "Implement the Swift parser module.",
+            "Add tests for the Swift parser.",
+        ],
+        "acceptance_criteria": [
+            "The Python parser rejects duplicate keys.",
+            "The Swift parser rejects duplicate keys.",
+        ],
+        "dependencies": ["PR-01"],
+    }
+    downstream = _item("PR-04", dependencies=["PR-03"])
+    downstream["scope"] = ["component: docs", "Document parser behavior"]
+    downstream["allowed_paths"] = ["docs/protocol.md"]
+    downstream["implementation_steps"] = ["Document parser configuration."]
+    client = FakePlanningClient({"items": [foundation, mixed, downstream]})
+
+    _rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement portable parsers and document them.",
+        plan_id="runtime-split-v1",
+        client=client,
+        verification_command="make test",
+        repository_ci_context="Recognized CI runs make test.",
+    )
+
+    assert client.messages is not None and len(client.messages) == 2
+    assert [item.item_id for item in plan.items] == [
+        "PR-01",
+        "PR-03",
+        "PR-03-swift",
+        "PR-04",
+    ]
+    assert plan.items[2].dependencies == ("PR-01",)
+    assert plan.items[3].dependencies == ("PR-03", "PR-03-swift")
+
+
+def test_plan_sizing_rejects_ambiguous_mixed_runtime_steps() -> None:
+    mixed = {
+        "id": "protocol",
+        "title": "Implement protocol parsers",
+        "objective": "Provide compatible parser implementations.",
+        "scope": [
+            "component: protocol",
+            "Implement the Python parser.",
+            "Implement the Swift parser.",
+        ],
+        "allowed_paths": ["src/protocol.py", "Sources/Protocol.swift"],
+        "implementation_steps": ["Implement the Python and Swift parser modules."],
+        "acceptance_criteria": ["Both parsers reject unsupported fields."],
+        "dependencies": [],
+    }
+
+    with pytest.raises(PlanSizingError, match="each implementation step"):
+        size_plan_items([mixed])
 
 
 def test_plan_sizing_never_merges_ci_bootstrap_with_product_work() -> None:

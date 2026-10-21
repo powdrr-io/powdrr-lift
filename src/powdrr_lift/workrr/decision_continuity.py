@@ -74,6 +74,8 @@ def review_inherited_decisions(
                     "ambiguous evidence is unknown. A contradiction is fail. "
                     "An existing decision remains binding unless the accepted "
                     "Structrr ledger explicitly records its amendment. "
+                    "Return an object with exactly these fields: outcome "
+                    "(pass, fail, or unknown) and explanation (a non-empty string). "
                     + phase_guidance
                 ),
             },
@@ -114,10 +116,15 @@ def review_inherited_decisions(
                 }
             )
             continue
-        outcome = result.get("outcome")
-        explanation = result.get("explanation")
+        # Some provider clients do not support response schemas and older
+        # prompts used verdict/reason. Accept that equivalent shape while
+        # keeping the normalized result and validation strict.
+        returned_decision_id = result.get("decision_id")
+        outcome = result.get("outcome", result.get("verdict"))
+        explanation = result.get("explanation", result.get("reason"))
         if (
-            outcome not in {"pass", "fail", "unknown"}
+            returned_decision_id not in {None, decision_id}
+            or outcome not in {"pass", "fail", "unknown"}
             or not isinstance(explanation, str)
             or not explanation.strip()
         ):

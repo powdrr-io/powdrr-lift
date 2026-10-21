@@ -127,9 +127,9 @@ from powdrr_lift.workrr.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     PostRunProbe,
     baseline_probe_failures,
+    instruction_evidence_candidates,
     parse_generated_postrun_probe_source,
     probe_failures,
-    resolve_probe_interaction_plan,
     run_postrun_probes,
 )
 from powdrr_lift.workrr.probe_repair import repair_behavior_probes
@@ -2896,10 +2896,6 @@ def _run_code_agent_phase(
                     scenarios=probe_scenarios,
                     instruction=feature_description,
                     repository_contract=implementation_packet.contract_closure or {},
-                    interaction_client=cast(
-                        WorkflowLLMClient | None,
-                        state.get("probe_generation_client"),
-                    ),
                 )
                 # MiniSWE may commit the authored probe suite. The coding
                 # request must then use that accepted commit as its base.
@@ -2950,6 +2946,11 @@ def _run_code_agent_phase(
                     base_commit = authoring_head
                     request = replace(request, base_commit=base_commit)
                 generation_error = str(error)
+                interaction_plan = {
+                    "status": "failed",
+                    "error": generation_error,
+                    "interactions": [],
+                }
                 probe_root = output_root / "postrun-probes"
                 probe_root.mkdir(parents=True, exist_ok=True)
                 interaction_plan_path = probe_root / "interaction-plan.json"
@@ -3180,25 +3181,17 @@ def _generate_miniswe_postrun_probes(
     scenarios: Sequence[Mapping[str, Any]],
     instruction: str,
     repository_contract: Mapping[str, Any],
-    interaction_client: WorkflowLLMClient | None = None,
 ) -> tuple[tuple[dict[str, Any], ...], tuple[PostRunProbe, ...]]:
     """Ask MiniSWE to author a frozen probe suite in the clean task worktree."""
     if not scenarios:
         return (), ()
-    interaction_plan = resolve_probe_interaction_plan(
-        interaction_client, instruction=instruction, scenarios=scenarios
-    )
-    interaction_obligations = interaction_plan.interactions
+    interaction_plan: dict[str, Any] = {
+        "status": "not_run",
+        "error": None,
+        "interactions": [],
+    }
     probe_output = output_root / "postrun-probes"
     probe_output.mkdir(parents=True, exist_ok=True)
-    interaction_plan_document = {
-        "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
-        **interaction_plan.to_data(),
-    }
-    (probe_output / "interaction-plan.json").write_text(
-        json.dumps(interaction_plan_document, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
     authoring_root = output_root / "miniswe-probe-authoring"
     authoring_root.mkdir(parents=True, exist_ok=True)
     probe_worktree = worktree
@@ -3218,6 +3211,9 @@ def _generate_miniswe_postrun_probes(
             {field: scenario[field] for field in scenario_fields if field in scenario}
             for scenario in scenarios
         ]
+        instruction_evidence_candidates_json = json.dumps(
+            instruction_evidence_candidates(instruction), indent=2, sort_keys=True
+        )
         probe_prompt = (
             "Classify the instruction into typed probe obligations and author "
             "executable post-coding behavior probes for those obligations. "
@@ -3225,18 +3221,20 @@ def _generate_miniswe_postrun_probes(
             "Do not implement the task or edit source/tests. Write exactly one "
             "file, `probe_suite.py`, in the current task checkout at "
             f"`{probe_worktree.resolve()}`. Stay in this checkout and do not "
-            "change directories. This must be the "
-            "Stage it with `git add -f probe_suite.py` so the workflow can "
-            "verify the authored artifact in repositories with ignore rules. "
-            "complete executable Python module: write normal Python imports and "
-            "function bodies directly. Do not return JSON, split imports from "
-            "function bodies, or ask Powdrr to assemble Python source. Define "
-            "only the module docstring, imports, and function definitions at "
-            "module scope. Do not put assignments, expressions, calls, control "
-            "flow, or other executable statements at module scope; put setup "
-            "inside a `test_probe_*` function. "
-            "zero-argument synchronous functions named `test_probe_*`. Put a JSON "
-            "object in the module docstring containing an `obligations` array. "
+            "change directories. Write a complete executable Python module and "
+            "stage it with `git add -f probe_suite.py` so the workflow can verify "
+            "the authored artifact in repositories with ignore rules. Use normal "
+            "Python imports and function bodies directly. Define three Python "
+            "literal values at "
+            "module scope: `OBLIGATIONS` (a list), `INTERACTIONS` (a list), and "
+            "`PROBE_METADATA` (a dictionary keyed by probe function name). "
+            "Powdrr reads these values from the syntax tree without executing "
+            "them. Do not encode metadata as JSON or in docstrings. Other than "
+            "those three assignments, allow only imports, an optional module "
+            "docstring, and function definitions at module scope. Put setup "
+            "inside a `test_probe_*` function. Define zero-argument synchronous "
+            "functions named `test_probe_*`. `OBLIGATIONS` is a list of "
+            "dictionaries. "
             "Each obligation has obligation_id, scenario_id, category, rule, "
             "supported, summary, condition, operation, expected, operands, "
             "evidence, and unresolved_reason. Use category values transformation, "
@@ -3247,9 +3245,10 @@ def _generate_miniswe_postrun_probes(
             "mapping_key, mapping_value, input, result, constraint, trigger, "
             "state, other. Split independently falsifiable rules. Include each "
             "scenario. Cite exact instruction or repository-contract substrings. "
-            "Mark unsupported behavior unresolved instead of guessing. Put a JSON "
-            "object in each function docstring with `probe_id`, `scenario_id`, "
-            "`obligation_id`, and `oracle_basis`. Each function must call the "
+            "Mark unsupported behavior unresolved instead of guessing. "
+            "`PROBE_METADATA` maps each function name to a dictionary with "
+            "`probe_id`, `scenario_id`, `obligation_id`, `oracle_basis`, and "
+            "optional `interaction_ids`. Each function must call the "
             "public software "
             "under test and assert an instruction-supported outcome. Prefer "
             "boundary, negative, and interaction cases that are not merely "
@@ -3268,14 +3267,15 @@ def _generate_miniswe_postrun_probes(
             "Baseline repository contract (use for API shapes and operand roles, "
             "not to invent normative behavior):\n"
             f"{json.dumps(repository_contract, indent=2, sort_keys=True)}\n\n"
-            "Interaction-plan status: "
-            f"{interaction_plan.status}. If it is `empty`, `failed`, or "
-            "`not_configured`, continue with individual scenarios and do not "
-            "invent interaction cases. If it is `generated`, write at least one "
-            "probe per listed interaction, with its ID in `interaction_ids`; "
-            "exercise the stated condition, operation, and observable result, "
-            "including an excluded case when specified.\n"
-            f"{json.dumps(interaction_obligations, indent=2, sort_keys=True)}\n\n"
+            "Plan interactions as part of this same artifact. Each `INTERACTIONS` "
+            "entry has interaction_id, scenario_ids, condition, operation, "
+            "expected, and evidence_quote_ids. Use only source-grounded "
+            "combinations with at least two distinct scenario IDs and two "
+            "distinct instruction evidence candidate IDs. Use an empty list when "
+            "no interaction is supported. Author at least one probe for each "
+            "interaction, listing its ID in `interaction_ids`. Exact instruction "
+            "evidence candidates (copy IDs exactly):\n"
+            f"{instruction_evidence_candidates_json}\n\n"
             "Return from the agent after writing probe_suite.py."
         )
         probe_request = ImplementationRequest(
@@ -3325,14 +3325,14 @@ def _generate_miniswe_postrun_probes(
                         f"{validation_error}\n\n"
                         "Rewrite `probe_suite.py` as complete executable Python. "
                         "Use ordinary Python imports and function bodies directly; "
-                        "do not split them into JSON fields. Preserve source-grounded "
+                        "use Python literal assignments for metadata, never JSON "
+                        "strings or docstrings. Preserve source-grounded "
                         "behavior and scenario provenance. Every probe must run "
                         "successfully as Python and fail on the untouched baseline "
                         "through its assertion (not through syntax, import, or "
-                        "runtime errors). At module scope, allow only the module "
-                        "docstring, imports, and function definitions. Do not add "
-                        "assignments, expressions, calls, or control flow there; "
-                        "move all setup into the `test_probe_*` functions. Fix "
+                        "runtime errors). At module scope, allow only the three "
+                        "required literal assignments, imports, an optional module "
+                        "docstring, and function definitions. Fix "
                         "the exact validation error above before returning. Use "
                         "only the supplied contract and "
                         "scenario IDs. Do not edit implementation files or tests."
@@ -3357,12 +3357,30 @@ def _generate_miniswe_postrun_probes(
                 )
             try:
                 suite_source = suite_path.read_text(encoding="utf-8")
-                obligations, probes = parse_generated_postrun_probe_source(
-                    suite_source,
-                    scenarios,
-                    instruction=instruction,
-                    repository_contract=repository_contract,
-                    interaction_obligations=interaction_obligations,
+                obligations, interaction_obligations, probes = (
+                    parse_generated_postrun_probe_source(
+                        suite_source,
+                        scenarios,
+                        instruction=instruction,
+                        repository_contract=repository_contract,
+                    )
+                )
+                interaction_plan = {
+                    "status": "generated" if interaction_obligations else "empty",
+                    "error": None,
+                    "interactions": list(interaction_obligations),
+                }
+                (probe_output / "interaction-plan.json").write_text(
+                    json.dumps(
+                        {
+                            "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
+                            **interaction_plan,
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
                 )
                 baseline_results = run_postrun_probes(
                     probes,
@@ -3395,8 +3413,8 @@ def _generate_miniswe_postrun_probes(
             "source_instruction": instruction,
             "obligations": list(obligations),
             "interaction_obligations": list(interaction_obligations),
-            "interaction_plan_status": interaction_plan.status,
-            "interaction_plan_error": interaction_plan.error,
+            "interaction_plan_status": interaction_plan["status"],
+            "interaction_plan_error": interaction_plan["error"],
             "authoring_attempts": authoring_attempts,
             "authoring_commits": [
                 {

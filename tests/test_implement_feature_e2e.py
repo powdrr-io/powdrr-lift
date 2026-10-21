@@ -1248,12 +1248,13 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     )
 
 
-def test_implement_feature_records_invalid_generated_probe_and_continues(
+def test_implement_feature_records_invalid_generated_probe_as_issue(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     repo = _fixture_repo(tmp_path)
     fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
+    output_root = tmp_path / "feature-output"
     authoring_calls = 0
 
     def author_invalid_probe(
@@ -1285,6 +1286,7 @@ def test_implement_feature_records_invalid_generated_probe_and_continues(
             work_item_name="hello-world-invalid-generated-probe",
             repo_root=repo,
             allowed_paths=("hello_world.py",),
+            output_root=output_root,
             validation_command=(
                 sys.executable,
                 "-m",
@@ -1301,18 +1303,17 @@ def test_implement_feature_records_invalid_generated_probe_and_continues(
         )
     )
 
-    assert result.status == "completed", (
+    assert result.status == "completed_with_issues", (
         result.failure.message if result.failure else None
     )
-    assert result.review["postrun_probe_generation"]["status"] == "unavailable"
-    assert (
-        "probe suite is not valid Python"
-        in result.review["postrun_probe_generation"]["error"]
-    )
-    suite_path = Path(result.review["postrun_probe_generation"]["suite_path"])
+    assert result.failure is not None
+    assert "cannot open a PR before a passing review" in result.failure.message
+    suite_path = output_root / "postrun-probes" / "probe-suite.json"
     suite = json.loads(suite_path.read_text(encoding="utf-8"))
     assert suite["probes"] == []
     assert suite["generation_status"] == "unavailable"
+    assert suite["interaction_plan_status"] == "failed"
+    assert "probe suite is not valid Python" in suite["generation_error"]
     assert (repo / "hello_world.py").read_text(encoding="utf-8") == (
         'print("Hello, world!")\nprint("Hello from Powdrr!")\n'
     )

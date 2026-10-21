@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import ast
 import builtins
-import json
 import os
 import re
 import subprocess
@@ -16,287 +15,8 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.structrr.validation import DiscoveredValidationProfile
-from powdrr_lift.workrr.llm import complete_json
-from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
-POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v5"
-_INTERACTION_PLAN_SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "interactions": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "interaction_id": {"type": "string"},
-                    "scenario_ids": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                    },
-                    "condition": {"type": "string"},
-                    "operation": {"type": "string"},
-                    "expected": {"type": "string"},
-                    "evidence_quote_ids": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                    },
-                },
-                "required": [
-                    "interaction_id",
-                    "scenario_ids",
-                    "condition",
-                    "operation",
-                    "expected",
-                ],
-                # Missing evidence IDs must reach semantic validation so its
-                # targeted repair can use the exact candidate list.
-                "additionalProperties": False,
-            },
-        }
-    },
-    "required": ["interactions"],
-    "additionalProperties": False,
-}
-
-
-def generate_probe_interaction_plan(
-    client: WorkflowLLMClient,
-    *,
-    instruction: str,
-    scenarios: Sequence[Mapping[str, Any]],
-) -> tuple[dict[str, Any], ...]:
-    """Plan source-grounded composition cases before probe code is authored."""
-    scenario_fields = (
-        "scenario_id",
-        "given",
-        "when",
-        "then",
-        "evidence",
-        "related_requirements",
-    )
-    compact_scenarios = [
-        {key: item[key] for key in scenario_fields if key in item} for item in scenarios
-    ]
-    evidence_candidates = _instruction_evidence_candidates(instruction)
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Analyze the instruction and behavior scenarios for interactions "
-                "that a post-coding probe should exercise. Find combinations where "
-                "one requirement defines values, states, or inputs and another "
-                "defines an operation, precedence rule, resolution rule, or "
-                "classification applied to them. Include only combinations that "
-                "are entailed by the instruction; do not enumerate arbitrary pairs "
-                "or invent behavior. Each interaction must cite at least two "
-                "distinct instruction evidence candidates and refer to at least "
-                "two scenario IDs. State a concrete condition, operation, and "
-                "observable expected result. Choose at least two distinct "
-                "evidence_quote_ids "
-                "from the supplied exact instruction clauses; do not copy or "
-                "rewrite quote text. For selection or classification behavior, make "
-                "the result distinguish the included case from a relevant "
-                "excluded case. Return an empty interactions list when no "
-                "cross-requirement interaction is supported. Do not write code."
-            ),
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                {
-                    "instruction": instruction,
-                    "instruction_evidence_candidates": evidence_candidates,
-                    "behavior_scenarios": compact_scenarios,
-                },
-                ensure_ascii=False,
-                sort_keys=True,
-            ),
-        },
-    ]
-    planned = _complete_valid_interaction_plan(
-        client,
-        messages,
-        instruction=instruction,
-        scenarios=scenarios,
-        evidence_candidates=evidence_candidates,
-        phase="initial interaction plan",
-    )
-    review_messages = [
-        {
-            "role": "system",
-            "content": (
-                "Audit the proposed interaction plan against the complete source "
-                "instruction and behavior scenarios. Find any materially distinct "
-                "cross-requirement combination that the plan omitted, especially "
-                "where a special value is used with a grammar operation or where "
-                "a composed result controls a later classification. Add only "
-                "source-entailed interactions, using at least two distinct "
-                "evidence_quote_ids from the supplied exact instruction clauses "
-                "and at least two scenario IDs. Do not copy or rewrite quote text. "
-                "Do not repeat an interaction already covered by the plan. Return "
-                "an empty interactions list if the plan is complete. Do not write "
-                "code or probes."
-            ),
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                {
-                    "instruction": instruction,
-                    "instruction_evidence_candidates": evidence_candidates,
-                    "behavior_scenarios": compact_scenarios,
-                    "proposed_interactions": planned,
-                },
-                ensure_ascii=False,
-                sort_keys=True,
-            ),
-        },
-    ]
-    additions = _complete_valid_interaction_plan(
-        client,
-        review_messages,
-        instruction=instruction,
-        scenarios=scenarios,
-        evidence_candidates=evidence_candidates,
-        phase="interaction-plan review",
-    )
-    by_id = {item["interaction_id"]: item for item in planned}
-    for item in additions:
-        by_id.setdefault(item["interaction_id"], item)
-    return tuple(by_id.values())
-
-
-def _complete_valid_interaction_plan(
-    client: WorkflowLLMClient,
-    messages: list[dict[str, str]],
-    *,
-    instruction: str,
-    scenarios: Sequence[Mapping[str, Any]],
-    evidence_candidates: Sequence[Mapping[str, str]],
-    phase: str,
-) -> tuple[dict[str, Any], ...]:
-    """Validate each interaction and repair only invalid entries once."""
-    response = complete_json(client, messages, response_schema=_INTERACTION_PLAN_SCHEMA)
-    interactions = response.get("interactions")
-    if not isinstance(interactions, list):
-        raise ValueError(f"{phase} must contain an interactions array")
-
-    valid, invalid = _validate_interaction_entries(
-        interactions,
-        instruction=instruction,
-        scenarios=scenarios,
-        evidence_candidates=evidence_candidates,
-    )
-    if not invalid:
-        return tuple(item for _, item in valid)
-
-    repair_messages = [
-        {
-            "role": "system",
-            "content": (
-                "Repair only the invalid interaction entries supplied below. "
-                "Do not repeat or rewrite valid interactions. Preserve each "
-                "existing interaction_id. Return only source-entailed entries. "
-                "Each repaired entry needs two distinct evidence_quote_ids from "
-                "instruction_evidence_candidates and two distinct scenario IDs. "
-                "Do not invent IDs or copy quote text."
-            ),
-        },
-        {
-            "role": "user",
-            "content": json.dumps(
-                {
-                    "instruction": instruction,
-                    "instruction_evidence_candidates": list(evidence_candidates),
-                    "behavior_scenarios": [dict(item) for item in scenarios],
-                    "invalid_interactions": [
-                        {
-                            "index": index,
-                            "interaction": raw,
-                            "validation_error": error,
-                        }
-                        for index, raw, error in invalid
-                    ],
-                    "repair_phase": phase,
-                },
-                ensure_ascii=False,
-                sort_keys=True,
-            ),
-        },
-    ]
-    repair_response = complete_json(
-        client, repair_messages, response_schema=_INTERACTION_PLAN_SCHEMA
-    )
-    repaired = repair_response.get("interactions")
-    if not isinstance(repaired, list) or len(repaired) != len(invalid):
-        raise ValueError(
-            f"{phase} repair must return exactly {len(invalid)} corrected "
-            "interaction entries"
-        )
-    repaired_valid, repaired_invalid = _validate_interaction_entries(
-        repaired,
-        instruction=instruction,
-        scenarios=scenarios,
-        evidence_candidates=evidence_candidates,
-    )
-    if repaired_invalid:
-        reasons = "; ".join(error for _, _, error in repaired_invalid)
-        raise ValueError(f"{phase} repair remained invalid: {reasons}")
-
-    by_position = dict(valid)
-    valid_ids = {item["interaction_id"] for _, item in valid}
-    for (position, original, _), (_, replacement) in zip(
-        invalid, repaired_valid, strict=True
-    ):
-        original_id = (
-            original.get("interaction_id") if isinstance(original, Mapping) else None
-        )
-        replacement_id = replacement["interaction_id"]
-        if original_id and replacement_id != original_id:
-            raise ValueError(
-                f"{phase} repair changed interaction id {original_id!r} "
-                f"to {replacement_id!r}"
-            )
-        if replacement_id in valid_ids:
-            raise ValueError(
-                f"{phase} repair duplicated interaction id {replacement_id!r}"
-            )
-        valid_ids.add(replacement_id)
-        by_position[position] = replacement
-    return tuple(by_position[index] for index in sorted(by_position))
-
-
-def _validate_interaction_entries(
-    interactions: Sequence[Any],
-    *,
-    instruction: str,
-    scenarios: Sequence[Mapping[str, Any]],
-    evidence_candidates: Sequence[Mapping[str, str]],
-) -> tuple[
-    list[tuple[int, dict[str, Any]]],
-    list[tuple[int, Any, str]],
-]:
-    """Keep valid entries and report invalid entries with their original positions."""
-    valid: list[tuple[int, dict[str, Any]]] = []
-    invalid: list[tuple[int, Any, str]] = []
-    seen: set[str] = set()
-    for index, raw in enumerate(interactions):
-        try:
-            item = validate_probe_interaction_plan(
-                [raw],
-                instruction=instruction,
-                scenarios=scenarios,
-                evidence_candidates=evidence_candidates,
-            )[0]
-            interaction_id = item["interaction_id"]
-            if interaction_id in seen:
-                raise ValueError(f"duplicate interaction id {interaction_id!r}")
-        except (ValueError, KeyError) as error:
-            invalid.append((index, raw, str(error)))
-        else:
-            seen.add(interaction_id)
-            valid.append((index, item))
-    return valid, invalid
+POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v6"
 
 
 def validate_probe_interaction_plan(
@@ -308,7 +28,7 @@ def validate_probe_interaction_plan(
 ) -> tuple[dict[str, Any], ...]:
     """Check references and materialize model-selected exact instruction quotes."""
     candidates = tuple(
-        evidence_candidates or _instruction_evidence_candidates(instruction)
+        evidence_candidates or instruction_evidence_candidates(instruction)
     )
     candidate_quotes = {str(item["id"]): str(item["quote"]) for item in candidates}
     known_scenarios = {str(item["scenario_id"]) for item in scenarios}
@@ -360,7 +80,7 @@ def validate_probe_interaction_plan(
     return tuple(validated)
 
 
-def _instruction_evidence_candidates(instruction: str) -> list[dict[str, str]]:
+def instruction_evidence_candidates(instruction: str) -> list[dict[str, str]]:
     """Split instruction text into exact, selectable evidence clauses."""
     clauses = re.split(r"(?<=[.!?;])(?:[ \t]+|\n+)|\n+", instruction)
     candidates: list[dict[str, str]] = []
@@ -422,42 +142,6 @@ class PostRunProbeResult:
         }
 
 
-@dataclass(frozen=True, slots=True)
-class ProbeInteractionPlan:
-    """Result of planning cross-requirement cases, separate from suite status."""
-
-    status: str
-    interactions: tuple[dict[str, Any], ...] = ()
-    error: str | None = None
-
-    def to_data(self) -> dict[str, Any]:
-        return {
-            "status": self.status,
-            "error": self.error,
-            "interactions": list(self.interactions),
-        }
-
-
-def resolve_probe_interaction_plan(
-    client: WorkflowLLMClient | None,
-    *,
-    instruction: str,
-    scenarios: Sequence[Mapping[str, Any]],
-) -> ProbeInteractionPlan:
-    """Return explicit empty, failed, or unconfigured interaction outcomes."""
-    if client is None:
-        return ProbeInteractionPlan("not_configured")
-    try:
-        interactions = generate_probe_interaction_plan(
-            client, instruction=instruction, scenarios=scenarios
-        )
-    except Exception as error:
-        return ProbeInteractionPlan("failed", error=f"{type(error).__name__}: {error}")
-    return ProbeInteractionPlan(
-        "generated" if interactions else "empty", interactions=interactions
-    )
-
-
 def parse_generated_postrun_probe_source(
     source: str,
     scenarios: Sequence[Mapping[str, Any]],
@@ -496,7 +180,9 @@ def parse_generated_postrun_probe_source(
         not isinstance(key, str) or not isinstance(value, Mapping)
         for key, value in raw_probe_metadata.items()
     ):
-        raise ValueError("PROBE_METADATA must map function names to Python dictionaries")
+        raise ValueError(
+            "PROBE_METADATA must map function names to Python dictionaries"
+        )
     interaction_obligations = validate_probe_interaction_plan(
         raw_interactions,
         instruction=instruction,
@@ -721,10 +407,16 @@ def _validate_probe_obligations(
             raise ValueError(f"obligation {obligation_id!r} has invalid support status")
         evidence = item.get("evidence")
         if not isinstance(evidence, list):
-            raise ValueError(f"obligation {obligation_id!r} has malformed evidence")
+            raise ValueError(
+                f"{obligation_id} evidence must be a Python list of citation "
+                "dictionaries with source and quote fields"
+            )
         for citation in evidence:
             if not isinstance(citation, Mapping):
-                raise ValueError(f"obligation {obligation_id!r} has malformed evidence")
+                raise ValueError(
+                    f"{obligation_id} evidence must be a Python list of citation "
+                    "dictionaries with source and quote fields"
+                )
             source, quote = citation.get("source"), citation.get("quote")
             allowed_strings = (
                 instruction_strings if source == "instruction" else contract_strings
@@ -769,21 +461,6 @@ def _validate_probe_obligations(
     if missing:
         raise ValueError("probe suite omitted scenarios: " + ", ".join(sorted(missing)))
     return tuple(obligations)
-
-
-def _probe_metadata(function: ast.FunctionDef) -> Mapping[str, Any]:
-    docstring = ast.get_docstring(function, clean=False)
-    if docstring is None:
-        raise ValueError(f"{function.name} must have a JSON metadata docstring")
-    try:
-        metadata = json.loads(docstring)
-    except json.JSONDecodeError as error:
-        raise ValueError(
-            f"{function.name} metadata docstring must be a JSON object: {error}"
-        ) from error
-    if not isinstance(metadata, Mapping):
-        raise ValueError(f"{function.name} metadata must be a JSON object")
-    return metadata
 
 
 def _validate_probe_function(function: ast.FunctionDef, tree: ast.Module) -> None:
@@ -993,12 +670,10 @@ __all__ = [
     "POSTRUN_PROBE_SCHEMA_VERSION",
     "PostRunProbe",
     "PostRunProbeResult",
-    "ProbeInteractionPlan",
     "baseline_probe_failures",
-    "generate_probe_interaction_plan",
+    "instruction_evidence_candidates",
     "parse_generated_postrun_probe_source",
     "probe_failures",
-    "resolve_probe_interaction_plan",
     "run_postrun_probes",
     "validate_probe_interaction_plan",
 ]

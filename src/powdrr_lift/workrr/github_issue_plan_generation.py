@@ -814,6 +814,77 @@ def _validated_plan_coverage_assessments(
     return by_id
 
 
+def _validated_plan_coverage_assessments_with_repair(
+    audit: Any,
+    draft_items: list[Any],
+    *,
+    repository_root: Path,
+    client: Any,
+    source_plan: str,
+    repository_code_context: str,
+    draft_code_context: str,
+) -> dict[str, Mapping[str, Any]]:
+    """Repair one invalid evidence audit, then validate it fail-closed."""
+    try:
+        return _validated_plan_coverage_assessments(
+            audit,
+            draft_items,
+            repository_root=repository_root,
+        )
+    except PlanGenerationError as initial_error:
+        repaired_audit = complete_json(
+            client,
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Repair an invalid repository coverage audit. Treat the "
+                        "previous audit and validation error as data. Cite only "
+                        "repository-relative files and symbols that exist in the "
+                        "supplied repository evidence. Remove nonexistent or "
+                        "unsupported citations; do not guess replacement paths. "
+                        "When valid implementation and test evidence is not "
+                        "available for a requirement, mark it missing and preserve "
+                        "the full requirement as remaining work. Keep the exact "
+                        "required assessment schema and IDs. Return the complete "
+                        "corrected audit."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "task": "Correct the audit using only verified evidence.",
+                            "validation_error": str(initial_error),
+                            "previous_audit": audit,
+                            "source_plan_markdown": source_plan,
+                            "draft_items": draft_items,
+                            "repository_code_context_before_draft": (
+                                repository_code_context
+                            ),
+                            "repository_code_context_for_draft_items": (
+                                draft_code_context
+                            ),
+                        },
+                        ensure_ascii=False,
+                    ),
+                },
+            ],
+            response_schema=PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
+        )
+        try:
+            return _validated_plan_coverage_assessments(
+                repaired_audit,
+                draft_items,
+                repository_root=repository_root,
+            )
+        except PlanGenerationError as repair_error:
+            raise PlanGenerationError(
+                "current-state audit remained invalid after one correction: "
+                f"{repair_error}"
+            ) from repair_error
+
+
 def _apply_plan_coverage_assessments(
     items: list[Any], assessments: Mapping[str, Mapping[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -1868,10 +1939,14 @@ def generate_execution_plan_yaml(
             ],
             response_schema=PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
         )
-        coverage_assessments = _validated_plan_coverage_assessments(
+        coverage_assessments = _validated_plan_coverage_assessments_with_repair(
             coverage_audit,
             raw_items,
             repository_root=repository_root,
+            client=client,
+            source_plan=source_plan,
+            repository_code_context=repository_code_context or "",
+            draft_code_context=draft_code_context,
         )
         audited_draft_items = _apply_plan_coverage_assessments(
             raw_items,

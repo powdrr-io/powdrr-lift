@@ -20,6 +20,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     _plan_item_refinement_issues,
     _require_jev_grouping_approval,
     _validated_plan_coverage_assessments,
+    _validated_plan_coverage_assessments_with_repair,
     generate_execution_plan_yaml,
     generate_multi_pr_structrr_proposal,
     inspect_repository_ci,
@@ -957,6 +958,92 @@ def test_incomplete_coverage_audit_preserves_unassessed_items(tmp_path: Path) ->
             "remaining_requirement": "",
         }
     ]
+
+
+def test_coverage_audit_repairs_a_fabricated_repository_path(
+    tmp_path: Path,
+) -> None:
+    item = _item("parser")
+    invalid_audit = {
+        "assessments": [
+            {
+                "item_id": "parser",
+                "status": "complete",
+                "scope_assessments": [
+                    {
+                        "requirement_id": "parser:scope-01",
+                        "status": "complete",
+                        "existing_evidence": [
+                            {
+                                "path": ".github/workflows/ci.yml",
+                                "symbol": "ci",
+                                "kind": "implementation",
+                                "rationale": "The CI config implements the parser.",
+                            },
+                            {
+                                "path": ".github/workflows/ci.yml",
+                                "symbol": "ci",
+                                "kind": "test",
+                                "rationale": "The CI config tests the parser.",
+                            },
+                        ],
+                        "remaining_requirement": "",
+                    }
+                ],
+                "remaining_work": "",
+                "remaining_item": {
+                    "title": "",
+                    "objective": "",
+                    "scope": [],
+                    "allowed_paths": [],
+                    "implementation_steps": [],
+                    "acceptance_criteria": [],
+                },
+            }
+        ]
+    }
+    corrected_audit = {
+        "assessments": [
+            {
+                "item_id": "parser",
+                "status": "missing",
+                "scope_assessments": [
+                    {
+                        "requirement_id": "parser:scope-01",
+                        "status": "missing",
+                        "existing_evidence": [],
+                        "remaining_requirement": "",
+                    }
+                ],
+                "remaining_work": "",
+                "remaining_item": {
+                    "title": "",
+                    "objective": "",
+                    "scope": [],
+                    "allowed_paths": [],
+                    "implementation_steps": [],
+                    "acceptance_criteria": [],
+                },
+            }
+        ]
+    }
+    client = SequencedPlanningClient([corrected_audit])
+
+    assessments = _validated_plan_coverage_assessments_with_repair(
+        invalid_audit,
+        [item],
+        repository_root=tmp_path,
+        client=client,
+        source_plan="# Plan\nImplement a parser.",
+        repository_code_context="The repository has no matching parser code.",
+        draft_code_context="No parser symbols were found.",
+    )
+
+    assert assessments["parser"]["status"] == "missing"
+    assert len(client.messages) == 1
+    repair_request = client.messages[0][1]["content"]
+    assert ".github/workflows/ci.yml" in repair_request
+    assert "verified evidence" in repair_request
 
 
 def test_missing_coverage_assessment_can_retain_the_full_draft_item() -> None:

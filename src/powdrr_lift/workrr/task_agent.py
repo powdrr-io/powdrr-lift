@@ -3389,7 +3389,10 @@ class _TaskProcedrrOperations:
                 "error": str(error),
             }
             self.strategy.events.append(failure)
-            return {"error": str(error), "retryable": True}
+            error_result = {"error": str(error), "retryable": True}
+            if operation == "invoke_tool" and parameters.get("tool") == "coding-agent":
+                return _normalize_execute_pr_coding_attempt(error_result)
+            return error_result
         observed = self.strategy.events[before:]
         result = next(
             (

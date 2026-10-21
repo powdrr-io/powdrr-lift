@@ -1639,7 +1639,6 @@ def test_nested_procedrr_operation_returns_action_result_binding() -> None:
 
 
 def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None:
-    raw_result = {"error": "invalid test coverage contract", "retryable": True}
     strategy: Any = SimpleNamespace(
         workflow=SimpleNamespace(),
         task=SimpleNamespace(task_id="task-001", process_checkpoint=None),
@@ -1647,15 +1646,8 @@ def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None
         events=[],
     )
 
-    def execute_action(action: Any) -> SimpleNamespace:
-        strategy.events.append(
-            {
-                "kind": action.kind,
-                "tool": action.tool,
-                "result": raw_result,
-            }
-        )
-        return SimpleNamespace(continue_running=True)
+    def execute_action(_action: Any) -> SimpleNamespace:
+        raise PowdrrExecutionError("invalid test coverage contract")
 
     strategy.execute_action = execute_action
     operations = _TaskProcedrrOperations(

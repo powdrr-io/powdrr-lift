@@ -849,6 +849,43 @@ def _preflight_reviewed_file_creation_conflicts(
     return tuple(findings)
 
 
+def _workflow_base_commit(
+    repo_root: Path,
+    workflow_directory: Path,
+    *,
+    workflow_id: str,
+) -> str:
+    """Resolve the workflow's target branch, not its checkpoint branch, as base."""
+    state = load_workflow_git_state(workflow_directory, workflow_id=workflow_id)
+    if state is None:
+        return subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD^{commit}"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+    refs = (
+        f"refs/remotes/origin/{state.base_branch}",
+        f"refs/heads/{state.base_branch}",
+    )
+    for ref in refs:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", f"{ref}^{{commit}}"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    raise PowdrrExecutionError(
+        f"Workflow {workflow_id!r} base branch {state.base_branch!r} "
+        "does not resolve to a commit."
+    )
+
+
 def _implementation_step_creates_path(step: str, raw_path: str) -> bool:
     """Return whether a creation instruction targets this path specifically."""
     path_pattern = re.compile(rf"(?<![\w./-]){re.escape(raw_path)}(?![\w./-])")
@@ -2835,13 +2872,11 @@ class _TaskWorkflowExecutionStrategy:
         workflow_id = str(task_context.get("proposed_pr_id", "")).strip()
         if not workflow_id:
             raise PowdrrExecutionError("plan amendment requires proposed_pr_id")
-        base_commit = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=self.repo_root,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
+        base_commit = _workflow_base_commit(
+            self.repo_root,
+            self.workflow.directory,
+            workflow_id=workflow_id,
+        )
         request, _validation_profile = _issue_worker_implementation_request(
             proposed, workflow_id=workflow_id, base_commit=base_commit
         )

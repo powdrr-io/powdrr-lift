@@ -264,6 +264,65 @@ def test_implementation_paths_include_committed_work_and_exclude_runtime_state(
     )
 
 
+def test_workflow_base_commit_uses_target_branch_not_integration_checkpoint(
+    tmp_path: Path,
+) -> None:
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-b", "main")
+    git("config", "user.name", "Test User")
+    git("config", "user.email", "test@example.invalid")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    git("add", "README.md")
+    git("commit", "-m", "base")
+    base_commit = git("rev-parse", "HEAD")
+    git("switch", "-c", "powdrr/pr-01")
+
+    workflow_file = tmp_path / ".github/workflows/ci.yml"
+    workflow_file.parent.mkdir(parents=True)
+    workflow_file.write_text("name: CI\n", encoding="utf-8")
+    git("add", ".github/workflows/ci.yml")
+    git("commit", "-m", "checkpoint candidate workflow")
+
+    workflow_directory = tmp_path / "docs/workflows/example"
+    workflow_directory.mkdir(parents=True)
+    save_workflow_git_state(
+        workflow_directory,
+        WorkflowGitState(
+            proposed_pr_id="pr-01",
+            base_branch="main",
+            integration_branch="powdrr/pr-01",
+            workflow_relative_directory="docs/workflows/example",
+        ),
+    )
+
+    resolved_base = task_agent._workflow_base_commit(
+        tmp_path,
+        workflow_directory,
+        workflow_id="pr-01",
+    )
+    assert resolved_base == base_commit
+    assert (
+        task_agent._preflight_reviewed_file_creation_conflicts(
+            tmp_path,
+            {
+                "allowed_paths": [".github/workflows/ci.yml"],
+                "implementation_steps": ["Add .github/workflows/ci.yml."],
+            },
+            base_commit=resolved_base,
+        )
+        == ()
+    )
+
+
 def test_reviewed_plan_creation_conflict_detects_existing_verifier(
     tmp_path: Path,
 ) -> None:

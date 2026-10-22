@@ -672,10 +672,37 @@ inputs:
     assert "plan amendment changed unrelated plan items" in findings
 
 
-def test_issue_worker_rebases_structrr_item_onto_unrelated_latest_changes(
+def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from powdrr_lift.workrr import feature_endpoint
+
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-q", "-b", "main")
+    git("config", "user.name", "Test User")
+    git("config", "user.email", "test@example.com")
+    (repo_root / "baseline.txt").write_text("target branch\n", encoding="utf-8")
+    git("add", "baseline.txt")
+    git("commit", "-qm", "Target branch baseline")
+    base_commit = git("rev-parse", "HEAD")
+    checkpoint_file = repo_root / ".github/workflows/ci.yml"
+    checkpoint_file.parent.mkdir(parents=True)
+    checkpoint_file.write_text("name: checkpoint\n", encoding="utf-8")
+    git("add", ".github/workflows/ci.yml")
+    git("commit", "-qm", "Persist earlier workflow checkpoint")
+    checkpoint_commit = git("rev-parse", "HEAD")
 
     baseline = {
         "entities": [{"id": "existing", "type": "Module", "description": "old"}],
@@ -702,7 +729,8 @@ def test_issue_worker_rebases_structrr_item_onto_unrelated_latest_changes(
         ],
         source_ref="docs/plans/feature.md",
     )
-    proposal_path = tmp_path / "docs/plans/feature-v1-structrr-proposal.json"
+    proposal_path = repo_root / "docs/plans/feature-v1-structrr-proposal.json"
+    proposal_path.parent.mkdir(parents=True)
     write_multi_pr_proposal(proposal_path, proposal)
     latest = {
         **baseline,
@@ -712,8 +740,8 @@ def test_issue_worker_rebases_structrr_item_onto_unrelated_latest_changes(
         ],
     }
     manifest = SourceManifest(
-        submission_base="a" * 40,
-        source_revision="b" * 40,
+        submission_base=base_commit,
+        source_revision=base_commit,
         extractor_version="test",
         taxonomy_fingerprint="taxonomy",
         excluded_paths=(),
@@ -722,6 +750,29 @@ def test_issue_worker_rebases_structrr_item_onto_unrelated_latest_changes(
         extraction_errors=(),
         product_digest="empty-product",
     )
+    bootstrap_revisions: list[tuple[str, str, bool]] = []
+
+    def bootstrap(root: Path, **_kwargs: Any) -> Any:
+        revision = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        bootstrap_revisions.append(
+            (
+                str(root),
+                revision,
+                (root / ".github/workflows/ci.yml").exists(),
+            )
+        )
+        return SimpleNamespace(
+            document=latest,
+            validation=SimpleNamespace(successful=True, issues=[]),
+            source_manifest=manifest,
+        )
+
     monkeypatch.setattr(
         feature_endpoint,
         "_structrr_taxonomy_path",
@@ -730,22 +781,18 @@ def test_issue_worker_rebases_structrr_item_onto_unrelated_latest_changes(
     monkeypatch.setattr(
         task_agent,
         "bootstrap_structrr",
-        lambda *_args, **_kwargs: SimpleNamespace(
-            document=latest,
-            validation=SimpleNamespace(successful=True, issues=[]),
-            source_manifest=manifest,
-        ),
+        bootstrap,
     )
 
     result = _issue_worker_structrr_context(
-        tmp_path,
+        repo_root,
         {
             "plan_id": "feature-v1",
             "item_id": "feature",
             "structrr_item_id": "feature",
             "structrr_proposal_file": "docs/plans/feature-v1-structrr-proposal.json",
         },
-        base_commit="a" * 40,
+        base_commit=base_commit,
     )
 
     assert result is not None
@@ -756,6 +803,16 @@ def test_issue_worker_rebases_structrr_item_onto_unrelated_latest_changes(
     )
     assert current_manifest is manifest
     assert report["classification"] == "clean"
+    assert len(bootstrap_revisions) == 1
+    baseline_root, baseline_revision, baseline_has_checkpoint_file = (
+        bootstrap_revisions[0]
+    )
+    assert Path(baseline_root) != repo_root
+    assert baseline_revision == base_commit
+    assert baseline_has_checkpoint_file is False
+    assert checkpoint_commit != base_commit
+    assert git("rev-parse", "HEAD") == checkpoint_commit
+    assert (repo_root / ".github/workflows/ci.yml").is_file()
 
 
 def test_issue_worker_blocks_file_addition_overlap_before_structrr_bootstrap(
@@ -851,6 +908,27 @@ def test_issue_worker_blocks_structrr_subject_changed_since_plan(
 ) -> None:
     from powdrr_lift.workrr import feature_endpoint
 
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return result.stdout.strip()
+
+    git("init", "-q", "-b", "main")
+    git("config", "user.name", "Test User")
+    git("config", "user.email", "test@example.com")
+    (repo_root / "baseline.txt").write_text("baseline\n", encoding="utf-8")
+    git("add", "baseline.txt")
+    git("commit", "-qm", "Target branch baseline")
+    base_commit = git("rev-parse", "HEAD")
+
     baseline = {
         "entities": [{"id": "existing", "type": "Module", "description": "old"}],
         "entity_relationships": [],
@@ -876,7 +954,8 @@ def test_issue_worker_blocks_structrr_subject_changed_since_plan(
         ],
         source_ref="docs/plans/feature.md",
     )
-    proposal_path = tmp_path / "docs/plans/feature-v1-structrr-proposal.json"
+    proposal_path = repo_root / "docs/plans/feature-v1-structrr-proposal.json"
+    proposal_path.parent.mkdir(parents=True)
     write_multi_pr_proposal(proposal_path, proposal)
     latest = {
         **baseline,
@@ -885,8 +964,8 @@ def test_issue_worker_blocks_structrr_subject_changed_since_plan(
         ],
     }
     manifest = SourceManifest(
-        submission_base="a" * 40,
-        source_revision="b" * 40,
+        submission_base=base_commit,
+        source_revision=base_commit,
         extractor_version="test",
         taxonomy_fingerprint="taxonomy",
         excluded_paths=(),
@@ -912,7 +991,7 @@ def test_issue_worker_blocks_structrr_subject_changed_since_plan(
 
     with pytest.raises(PowdrrExecutionError, match="intervening repository work"):
         _issue_worker_structrr_context(
-            tmp_path,
+            repo_root,
             {
                 "plan_id": "feature-v1",
                 "item_id": "feature",
@@ -921,7 +1000,7 @@ def test_issue_worker_blocks_structrr_subject_changed_since_plan(
                     "docs/plans/feature-v1-structrr-proposal.json"
                 ),
             },
-            base_commit="a" * 40,
+            base_commit=base_commit,
         )
 
 

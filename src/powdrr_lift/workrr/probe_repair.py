@@ -111,6 +111,52 @@ OBLIGATION_CATEGORY_RESPONSE_SCHEMA: dict[str, Any] = {
     "required": ["category"],
     "additionalProperties": False,
 }
+PROBE_REPAIR_EXAMPLES: tuple[dict[str, str], ...] = (
+    {
+        "category": "property_exposure",
+        "source": "The record exposes a property item_count.",
+        "given": (
+            "A Record instance created with its documented constructor is available."
+        ),
+        "when": "Read record.item_count.",
+        "then": "The property access completes without AttributeError.",
+        "lesson": "Exposure entails access, not a particular returned value.",
+    },
+    {
+        "category": "derived_property",
+        "source": "The remaining property equals total minus used.",
+        "given": "A Record has total=9 and used=4, using its documented constructor.",
+        "when": "Read record.remaining.",
+        "then": "The value is 5.",
+        "lesson": "Assert a computed value when the source gives the derivation.",
+    },
+    {
+        "category": "normalization",
+        "source": "The keyword is normalized to lowercase.",
+        "given": "The normalizer receives the keyword SELECT.",
+        "when": "Normalize the keyword.",
+        "then": "The result is select.",
+        "lesson": "Use a non-canonical input and assert the stated canonical form.",
+    },
+    {
+        "category": "pass_through",
+        "source": "Unsupported statements pass through unchanged.",
+        "given": "The formatter receives an unsupported statement string.",
+        "when": "The formatter processes the statement.",
+        "then": "The output string equals the input string exactly.",
+        "lesson": "Assert only the preservation required by the source.",
+    },
+    {
+        "category": "formatting_transformation",
+        "source": "The opening parenthesis follows the table name on the same line.",
+        "given": "The formatter receives CREATE TABLE t (id int).",
+        "when": "Format the statement.",
+        "then": "The output places the opening parenthesis on the table-name line.",
+        "lesson": (
+            "Use the smallest input that demonstrates the stated formatting rule."
+        ),
+    },
+)
 
 
 def repair_behavior_probes(
@@ -359,7 +405,10 @@ def _build_repair_messages(
                 "assert a value only when its derivation is specified by the source. "
                 "For normalization, use a non-canonical input and assert the canonical "
                 "value. For explicit pass-through behavior, compare output with input. "
-                "Do not invent behavior for scope exclusions. Keep scenario IDs "
+                "Do not invent behavior for scope exclusions. The examples in the user "
+                "payload demonstrate the level of specificity; their names and values "
+                "are illustrative only, never evidence for the current task. Keep "
+                "scenario IDs "
                 "unchanged. If the "
                 "clause truly does not support a safe observable check, return its "
                 "fields unchanged so the pre-coding gate can stop the task."
@@ -376,6 +425,7 @@ def _build_repair_messages(
                         for item in obligation_guidance
                         if item["scenario_id"] in scenarios
                     ],
+                    "examples": PROBE_REPAIR_EXAMPLES,
                     "flagged_scenarios": _flagged_scenarios_with_sources(
                         findings,
                         scenarios,

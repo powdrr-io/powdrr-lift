@@ -167,6 +167,14 @@ def test_probe_repair_adds_related_source_and_typed_obligation_guidance(
     assert client.messages is not None
     assert "property_exposure" in client.messages[1]["content"]
     assert "do not infer its returned value" in client.messages[0]["content"]
+    examples = json.loads(client.messages[1]["content"])["examples"]
+    property_example = next(
+        item for item in examples if item["category"] == "property_exposure"
+    )
+    assert property_example["then"] == (
+        "The property access completes without AttributeError."
+    )
+    assert "never evidence for the current task" in client.messages[0]["content"]
     assert any(
         clause["clause_id"] == "instruction-source:full-request"
         and clause["text"] == instruction

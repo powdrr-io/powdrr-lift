@@ -437,13 +437,18 @@ def finalize_scenario_claim_reviews(
 
 def _scenario_source_clauses(
     contract: PartialSemanticContract, ledger_clauses: Sequence[Mapping[str, Any]]
-) -> list[dict[str, str]]:
-    clauses: list[dict[str, str]] = []
+) -> list[dict[str, Any]]:
+    clauses: list[dict[str, Any]] = []
     for item in ledger_clauses:
         clause_id = item.get("clause_id")
         text = item.get("text")
         if isinstance(clause_id, str) and clause_id.strip() and isinstance(text, str):
-            clauses.append({"clause_id": clause_id, "text": text})
+            clause = {"clause_id": clause_id, "text": text}
+            for key in ("parent_clause_id", "validation_group_id", "source_span"):
+                value = item.get(key)
+                if value is not None:
+                    clause[key] = value
+            clauses.append(clause)
     if not any(item["clause_id"] == contract.source_ref for item in clauses):
         clauses.insert(
             0,

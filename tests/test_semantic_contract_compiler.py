@@ -747,6 +747,42 @@ def test_scenario_claim_review_covers_later_prompt_fields_and_exact_quotes() -> 
     } <= reviewed_paths
 
 
+def test_scenario_claim_review_preserves_source_clause_relationships() -> None:
+    source = "The parser accepts CREATE TABLE IF NOT EXISTS."
+    contract = _faithfulness_contract(source)
+    ledger_clauses: list[Mapping[str, Any]] = [
+        {
+            "clause_id": contract.source_ref,
+            "text": source,
+            "parent_clause_id": "instruction-001",
+            "validation_group_id": "parser-behavior",
+            "source_span": {"start": 10, "end": 55},
+        },
+        {
+            "clause_id": "instruction-002",
+            "text": "The parsed result includes the table name.",
+            "parent_clause_id": "instruction-001",
+            "validation_group_id": "parser-behavior",
+        },
+    ]
+
+    plan = prepare_scenario_claim_reviews(
+        contract,
+        scenario={"then": "The parsed result has table_name 't'."},
+        ledger_clauses=ledger_clauses,
+    )
+
+    source_context = json.loads(plan["requests"][0]["context_text"])
+    clauses = {item["clause_id"]: item for item in source_context["source_clauses"]}
+    assert clauses[contract.source_ref]["parent_clause_id"] == "instruction-001"
+    assert clauses[contract.source_ref]["validation_group_id"] == "parser-behavior"
+    assert clauses[contract.source_ref]["source_span"] == {
+        "start": 10,
+        "end": 55,
+    }
+    assert clauses["instruction-002"]["validation_group_id"] == "parser-behavior"
+
+
 def test_scenario_claim_review_separates_contradictions_and_assumptions() -> None:
     source = "The API initializes values from defaults."
     contract = _faithfulness_contract(source)

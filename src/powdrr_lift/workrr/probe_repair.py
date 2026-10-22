@@ -148,12 +148,12 @@ PROBE_REPAIR_EXAMPLES: tuple[dict[str, str], ...] = (
     },
     {
         "category": "formatting_transformation",
-        "source": "Each entry is placed on its own line.",
-        "given": "The renderer receives the entries red and blue.",
-        "when": "Render the entries.",
-        "then": "The output places red and blue on separate lines.",
+        "source": "A comma in the formatted list is followed by one space.",
+        "given": "The formatter receives the list text red,blue.",
+        "when": "Format the list.",
+        "then": "The output contains red, blue.",
         "lesson": (
-            "Use the smallest input that demonstrates the stated formatting rule."
+            "Use a non-canonical input and assert the exact visible transformation."
         ),
     },
 )
@@ -872,6 +872,10 @@ def _build_jev_claim_category_messages(
         "given and when context.",
         "A concrete observable check is entailed when it directly checks required "
         "behavior, even if the exact test expression is not stated.",
+        "Calibration example: source instruction 'A comma in the formatted list is "
+        "followed by one space'; given 'red,blue', when the list is formatted, then "
+        "the output contains 'red, blue' is entailed. The example is illustrative "
+        "only and does not add requirements to the current source.",
         "Do not provide explanations or revise the candidate.",
     ]
     classifier = {

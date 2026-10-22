@@ -717,7 +717,24 @@ def test_jev_claim_category_messages_use_classifier_adapter_envelope() -> None:
         "contradicted",
         "not_stated",
     ]
+    assert any(
+        "Calibration example" in instruction
+        for instruction in classifier_request["state"]["context"]["scenario_claim"][
+            "instructions"
+        ]
+    )
     assert (
         classifier_request["state"]["context"]["scenario_claim"]["candidate_value"]
         == "The candidate claim"
     )
+
+
+def test_formatting_repair_example_demonstrates_a_visible_transformation() -> None:
+    example = next(
+        item
+        for item in probe_repair.PROBE_REPAIR_EXAMPLES
+        if item["category"] == "formatting_transformation"
+    )
+
+    assert example["given"] == "The formatter receives the list text red,blue."
+    assert example["then"] == "The output contains red, blue."

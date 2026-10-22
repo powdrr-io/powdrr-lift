@@ -504,40 +504,15 @@ def _validate_probe_obligations(
                 )
             for key in ("summary", "condition", "operation", "expected"):
                 _required_text(item, key)
-            operands = item.get("operands")
-            if not isinstance(operands, list):
-                raise ValueError(f"obligation {obligation_id!r} has malformed operands")
-            for operand_index, operand in enumerate(operands):
-                if (
-                    not isinstance(operand, Mapping)
-                    or operand.get("role") not in operand_roles
-                ):
-                    raise ValueError(
-                        f"obligation {obligation_id!r} operand {operand_index} "
-                        "has an invalid role"
-                    )
-                name = operand.get("name")
-                if not isinstance(name, str) or not name.strip():
-                    raise ValueError(
-                        f"obligation {obligation_id!r} operand {operand_index} "
-                        "requires non-empty name"
-                    )
-                meaning = operand.get("meaning")
-                normalized_operand = dict(operand)
-                normalized_operand["name"] = name.strip()
-                if not isinstance(meaning, str) or not meaning.strip():
-                    # Meaning is explanatory only. Drop empty model-authored
-                    # placeholders instead of rejecting executable probes.
-                    normalized_operand.pop("meaning", None)
-                else:
-                    normalized_operand["meaning"] = meaning.strip()
-                operands[operand_index] = normalized_operand
         elif item["rule"] != "unresolved":
             raise ValueError(
                 f"unsupported obligation {obligation_id!r} must be unresolved"
             )
         else:
             _required_text(item, "unresolved_reason")
+        item["operands"] = _normalize_obligation_operands(
+            item.get("operands"), operand_roles
+        )
         seen.add(obligation_id)
         covered.add(scenario_id)
         obligations.append(item)
@@ -545,6 +520,33 @@ def _validate_probe_obligations(
     if missing:
         raise ValueError("probe suite omitted scenarios: " + ", ".join(sorted(missing)))
     return tuple(obligations)
+
+
+def _normalize_obligation_operands(
+    value: Any, valid_roles: set[str]
+) -> list[dict[str, str]]:
+    """Keep usable descriptive operand fields and drop malformed model output."""
+    if not isinstance(value, list):
+        return []
+    normalized: list[dict[str, str]] = []
+    for operand in value:
+        if not isinstance(operand, Mapping):
+            continue
+        role = operand.get("role")
+        name = operand.get("name")
+        if (
+            not isinstance(role, str)
+            or role not in valid_roles
+            or not isinstance(name, str)
+            or not name.strip()
+        ):
+            continue
+        item = {"role": role, "name": name.strip()}
+        meaning = operand.get("meaning")
+        if isinstance(meaning, str) and meaning.strip():
+            item["meaning"] = meaning.strip()
+        normalized.append(item)
+    return normalized
 
 
 def _validate_probe_function(function: ast.FunctionDef, tree: ast.Module) -> None:

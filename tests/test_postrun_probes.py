@@ -104,6 +104,28 @@ def test_supported_obligation_drops_empty_optional_operand_meaning() -> None:
     assert obligations[0]["operands"] == [{"role": "input", "name": "state"}]
 
 
+def test_supported_obligation_drops_unusable_operand_metadata() -> None:
+    source = _source().replace(
+        "'operands': []",
+        "'operands': [{'role': 'invented', 'name': 'state'}, "
+        "{'role': 'input'}, 'not-an-operand']",
+    )
+
+    obligations, _, probes = _parse(source, ({"scenario_id": "selector"},))
+
+    assert obligations[0]["operands"] == []
+    assert len(probes) == 1
+
+
+def test_supported_obligation_drops_non_list_operand_metadata() -> None:
+    source = _source().replace("'operands': []", "'operands': 'malformed'")
+
+    obligations, _, probes = _parse(source, ({"scenario_id": "selector"},))
+
+    assert obligations[0]["operands"] == []
+    assert len(probes) == 1
+
+
 def test_probe_obligation_evidence_uses_instruction_ledger_by_scenario_id() -> None:
     source = _source().replace(
         "'scenario_id': 'selector'", "'scenario_id': 'scenario:instruction-001'"

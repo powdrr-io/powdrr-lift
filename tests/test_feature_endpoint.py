@@ -167,7 +167,8 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         assert "complete executable Python module" in request.prompt
         assert "Do not encode metadata as JSON" in request.prompt
         assert "public fields, properties, methods, or return types" in request.prompt
-        assert "a valid `role` and a non-empty `name`" in request.prompt
+        assert "`operands` is optional descriptive metadata" in request.prompt
+        assert "Powdrr discards unusable operand metadata" in request.prompt
         assert "A `meaning` field is optional" in request.prompt
         assert "Do not put an example value in `meaning`" in request.prompt
         assert "instead of labeling it unresolved" in request.prompt

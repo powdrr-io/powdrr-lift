@@ -174,16 +174,31 @@ def bootstrap_structrr(
     source_revision = source_revision_result.stdout.strip()
     if source_revision_result.returncode != 0 or not source_revision:
         source_revision = "unavailable"
+    # GitHub workflows are intentionally excluded from the semantic Structrr
+    # inventory, but candidate comparison still needs file-level provenance
+    # when a plan explicitly adds or changes CI configuration.
+    source_manifest_files = tuple(
+        sorted(
+            {
+                *tracked_files,
+                *(
+                    path
+                    for path in validation_files
+                    if path.startswith(".github/workflows/")
+                ),
+            }
+        )
+    )
     source_manifest = compile_source_manifest(
         str(root),
-        tracked_files,
+        source_manifest_files,
         submission_base=submission_base or source_revision,
         source_revision=source_revision,
         taxonomy_fingerprint=content_fingerprint(
             {"entity_types": list(taxonomy.entity_types)}
         ),
         excluded_paths=(
-            *_IGNORED_PREFIXES,
+            *(prefix for prefix in _IGNORED_PREFIXES if prefix != ".github/"),
             "docs/changelogs/",
             *artifact_exclusions,
         ),

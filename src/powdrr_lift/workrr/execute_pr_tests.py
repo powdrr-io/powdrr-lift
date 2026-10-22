@@ -422,7 +422,8 @@ def install_frozen_test_files(root: Path, files: Mapping[str, str]) -> None:
             candidate.is_absolute()
             or ".." in candidate.parts
             or not candidate.parts
-            or candidate.parts[0] not in {"tests", "test"}
+            or not any(part in {"tests", "test"} for part in candidate.parts[:-1])
+            or candidate.suffix != ".py"
         ):
             raise ExecutePrTestError(f"invalid frozen integration-test path: {path}")
         destination = root.joinpath(*candidate.parts)

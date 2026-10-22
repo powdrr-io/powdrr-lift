@@ -422,7 +422,9 @@ def test_bootstrap_section_validation_reports_missing_and_stale_sections() -> No
     assert any(issue.code == "bootstrap_section_missing" for issue in issues)
 
 
-def test_bootstrap_ignores_tracked_github_metadata(tmp_path: Path) -> None:
+def test_bootstrap_keeps_github_workflow_out_of_structrr_but_in_manifest(
+    tmp_path: Path,
+) -> None:
     repo = _fixture_repo(tmp_path)
     github_workflow = repo / ".github" / "workflows" / "ci.yml"
     github_workflow.parent.mkdir(parents=True)
@@ -433,7 +435,11 @@ def test_bootstrap_ignores_tracked_github_metadata(tmp_path: Path) -> None:
     result = bootstrap_structrr(repo, output_path=tmp_path / "bootstrap.yaml")
 
     assert result.validation.successful
+    assert result.source_manifest is not None
     assert ".github/workflows/ci.yml" not in result.evidence_files
+    assert ".github/workflows/ci.yml" in {
+        item.path for item in result.source_manifest.files
+    }
     assert all(
         file_entry["path"] != ".github/workflows/ci.yml"
         for file_entry in result.document["files"]

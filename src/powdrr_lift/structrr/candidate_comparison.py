@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -161,6 +162,25 @@ def compare_candidate_snapshot(
             if change.kind in expected_kinds
         ]
         match_mode = "exact"
+        manifest_match: Mapping[str, Any] | None = None
+        manifest_path: str | None = None
+        if not exact and operation.section == "files" and actual_diff is not None:
+            manifest_path = _proposal_file_path(operation)
+            if manifest_path is not None:
+                expected_status = {
+                    "add": "added",
+                    "remove": "deleted",
+                    "change": "modified",
+                }.get(operation.action)
+                manifest_matching = [
+                    item
+                    for item in actual_diff.source_observations
+                    if item.get("path") == manifest_path
+                    and item.get("status") == expected_status
+                ]
+                if len(manifest_matching) == 1:
+                    manifest_match = manifest_matching[0]
+                    match_mode = "manifest_file"
         if not exact and operation.section == "files":
             flexible = _flexible_source_subject_matches(
                 operation, observed, consumed, proposal.allowed_paths
@@ -169,7 +189,17 @@ def compare_candidate_snapshot(
                 exact = flexible
                 matching = flexible
                 match_mode = "allowed_location"
-        if len(exact) == 1:
+        if manifest_match is not None:
+            expected_digest = _proposal_file_content_digest(operation)
+            actual_digest = manifest_match.get("after_digest")
+            if expected_digest is not None and actual_digest != expected_digest:
+                status = "contradictory"
+                reason = "the candidate file content differs from the proposal"
+            else:
+                status = "fulfilled"
+                reason = "the candidate file matches the proposed manifest change"
+            related = [dict(manifest_match)]
+        elif len(exact) == 1:
             index, change = exact[0]
             related = [change.to_data()]
             after_matches = (
@@ -213,6 +243,8 @@ def compare_candidate_snapshot(
                     if status == "fulfilled"
                     and match_mode == "allowed_location"
                     and isinstance(change.after, Mapping)
+                    else manifest_path
+                    if status == "fulfilled" and match_mode == "manifest_file"
                     else None
                 ),
             }
@@ -406,14 +438,36 @@ def _classify_reviewable_additions(
             _within_allowed_path(path, allowed_paths) for path in paths
         ):
             continue
-        is_test_path = all(
-            path == "tests" or path.startswith("tests/") for path in paths
-        )
+        is_test_path = all(_is_test_path(path) for path in paths)
         finding["review_classification"] = (
             "validation_change" if is_test_path else "implementation_detail"
         )
         finding["review_paths"] = list(paths)
         finding["review_required"] = True
+
+
+def _is_test_path(path: str) -> bool:
+    """Recognize test trees nested beneath a project or component directory."""
+    parts = path.replace("\\", "/").strip("/").split("/")
+    return any(part.casefold() in {"test", "tests"} for part in parts[:-1])
+
+
+def _proposal_file_path(operation: Any) -> str | None:
+    content = operation.content
+    raw_path = content.get("path")
+    if isinstance(raw_path, str) and raw_path.strip():
+        return raw_path.replace("\\", "/").strip("/")
+    identity = operation.subject_id
+    if isinstance(identity, str) and identity.startswith("file:"):
+        return identity.removeprefix("file:").replace("\\", "/").strip("/")
+    return None
+
+
+def _proposal_file_content_digest(operation: Any) -> str | None:
+    content = operation.content.get("content")
+    if not isinstance(content, str):
+        return None
+    return "sha256:" + hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 def _group_reviewable_additions(

@@ -136,22 +136,23 @@ class GitHubIssueClient:
             raise GitHubIssueQueueError(
                 "issue state filter must be open, closed, or all"
             )
-        endpoint = f"repos/{self.repository}/issues?state={state}&per_page=100"
+        # GitHub's issue list can omit recently relabeled open issues when the
+        # status label and state=open filters are combined. Query by the sparse
+        # Powdrr label across all states, then apply the requested state locally.
+        endpoint_state = "all" if labels and state != "all" else state
+        endpoint = f"repos/{self.repository}/issues?state={endpoint_state}&per_page=100"
         if labels:
             endpoint += "&labels=" + quote(",".join(labels), safe=",")
         result = self._invoke(
             [
                 "api",
+                "-H",
+                "Cache-Control: no-cache",
                 "--paginate",
-                "--slurp",
                 endpoint,
             ]
         )
-        try:
-            values = json.loads(result.stdout)
-        except json.JSONDecodeError as error:
-            raise GitHubIssueQueueError("gh returned malformed issue JSON") from error
-        issue_values = _flatten_pages(values)
+        issue_values = _parse_paginated_json_arrays(result.stdout, description="issue")
         issues: list[QueueIssue] = []
         for value in issue_values:
             if not isinstance(value, Mapping):
@@ -168,16 +169,17 @@ class GitHubIssueClient:
                 if isinstance(raw_labels, list)
                 else ()
             )
-            issues.append(
-                QueueIssue(
-                    number=int(value["number"]),
-                    title=str(value.get("title", "")),
-                    body=str(value.get("body", "")),
-                    state=str(value.get("state", "OPEN")).lower(),
-                    labels=labels,
-                    url=str(value.get("url", "")),
-                )
+            issue = QueueIssue(
+                number=int(value["number"]),
+                title=str(value.get("title", "")),
+                body=str(value.get("body", "")),
+                state=str(value.get("state", "OPEN")).lower(),
+                labels=labels,
+                url=str(value.get("url", "")),
             )
+            if state != "all" and issue.state != state:
+                continue
+            issues.append(issue)
         return tuple(issues)
 
     def create_issue(
@@ -1261,6 +1263,30 @@ def _flatten_pages(value: Any) -> list[Any]:
     if not value or not all(isinstance(page, list) for page in value):
         return value
     return [item for page in value for item in page]
+
+
+def _parse_paginated_json_arrays(text: str, *, description: str) -> list[Any]:
+    """Decode the JSON arrays emitted page by page by ``gh api --paginate``."""
+    decoder = json.JSONDecoder()
+    pages: list[list[Any]] = []
+    cursor = 0
+    while cursor < len(text):
+        while cursor < len(text) and text[cursor].isspace():
+            cursor += 1
+        if cursor == len(text):
+            break
+        try:
+            value, cursor = decoder.raw_decode(text, cursor)
+        except json.JSONDecodeError as error:
+            raise GitHubIssueQueueError(
+                f"gh returned malformed paginated {description} JSON"
+            ) from error
+        if not isinstance(value, list):
+            raise GitHubIssueQueueError(
+                f"GitHub paginated {description} response must be a list"
+            )
+        pages.append(value)
+    return _flatten_pages(pages)
 
 
 def _json_mapping(text: str, description: str) -> Mapping[str, Any]:

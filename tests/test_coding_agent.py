@@ -370,6 +370,9 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     task = command[command.index("--task") + 1]
     assert "Use the repository's local conventions." in task
     assert "Stop after implementing the requested change." in task
+    assert f"only repository workspace is `{worktree.resolve()}`" in task
+    assert "Before inspecting or editing anything, run `pwd`" in task
+    assert "Do not `cd` to, read from, or write to any other checkout" in task
     assert any(item.startswith("environment.cwd=") for item in command)
     assert "--yolo" in command
     assert "--exit-immediately" in command
@@ -488,7 +491,9 @@ def test_minisweagent_provider_reads_large_task_prompt_from_file(
         captured["command"] = command
         task_path = Path(command[command.index("--task-file") + 1])
         captured["task_path"] = task_path
-        assert task_path.read_text(encoding="utf-8") == prompt
+        task = task_path.read_text(encoding="utf-8")
+        assert task.endswith(prompt)
+        assert f"only repository workspace is `{worktree.resolve()}`" in task
         assert "--task" not in command
         assert all(len(argument.encode("utf-8")) < 64 * 1024 for argument in command)
         output = Path(command[command.index("--output") + 1])

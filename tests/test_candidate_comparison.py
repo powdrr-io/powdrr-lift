@@ -274,6 +274,110 @@ def test_candidate_comparison_matches_named_symbol_at_allowed_location() -> None
     assert report["passed"] is True
 
 
+def test_candidate_comparison_matches_planned_non_source_file_from_manifest(
+    tmp_path: Path,
+) -> None:
+    import hashlib
+
+    from powdrr_lift.structrr.actual_diff import compile_actual_structrr_diff
+    from powdrr_lift.structrr.source_manifest import compile_source_manifest
+
+    relative = ".github/workflows/ci.yml"
+    content = "name: CI\n\non: [pull_request]\n"
+    (tmp_path / relative).parent.mkdir(parents=True)
+    (tmp_path / relative).write_text(content, encoding="utf-8")
+    baseline: dict[str, Any] = {
+        "entities": [],
+        "entity_relationships": [],
+        "source_subjects": [],
+    }
+    proposal = _proposal(
+        {
+            "files": [
+                {
+                    "id": f"file:{relative}",
+                    "path": relative,
+                    "content": content,
+                    "action": "added",
+                }
+            ]
+        },
+        baseline,
+    )
+    baseline_manifest = compile_source_manifest(
+        tmp_path,
+        (),
+        submission_base="base",
+        source_revision="base",
+        taxonomy_fingerprint="taxonomy",
+    )
+    candidate_manifest = compile_source_manifest(
+        tmp_path,
+        (relative,),
+        submission_base="base",
+        source_revision="candidate",
+        taxonomy_fingerprint="taxonomy",
+    )
+    actual_diff = compile_actual_structrr_diff(
+        baseline, baseline, baseline_manifest, candidate_manifest
+    )
+
+    report = compare_candidate_snapshot(
+        proposal,
+        baseline,
+        baseline,
+        extraction_complete=True,
+        actual_diff=actual_diff,
+    )
+
+    assert actual_diff.source_observations[0]["path"] == relative
+    assert actual_diff.source_observations[0]["after_digest"] == (
+        "sha256:" + hashlib.sha256(content.encode("utf-8")).hexdigest()
+    )
+    assert report["passed"] is True
+    assert report["findings"][0]["status"] == "fulfilled"
+    assert report["findings"][0]["match_mode"] == "manifest_file"
+
+
+def test_candidate_comparison_classifies_nested_test_path_as_validation_change() -> (
+    None
+):
+    baseline: dict[str, Any] = {
+        "entities": [],
+        "entity_relationships": [],
+        "source_subjects": [],
+    }
+    proposal = compile_proposal_revision(
+        "change-1",
+        baseline,
+        {},
+        acceptance_criteria=("requested change is present",),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("attestation",),
+        source_refs=("instructions:1",),
+    )
+    candidate = {
+        **baseline,
+        "source_subjects": [
+            {
+                "stable_key": "python::attestation.tests.test_ci",
+                "path": "attestation/tests/test_ci.py",
+                "kind": "module",
+                "qualified_name": "attestation.tests.test_ci",
+            }
+        ],
+    }
+
+    report = compare_candidate_snapshot(
+        proposal, baseline, candidate, extraction_complete=True
+    )
+
+    assert report["passed"] is True
+    assert report["findings"][0]["review_classification"] == "validation_change"
+    assert report["findings"][0]["review_paths"] == ["attestation/tests/test_ci.py"]
+
+
 def test_candidate_comparison_reports_in_scope_helpers_without_requiring_test_files(
     tmp_path: Path,
 ) -> None:

@@ -1,19 +1,21 @@
 .PHONY: format format-check lint test typecheck worktree
 
+PYTHON ?= python
+
 format:
-	uv run ruff format .
+	$(PYTHON) -m ruff format .
 
 format-check:
-	uv run ruff format --check .
+	$(PYTHON) -m ruff format --check .
 
 lint:
-	uv run ruff check .
+	$(PYTHON) -m ruff check .
 
 test:
-	uv run pytest
+	$(PYTHON) -m pytest
 
 typecheck:
-	uv run mypy src tests
+	$(PYTHON) -m mypy src tests
 
 worktree:
 	BRANCH_NAME="$${BRANCH_NAME:-}" WORKTREE_PATH="$${WORKTREE_PATH:-}" ./scripts/create-worktree.sh

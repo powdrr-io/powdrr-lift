@@ -259,7 +259,10 @@ def test_frozen_test_installation_stages_files_and_rejects_unsafe_paths(
         check=True,
         capture_output=True,
     )
-    files = {"tests/integration/test_api.py": "def test_api():\n    assert api()\n"}
+    files = {
+        "attestation/tests/test_api.py": "def test_api():\n    assert api()\n",
+        "tests/integration/test_api.py": "def test_api():\n    assert api()\n",
+    }
     install_frozen_test_files(tmp_path, files)
     staged = subprocess.run(
         ["git", "diff", "--cached", "--name-only"],
@@ -268,10 +271,15 @@ def test_frozen_test_installation_stages_files_and_rejects_unsafe_paths(
         capture_output=True,
         text=True,
     )
-    assert staged.stdout.splitlines() == ["tests/integration/test_api.py"]
+    assert staged.stdout.splitlines() == [
+        "attestation/tests/test_api.py",
+        "tests/integration/test_api.py",
+    ]
 
     with pytest.raises(ExecutePrTestError, match="invalid frozen"):
         install_frozen_test_files(tmp_path, {"../outside.py": "assert True\n"})
+    with pytest.raises(ExecutePrTestError, match="invalid frozen"):
+        install_frozen_test_files(tmp_path, {"attestation/source.py": "assert True\n"})
 
 
 def test_generated_tests_fall_back_to_powdrr_pytest_for_non_pytest_profiles() -> None:

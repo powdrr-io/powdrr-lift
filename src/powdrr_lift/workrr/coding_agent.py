@@ -730,6 +730,17 @@ class MiniSWEAgentProvider:
     def run(
         self, request: ImplementationRequest, *, worktree_root: Path, attempt_id: str
     ) -> subprocess.CompletedProcess[str]:
+        workspace_root = worktree_root.resolve()
+        task_prompt = (
+            "Workspace boundary (mandatory preflight):\n"
+            f"- The only repository workspace is `{workspace_root}`.\n"
+            "- Before inspecting or editing anything, run `pwd` and `git rev-parse "
+            "--show-toplevel`. Both must identify this exact workspace.\n"
+            "- If either path differs, stop immediately without inspecting or "
+            "changing any files.\n"
+            "- Do not `cd` to, read from, or write to any other checkout or path.\n\n"
+            f"{request.prompt}"
+        )
         environment = os.environ.copy()
         environment.pop("VIRTUAL_ENV", None)
         # mini-swe-agent v2 otherwise launches its first-run interactive setup
@@ -741,7 +752,7 @@ class MiniSWEAgentProvider:
             token = environment.get("DEEPINFRA_API_TOKEN")
             if token:
                 environment["DEEPINFRA_API_KEY"] = token
-        environment["PWD"] = str(worktree_root.resolve())
+        environment["PWD"] = str(workspace_root)
         mini_config = _miniswe_builtin_config(self.executable)
         command = [
             self.executable,
@@ -756,7 +767,7 @@ class MiniSWEAgentProvider:
                     "--config",
                     str(mini_config),
                     "--config",
-                    f"environment.cwd={worktree_root.resolve()}",
+                    f"environment.cwd={workspace_root}",
                 )
             )
         output_path = (
@@ -765,15 +776,15 @@ class MiniSWEAgentProvider:
             else None
         )
         task_file: Path | None = None
-        use_task_file = (
-            len(request.prompt.encode("utf-8")) > MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES
+        use_task_file = len(task_prompt.encode("utf-8")) > (
+            MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES
         )
         if self.session_trajectory is None:
             if not use_task_file:
                 command.extend(
                     [
                         "--task",
-                        request.prompt,
+                        task_prompt,
                         "--yolo",
                         "--exit-immediately",
                         # Powdrr owns the wall-clock budget and can continue a partial
@@ -805,14 +816,14 @@ class MiniSWEAgentProvider:
                     suffix=".txt",
                     delete=False,
                 ) as task_stream:
-                    task_stream.write(request.prompt)
+                    task_stream.write(task_prompt)
                     task_file = Path(task_stream.name)
                 command.extend(("--task-file", str(task_file)))
             else:
-                command.extend(("--task", request.prompt))
+                command.extend(("--task", task_prompt))
             if mini_config is not None:
                 command.extend(("--config", str(mini_config)))
-            command.extend(("--config", f"environment.cwd={worktree_root.resolve()}"))
+            command.extend(("--config", f"environment.cwd={workspace_root}"))
             if self.model is not None:
                 command.extend(("--model", self.model))
         if output_path is not None:

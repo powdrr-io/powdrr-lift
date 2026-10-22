@@ -1,0 +1,43 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1109
+title: Keep main as the base for checkpointed worker attempts
+intent:
+  problem: A worker implementation runs on the durable workflow integration branch, whose checkpoint commits advance beyond main, but the coding-agent guard rejected any HEAD that was not exactly equal to main.
+  goal: Keep main as the declared target baseline while allowing the integration checkpoint branch to run coding attempts when it descends from that baseline.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 1210, end_line: 1216}
+    summary: Check ancestry between the declared target base and implementation worktree HEAD.
+    rationale: Durable workflow checkpoints can advance integration HEAD while main remains the code comparison baseline.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 1224, end_line: 1225}
+    summary: Report a policy denial when the worktree is not based on the target commit.
+    rationale: Keep attempts on unrelated commit histories blocked.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 833, end_line: 867}
+    summary: Add regression coverage for a checkpoint commit descended from the declared base.
+    rationale: Verify the coding worker runs against a checkpointed integration branch while preserving the main baseline.
+entities:
+  - id: coding-agent-base-ancestry-guard
+    type: Function
+    action: added
+  - id: coding-agent-checkpoint-descendant-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: checkpoint-descendant-test-verifies-base-guard
+    type: verifies
+    source: coding-agent-checkpoint-descendant-regression
+    target: coding-agent-base-ancestry-guard
+    action: added
+    description: The regression test verifies that a durable checkpoint descendant can execute while retaining the main commit as the declared baseline.
+invariants:
+  - id: target-main-remains-worker-baseline
+    description: The declared target commit remains the baseline; implementation worktrees may add workflow checkpoint commits only when the target commit is their ancestor.
+    action: added
+guidance: []

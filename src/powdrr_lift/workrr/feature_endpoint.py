@@ -2681,6 +2681,10 @@ def _run_code_agent_phase(
                 WorkflowLLMClient | None,
                 state.get("scenario_claim_faithfulness_client"),
             ),
+            faithfulness_detail_client=cast(
+                WorkflowLLMClient | None,
+                state.get("probe_generation_client"),
+            ),
             repository_contract=implementation_packet.contract_closure,
         )
         if (

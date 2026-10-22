@@ -21,7 +21,7 @@ from powdrr_lift.core.semantic_faithfulness import (
 from powdrr_lift.workrr.llm import complete_json
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
-PROBE_REPAIR_SCHEMA_VERSION = "behavior-probe-repair-v3"
+PROBE_REPAIR_SCHEMA_VERSION = "behavior-probe-repair-v5"
 PROBE_REPAIR_BATCH_SIZE = 8
 PROBE_REPAIR_RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -44,7 +44,20 @@ PROBE_REPAIR_RESPONSE_SCHEMA: dict[str, Any] = {
     "required": ["revisions"],
     "additionalProperties": False,
 }
-CLAIM_REVIEW_RESPONSE_SCHEMA: dict[str, Any] = {
+CLAIM_CATEGORY_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "status": {"type": "string", "enum": ["resolved", "unresolved"]},
+        "value": {
+            "type": ["string", "null"],
+            "enum": ["entailed", "contradicted", "not_stated", None],
+        },
+        "reason_code": {"type": ["string", "null"]},
+    },
+    "required": ["status", "value", "reason_code"],
+    "additionalProperties": False,
+}
+CLAIM_DETAILS_RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
         "results": {
@@ -52,17 +65,24 @@ CLAIM_REVIEW_RESPONSE_SCHEMA: dict[str, Any] = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "status": {
-                        "type": "string",
-                        "enum": ["resolved", "unresolved"],
+                    "unsupported_part": {"type": ["string", "null"]},
+                    "source_evidence": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "clause_id": {"type": "string"},
+                                "quote": {"type": "string"},
+                            },
+                            "required": ["clause_id", "quote"],
+                            "additionalProperties": False,
+                        },
                     },
-                    "value": {
-                        "type": ["string", "null"],
-                        "enum": ["entailed", "contradicted", "not_stated", None],
-                    },
-                    "reason_code": {"type": ["string", "null"]},
                 },
-                "required": ["status", "value", "reason_code"],
+                "required": [
+                    "unsupported_part",
+                    "source_evidence",
+                ],
                 "additionalProperties": False,
             },
         }
@@ -80,6 +100,7 @@ def repair_behavior_probes(
     contract_directory: Path,
     ledger_clauses: Sequence[Mapping[str, Any]],
     faithfulness_client: WorkflowLLMClient | None,
+    faithfulness_detail_client: WorkflowLLMClient | None = None,
     repository_contract: Mapping[str, Any] | None = None,
 ) -> tuple[tuple[dict[str, Any], ...], dict[str, Any]]:
     """Revise degraded probes once, retaining only source-faithful candidates."""
@@ -98,6 +119,7 @@ def repair_behavior_probes(
         "initial_findings": initial_findings,
         "final_findings": initial_findings,
         "faithfulness_reviews": [],
+        "faithfulness_retries": [],
         "repair_batches": [],
         "missing_scenario_ids": [],
         "error": None,
@@ -233,9 +255,29 @@ def repair_behavior_probes(
                     instruction, ledger_clauses
                 ),
                 client=faithfulness_client,
+                detail_client=faithfulness_detail_client or client,
             )
             artifact["faithfulness_reviews"].append(review)
-            candidates.append(candidate if accepted else original)
+            if accepted:
+                candidates.append(candidate)
+                continue
+            retry_candidate, retry_review = _retry_faithfulness_rejection(
+                client,
+                instruction=instruction,
+                repository_contract=repository_contract or {},
+                scenario=candidate,
+                review=review,
+                ledger_clauses=_faithfulness_source_context(
+                    instruction, ledger_clauses
+                ),
+                contract_directory=contract_directory,
+                faithfulness_client=faithfulness_client,
+                faithfulness_detail_client=faithfulness_detail_client or client,
+            )
+            artifact["faithfulness_retries"].append(retry_review)
+            candidates.append(
+                retry_candidate if retry_candidate is not None else original
+            )
         else:
             candidates.append(original)
     try:
@@ -451,6 +493,42 @@ def _faithfulness_source_context(
     )
 
 
+def _source_evidence_is_valid(evidence: Any, *, context_text: str) -> bool:
+    """Check that cited source quotes are exact excerpts from cited clauses."""
+    if not isinstance(evidence, list) or not evidence:
+        return False
+    try:
+        context = json.loads(context_text)
+    except (TypeError, ValueError):
+        return False
+    clauses = context.get("source_clauses") if isinstance(context, Mapping) else None
+    if not isinstance(clauses, list):
+        return False
+    source_by_id = {
+        clause.get("clause_id"): clause.get("text")
+        for clause in clauses
+        if isinstance(clause, Mapping)
+        and isinstance(clause.get("clause_id"), str)
+        and isinstance(clause.get("text"), str)
+    }
+    for item in evidence:
+        if not isinstance(item, Mapping):
+            return False
+        clause_id = item.get("clause_id")
+        quote = item.get("quote")
+        source_text = (
+            source_by_id.get(clause_id) if isinstance(clause_id, str) else None
+        )
+        if (
+            not isinstance(quote, str)
+            or not quote.strip()
+            or not isinstance(source_text, str)
+            or quote not in source_text
+        ):
+            return False
+    return True
+
+
 def _obligation_guidance(
     *,
     scenarios: Mapping[str, Mapping[str, Any]],
@@ -537,6 +615,180 @@ def _classify_probe_obligation(source: str) -> tuple[str, str]:
     )
 
 
+def _retry_faithfulness_rejection(
+    client: WorkflowLLMClient | None,
+    *,
+    instruction: str,
+    repository_contract: Mapping[str, Any],
+    scenario: Mapping[str, Any],
+    review: Mapping[str, Any],
+    ledger_clauses: Sequence[Mapping[str, Any]],
+    contract_directory: Path,
+    faithfulness_client: WorkflowLLMClient | None,
+    faithfulness_detail_client: WorkflowLLMClient | None,
+) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    """Give one rejected revision a targeted, source-only repair attempt."""
+    scenario_id = str(scenario.get("scenario_id", "unknown"))
+    record: dict[str, Any] = {
+        "scenario_id": scenario_id,
+        "status": "unavailable",
+        "faithfulness_review": dict(review),
+        "error": None,
+    }
+    if client is None or review.get("status") != "rejected":
+        record["status"] = "not_attempted"
+        record["error"] = "revision was not rejected or repair client is unavailable"
+        return None, record
+    try:
+        response = complete_json(
+            client,
+            _build_faithfulness_retry_messages(
+                instruction=instruction,
+                repository_contract=repository_contract,
+                scenario=scenario,
+                review=review,
+                ledger_clauses=ledger_clauses,
+            ),
+            response_schema=PROBE_REPAIR_RESPONSE_SCHEMA,
+        )
+        revisions, errors = _parse_revision_batch(response, {scenario_id})
+        retry = revisions.get(scenario_id)
+        if retry is None:
+            record["status"] = "no_revision"
+            record["error"] = "; ".join(errors) or "repair returned no scenario"
+            return None, record
+        candidate = {
+            **scenario,
+            "given": retry["given"],
+            "when": retry["when"],
+            "then": retry["then"],
+        }
+        compile_behavior_scenarios((candidate,))
+        accepted, retry_review = _check_revised_scenario_faithfulness(
+            scenario,
+            candidate,
+            contract_directory=contract_directory,
+            ledger_clauses=ledger_clauses,
+            client=faithfulness_client,
+            detail_client=faithfulness_detail_client,
+        )
+        record["proposed_revision"] = dict(retry)
+        record["faithfulness_review"] = retry_review
+        if accepted:
+            record["status"] = "accepted"
+            return candidate, record
+        record["status"] = "rejected"
+        return None, record
+    except Exception as error:
+        record["status"] = "unavailable"
+        record["error"] = f"{type(error).__name__}: {error}"
+        return None, record
+
+
+def _build_faithfulness_retry_messages(
+    *,
+    instruction: str,
+    repository_contract: Mapping[str, Any],
+    scenario: Mapping[str, Any],
+    review: Mapping[str, Any],
+    ledger_clauses: Sequence[Mapping[str, Any]],
+) -> list[dict[str, str]]:
+    """Ask Miniswe to correct only a rejected probe assertion using source."""
+    scenario_id = str(scenario.get("scenario_id", ""))
+    finding = {
+        "scenario_id": scenario_id,
+        "reason": review.get("outcome", review),
+    }
+    sources = _flagged_scenarios_with_sources(
+        [finding],
+        {scenario_id: scenario},
+        ledger_clauses,
+        source_instruction=instruction,
+    )
+    return [
+        {
+            "role": "system",
+            "content": (
+                "Correct one behavior probe that failed source-faithfulness review. "
+                "Use only the source instruction, related source clauses, and the "
+                "provided repository contract. The verifier and hidden tests are "
+                "never inputs. Read the review findings and source evidence, then "
+                "change only the unsupported or contradictory assertion. Preserve "
+                "supported setup, operation, and expectations. If the source does "
+                "not support a safe probe, return the scenario unchanged. Return one "
+                "revision with the same scenario ID."
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "source_instruction": instruction,
+                    "repository_contract": repository_contract,
+                    "flagged_scenario": sources[0] if sources else scenario,
+                    "faithfulness_review": review,
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        },
+    ]
+
+
+def _build_jev_claim_category_messages(
+    request: Mapping[str, Any],
+) -> list[dict[str, str]]:
+    """Build the enum-classifier envelope recognized by the JEV adapter."""
+    claim = request.get("claim")
+    if not isinstance(claim, Mapping):
+        raise ValueError("scenario claim request has no claim")
+    source_text = request.get("source_text")
+    if not isinstance(source_text, str):
+        raise ValueError("scenario claim request has no source text")
+    question = (
+        "Is this candidate scenario claim entailed, contradicted, or not stated "
+        "by the source instruction?"
+    )
+    instructions = [
+        "Use entailed when the source supports the claim.",
+        "Use contradicted when the source rules the claim out.",
+        "Use not_stated when the source does not decide it.",
+        "Read related source clauses together and interpret the claim with its "
+        "given and when context.",
+        "A concrete observable check is entailed when it directly checks required "
+        "behavior, even if the exact test expression is not stated.",
+        "Do not provide explanations or revise the candidate.",
+    ]
+    classifier = {
+        "spec": {"decision_kind": "entailment"},
+        "question": question,
+        "instructions": instructions,
+        "allowed_values": ["entailed", "contradicted", "not_stated"],
+        "subject_text": source_text,
+        "candidate_field": "scenario claim",
+        "candidate_value": claim.get("candidate_value"),
+        "claim": dict(claim),
+        "source_context": request.get("context_text"),
+    }
+    context = json.dumps(
+        {"scenario_claim": classifier}, ensure_ascii=False, sort_keys=True
+    )
+    return [
+        {
+            "role": "system",
+            "content": "Classify the candidate using the allowed labels.",
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Question:\n{question}\n"
+                f"Instructions:\n{' '.join(instructions)}\n"
+                f"Context:\n{context}"
+            ),
+        },
+    ]
+
+
 def _check_revised_scenario_faithfulness(
     original: Mapping[str, Any],
     candidate: Mapping[str, Any],
@@ -544,8 +796,10 @@ def _check_revised_scenario_faithfulness(
     contract_directory: Path,
     ledger_clauses: Sequence[Mapping[str, Any]],
     client: WorkflowLLMClient | None,
+    detail_client: WorkflowLLMClient | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """Run the scenario-claim entailment check used during prompt planning."""
+    detail_client = detail_client or client
     reference = original.get("faithfulness_ref")
     scenario_id = str(original.get("scenario_id", "unknown"))
     if not isinstance(reference, Mapping) or not isinstance(
@@ -594,57 +848,85 @@ def _check_revised_scenario_faithfulness(
             },
         }
         plan = prepare_scenario_claim_reviews(
-            contract, scenario=changed_claims, ledger_clauses=ledger_clauses
+            contract,
+            scenario=changed_claims,
+            scenario_context=candidate,
+            ledger_clauses=ledger_clauses,
         )
         requests = plan.get("requests")
         if not isinstance(requests, list):
             raise ValueError("scenario faithfulness plan is malformed")
+        review_results: list[Mapping[str, Any]] = []
         if requests:
             if client is None:
                 raise ValueError("faithfulness classifier is unavailable")
-            response = complete_json(
-                client,
+            category_results = [
+                complete_json(
+                    client,
+                    _build_jev_claim_category_messages(request),
+                    response_schema=CLAIM_CATEGORY_RESPONSE_SCHEMA,
+                )
+                for request in requests
+                if isinstance(request, Mapping)
+            ]
+            if len(category_results) != len(requests):
+                raise ValueError("scenario claim request is malformed")
+            if detail_client is None:
+                raise ValueError("faithfulness detail LLM is unavailable")
+            detail_response = complete_json(
+                detail_client,
                 [
                     {
                         "role": "system",
                         "content": (
-                            "Classify whether each candidate scenario claim is "
-                            "entailed by the exact source instruction and accepted "
-                            "semantic contract. Use entailed only when the source "
-                            "supports the claim, contradicted when it conflicts, "
-                            "and not_stated when the source does not decide it. "
-                            "Read the complete source-clause set together, including "
-                            "clauses with the same parent or validation group. A "
-                            "claim can be entailed by combining those clauses; do "
-                            "not require one clause to restate the whole behavior. "
-                            "A concrete observable check is entailed when it directly "
-                            "checks an explicitly required behavior, even if the "
-                            "source does not prescribe that exact test expression. "
-                            "For example, checking that a named exposed property is "
-                            "present tests the stated exposure requirement; do not "
-                            "infer an unstated property value from that. Do not use "
-                            "common practice or implementation guesses. "
-                            "For resolved results, set reason_code to null. Use "
-                            "unresolved with a null value and a reason code only "
-                            "when the source cannot be classified."
+                            "JEV already classified each claim. Do not change or "
+                            "second-guess its category. For each claim, provide exact "
+                            "source quotes with clause IDs that explain that category. "
+                            "Quotes must be exact substrings of the supplied source "
+                            "clauses; never cite the candidate probe. For not_stated, "
+                            "identify "
+                            "the shortest exact unsupported substring in the candidate "
+                            "claim, or use null if none can be isolated. For entailed "
+                            "or contradicted claims, unsupported_part must be null. "
+                            "Checking a named exposed property for presence supports "
+                            "exposure requirement but does not imply its value. Do not "
+                            "use common practice or implementation guesses. Return one "
+                            "details result for each claim, in input order."
                         ),
                     },
                     {
                         "role": "user",
                         "content": json.dumps(
-                            {"requests": requests},
+                            {
+                                "requests": requests,
+                                "jev_categories": [
+                                    dict(item) for item in category_results
+                                ],
+                            },
                             ensure_ascii=False,
                             sort_keys=True,
                         ),
                     },
                 ],
-                response_schema=CLAIM_REVIEW_RESPONSE_SCHEMA,
+                response_schema=CLAIM_DETAILS_RESPONSE_SCHEMA,
             )
-            raw_results = response.get("results")
-            if not isinstance(raw_results, list) or not all(
-                isinstance(item, Mapping) for item in raw_results
+            detail_results = detail_response.get("results")
+            if not isinstance(detail_results, list) or not all(
+                isinstance(item, Mapping) for item in detail_results
             ):
-                raise ValueError("faithfulness response has no results array")
+                raise ValueError(
+                    "faithfulness detail LLM response has no results array"
+                )
+            if len(detail_results) != len(requests):
+                raise ValueError(
+                    "faithfulness detail response count does not match claims"
+                )
+            review_results = [
+                {**dict(category), **dict(details)}
+                for category, details in zip(
+                    category_results, detail_results, strict=True
+                )
+            ]
             results = [
                 {
                     "status": item.get("status"),
@@ -655,11 +937,52 @@ def _check_revised_scenario_faithfulness(
                         else item.get("reason_code")
                     ),
                 }
-                for item in raw_results
+                for item in category_results
             ]
         else:
             results = []
         outcome = finalize_scenario_claim_reviews(plan, results, benchmark_mode=True)
+        requests = plan.get("requests")
+        outcome_reviews = outcome.get("reviews")
+        if isinstance(requests, list) and isinstance(outcome_reviews, list):
+            enriched_reviews = [
+                dict(review)
+                for review in outcome_reviews
+                if isinstance(review, Mapping)
+            ]
+            review_by_claim = {
+                str(review.get("claim_id")): review for review in enriched_reviews
+            }
+            for request, result in zip(requests, review_results, strict=True):
+                claim = request.get("claim") if isinstance(request, Mapping) else None
+                claim_id = claim.get("claim_id") if isinstance(claim, Mapping) else None
+                if not isinstance(claim_id, str):
+                    continue
+                review = review_by_claim.get(claim_id)
+                if review is None:
+                    continue
+                evidence = result.get("source_evidence")
+                review["source_evidence"] = (
+                    [dict(item) for item in evidence if isinstance(item, Mapping)]
+                    if isinstance(evidence, list)
+                    else []
+                )
+                review["source_evidence_valid"] = _source_evidence_is_valid(
+                    evidence,
+                    context_text=str(request.get("context_text") or ""),
+                )
+                unsupported_part = result.get("unsupported_part")
+                claim_value = (
+                    claim.get("candidate_value") if isinstance(claim, Mapping) else None
+                )
+                review["unsupported_part"] = unsupported_part
+                review["unsupported_part_valid"] = (
+                    isinstance(unsupported_part, str)
+                    and bool(unsupported_part.strip())
+                    and isinstance(claim_value, str)
+                    and unsupported_part in claim_value
+                )
+            outcome["reviews"] = enriched_reviews
         return bool(outcome.get("accepted")), {
             "scenario_id": scenario_id,
             "status": "accepted" if outcome.get("accepted") else "rejected",

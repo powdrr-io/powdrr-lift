@@ -18,7 +18,7 @@ from powdrr_lift.core.semantic_decision import (
 )
 
 FAITHFULNESS_REVISION = "source-faithfulness-v1"
-SCENARIO_CLAIM_REVISION = "scenario-claim-faithfulness-v1"
+SCENARIO_CLAIM_REVISION = "scenario-claim-faithfulness-v2"
 MAX_SCENARIO_CLAIMS = 32
 REVIEWABLE_FIELDS = (
     "behavior_family",
@@ -151,12 +151,19 @@ def prepare_scenario_claim_reviews(
     contract: PartialSemanticContract,
     *,
     scenario: Mapping[str, Any],
+    scenario_context: Mapping[str, Any] | None = None,
     ledger_clauses: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     """Prepare bounded reviews for claims scenario generation adds downstream."""
     source_clauses = _scenario_source_clauses(contract, ledger_clauses)
     source_context = {
         "source_clauses": source_clauses,
+        "probe_context": {
+            field: scenario_context.get(field)
+            for field in ("given", "when")
+            if scenario_context is not None
+            and isinstance(scenario_context.get(field), str)
+        },
         "accepted_decisions": {
             "routing": contract.routing,
             "disposition": contract.disposition,

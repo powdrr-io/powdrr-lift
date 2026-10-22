@@ -783,6 +783,29 @@ def test_scenario_claim_review_preserves_source_clause_relationships() -> None:
     assert clauses["instruction-002"]["validation_group_id"] == "parser-behavior"
 
 
+def test_scenario_claim_review_includes_probe_setup_and_action_as_context() -> None:
+    source = "DdlTable exposes a property column_count."
+    contract = _faithfulness_contract(source)
+    scenario = {"then": "The result is True."}
+    probe_context = {
+        "given": "A DdlTable instance exists.",
+        "when": "hasattr(table, 'column_count') is evaluated.",
+    }
+
+    plan = prepare_scenario_claim_reviews(
+        contract,
+        scenario=scenario,
+        scenario_context=probe_context,
+        ledger_clauses=[{"clause_id": contract.source_ref, "text": source}],
+    )
+
+    assert len(plan["requests"]) == 1
+    request = plan["requests"][0]
+    assert request["claim"]["candidate_value"] == "The result is True."
+    context = json.loads(request["context_text"])
+    assert context["probe_context"] == probe_context
+
+
 def test_scenario_claim_review_separates_contradictions_and_assumptions() -> None:
     source = "The API initializes values from defaults."
     contract = _faithfulness_contract(source)

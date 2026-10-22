@@ -665,14 +665,59 @@ def _issue_worker_structrr_context(
         / plan_slug
         / f"bootstrap-{base_commit}.yaml"
     )
-    current = bootstrap_structrr(
-        repo_root,
-        output_path=bootstrap_path,
-        taxonomy_path=_structrr_taxonomy_path(repo_root),
-        include_untracked=False,
-        artifact_exclusions=exclusions,
-        submission_base=base_commit,
-    )
+    # The workflow integration worktree can contain checkpoints from earlier
+    # attempts. `submission_base` records the comparison base in the manifest,
+    # but bootstrap still reads the checked-out files. Bootstrap a detached
+    # worktree at the target branch commit so prior checkpoint code cannot be
+    # mistaken for the repository baseline.
+    baseline_temp_parent = Path(tempfile.gettempdir())
+    baseline_temp_parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix="powdrr-structrr-baseline-", dir=baseline_temp_parent
+    ) as temp_root:
+        baseline_worktree = Path(temp_root) / "checkout"
+        add_worktree = subprocess.run(
+            [
+                "git",
+                "worktree",
+                "add",
+                "--quiet",
+                "--detach",
+                str(baseline_worktree),
+                base_commit,
+            ],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if add_worktree.returncode != 0:
+            raise PowdrrExecutionError(
+                "could not prepare the target-branch Structrr baseline worktree: "
+                + add_worktree.stderr.strip()
+            )
+        try:
+            current = bootstrap_structrr(
+                baseline_worktree,
+                output_path=bootstrap_path,
+                taxonomy_path=_structrr_taxonomy_path(baseline_worktree),
+                include_untracked=False,
+                artifact_exclusions=exclusions,
+                submission_base=base_commit,
+            )
+        finally:
+            remove_worktree = subprocess.run(
+                ["git", "worktree", "remove", "--force", str(baseline_worktree)],
+                cwd=repo_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if remove_worktree.returncode != 0:
+                raise PowdrrExecutionError(
+                    "could not remove the temporary Structrr baseline worktree: "
+                    + remove_worktree.stderr.strip()
+                )
     if not current.validation.successful or current.source_manifest is None:
         raise PowdrrExecutionError(
             "current Structrr bootstrap failed before coding: "

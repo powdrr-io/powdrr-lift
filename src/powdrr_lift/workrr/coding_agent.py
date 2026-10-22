@@ -1207,7 +1207,13 @@ def run_coding_agent(
 ) -> CodingAgentAttempt:
     """Run one worker and derive the result from the observed repository state."""
     before_head = _git_output(worktree_root, "rev-parse", "HEAD")
-    if before_head != request.base_commit:
+    based_on_request_base = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", request.base_commit, before_head],
+        cwd=worktree_root,
+        capture_output=True,
+        check=False,
+    )
+    if based_on_request_base.returncode != 0:
         return CodingAgentAttempt(
             attempt_id,
             request.request_id,
@@ -1215,8 +1221,8 @@ def run_coding_agent(
             CodingAgentStatus.POLICY_DENIED,
             None,
             error=(
-                "worktree HEAD does not match implementation request base commit: "
-                f"expected {request.base_commit}, found {before_head}"
+                "implementation worktree HEAD is not based on the declared target "
+                f"base commit: base {request.base_commit}, found {before_head}"
             ),
         )
     before_status = _working_paths(worktree_root)

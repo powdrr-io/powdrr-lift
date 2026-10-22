@@ -830,6 +830,41 @@ def test_worker_rejects_worktree_at_wrong_base_commit(tmp_path: Path) -> None:
     assert not (worktree / "src" / "change.py").exists()
 
 
+def test_worker_accepts_checkpoint_commit_descending_from_declared_base(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path)
+    base_commit = _head(worktree)
+    (worktree / "docs").mkdir()
+    (worktree / "docs" / "workflow-state.txt").write_text("checkpoint\n")
+    subprocess.run(["git", "add", "docs/workflow-state.txt"], cwd=worktree, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "persist workflow checkpoint",
+        ],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+    )
+
+    attempt = run_coding_agent(
+        FakeProvider("allowed"),
+        _request(base_commit),
+        worktree_root=worktree,
+        attempt_id="attempt-checkpoint-descendant",
+    )
+
+    assert attempt.status is CodingAgentStatus.COMPLETED
+    assert attempt.changed_paths == ("src/change.py",)
+
+
 def test_opencode_policy_is_noninteractive_and_denies_publication() -> None:
     policy = OpenCodePermissionPolicy(("pytest *", "ruff *"))
 

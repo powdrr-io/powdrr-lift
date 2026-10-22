@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -90,6 +89,28 @@ CLAIM_DETAILS_RESPONSE_SCHEMA: dict[str, Any] = {
     "required": ["results"],
     "additionalProperties": False,
 }
+OBLIGATION_CATEGORY_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "category": {
+            "type": "string",
+            "enum": [
+                "property_exposure",
+                "derived_property",
+                "public_member",
+                "normalization",
+                "pass_through",
+                "scope_exclusion",
+                "parser_support",
+                "formatting_transformation",
+                "behavioral_result",
+                "uncertain",
+            ],
+        }
+    },
+    "required": ["category"],
+    "additionalProperties": False,
+}
 
 
 def repair_behavior_probes(
@@ -112,10 +133,7 @@ def repair_behavior_probes(
         "original_scenarios": originals,
         "proposed_revisions": [],
         "used_scenarios": originals,
-        "obligation_guidance": _obligation_guidance(
-            scenarios={str(item.get("scenario_id", "")): item for item in originals},
-            ledger_clauses=ledger_clauses,
-        ),
+        "obligation_guidance": [],
         "initial_findings": initial_findings,
         "final_findings": initial_findings,
         "faithfulness_reviews": [],
@@ -148,6 +166,13 @@ def repair_behavior_probes(
         return tuple(originals), artifact
 
     findings_by_id = {str(item["scenario_id"]): item for item in initial_findings}
+    obligation_guidance = _obligation_guidance(
+        client=faithfulness_client,
+        scenarios={str(item.get("scenario_id", "")): item for item in originals},
+        ledger_clauses=ledger_clauses,
+        scenario_ids=set(repairable),
+    )
+    artifact["obligation_guidance"] = obligation_guidance
     revisions: dict[str, Mapping[str, Any]] = {}
     repair_errors: list[str] = []
     requested_ids = list(repairable)
@@ -170,6 +195,7 @@ def repair_behavior_probes(
             findings=batch_findings,
             scenarios=batch_scenarios,
             ledger_clauses=ledger_clauses,
+            obligation_guidance=obligation_guidance,
         )
         batch_record: dict[str, Any] = {
             "requested_scenario_ids": batch_ids,
@@ -306,6 +332,7 @@ def _build_repair_messages(
     findings: Sequence[Mapping[str, Any]],
     scenarios: Mapping[str, Mapping[str, Any]],
     ledger_clauses: Sequence[Mapping[str, Any]],
+    obligation_guidance: Sequence[Mapping[str, str]],
 ) -> list[dict[str, str]]:
     return [
         {
@@ -323,15 +350,17 @@ def _build_repair_messages(
                 "input transformation in `when`; state an assertion-sized result in "
                 "`then`. Use the full source instruction and related source clauses "
                 "to understand how an atomic clause fits the requested deliverable; "
-                "the verifier and hidden tests are never inputs. Follow the supplied "
-                "obligation-specific probe guidance. For a derived property, assert "
-                "its exact value from a setup with known inputs, not merely that it "
-                "exists. For normalization, use a non-canonical input and assert the "
-                "canonical value. For explicit pass-through behavior, compare the "
-                "output with the original input. Do not invent behavior for a clause "
-                "that only excludes work from scope. For a clause that names a public "
-                "field, property, method, or type, test the stated member or type "
-                "directly. Keep scenario IDs unchanged. If the "
+                "the verifier and hidden tests are never inputs. The obligation "
+                "category was assigned by JEV. Use that category to select "
+                "the right kind of probe, then derive all concrete setup and expected "
+                "details from the source clause and repository contract. For a "
+                "property_exposure obligation, assert that the named property can be "
+                "accessed; do not infer its returned value. For derived_property, "
+                "assert a value only when its derivation is specified by the source. "
+                "For normalization, use a non-canonical input and assert the canonical "
+                "value. For explicit pass-through behavior, compare output with input. "
+                "Do not invent behavior for scope exclusions. Keep scenario IDs "
+                "unchanged. If the "
                 "clause truly does not support a safe observable check, return its "
                 "fields unchanged so the pre-coding gate can stop the task."
             ),
@@ -342,10 +371,11 @@ def _build_repair_messages(
                 {
                     "source_instruction": instruction,
                     "repository_contract": repository_contract,
-                    "obligation_guidance": _obligation_guidance(
-                        scenarios=scenarios,
-                        ledger_clauses=ledger_clauses,
-                    ),
+                    "obligation_guidance": [
+                        item
+                        for item in obligation_guidance
+                        if item["scenario_id"] in scenarios
+                    ],
                     "flagged_scenarios": _flagged_scenarios_with_sources(
                         findings,
                         scenarios,
@@ -531,8 +561,10 @@ def _source_evidence_is_valid(evidence: Any, *, context_text: str) -> bool:
 
 def _obligation_guidance(
     *,
+    client: WorkflowLLMClient | None,
     scenarios: Mapping[str, Mapping[str, Any]],
     ledger_clauses: Sequence[Mapping[str, Any]],
+    scenario_ids: set[str],
 ) -> list[dict[str, str]]:
     clauses = {
         str(clause.get("clause_id")): clause
@@ -544,75 +576,97 @@ def _obligation_guidance(
         source_id = scenario_id.removeprefix("scenario:")
         clause = clauses.get(source_id, {})
         source = str(clause.get("text") or scenario.get("then") or "")
-        kind, guidance = _classify_probe_obligation(source)
+        if scenario_id not in scenario_ids:
+            continue
+        kind = "uncertain"
+        if client is not None:
+            try:
+                response = complete_json(
+                    client,
+                    _build_jev_obligation_category_messages(source),
+                    response_schema=OBLIGATION_CATEGORY_RESPONSE_SCHEMA,
+                )
+                candidate = response.get("category")
+                if isinstance(candidate, str) and candidate in {
+                    "property_exposure",
+                    "derived_property",
+                    "public_member",
+                    "normalization",
+                    "pass_through",
+                    "scope_exclusion",
+                    "parser_support",
+                    "formatting_transformation",
+                    "behavioral_result",
+                    "uncertain",
+                }:
+                    kind = candidate
+            except Exception:
+                # Keep the category conservative. The probe authoring LLM still
+                # receives the source and must not infer an unstated behavior.
+                kind = "uncertain"
         result.append(
             {
                 "scenario_id": scenario_id,
                 "obligation_type": kind,
-                "probe_guidance": guidance,
+                "categorized_by": "jev" if kind != "uncertain" else "unresolved",
             }
         )
     return result
 
 
-def _classify_probe_obligation(source: str) -> tuple[str, str]:
-    normalized = re.sub(r"\s+", " ", source).strip().casefold()
-    if "out of scope" in normalized:
-        return (
-            "scope_exclusion",
-            "Do not invent an expected behavior for this excluded obligation. "
-            "Use only an explicit pass-through requirement from related source "
-            "clauses.",
-        )
-    if re.search(r"\bpass(?:es|ed)?\s+through\s+unchanged\b|\bunchanged\b", normalized):
-        return (
-            "pass_through",
-            "Use a concrete in-scope input and assert that the output is unchanged.",
-        )
-    if re.search(
-        r"\b(?:lowercase|lowercased|normalized|normalizes|normalization)\b", normalized
-    ):
-        return (
-            "normalization",
-            "Use a non-canonical input and assert the exact canonical value.",
-        )
-    if re.search(r"\bproperty\b|\bderived\b", normalized):
-        return (
+def _build_jev_obligation_category_messages(source: str) -> list[dict[str, str]]:
+    categories = [
+        "property_exposure: the source requires a named property to be exposed, but "
+        "does not specify its value",
+        "derived_property: the source specifies how a property's value is derived",
+        "public_member: the source names a field, method, or type to expose",
+        "normalization: the source requires canonicalization of an input value",
+        "pass_through: the source requires preserving an input unchanged",
+        "scope_exclusion: the source explicitly excludes behavior from scope",
+        "parser_support: the source requires accepting or rejecting named syntax",
+        "formatting_transformation: the source specifies an output formatting rule",
+        "behavioral_result: the source specifies another observable behavior",
+        "uncertain: the source does not establish one safe category",
+    ]
+    classifier = {
+        "spec": {"decision_kind": "probe_obligation_category"},
+        "question": "Which single category best describes the stated obligation?",
+        "instructions": [
+            "Select the category that matches only what the source states.",
+            "A requirement to expose a named property is property_exposure unless "
+            "the source also specifies its value or derivation.",
+            "Do not infer behavior from repository conventions or likely intent.",
+        ],
+        "allowed_values": [
+            "property_exposure",
             "derived_property",
-            "Construct an object with known source values and assert the exact "
-            "derived property value, not just property presence.",
-        )
-    if re.search(r"\battribute\b|\bfield\b|\btype\s+str\b|\btype\s+bool\b", normalized):
-        return (
             "public_member",
-            "Access the named public member directly and assert its specified value "
-            "or type.",
-        )
-    if re.search(
-        r"\bvalid parsed representation\b|\bparsed list\[line\]\b", normalized
-    ):
-        return (
-            "representation_robustness",
-            "Exercise distinct valid parsed representations of the same input and "
-            "assert the same parsed result.",
-        )
-    if re.search(r"\bparse\w*\b|\bsupport(?:s|ed)?\b", normalized):
-        return (
+            "normalization",
+            "pass_through",
+            "scope_exclusion",
             "parser_support",
-            "Supply the named minimal supported syntax and assert the parsed "
-            "structure and relevant values.",
-        )
-    if re.search(r"\bformat\w*\b|\bline\b|\bcomma\b|\bspace\b", normalized):
-        return (
             "formatting_transformation",
-            "Use the smallest input that exercises this formatting rule and assert "
-            "the exact transformed output.",
-        )
-    return (
-        "behavioral_result",
-        "Name a concrete operation and setup, then assert one observable result "
-        "entailed by the source instruction.",
-    )
+            "behavioral_result",
+            "uncertain",
+        ],
+        "subject_text": source,
+        "candidate_field": "probe obligation category",
+        "candidate_value": source,
+        "category_definitions": categories,
+    }
+    return [
+        {
+            "role": "system",
+            "content": "Classify the source obligation using one allowed category.",
+        },
+        {
+            "role": "user",
+            "content": (
+                "Return the required enum classification only.\n"
+                + json.dumps({"probe_obligation": classifier}, ensure_ascii=False)
+            ),
+        },
+    ]
 
 
 def _retry_faithfulness_rejection(

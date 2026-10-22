@@ -10,8 +10,10 @@ from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.execute_pr_tests import (
     ExecutePrTestError,
     candidate_test_changes,
+    discover_python_test_root,
     fingerprint_test_files,
     generated_test_source_paths,
+    generated_test_source_paths_under_root,
     install_frozen_test_files,
     pytest_command_for_files,
     pytest_execution_evidence,
@@ -54,6 +56,47 @@ def test_generated_test_paths_ignore_staged_python_cache_files() -> None:
         generated_test_source_paths(
             ("tests/__pycache__/test_ci_workflow.cpython-312.pyc",)
         )
+
+
+def test_generated_test_paths_allow_the_discovered_nested_test_root() -> None:
+    assert generated_test_source_paths_under_root(
+        (
+            "attestation/tests/test_ci_workflow.py",
+            "attestation/tests/__pycache__/test_ci_workflow.cpython-312.pyc",
+            "attestation/tests/.pytest_cache/v/cache/nodeids",
+        ),
+        test_root="attestation/tests",
+    ) == ("attestation/tests/test_ci_workflow.py",)
+
+    with pytest.raises(ExecutePrTestError, match="outside attestation/tests"):
+        generated_test_source_paths_under_root(
+            (
+                "attestation/tests/test_ci_workflow.py",
+                "tests/test_ci_workflow.py",
+            ),
+            test_root="attestation/tests",
+        )
+
+
+def test_discover_python_test_root_uses_pr_scope_in_nested_repository() -> None:
+    tracked_paths = (
+        "attestation/tests/conftest.py",
+        "attestation/tests/test_attestation.py",
+        "attestation/tests/test_hashing.py",
+        "attestation/verifier/tests/test_policy.py",
+        "tests/test_ci_bootstrap.py",
+    )
+
+    assert (
+        discover_python_test_root(
+            tracked_paths,
+            allowed_paths=(
+                ".github/workflows/ci.yml",
+                "attestation/scripts/verify-all.sh",
+            ),
+        )
+        == "attestation/tests"
+    )
 
 
 def test_acceptance_criteria_get_deterministic_ids_and_require_test_links() -> None:

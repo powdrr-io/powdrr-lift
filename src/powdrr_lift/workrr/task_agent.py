@@ -90,8 +90,9 @@ from powdrr_lift.workrr.error_logging import record_workflow_llm_error
 from powdrr_lift.workrr.execute_pr_tests import (
     ExecutePrTestError,
     candidate_test_changes,
+    discover_python_test_root,
     fingerprint_test_files,
-    generated_test_source_paths,
+    generated_test_source_paths_under_root,
     install_frozen_test_files,
     pytest_execution_evidence,
     require_behavioral_red_result,
@@ -1009,6 +1010,7 @@ def _normalize_execute_pr_coding_attempt(value: Any) -> dict[str, Any]:
 def _execute_pr_test_author_prompt(
     *,
     authoring_worktree: Path,
+    test_path: str,
     plan_context: Mapping[str, Any],
     obligations: Sequence[Mapping[str, Any]],
 ) -> str:
@@ -1024,17 +1026,17 @@ def _execute_pr_test_author_prompt(
         "or staging any changes and report the observed paths. Do not use the "
         "parent checkout or any path outside this workspace.\n\n"
         "Inspect the untouched repository and its public entry points. Add only "
-        "new test files under `tests/` (or `test/` if that is the repository's "
-        "test root); do not edit implementation, existing tests, configuration, "
-        "or documentation. Use realistic setup and real application wiring. "
+        f"the new test file `{test_path}`; do not create other files or edit "
+        "implementation, existing tests, configuration, or documentation. Use "
+        "realistic setup and real application wiring. "
         "Exercise public behavior at the narrowest end-to-end or integration "
         "boundary that proves the acceptance criterion. Do not mock the entry "
         "point or behavior under test. Do not use private implementation "
         "details as the oracle. Every test must make a specific observable "
         "assertion grounded in the supplied acceptance criteria. Avoid "
         "tautologies, constant-only assertions, unconditional passes, skips, "
-        "and expected failures. Stage each new `.py` test file individually "
-        "with `git add -f <path>` so ignored source paths remain visible. Do "
+        "and expected failures. Stage only the specified file individually "
+        f"with `git add -f {test_path}` so ignored source paths remain visible. Do "
         "not stage `__pycache__`, `.pytest_cache`, or `.pyc` files; stage only "
         "authored Python test files. Do not commit. Stop after creating "
         "the tests.\n\n"
@@ -1076,26 +1078,10 @@ def _execute_pr_test_author_write_denied_paths(repo_root: Path) -> tuple[Path, .
     return tuple(sorted({root, common_dir, common_dir.parent}, key=str))
 
 
-def _author_execute_pr_tests(
-    repo_root: Path,
-    *,
-    base_commit: str,
-    request: ImplementationRequest,
-    proposed: Mapping[str, Any],
-    workflow_id: str,
-    config: WorkflowTaskAgentConfig,
-    store_root: Path,
-    validation_profile: ValidationProfile,
-    quality_client: WorkflowLLMClient,
-) -> tuple[dict[str, str], dict[str, Any]]:
-    """Ask MiniSWE to write and baseline-check independent integration tests."""
-    test_root = store_root / "integration-tests"
-    authoring_worktree = test_root / "authoring-worktree"
-    test_root.mkdir(parents=True, exist_ok=True)
-    if authoring_worktree.exists():
-        raise PowdrrExecutionError(
-            f"integration-test worktree already exists: {authoring_worktree}"
-        )
+def _clone_execute_pr_test_worktree(
+    repo_root: Path, authoring_worktree: Path, *, base_commit: str
+) -> None:
+    """Create an isolated baseline checkout for one test-author attempt."""
     try:
         subprocess.run(
             [
@@ -1121,6 +1107,31 @@ def _author_execute_pr_tests(
     except Exception:
         shutil.rmtree(authoring_worktree, ignore_errors=True)
         raise
+
+
+def _author_execute_pr_tests(
+    repo_root: Path,
+    *,
+    base_commit: str,
+    request: ImplementationRequest,
+    proposed: Mapping[str, Any],
+    workflow_id: str,
+    config: WorkflowTaskAgentConfig,
+    store_root: Path,
+    validation_profile: ValidationProfile,
+    quality_client: WorkflowLLMClient,
+) -> tuple[dict[str, str], dict[str, Any]]:
+    """Ask MiniSWE to write and baseline-check independent integration tests."""
+    test_root = store_root / "integration-tests"
+    authoring_worktree = test_root / "authoring-worktree"
+    test_root.mkdir(parents=True, exist_ok=True)
+    if authoring_worktree.exists():
+        raise PowdrrExecutionError(
+            f"integration-test worktree already exists: {authoring_worktree}"
+        )
+    _clone_execute_pr_test_worktree(
+        repo_root, authoring_worktree, base_commit=base_commit
+    )
     try:
         plan_context = {
             "title": proposed.get("title"),
@@ -1138,8 +1149,23 @@ def _author_execute_pr_tests(
                 "execute-PR test coverage requires explicit acceptance criteria"
             )
         obligations = acceptance_criteria_contract(acceptance_criteria)
+        tracked = subprocess.run(
+            ["git", "ls-files", "-z"],
+            cwd=authoring_worktree,
+            check=True,
+            capture_output=True,
+        )
+        test_root_relative = discover_python_test_root(
+            tuple(path.decode("utf-8") for path in tracked.stdout.split(b"\0") if path),
+            allowed_paths=request.allowed_paths,
+        )
+        test_path = (
+            PurePosixPath(test_root_relative) / "test_powdrr_execute_pr_"
+            f"{hashlib.sha256(workflow_id.encode()).hexdigest()[:12]}.py"
+        ).as_posix()
         prompt = _execute_pr_test_author_prompt(
             authoring_worktree=authoring_worktree,
+            test_path=test_path,
             plan_context=plan_context,
             obligations=obligations,
         )
@@ -1149,7 +1175,7 @@ def _author_execute_pr_tests(
             prompt=prompt,
             base_commit=base_commit,
             plan_fingerprint=request.plan_fingerprint,
-            allowed_paths=("tests", "test"),
+            allowed_paths=(test_path,),
             acceptance_criteria=(
                 "Add pytest tests for observable PR acceptance criteria.",
                 "Do not modify implementation or existing tests.",
@@ -1158,10 +1184,8 @@ def _author_execute_pr_tests(
             validation_profiles=(),
             context_refs=request.context_refs,
             ephemeral_paths=(
-                "tests/__pycache__",
-                "tests/.pytest_cache",
-                "test/__pycache__",
-                "test/.pytest_cache",
+                f"{test_root_relative}/__pycache__",
+                f"{test_root_relative}/.pytest_cache",
             ),
         )
         test_provider = MiniSWEAgentProvider(
@@ -1183,25 +1207,36 @@ def _author_execute_pr_tests(
         quality_report: dict[str, Any] | None = None
         coverage_references: dict[str, list[str]] = {}
         for attempt_number in (1, 2):
-            current_head = _git_output(authoring_worktree, ["rev-parse", "HEAD"])
             if attempt_number == 2:
+                # A repair starts from the baseline. Reusing a rejected
+                # attempt can make its out-of-scope files poison the next diff.
+                shutil.rmtree(authoring_worktree, ignore_errors=True)
+                _clone_execute_pr_test_worktree(
+                    repo_root, authoring_worktree, base_commit=base_commit
+                )
+                test_paths.clear()
+                test_sources = {}
+                baseline_report = None
+                quality_report = None
+                coverage_references = {}
                 author_request = replace(
                     author_request,
                     request_id=f"{workflow_id}-integration-test-author-repair",
-                    base_commit=current_head,
+                    base_commit=base_commit,
                     prompt=(
                         prompt
                         + "\n\nRepair the test-only change. The previous attempt "
                         "failed this exact validation:\n"
                         + str(validation_error)
-                        + "\nRewrite only new pytest files under tests/ or test/. "
+                        + f"\nRewrite only `{test_path}`. Do not create other "
+                        "files. "
                         "Every test must run and fail on the untouched baseline "
                         "through an assertion about requested behavior. Repair any "
                         "coverage-plan or independent-review findings with additional "
                         "real cases; do not weaken the contract. Do not commit or "
                         "edit implementation files."
                     ),
-                    allow_existing_changes=True,
+                    allow_existing_changes=False,
                 )
             attempt = test_runner.run(
                 author_request,
@@ -1215,13 +1250,22 @@ def _author_execute_pr_tests(
                 )
                 continue
             try:
-                source_paths = generated_test_source_paths(attempt.changed_paths)
+                source_paths = generated_test_source_paths_under_root(
+                    attempt.changed_paths, test_root=test_root_relative
+                )
+                if source_paths != (test_path,):
+                    raise ExecutePrTestError(
+                        "test author must create only the assigned test file; "
+                        f"expected {test_path}, changed {source_paths}"
+                    )
                 test_paths.update(source_paths)
                 raw_sources = {
                     path: (authoring_worktree / path).read_text(encoding="utf-8")
                     for path in sorted(test_paths)
                 }
-                test_sources = validate_generated_test_files(raw_sources)
+                test_sources = validate_generated_test_files(
+                    raw_sources, test_root=test_root_relative
+                )
                 coverage_references = validate_coverage_references(
                     test_sources, obligations
                 )

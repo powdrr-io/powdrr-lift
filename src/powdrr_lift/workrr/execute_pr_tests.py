@@ -20,6 +20,87 @@ class ExecutePrTestError(ValueError):
     """Generated execute-PR tests are invalid or did not prove behavior."""
 
 
+def discover_python_test_root(
+    tracked_paths: Sequence[str], *, allowed_paths: Sequence[str]
+) -> str:
+    """Choose the nearest existing Python test root to the PR's file scope."""
+    test_counts: dict[str, int] = {}
+    for raw_path in tracked_paths:
+        path = PurePosixPath(raw_path)
+        if path.suffix != ".py" or not (
+            path.name == "conftest.py"
+            or path.name.startswith("test_")
+            or path.name.endswith("_test.py")
+        ):
+            continue
+        for index, part in enumerate(path.parts):
+            if part in {"test", "tests"}:
+                root = PurePosixPath(*path.parts[: index + 1]).as_posix()
+                test_counts[root] = test_counts.get(root, 0) + 1
+                break
+
+    if not test_counts:
+        return "tests"
+
+    scope_directories: list[tuple[str, ...]] = []
+    for raw_path in allowed_paths:
+        path = PurePosixPath(raw_path)
+        if path.is_absolute() or ".." in path.parts or not path.parts:
+            continue
+        parts = path.parts
+        if path.suffix:
+            parts = parts[:-1]
+        if parts and parts != (".",):
+            scope_directories.append(parts)
+
+    def common_prefix_length(left: tuple[str, ...], right: tuple[str, ...]) -> int:
+        length = 0
+        for left_part, right_part in zip(left, right, strict=False):
+            if left_part != right_part:
+                break
+            length += 1
+        return length
+
+    def rank(root: str) -> tuple[int, int, int, int, str]:
+        root_parts = PurePosixPath(root).parts
+        if not scope_directories:
+            common = 0
+            distance = len(root_parts)
+        else:
+            matches = [
+                (common_prefix_length(root_parts, scope), scope)
+                for scope in scope_directories
+            ]
+            common = max(length for length, _scope in matches)
+            distance = min(
+                len(root_parts) + len(scope) - 2 * length
+                for length, scope in matches
+                if length == common
+            )
+        return (
+            common,
+            -distance,
+            test_counts[root],
+            -len(root_parts),
+            root,
+        )
+
+    # With no path overlap, keep the conventional root tests/ when present.
+    if not scope_directories and "tests" in test_counts:
+        return "tests"
+    if scope_directories:
+        best_common = max(
+            max(
+                common_prefix_length(PurePosixPath(root).parts, scope)
+                for scope in scope_directories
+            )
+            for root in test_counts
+        )
+        if best_common == 0 and "tests" in test_counts:
+            return "tests"
+    return max(test_counts, key=rank)
+
+
 def validate_coverage_references(
     files: Mapping[str, str], obligations: Sequence[Mapping[str, Any]]
 ) -> dict[str, list[str]]:
@@ -127,10 +208,20 @@ def validate_quality_review(review: Mapping[str, Any]) -> dict[str, Any]:
 
 def validate_generated_test_files(
     files: Mapping[str, str],
+    *,
+    test_root: str = "tests",
 ) -> dict[str, str]:
     """Require new pytest tests with observable assertions and safe paths."""
     if not files:
         raise ExecutePrTestError("test author produced no integration test files")
+    root = PurePosixPath(test_root)
+    if (
+        root.is_absolute()
+        or not root.parts
+        or ".." in root.parts
+        or root.parts[-1] not in {"tests", "test"}
+    ):
+        raise ExecutePrTestError(f"unsupported Python test root: {test_root}")
     validated: dict[str, str] = {}
     for raw_path, source in sorted(files.items()):
         path = PurePosixPath(raw_path)
@@ -138,12 +229,12 @@ def validate_generated_test_files(
             path.is_absolute()
             or ".." in path.parts
             or not path.parts
-            or path.parts[0] not in {"tests", "test"}
+            or path.parts[: len(root.parts)] != root.parts
             or path.suffix != ".py"
             or not (path.name.startswith("test_") or path.name.endswith("_test.py"))
         ):
             raise ExecutePrTestError(
-                f"test author wrote outside the supported Python test paths: {raw_path}"
+                f"test author wrote outside {test_root}: {raw_path}"
             )
         try:
             tree = ast.parse(source, filename=raw_path)
@@ -178,7 +269,22 @@ def validate_generated_test_files(
 
 
 def generated_test_source_paths(changed_paths: Sequence[str]) -> tuple[str, ...]:
-    """Select authored Python tests, ignoring staged interpreter cache files."""
+    """Select authored Python tests under the repository's chosen test root."""
+    return generated_test_source_paths_under_root(changed_paths, test_root="tests")
+
+
+def generated_test_source_paths_under_root(
+    changed_paths: Sequence[str], *, test_root: str
+) -> tuple[str, ...]:
+    """Select authored Python tests, ignoring caches under one test root."""
+    root = PurePosixPath(test_root)
+    if (
+        root.is_absolute()
+        or not root.parts
+        or ".." in root.parts
+        or root.parts[-1] not in {"tests", "test"}
+    ):
+        raise ExecutePrTestError(f"unsupported Python test root: {test_root}")
     sources: set[str] = set()
     for raw_path in changed_paths:
         path = PurePosixPath(raw_path)
@@ -186,11 +292,10 @@ def generated_test_source_paths(changed_paths: Sequence[str]) -> tuple[str, ...]
             path.is_absolute()
             or ".." in path.parts
             or not path.parts
-            or path.parts[0] not in {"tests", "test"}
+            or path.parts[: len(root.parts)] != root.parts
         ):
             raise ExecutePrTestError(
-                "test author changed a path outside the supported test roots: "
-                f"{raw_path}"
+                f"test author changed a path outside {test_root}: {raw_path}"
             )
         if (
             "__pycache__" in path.parts

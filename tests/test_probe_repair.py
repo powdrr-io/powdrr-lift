@@ -186,12 +186,24 @@ def test_jev_obligation_classifier_distinguishes_property_exposure() -> None:
     messages = probe_repair._build_jev_obligation_category_messages(
         "DdlTable exposes a property constrained_columns."
     )
-    payload = json.loads(messages[1]["content"].split("\n", 1)[1])
+    payload = json.loads(messages[1]["content"].split("Context:\n", 1)[1])
     classifier = payload["probe_obligation"]
     assert classifier["spec"]["decision_kind"] == "probe_obligation_category"
     assert "property_exposure" in classifier["allowed_values"]
     assert "unless the source also specifies its value or derivation" in " ".join(
         classifier["instructions"]
+    )
+
+    classifier_request = jev_classifier._classifier_request(
+        messages, probe_repair.OBLIGATION_CATEGORY_RESPONSE_SCHEMA
+    )
+
+    assert classifier_request is not None
+    assert classifier_request["kind"] == "probe_obligation_category"
+    assert classifier_request["allowed_values"] == classifier["allowed_values"]
+    assert (
+        classifier_request["state"]["source_text"]
+        == "DdlTable exposes a property constrained_columns."
     )
 
 

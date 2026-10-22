@@ -1,0 +1,48 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1105
+title: Include generated tests in Structrr candidate review
+intent:
+  problem: The issue worker stages independently generated acceptance tests in the implementation worktree, but the Structrr candidate comparison treated these checked-in tests as unexpected changes outside the reviewed plan paths.
+  goal: Include the exact generated test paths in the candidate comparison so Structrr records them as validation changes while retaining them in the implementation PR.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 3387, end_line: 3400}
+    summary: Add the exact generated acceptance-test paths to the candidate proposal scope.
+    rationale: Allow the comparison to report checked-in tests as validation changes without excluding them from the candidate snapshot.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 3402, end_line: 3402}
+    summary: Compare the candidate against the proposal extended with generated test paths.
+    rationale: Keep the ordinary proposal unchanged while reconciling its generated validation additions.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 973, end_line: 980}
+    summary: Capture the candidate proposal paths used by reconciliation.
+    rationale: Verify dynamically generated test paths are included in the Structrr comparison.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1057, end_line: 1060}
+    summary: Assert the generated acceptance test remains in candidate comparison scope.
+    rationale: Prevent generated tests from being misclassified as unplanned changes.
+entities:
+  - id: issue-worker-structrr-candidate-comparison
+    type: Function
+    action: added
+  - id: generated-acceptance-test-scope-regression-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: generated-test-scope-test-verifies-candidate-comparison
+    type: verifies
+    source: generated-acceptance-test-scope-regression-test
+    target: issue-worker-structrr-candidate-comparison
+    action: added
+    description: The worker regression test verifies exact generated test paths are included in the candidate Structrr comparison.
+invariants:
+  - id: generated-acceptance-tests-remain-visible-in-structrr
+    description: Frozen acceptance tests included in an implementation PR remain visible in the Structrr candidate diff and are classified as validation changes.
+    action: added
+guidance: []

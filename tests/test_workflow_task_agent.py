@@ -970,6 +970,14 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
             source_manifest=manifest,
         ),
     )
+    reconciled_allowed_paths: list[tuple[str, ...]] = []
+    reconcile = task_agent.reconcile_item_candidate
+
+    def reconcile_candidate(**kwargs: Any) -> Any:
+        reconciled_allowed_paths.append(kwargs["proposal"].allowed_paths)
+        return reconcile(**kwargs)
+
+    monkeypatch.setattr(task_agent, "reconcile_item_candidate", reconcile_candidate)
     review_phases: list[str] = []
     implementation_reviews = 0
 
@@ -1046,6 +1054,10 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
         "tests/integration/test_feature_e2e.py"
     ]
     assert result["attempts"][0]["structrr"]["passed"] is False
+    assert reconciled_allowed_paths == [
+        ("src", "tests/integration/test_feature_e2e.py"),
+        ("src", "tests/integration/test_feature_e2e.py"),
+    ]
     assert review_phases == ["planning", "implementation", "implementation"]
     assert "Observed issue:" in provider_requests[1].prompt
     assert "active_intent:api-stable" in provider_requests[1].prompt

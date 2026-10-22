@@ -712,8 +712,19 @@ def _build_jev_obligation_category_messages(source: str) -> list[dict[str, str]]
         {
             "role": "user",
             "content": (
-                "Return the required enum classification only.\n"
-                + json.dumps({"probe_obligation": classifier}, ensure_ascii=False)
+                "Question:\nWhich single category best describes the stated "
+                "obligation?\n"
+                "Instructions:\nReturn only one allowed category. Select the category "
+                "that matches only what the source states. A requirement to expose a "
+                "named property is property_exposure unless the source also specifies "
+                "its value or derivation. Do not infer behavior from repository "
+                "conventions or likely intent.\n"
+                "Context:\n"
+                + json.dumps(
+                    {"probe_obligation": classifier},
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
             ),
         },
     ]

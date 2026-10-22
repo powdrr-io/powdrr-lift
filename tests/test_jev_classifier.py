@@ -201,6 +201,36 @@ def test_preferred_classifier_uses_subq_when_jev_key_is_missing(
     assert isinstance(client, SubQSemanticClassifierClient)
 
 
+def test_jev_fail_closed_boolean_decision_never_uses_fallback(
+    monkeypatch: Any,
+) -> None:
+    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    fallback = _Fallback()
+    client = JevSemanticClassifierClient(fallback, fail_closed=True)
+
+    result = client.complete_json(
+        [
+            {"role": "system", "content": "Return a binary decision."},
+            {
+                "role": "user",
+                "content": (
+                    "Question:\nIs the test suite acceptable?\n\nContext:\n"
+                    '{"test_suite": {"text": "suite evidence"}}'
+                ),
+            },
+        ],
+        response_schema={
+            "type": "object",
+            "required": ["passed"],
+            "properties": {"passed": {"type": "boolean"}},
+        },
+    )
+
+    assert result == {"passed": False}
+    assert fallback.calls == 0
+
+
 def test_preferred_classifier_returns_none_without_provider_keys(
     monkeypatch: Any,
 ) -> None:

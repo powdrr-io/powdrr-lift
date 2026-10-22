@@ -114,44 +114,44 @@ OBLIGATION_CATEGORY_RESPONSE_SCHEMA: dict[str, Any] = {
 PROBE_REPAIR_EXAMPLES: tuple[dict[str, str], ...] = (
     {
         "category": "property_exposure",
-        "source": "The record exposes a property item_count.",
+        "source": "A profile exposes a property display_name.",
         "given": (
-            "A Record instance created with its documented constructor is available."
+            "A Profile instance created with its documented constructor is available."
         ),
-        "when": "Read record.item_count.",
+        "when": "Read profile.display_name.",
         "then": "The property access completes without AttributeError.",
         "lesson": "Exposure entails access, not a particular returned value.",
     },
     {
         "category": "derived_property",
-        "source": "The remaining property equals total minus used.",
-        "given": "A Record has total=9 and used=4, using its documented constructor.",
-        "when": "Read record.remaining.",
+        "source": "The remaining quota equals granted quota minus consumed quota.",
+        "given": "An account has 9 units granted and 4 units consumed.",
+        "when": "Read the account's remaining quota.",
         "then": "The value is 5.",
         "lesson": "Assert a computed value when the source gives the derivation.",
     },
     {
         "category": "normalization",
-        "source": "The keyword is normalized to lowercase.",
-        "given": "The normalizer receives the keyword SELECT.",
-        "when": "Normalize the keyword.",
-        "then": "The result is select.",
+        "source": "The identifier is normalized to lowercase.",
+        "given": "The normalizer receives the identifier MiXeD.",
+        "when": "Normalize the identifier.",
+        "then": "The result is mixed.",
         "lesson": "Use a non-canonical input and assert the stated canonical form.",
     },
     {
         "category": "pass_through",
-        "source": "Unsupported statements pass through unchanged.",
-        "given": "The formatter receives an unsupported statement string.",
-        "when": "The formatter processes the statement.",
+        "source": "Unknown input values pass through unchanged.",
+        "given": "The processor receives an unknown input value.",
+        "when": "The processor handles the input value.",
         "then": "The output string equals the input string exactly.",
         "lesson": "Assert only the preservation required by the source.",
     },
     {
         "category": "formatting_transformation",
-        "source": "The opening parenthesis follows the table name on the same line.",
-        "given": "The formatter receives CREATE TABLE t (id int).",
-        "when": "Format the statement.",
-        "then": "The output places the opening parenthesis on the table-name line.",
+        "source": "Each entry is placed on its own line.",
+        "given": "The renderer receives the entries red and blue.",
+        "when": "Render the entries.",
+        "then": "The output places red and blue on separate lines.",
         "lesson": (
             "Use the smallest input that demonstrates the stated formatting rule."
         ),

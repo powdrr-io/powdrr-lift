@@ -91,6 +91,7 @@ from powdrr_lift.workrr.execute_pr_tests import (
     ExecutePrTestError,
     candidate_test_changes,
     fingerprint_test_files,
+    generated_test_source_paths,
     install_frozen_test_files,
     pytest_execution_evidence,
     require_behavioral_red_result,
@@ -1032,8 +1033,10 @@ def _execute_pr_test_author_prompt(
         "details as the oracle. Every test must make a specific observable "
         "assertion grounded in the supplied acceptance criteria. Avoid "
         "tautologies, constant-only assertions, unconditional passes, skips, "
-        "and expected failures. Stage every new test file with `git add -f` "
-        "so ignored paths remain visible. Do not commit. Stop after creating "
+        "and expected failures. Stage each new `.py` test file individually "
+        "with `git add -f <path>` so ignored source paths remain visible. Do "
+        "not stage `__pycache__`, `.pytest_cache`, or `.pyc` files; stage only "
+        "authored Python test files. Do not commit. Stop after creating "
         "the tests.\n\n"
         "The implementation is intentionally absent. Tests must execute "
         "against the baseline and fail through a behavioral assertion, not "
@@ -1154,6 +1157,12 @@ def _author_execute_pr_tests(
             ),
             validation_profiles=(),
             context_refs=request.context_refs,
+            ephemeral_paths=(
+                "tests/__pycache__",
+                "tests/.pytest_cache",
+                "test/__pycache__",
+                "test/.pytest_cache",
+            ),
         )
         test_provider = MiniSWEAgentProvider(
             executable=config.minisweagent_executable,
@@ -1205,18 +1214,9 @@ def _author_execute_pr_tests(
                     f"test author status was {attempt.status.value}: {attempt.error}"
                 )
                 continue
-            changed = set(attempt.changed_paths)
-            if not changed or any(
-                not (path.startswith("tests/") or path.startswith("test/"))
-                for path in changed
-            ):
-                validation_error = (
-                    "test author must add only new files under tests/ or test/; "
-                    f"changed {sorted(changed)}"
-                )
-                continue
-            test_paths.update(changed)
             try:
+                source_paths = generated_test_source_paths(attempt.changed_paths)
+                test_paths.update(source_paths)
                 raw_sources = {
                     path: (authoring_worktree / path).read_text(encoding="utf-8")
                     for path in sorted(test_paths)

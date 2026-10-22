@@ -146,16 +146,13 @@ class GitHubIssueClient:
         result = self._invoke(
             [
                 "api",
+                "-H",
+                "Cache-Control: no-cache",
                 "--paginate",
-                "--slurp",
                 endpoint,
             ]
         )
-        try:
-            values = json.loads(result.stdout)
-        except json.JSONDecodeError as error:
-            raise GitHubIssueQueueError("gh returned malformed issue JSON") from error
-        issue_values = _flatten_pages(values)
+        issue_values = _parse_paginated_json_arrays(result.stdout, description="issue")
         issues: list[QueueIssue] = []
         for value in issue_values:
             if not isinstance(value, Mapping):
@@ -1266,6 +1263,30 @@ def _flatten_pages(value: Any) -> list[Any]:
     if not value or not all(isinstance(page, list) for page in value):
         return value
     return [item for page in value for item in page]
+
+
+def _parse_paginated_json_arrays(text: str, *, description: str) -> list[Any]:
+    """Decode the JSON arrays emitted page by page by ``gh api --paginate``."""
+    decoder = json.JSONDecoder()
+    pages: list[list[Any]] = []
+    cursor = 0
+    while cursor < len(text):
+        while cursor < len(text) and text[cursor].isspace():
+            cursor += 1
+        if cursor == len(text):
+            break
+        try:
+            value, cursor = decoder.raw_decode(text, cursor)
+        except json.JSONDecodeError as error:
+            raise GitHubIssueQueueError(
+                f"gh returned malformed paginated {description} JSON"
+            ) from error
+        if not isinstance(value, list):
+            raise GitHubIssueQueueError(
+                f"GitHub paginated {description} response must be a list"
+            )
+        pages.append(value)
+    return _flatten_pages(pages)
 
 
 def _json_mapping(text: str, description: str) -> Mapping[str, Any]:

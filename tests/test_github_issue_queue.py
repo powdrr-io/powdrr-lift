@@ -288,34 +288,39 @@ def test_github_issue_client_paginates_and_ignores_pull_requests() -> None:
         arguments: list[str], **_kwargs: object
     ) -> subprocess.CompletedProcess[str]:
         assert "--paginate" in arguments
-        assert "--slurp" in arguments
+        assert "--slurp" not in arguments
+        assert arguments[arguments.index("-H") + 1] == "Cache-Control: no-cache"
         return subprocess.CompletedProcess(
             arguments,
             0,
-            json.dumps(
-                [
-                    [
-                        {
-                            "number": 1,
-                            "title": "Powdrr work item",
-                            "body": "pointer",
-                            "state": "open",
-                            "labels": [{"name": "powdrr:ready"}],
-                            "html_url": "https://github.com/example/project/issues/1",
-                        }
-                    ],
-                    [
-                        {
-                            "number": 2,
-                            "title": "An issue",
-                            "body": "pointer",
-                            "state": "closed",
-                            "labels": [],
-                            "html_url": "https://github.com/example/project/issues/2",
-                        },
-                        {"number": 3, "pull_request": {"url": "ignored"}},
-                    ],
-                ]
+            "\n".join(
+                (
+                    json.dumps(
+                        [
+                            {
+                                "number": 1,
+                                "title": "Powdrr work item",
+                                "body": "pointer",
+                                "state": "open",
+                                "labels": [{"name": "powdrr:ready"}],
+                                "url": "https://github.com/example/project/issues/1",
+                            }
+                        ]
+                    ),
+                    json.dumps(
+                        [
+                            {
+                                "number": 2,
+                                "title": "An issue",
+                                "body": "pointer",
+                                "state": "closed",
+                                "labels": [],
+                                "url": "https://github.com/example/project/issues/2",
+                            },
+                            {"number": 3, "pull_request": {"url": "ignored"}},
+                        ]
+                    ),
+                )
             ),
             "",
         )
@@ -337,24 +342,22 @@ def test_github_issue_client_filters_issue_state_locally_for_labeled_queries() -
             0,
             json.dumps(
                 [
-                    [
-                        {
-                            "number": 1,
-                            "title": "Ready item",
-                            "body": "",
-                            "state": "open",
-                            "labels": [{"name": QUEUE_LABELS["ready"]}],
-                            "url": "https://github.com/example/project/issues/1",
-                        },
-                        {
-                            "number": 2,
-                            "title": "Closed item",
-                            "body": "",
-                            "state": "closed",
-                            "labels": [{"name": QUEUE_LABELS["ready"]}],
-                            "url": "https://github.com/example/project/issues/2",
-                        },
-                    ]
+                    {
+                        "number": 1,
+                        "title": "Ready item",
+                        "body": "",
+                        "state": "open",
+                        "labels": [{"name": QUEUE_LABELS["ready"]}],
+                        "url": "https://github.com/example/project/issues/1",
+                    },
+                    {
+                        "number": 2,
+                        "title": "Closed item",
+                        "body": "",
+                        "state": "closed",
+                        "labels": [{"name": QUEUE_LABELS["ready"]}],
+                        "url": "https://github.com/example/project/issues/2",
+                    },
                 ]
             ),
             "",
@@ -364,7 +367,7 @@ def test_github_issue_client_filters_issue_state_locally_for_labeled_queries() -
     issues = client.list_issues(labels=(QUEUE_LABELS["ready"],), state="open")
     assert [issue.number for issue in issues] == [1]
 
-    assert commands[0][4] == (
+    assert commands[0][-1] == (
         "repos/example/project/issues?state=all&per_page=100&labels=powdrr%3Aready"
     )
 

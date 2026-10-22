@@ -98,7 +98,105 @@ def test_probe_repair_revises_only_flagged_scenario_after_faithfulness(
     assert "pre-coding gate can stop the task" in str(client.messages)
     assert "authoritative_source_clause" in str(client.messages)
     assert "instruction-001" in str(client.messages)
-    assert "source_instruction" not in str(client.messages)
+    assert "source_instruction" in str(client.messages)
+
+
+def test_probe_repair_adds_related_source_and_typed_obligation_guidance(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    instruction = (
+        "DdlTable exposes property column_count. "
+        "DdlTable exposes property constraint_count."
+    )
+    scenario = _scenario()
+    scenario["scenario_id"] = "scenario:instruction-001"
+    source_clauses = (
+        {
+            "clause_id": "instruction-001",
+            "text": "DdlTable exposes property column_count.",
+            "validation_group_id": "validation:table-properties",
+            "source_span": {"start": 0, "end": 39},
+        },
+        {
+            "clause_id": "instruction-002",
+            "text": "DdlTable exposes property constraint_count.",
+            "validation_group_id": "validation:table-properties",
+        },
+    )
+    client = RepairClient([_revision("scenario:instruction-001")])
+    reviewed_contexts: list[tuple[Mapping[str, Any], ...]] = []
+
+    def accept(
+        _original: Mapping[str, Any],
+        _candidate: Mapping[str, Any],
+        **kwargs: Any,
+    ) -> tuple[bool, dict[str, Any]]:
+        reviewed_contexts.append(kwargs["ledger_clauses"])
+        return True, {"scenario_id": "scenario:instruction-001", "status": "accepted"}
+
+    monkeypatch.setattr(probe_repair, "_check_revised_scenario_faithfulness", accept)
+    probe_repair.repair_behavior_probes(
+        client,
+        instruction=instruction,
+        scenarios=(scenario,),
+        contract_directory=tmp_path,
+        ledger_clauses=source_clauses,
+        faithfulness_client=client,
+    )
+
+    request = json.loads(client.messages[1]["content"])  # type: ignore[index]
+    flagged = request["flagged_scenarios"][0]
+    source = flagged["authoritative_source_clause"]
+    assert request["source_instruction"] == instruction
+    assert source["source_span_text"] == "DdlTable exposes property column_count."
+    assert source["related_clauses"] == [
+        {
+            "clause_id": "instruction-002",
+            "text": "DdlTable exposes property constraint_count.",
+        }
+    ]
+    assert request["obligation_guidance"] == [
+        {
+            "scenario_id": "scenario:instruction-001",
+            "obligation_type": "derived_property",
+            "probe_guidance": (
+                "Construct an object with known source values and assert the exact "
+                "derived property value, not just property presence."
+            ),
+        }
+    ]
+    assert any(
+        clause["clause_id"] == "instruction-source:full-request"
+        and clause["text"] == instruction
+        for clause in reviewed_contexts[0]
+    )
+
+
+def test_probe_obligation_classifier_distinguishes_behavior_types() -> None:
+    assert (
+        probe_repair._classify_probe_obligation(
+            "The keyword is normalized to lowercase."
+        )[0]
+        == "normalization"
+    )
+    assert (
+        probe_repair._classify_probe_obligation(
+            "DdlTable exposes a property column_count."
+        )[0]
+        == "derived_property"
+    )
+    assert (
+        probe_repair._classify_probe_obligation("Other DDL variants are out of scope.")[
+            0
+        ]
+        == "scope_exclusion"
+    )
+    assert (
+        probe_repair._classify_probe_obligation(
+            "CREATE TABLE IF NOT EXISTS is supported."
+        )[0]
+        == "parser_support"
+    )
 
 
 def test_probe_repair_discards_candidate_rejected_by_faithfulness(

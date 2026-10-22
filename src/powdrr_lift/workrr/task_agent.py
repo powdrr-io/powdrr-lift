@@ -1531,6 +1531,35 @@ def _render_execute_pr_test_quality_pr_notes(notes: Sequence[str]) -> list[str]:
     return lines
 
 
+def _execute_pr_test_install_worktree_status(
+    repo_root: Path, workflow_dir: Path
+) -> subprocess.CompletedProcess[str]:
+    """Check product changes while excluding this run's durable runtime state."""
+    try:
+        workflow_relative = (
+            workflow_dir.resolve().relative_to(repo_root.resolve()).as_posix()
+        )
+    except ValueError:
+        workflow_relative = ""
+    command = ["git", "status", "--porcelain", "--untracked-files=all"]
+    if workflow_relative:
+        command.extend(
+            [
+                "--",
+                ".",
+                f":(exclude){workflow_relative}/**",
+                ":(exclude).powdrr/procedrr-runs/**",
+            ]
+        )
+    return subprocess.run(
+        command,
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
 def _author_execute_pr_tests(
     repo_root: Path,
     *,
@@ -3149,12 +3178,8 @@ class _TaskWorkflowExecutionStrategy:
             validation_profile=validation_profile,
             quality_client=self.client,
         )
-        status_before_test_install = subprocess.run(
-            ["git", "status", "--porcelain", "--untracked-files=all"],
-            cwd=self.repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
+        status_before_test_install = _execute_pr_test_install_worktree_status(
+            self.repo_root, self.config.workflow_dir
         )
         if status_before_test_install.returncode:
             raise PowdrrExecutionError(

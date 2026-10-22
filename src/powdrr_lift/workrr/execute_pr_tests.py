@@ -7,6 +7,7 @@ import hashlib
 import os
 import re
 import subprocess
+import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -180,7 +181,12 @@ def pytest_command_for_files(
     profile: ValidationProfile,
     paths: Sequence[str],
 ) -> tuple[str, ...]:
-    """Extend the task's declared pytest command with generated test files."""
+    """Select a pytest runner for frozen tests and append their paths.
+
+    Prefer the repository's declared verification command when it is pytest.
+    Otherwise, use Powdrr's Python environment to run the isolated generated
+    contract tests; the repository verification command is run separately.
+    """
     command = profile.command
     pytest_present = any(
         Path(token).name == "pytest"
@@ -192,10 +198,7 @@ def pytest_command_for_files(
         for index, token in enumerate(command)
     )
     if not pytest_present:
-        raise ExecutePrTestError(
-            "execute-PR generated integration tests currently require the plan's "
-            "verification command to use pytest"
-        )
+        command = (sys.executable, "-m", "pytest")
     return (*command, "--tb=short", *paths)
 
 
@@ -206,7 +209,7 @@ def run_generated_pytest(
     paths: Sequence[str],
     timeout_seconds: float,
 ) -> dict[str, Any]:
-    """Run only the frozen generated tests with the plan's approved runner."""
+    """Run only the frozen generated tests, independent of project validation."""
     command = pytest_command_for_files(profile, paths)
     environment = os.environ.copy()
     environment.pop("VIRTUAL_ENV", None)

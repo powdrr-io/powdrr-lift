@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from powdrr_lift.workrr.execute_pr_tests import (
     pytest_command_for_files,
     pytest_execution_evidence,
     require_behavioral_red_result,
+    run_generated_pytest,
     validate_coverage_references,
     validate_generated_test_files,
     validate_quality_review,
@@ -220,9 +222,36 @@ def test_frozen_test_installation_stages_files_and_rejects_unsafe_paths(
         install_frozen_test_files(tmp_path, {"../outside.py": "assert True\n"})
 
 
-def test_generated_tests_require_a_declared_pytest_runner() -> None:
-    with pytest.raises(ExecutePrTestError, match="require.*pytest"):
-        pytest_command_for_files(
-            ValidationProfile("verify", ("make", "test")),
-            ("tests/test_api.py",),
-        )
+def test_generated_tests_fall_back_to_powdrr_pytest_for_non_pytest_profiles() -> None:
+    assert pytest_command_for_files(
+        ValidationProfile("verify", ("bash", "scripts/verify-all.sh")),
+        ("tests/test_api.py",),
+    ) == (
+        sys.executable,
+        "-m",
+        "pytest",
+        "--tb=short",
+        "tests/test_api.py",
+    )
+
+
+def test_generated_contract_tests_can_prove_red_baseline_with_shell_validation(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_ci_workflow.py").write_text(
+        "from pathlib import Path\n\n"
+        "def test_ci_workflow_exists():\n"
+        "    assert Path('.github/workflows/ci.yml').is_file()\n"
+    )
+
+    result = run_generated_pytest(
+        ValidationProfile("verify", ("bash", "attestation/scripts/verify-all.sh")),
+        root=tmp_path,
+        paths=("tests/test_ci_workflow.py",),
+        timeout_seconds=30,
+    )
+
+    assert result["command"][:3] == [sys.executable, "-m", "pytest"]
+    assert result["passed"] is False
+    require_behavioral_red_result(result)

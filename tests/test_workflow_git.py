@@ -215,6 +215,91 @@ def test_create_task_worktree_starts_from_integration_branch(tmp_path: Path) -> 
     )
 
 
+def test_create_workflow_worktree_resumes_remote_branch_and_syncs_latest_base(
+    tmp_path: Path,
+) -> None:
+    remote = tmp_path / "origin.git"
+    subprocess.run(
+        ["git", "init", "--bare", str(remote)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    repo = tmp_path / "author"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test User")
+    _git(repo, "remote", "add", "origin", str(remote))
+    plan = repo / "docs/plans/plan.yaml"
+    workflow = repo / "docs/workflows/plan/pr-01.yaml"
+    plan.parent.mkdir(parents=True)
+    workflow.parent.mkdir(parents=True)
+    plan.write_text("revision: original\n", encoding="utf-8")
+    workflow.write_text("revision: original\n", encoding="utf-8")
+    _git(repo, "add", "docs")
+    _git(repo, "commit", "-m", "initial plan")
+    _git(repo, "push", "--set-upstream", "origin", "main")
+
+    integration, branch = create_workflow_worktree(repo, "plan-pr-01")
+    runtime = integration / "docs/workflows/plan/runtime/task.json"
+    runtime.parent.mkdir(parents=True)
+    runtime.write_text('{"status": "open"}\n', encoding="utf-8")
+    _git(integration, "add", "docs/workflows/plan/runtime/task.json")
+    _git(integration, "commit", "-m", "save workflow checkpoint")
+    _git(integration, "push", "--set-upstream", "origin", branch)
+    _git(repo, "switch", "main")
+    plan.write_text("revision: amended\n", encoding="utf-8")
+    workflow.write_text("revision: amended\n", encoding="utf-8")
+    _git(repo, "add", "docs")
+    _git(repo, "commit", "-m", "amend reviewed plan")
+    _git(repo, "push", "origin", "main")
+
+    fresh = tmp_path / "fresh"
+    subprocess.run(
+        ["git", "clone", str(remote), str(fresh)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    _git(fresh, "config", "user.email", "test@example.com")
+    _git(fresh, "config", "user.name", "Test User")
+
+    resumed, resumed_branch = create_workflow_worktree(fresh, "plan-pr-01")
+
+    assert resumed_branch == branch
+    assert plan.read_text(encoding="utf-8") == "revision: amended\n"
+    assert (resumed / "docs/plans/plan.yaml").read_text(encoding="utf-8") == (
+        "revision: amended\n"
+    )
+    assert (resumed / "docs/workflows/plan/pr-01.yaml").read_text(
+        encoding="utf-8"
+    ) == "revision: amended\n"
+    assert (resumed / "docs/workflows/plan/runtime/task.json").read_text(
+        encoding="utf-8"
+    ) == '{"status": "open"}\n'
+    for ref in (
+        f"refs/remotes/origin/{branch}",
+        "refs/remotes/origin/main",
+    ):
+        ancestor = subprocess.run(
+            ["git", "rev-parse", ref],
+            cwd=resumed,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        assert (
+            subprocess.run(
+                ["git", "merge-base", "--is-ancestor", ancestor, "HEAD"],
+                cwd=resumed,
+                capture_output=True,
+                text=True,
+            ).returncode
+            == 0
+        ), f"{ref} at {ancestor} is not an ancestor of the resumed branch"
+
+
 def test_claim_workflow_task_is_an_atomic_git_ref(tmp_path: Path) -> None:
     _git(tmp_path, "init", "-b", "main")
     _git(tmp_path, "config", "user.email", "test@example.com")

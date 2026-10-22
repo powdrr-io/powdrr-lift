@@ -258,6 +258,7 @@ def create_workflow_worktree(
     branch = integration_branch_name(proposed_pr_id)
     worktree = workflow_worktree_path(repo_root_path, proposed_pr_id)
     worktree.parent.mkdir(parents=True, exist_ok=True)
+    base_ref = _refresh_workflow_refs(repo_root_path, branch, base_branch)
     if worktree.exists():
         if not (worktree / ".git").exists():
             raise PowdrrExecutionError(
@@ -269,20 +270,124 @@ def create_workflow_worktree(
                 f"Workflow worktree {worktree} is on {existing_branch!r}, "
                 f"expected integration branch {branch!r}."
             )
+        _merge_workflow_branch_updates(worktree, branch, base_ref)
         return worktree, branch
-    if (
-        _git(
-            repo_root_path, ["show-ref", "--verify", f"refs/heads/{branch}"]
-        ).returncode
-        == 0
-    ):
+
+    if _branch_exists(repo_root_path, branch):
         _run_git(repo_root_path, ["worktree", "add", str(worktree), branch])
     else:
+        remote_branch_ref = f"refs/remotes/origin/{branch}"
+        if _ref_exists(repo_root_path, remote_branch_ref):
+            start_point = remote_branch_ref
+        else:
+            start_point = base_ref
         _run_git(
             repo_root_path,
-            ["worktree", "add", str(worktree), "-b", branch, base_branch],
+            ["worktree", "add", str(worktree), "-b", branch, start_point],
         )
+    _merge_workflow_branch_updates(worktree, branch, base_ref)
     return worktree, branch
+
+
+def _refresh_workflow_refs(repo_root: Path, branch: str, base_branch: str) -> str:
+    """Fetch an existing workflow branch and the latest base before resuming."""
+    remote = _git(repo_root, ["remote", "get-url", "origin"])
+    if remote.returncode != 0:
+        return base_branch
+
+    workflow_ref = f"refs/heads/{branch}"
+    remote_workflow = _git(
+        repo_root,
+        ["ls-remote", "--exit-code", "--heads", "origin", workflow_ref],
+    )
+    if remote_workflow.returncode not in {0, 2}:
+        raise PowdrrExecutionError(
+            "Could not check the remote workflow branch: "
+            + remote_workflow.stderr.strip()
+        )
+    base_ref = f"refs/heads/{base_branch}"
+    remote_base = _git(
+        repo_root,
+        ["ls-remote", "--exit-code", "--heads", "origin", base_ref],
+    )
+    if remote_base.returncode not in {0, 2}:
+        raise PowdrrExecutionError(
+            "Could not check the remote base branch: " + remote_base.stderr.strip()
+        )
+
+    refspecs: list[str] = []
+    if remote_base.returncode == 0:
+        refspecs.append(f"+{base_ref}:refs/remotes/origin/{base_branch}")
+    if remote_workflow.returncode == 0:
+        refspecs.append(f"+{workflow_ref}:refs/remotes/origin/{branch}")
+    if refspecs:
+        fetched = _git(repo_root, ["fetch", "origin", *refspecs])
+        if fetched.returncode != 0:
+            raise PowdrrExecutionError(
+                "Could not fetch the latest workflow/base branches: "
+                + fetched.stderr.strip()
+            )
+    remote_base_ref = f"refs/remotes/origin/{base_branch}"
+    return remote_base_ref if _ref_exists(repo_root, remote_base_ref) else base_branch
+
+
+def _merge_workflow_branch_updates(worktree: Path, branch: str, base_ref: str) -> None:
+    """Preserve remote checkpoints while incorporating the latest base branch."""
+    remote_branch_ref = f"refs/remotes/origin/{branch}"
+    if _ref_exists(worktree, remote_branch_ref):
+        _merge_workflow_ref(worktree, remote_branch_ref)
+    _merge_workflow_ref(worktree, base_ref)
+
+
+def _merge_workflow_ref(worktree: Path, ref: str) -> None:
+    result = _git(worktree, ["merge", "--no-edit", ref])
+    if result.returncode == 0:
+        return
+
+    conflict_result = _git(worktree, ["diff", "--name-only", "--diff-filter=U"])
+    conflicts = tuple(
+        path for path in conflict_result.stdout.splitlines() if path.strip()
+    )
+    if conflict_result.returncode != 0 or not conflicts:
+        _git(worktree, ["merge", "--abort"])
+        raise PowdrrExecutionError(
+            f"Could not merge workflow branch with {ref}: " + result.stderr.strip()
+        )
+
+    for path in conflicts:
+        if path.startswith("docs/plans/") or (
+            path.startswith("docs/workflows/") and "/runtime/" not in path
+        ):
+            side = "--theirs"
+        elif path.startswith(".powdrr/") or "/runtime/" in path:
+            side = "--ours"
+        else:
+            _git(worktree, ["merge", "--abort"])
+            raise PowdrrExecutionError(
+                "Workflow branch update has unresolved product conflicts: "
+                + ", ".join(conflicts)
+            )
+        resolved = _git(worktree, ["checkout", side, "--", path])
+        if resolved.returncode != 0:
+            _git(worktree, ["merge", "--abort"])
+            raise PowdrrExecutionError(
+                f"Could not resolve workflow state conflict for {path}: "
+                + resolved.stderr.strip()
+            )
+
+    staged = _git(worktree, ["add", "--", *conflicts])
+    if staged.returncode != 0:
+        _git(worktree, ["merge", "--abort"])
+        raise PowdrrExecutionError(
+            "Could not stage workflow branch synchronization: " + staged.stderr.strip()
+        )
+    committed = _git(worktree, ["commit", "-m", f"Sync workflow branch with {ref}"])
+    if committed.returncode != 0:
+        _git(worktree, ["merge", "--abort"])
+        raise PowdrrExecutionError(
+            "Could not commit workflow branch synchronization: "
+            + committed.stderr.strip()
+        )
 
 
 def create_task_worktree(
@@ -1106,10 +1211,11 @@ def _for_each_ref(repo_root: Path, prefix: str) -> list[str]:
 
 
 def _branch_exists(repo_root: Path, branch: str) -> bool:
-    return (
-        _git(repo_root, ["show-ref", "--verify", f"refs/heads/{branch}"]).returncode
-        == 0
-    )
+    return _ref_exists(repo_root, f"refs/heads/{branch}")
+
+
+def _ref_exists(repo_root: Path, ref: str) -> bool:
+    return _git(repo_root, ["show-ref", "--verify", ref]).returncode == 0
 
 
 def _is_ancestor(repo_root: Path, ancestor: str, descendant: str) -> bool:

@@ -20,6 +20,10 @@ class ExecutePrTestError(ValueError):
     """Generated execute-PR tests are invalid or did not prove behavior."""
 
 
+class ExecutePrQualityFindingsFormatError(ExecutePrTestError):
+    """The quality reviewer could not return findings in the required format."""
+
+
 def discover_python_test_root(
     tracked_paths: Sequence[str], *, allowed_paths: Sequence[str]
 ) -> str:

@@ -88,6 +88,7 @@ from powdrr_lift.workrr.decision_continuity import (
 )
 from powdrr_lift.workrr.error_logging import record_workflow_llm_error
 from powdrr_lift.workrr.execute_pr_tests import (
+    ExecutePrQualityFindingsFormatError,
     ExecutePrTestError,
     candidate_test_changes,
     discover_python_test_root,
@@ -1162,50 +1163,86 @@ def _review_execute_pr_test_quality(
     if passed:
         return {"provider": "jev", "outcome": "pass"}
 
-    findings_response = complete_json(
-        quality_client,
-        [
-            {
-                "role": "system",
-                "content": (
-                    "Explain concrete test-quality defects in a suite that Jev has "
-                    "already judged inadequate. Do not make or change the pass/fail "
-                    "decision. Return only specific findings supported by the "
-                    "supplied tests and criteria."
-                ),
-            },
-            {
-                "role": "user",
-                "content": json.dumps(
-                    {**suite_evidence, "jev_decision": "fail"},
-                    ensure_ascii=False,
-                    sort_keys=True,
-                ),
-            },
-        ],
-        response_schema={
-            "type": "object",
-            "properties": {
-                "findings": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "test_id": {"type": "string"},
-                            "issue": {"type": "string"},
-                            "evidence": {"type": "string"},
-                        },
-                        "required": ["test_id", "issue", "evidence"],
-                        "additionalProperties": False,
+    findings_schema = {
+        "type": "object",
+        "properties": {
+            "findings": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "test_id": {"type": "string"},
+                        "issue": {"type": "string"},
+                        "evidence": {"type": "string"},
                     },
-                }
-            },
-            "required": ["findings"],
-            "additionalProperties": False,
+                    "required": ["test_id", "issue", "evidence"],
+                    "additionalProperties": False,
+                },
+            }
         },
-    )
-    findings = validate_quality_findings(findings_response.get("findings"))
+        "required": ["findings"],
+        "additionalProperties": False,
+    }
+    findings_messages = [
+        {
+            "role": "system",
+            "content": (
+                "Explain concrete test-quality defects in a suite that Jev has "
+                "already judged inadequate. Do not make or change the pass/fail "
+                "decision. Return only specific findings supported by the "
+                "supplied tests and criteria. Output exactly one JSON object "
+                "with a top-level `findings` array. Every finding must contain "
+                "exactly these three string fields: `test_id` (the test name or "
+                "test path), `issue` (the concrete coverage defect), and "
+                "`evidence` (the relevant criterion or test behavior). Do not "
+                "use alternate keys such as `test`, `obligation_id`, or "
+                "`finding`. Example format only; derive the actual findings "
+                "from the supplied evidence:\n"
+                '{"findings":[{"test_id":"tests/test_api.py::test_rejects_bad_input",'
+                '"issue":"The test does not exercise the malformed-input case.",'
+                '"evidence":"The test only calls the API with a valid value."}]}'
+            ),
+        },
+        {
+            "role": "user",
+            "content": json.dumps(
+                {**suite_evidence, "jev_decision": "fail"},
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        },
+    ]
+    findings: list[dict[str, str]] | None = None
+    validation_error: ExecutePrTestError | None = None
+    for attempt in range(2):
+        messages = findings_messages
+        if attempt:
+            messages = [
+                *findings_messages,
+                {
+                    "role": "user",
+                    "content": (
+                        "Your previous response failed validation: "
+                        f"{validation_error}. Return a corrected JSON object now. "
+                        "Use the exact keys and example format in the system "
+                        "instruction; do not add fields or explanatory prose."
+                    ),
+                },
+            ]
+        findings_response = complete_json(
+            quality_client, messages, response_schema=findings_schema
+        )
+        try:
+            findings = validate_quality_findings(findings_response.get("findings"))
+            break
+        except ExecutePrTestError as error:
+            validation_error = error
+    if findings is None:
+        raise ExecutePrQualityFindingsFormatError(
+            "test-quality findings remained invalid after one format-repair "
+            f"request: {validation_error}"
+        )
     raise ExecutePrTestError(
         "independent test-quality review found gaps: "
         + json.dumps(findings, sort_keys=True)
@@ -1402,6 +1439,8 @@ def _author_execute_pr_tests(
                 )
                 validation_error = None
                 break
+            except ExecutePrQualityFindingsFormatError:
+                raise
             except (OSError, ExecutePrTestError) as error:
                 validation_error = str(error)
         if validation_error is not None or baseline_report is None:

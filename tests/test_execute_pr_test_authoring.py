@@ -189,7 +189,7 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     assert '"name": "main"' in author_prompts[0]
     assert '"source": "refs/remotes/origin/HEAD"' in author_prompts[0]
     assert len(jev_calls) == 6
-    assert jev_calls[0][1]["properties"]["passed"]["type"] == "boolean"
+    assert jev_calls[0][1]["properties"]["shortcoming_present"]["type"] == "boolean"
     assert (
         "Does this test fail to demonstrate observable behavior"
         in jev_calls[0][0][1]["content"]
@@ -264,8 +264,8 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
             jev_calls.append(messages)
-            assert response_schema["required"] == ["passed"]
-            return {"passed": next(jev_results)}
+            assert response_schema["required"] == ["shortcoming_present"]
+            return {"shortcoming_present": next(jev_results)}
 
     def request_llm(
         _client: Any,
@@ -279,8 +279,11 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
     ) -> dict[str, Any]:
         del model, stderr, max_timeout_retries, timeout_backoff_seconds
         llm_calls.append((messages, response_schema))
-        if response_schema["required"] == ["passed", "explanation"]:
-            return {"passed": True, "explanation": "The assertion is vacuous."}
+        if response_schema["required"] == ["shortcoming_present", "explanation"]:
+            return {
+                "shortcoming_present": True,
+                "explanation": "The assertion is vacuous.",
+            }
         return {
             "test_name": "test_rejects_invalid_payload",
             "test_code": "def test_rejects_invalid_payload():\n    ...",
@@ -336,12 +339,15 @@ def test_execute_pr_test_quality_accepts_jev_concern_as_advisory_on_disagreement
             *,
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
-            return {"passed": True}
+            return {"shortcoming_present": True}
 
     def request_llm(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
         nonlocal llm_calls
         llm_calls += 1
-        return {"passed": False, "explanation": "The assertion checks public behavior."}
+        return {
+            "shortcoming_present": False,
+            "explanation": "The assertion checks public behavior.",
+        }
 
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
     monkeypatch.setattr(task_agent, "complete_json_with_timeout_retry", request_llm)
@@ -449,8 +455,8 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
             self.calls += 1
-            assert response_schema["required"] == ["passed"]
-            return {"passed": self.calls == 1}
+            assert response_schema["required"] == ["shortcoming_present"]
+            return {"shortcoming_present": self.calls == 1}
 
     class FakeMiniSWEAgentProvider:
         provider_name = "fake-miniswe"
@@ -490,8 +496,11 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
         del model, stderr, max_timeout_retries, timeout_backoff_seconds
         nonlocal llm_calls
         llm_calls += 1
-        if response_schema["required"] == ["passed", "explanation"]:
-            return {"passed": True, "explanation": "The test needs stronger evidence."}
+        if response_schema["required"] == ["shortcoming_present", "explanation"]:
+            return {
+                "shortcoming_present": True,
+                "explanation": "The test needs stronger evidence.",
+            }
         return {
             "test_name": "test_observes_expected_value",
             "test_code": "def test_observes_expected_value():\n    ...",

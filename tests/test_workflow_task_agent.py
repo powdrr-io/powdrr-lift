@@ -92,7 +92,10 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
                     '{"error":{"code":"engine_overloaded"}}',
                 )
             if self.calls == 2:
-                return {"passed": True, "explanation": "The concern is present."}
+                return {
+                    "shortcoming_present": True,
+                    "explanation": "The concern is present.",
+                }
             return {
                 "test_name": "test_workflow_runs_command_with_trigger",
                 "test_code": "def test_workflow_runs_command_with_trigger():\n    ...",
@@ -123,8 +126,8 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
             self.calls += 1
-            assert response_schema["required"] == ["passed"]
-            return {"passed": self.calls == 1}
+            assert response_schema["required"] == ["shortcoming_present"]
+            return {"shortcoming_present": self.calls == 1}
 
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
     review = _review_execute_pr_test_quality(

@@ -1201,17 +1201,17 @@ def _review_execute_pr_test_quality(
     )
     decision_schema = {
         "type": "object",
-        "properties": {"passed": {"type": "boolean"}},
-        "required": ["passed"],
+        "properties": {"shortcoming_present": {"type": "boolean"}},
+        "required": ["shortcoming_present"],
         "additionalProperties": False,
     }
     opinion_schema = {
         "type": "object",
         "properties": {
-            "passed": {"type": "boolean"},
+            "shortcoming_present": {"type": "boolean"},
             "explanation": {"type": "string"},
         },
-        "required": ["passed", "explanation"],
+        "required": ["shortcoming_present", "explanation"],
         "additionalProperties": False,
     }
     suggestion_schema = {
@@ -1266,7 +1266,7 @@ def _review_execute_pr_test_quality(
             }
             try:
                 decision = jev.complete_json(messages, response_schema=decision_schema)
-                jev_reports_shortcoming = decision.get("passed")
+                jev_reports_shortcoming = decision.get("shortcoming_present")
                 if not isinstance(jev_reports_shortcoming, bool):
                     raise ExecutePrTestError(
                         "Jev test-quality decision did not return a boolean"
@@ -1285,7 +1285,8 @@ def _review_execute_pr_test_quality(
                                 "asked. Do not broaden it or make an overall quality "
                                 "judgment. Use the supplied plan, criterion, test "
                                 "source, and baseline result as evidence. Return "
-                                "passed=true only when the specific shortcoming in "
+                                "shortcoming_present=true only when the specific "
+                                "shortcoming in "
                                 "the question is present. Include a concise "
                                 "explanation."
                             ),
@@ -1301,7 +1302,7 @@ def _review_execute_pr_test_quality(
                         timeout_backoff_seconds=config.timeout_backoff_seconds,
                         response_schema=opinion_schema,
                     )
-                    agrees = opinion.get("passed")
+                    agrees = opinion.get("shortcoming_present")
                     if not isinstance(agrees, bool):
                         raise ExecutePrTestError(
                             "LLM test-quality opinion did not return a boolean"

@@ -93,17 +93,15 @@ def test_probe_obligation_evidence_resolves_from_scenario_deterministically() ->
     ]
 
 
-def test_supported_obligation_requires_named_operand_meanings() -> None:
+def test_supported_obligation_drops_empty_optional_operand_meaning() -> None:
     source = _source().replace(
         "'operands': []",
         "'operands': [{'role': 'input', 'name': 'state', 'meaning': ''}]",
     )
 
-    with pytest.raises(
-        ValueError,
-        match="obligation 'selector-obligation' operand 0 requires non-empty meaning",
-    ):
-        _parse(source, ({"scenario_id": "selector"},))
+    obligations, _, _ = _parse(source, ({"scenario_id": "selector"},))
+
+    assert obligations[0]["operands"] == [{"role": "input", "name": "state"}]
 
 
 def test_probe_obligation_evidence_uses_instruction_ledger_by_scenario_id() -> None:

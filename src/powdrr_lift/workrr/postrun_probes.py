@@ -516,13 +516,22 @@ def _validate_probe_obligations(
                         f"obligation {obligation_id!r} operand {operand_index} "
                         "has an invalid role"
                     )
-                for key in ("name", "meaning"):
-                    value = operand.get(key)
-                    if not isinstance(value, str) or not value.strip():
-                        raise ValueError(
-                            f"obligation {obligation_id!r} operand "
-                            f"{operand_index} requires non-empty {key}"
-                        )
+                name = operand.get("name")
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError(
+                        f"obligation {obligation_id!r} operand {operand_index} "
+                        "requires non-empty name"
+                    )
+                meaning = operand.get("meaning")
+                normalized_operand = dict(operand)
+                normalized_operand["name"] = name.strip()
+                if not isinstance(meaning, str) or not meaning.strip():
+                    # Meaning is explanatory only. Drop empty model-authored
+                    # placeholders instead of rejecting executable probes.
+                    normalized_operand.pop("meaning", None)
+                else:
+                    normalized_operand["meaning"] = meaning.strip()
+                operands[operand_index] = normalized_operand
         elif item["rule"] != "unresolved":
             raise ValueError(
                 f"unsupported obligation {obligation_id!r} must be unresolved"

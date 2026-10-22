@@ -23,6 +23,8 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.workrr.http_retry import retry_transient_http
+
 MAX_SOURCES = 8
 MAX_RESPONSE_BYTES = 1_000_000
 FETCH_TIMEOUT_SECONDS = 12
@@ -961,7 +963,9 @@ def _tavily_search(query: str, api_key: str) -> Mapping[str, Any]:
             "Content-Type": "application/json",
         },
     )
-    with urllib.request.urlopen(request, timeout=FETCH_TIMEOUT_SECONDS) as response:
+    with retry_transient_http(
+        lambda: urllib.request.urlopen(request, timeout=FETCH_TIMEOUT_SECONDS)
+    ) as response:
         body = response.read(MAX_SEARCH_RESPONSE_BYTES + 1)
     if len(body) > MAX_SEARCH_RESPONSE_BYTES:
         raise ValueError("Tavily search response exceeds the 512,000-byte limit")
@@ -1261,7 +1265,9 @@ def _fetch_https(url: str) -> tuple[int, str, bytes]:
     )
     opener = urllib.request.build_opener(_SafeRedirectHandler())
     try:
-        response = opener.open(request, timeout=FETCH_TIMEOUT_SECONDS)
+        response = retry_transient_http(
+            lambda: opener.open(request, timeout=FETCH_TIMEOUT_SECONDS)
+        )
     except urllib.error.HTTPError as error:
         return error.code, error.geturl(), error.read(MAX_RESPONSE_BYTES + 1)
     with response:

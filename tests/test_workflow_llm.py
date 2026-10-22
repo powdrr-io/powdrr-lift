@@ -18,6 +18,7 @@ from powdrr_lift.workrr.llm import (
     WorkflowActionRequest,
     WorkflowExecutionStrategy,
     WorkflowLLMActionEngine,
+    WorkflowLLMHTTPError,
     WorkflowRepairCoordinator,
     WorkflowStepRunner,
     assert_material_repair_prompt,
@@ -29,12 +30,19 @@ from powdrr_lift.workrr.llm import (
     complete_json_with_timeout_retry,
     complete_two_pass_action,
     constrain_action_response_schema,
+    is_retryable_provider_error,
     prompt_size_breakdown,
     prune_execution_events,
     resolve_deterministic_repair,
     workflow_action_signature,
     workflow_action_target_signature,
 )
+
+
+def test_provider_5xx_errors_are_retryable() -> None:
+    assert is_retryable_provider_error(WorkflowLLMHTTPError("test", 500, "error"))
+    assert is_retryable_provider_error(WorkflowLLMHTTPError("test", 599, "error"))
+    assert not is_retryable_provider_error(WorkflowLLMHTTPError("test", 400, "error"))
 
 
 def test_repair_failure_classification_uses_codes_not_error_text() -> None:

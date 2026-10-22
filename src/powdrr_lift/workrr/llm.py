@@ -733,7 +733,10 @@ def is_retryable_provider_error(error: RuntimeError) -> bool:
     """Return whether a provider failure is transient enough to retry."""
     return (
         is_timeout_error(error)
-        or (isinstance(error, WorkflowLLMHTTPError) and error.status_code == 429)
+        or (
+            isinstance(error, WorkflowLLMHTTPError)
+            and (error.status_code == 429 or 500 <= error.status_code <= 599)
+        )
         or any(
             phrase in str(error).casefold()
             for phrase in (

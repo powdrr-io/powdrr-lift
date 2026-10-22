@@ -1053,9 +1053,58 @@ def _execute_pr_test_author_prompt(
         "test_function_name` immediately above the test. Cover every ID. You "
         "may use multiple tests for a criterion and one test for multiple "
         "criteria. Choose useful normal, boundary, invalid, interaction, or "
-        "state cases from the contract; do not invent behavior beyond it.\n"
+        "state cases from the contract; do not invent behavior beyond it.\n\n"
+        "Make relationship assertions when criteria describe connected pieces "
+        "of configuration. For a CI workflow, parse the YAML and verify that "
+        "the pull_request trigger is enabled, that a job which runs the exact "
+        "verification command also uses the required runner, and that no job "
+        "condition excludes pull requests. Do not satisfy these checks with "
+        "the command in a comment, unrelated YAML field, or a different job. "
+        "For a default-branch requirement, use the `repository_default_branch` "
+        "evidence in the reviewed PR contract; never guess a branch name. If "
+        "that value is null, do not claim a specific branch is the default. "
+        "Treat the supplied suite "
+        "as a contract: assert every acceptance criterion directly and keep "
+        "checks linked to the same workflow/job/step that provides the behavior.\n\n"
         f"{json.dumps(list(obligations), indent=2, sort_keys=True)}\n"
     )
+
+
+def _repository_default_branch_evidence(repo_root: Path) -> dict[str, str] | None:
+    """Resolve the remote's default branch and retain the source as evidence."""
+    remote_head = subprocess.run(
+        ["git", "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if remote_head.returncode == 0 and remote_head.stdout.strip():
+        return {
+            "name": remote_head.stdout.strip().removeprefix("origin/"),
+            "source": "refs/remotes/origin/HEAD",
+        }
+
+    try:
+        remote_info = subprocess.run(
+            ["git", "remote", "show", "origin"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+            env=_noninteractive_environment(),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if remote_info.returncode != 0:
+        return None
+    for line in remote_info.stdout.splitlines():
+        if line.startswith("  HEAD branch: "):
+            branch = line.partition(": ")[2].strip()
+            if branch:
+                return {"name": branch, "source": "git remote show origin"}
+    return None
 
 
 def _execute_pr_test_author_write_denied_paths(repo_root: Path) -> tuple[Path, ...]:
@@ -1283,6 +1332,9 @@ def _author_execute_pr_tests(
                 "accepted_structrr_operations", []
             ),
         }
+        plan_context["repository_default_branch"] = _repository_default_branch_evidence(
+            repo_root
+        )
         acceptance_criteria = plan_context["acceptance_criteria"]
         if not isinstance(acceptance_criteria, list) or not acceptance_criteria:
             raise PowdrrExecutionError(

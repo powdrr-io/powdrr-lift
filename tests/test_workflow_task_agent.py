@@ -30,6 +30,7 @@ from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
 )
+from powdrr_lift.structrr.proposal import ProposalOperation, ProposalRevision
 from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.actions import WorkflowEdit
@@ -219,6 +220,80 @@ def test_execute_pr_test_author_write_denials_cover_primary_checkout(
     assert worker.resolve() in denied_paths
     assert primary.resolve() in denied_paths
     assert (primary / ".git").resolve() in denied_paths
+
+
+def test_preflight_proposed_file_additions_ignores_files_outside_base_commit(
+    tmp_path: Path,
+) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "README.md").write_text("baseline\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "baseline",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    base_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    candidate = tmp_path / ".github" / "workflows" / "ci.yml"
+    candidate.parent.mkdir(parents=True)
+    candidate.write_text("name: CI\n", encoding="utf-8")
+    subprocess.run(["git", "add", str(candidate)], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "persist candidate checkpoint",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    proposal = ProposalRevision(
+        proposal_id="feature-pr-01",
+        structrr_baseline_fingerprint="sha256:baseline",
+        operations=(
+            ProposalOperation(
+                operation_id="add-ci-workflow",
+                section="files",
+                subject_id="ci-workflow",
+                action="add",
+                content={"path": ".github/workflows/ci.yml", "content": "name: CI\n"},
+            ),
+        ),
+        acceptance_criteria=(),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=(".github/workflows/ci.yml",),
+        source_refs=(),
+    )
+
+    findings = task_agent._preflight_proposed_file_additions(
+        tmp_path, proposal, base_commit=base_commit
+    )
+
+    assert findings == ()
 
 
 def test_implementation_paths_include_committed_work_and_exclude_runtime_state(

@@ -22,6 +22,8 @@ class RepairClient:
     ) -> dict[str, Any]:
         self.messages = messages
         assert response_schema is not None
+        if "category" in response_schema.get("properties", {}):
+            return {"category": "property_exposure"}
         return {"revisions": self.revisions}
 
 
@@ -94,7 +96,7 @@ def test_probe_repair_revises_only_flagged_scenario_after_faithfulness(
     assert artifact["initial_findings"]
     assert artifact["final_findings"] == []
     assert "Do not add details or assumptions" in str(client.messages)
-    assert "test the stated member or type directly" in str(client.messages)
+    assert "property_exposure" in str(client.messages)
     assert "pre-coding gate can stop the task" in str(client.messages)
     assert "authoritative_source_clause" in str(client.messages)
     assert "instruction-001" in str(client.messages)
@@ -158,13 +160,21 @@ def test_probe_repair_adds_related_source_and_typed_obligation_guidance(
     assert request["obligation_guidance"] == [
         {
             "scenario_id": "scenario:instruction-001",
-            "obligation_type": "derived_property",
-            "probe_guidance": (
-                "Construct an object with known source values and assert the exact "
-                "derived property value, not just property presence."
-            ),
+            "obligation_type": "property_exposure",
+            "categorized_by": "jev",
         }
     ]
+    assert client.messages is not None
+    assert "property_exposure" in client.messages[1]["content"]
+    assert "do not infer its returned value" in client.messages[0]["content"]
+    examples = json.loads(client.messages[1]["content"])["examples"]
+    property_example = next(
+        item for item in examples if item["category"] == "property_exposure"
+    )
+    assert property_example["then"] == (
+        "The property access completes without AttributeError."
+    )
+    assert "never evidence for the current task" in client.messages[0]["content"]
     assert any(
         clause["clause_id"] == "instruction-source:full-request"
         and clause["text"] == instruction
@@ -172,30 +182,16 @@ def test_probe_repair_adds_related_source_and_typed_obligation_guidance(
     )
 
 
-def test_probe_obligation_classifier_distinguishes_behavior_types() -> None:
-    assert (
-        probe_repair._classify_probe_obligation(
-            "The keyword is normalized to lowercase."
-        )[0]
-        == "normalization"
+def test_jev_obligation_classifier_distinguishes_property_exposure() -> None:
+    messages = probe_repair._build_jev_obligation_category_messages(
+        "DdlTable exposes a property constrained_columns."
     )
-    assert (
-        probe_repair._classify_probe_obligation(
-            "DdlTable exposes a property column_count."
-        )[0]
-        == "derived_property"
-    )
-    assert (
-        probe_repair._classify_probe_obligation("Other DDL variants are out of scope.")[
-            0
-        ]
-        == "scope_exclusion"
-    )
-    assert (
-        probe_repair._classify_probe_obligation(
-            "CREATE TABLE IF NOT EXISTS is supported."
-        )[0]
-        == "parser_support"
+    payload = json.loads(messages[1]["content"].split("\n", 1)[1])
+    classifier = payload["probe_obligation"]
+    assert classifier["spec"]["decision_kind"] == "probe_obligation_category"
+    assert "property_exposure" in classifier["allowed_values"]
+    assert "unless the source also specifies its value or derivation" in " ".join(
+        classifier["instructions"]
     )
 
 
@@ -311,6 +307,8 @@ def test_probe_repair_retries_rejected_claim_with_review_feedback(
         ) -> dict[str, Any]:
             assert response_schema is not None
             self.messages.append(messages)
+            if "category" in response_schema.get("properties", {}):
+                return {"category": "behavioral_result"}
             return self.responses.pop(0)
 
     client = RetryClient()
@@ -359,15 +357,15 @@ def test_probe_repair_retries_rejected_claim_with_review_feedback(
         faithfulness_client=client,
     )
 
-    assert len(client.messages) == 2
-    retry_payload = json.loads(client.messages[1][1]["content"])
+    assert len(client.messages) == 3
+    retry_payload = json.loads(client.messages[2][1]["content"])
     assert (
         retry_payload["faithfulness_review"]["outcome"]["findings"][0]["reason_code"]
         == "source_underspecified"
     )
     assert (
         "The verifier and hidden tests are never inputs"
-        in client.messages[1][0]["content"]
+        in client.messages[2][0]["content"]
     )
     assert revised[0]["then"] == corrected["then"]
     assert artifact["faithfulness_retries"][0]["status"] == "accepted"

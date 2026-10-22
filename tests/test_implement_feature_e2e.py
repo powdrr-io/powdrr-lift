@@ -239,8 +239,11 @@ class DeterministicPlanningClient:
                     for item in payload["flagged_scenarios"]
                 ]
             }
-        if required == {"status", "value", "reason_code"} and (
-            "scenario claim" in text
+        if (
+            required == {"status", "value", "reason_code"}
+            and "scenario_claim" in text
+            and properties.get("value", {}).get("enum")
+            == ["entailed", "contradicted", "not_stated", None]
         ):
             return {
                 "status": "resolved",
@@ -738,12 +741,34 @@ class ProbeEnabledPlanningClient(DeterministicPlanningClient):
                     for item in payload["flagged_scenarios"]
                 ]
             }
+        if required == {"status", "value", "reason_code"} and (
+            response_schema or {}
+        ).get("properties", {}).get("value", {}).get("enum") == [
+            "entailed",
+            "contradicted",
+            "not_stated",
+            None,
+        ]:
+            return {
+                "status": "resolved",
+                "value": "entailed",
+                "reason_code": None,
+            }
         if required == {"results"}:
             payload = json.loads(messages[-1]["content"])
             return {
                 "results": [
-                    {"status": "resolved", "value": "entailed", "reason_code": None}
-                    for _ in payload["requests"]
+                    {
+                        "unsupported_part": None,
+                        "source_evidence": [
+                            {
+                                "clause_id": context["source_clauses"][0]["clause_id"],
+                                "quote": context["source_clauses"][0]["text"],
+                            }
+                        ],
+                    }
+                    for request in payload["requests"]
+                    for context in [json.loads(request["context_text"])]
                 ]
             }
         if required == {"source"}:

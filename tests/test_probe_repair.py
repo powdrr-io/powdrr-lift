@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.core.behavior_contract import BEHAVIOR_DIMENSIONS
-from powdrr_lift.workrr import probe_repair
+from powdrr_lift.workrr import jev_classifier, probe_repair
 
 
 class RepairClient:
@@ -199,17 +199,74 @@ def test_probe_obligation_classifier_distinguishes_behavior_types() -> None:
     )
 
 
+def test_faithfulness_source_evidence_requires_exact_quote_from_named_clause() -> None:
+    context_text = json.dumps(
+        {
+            "source_clauses": [
+                {
+                    "clause_id": "instruction-001",
+                    "text": "DdlTable exposes a property column_count.",
+                }
+            ]
+        }
+    )
+
+    assert probe_repair._source_evidence_is_valid(
+        [
+            {
+                "clause_id": "instruction-001",
+                "quote": "exposes a property column_count",
+            }
+        ],
+        context_text=context_text,
+    )
+    assert not probe_repair._source_evidence_is_valid(
+        [
+            {
+                "clause_id": "instruction-001",
+                "quote": "column_count is always positive",
+            }
+        ],
+        context_text=context_text,
+    )
+    assert not probe_repair._source_evidence_is_valid(
+        [
+            {
+                "clause_id": "instruction-999",
+                "quote": "exposes a property column_count",
+            }
+        ],
+        context_text=context_text,
+    )
+
+
 def test_probe_repair_discards_candidate_rejected_by_faithfulness(
     monkeypatch: Any, tmp_path: Path
 ) -> None:
     client = RepairClient([_revision()])
+    faithfulness_checks = 0
+
+    def reject(*_args: Any, **_kwargs: Any) -> tuple[bool, dict[str, Any]]:
+        nonlocal faithfulness_checks
+        faithfulness_checks += 1
+        return False, {
+            "scenario_id": "instruction-001",
+            "status": "rejected",
+            "outcome": {
+                "findings": [
+                    {
+                        "classification": "not_stated",
+                        "field_paths": ["then"],
+                        "reason_code": "source_underspecified",
+                    }
+                ]
+            },
+        }
+
     monkeypatch.setattr(
         probe_repair,
         "_check_revised_scenario_faithfulness",
-        lambda *_args, **_kwargs: (
-            False,
-            {"scenario_id": "instruction-001", "status": "rejected"},
-        ),
+        reject,
     )
 
     revised, artifact = probe_repair.repair_behavior_probes(
@@ -226,6 +283,94 @@ def test_probe_repair_discards_candidate_rejected_by_faithfulness(
     assert artifact["used_scenarios"] == [_scenario()]
     assert artifact["final_findings"] == artifact["initial_findings"]
     assert artifact["faithfulness_reviews"][0]["status"] == "rejected"
+    assert faithfulness_checks == 2
+    assert artifact["faithfulness_retries"][0]["status"] == "rejected"
+
+
+def test_probe_repair_retries_rejected_claim_with_review_feedback(
+    monkeypatch: Any, tmp_path: Path
+) -> None:
+    corrected = {
+        **_revision(),
+        "then": "The accumulated user object's email field equals the deferred value.",
+    }
+
+    class RetryClient:
+        def __init__(self) -> None:
+            self.responses = [
+                {"revisions": [_revision()]},
+                {"revisions": [corrected]},
+            ]
+            self.messages: list[list[dict[str, str]]] = []
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: Mapping[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            assert response_schema is not None
+            self.messages.append(messages)
+            return self.responses.pop(0)
+
+    client = RetryClient()
+    review_count = 0
+
+    def review(
+        _original: Mapping[str, Any], candidate: Mapping[str, Any], **_: Any
+    ) -> tuple[bool, dict[str, Any]]:
+        nonlocal review_count
+        review_count += 1
+        if review_count == 1:
+            return False, {
+                "scenario_id": "instruction-001",
+                "status": "rejected",
+                "outcome": {
+                    "findings": [
+                        {
+                            "classification": "not_stated",
+                            "field_paths": ["then"],
+                            "reason_code": "source_underspecified",
+                        }
+                    ]
+                },
+            }
+        return True, {
+            "scenario_id": candidate["scenario_id"],
+            "status": "accepted",
+        }
+
+    monkeypatch.setattr(
+        probe_repair,
+        "_check_revised_scenario_faithfulness",
+        review,
+    )
+    revised, artifact = probe_repair.repair_behavior_probes(
+        client,
+        instruction="Deferred fields merge at the path given.",
+        scenarios=(_scenario(),),
+        contract_directory=tmp_path,
+        ledger_clauses=(
+            {
+                "clause_id": "instruction-001",
+                "text": "Deferred fields merge at the path given.",
+            },
+        ),
+        faithfulness_client=client,
+    )
+
+    assert len(client.messages) == 2
+    retry_payload = json.loads(client.messages[1][1]["content"])
+    assert (
+        retry_payload["faithfulness_review"]["outcome"]["findings"][0]["reason_code"]
+        == "source_underspecified"
+    )
+    assert (
+        "The verifier and hidden tests are never inputs"
+        in client.messages[1][0]["content"]
+    )
+    assert revised[0]["then"] == corrected["then"]
+    assert artifact["faithfulness_retries"][0]["status"] == "accepted"
 
 
 def test_probe_repair_records_empty_response_as_partial_not_failure(
@@ -397,35 +542,96 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
     monkeypatch.setattr(probe_repair, "PartialSemanticContract", Contract)
 
     reviewed_scenarios: list[Mapping[str, Any]] = []
+    reviewed_contexts: list[Mapping[str, Any]] = []
     finalized_results: list[Mapping[str, Any]] = []
+    categorizer_messages: list[list[dict[str, str]]] = []
+    detail_messages: list[list[dict[str, str]]] = []
 
-    class FaithfulnessClient:
+    class CategorizerClient:
         def complete_json(
             self,
-            _: list[dict[str, str]],
+            messages: list[dict[str, str]],
             *,
             response_schema: Mapping[str, Any] | None = None,
         ) -> dict[str, Any]:
             assert response_schema is not None
+            categorizer_messages.append(messages)
+            return {
+                "status": "resolved",
+                "value": "entailed",
+                "reason_code": None,
+            }
+
+    class DetailClient:
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: Mapping[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            assert response_schema is not None
+            detail_messages.append(messages)
+            detail_request = json.loads(messages[-1]["content"])
+            assert detail_request["jev_categories"][0]["value"] == "entailed"
             return {
                 "results": [
                     {
-                        "status": "resolved",
-                        "value": "entailed",
-                        "reason_code": "supported_by_source",
+                        "unsupported_part": None,
+                        "source_evidence": [
+                            {
+                                "clause_id": "instruction-001",
+                                "quote": "The source instruction",
+                            }
+                        ],
                     }
                 ]
             }
 
-    def prepare(_: Any, *, scenario: Mapping[str, Any], **__: Any) -> dict[str, Any]:
+    def prepare(
+        _: Any,
+        *,
+        scenario: Mapping[str, Any],
+        scenario_context: Mapping[str, Any],
+        **__: Any,
+    ) -> dict[str, Any]:
         reviewed_scenarios.append(scenario)
-        return {"requests": [{"claim_id": "claim-1"}]}
+        reviewed_contexts.append(scenario_context)
+        context_text = json.dumps(
+            {
+                "source_clauses": [
+                    {
+                        "clause_id": "instruction-001",
+                        "text": "The source instruction",
+                    }
+                ]
+            }
+        )
+        return {
+            "requests": [
+                {
+                    "source_text": "The source instruction",
+                    "claim": {
+                        "claim_id": "claim-1",
+                        "candidate_value": "Revised supported claim.",
+                    },
+                    "context_text": context_text,
+                }
+            ]
+        }
 
     def finalize(
         _: Mapping[str, Any], results: list[Mapping[str, Any]], **__: Any
     ) -> dict[str, Any]:
         finalized_results.extend(results)
-        return {"accepted": True}
+        return {
+            "accepted": True,
+            "reviews": [
+                {
+                    "claim_id": "claim-1",
+                    "decision": {"result": results[0]},
+                }
+            ],
+        }
 
     monkeypatch.setattr(
         probe_repair,
@@ -454,7 +660,8 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
         },
         contract_directory=tmp_path,
         ledger_clauses=(),
-        client=FaithfulnessClient(),
+        client=CategorizerClient(),
+        detail_client=DetailClient(),
     )
 
     assert accepted is True
@@ -462,6 +669,45 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
     assert reviewed_scenarios == [
         {"scenario_id": "instruction-001", "then": "Revised supported claim."}
     ]
+    assert reviewed_contexts == [
+        {
+            "scenario_id": "instruction-001",
+            "subject": "The source instruction",
+            "then": "Revised supported claim.",
+        }
+    ]
     assert finalized_results == [
         {"status": "resolved", "value": "entailed", "reason_code": None}
     ]
+    assert review["outcome"]["reviews"][0]["source_evidence_valid"] is True
+    assert "given and when context" in categorizer_messages[0][1]["content"]
+    assert "source_evidence" not in categorizer_messages[0][1]["content"]
+    assert "JEV already classified" in detail_messages[0][0]["content"]
+
+
+def test_jev_claim_category_messages_use_classifier_adapter_envelope() -> None:
+    request = {
+        "source_text": "The source instruction",
+        "context_text": '{"source_clauses": []}',
+        "claim": {
+            "claim_id": "claim-1",
+            "candidate_value": "The candidate claim",
+        },
+    }
+
+    classifier_request = jev_classifier._classifier_request(
+        probe_repair._build_jev_claim_category_messages(request),
+        probe_repair.CLAIM_CATEGORY_RESPONSE_SCHEMA,
+    )
+
+    assert classifier_request is not None
+    assert classifier_request["kind"] == "entailment"
+    assert classifier_request["allowed_values"] == [
+        "entailed",
+        "contradicted",
+        "not_stated",
+    ]
+    assert (
+        classifier_request["state"]["context"]["scenario_claim"]["candidate_value"]
+        == "The candidate claim"
+    )

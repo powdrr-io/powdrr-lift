@@ -30,6 +30,47 @@ def _write(root: Path, relative_path: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def test_test_install_cleanliness_ignores_only_workflow_runtime_changes(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.name", "Powdrr Test")
+    _git(repository, "config", "user.email", "powdrr-test@example.invalid")
+    workflow_dir = Path("docs/workflows/plan/runtime/worker")
+    _write(repository, "src/app.py", "value = 1\n")
+    _write(repository, workflow_dir.joinpath("execution/state.json").as_posix(), "{}\n")
+    _write(repository, ".powdrr/procedrr-runs/run.json", "{}\n")
+    _git(repository, "add", ".")
+    _git(repository, "commit", "-m", "baseline")
+
+    _write(
+        repository,
+        workflow_dir.joinpath("execution/state.json").as_posix(),
+        '{"state_version": 2}\n',
+    )
+    _write(
+        repository,
+        workflow_dir.joinpath("execution/checkpoints/new.json").as_posix(),
+        "{}\n",
+    )
+    _write(
+        repository,
+        ".powdrr/procedrr-runs/run.json",
+        '{"status": "active"}\n',
+    )
+    _write(repository, "src/app.py", "value = 2\n")
+    _write(repository, "src/new.py", "value = 3\n")
+
+    status = task_agent._execute_pr_test_install_worktree_status(
+        repository, repository / workflow_dir
+    )
+
+    assert status.returncode == 0
+    assert status.stdout.splitlines() == [" M src/app.py", "?? src/new.py"]
+
+
 def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     tmp_path: Path, monkeypatch: Any
 ) -> None:

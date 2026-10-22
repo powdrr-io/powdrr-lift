@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.structrr.validation import DiscoveredValidationProfile
+from powdrr_lift.workrr.test_obligations import missing_obligation_ids
 
 POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v7"
 
@@ -281,9 +282,14 @@ def parse_generated_postrun_probe_source(
                 interaction_ids,
             )
         )
-    missing_obligations = {
-        str(item["obligation_id"]) for item in obligations if item["supported"] is True
-    } - covered_obligations
+    missing_obligations = missing_obligation_ids(
+        [
+            str(item["obligation_id"])
+            for item in obligations
+            if item["supported"] is True
+        ],
+        covered_obligations,
+    )
     if missing_obligations:
         raise ValueError(
             "probe suite omitted supported obligations: "
@@ -495,7 +501,7 @@ def _validate_probe_obligations(
         seen.add(obligation_id)
         covered.add(scenario_id)
         obligations.append(item)
-    missing = known_scenarios - covered
+    missing = missing_obligation_ids(sorted(known_scenarios), covered)
     if missing:
         raise ValueError("probe suite omitted scenarios: " + ", ".join(sorted(missing)))
     return tuple(obligations)

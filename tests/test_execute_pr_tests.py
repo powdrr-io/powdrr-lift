@@ -14,10 +14,13 @@ from powdrr_lift.workrr.execute_pr_tests import (
     pytest_command_for_files,
     pytest_execution_evidence,
     require_behavioral_red_result,
-    validate_coverage_plan,
     validate_coverage_references,
     validate_generated_test_files,
     validate_quality_review,
+)
+from powdrr_lift.workrr.test_obligations import (
+    ObligationError,
+    acceptance_criteria_contract,
 )
 
 
@@ -35,60 +38,54 @@ def test_generated_pytest_files_require_assertive_tests_under_test_root() -> Non
     assert tuple(result) == ("tests/integration/test_public_api.py",)
 
 
-def test_coverage_plan_must_cover_each_criterion_and_link_real_tests() -> None:
+def test_acceptance_criteria_get_deterministic_ids_and_require_test_links() -> None:
     criteria = ["Returns computed values", "Rejects malformed expressions"]
-    plan = {
-        "criteria": [
-            {
-                "criterion_id": "AC-01",
-                "criterion": criteria[0],
-                "partitions": [
-                    {
-                        "partition_id": "P01",
-                        "behavior_class": "operator precedence",
-                        "case_strategy": "parameterized expressions across operators",
-                        "minimum_case_count": 12,
-                        "observable_oracle": "numeric evaluation result",
-                        "test_ids": ["test_precedence"],
-                    }
-                ],
-            },
-            {
-                "criterion_id": "AC-02",
-                "criterion": criteria[1],
-                "partitions": [
-                    {
-                        "partition_id": "P01",
-                        "behavior_class": "invalid syntax",
-                        "case_strategy": "multiple malformed tokens",
-                        "minimum_case_count": 5,
-                        "observable_oracle": "documented parse error",
-                        "test_ids": ["test_rejects_invalid_syntax"],
-                    }
-                ],
-            },
-        ]
-    }
-    validated = validate_coverage_plan(plan, criteria)
+    obligations = acceptance_criteria_contract(criteria)
+    assert obligations == [
+        {"obligation_id": "AC-01", "source_text": criteria[0]},
+        {"obligation_id": "AC-02", "source_text": criteria[1]},
+    ]
+    with pytest.raises(ObligationError, match="requires acceptance criteria"):
+        acceptance_criteria_contract([])
+    with pytest.raises(ObligationError, match="non-empty string"):
+        acceptance_criteria_contract(["valid criterion", "  "])
     files = {
         "tests/test_parser.py": (
-            "# Covers: AC-01.P01 test_precedence\n"
+            "# Covers: AC-01 test_precedence\n"
             "def test_precedence():\n    assert evaluate('4 + 3') == 7\n\n"
-            "# Covers: AC-02.P01 test_rejects_invalid_syntax\n"
+            "# Covers: AC-02 test_rejects_invalid_syntax\n"
             "def test_rejects_invalid_syntax():\n"
             "    with pytest.raises(ParseError):\n        evaluate('4 +')\n"
         )
     }
-    assert validate_coverage_references(files, validated) == {
-        "AC-01.P01": 1,
-        "AC-02.P01": 1,
+    assert validate_coverage_references(files, obligations) == {
+        "AC-01": ["test_precedence"],
+        "AC-02": ["test_rejects_invalid_syntax"],
     }
     with pytest.raises(ExecutePrTestError, match="every acceptance criterion"):
-        validate_coverage_plan({"criteria": plan["criteria"][:1]}, criteria)
-    with pytest.raises(ExecutePrTestError, match="not linked"):
         validate_coverage_references(
-            {"tests/test_parser.py": "def test_precedence():\n    assert True\n"},
-            validated,
+            {
+                "tests/test_parser.py": "# Covers: AC-01 test_precedence\n"
+                "def test_precedence():\n    assert evaluate('4 + 3') == 7\n"
+            },
+            obligations,
+        )
+    with pytest.raises(ExecutePrTestError, match="unknown obligation"):
+        validate_coverage_references(
+            {
+                "tests/test_parser.py": "# Covers: AC-03 test_precedence\n"
+                "def test_precedence():\n    assert evaluate('4 + 3') == 7\n"
+            },
+            obligations,
+        )
+    with pytest.raises(ExecutePrTestError, match="unlinked"):
+        validate_coverage_references(
+            {
+                "tests/test_parser.py": "# Covers: AC-01 test_precedence\n"
+                "def test_precedence():\n    assert True\n\n"
+                "def test_other():\n    assert True\n"
+            },
+            obligations[:1],
         )
 
 

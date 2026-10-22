@@ -64,6 +64,7 @@ from powdrr_lift.workrr.task_agent import (
     _open_final_workflow_pull_request,
     _publish_workflow_progress,
     _read_task_document,
+    _review_execute_pr_test_quality,
     _select_ready_workflow_git_state,
     _TaskProcedrrOperations,
     _validate_issue_worker_plan_amendment,
@@ -72,6 +73,62 @@ from powdrr_lift.workrr.task_agent import (
     run_workflow_task,
 )
 from powdrr_lift.workrr.test_obligations import acceptance_criteria_contract
+
+
+def test_execute_pr_test_findings_retry_provider_429_with_backoff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class RateLimitedThenFindings:
+        calls = 0
+
+        def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls == 1:
+                raise WorkflowLLMHTTPError(
+                    "OpenAI",
+                    429,
+                    '{"error":{"code":"engine_overloaded"}}',
+                )
+            return {
+                "findings": [
+                    {
+                        "test_id": "tests/test_ci.py::test_workflow_runs_command",
+                        "issue": (
+                            "The workflow test does not inspect the executed command."
+                        ),
+                        "evidence": (
+                            "The test only asserts that the workflow file exists."
+                        ),
+                    }
+                ]
+            }
+
+    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+    delays: list[float] = []
+    monkeypatch.setattr("powdrr_lift.workrr.llm.time.sleep", delays.append)
+    client = RateLimitedThenFindings()
+    config = WorkflowTaskAgentConfig(
+        workflow_dir=tmp_path,
+        max_timeout_retries=2,
+        timeout_backoff_seconds=1.5,
+    )
+
+    with pytest.raises(
+        task_agent.ExecutePrTestError,
+        match="independent test-quality review found gaps",
+    ):
+        _review_execute_pr_test_quality(
+            client,
+            {"acceptance_criteria": ["The CI workflow runs verification."]},
+            config=config,
+        )
+
+    assert client.calls == 2
+    assert delays == [1.5]
+    assert "retrying in 1.5 seconds (retry 1/2)" in capsys.readouterr().err
 
 
 def test_execute_pr_test_author_prompt_pins_authoring_worktree(

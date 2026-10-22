@@ -129,7 +129,7 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
     monkeypatch.setattr(
         task_agent,
-        "complete_json",
+        "complete_json_with_timeout_retry",
         lambda *_args, **_kwargs: pytest.fail(
             "the LLM must not be asked for findings when Jev passes"
         ),
@@ -272,8 +272,13 @@ def test_execute_pr_test_quality_asks_llm_for_findings_after_jev_failure(
         _client: Any,
         messages: list[dict[str, str]],
         *,
+        model: str,
+        stderr: Any,
+        max_timeout_retries: int,
+        timeout_backoff_seconds: float,
         response_schema: dict[str, Any],
     ) -> dict[str, Any]:
+        del model, stderr, max_timeout_retries, timeout_backoff_seconds
         findings_calls.append((messages, response_schema))
         return {
             "findings": [
@@ -286,12 +291,15 @@ def test_execute_pr_test_quality_asks_llm_for_findings_after_jev_failure(
         }
 
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
-    monkeypatch.setattr(task_agent, "complete_json", request_findings)
+    monkeypatch.setattr(
+        task_agent, "complete_json_with_timeout_retry", request_findings
+    )
 
     with pytest.raises(task_agent.ExecutePrTestError, match="test_ci_workflow"):
         task_agent._review_execute_pr_test_quality(
             FakeQualityClient(),
             {"test_sources": {"tests/test_ci.py": "def test_ci(): ..."}},
+            config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
         )
 
     assert len(jev_calls) == 1
@@ -353,18 +361,26 @@ def test_execute_pr_test_quality_repairs_malformed_findings_response(
         _client: Any,
         messages: list[dict[str, str]],
         *,
+        model: str,
+        stderr: Any,
+        max_timeout_retries: int,
+        timeout_backoff_seconds: float,
         response_schema: dict[str, Any],
     ) -> dict[str, Any]:
+        del model, stderr, max_timeout_retries, timeout_backoff_seconds
         findings_calls.append((messages, response_schema))
         return next(responses)
 
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
-    monkeypatch.setattr(task_agent, "complete_json", request_findings)
+    monkeypatch.setattr(
+        task_agent, "complete_json_with_timeout_retry", request_findings
+    )
 
     with pytest.raises(task_agent.ExecutePrTestError, match="test_ci_workflow"):
         task_agent._review_execute_pr_test_quality(
             FakeQualityClient(),
             {"test_sources": {"tests/test_ci.py": "def test_ci(): ..."}},
+            config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
         )
 
     assert len(findings_calls) == 2
@@ -406,8 +422,13 @@ def test_execute_pr_test_quality_stops_after_invalid_findings_repair(
         _client: Any,
         _messages: list[dict[str, str]],
         *,
+        model: str,
+        stderr: Any,
+        max_timeout_retries: int,
+        timeout_backoff_seconds: float,
         response_schema: dict[str, Any],
     ) -> dict[str, Any]:
+        del model, stderr, max_timeout_retries, timeout_backoff_seconds
         nonlocal findings_calls
         findings_calls += 1
         assert response_schema["required"] == ["findings"]
@@ -422,7 +443,9 @@ def test_execute_pr_test_quality_stops_after_invalid_findings_repair(
         }
 
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
-    monkeypatch.setattr(task_agent, "complete_json", request_findings)
+    monkeypatch.setattr(
+        task_agent, "complete_json_with_timeout_retry", request_findings
+    )
 
     with pytest.raises(
         task_agent.ExecutePrQualityFindingsFormatError,
@@ -431,6 +454,7 @@ def test_execute_pr_test_quality_stops_after_invalid_findings_repair(
         task_agent._review_execute_pr_test_quality(
             FakeQualityClient(),
             {"test_sources": {"tests/test_ci.py": "def test_ci(): ..."}},
+            config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
         )
 
     assert findings_calls == 2

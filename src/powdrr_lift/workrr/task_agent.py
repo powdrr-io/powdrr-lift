@@ -6,6 +6,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -138,7 +139,7 @@ from powdrr_lift.workrr.llm import (
     WorkflowActionProgressStrategy,
     WorkflowLLMActionEngine,
     WorkflowLLMClient,
-    complete_json,
+    complete_json_with_timeout_retry,
     resolve_deterministic_repair,
     workflow_action_failure_signature,
     workflow_action_signature,
@@ -1163,6 +1164,8 @@ def _clone_execute_pr_test_worktree(
 def _review_execute_pr_test_quality(
     quality_client: WorkflowLLMClient,
     suite_evidence: Mapping[str, Any],
+    *,
+    config: WorkflowTaskAgentConfig,
 ) -> dict[str, Any]:
     """Let Jev decide test quality and ask the LLM for evidence only on failure."""
     decision = JevSemanticClassifierClient(
@@ -1279,8 +1282,14 @@ def _review_execute_pr_test_quality(
                     ),
                 },
             ]
-        findings_response = complete_json(
-            quality_client, messages, response_schema=findings_schema
+        findings_response = complete_json_with_timeout_retry(
+            quality_client,
+            messages,
+            model=config.minisweagent_model or config.provider,
+            stderr=sys.stderr,
+            max_timeout_retries=config.max_timeout_retries,
+            timeout_backoff_seconds=config.timeout_backoff_seconds,
+            response_schema=findings_schema,
         )
         try:
             findings = validate_quality_findings(findings_response.get("findings"))
@@ -1487,7 +1496,7 @@ def _author_execute_pr_tests(
                     "baseline_result": baseline_report,
                 }
                 quality_report = _review_execute_pr_test_quality(
-                    quality_client, suite_evidence
+                    quality_client, suite_evidence, config=config
                 )
                 validation_error = None
                 break

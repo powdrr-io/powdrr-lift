@@ -234,3 +234,139 @@ def test_execute_pr_test_quality_asks_llm_for_findings_after_jev_failure(
     assert len(findings_calls) == 1
     assert findings_calls[0][1]["required"] == ["findings"]
     assert "Jev has already judged inadequate" in findings_calls[0][0][0]["content"]
+    assert (
+        '"test_id":"tests/test_api.py::test_rejects_bad_input"'
+        in (findings_calls[0][0][0]["content"])
+    )
+    assert "Do not use alternate keys" in findings_calls[0][0][0]["content"]
+
+
+def test_execute_pr_test_quality_repairs_malformed_findings_response(
+    monkeypatch: Any,
+) -> None:
+    findings_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
+    responses = iter(
+        [
+            {
+                "findings": [
+                    {
+                        "test": "test_ci_workflow",
+                        "obligation_id": "AC-01",
+                        "finding": "The test only checks that a workflow file exists.",
+                    }
+                ]
+            },
+            {
+                "findings": [
+                    {
+                        "test_id": "test_ci_workflow",
+                        "issue": "Does not exercise the workflow trigger.",
+                        "evidence": "The test only checks that the YAML file exists.",
+                    }
+                ]
+            },
+        ]
+    )
+
+    class FakeJevClient:
+        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
+            assert fail_closed
+
+        def complete_json(
+            self,
+            _messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any],
+        ) -> dict[str, Any]:
+            assert response_schema["required"] == ["passed"]
+            return {"passed": False}
+
+    class FakeQualityClient:
+        def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
+            pytest.fail("the patched complete_json helper should be used")
+
+    def request_findings(
+        _client: Any,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        findings_calls.append((messages, response_schema))
+        return next(responses)
+
+    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
+    monkeypatch.setattr(task_agent, "complete_json", request_findings)
+
+    with pytest.raises(task_agent.ExecutePrTestError, match="test_ci_workflow"):
+        task_agent._review_execute_pr_test_quality(
+            FakeQualityClient(),
+            {"test_sources": {"tests/test_ci.py": "def test_ci(): ..."}},
+        )
+
+    assert len(findings_calls) == 2
+    assert findings_calls[1][1]["properties"]["findings"]["items"]["required"] == [
+        "test_id",
+        "issue",
+        "evidence",
+    ]
+    assert "previous response failed validation" in findings_calls[1][0][-1]["content"]
+    assert (
+        "test-quality review contains an invalid finding"
+        in findings_calls[1][0][-1]["content"]
+    )
+
+
+def test_execute_pr_test_quality_stops_after_invalid_findings_repair(
+    monkeypatch: Any,
+) -> None:
+    findings_calls = 0
+
+    class FakeJevClient:
+        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
+            assert fail_closed
+
+        def complete_json(
+            self,
+            _messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any],
+        ) -> dict[str, Any]:
+            assert response_schema["required"] == ["passed"]
+            return {"passed": False}
+
+    class FakeQualityClient:
+        def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
+            pytest.fail("the patched complete_json helper should be used")
+
+    def request_findings(
+        _client: Any,
+        _messages: list[dict[str, str]],
+        *,
+        response_schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        nonlocal findings_calls
+        findings_calls += 1
+        assert response_schema["required"] == ["findings"]
+        return {
+            "findings": [
+                {
+                    "test": "test_ci_workflow",
+                    "obligation_id": "AC-01",
+                    "finding": "Wrong shape again.",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
+    monkeypatch.setattr(task_agent, "complete_json", request_findings)
+
+    with pytest.raises(
+        task_agent.ExecutePrQualityFindingsFormatError,
+        match="after one format-repair request",
+    ):
+        task_agent._review_execute_pr_test_quality(
+            FakeQualityClient(),
+            {"test_sources": {"tests/test_ci.py": "def test_ci(): ..."}},
+        )
+
+    assert findings_calls == 2

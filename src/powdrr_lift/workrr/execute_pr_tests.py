@@ -20,10 +20,6 @@ class ExecutePrTestError(ValueError):
     """Generated execute-PR tests are invalid or did not prove behavior."""
 
 
-class ExecutePrQualityFindingsFormatError(ExecutePrTestError):
-    """The quality reviewer could not return findings in the required format."""
-
-
 def discover_python_test_root(
     tracked_paths: Sequence[str], *, allowed_paths: Sequence[str]
 ) -> str:
@@ -183,50 +179,6 @@ def pytest_execution_evidence(result: Mapping[str, Any]) -> dict[str, Any]:
     if executed == 0:
         raise ExecutePrTestError("pytest reported no executed tests")
     return {"summary": summary, "counts": counts, "executed": executed}
-
-
-def validate_quality_review(review: Mapping[str, Any]) -> dict[str, Any]:
-    """Accept only an explicit clean verdict from the independent test reviewer."""
-    outcome = review.get("outcome")
-    findings = review.get("findings")
-    if outcome not in {"pass", "fail"} or not isinstance(findings, list):
-        raise ExecutePrTestError("test-quality review has an invalid verdict")
-    normalized: list[dict[str, str]] = []
-    for finding in findings:
-        if not isinstance(finding, Mapping) or any(
-            not isinstance(finding.get(key), str) or not finding[key].strip()
-            for key in ("test_id", "issue", "evidence")
-        ):
-            raise ExecutePrTestError("test-quality review contains an invalid finding")
-        normalized.append(
-            {key: finding[key].strip() for key in ("test_id", "issue", "evidence")}
-        )
-    if outcome == "pass" and normalized:
-        raise ExecutePrTestError(
-            "test-quality reviewer passed while reporting findings"
-        )
-    if outcome == "fail" and not normalized:
-        raise ExecutePrTestError("test-quality reviewer failed without explaining why")
-    return {"outcome": outcome, "findings": normalized}
-
-
-def validate_quality_findings(findings: Any) -> list[dict[str, str]]:
-    """Validate concrete explanations requested after Jev rejects a suite."""
-    if not isinstance(findings, list) or not findings:
-        raise ExecutePrTestError(
-            "test-quality findings must explain Jev's fail decision"
-        )
-    normalized: list[dict[str, str]] = []
-    for finding in findings:
-        if not isinstance(finding, Mapping) or any(
-            not isinstance(finding.get(key), str) or not finding[key].strip()
-            for key in ("test_id", "issue", "evidence")
-        ):
-            raise ExecutePrTestError("test-quality review contains an invalid finding")
-        normalized.append(
-            {key: finding[key].strip() for key in ("test_id", "issue", "evidence")}
-        )
-    return normalized
 
 
 def validate_generated_test_files(

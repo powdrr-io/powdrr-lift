@@ -21,7 +21,6 @@ from powdrr_lift.workrr.execute_pr_tests import (
     run_generated_pytest,
     validate_coverage_references,
     validate_generated_test_files,
-    validate_quality_review,
 )
 from powdrr_lift.workrr.test_obligations import (
     ObligationError,
@@ -150,13 +149,7 @@ def test_acceptance_criteria_get_deterministic_ids_and_require_test_links() -> N
         )
 
 
-def test_quality_review_and_pytest_execution_evidence_fail_closed() -> None:
-    assert validate_quality_review({"outcome": "pass", "findings": []}) == {
-        "outcome": "pass",
-        "findings": [],
-    }
-    with pytest.raises(ExecutePrTestError, match="without explaining"):
-        validate_quality_review({"outcome": "fail", "findings": []})
+def test_pytest_execution_evidence_reports_counts() -> None:
     assert pytest_execution_evidence(
         {"stdout": "14 passed, 2 skipped in 0.50s", "stderr": ""}
     ) == {

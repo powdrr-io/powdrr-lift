@@ -14,6 +14,7 @@ from typing import Any
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
+from powdrr_lift.workrr.http_retry import retry_transient_http
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
 LOGGER = logging.getLogger(__name__)
@@ -106,7 +107,9 @@ class _DecisionApiSemanticClassifierClient:
         )
         phase = "request"
         try:
-            response = self._call(request_data, self._api_key, self._endpoint)
+            response = retry_transient_http(
+                lambda: self._call(request_data, self._api_key or "", self._endpoint)
+            )
             answer = response.get("answer", response)
             returned_model = response.get("model", self._model)
             LOGGER.warning(
@@ -170,8 +173,10 @@ class _DecisionApiSemanticClassifierClient:
                 )
             if len(batch) == 1:
                 item = batch[0]
-                single_response = self._call(
-                    item.request_data, self._api_key or "", self._endpoint
+                single_response = retry_transient_http(
+                    lambda: self._call(
+                        item.request_data, self._api_key or "", self._endpoint
+                    )
                 )
                 answer = single_response.get("answer", single_response)
                 response = {
@@ -179,7 +184,9 @@ class _DecisionApiSemanticClassifierClient:
                     "model": single_response.get("model", self._model),
                 }
             else:
-                response = self._call_batch(batch, self._api_key or "", self._endpoint)
+                response = retry_transient_http(
+                    lambda: self._call_batch(batch, self._api_key or "", self._endpoint)
+                )
             phase = "response_mapping"
             returned_model = response.get("model", self._model)
             answers = response.get("answers")

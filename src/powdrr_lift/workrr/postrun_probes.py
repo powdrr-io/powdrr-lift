@@ -16,7 +16,7 @@ from typing import Any
 
 from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 
-POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v6"
+POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v7"
 
 
 def validate_probe_interaction_plan(
@@ -24,14 +24,12 @@ def validate_probe_interaction_plan(
     *,
     instruction: str,
     scenarios: Sequence[Mapping[str, Any]],
-    evidence_candidates: Sequence[Mapping[str, str]] | None = None,
+    repository_contract: Mapping[str, Any] | None = None,
+    instruction_ledger_clauses: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[dict[str, Any], ...]:
-    """Check references and materialize model-selected exact instruction quotes."""
-    candidates = tuple(
-        evidence_candidates or instruction_evidence_candidates(instruction)
-    )
-    candidate_quotes = {str(item["id"]): str(item["quote"]) for item in candidates}
-    known_scenarios = {str(item["scenario_id"]) for item in scenarios}
+    """Check references and bind evidence from each scenario deterministically."""
+    scenarios_by_id = {str(item["scenario_id"]): item for item in scenarios}
+    known_scenarios = set(scenarios_by_id)
     seen: set[str] = set()
     validated: list[dict[str, Any]] = []
     for raw in interactions:
@@ -60,38 +58,37 @@ def validate_probe_interaction_plan(
             )
         for key in ("condition", "operation", "expected"):
             _required_text(item, key)
-        quote_ids = item.get("evidence_quote_ids")
-        if (
-            not isinstance(quote_ids, list)
-            or any(
-                not isinstance(quote_id, str) or quote_id not in candidate_quotes
-                for quote_id in quote_ids
+        item.pop("evidence_quote_ids", None)
+        item.pop("evidence_quotes", None)
+        evidence_quotes: list[str] = []
+        for scenario_id in scenario_ids:
+            evidence = _resolve_scenario_evidence(
+                scenarios_by_id[scenario_id].get("evidence", ()),
+                scenario_id=scenario_id,
+                instruction=instruction,
+                repository_contract=repository_contract or {},
+                instruction_ledger_clauses=instruction_ledger_clauses,
             )
-            or len(set(quote_ids)) < 2
-        ):
+            quote = next(
+                (
+                    citation["quote"]
+                    for citation in evidence
+                    if citation["quote"] not in evidence_quotes
+                ),
+                None,
+            )
+            if quote is None:
+                continue
+            evidence_quotes.append(quote)
+        if len(evidence_quotes) < 2:
             raise ValueError(
-                f"interaction {interaction_id!r} must cite two distinct "
-                "instruction evidence_quote_ids"
+                f"interaction {interaction_id!r} cannot resolve two distinct "
+                "source quotes from its scenarios"
             )
-        item.pop("evidence_quote_ids")
-        item["evidence_quotes"] = [candidate_quotes[quote_id] for quote_id in quote_ids]
+        item["evidence_quotes"] = evidence_quotes
         seen.add(interaction_id)
         validated.append(item)
     return tuple(validated)
-
-
-def instruction_evidence_candidates(instruction: str) -> list[dict[str, str]]:
-    """Split instruction text into exact, selectable evidence clauses."""
-    clauses = re.split(r"(?<=[.!?;])(?:[ \t]+|\n+)|\n+", instruction)
-    candidates: list[dict[str, str]] = []
-    seen: set[str] = set()
-    for clause in clauses:
-        quote = clause.strip()
-        if not quote or quote in seen:
-            continue
-        seen.add(quote)
-        candidates.append({"id": f"quote-{len(candidates) + 1:03d}", "quote": quote})
-    return candidates
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +145,7 @@ def parse_generated_postrun_probe_source(
     *,
     instruction: str,
     repository_contract: Mapping[str, Any] | None = None,
+    instruction_ledger_clauses: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[
     tuple[dict[str, Any], ...],
     tuple[dict[str, Any], ...],
@@ -187,12 +185,15 @@ def parse_generated_postrun_probe_source(
         raw_interactions,
         instruction=instruction,
         scenarios=scenarios,
+        repository_contract=repository_contract or {},
+        instruction_ledger_clauses=instruction_ledger_clauses,
     )
     obligations = _validate_probe_obligations(
         raw_obligations,
         scenarios,
         instruction=instruction,
         repository_contract=repository_contract or {},
+        instruction_ledger_clauses=instruction_ledger_clauses,
     )
     if not functions and any(item["supported"] is True for item in obligations):
         raise ValueError("probe suite must define probes for supported obligations")
@@ -343,12 +344,58 @@ def _probe_module_metadata(tree: ast.Module) -> dict[str, Any]:
     return metadata
 
 
+def _resolve_scenario_evidence(
+    raw_evidence: Any,
+    *,
+    scenario_id: str,
+    instruction: str,
+    repository_contract: Mapping[str, Any],
+    instruction_ledger_clauses: Sequence[Mapping[str, Any]],
+) -> list[dict[str, str]]:
+    """Bind scenario evidence to exact source text without model-authored citations."""
+    if not isinstance(raw_evidence, Sequence) or isinstance(raw_evidence, (str, bytes)):
+        return []
+    contract_strings = _string_leaves(repository_contract)
+    citations: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    clause_id = scenario_id.removeprefix("scenario:")
+    ledger_quote = next(
+        (
+            str(clause["text"]).strip()
+            for clause in instruction_ledger_clauses
+            if clause.get("clause_id") == clause_id
+            and isinstance(clause.get("text"), str)
+            and str(clause["text"]).strip() in instruction
+        ),
+        None,
+    )
+    if ledger_quote is not None:
+        citations.append({"source": "instruction", "quote": ledger_quote})
+        seen.add(("instruction", ledger_quote))
+    for raw_quote in raw_evidence:
+        if not isinstance(raw_quote, str) or not raw_quote.strip():
+            continue
+        quote = raw_quote.strip()
+        if quote in instruction:
+            citation = ("instruction", quote)
+        elif any(quote in value for value in contract_strings):
+            citation = ("repository_contract", quote)
+        else:
+            continue
+        if citation in seen:
+            continue
+        seen.add(citation)
+        citations.append({"source": citation[0], "quote": citation[1]})
+    return citations
+
+
 def _validate_probe_obligations(
     raw_obligations: list[Any],
     scenarios: Sequence[Mapping[str, Any]],
     *,
     instruction: str,
     repository_contract: Mapping[str, Any],
+    instruction_ledger_clauses: Sequence[Mapping[str, Any]],
 ) -> tuple[dict[str, Any], ...]:
     category_values = {
         "transformation",
@@ -383,8 +430,6 @@ def _validate_probe_obligations(
         "other",
     }
     known_scenarios = {str(item["scenario_id"]) for item in scenarios}
-    instruction_strings = (instruction,)
-    contract_strings = tuple(_string_leaves(repository_contract))
     seen: set[str] = set()
     covered: set[str] = set()
     obligations: list[dict[str, Any]] = []
@@ -405,33 +450,26 @@ def _validate_probe_obligations(
             raise ValueError(f"obligation {obligation_id!r} has an invalid type")
         if not isinstance(item.get("supported"), bool):
             raise ValueError(f"obligation {obligation_id!r} has invalid support status")
-        evidence = item.get("evidence")
-        if not isinstance(evidence, list):
-            raise ValueError(
-                f"{obligation_id} evidence must be a Python list of citation "
-                "dictionaries with source and quote fields"
-            )
-        for citation in evidence:
-            if not isinstance(citation, Mapping):
-                raise ValueError(
-                    f"{obligation_id} evidence must be a Python list of citation "
-                    "dictionaries with source and quote fields"
-                )
-            source, quote = citation.get("source"), citation.get("quote")
-            allowed_strings = (
-                instruction_strings if source == "instruction" else contract_strings
-            )
-            if (
-                source not in {"instruction", "repository_contract"}
-                or not isinstance(quote, str)
-                or not quote.strip()
-                or not any(quote in value for value in allowed_strings)
-            ):
-                raise ValueError(f"obligation {obligation_id!r} cites absent evidence")
+        item.pop("evidence", None)
+        item.pop("evidence_ids", None)
+        scenario = next(
+            scenario
+            for scenario in scenarios
+            if str(scenario["scenario_id"]) == scenario_id
+        )
+        evidence = _resolve_scenario_evidence(
+            scenario.get("evidence", ()),
+            scenario_id=scenario_id,
+            instruction=instruction,
+            repository_contract=repository_contract,
+            instruction_ledger_clauses=instruction_ledger_clauses,
+        )
+        item["evidence"] = evidence
         if item["supported"]:
             if item["rule"] == "unresolved" or not evidence:
                 raise ValueError(
-                    f"supported obligation {obligation_id!r} is not grounded"
+                    f"supported obligation {obligation_id!r} has no scenario evidence "
+                    "that resolves to exact instruction or repository-contract text"
                 )
             for key in ("summary", "condition", "operation", "expected"):
                 _required_text(item, key)
@@ -671,7 +709,6 @@ __all__ = [
     "PostRunProbe",
     "PostRunProbeResult",
     "baseline_probe_failures",
-    "instruction_evidence_candidates",
     "parse_generated_postrun_probe_source",
     "probe_failures",
     "run_postrun_probes",

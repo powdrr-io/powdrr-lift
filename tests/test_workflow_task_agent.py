@@ -71,6 +71,7 @@ from powdrr_lift.workrr.task_agent import (
     _workflow_file_command_error,
     run_workflow_task,
 )
+from powdrr_lift.workrr.test_obligations import acceptance_criteria_contract
 
 
 def test_execute_pr_test_author_prompt_pins_authoring_worktree(
@@ -80,7 +81,9 @@ def test_execute_pr_test_author_prompt_pins_authoring_worktree(
     prompt = _execute_pr_test_author_prompt(
         authoring_worktree=authoring_worktree,
         plan_context={"acceptance_criteria": ["The workflow runs on pull requests."]},
-        coverage_plan={"criteria": []},
+        obligations=acceptance_criteria_contract(
+            ["The workflow runs on pull requests."]
+        ),
     )
 
     assert f"exact, only workspace for this attempt is:\n{authoring_worktree}" in prompt
@@ -91,6 +94,10 @@ def test_execute_pr_test_author_prompt_pins_authoring_worktree(
     )
     assert "implementation is intentionally absent" in prompt
     assert "fail through a behavioral assertion" in prompt
+    assert "Deterministic test obligations" in prompt
+    assert "# Covers: AC-01 test_function_name" in prompt
+    assert '"obligation_id": "AC-01"' in prompt
+    assert "partitions" not in prompt
 
 
 def test_execute_pr_test_author_write_denials_cover_primary_checkout(
@@ -257,86 +264,6 @@ def test_reviewed_plan_reference_to_existing_allowed_file_is_not_creation(
     )
 
     assert evidence == ()
-
-
-def test_execute_pr_coverage_plan_repairs_empty_criteria_once(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    responses: list[dict[str, Any]] = [
-        {"criteria": []},
-        {
-            "criteria": [
-                {
-                    "criterion_id": "AC-01",
-                    "criterion": "The signature is accepted only for a trusted key.",
-                    "partitions": [
-                        {
-                            "partition_id": "P01",
-                            "behavior_class": "trusted-key acceptance",
-                            "case_strategy": (
-                                "verify a valid envelope against a registered key"
-                            ),
-                            "minimum_case_count": 1,
-                            "observable_oracle": "the verifier accepts the signature",
-                            "test_ids": ["test_accepts_registered_signing_key"],
-                        },
-                        {
-                            "partition_id": "P02",
-                            "behavior_class": "untrusted-key rejection",
-                            "case_strategy": (
-                                "verify an envelope signed by an unregistered key"
-                            ),
-                            "minimum_case_count": 1,
-                            "observable_oracle": (
-                                "the verifier returns the untrusted-key rejection code"
-                            ),
-                            "test_ids": ["test_rejects_unregistered_signing_key"],
-                        },
-                    ],
-                }
-            ]
-        },
-    ]
-    calls: list[list[dict[str, str]]] = []
-
-    def complete_json(
-        _client: Any,
-        messages: list[dict[str, str]],
-        *,
-        response_schema: Mapping[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        assert response_schema is not None
-        calls.append(messages)
-        return responses.pop(0)
-
-    monkeypatch.setattr(task_agent, "complete_json", complete_json)
-    acceptance_criteria = [
-        "The signature is accepted only for a trusted key.",
-    ]
-    plan, repairs = task_agent._build_execute_pr_coverage_plan(
-        cast(Any, object()),
-        {
-            "acceptance_criteria": acceptance_criteria,
-            "title": "Verify trusted signing keys",
-        },
-        acceptance_criteria,
-    )
-
-    assert len(calls) == 2
-    assert "Repair the prior response" in calls[1][0]["content"]
-    assert (
-        "coverage plan must represent every acceptance criterion"
-        in calls[1][1]["content"]
-    )
-    assert plan["criteria"][0]["criterion_id"] == "AC-01"
-    assert [item["partition_id"] for item in plan["criteria"][0]["partitions"]] == [
-        "P01",
-        "P02",
-    ]
-    assert repairs == [
-        "coverage plan must represent every acceptance criterion; "
-        "missing=['AC-01'], extra=[]"
-    ]
 
 
 def test_normalize_execute_pr_coding_attempt_marks_unshaped_error_failed() -> None:
@@ -898,6 +825,7 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     )
     generated_test_source = (
         "from feature import value\n\n"
+        "# Covers: AC-01 test_public_feature_value_is_implemented\n"
         "def test_public_feature_value_is_implemented():\n"
         "    assert value == 42\n"
     )
@@ -910,27 +838,15 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
                 "generation_method": "miniswe_pre_coding",
                 "test_sha256": {"tests/integration/test_feature_e2e.py": "a" * 64},
                 "authoring_attempts": [{"status": "completed"}],
-                "coverage_plan": {
-                    "criteria": [
-                        {
-                            "criterion_id": "AC-01",
-                            "criterion": "The feature value equals 42.",
-                            "partitions": [
-                                {
-                                    "partition_id": "P01",
-                                    "behavior_class": "public value",
-                                    "case_strategy": "read public feature value",
-                                    "minimum_case_count": 1,
-                                    "observable_oracle": "value equals 42",
-                                    "test_ids": [
-                                        "test_public_feature_value_is_implemented"
-                                    ],
-                                }
-                            ],
-                        }
-                    ]
+                "test_obligations": [
+                    {
+                        "obligation_id": "AC-01",
+                        "source_text": "The feature value equals 42.",
+                    }
+                ],
+                "coverage_references": {
+                    "AC-01": ["test_public_feature_value_is_implemented"]
                 },
-                "coverage_references": {"AC-01.P01": 1},
                 "quality_review": {"outcome": "pass", "findings": []},
                 "baseline_execution_evidence": {"executed": 1},
                 "baseline_result": {

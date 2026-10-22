@@ -12,86 +12,17 @@ from pathlib import Path, PurePosixPath
 from typing import Any
 
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
+from powdrr_lift.workrr.test_obligations import missing_obligation_ids
 
 
 class ExecutePrTestError(ValueError):
     """Generated execute-PR tests are invalid or did not prove behavior."""
 
 
-def validate_coverage_plan(
-    plan: Mapping[str, Any], acceptance_criteria: Sequence[Any]
-) -> dict[str, Any]:
-    """Require an explicit, test-linked partition plan for every criterion."""
-    criteria = plan.get("criteria")
-    if not isinstance(criteria, list):
-        raise ExecutePrTestError("test coverage plan must contain criteria")
-    expected_ids = {f"AC-{index:02d}" for index, _ in enumerate(acceptance_criteria, 1)}
-    by_id: dict[str, dict[str, Any]] = {}
-    assigned_test_ids: set[str] = set()
-    for raw in criteria:
-        if not isinstance(raw, Mapping):
-            raise ExecutePrTestError(
-                "test coverage plan contains a malformed criterion"
-            )
-        criterion_id = raw.get("criterion_id")
-        partitions = raw.get("partitions")
-        if (
-            not isinstance(criterion_id, str)
-            or criterion_id not in expected_ids
-            or criterion_id in by_id
-            or not isinstance(raw.get("criterion"), str)
-            or not raw["criterion"].strip()
-            or not isinstance(partitions, list)
-            or not partitions
-        ):
-            raise ExecutePrTestError(
-                "test coverage plan has missing or invalid criterion IDs"
-            )
-        checked_partitions: list[dict[str, Any]] = []
-        partition_ids: set[str] = set()
-        for partition in partitions:
-            if not isinstance(partition, Mapping):
-                raise ExecutePrTestError(f"{criterion_id} has a malformed partition")
-            partition_id = partition.get("partition_id")
-            test_ids = partition.get("test_ids")
-            if (
-                not isinstance(partition_id, str)
-                or not partition_id
-                or partition_id in partition_ids
-                or not isinstance(partition.get("behavior_class"), str)
-                or not partition["behavior_class"].strip()
-                or not isinstance(partition.get("observable_oracle"), str)
-                or not partition["observable_oracle"].strip()
-                or not isinstance(partition.get("case_strategy"), str)
-                or not partition["case_strategy"].strip()
-                or not isinstance(partition.get("minimum_case_count"), int)
-                or isinstance(partition.get("minimum_case_count"), bool)
-                or partition["minimum_case_count"] < 1
-                or not isinstance(test_ids, list)
-                or not test_ids
-                or any(not isinstance(value, str) or not value for value in test_ids)
-                or len(set(test_ids)) != len(test_ids)
-                or assigned_test_ids.intersection(test_ids)
-            ):
-                raise ExecutePrTestError(f"{criterion_id} has an incomplete partition")
-            partition_ids.add(partition_id)
-            assigned_test_ids.update(test_ids)
-            checked_partitions.append(dict(partition))
-        by_id[criterion_id] = {**dict(raw), "partitions": checked_partitions}
-    if set(by_id) != expected_ids:
-        missing = sorted(expected_ids - set(by_id))
-        extra = sorted(set(by_id) - expected_ids)
-        raise ExecutePrTestError(
-            "coverage plan must represent every acceptance criterion; "
-            f"missing={missing}, extra={extra}"
-        )
-    return {"criteria": [by_id[key] for key in sorted(by_id)]}
-
-
 def validate_coverage_references(
-    files: Mapping[str, str], plan: Mapping[str, Any]
-) -> dict[str, int]:
-    """Check every planned partition is explicitly linked to authored tests."""
+    files: Mapping[str, str], obligations: Sequence[Mapping[str, Any]]
+) -> dict[str, list[str]]:
+    """Require each deterministic obligation to link to an actual authored test."""
     tests = {
         node.name
         for source in files.values()
@@ -99,26 +30,46 @@ def validate_coverage_references(
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         and node.name.startswith("test_")
     }
-    references: dict[str, int] = {}
-    for criterion in plan["criteria"]:
-        criterion_id = criterion["criterion_id"]
-        for partition in criterion["partitions"]:
-            reference = f"{criterion_id}.{partition['partition_id']}"
-            referenced = 0
-            for source in files.values():
-                for test_id in partition["test_ids"]:
-                    if test_id in tests and re.search(
-                        rf"(?m)^\s*#\s*Covers:\s*{re.escape(reference)}\s+{re.escape(test_id)}\s*$",
-                        source,
-                    ):
-                        referenced += 1
-            if referenced == 0:
+    expected_ids = [str(item.get("obligation_id", "")) for item in obligations]
+    if not expected_ids or any(not item for item in expected_ids):
+        raise ExecutePrTestError("coverage obligations must have non-empty IDs")
+    if len(set(expected_ids)) != len(expected_ids):
+        raise ExecutePrTestError("coverage obligations contain duplicate IDs")
+    references: dict[str, set[str]] = {item: set() for item in expected_ids}
+    markers = re.compile(
+        r"(?m)^[ \t]*#[ \t]*Covers:[ \t]*(AC-[0-9]{2,})"
+        r"[ \t]+(test_[A-Za-z0-9_]+)[ \t]*$"
+    )
+    for source in files.values():
+        for obligation_id, test_name in markers.findall(source):
+            if obligation_id not in references:
                 raise ExecutePrTestError(
-                    f"coverage partition {reference} is not linked to an actual test; "
-                    "add '# Covers: <partition-id> <test_function>' above its test"
+                    f"test coverage marker refers to unknown obligation {obligation_id}"
                 )
-            references[reference] = referenced
-    return references
+            if test_name not in tests:
+                raise ExecutePrTestError(
+                    f"coverage marker {obligation_id} refers to missing test "
+                    f"{test_name}"
+                )
+            references[obligation_id].add(test_name)
+    covered_ids = {key for key, test_names in references.items() if test_names}
+    missing = missing_obligation_ids(expected_ids, covered_ids)
+    if missing:
+        raise ExecutePrTestError(
+            "tests must cover every acceptance criterion; "
+            f"missing={missing}. Add '# Covers: <AC-ID> <test_function>' above "
+            "an authored test."
+        )
+    if not tests:
+        raise ExecutePrTestError("coverage references contain no actual tests")
+    referenced_tests = set().union(*references.values())
+    unlinked_tests = sorted(tests - referenced_tests)
+    if unlinked_tests:
+        raise ExecutePrTestError(
+            "authored tests must link to an acceptance criterion; "
+            f"unlinked={unlinked_tests}"
+        )
+    return {key: sorted(value) for key, value in sorted(references.items())}
 
 
 def pytest_execution_evidence(result: Mapping[str, Any]) -> dict[str, Any]:

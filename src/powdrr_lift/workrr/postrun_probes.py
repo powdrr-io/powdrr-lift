@@ -507,16 +507,22 @@ def _validate_probe_obligations(
             operands = item.get("operands")
             if not isinstance(operands, list):
                 raise ValueError(f"obligation {obligation_id!r} has malformed operands")
-            for operand in operands:
+            for operand_index, operand in enumerate(operands):
                 if (
                     not isinstance(operand, Mapping)
                     or operand.get("role") not in operand_roles
                 ):
                     raise ValueError(
-                        f"obligation {obligation_id!r} has invalid operand roles"
+                        f"obligation {obligation_id!r} operand {operand_index} "
+                        "has an invalid role"
                     )
-                _required_text(operand, "name")
-                _required_text(operand, "meaning")
+                for key in ("name", "meaning"):
+                    value = operand.get(key)
+                    if not isinstance(value, str) or not value.strip():
+                        raise ValueError(
+                            f"obligation {obligation_id!r} operand "
+                            f"{operand_index} requires non-empty {key}"
+                        )
         elif item["rule"] != "unresolved":
             raise ValueError(
                 f"unsupported obligation {obligation_id!r} must be unresolved"

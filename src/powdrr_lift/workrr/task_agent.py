@@ -777,14 +777,23 @@ def _preflight_proposed_file_additions(
         )
         if base_file.returncode == 0:
             current_bytes = base_file.stdout
-        elif candidate_path.is_file():
-            current_bytes = candidate_path.read_bytes()
-        elif candidate_path.exists():
-            findings.append(
-                f"{raw_path} already exists in the base tree but is not a regular file"
-            )
-            continue
         else:
+            base_path_exists = subprocess.run(
+                [
+                    "git",
+                    "cat-file",
+                    "-e",
+                    f"{base_commit}:{relative_path.as_posix()}",
+                ],
+                cwd=root,
+                capture_output=True,
+                check=False,
+            )
+            if base_path_exists.returncode == 0:
+                findings.append(
+                    f"{raw_path} already exists in the base tree but is not "
+                    "a regular file"
+                )
             continue
 
         current_digest = hashlib.sha256(current_bytes).hexdigest()

@@ -1,0 +1,48 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1108
+title: Ignore checkpoint files outside the worker baseline
+intent:
+  problem: The accepted-plan preflight treated files on a durable integration checkpoint as existing in the target branch when they were absent from the declared base commit.
+  goal: Compare proposed file additions only with the declared base commit while preserving detection of paths that already exist there as non-regular files.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 780, end_line: 786}
+    summary: Remove the fallback that read candidate files from the integration checkout.
+    rationale: A prior worker checkpoint must not be mistaken for content in the declared baseline.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 781, end_line: 796}
+    summary: Detect existing non-regular paths only in the declared base commit.
+    rationale: Preserve real baseline collisions without treating checkpoint-only files as pre-existing.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 33, end_line: 33}
+    summary: Import proposal objects for the preflight regression test.
+    rationale: Construct a deterministic proposed file-add operation in the test.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 225, end_line: 298}
+    summary: Add regression coverage for a candidate file committed after the baseline.
+    rationale: Ensure an integration checkpoint containing the proposed file does not produce a false plan-defect finding.
+entities:
+  - id: preflight-proposed-file-additions
+    type: Function
+    action: added
+  - id: integration-checkpoint-addition-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: checkpoint-addition-test-verifies-preflight
+    type: verifies
+    source: integration-checkpoint-addition-regression
+    target: preflight-proposed-file-additions
+    action: added
+    description: The regression test verifies that checkpoint-only candidate files do not count as files in the declared baseline.
+invariants:
+  - id: proposed-file-addition-checks-use-base-commit
+    description: Preflight checks for proposed file additions compare repository content against the declared base commit.
+    action: added
+guidance: []

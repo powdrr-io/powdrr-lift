@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -20,7 +21,7 @@ from powdrr_lift.core.semantic_faithfulness import (
 from powdrr_lift.workrr.llm import complete_json
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
-PROBE_REPAIR_SCHEMA_VERSION = "behavior-probe-repair-v2"
+PROBE_REPAIR_SCHEMA_VERSION = "behavior-probe-repair-v3"
 PROBE_REPAIR_BATCH_SIZE = 8
 PROBE_REPAIR_RESPONSE_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -90,6 +91,10 @@ def repair_behavior_probes(
         "original_scenarios": originals,
         "proposed_revisions": [],
         "used_scenarios": originals,
+        "obligation_guidance": _obligation_guidance(
+            scenarios={str(item.get("scenario_id", "")): item for item in originals},
+            ledger_clauses=ledger_clauses,
+        ),
         "initial_findings": initial_findings,
         "final_findings": initial_findings,
         "faithfulness_reviews": [],
@@ -138,6 +143,7 @@ def repair_behavior_probes(
             scenario_id: repairable[scenario_id] for scenario_id in batch_ids
         }
         messages = _build_repair_messages(
+            instruction=instruction,
             repository_contract=repository_contract or {},
             findings=batch_findings,
             scenarios=batch_scenarios,
@@ -223,7 +229,9 @@ def repair_behavior_probes(
                 original,
                 candidate,
                 contract_directory=contract_directory,
-                ledger_clauses=ledger_clauses,
+                ledger_clauses=_faithfulness_source_context(
+                    instruction, ledger_clauses
+                ),
                 client=faithfulness_client,
             )
             artifact["faithfulness_reviews"].append(review)
@@ -251,6 +259,7 @@ def repair_behavior_probes(
 
 def _build_repair_messages(
     *,
+    instruction: str,
     repository_contract: Mapping[str, Any],
     findings: Sequence[Mapping[str, Any]],
     scenarios: Mapping[str, Mapping[str, Any]],
@@ -270,10 +279,17 @@ def _build_repair_messages(
                 "to make setup and operations concrete. Do not repeat the clause as "
                 "the expected result. Name the public API call, property access, or "
                 "input transformation in `when`; state an assertion-sized result in "
-                "`then`. For a clause that names a public field, property, method, "
-                "or type, test the stated member or type directly. If the clause "
-                "only requires a property to exist, check property presence rather "
-                "than infer its semantics. Keep scenario IDs unchanged. If the "
+                "`then`. Use the full source instruction and related source clauses "
+                "to understand how an atomic clause fits the requested deliverable; "
+                "the verifier and hidden tests are never inputs. Follow the supplied "
+                "obligation-specific probe guidance. For a derived property, assert "
+                "its exact value from a setup with known inputs, not merely that it "
+                "exists. For normalization, use a non-canonical input and assert the "
+                "canonical value. For explicit pass-through behavior, compare the "
+                "output with the original input. Do not invent behavior for a clause "
+                "that only excludes work from scope. For a clause that names a public "
+                "field, property, method, or type, test the stated member or type "
+                "directly. Keep scenario IDs unchanged. If the "
                 "clause truly does not support a safe observable check, return its "
                 "fields unchanged so the pre-coding gate can stop the task."
             ),
@@ -282,9 +298,17 @@ def _build_repair_messages(
             "role": "user",
             "content": json.dumps(
                 {
+                    "source_instruction": instruction,
                     "repository_contract": repository_contract,
+                    "obligation_guidance": _obligation_guidance(
+                        scenarios=scenarios,
+                        ledger_clauses=ledger_clauses,
+                    ),
                     "flagged_scenarios": _flagged_scenarios_with_sources(
-                        findings, scenarios, ledger_clauses
+                        findings,
+                        scenarios,
+                        ledger_clauses,
+                        source_instruction=instruction,
                     ),
                 },
                 ensure_ascii=False,
@@ -332,6 +356,8 @@ def _flagged_scenarios_with_sources(
     findings: Sequence[Mapping[str, Any]],
     scenarios: Mapping[str, Mapping[str, Any]],
     ledger_clauses: Sequence[Mapping[str, Any]],
+    *,
+    source_instruction: str,
 ) -> list[dict[str, Any]]:
     clauses = {
         str(clause.get("clause_id")): clause
@@ -345,9 +371,25 @@ def _flagged_scenarios_with_sources(
         clause = clauses.get(source_id)
         source_clause = None
         if clause is not None:
+            related_clauses = _related_source_clauses(clause, ledger_clauses)
+            source_span = clause.get("source_span")
+            span_text = None
+            if isinstance(source_span, Mapping):
+                start = source_span.get("start")
+                end = source_span.get("end")
+                if (
+                    isinstance(start, int)
+                    and not isinstance(start, bool)
+                    and isinstance(end, int)
+                    and not isinstance(end, bool)
+                    and 0 <= start <= end <= len(source_instruction)
+                ):
+                    span_text = source_instruction[start:end]
             source_clause = {
                 "clause_id": source_id,
                 "text": clause.get("text"),
+                "source_span_text": span_text,
+                "related_clauses": related_clauses,
             }
         result.append(
             {
@@ -357,6 +399,142 @@ def _flagged_scenarios_with_sources(
             }
         )
     return result
+
+
+def _related_source_clauses(
+    clause: Mapping[str, Any], ledger_clauses: Sequence[Mapping[str, Any]]
+) -> list[dict[str, str]]:
+    validation_group_id = clause.get("validation_group_id")
+    parent_clause_id = clause.get("parent_clause_id")
+    clause_id = clause.get("clause_id")
+    related: list[dict[str, str]] = []
+    for candidate in ledger_clauses:
+        candidate_id = candidate.get("clause_id")
+        text = candidate.get("text")
+        if not isinstance(candidate_id, str) or not isinstance(text, str):
+            continue
+        if candidate_id == clause_id:
+            continue
+        same_validation_group = (
+            isinstance(validation_group_id, str)
+            and candidate.get("validation_group_id") == validation_group_id
+        )
+        same_parent = (
+            isinstance(parent_clause_id, str)
+            and candidate.get("parent_clause_id") == parent_clause_id
+        )
+        direct_child = (
+            isinstance(clause_id, str)
+            and candidate.get("parent_clause_id") == f"candidate:{clause_id}"
+        )
+        if same_validation_group or same_parent or direct_child:
+            related.append({"clause_id": candidate_id, "text": text})
+    return related
+
+
+def _faithfulness_source_context(
+    instruction: str, ledger_clauses: Sequence[Mapping[str, Any]]
+) -> tuple[Mapping[str, Any], ...]:
+    """Let entailment review use the complete user request as source evidence."""
+    context = tuple(ledger_clauses)
+    if not instruction.strip() or any(
+        clause.get("clause_id") == "instruction-source:full-request"
+        for clause in context
+    ):
+        return context
+    return (
+        *context,
+        {
+            "clause_id": "instruction-source:full-request",
+            "text": instruction,
+        },
+    )
+
+
+def _obligation_guidance(
+    *,
+    scenarios: Mapping[str, Mapping[str, Any]],
+    ledger_clauses: Sequence[Mapping[str, Any]],
+) -> list[dict[str, str]]:
+    clauses = {
+        str(clause.get("clause_id")): clause
+        for clause in ledger_clauses
+        if isinstance(clause.get("clause_id"), str)
+    }
+    result: list[dict[str, str]] = []
+    for scenario_id, scenario in scenarios.items():
+        source_id = scenario_id.removeprefix("scenario:")
+        clause = clauses.get(source_id, {})
+        source = str(clause.get("text") or scenario.get("then") or "")
+        kind, guidance = _classify_probe_obligation(source)
+        result.append(
+            {
+                "scenario_id": scenario_id,
+                "obligation_type": kind,
+                "probe_guidance": guidance,
+            }
+        )
+    return result
+
+
+def _classify_probe_obligation(source: str) -> tuple[str, str]:
+    normalized = re.sub(r"\s+", " ", source).strip().casefold()
+    if "out of scope" in normalized:
+        return (
+            "scope_exclusion",
+            "Do not invent an expected behavior for this excluded obligation. "
+            "Use only an explicit pass-through requirement from related source "
+            "clauses.",
+        )
+    if re.search(r"\bpass(?:es|ed)?\s+through\s+unchanged\b|\bunchanged\b", normalized):
+        return (
+            "pass_through",
+            "Use a concrete in-scope input and assert that the output is unchanged.",
+        )
+    if re.search(
+        r"\b(?:lowercase|lowercased|normalized|normalizes|normalization)\b", normalized
+    ):
+        return (
+            "normalization",
+            "Use a non-canonical input and assert the exact canonical value.",
+        )
+    if re.search(r"\bproperty\b|\bderived\b", normalized):
+        return (
+            "derived_property",
+            "Construct an object with known source values and assert the exact "
+            "derived property value, not just property presence.",
+        )
+    if re.search(r"\battribute\b|\bfield\b|\btype\s+str\b|\btype\s+bool\b", normalized):
+        return (
+            "public_member",
+            "Access the named public member directly and assert its specified value "
+            "or type.",
+        )
+    if re.search(
+        r"\bvalid parsed representation\b|\bparsed list\[line\]\b", normalized
+    ):
+        return (
+            "representation_robustness",
+            "Exercise distinct valid parsed representations of the same input and "
+            "assert the same parsed result.",
+        )
+    if re.search(r"\bparse\w*\b|\bsupport(?:s|ed)?\b", normalized):
+        return (
+            "parser_support",
+            "Supply the named minimal supported syntax and assert the parsed "
+            "structure and relevant values.",
+        )
+    if re.search(r"\bformat\w*\b|\bline\b|\bcomma\b|\bspace\b", normalized):
+        return (
+            "formatting_transformation",
+            "Use the smallest input that exercises this formatting rule and assert "
+            "the exact transformed output.",
+        )
+    return (
+        "behavioral_result",
+        "Name a concrete operation and setup, then assert one observable result "
+        "entailed by the source instruction.",
+    )
 
 
 def _check_revised_scenario_faithfulness(

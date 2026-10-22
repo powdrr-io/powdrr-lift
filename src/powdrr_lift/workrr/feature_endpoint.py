@@ -16,7 +16,10 @@ from typing import Any, cast
 import yaml
 
 from powdrr_lift.change_log_parser import parse_change_log
-from powdrr_lift.core.behavior_contract import compile_behavior_scenarios
+from powdrr_lift.core.behavior_contract import (
+    behavior_scenario_probe_findings,
+    compile_behavior_scenarios,
+)
 from powdrr_lift.core.contract_closure import (
     ContractClosureError,
     RepositoryEvidence,
@@ -2698,6 +2701,31 @@ def _run_code_agent_phase(
         )
         state["behavior_probe_repair_path"] = repair_path
         state["behavior_probe_repair_status"] = repair_artifact.get("status")
+        pre_coding_findings = behavior_scenario_probe_findings(repaired_scenarios)
+        pre_coding_review = {
+            "schema_version": "pre-coding-probe-quality-review-v1",
+            "status": "blocked" if pre_coding_findings else "passed",
+            "findings": pre_coding_findings,
+            "behavior_probe_repair_status": repair_artifact.get("status"),
+        }
+        pre_coding_review_path = (
+            output_root / "postrun-probes" / "pre-coding-quality-review.json"
+        )
+        pre_coding_review_path.parent.mkdir(parents=True, exist_ok=True)
+        pre_coding_review_path.write_text(
+            json.dumps(pre_coding_review, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        state["pre_coding_probe_quality_review_path"] = pre_coding_review_path
+        if pre_coding_findings:
+            failed_scenarios = ", ".join(
+                item["scenario_id"] for item in pre_coding_findings
+            )
+            raise PowdrrExecutionError(
+                "pre-coding probe quality gate blocked implementation; scenario "
+                "repair left non-falsifiable behavior scenarios: "
+                f"{failed_scenarios}"
+            )
     implementation_packet_path = output_root / "implementation-packet.json"
     packet_document = implementation_packet.to_data()
     behavior_probe_repair_path = state.get("behavior_probe_repair_path")
@@ -2995,6 +3023,10 @@ def _run_code_agent_phase(
                     + "\n",
                     encoding="utf-8",
                 )
+                raise PowdrrExecutionError(
+                    "pre-coding probe generation failed; implementation was not "
+                    f"started: {generation_error}"
+                ) from error
             if interaction_plan["status"] == "not_run":
                 interaction_plan_path = (
                     output_root / "postrun-probes" / "interaction-plan.json"
@@ -3237,16 +3269,21 @@ def _generate_miniswe_postrun_probes(
             "supported, summary, condition, operation, expected, operands, "
             "and unresolved_reason. Omit evidence fields; Powdrr attaches scenario "
             "evidence deterministically from the scenario ID and instruction "
-            "ledger. Use category values transformation, "
+            "ledger. Evidence binding is handled outside this authoring step: do "
+            "not mark an obligation unresolved because you cannot quote or locate "
+            "its source. Use the supplied `then` and its source clause to decide "
+            "whether the outcome is actually under-specified. Use category values "
+            "transformation, "
             "validation, preservation, lifecycle, compatibility, presence, other; "
             "rule values reference_integrity, uniqueness, collision, "
             "mutual_exclusion, type_constraint, range_constraint, presence, "
             "format, other, not_applicable, unresolved; and operand roles "
             "mapping_key, mapping_value, input, result, constraint, trigger, "
             "state, other. Split independently falsifiable rules. Include each "
-            "scenario. If the scenario has no resolvable source evidence, mark "
-            "the obligation unsupported and unresolved. "
-            "Mark unsupported behavior unresolved instead of guessing. "
+            "scenario. Mark an obligation unsupported and unresolved only when "
+            "its source clause does not define a safe observable outcome; explain "
+            "what is missing in `unresolved_reason`. Mark unsupported behavior "
+            "unresolved instead of guessing. "
             "`PROBE_METADATA` maps each function name to a dictionary with "
             "`probe_id`, `scenario_id`, `obligation_id`, `oracle_basis`, and "
             "optional `interaction_ids`. Each function must call the "
@@ -3258,7 +3295,13 @@ def _generate_miniswe_postrun_probes(
             "files, launch subprocesses, or access the network. Omit a scenario "
             "when the supplied contract does not define a safe oracle. A public "
             "API call may happen in setup or exception handling before the "
-            "assertion; the assertion must observe the resulting behavior.\n\n"
+            "assertion; the assertion must observe the resulting behavior. "
+            "Requirements that name public fields, properties, methods, or return "
+            "types are directly probeable: test the stated member/type contract "
+            "instead of labeling it unresolved. For properties whose semantics "
+            "are not specified, assert that the property exists without inventing "
+            "its value semantics. Mark an obligation unresolved only when its "
+            "source does not support any safe, observable assertion.\n\n"
             f"Task instruction:\n{instruction}\n\n"
             "Behavior scenarios. Treat each `then` as an oracle only when its "
             "`evidence` supports it. Use `related_requirements` to identify "

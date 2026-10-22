@@ -166,6 +166,14 @@ def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
         assert "large-review-metadata.json" not in request.prompt
         assert "complete executable Python module" in request.prompt
         assert "Do not encode metadata as JSON" in request.prompt
+        assert "public fields, properties, methods, or return types" in request.prompt
+        assert "instead of labeling it unresolved" in request.prompt
+        assert "Evidence binding is handled outside this authoring step" in (
+            request.prompt
+        )
+        assert "do not mark an obligation unresolved because you cannot quote" in (
+            request.prompt
+        )
         obligation = {
             "obligation_id": "selector-obligation",
             "scenario_id": "selector",

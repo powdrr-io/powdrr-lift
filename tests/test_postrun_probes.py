@@ -116,6 +116,38 @@ def test_probe_obligation_evidence_uses_instruction_ledger_by_scenario_id() -> N
     ]
 
 
+def test_probe_obligation_evidence_falls_back_to_ledger_source_span() -> None:
+    instruction = (
+        "Opening ( follows the table name on the same line; closing ) follows."
+    )
+    source = _source().replace(
+        "'scenario_id': 'selector'",
+        "'scenario_id': 'scenario:instruction-003'",
+    )
+    scenario = {
+        "scenario_id": "scenario:instruction-003",
+        "evidence": ["model-authored paraphrase is not a source quote"],
+    }
+    source_span = {"start": 0, "end": len(instruction)}
+
+    obligations, _, _ = _parse(
+        source,
+        (scenario,),
+        instruction=instruction,
+        instruction_ledger_clauses=(
+            {
+                "clause_id": "instruction-003",
+                "text": "Opening follows the table name on its line.",
+                "source_span": source_span,
+            },
+        ),
+    )
+
+    assert obligations[0]["evidence"] == [
+        {"source": "instruction", "quote": instruction}
+    ]
+
+
 def test_miniswe_cannot_override_deterministically_bound_evidence() -> None:
     source = _source().replace(
         "'operands': []",

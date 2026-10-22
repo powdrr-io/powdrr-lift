@@ -224,6 +224,21 @@ class DeterministicPlanningClient:
 
         if required == {"interactions"}:
             return {"interactions": []}
+        if required == {"revisions"}:
+            payload = json.loads(messages[-1]["content"])
+            return {
+                "revisions": [
+                    {
+                        "scenario_id": item["scenario"]["scenario_id"],
+                        "given": (
+                            "The inputs required by the stated behavior are available."
+                        ),
+                        "when": ("Call the named public operation with those inputs."),
+                        "then": item["scenario"]["then"],
+                    }
+                    for item in payload["flagged_scenarios"]
+                ]
+            }
         if required == {"status", "value", "reason_code"} and (
             "scenario claim" in text
         ):
@@ -784,6 +799,30 @@ class WeakProbePlanningClient(ProbeEnabledPlanningClient):
         return response
 
 
+class UnrepairableWeakProbePlanningClient(WeakProbePlanningClient):
+    """Keep a generic scenario weak so the pre-coding gate can be exercised."""
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        required = set((response_schema or {}).get("required", ()))
+        if required == {"revisions"}:
+            payload = json.loads(messages[-1]["content"])
+            return {
+                "revisions": [
+                    {
+                        key: item["scenario"][key]
+                        for key in ("scenario_id", "given", "when", "then")
+                    }
+                    for item in payload["flagged_scenarios"]
+                ]
+            }
+        return super().complete_json(messages, response_schema=response_schema)
+
+
 class InvalidSyntaxProbePlanningClient(ProbeEnabledPlanningClient):
     """Return malformed Python so the pipeline's probe failure path is exercised."""
 
@@ -1248,7 +1287,75 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
     )
 
 
-def test_implement_feature_records_invalid_generated_probe_as_issue(
+def test_implement_feature_blocks_coding_when_probe_repair_stays_generic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
+    output_root = tmp_path / "feature-output"
+    probe_authoring_calls = 0
+
+    def unexpected_probe_authoring(
+        self: MiniSWEAgentProvider,
+        request: Any,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal probe_authoring_calls
+        del self, request, worktree_root, attempt_id
+        probe_authoring_calls += 1
+        raise AssertionError("probe authoring must not run before quality passes")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", unexpected_probe_authoring)
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description=(
+                "Add a second greeting to hello_world.py. Keep the existing "
+                "Hello, world! output first and print Hello from Powdrr! second."
+            ),
+            work_item_name="hello-world-unrepairable-probe",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            output_root=output_root,
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
+            code_agent="opencode",
+            opencode_executable=str(fake_opencode),
+            opencode_model="deterministic-test-model",
+            open_pr=False,
+            push_changes=False,
+            planning_client=UnrepairableWeakProbePlanningClient(),
+        )
+    )
+
+    assert result.status == "completed_with_issues"
+    assert result.failure is not None
+    assert "pre-coding probe quality gate blocked implementation" in (
+        result.failure.message
+    )
+    review = json.loads(
+        (output_root / "postrun-probes" / "pre-coding-quality-review.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert review["status"] == "blocked"
+    assert review["findings"]
+    assert probe_authoring_calls == 0
+    assert not (output_root / "postrun-probes" / "probe-suite.json").exists()
+    assert not (repo / ".powdrr" / "fake-opencode-attempt-count").exists()
+    assert (repo / "hello_world.py").read_text(encoding="utf-8") == (
+        'print("Hello, world!")\n'
+    )
+
+
+def test_implement_feature_stops_before_coding_when_generated_probe_is_invalid(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1307,7 +1414,7 @@ def test_implement_feature_records_invalid_generated_probe_as_issue(
         result.failure.message if result.failure else None
     )
     assert result.failure is not None
-    assert "cannot open a PR before a passing review" in result.failure.message
+    assert "pre-coding probe generation failed" in result.failure.message
     suite_path = output_root / "postrun-probes" / "probe-suite.json"
     suite = json.loads(suite_path.read_text(encoding="utf-8"))
     assert suite["probes"] == []
@@ -1315,7 +1422,7 @@ def test_implement_feature_records_invalid_generated_probe_as_issue(
     assert suite["interaction_plan_status"] == "failed"
     assert "probe suite is not valid Python" in suite["generation_error"]
     assert (repo / "hello_world.py").read_text(encoding="utf-8") == (
-        'print("Hello, world!")\nprint("Hello from Powdrr!")\n'
+        'print("Hello, world!")\n'
     )
 
 

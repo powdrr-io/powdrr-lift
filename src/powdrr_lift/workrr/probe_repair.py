@@ -267,9 +267,15 @@ def _build_repair_messages(
                 "for the required behavior. Make `then` one observable outcome "
                 "strictly entailed by that clause. Do not add details or assumptions "
                 "unless the clause states them. Use the supplied repository contract "
-                "only to make setup concrete. Keep scenario IDs unchanged. If the "
-                "clause does not support a more concrete probe, return its fields "
-                "unchanged."
+                "to make setup and operations concrete. Do not repeat the clause as "
+                "the expected result. Name the public API call, property access, or "
+                "input transformation in `when`; state an assertion-sized result in "
+                "`then`. For a clause that names a public field, property, method, "
+                "or type, test the stated member or type directly. If the clause "
+                "only requires a property to exist, check property presence rather "
+                "than infer its semantics. Keep scenario IDs unchanged. If the "
+                "clause truly does not support a safe observable check, return its "
+                "fields unchanged so the pre-coding gate can stop the task."
             ),
         },
         {

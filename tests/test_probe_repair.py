@@ -94,6 +94,8 @@ def test_probe_repair_revises_only_flagged_scenario_after_faithfulness(
     assert artifact["initial_findings"]
     assert artifact["final_findings"] == []
     assert "Do not add details or assumptions" in str(client.messages)
+    assert "test the stated member or type directly" in str(client.messages)
+    assert "pre-coding gate can stop the task" in str(client.messages)
     assert "authoritative_source_clause" in str(client.messages)
     assert "instruction-001" in str(client.messages)
     assert "source_instruction" not in str(client.messages)

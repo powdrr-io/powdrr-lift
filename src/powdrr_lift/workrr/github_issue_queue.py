@@ -136,7 +136,11 @@ class GitHubIssueClient:
             raise GitHubIssueQueueError(
                 "issue state filter must be open, closed, or all"
             )
-        endpoint = f"repos/{self.repository}/issues?state={state}&per_page=100"
+        # GitHub's issue list can omit recently relabeled open issues when the
+        # status label and state=open filters are combined. Query by the sparse
+        # Powdrr label across all states, then apply the requested state locally.
+        endpoint_state = "all" if labels and state != "all" else state
+        endpoint = f"repos/{self.repository}/issues?state={endpoint_state}&per_page=100"
         if labels:
             endpoint += "&labels=" + quote(",".join(labels), safe=",")
         result = self._invoke(
@@ -168,16 +172,17 @@ class GitHubIssueClient:
                 if isinstance(raw_labels, list)
                 else ()
             )
-            issues.append(
-                QueueIssue(
-                    number=int(value["number"]),
-                    title=str(value.get("title", "")),
-                    body=str(value.get("body", "")),
-                    state=str(value.get("state", "OPEN")).lower(),
-                    labels=labels,
-                    url=str(value.get("url", "")),
-                )
+            issue = QueueIssue(
+                number=int(value["number"]),
+                title=str(value.get("title", "")),
+                body=str(value.get("body", "")),
+                state=str(value.get("state", "OPEN")).lower(),
+                labels=labels,
+                url=str(value.get("url", "")),
             )
+            if state != "all" and issue.state != state:
+                continue
+            issues.append(issue)
         return tuple(issues)
 
     def create_issue(

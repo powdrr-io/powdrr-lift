@@ -325,20 +325,47 @@ def test_github_issue_client_paginates_and_ignores_pull_requests() -> None:
     assert [issue.number for issue in issues] == [1, 2]
 
 
-def test_github_issue_client_filters_issues_server_side_by_label_and_state() -> None:
+def test_github_issue_client_filters_issue_state_locally_for_labeled_queries() -> None:
     commands: list[list[str]] = []
 
     def run(
         arguments: list[str], **_kwargs: object
     ) -> subprocess.CompletedProcess[str]:
         commands.append(arguments)
-        return subprocess.CompletedProcess(arguments, 0, "[[]]", "")
+        return subprocess.CompletedProcess(
+            arguments,
+            0,
+            json.dumps(
+                [
+                    [
+                        {
+                            "number": 1,
+                            "title": "Ready item",
+                            "body": "",
+                            "state": "open",
+                            "labels": [{"name": QUEUE_LABELS["ready"]}],
+                            "url": "https://github.com/example/project/issues/1",
+                        },
+                        {
+                            "number": 2,
+                            "title": "Closed item",
+                            "body": "",
+                            "state": "closed",
+                            "labels": [{"name": QUEUE_LABELS["ready"]}],
+                            "url": "https://github.com/example/project/issues/2",
+                        },
+                    ]
+                ]
+            ),
+            "",
+        )
 
     client = GitHubIssueClient("example/project", run=run)
-    assert client.list_issues(labels=(QUEUE_LABELS["ready"],), state="open") == ()
+    issues = client.list_issues(labels=(QUEUE_LABELS["ready"],), state="open")
+    assert [issue.number for issue in issues] == [1]
 
     assert commands[0][4] == (
-        "repos/example/project/issues?state=open&per_page=100&labels=powdrr%3Aready"
+        "repos/example/project/issues?state=all&per_page=100&labels=powdrr%3Aready"
     )
 
 

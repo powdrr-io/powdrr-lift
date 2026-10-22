@@ -3079,13 +3079,11 @@ class _TaskWorkflowExecutionStrategy:
         workflow_id = str(self.task.input_state.get("proposed_pr_id", ""))
         if not workflow_id.strip():
             raise PowdrrExecutionError("proposed PR ID must not be empty")
-        base_commit = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=self.repo_root,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
+        base_commit = _workflow_base_commit(
+            self.repo_root,
+            self.workflow.directory,
+            workflow_id=workflow_id,
+        )
         plan_defect_evidence = _preflight_reviewed_file_creation_conflicts(
             self.repo_root,
             proposed,

@@ -673,6 +673,51 @@ def test_worker_removes_declared_ephemeral_artifacts_before_final_diff(
     assert not (worktree / "test_helper.py").exists()
 
 
+def test_worker_removes_pytest_bytecode_from_declared_ephemeral_path(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path)
+
+    class PytestCacheProvider:
+        provider_name = "fake"
+
+        def run(
+            self,
+            request: ImplementationRequest,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            del request, attempt_id
+            cache_file = (
+                worktree_root
+                / "tests"
+                / "__pycache__"
+                / "test_example.cpython-312-pytest-9.0.3.pyc"
+            )
+            cache_file.parent.mkdir(parents=True)
+            cache_file.write_bytes(b"compiled pytest cache")
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
+
+    request = replace(
+        _request(_head(worktree)),
+        allowed_paths=("tests",),
+        ephemeral_paths=("tests/__pycache__",),
+    )
+    attempt = run_coding_agent(
+        PytestCacheProvider(),
+        request,
+        worktree_root=worktree,
+        attempt_id="attempt-pytest-cache",
+    )
+
+    assert attempt.status is CodingAgentStatus.COMPLETED
+    assert attempt.changed_paths == ()
+    assert not (
+        worktree / "tests" / "__pycache__" / "test_example.cpython-312-pytest-9.0.3.pyc"
+    ).exists()
+
+
 def test_worker_removes_new_untracked_files_outside_scope(tmp_path: Path) -> None:
     worktree = _git_repo(tmp_path)
     attempt = run_coding_agent(

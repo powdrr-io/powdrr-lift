@@ -177,6 +177,37 @@ def validate_generated_test_files(
     return validated
 
 
+def generated_test_source_paths(changed_paths: Sequence[str]) -> tuple[str, ...]:
+    """Select authored Python tests, ignoring staged interpreter cache files."""
+    sources: set[str] = set()
+    for raw_path in changed_paths:
+        path = PurePosixPath(raw_path)
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or not path.parts
+            or path.parts[0] not in {"tests", "test"}
+        ):
+            raise ExecutePrTestError(
+                "test author changed a path outside the supported test roots: "
+                f"{raw_path}"
+            )
+        if (
+            "__pycache__" in path.parts
+            or ".pytest_cache" in path.parts
+            or path.suffix == ".pyc"
+        ):
+            continue
+        if path.suffix != ".py":
+            raise ExecutePrTestError(
+                f"test author changed a non-Python test source path: {raw_path}"
+            )
+        sources.add(path.as_posix())
+    if not sources:
+        raise ExecutePrTestError("test author produced no Python test source files")
+    return tuple(sorted(sources))
+
+
 def pytest_command_for_files(
     profile: ValidationProfile,
     paths: Sequence[str],
@@ -365,6 +396,7 @@ __all__ = [
     "require_behavioral_red_result",
     "run_generated_pytest",
     "fingerprint_test_files",
+    "generated_test_source_paths",
     "install_frozen_test_files",
     "validate_generated_test_files",
 ]

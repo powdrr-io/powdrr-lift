@@ -11,6 +11,7 @@ from powdrr_lift.workrr.execute_pr_tests import (
     ExecutePrTestError,
     candidate_test_changes,
     fingerprint_test_files,
+    generated_test_source_paths,
     install_frozen_test_files,
     pytest_command_for_files,
     pytest_execution_evidence,
@@ -38,6 +39,21 @@ def test_generated_pytest_files_require_assertive_tests_under_test_root() -> Non
     )
 
     assert tuple(result) == ("tests/integration/test_public_api.py",)
+
+
+def test_generated_test_paths_ignore_staged_python_cache_files() -> None:
+    assert generated_test_source_paths(
+        (
+            "tests/test_ci_workflow.py",
+            "tests/__pycache__/test_ci_workflow.cpython-312-pytest-9.0.3.pyc",
+            "tests/.pytest_cache/v/cache/nodeids",
+        )
+    ) == ("tests/test_ci_workflow.py",)
+
+    with pytest.raises(ExecutePrTestError, match="no Python test source"):
+        generated_test_source_paths(
+            ("tests/__pycache__/test_ci_workflow.cpython-312.pyc",)
+        )
 
 
 def test_acceptance_criteria_get_deterministic_ids_and_require_test_links() -> None:

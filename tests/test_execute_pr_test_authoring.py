@@ -54,8 +54,16 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     _git(repository, "add", ".")
     _git(repository, "commit", "-m", "baseline")
     base_commit = _git(repository, "rev-parse", "HEAD")
+    _git(repository, "remote", "add", "origin", "https://example.invalid/repo.git")
+    _git(
+        repository,
+        "symbolic-ref",
+        "refs/remotes/origin/HEAD",
+        "refs/remotes/origin/main",
+    )
 
     provider_calls: list[tuple[str, ...]] = []
+    author_prompts: list[str] = []
     expected_test_path = (
         "attestation/tests/test_powdrr_execute_pr_"
         + hashlib.sha256(b"local-pr-01").hexdigest()[:12]
@@ -97,6 +105,7 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
             attempt_id: str,
         ) -> subprocess.CompletedProcess[str]:
             del attempt_id
+            author_prompts.append(request.prompt)
             if not provider_calls:
                 # Simulate the failed attempt from Gaterr: the agent chooses
                 # the wrong repository-level test root.
@@ -174,11 +183,66 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     ]
     assert artifact["authoring_attempts"][1]["status"] == "completed"
     assert artifact["baseline_result"]["passed"] is False
+    assert len(author_prompts) == 2
+    assert "same workflow/job/step" in author_prompts[0]
+    assert "never guess a branch name" in author_prompts[0]
+    assert '"name": "main"' in author_prompts[0]
+    assert '"source": "refs/remotes/origin/HEAD"' in author_prompts[0]
     assert len(jev_calls) == 1
     assert jev_calls[0][1]["properties"]["passed"]["type"] == "boolean"
     assert (
         "Do these tests provide adequate independent" in jev_calls[0][0][1]["content"]
     )
+    jev_context = jev_calls[0][0][1]["content"]
+    assert "repository_default_branch" in jev_context
+    assert "refs/remotes/origin/HEAD" in jev_context
+
+
+def test_repository_default_branch_evidence_uses_remote_head(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    _git(repository, "init", "-q")
+    _git(repository, "remote", "add", "origin", "https://example.invalid/repo.git")
+    _git(
+        repository,
+        "symbolic-ref",
+        "refs/remotes/origin/HEAD",
+        "refs/remotes/origin/trunk",
+    )
+
+    assert task_agent._repository_default_branch_evidence(repository) == {
+        "name": "trunk",
+        "source": "refs/remotes/origin/HEAD",
+    }
+
+
+def test_repository_default_branch_evidence_uses_remote_show_fallback(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(
+        command: list[str], **_kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        calls.append(command)
+        if command[1] == "symbolic-ref":
+            return subprocess.CompletedProcess(command, 1, "", "")
+        return subprocess.CompletedProcess(
+            command, 0, "* remote origin\n  HEAD branch: release\n", ""
+        )
+
+    monkeypatch.setattr(task_agent.subprocess, "run", fake_run)
+
+    assert task_agent._repository_default_branch_evidence(tmp_path) == {
+        "name": "release",
+        "source": "git remote show origin",
+    }
+    assert calls == [
+        ["git", "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+        ["git", "remote", "show", "origin"],
+    ]
 
 
 def test_execute_pr_test_quality_asks_llm_for_findings_after_jev_failure(

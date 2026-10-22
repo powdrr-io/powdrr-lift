@@ -423,7 +423,7 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
         assert "Plan interactions as part of this same artifact" in request.prompt
-        obligations = [
+        obligations: list[dict[str, Any]] = [
             {
                 "obligation_id": f"obligation-{scenario_id}",
                 "scenario_id": scenario_id,

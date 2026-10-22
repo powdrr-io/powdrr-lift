@@ -19,7 +19,7 @@ from powdrr_lift.workrr.postrun_probes import (
 
 
 def _source(body: str = "assert module.public_api('value') == 'handled:value'") -> str:
-    obligations = [
+    obligations: list[dict[str, Any]] = [
         {
             "obligation_id": "selector-obligation",
             "scenario_id": "selector",
@@ -230,7 +230,7 @@ def test_probe_suite_must_cover_each_required_interaction() -> None:
         },
         {"scenario_id": "operator", "evidence": ["difference removes a value"]},
     )
-    obligations = [
+    obligations: list[dict[str, Any]] = [
         {
             "obligation_id": f"obligation-{scenario_id}",
             "scenario_id": scenario_id,
@@ -346,7 +346,7 @@ def test_run_postrun_probes_executes_each_function_from_same_module(
 ) -> None:
     module = tmp_path / "module.py"
     module.write_text("def public_api(value): return 'handled:' + value\n")
-    obligation_data = [
+    obligation_data: list[dict[str, Any]] = [
         {
             "obligation_id": f"obligation-{scenario}",
             "scenario_id": scenario,

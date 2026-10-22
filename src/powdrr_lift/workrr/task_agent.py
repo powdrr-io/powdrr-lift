@@ -3384,8 +3384,22 @@ class _TaskWorkflowExecutionStrategy:
                         "rebase": rebase_report,
                     }
                 else:
+                    # These frozen acceptance tests are checked in with the PR,
+                    # but their names are generated only after plan review. Let
+                    # Structrr report their exact paths as validation changes.
+                    candidate_proposal = replace(
+                        item_proposal,
+                        allowed_paths=tuple(
+                            dict.fromkeys(
+                                (
+                                    *item_proposal.allowed_paths,
+                                    *integration_test_sources,
+                                )
+                            )
+                        ),
+                    )
                     actual_diff, comparison = reconcile_item_candidate(
-                        proposal=item_proposal,
+                        proposal=candidate_proposal,
                         baseline_snapshot=current_structrr,
                         candidate_snapshot=candidate_bootstrap.document,
                         baseline_manifest=baseline_manifest,

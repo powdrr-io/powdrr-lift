@@ -80,7 +80,7 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    class RateLimitedThenFindings:
+    class RateLimitedThenOpinionAndSuggestion:
         calls = 0
 
         def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
@@ -91,42 +91,66 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
                     429,
                     '{"error":{"code":"engine_overloaded"}}',
                 )
+            if self.calls == 2:
+                return {
+                    "shortcoming_present": True,
+                    "explanation": "The concern is present.",
+                }
             return {
-                "findings": [
-                    {
-                        "test_id": "tests/test_ci.py::test_workflow_runs_command",
-                        "issue": (
-                            "The workflow test does not inspect the executed command."
-                        ),
-                        "evidence": (
-                            "The test only asserts that the workflow file exists."
-                        ),
-                    }
-                ]
+                "test_name": "test_workflow_runs_command_with_trigger",
+                "test_code": "def test_workflow_runs_command_with_trigger():\n    ...",
+                "rationale": "Observe the command on the pull request path.",
             }
 
     for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     delays: list[float] = []
     monkeypatch.setattr("powdrr_lift.workrr.llm.time.sleep", delays.append)
-    client = RateLimitedThenFindings()
+    client = RateLimitedThenOpinionAndSuggestion()
     config = WorkflowTaskAgentConfig(
         workflow_dir=tmp_path,
         max_timeout_retries=2,
         timeout_backoff_seconds=1.5,
     )
 
-    with pytest.raises(
-        task_agent.ExecutePrTestError,
-        match="independent test-quality review found gaps",
-    ):
-        _review_execute_pr_test_quality(
-            client,
-            {"acceptance_criteria": ["The CI workflow runs verification."]},
-            config=config,
-        )
+    class FakeJevClient:
+        calls = 0
 
-    assert client.calls == 2
+        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
+            assert fail_closed
+
+        def complete_json(
+            self,
+            _messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any],
+        ) -> dict[str, Any]:
+            self.calls += 1
+            assert response_schema["required"] == ["shortcoming_present"]
+            return {"shortcoming_present": self.calls == 1}
+
+    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
+    review = _review_execute_pr_test_quality(
+        client,
+        {
+            "test_obligations": [
+                {
+                    "obligation_id": "AC-01",
+                    "source_text": "The CI workflow runs verification.",
+                }
+            ],
+            "test_sources": {
+                "tests/test_ci.py": (
+                    "# Covers: AC-01 test_workflow_runs_command\n"
+                    "def test_workflow_runs_command():\n    assert True\n"
+                )
+            },
+        },
+        config=config,
+    )
+
+    assert review["outcome"] == "advisory"
+    assert client.calls == 3
     assert delays == [1.5]
     assert "retrying in 1.5 seconds (retry 1/2)" in capsys.readouterr().err
 
@@ -907,7 +931,7 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
                 "coverage_references": {
                     "AC-01": ["test_public_feature_value_is_implemented"]
                 },
-                "quality_review": {"outcome": "pass", "findings": []},
+                "quality_review": {"outcome": "advisory", "notes": []},
                 "baseline_execution_evidence": {"executed": 1},
                 "baseline_result": {
                     "command": ["pytest", "tests/integration/test_feature_e2e.py"],
@@ -1028,6 +1052,12 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     assert "inherited decision" in provider_requests[1].prompt
     assert "validation" in provider_requests[1].prompt
     assert "Set the feature value to 42." in provider_requests[1].prompt
+    assert "Advisory test-review notes for the pull request" in (
+        provider_requests[0].prompt
+    )
+    assert "No unresolved test-quality concerns were reported." in (
+        provider_requests[0].prompt
+    )
     assert provider_timeouts == [1800.0]
 
 

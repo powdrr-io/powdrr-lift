@@ -89,7 +89,7 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
             jev_calls.append((messages, response_schema))
-            return {"passed": True}
+            return {"passed": False}
 
     class FakeMiniSWEAgentProvider:
         provider_name = "fake-miniswe"
@@ -131,7 +131,7 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
         task_agent,
         "complete_json_with_timeout_retry",
         lambda *_args, **_kwargs: pytest.fail(
-            "the LLM must not be asked for findings when Jev passes"
+            "the LLM must not be asked when Jev finds no shortcoming"
         ),
     )
 
@@ -188,10 +188,11 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     assert "never guess a branch name" in author_prompts[0]
     assert '"name": "main"' in author_prompts[0]
     assert '"source": "refs/remotes/origin/HEAD"' in author_prompts[0]
-    assert len(jev_calls) == 1
-    assert jev_calls[0][1]["properties"]["passed"]["type"] == "boolean"
+    assert len(jev_calls) == 6
+    assert jev_calls[0][1]["properties"]["shortcoming_present"]["type"] == "boolean"
     assert (
-        "Do these tests provide adequate independent" in jev_calls[0][0][1]["content"]
+        "Does this test fail to demonstrate observable behavior"
+        in jev_calls[0][0][1]["content"]
     )
     jev_context = jev_calls[0][0][1]["content"]
     assert "repository_default_branch" in jev_context
@@ -245,11 +246,12 @@ def test_repository_default_branch_evidence_uses_remote_show_fallback(
     ]
 
 
-def test_execute_pr_test_quality_asks_llm_for_findings_after_jev_failure(
+def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
     monkeypatch: Any,
 ) -> None:
-    jev_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
-    findings_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
+    jev_calls: list[list[dict[str, str]]] = []
+    llm_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
+    jev_results = iter([True, False, False, False, False, False])
 
     class FakeJevClient:
         def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
@@ -261,14 +263,11 @@ def test_execute_pr_test_quality_asks_llm_for_findings_after_jev_failure(
             *,
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
-            jev_calls.append((messages, response_schema))
-            return {"passed": False}
+            jev_calls.append(messages)
+            assert response_schema["required"] == ["shortcoming_present"]
+            return {"shortcoming_present": next(jev_results)}
 
-    class FakeQualityClient:
-        def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
-            pytest.fail("the patched complete_json helper should be used")
-
-    def request_findings(
+    def request_llm(
         _client: Any,
         messages: list[dict[str, str]],
         *,
@@ -279,66 +278,56 @@ def test_execute_pr_test_quality_asks_llm_for_findings_after_jev_failure(
         response_schema: dict[str, Any],
     ) -> dict[str, Any]:
         del model, stderr, max_timeout_retries, timeout_backoff_seconds
-        findings_calls.append((messages, response_schema))
+        llm_calls.append((messages, response_schema))
+        if response_schema["required"] == ["shortcoming_present", "explanation"]:
+            return {
+                "shortcoming_present": True,
+                "explanation": "The assertion is vacuous.",
+            }
         return {
-            "findings": [
-                {
-                    "test_id": "test_ci_workflow",
-                    "issue": "Does not exercise the workflow trigger.",
-                    "evidence": "The test only checks that the YAML file exists.",
-                }
-            ]
+            "test_name": "test_rejects_invalid_payload",
+            "test_code": "def test_rejects_invalid_payload():\n    ...",
+            "rationale": "Exercise the invalid request through the public API.",
         }
 
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
-    monkeypatch.setattr(
-        task_agent, "complete_json_with_timeout_retry", request_findings
+    monkeypatch.setattr(task_agent, "complete_json_with_timeout_retry", request_llm)
+    evidence = {
+        "contract": {"acceptance_criteria": ["AC-01: Reject invalid payloads."]},
+        "test_obligations": [
+            {"obligation_id": "AC-01", "source_text": "Reject invalid payloads."}
+        ],
+        "coverage_references": {"AC-01": ["test_rejects_payload"]},
+        "test_sources": {
+            "tests/test_api.py": (
+                "# Covers: AC-01 test_rejects_payload\n"
+                "def test_rejects_payload():\n    assert True\n"
+            )
+        },
+        "baseline_result": {"stdout": "1 failed in 0.01s", "passed": False},
+    }
+
+    review = task_agent._review_execute_pr_test_quality(
+        object(),  # type: ignore[arg-type]
+        evidence,
+        config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
     )
 
-    with pytest.raises(task_agent.ExecutePrTestError, match="test_ci_workflow"):
-        task_agent._review_execute_pr_test_quality(
-            FakeQualityClient(),
-            {"test_sources": {"tests/test_ci.py": "def test_ci(): ..."}},
-            config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
-        )
-
-    assert len(jev_calls) == 1
-    assert len(findings_calls) == 1
-    assert findings_calls[0][1]["required"] == ["findings"]
-    assert "Jev has already judged inadequate" in findings_calls[0][0][0]["content"]
-    assert (
-        '"test_id":"tests/test_api.py::test_rejects_bad_input"'
-        in (findings_calls[0][0][0]["content"])
-    )
-    assert "Do not use alternate keys" in findings_calls[0][0][0]["content"]
+    assert len(jev_calls) == 6
+    assert len(llm_calls) == 2
+    assert jev_calls[0][1]["content"] == llm_calls[0][0][1]["content"]
+    assert "tests/test_api.py::test_rejects_payload" in llm_calls[0][0][1]["content"]
+    assert "AC-01: Reject invalid payloads." in llm_calls[0][0][1]["content"]
+    assert "baseline_result" in llm_calls[1][0][1]["content"]
+    assert review["outcome"] == "advisory"
+    assert review["suggestions"][0]["test_name"] == "test_rejects_invalid_payload"
+    assert review["assessments"][0]["check_id"] == "observable_coverage"
 
 
-def test_execute_pr_test_quality_repairs_malformed_findings_response(
+def test_execute_pr_test_quality_accepts_jev_concern_as_advisory_on_disagreement(
     monkeypatch: Any,
 ) -> None:
-    findings_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
-    responses = iter(
-        [
-            {
-                "findings": [
-                    {
-                        "test": "test_ci_workflow",
-                        "obligation_id": "AC-01",
-                        "finding": "The test only checks that a workflow file exists.",
-                    }
-                ]
-            },
-            {
-                "findings": [
-                    {
-                        "test_id": "test_ci_workflow",
-                        "issue": "Does not exercise the workflow trigger.",
-                        "evidence": "The test only checks that the YAML file exists.",
-                    }
-                ]
-            },
-        ]
-    )
+    llm_calls = 0
 
     class FakeJevClient:
         def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
@@ -350,60 +339,114 @@ def test_execute_pr_test_quality_repairs_malformed_findings_response(
             *,
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
-            assert response_schema["required"] == ["passed"]
-            return {"passed": False}
+            return {"shortcoming_present": True}
 
-    class FakeQualityClient:
-        def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
-            pytest.fail("the patched complete_json helper should be used")
-
-    def request_findings(
-        _client: Any,
-        messages: list[dict[str, str]],
-        *,
-        model: str,
-        stderr: Any,
-        max_timeout_retries: int,
-        timeout_backoff_seconds: float,
-        response_schema: dict[str, Any],
-    ) -> dict[str, Any]:
-        del model, stderr, max_timeout_retries, timeout_backoff_seconds
-        findings_calls.append((messages, response_schema))
-        return next(responses)
+    def request_llm(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        nonlocal llm_calls
+        llm_calls += 1
+        return {
+            "shortcoming_present": False,
+            "explanation": "The assertion checks public behavior.",
+        }
 
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
-    monkeypatch.setattr(
-        task_agent, "complete_json_with_timeout_retry", request_findings
+    monkeypatch.setattr(task_agent, "complete_json_with_timeout_retry", request_llm)
+    review = task_agent._review_execute_pr_test_quality(
+        object(),  # type: ignore[arg-type]
+        {
+            "test_obligations": [
+                {"obligation_id": "AC-01", "source_text": "Run the verifier."}
+            ],
+            "test_sources": {
+                "tests/test_ci.py": (
+                    "# Covers: AC-01 test_ci\n"
+                    "def test_ci():\n    assert public_verify()\n"
+                )
+            },
+        },
+        config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
     )
-
-    with pytest.raises(task_agent.ExecutePrTestError, match="test_ci_workflow"):
-        task_agent._review_execute_pr_test_quality(
-            FakeQualityClient(),
-            {"test_sources": {"tests/test_ci.py": "def test_ci(): ..."}},
-            config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
-        )
-
-    assert len(findings_calls) == 2
-    assert findings_calls[1][1]["properties"]["findings"]["items"]["required"] == [
-        "test_id",
-        "issue",
-        "evidence",
-    ]
-    assert "previous response failed validation" in findings_calls[1][0][-1]["content"]
-    assert (
-        "test-quality review contains an invalid finding"
-        in findings_calls[1][0][-1]["content"]
-    )
+    assert review["outcome"] == "advisory"
+    assert llm_calls == 6
+    assert review["suggestions"] == []
+    assert any("disagreed" in note for note in review["notes"])
 
 
-def test_execute_pr_test_quality_stops_after_invalid_findings_repair(
+def test_execute_pr_test_quality_review_outage_is_advisory(
     monkeypatch: Any,
 ) -> None:
-    findings_calls = 0
+    class BrokenJevClient:
+        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
+            assert fail_closed
+
+        def complete_json(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            raise RuntimeError("Jev is unavailable")
+
+    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", BrokenJevClient)
+    review = task_agent._review_execute_pr_test_quality(
+        object(),  # type: ignore[arg-type]
+        {
+            "test_obligations": [
+                {"obligation_id": "AC-01", "source_text": "Run the verifier."}
+            ],
+            "test_sources": {
+                "tests/test_ci.py": (
+                    "# Covers: AC-01 test_ci\n"
+                    "def test_ci():\n    assert public_verify()\n"
+                )
+            },
+        },
+        config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
+    )
+    assert review["outcome"] == "advisory"
+    assert len(review["assessments"]) == 6
+    assert all(
+        item["jev_reports_shortcoming"] is None for item in review["assessments"]
+    )
+
+
+def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.name", "Powdrr Test")
+    _git(repository, "config", "user.email", "powdrr-test@example.invalid")
+    _write(repository, "sample.py", "value = 1\n")
+    _write(
+        repository, "tests/test_existing.py", "def test_existing():\n    assert True\n"
+    )
+    _git(repository, "add", ".")
+    _git(repository, "commit", "-m", "baseline")
+    base_commit = _git(repository, "rev-parse", "HEAD")
+    _git(repository, "remote", "add", "origin", "https://example.invalid/repo.git")
+    _git(
+        repository,
+        "symbolic-ref",
+        "refs/remotes/origin/HEAD",
+        "refs/remotes/origin/main",
+    )
+    test_path = (
+        "tests/test_powdrr_execute_pr_"
+        + hashlib.sha256(b"local-pr-quality-repair").hexdigest()[:12]
+        + ".py"
+    )
+    test_source = (
+        "from pathlib import Path\n"
+        "import sys\n\n"
+        "sys.path.insert(0, str(Path(__file__).resolve().parents[1]))\n"
+        "from sample import value\n\n"
+        "# Covers: AC-01 test_expected_value\n"
+        "def test_expected_value():\n"
+        "    assert value == 2\n"
+    )
+    author_prompts: list[str] = []
 
     class FakeJevClient:
         def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
             assert fail_closed
+            self.calls = 0
 
         def complete_json(
             self,
@@ -411,14 +454,36 @@ def test_execute_pr_test_quality_stops_after_invalid_findings_repair(
             *,
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
-            assert response_schema["required"] == ["passed"]
-            return {"passed": False}
+            self.calls += 1
+            assert response_schema["required"] == ["shortcoming_present"]
+            return {"shortcoming_present": self.calls == 1}
 
-    class FakeQualityClient:
-        def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
-            pytest.fail("the patched complete_json helper should be used")
+    class FakeMiniSWEAgentProvider:
+        provider_name = "fake-miniswe"
 
-    def request_findings(
+        def __init__(self, **_kwargs: Any) -> None:
+            pass
+
+        def run(
+            self,
+            request: ImplementationRequest,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            del attempt_id
+            author_prompts.append(request.prompt)
+            if len(author_prompts) == 2:
+                assert "test_observes_expected_value" in request.prompt, request.prompt[
+                    -1800:
+                ]
+                assert request.allow_existing_changes is False
+            _write(worktree_root, request.allowed_paths[0], test_source)
+            return subprocess.CompletedProcess(["fake-miniswe"], 0, "done\n", "")
+
+    llm_calls = 0
+
+    def request_llm(
         _client: Any,
         _messages: list[dict[str, str]],
         *,
@@ -429,32 +494,78 @@ def test_execute_pr_test_quality_stops_after_invalid_findings_repair(
         response_schema: dict[str, Any],
     ) -> dict[str, Any]:
         del model, stderr, max_timeout_retries, timeout_backoff_seconds
-        nonlocal findings_calls
-        findings_calls += 1
-        assert response_schema["required"] == ["findings"]
+        nonlocal llm_calls
+        llm_calls += 1
+        if response_schema["required"] == ["shortcoming_present", "explanation"]:
+            return {
+                "shortcoming_present": True,
+                "explanation": "The test needs stronger evidence.",
+            }
         return {
-            "findings": [
-                {
-                    "test": "test_ci_workflow",
-                    "obligation_id": "AC-01",
-                    "finding": "Wrong shape again.",
-                }
-            ]
+            "test_name": "test_observes_expected_value",
+            "test_code": "def test_observes_expected_value():\n    ...",
+            "rationale": "Assert the externally visible result.",
         }
 
+    monkeypatch.setattr(task_agent, "MiniSWEAgentProvider", FakeMiniSWEAgentProvider)
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
+    monkeypatch.setattr(task_agent, "complete_json_with_timeout_retry", request_llm)
     monkeypatch.setattr(
-        task_agent, "complete_json_with_timeout_retry", request_findings
+        task_agent,
+        "run_generated_pytest",
+        lambda *_args, **_kwargs: {
+            "passed": False,
+            "returncode": 1,
+            "stdout": (
+                "FAILED tests/test_generated.py::test_expected_value - AssertionError\n"
+                "1 failed in 0.01s\n"
+            ),
+            "stderr": "",
+        },
+    )
+    request = ImplementationRequest(
+        request_id="quality-repair",
+        objective="Add behavior coverage.",
+        prompt="",
+        base_commit=base_commit,
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("src/sample.py",),
+        acceptance_criteria=("The public value is 2.",),
+        validation_profiles=(),
+    )
+    config = task_agent.WorkflowTaskAgentConfig(
+        workflow_dir=tmp_path / "workflow",
+        repo_root=repository,
+        coding_agent_timeout_seconds=60,
+        coding_agent_validation_timeout_seconds=60,
     )
 
-    with pytest.raises(
-        task_agent.ExecutePrQualityFindingsFormatError,
-        match="after one format-repair request",
-    ):
-        task_agent._review_execute_pr_test_quality(
-            FakeQualityClient(),
-            {"test_sources": {"tests/test_ci.py": "def test_ci(): ..."}},
-            config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
-        )
+    sources, artifact = task_agent._author_execute_pr_tests(
+        repository,
+        base_commit=base_commit,
+        request=request,
+        proposed={
+            "title": "Check the public value",
+            "objective": "Add behavior coverage.",
+            "acceptance_criteria": ["The public value is 2."],
+        },
+        workflow_id="local-pr-quality-repair",
+        config=config,
+        store_root=tmp_path / "run",
+        validation_profile=ValidationProfile(
+            name="verify", command=(sys.executable, "-m", "pytest")
+        ),
+        quality_client=object(),  # type: ignore[arg-type]
+    )
 
-    assert findings_calls == 2
+    assert tuple(sources) == (test_path,)
+    assert len(author_prompts) == 2
+    assert llm_calls == 3
+    assert artifact["quality_review"]["outcome"] == "advisory"
+    assert len(artifact["quality_review"]["reviews"]) == 2
+    assert "after a targeted repair attempt" in artifact["quality_review"]["notes"][0]
+    pr_notes = task_agent._render_execute_pr_test_quality_pr_notes(
+        artifact["quality_review"]["notes"]
+    )
+    assert "Test-quality review is advisory" in " ".join(pr_notes)
+    assert "consider adding more coverage" in " ".join(pr_notes)

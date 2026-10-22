@@ -375,6 +375,31 @@ def _resolve_scenario_evidence(
         ),
         None,
     )
+    if ledger_quote is None:
+        ledger_clause = next(
+            (
+                clause
+                for clause in instruction_ledger_clauses
+                if clause.get("clause_id") == clause_id
+            ),
+            None,
+        )
+        source_span = (
+            ledger_clause.get("source_span")
+            if isinstance(ledger_clause, Mapping)
+            else None
+        )
+        if isinstance(source_span, Mapping):
+            start = source_span.get("start")
+            end = source_span.get("end")
+            if (
+                isinstance(start, int)
+                and not isinstance(start, bool)
+                and isinstance(end, int)
+                and not isinstance(end, bool)
+                and 0 <= start < end <= len(instruction)
+            ):
+                ledger_quote = instruction[start:end].strip() or None
     if ledger_quote is not None:
         citations.append({"source": "instruction", "quote": ledger_quote})
         seen.add(("instruction", ledger_quote))

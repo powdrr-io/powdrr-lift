@@ -1,0 +1,48 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1107
+title: Use the target branch as the worker baseline
+intent:
+  problem: Retried issue workflows can have candidate files committed on their durable integration branch, causing implementation preflight to mistake those files for part of the repository baseline.
+  goal: Resolve implementation and plan-amendment baselines from each workflow's declared target branch so prior checkpoints do not create false plan-defect findings.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 852, end_line: 888}
+    summary: Resolve the workflow base commit from its declared target branch.
+    rationale: Keep candidate and plan-amendment comparisons anchored to the target branch instead of a checkpoint containing previous attempt changes.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2875, end_line: 2879}
+    summary: Use the target branch baseline for plan amendment validation.
+    rationale: Ensure an earlier workflow checkpoint cannot be mistaken for the plan's source baseline.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 3082, end_line: 3086}
+    summary: Use the target branch baseline for implementation preflight and candidate comparison.
+    rationale: Avoid treating files from previous attempts as existing in the repository baseline.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 267, end_line: 325}
+    summary: Add regression coverage for a candidate workflow present on the integration branch but absent from the target branch.
+    rationale: Verify that retried worker state does not produce a false plan-defect finding.
+entities:
+  - id: workflow-target-branch-baseline
+    type: Function
+    action: added
+  - id: integration-checkpoint-baseline-regression-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: regression-test-verifies-target-branch-baseline
+    type: verifies
+    source: integration-checkpoint-baseline-regression-test
+    target: workflow-target-branch-baseline
+    action: added
+    description: The regression test verifies that files committed only on the integration checkpoint are absent from the target-branch baseline comparison.
+invariants:
+  - id: workflow-baseline-is-target-branch
+    description: Worker implementation and plan-amendment preflight use the workflow's declared target branch as their baseline.
+    action: added
+guidance: []

@@ -384,22 +384,21 @@ def _resolve_scenario_evidence(
             ),
             None,
         )
-        source_span = (
-            ledger_clause.get("source_span")
-            if isinstance(ledger_clause, Mapping)
-            else None
-        )
-        if isinstance(source_span, Mapping):
-            start = source_span.get("start")
-            end = source_span.get("end")
-            if (
-                isinstance(start, int)
-                and not isinstance(start, bool)
-                and isinstance(end, int)
-                and not isinstance(end, bool)
-                and 0 <= start < end <= len(instruction)
-            ):
-                ledger_quote = instruction[start:end].strip() or None
+        if isinstance(ledger_clause, Mapping):
+            ledger_quote = _resolve_ledger_clause_quote(instruction, ledger_clause)
+            if ledger_quote is None:
+                source_span = ledger_clause.get("source_span")
+                if isinstance(source_span, Mapping):
+                    start = source_span.get("start")
+                    end = source_span.get("end")
+                    if (
+                        isinstance(start, int)
+                        and not isinstance(start, bool)
+                        and isinstance(end, int)
+                        and not isinstance(end, bool)
+                        and 0 <= start < end <= len(instruction)
+                    ):
+                        ledger_quote = instruction[start:end].strip() or None
     if ledger_quote is not None:
         citations.append({"source": "instruction", "quote": ledger_quote})
         seen.add(("instruction", ledger_quote))
@@ -418,6 +417,68 @@ def _resolve_scenario_evidence(
         seen.add(citation)
         citations.append({"source": citation[0], "quote": citation[1]})
     return citations
+
+
+def _resolve_ledger_clause_quote(
+    instruction: str, clause: Mapping[str, Any]
+) -> str | None:
+    """Resolve a split clause to its exact source substring when unambiguous."""
+    source_span = clause.get("source_span")
+    if not isinstance(source_span, Mapping):
+        return None
+    start = source_span.get("start")
+    end = source_span.get("end")
+    clause_text = clause.get("text")
+    if (
+        not isinstance(start, int)
+        or isinstance(start, bool)
+        or not isinstance(end, int)
+        or isinstance(end, bool)
+        or not 0 <= start < end <= len(instruction)
+        or not isinstance(clause_text, str)
+        or not clause_text.strip()
+    ):
+        return None
+
+    source_text = instruction[start:end]
+    source_tokens = [
+        (match.group().casefold(), match.start(), match.end())
+        for match in re.finditer(r"\w+", source_text, flags=re.UNICODE)
+    ]
+    clause_tokens = [
+        match.group().casefold()
+        for match in re.finditer(r"\w+", clause_text, flags=re.UNICODE)
+    ]
+    if not source_tokens or not clause_tokens:
+        return None
+
+    # Atomicity descriptions sometimes normalize punctuation or add a copula
+    # ("Each column is on ...") that is absent from the original source. Keep
+    # the quote source-grounded by matching the remaining words in order and
+    # returning the exact corresponding substring from the original span.
+    candidates = [clause_tokens]
+    without_copulas = [
+        token
+        for token in clause_tokens
+        if token not in {"is", "are", "was", "were", "be", "been", "being"}
+    ]
+    if without_copulas != clause_tokens:
+        candidates.append(without_copulas)
+
+    for tokens in candidates:
+        width = len(tokens)
+        starts = [
+            index
+            for index in range(len(source_tokens) - width + 1)
+            if [token[0] for token in source_tokens[index : index + width]] == tokens
+        ]
+        if len(starts) == 1:
+            first = source_tokens[starts[0]][1]
+            last = source_tokens[starts[0] + width - 1][2]
+            return source_text[first:last]
+        if starts:
+            return None
+    return None
 
 
 def _validate_probe_obligations(

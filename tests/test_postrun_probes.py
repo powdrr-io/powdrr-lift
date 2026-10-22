@@ -253,6 +253,53 @@ def test_interaction_plan_requires_multiple_scenarios_and_exact_evidence() -> No
         )
 
 
+def test_interaction_plan_resolves_distinct_atomic_quotes_from_shared_span() -> None:
+    instruction = (
+        "Opening ( follows the table name on the same line; "
+        "Each column on its own indented line."
+    )
+    source_span = {"start": 0, "end": len(instruction)}
+    ledger_clauses = (
+        {
+            "clause_id": "instruction-003",
+            "text": "Opening ( follows the table name on the same line.",
+            "source_span": source_span,
+        },
+        {
+            "clause_id": "instruction-005",
+            "text": "Each column is on its own indented line.",
+            "source_span": source_span,
+        },
+    )
+    scenarios = (
+        {"scenario_id": "scenario:instruction-003", "evidence": ["not a quote"]},
+        {"scenario_id": "scenario:instruction-005", "evidence": ["not a quote"]},
+    )
+    interaction = {
+        "interaction_id": "opening-and-columns",
+        "scenario_ids": [
+            "scenario:instruction-003",
+            "scenario:instruction-005",
+        ],
+        "condition": "The formatter receives a CREATE TABLE statement.",
+        "operation": "Format a table with two columns.",
+        "expected": "The opening parenthesis and columns follow their source rules.",
+    }
+
+    validated = validate_probe_interaction_plan(
+        [interaction],
+        instruction=instruction,
+        scenarios=scenarios,
+        instruction_ledger_clauses=ledger_clauses,
+    )
+
+    assert validated[0]["evidence_quotes"] == [
+        "Opening ( follows the table name on the same line",
+        "Each column on its own indented line",
+    ]
+    assert len(set(validated[0]["evidence_quotes"])) == 2
+
+
 def test_probe_suite_must_cover_each_required_interaction() -> None:
     instruction = "all values are selected; difference removes a value"
     scenarios = (

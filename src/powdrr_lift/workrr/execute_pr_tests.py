@@ -206,6 +206,25 @@ def validate_quality_review(review: Mapping[str, Any]) -> dict[str, Any]:
     return {"outcome": outcome, "findings": normalized}
 
 
+def validate_quality_findings(findings: Any) -> list[dict[str, str]]:
+    """Validate concrete explanations requested after Jev rejects a suite."""
+    if not isinstance(findings, list) or not findings:
+        raise ExecutePrTestError(
+            "test-quality findings must explain Jev's fail decision"
+        )
+    normalized: list[dict[str, str]] = []
+    for finding in findings:
+        if not isinstance(finding, Mapping) or any(
+            not isinstance(finding.get(key), str) or not finding[key].strip()
+            for key in ("test_id", "issue", "evidence")
+        ):
+            raise ExecutePrTestError("test-quality review contains an invalid finding")
+        normalized.append(
+            {key: finding[key].strip() for key in ("test_id", "issue", "evidence")}
+        )
+    return normalized
+
+
 def validate_generated_test_files(
     files: Mapping[str, str],
     *,

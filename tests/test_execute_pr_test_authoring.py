@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.coding_agent import ImplementationRequest
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
@@ -66,6 +68,21 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
         "    assert value == 2, 'AssertionError: expected value 2'\n"
     )
 
+    jev_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
+
+    class FakeJevClient:
+        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
+            assert fail_closed
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any],
+        ) -> dict[str, Any]:
+            jev_calls.append((messages, response_schema))
+            return {"passed": True}
+
     class FakeMiniSWEAgentProvider:
         provider_name = "fake-miniswe"
 
@@ -100,10 +117,13 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
             return subprocess.CompletedProcess(["fake-miniswe"], 0, "done\n", "")
 
     monkeypatch.setattr(task_agent, "MiniSWEAgentProvider", FakeMiniSWEAgentProvider)
+    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
     monkeypatch.setattr(
         task_agent,
         "complete_json",
-        lambda *_args, **_kwargs: {"outcome": "pass", "findings": []},
+        lambda *_args, **_kwargs: pytest.fail(
+            "the LLM must not be asked for findings when Jev passes"
+        ),
     )
 
     request = ImplementationRequest(
@@ -154,3 +174,63 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     ]
     assert artifact["authoring_attempts"][1]["status"] == "completed"
     assert artifact["baseline_result"]["passed"] is False
+    assert len(jev_calls) == 1
+    assert jev_calls[0][1]["properties"]["passed"]["type"] == "boolean"
+    assert (
+        "Do these tests provide adequate independent" in jev_calls[0][0][1]["content"]
+    )
+
+
+def test_execute_pr_test_quality_asks_llm_for_findings_after_jev_failure(
+    monkeypatch: Any,
+) -> None:
+    jev_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
+    findings_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
+
+    class FakeJevClient:
+        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
+            assert fail_closed
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any],
+        ) -> dict[str, Any]:
+            jev_calls.append((messages, response_schema))
+            return {"passed": False}
+
+    class FakeQualityClient:
+        def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
+            pytest.fail("the patched complete_json helper should be used")
+
+    def request_findings(
+        _client: Any,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: dict[str, Any],
+    ) -> dict[str, Any]:
+        findings_calls.append((messages, response_schema))
+        return {
+            "findings": [
+                {
+                    "test_id": "test_ci_workflow",
+                    "issue": "Does not exercise the workflow trigger.",
+                    "evidence": "The test only checks that the YAML file exists.",
+                }
+            ]
+        }
+
+    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
+    monkeypatch.setattr(task_agent, "complete_json", request_findings)
+
+    with pytest.raises(task_agent.ExecutePrTestError, match="test_ci_workflow"):
+        task_agent._review_execute_pr_test_quality(
+            FakeQualityClient(),
+            {"test_sources": {"tests/test_ci.py": "def test_ci(): ..."}},
+        )
+
+    assert len(jev_calls) == 1
+    assert len(findings_calls) == 1
+    assert findings_calls[0][1]["required"] == ["findings"]
+    assert "Jev has already judged inadequate" in findings_calls[0][0][0]["content"]

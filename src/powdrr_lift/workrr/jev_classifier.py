@@ -85,6 +85,8 @@ class _DecisionApiSemanticClassifierClient:
                 request_id,
                 endpoint_host,
             )
+            if self._fail_closed:
+                return self._fallback_or_false(messages, response_schema)
             return _fallback(self._fallback, messages, response_schema)
         if request_data is None:
             LOGGER.warning(
@@ -94,6 +96,8 @@ class _DecisionApiSemanticClassifierClient:
                 request_id,
                 endpoint_host,
             )
+            if self._fail_closed:
+                return self._fallback_or_false(messages, response_schema)
             return _fallback(self._fallback, messages, response_schema)
 
         started_at = time.monotonic()

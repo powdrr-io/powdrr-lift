@@ -273,19 +273,28 @@ def test_interaction_plan_final_gate_distinguishes_empty_and_failed() -> None:
     )
 
     assert empty == {
-        "check": "interaction_plan_generated_or_validly_empty",
+        "check": "interaction_plan_recorded_and_probe_generation_succeeded",
         "passed": True,
         "status": "empty",
         "error": None,
+        "rejected_interactions": [],
     }
     assert not_run["passed"] is True
     assert not_run["status"] == "not_run"
     assert failed == {
-        "check": "interaction_plan_generated_or_validly_empty",
-        "passed": False,
+        "check": "interaction_plan_recorded_and_probe_generation_succeeded",
+        "passed": True,
         "status": "failed",
         "error": "invalid exact quote evidence",
+        "rejected_interactions": [],
     }
+    failed_probe_generation = _probe_interaction_plan_decision(
+        {
+            "interaction_plan_status": "failed",
+            "postrun_probe_generation_error": "probe suite invalid",
+        }
+    )
+    assert failed_probe_generation["passed"] is False
 
 
 def test_miniswe_authors_individual_probes_for_empty_or_failed_interaction_plan(

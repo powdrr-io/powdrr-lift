@@ -2915,6 +2915,7 @@ def _run_code_agent_phase(
                 "status": "not_run",
                 "error": None,
                 "interactions": [],
+                "rejected_interactions": [],
             }
             try:
                 obligations, probes = _generate_miniswe_postrun_probes(
@@ -2982,6 +2983,7 @@ def _run_code_agent_phase(
                     "status": "failed",
                     "error": generation_error,
                     "interactions": [],
+                    "rejected_interactions": [],
                 }
                 probe_root = output_root / "postrun-probes"
                 probe_root.mkdir(parents=True, exist_ok=True)
@@ -2996,12 +2998,16 @@ def _run_code_agent_phase(
                                 "status": saved_plan.get("status", "not_run"),
                                 "error": saved_plan.get("error"),
                                 "interactions": saved_plan.get("interactions", []),
+                                "rejected_interactions": saved_plan.get(
+                                    "rejected_interactions", []
+                                ),
                             }
                     except (OSError, json.JSONDecodeError):
                         interaction_plan = {
                             "status": "artifact_error",
                             "error": "interaction plan artifact could not be read",
                             "interactions": [],
+                            "rejected_interactions": [],
                         }
                 (probe_root / "probe-suite.json").write_text(
                     json.dumps(
@@ -3016,6 +3022,9 @@ def _run_code_agent_phase(
                             "interaction_obligations": interaction_plan["interactions"],
                             "interaction_plan_status": interaction_plan["status"],
                             "interaction_plan_error": interaction_plan["error"],
+                            "rejected_interactions": interaction_plan[
+                                "rejected_interactions"
+                            ],
                             "probes": [],
                             "scenarios_without_executable_probe": sorted(
                                 str(item["scenario_id"]) for item in probe_scenarios
@@ -3045,12 +3054,16 @@ def _run_code_agent_phase(
                                 "status": saved_plan.get("status", "not_run"),
                                 "error": saved_plan.get("error"),
                                 "interactions": saved_plan.get("interactions", []),
+                                "rejected_interactions": saved_plan.get(
+                                    "rejected_interactions", []
+                                ),
                             }
                     except (OSError, json.JSONDecodeError):
                         interaction_plan = {
                             "status": "artifact_error",
                             "error": "interaction plan artifact could not be read",
                             "interactions": [],
+                            "rejected_interactions": [],
                         }
             state["postrun_probe_obligations"] = obligations
             state["postrun_probes"] = probes
@@ -3058,6 +3071,7 @@ def _run_code_agent_phase(
             state["postrun_probe_generation_error"] = generation_error
             state["interaction_plan_status"] = interaction_plan["status"]
             state["interaction_plan_error"] = interaction_plan["error"]
+            state["rejected_interactions"] = interaction_plan["rejected_interactions"]
         probes_for_request = state.get("postrun_probes")
         if (
             isinstance(probes_for_request, tuple)
@@ -3226,6 +3240,7 @@ def _generate_miniswe_postrun_probes(
         "status": "not_run",
         "error": None,
         "interactions": [],
+        "rejected_interactions": [],
     }
     probe_output = output_root / "postrun-probes"
     probe_output.mkdir(parents=True, exist_ok=True)
@@ -3364,6 +3379,7 @@ def _generate_miniswe_postrun_probes(
         obligations: tuple[dict[str, Any], ...] = ()
         probes: tuple[PostRunProbe, ...] = ()
         validation_error: str | None = None
+        rejected_interactions: list[dict[str, str]] = []
         baseline_results: tuple[Any, ...] = ()
         for attempt_number in range(1, 3):
             if attempt_number == 2:
@@ -3417,6 +3433,7 @@ def _generate_miniswe_postrun_probes(
                 )
             try:
                 suite_source = suite_path.read_text(encoding="utf-8")
+                rejected_interactions.clear()
                 obligations, interaction_obligations, probes = (
                     parse_generated_postrun_probe_source(
                         suite_source,
@@ -3424,12 +3441,23 @@ def _generate_miniswe_postrun_probes(
                         instruction=instruction,
                         repository_contract=repository_contract,
                         instruction_ledger_clauses=instruction_ledger_clauses,
+                        rejected_interactions=rejected_interactions,
                     )
                 )
+                rejection_errors = [item["error"] for item in rejected_interactions]
                 interaction_plan = {
-                    "status": "generated" if interaction_obligations else "empty",
-                    "error": None,
+                    "status": (
+                        "partial"
+                        if interaction_obligations and rejected_interactions
+                        else "failed"
+                        if rejected_interactions
+                        else "generated"
+                        if interaction_obligations
+                        else "empty"
+                    ),
+                    "error": "; ".join(rejection_errors) or None,
                     "interactions": list(interaction_obligations),
+                    "rejected_interactions": list(rejected_interactions),
                 }
                 (probe_output / "interaction-plan.json").write_text(
                     json.dumps(
@@ -3476,6 +3504,7 @@ def _generate_miniswe_postrun_probes(
             "interaction_obligations": list(interaction_obligations),
             "interaction_plan_status": interaction_plan["status"],
             "interaction_plan_error": interaction_plan["error"],
+            "rejected_interactions": interaction_plan["rejected_interactions"],
             "authoring_attempts": authoring_attempts,
             "authoring_commits": [
                 {
@@ -7627,14 +7656,27 @@ def _candidate_behavior_probe_findings(
 
 
 def _probe_interaction_plan_decision(state: Mapping[str, Any]) -> dict[str, Any]:
-    """Keep a valid empty plan distinct from a failed interaction planner."""
+    """Report interaction planning while allowing valid probes to continue."""
     status = state.get("interaction_plan_status", "not_run")
-    passed = status in {"generated", "empty", "not_configured", "not_run"}
+    probe_generation_succeeded = state.get("postrun_probe_generation_error") is None
+    passed = (
+        status
+        in {
+            "generated",
+            "partial",
+            "failed",
+            "empty",
+            "not_configured",
+            "not_run",
+        }
+        and probe_generation_succeeded
+    )
     return {
-        "check": "interaction_plan_generated_or_validly_empty",
+        "check": "interaction_plan_recorded_and_probe_generation_succeeded",
         "passed": passed,
         "status": status,
         "error": state.get("interaction_plan_error"),
+        "rejected_interactions": state.get("rejected_interactions", []),
     }
 
 

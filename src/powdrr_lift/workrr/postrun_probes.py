@@ -27,6 +27,7 @@ def validate_probe_interaction_plan(
     scenarios: Sequence[Mapping[str, Any]],
     repository_contract: Mapping[str, Any] | None = None,
     instruction_ledger_clauses: Sequence[Mapping[str, Any]] = (),
+    rejected_interactions: list[dict[str, str]] | None = None,
 ) -> tuple[dict[str, Any], ...]:
     """Check references and bind evidence from each scenario deterministically."""
     scenarios_by_id = {str(item["scenario_id"]): item for item in scenarios}
@@ -34,62 +35,99 @@ def validate_probe_interaction_plan(
     seen: set[str] = set()
     validated: list[dict[str, Any]] = []
     for raw in interactions:
-        if not isinstance(raw, Mapping):
-            raise ValueError("interaction plan contains a malformed entry")
-        item = dict(raw)
-        interaction_id = _required_text(item, "interaction_id")
-        if interaction_id in seen:
-            raise ValueError(f"duplicate interaction id {interaction_id!r}")
-        scenario_ids = item.get("scenario_ids")
-        if (
-            not isinstance(scenario_ids, list)
-            or any(not isinstance(value, str) for value in scenario_ids)
-            or len(scenario_ids) < 2
-            or len(set(scenario_ids)) != len(scenario_ids)
-        ):
-            raise ValueError(
-                f"interaction {interaction_id!r} must reference at least two "
-                "distinct scenarios"
-            )
-        unknown = set(scenario_ids) - known_scenarios
-        if unknown:
-            raise ValueError(
-                f"interaction {interaction_id!r} refers to unknown scenarios: "
-                + ", ".join(sorted(unknown))
-            )
-        for key in ("condition", "operation", "expected"):
-            _required_text(item, key)
-        item.pop("evidence_quote_ids", None)
-        item.pop("evidence_quotes", None)
-        evidence_quotes: list[str] = []
-        for scenario_id in scenario_ids:
-            evidence = _resolve_scenario_evidence(
-                scenarios_by_id[scenario_id].get("evidence", ()),
-                scenario_id=scenario_id,
+        try:
+            validated_item = _validate_probe_interaction(
+                raw,
+                scenarios_by_id=scenarios_by_id,
+                known_scenarios=known_scenarios,
                 instruction=instruction,
                 repository_contract=repository_contract or {},
                 instruction_ledger_clauses=instruction_ledger_clauses,
+                seen=seen,
             )
-            quote = next(
-                (
-                    citation["quote"]
-                    for citation in evidence
-                    if citation["quote"] not in evidence_quotes
-                ),
-                None,
+        except ValueError as error:
+            if rejected_interactions is None:
+                raise
+            interaction_id = (
+                raw.get("interaction_id") if isinstance(raw, Mapping) else None
             )
-            if quote is None:
-                continue
-            evidence_quotes.append(quote)
-        if len(evidence_quotes) < 2:
-            raise ValueError(
-                f"interaction {interaction_id!r} cannot resolve two distinct "
-                "source quotes from its scenarios"
+            rejected_interactions.append(
+                {
+                    "interaction_id": (
+                        interaction_id if isinstance(interaction_id, str) else ""
+                    ),
+                    "error": str(error),
+                }
             )
-        item["evidence_quotes"] = evidence_quotes
-        seen.add(interaction_id)
-        validated.append(item)
+            continue
+        seen.add(validated_item["interaction_id"])
+        validated.append(validated_item)
     return tuple(validated)
+
+
+def _validate_probe_interaction(
+    raw: Any,
+    *,
+    scenarios_by_id: Mapping[str, Mapping[str, Any]],
+    known_scenarios: set[str],
+    instruction: str,
+    repository_contract: Mapping[str, Any],
+    instruction_ledger_clauses: Sequence[Mapping[str, Any]],
+    seen: set[str],
+) -> dict[str, Any]:
+    if not isinstance(raw, Mapping):
+        raise ValueError("interaction plan contains a malformed entry")
+    item = dict(raw)
+    interaction_id = _required_text(item, "interaction_id")
+    if interaction_id in seen:
+        raise ValueError(f"duplicate interaction id {interaction_id!r}")
+    scenario_ids = item.get("scenario_ids")
+    if (
+        not isinstance(scenario_ids, list)
+        or any(not isinstance(value, str) for value in scenario_ids)
+        or len(scenario_ids) < 2
+        or len(set(scenario_ids)) != len(scenario_ids)
+    ):
+        raise ValueError(
+            f"interaction {interaction_id!r} must reference at least two "
+            "distinct scenarios"
+        )
+    unknown = set(scenario_ids) - known_scenarios
+    if unknown:
+        raise ValueError(
+            f"interaction {interaction_id!r} refers to unknown scenarios: "
+            + ", ".join(sorted(unknown))
+        )
+    for key in ("condition", "operation", "expected"):
+        _required_text(item, key)
+    item.pop("evidence_quote_ids", None)
+    item.pop("evidence_quotes", None)
+    evidence_quotes: list[str] = []
+    for scenario_id in scenario_ids:
+        evidence = _resolve_scenario_evidence(
+            scenarios_by_id[scenario_id].get("evidence", ()),
+            scenario_id=scenario_id,
+            instruction=instruction,
+            repository_contract=repository_contract,
+            instruction_ledger_clauses=instruction_ledger_clauses,
+        )
+        quote = next(
+            (
+                citation["quote"]
+                for citation in evidence
+                if citation["quote"] not in evidence_quotes
+            ),
+            None,
+        )
+        if quote is not None:
+            evidence_quotes.append(quote)
+    if len(evidence_quotes) < 2:
+        raise ValueError(
+            f"interaction {interaction_id!r} cannot resolve two distinct "
+            "source quotes from its scenarios"
+        )
+    item["evidence_quotes"] = evidence_quotes
+    return item
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +185,7 @@ def parse_generated_postrun_probe_source(
     instruction: str,
     repository_contract: Mapping[str, Any] | None = None,
     instruction_ledger_clauses: Sequence[Mapping[str, Any]] = (),
+    rejected_interactions: list[dict[str, str]] | None = None,
 ) -> tuple[
     tuple[dict[str, Any], ...],
     tuple[dict[str, Any], ...],
@@ -188,6 +227,7 @@ def parse_generated_postrun_probe_source(
         scenarios=scenarios,
         repository_contract=repository_contract or {},
         instruction_ledger_clauses=instruction_ledger_clauses,
+        rejected_interactions=rejected_interactions,
     )
     obligations = _validate_probe_obligations(
         raw_obligations,
@@ -234,7 +274,16 @@ def parse_generated_postrun_probe_source(
             not isinstance(value, str) for value in raw_interaction_ids
         ):
             raise ValueError(f"{function.name} has malformed interaction_ids")
-        interaction_ids = tuple(dict.fromkeys(raw_interaction_ids))
+        rejected_ids = {
+            item["interaction_id"]
+            for item in rejected_interactions or ()
+            if item.get("interaction_id")
+        }
+        interaction_ids = tuple(
+            value
+            for value in dict.fromkeys(raw_interaction_ids)
+            if value not in rejected_ids
+        )
         if probe_id in seen_probe_ids:
             raise ValueError(f"probe suite has duplicate probe id {probe_id!r}")
         if scenario_id not in known_scenarios:

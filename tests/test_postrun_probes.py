@@ -286,6 +286,37 @@ def test_interaction_plan_requires_multiple_scenarios_and_exact_evidence() -> No
         )
 
 
+def test_unverifiable_interaction_does_not_discard_individual_probes() -> None:
+    source = _source()
+    source = source.replace(
+        "INTERACTIONS = []",
+        "INTERACTIONS = [{'interaction_id': 'weak-combination', "
+        "'scenario_ids': ['selector', 'selector'], "
+        "'condition': 'Both scenarios apply.', 'operation': 'Combine them.', "
+        "'expected': 'Both outcomes hold.'}]",
+    )
+    rejected: list[dict[str, str]] = []
+
+    obligations, interactions, probes = parse_generated_postrun_probe_source(
+        source,
+        ({"scenario_id": "selector", "evidence": ["select values"]},),
+        instruction="select values",
+        rejected_interactions=rejected,
+    )
+
+    assert obligations[0]["supported"] is True
+    assert interactions == ()
+    assert len(probes) == 1
+    assert probes[0].interaction_ids == ()
+    assert rejected == [
+        {
+            "interaction_id": "weak-combination",
+            "error": "interaction 'weak-combination' must reference at least two "
+            "distinct scenarios",
+        }
+    ]
+
+
 def test_probe_suite_must_cover_each_required_interaction() -> None:
     instruction = "all values are selected; difference removes a value"
     scenarios = (

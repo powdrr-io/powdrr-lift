@@ -115,7 +115,6 @@ from powdrr_lift.workrr.git import (
     claim_workflow_task,
     create_workflow_worktree,
     inspect_workflow_run,
-    integration_branch_name,
     load_workflow_git_state,
     load_workflow_git_states,
     resolve_git_repository_root,
@@ -5018,7 +5017,7 @@ def _validate_workflow_task_state(
         repo_root,
         workflow_git_state.proposed_pr_id,
         integration_branch=workflow_git_state.integration_branch,
-        worktree_name=_workflow_git_worktree_name(workflow_git_state),
+        worktree_name=workflow_git_state.integration_branch,
     )
     claim_refs = [
         claim_ref
@@ -5104,7 +5103,7 @@ def _resolve_workflow_task_context(
             workflow_git_state.proposed_pr_id,
             base_branch=workflow_git_state.base_branch,
             branch_name=workflow_git_state.integration_branch,
-            worktree_name=_workflow_git_worktree_name(workflow_git_state),
+            worktree_name=workflow_git_state.integration_branch,
         )
     except RuntimeError as exc:
         raise WorkflowGitInconsistency(
@@ -5130,15 +5129,6 @@ def _resolve_workflow_task_context(
         integration_worktree,
         integration_worktree / workflow_git_state.workflow_relative_directory,
     )
-
-
-def _workflow_git_worktree_name(workflow_git_state: WorkflowGitState) -> str:
-    """Keep legacy paths while isolating new issue-worker attempt worktrees."""
-    if workflow_git_state.integration_branch == integration_branch_name(
-        workflow_git_state.proposed_pr_id
-    ):
-        return workflow_git_state.proposed_pr_id
-    return workflow_git_state.integration_branch
 
 
 def _publish_workflow_progress(

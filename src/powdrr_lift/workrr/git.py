@@ -271,7 +271,7 @@ def create_workflow_worktree(
 ) -> tuple[Path, str]:
     repo_root_path = Path(repo_root).resolve()
     branch = branch_name or integration_branch_name(proposed_pr_id)
-    worktree = workflow_worktree_path(repo_root_path, worktree_name or proposed_pr_id)
+    worktree = workflow_worktree_path(repo_root_path, worktree_name or branch)
     worktree.parent.mkdir(parents=True, exist_ok=True)
     base_ref = _refresh_workflow_refs(repo_root_path, branch, base_branch)
     if worktree.exists():
@@ -622,7 +622,7 @@ def inspect_workflow_run(
     integration_worktree = (
         registered_integration_worktrees[0]
         if registered_integration_worktrees
-        else workflow_worktree_path(repo_root_path, worktree_name or proposed_pr_id)
+        else workflow_worktree_path(repo_root_path, worktree_name or integration_branch)
     )
     state_paths: list[Path] = []
     if integration_worktree.is_dir():
@@ -1186,16 +1186,11 @@ def validate_workflow_git_state(
     branch.  The task id remains part of the diagnostic and claim identity,
     but it must not imply a task branch or task worktree.
     """
-    worktree_name = (
-        state.proposed_pr_id
-        if state.integration_branch == integration_branch_name(state.proposed_pr_id)
-        else state.integration_branch
-    )
     report = inspect_workflow_run(
         repo_root,
         state.proposed_pr_id,
         integration_branch=state.integration_branch,
-        worktree_name=worktree_name,
+        worktree_name=state.integration_branch,
     )
     errors = list(report["inconsistencies"])
     if not report["integration_branch_exists"]:

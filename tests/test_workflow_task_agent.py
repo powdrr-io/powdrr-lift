@@ -2633,7 +2633,7 @@ def test_process_workflow_task_uses_workflow_integration_worktree(
         capture_output=True,
         text=True,
     )
-    integration_root = primary_root / ".worktrees" / "powdrr" / "feature-17"
+    integration_root = primary_root / ".worktrees" / "powdrr" / "powdrr-feature-17"
     subprocess.run(
         [
             "git",

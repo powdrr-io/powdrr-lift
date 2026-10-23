@@ -645,10 +645,18 @@ def _issue_worker_structrr_context(
             "a test plan: " + "; ".join(file_overlap_findings)
         )
 
-    current, current_manifest = _load_committed_issue_worker_structrr_baseline(
+    committed_baseline, _committed_manifest = (
+        _load_committed_issue_worker_structrr_baseline(
+            repo_root,
+            base_commit=base_commit,
+        )
+    )
+    current, current_manifest = _bootstrap_issue_worker_structrr_baseline(
         repo_root,
+        proposed=proposed,
         base_commit=base_commit,
     )
+    current = _merge_structrr_decision_sections(current, committed_baseline)
     if final_review:
         # Check the latest tree against the projected plan result. Unrelated
         # interlaced work carries forward; changes to plan-owned subjects require
@@ -751,6 +759,140 @@ def _load_committed_issue_worker_structrr_baseline(
             "implementation workflows"
         )
     return document, manifest
+
+
+def _bootstrap_issue_worker_structrr_baseline(
+    repo_root: Path,
+    *,
+    proposed: Mapping[str, Any],
+    base_commit: str,
+) -> tuple[Mapping[str, Any], SourceManifest]:
+    """Bootstrap the exact branch base in a clean temporary Git worktree."""
+    temporary_parent = Path(tempfile.gettempdir())
+    temporary_parent.mkdir(parents=True, exist_ok=True)
+    temporary_root = Path(
+        tempfile.mkdtemp(
+            prefix="powdrr-lift-issue-worker-structrr-",
+            dir=temporary_parent,
+        )
+    )
+    baseline_worktree = temporary_root / "baseline"
+    added = subprocess.run(
+        [
+            "git",
+            "worktree",
+            "add",
+            "--detach",
+            str(baseline_worktree),
+            base_commit,
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if added.returncode != 0:
+        shutil.rmtree(temporary_root, ignore_errors=True)
+        raise PowdrrExecutionError(
+            "could not create a clean worktree for the PR base bootstrap: "
+            + (added.stderr.strip() or added.stdout.strip())
+        )
+    try:
+        from powdrr_lift.workrr.feature_endpoint import _structrr_taxonomy_path
+
+        bootstrap = bootstrap_structrr(
+            baseline_worktree,
+            output_path=temporary_root / "baseline-bootstrap.yaml",
+            taxonomy_path=_structrr_taxonomy_path(baseline_worktree),
+            include_untracked=False,
+            artifact_exclusions=_issue_worker_structrr_artifact_exclusions(proposed),
+            submission_base=base_commit,
+        )
+        if not bootstrap.validation.successful:
+            issues = "; ".join(issue.message for issue in bootstrap.validation.issues)
+            raise PowdrrExecutionError(
+                "Structrr could not bootstrap the clean PR base: " + issues
+            )
+        if bootstrap.source_manifest is None:
+            raise PowdrrExecutionError(
+                "Structrr base bootstrap did not produce a source manifest"
+            )
+        return bootstrap.document, bootstrap.source_manifest
+    finally:
+        removed = subprocess.run(
+            ["git", "worktree", "remove", "--force", str(baseline_worktree)],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        shutil.rmtree(temporary_root, ignore_errors=True)
+        if removed.returncode != 0:
+            raise PowdrrExecutionError(
+                "could not remove the temporary PR-base bootstrap worktree: "
+                + (removed.stderr.strip() or removed.stdout.strip())
+            )
+
+
+def _issue_worker_structrr_artifact_exclusions(
+    proposed: Mapping[str, Any],
+    *,
+    additional_paths: Sequence[str] = (),
+) -> tuple[str, ...]:
+    """Exclude generated plan/runtime artifacts from product-state comparison."""
+    plan_slug = slugify_workflow_id(str(proposed.get("plan_id", "")))
+    exclusions = [
+        f"docs/plans/{plan_slug}-execution-plan.yaml",
+        f"docs/plans/{plan_slug}-structrr-proposal.json",
+        f"docs/workflows/{plan_slug}/",
+    ]
+    final_report = proposed.get("final_review_report_path")
+    if isinstance(final_report, str) and final_report:
+        exclusions.append(final_report)
+    exclusions.extend(additional_paths)
+    return tuple(dict.fromkeys(exclusions))
+
+
+def _merge_structrr_decision_sections(
+    current_snapshot: Mapping[str, Any],
+    committed_snapshot: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Carry accepted decision records into a fresh source bootstrap."""
+    merged = dict(current_snapshot)
+    for section, identity_key in (
+        ("active_intent", "clause_id"),
+        ("human-decisions", "id"),
+        ("invariants", "id"),
+        ("guidance", "id"),
+    ):
+        committed_records = committed_snapshot.get(section)
+        if not isinstance(committed_records, list):
+            continue
+        current_records = merged.get(section)
+        records = (
+            [dict(record) for record in current_records if isinstance(record, Mapping)]
+            if isinstance(current_records, list)
+            else []
+        )
+        indexes = {
+            str(record[identity_key]): index
+            for index, record in enumerate(records)
+            if isinstance(record.get(identity_key), str)
+        }
+        for committed_record in committed_records:
+            if not isinstance(committed_record, Mapping):
+                continue
+            identity = committed_record.get(identity_key)
+            if not isinstance(identity, str):
+                continue
+            existing_index = indexes.get(identity)
+            if existing_index is None:
+                indexes[identity] = len(records)
+                records.append(dict(committed_record))
+            else:
+                records[existing_index] = dict(committed_record)
+        merged[section] = records
+    return merged
 
 
 def _preflight_proposed_file_additions(
@@ -3412,15 +3554,9 @@ class _TaskWorkflowExecutionStrategy:
                     ),
                     taxonomy_path=_structrr_taxonomy_path(self.repo_root),
                     include_untracked=True,
-                    artifact_exclusions=(
-                        f"docs/plans/{slugify_workflow_id(str(proposed['plan_id']))}-execution-plan.yaml",
-                        f"docs/plans/{slugify_workflow_id(str(proposed['plan_id']))}-structrr-proposal.json",
-                        f"docs/workflows/{slugify_workflow_id(str(proposed['plan_id']))}/",
-                        *(
-                            (str(proposed["final_review_report_path"]),)
-                            if isinstance(proposed.get("final_review_report_path"), str)
-                            else ()
-                        ),
+                    artifact_exclusions=_issue_worker_structrr_artifact_exclusions(
+                        proposed,
+                        additional_paths=tuple(integration_test_sources),
                     ),
                     submission_base=baseline_manifest.submission_base,
                 )
@@ -3444,31 +3580,21 @@ class _TaskWorkflowExecutionStrategy:
                         "rebase": rebase_report,
                     }
                 else:
-                    # These frozen acceptance tests are checked in with the PR,
-                    # but their names are generated only after plan review. Let
-                    # Structrr report their exact paths as validation changes.
-                    candidate_proposal = replace(
-                        item_proposal,
-                        allowed_paths=tuple(
-                            dict.fromkeys(
-                                (
-                                    *item_proposal.allowed_paths,
-                                    *integration_test_sources,
-                                )
-                            )
-                        ),
+                    candidate_snapshot = _merge_structrr_decision_sections(
+                        candidate_bootstrap.document,
+                        current_structrr,
                     )
                     actual_diff, comparison = reconcile_item_candidate(
-                        proposal=candidate_proposal,
+                        proposal=item_proposal,
                         baseline_snapshot=current_structrr,
-                        candidate_snapshot=candidate_bootstrap.document,
+                        candidate_snapshot=candidate_snapshot,
                         baseline_manifest=baseline_manifest,
                         candidate_manifest=candidate_bootstrap.source_manifest,
                     )
                     structural_findings = (
                         *structural_repair_findings(comparison),
                         *active_decision_drift_findings(
-                            current_structrr, candidate_bootstrap.document
+                            current_structrr, candidate_snapshot
                         ),
                     )
                     implementation_decision_review = review_inherited_decisions(

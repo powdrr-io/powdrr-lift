@@ -755,6 +755,12 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
         "entities": [{"id": "existing", "type": "Module", "description": "old"}],
         "entity_relationships": [],
         "source_subjects": [],
+        "guidance": [
+            {
+                "id": "bootstrap-review-before-edit",
+                "description": "Review inferred entities before using them.",
+            }
+        ],
     }
     latest = {
         **baseline,
@@ -796,13 +802,28 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     proposal_path = repo_root / "docs/plans/feature-v1-structrr-proposal.json"
     proposal_path.parent.mkdir(parents=True)
     write_multi_pr_proposal(proposal_path, proposal)
-    monkeypatch.setattr(
-        task_agent,
-        "bootstrap_structrr",
-        lambda *_args, **_kwargs: pytest.fail(
-            "worker must reuse the committed baseline instead of bootstrapping it"
-        ),
-    )
+    fresh_baseline = {
+        **latest,
+        "entities": [
+            *latest["entities"],
+            {"id": "present-on-main", "type": "Module", "description": "fresh"},
+        ],
+        "guidance": [],
+    }
+    bootstrap_calls: list[tuple[Path, dict[str, Any]]] = []
+
+    def bootstrap_base(root: Path, **kwargs: Any) -> SimpleNamespace:
+        assert root != repo_root
+        assert git("-C", str(root), "rev-parse", "HEAD") == base_commit
+        assert not (root / ".github/workflows/ci.yml").exists()
+        bootstrap_calls.append((root, kwargs))
+        return SimpleNamespace(
+            document=fresh_baseline,
+            source_manifest=manifest,
+            validation=SimpleNamespace(successful=True, issues=()),
+        )
+
+    monkeypatch.setattr(task_agent, "bootstrap_structrr", bootstrap_base)
 
     result = _issue_worker_structrr_context(
         repo_root,
@@ -817,11 +838,30 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
 
     assert result is not None
     current, rebased_proposal, current_manifest, report = result
-    assert current == committed_bootstrap
+    assert current["entities"] == fresh_baseline["entities"]
+    assert current["guidance"] == committed_bootstrap["guidance"]
     assert rebased_proposal.structrr_baseline_fingerprint == task_agent.snapshot_digest(
-        committed_bootstrap
+        current
     )
     assert current_manifest == manifest
+    assert len(bootstrap_calls) == 1
+    bootstrap_root, bootstrap_options = bootstrap_calls[0]
+    assert not bootstrap_root.exists()
+    assert bootstrap_options["include_untracked"] is False
+    assert bootstrap_options["submission_base"] == base_commit
+    assert (
+        "docs/plans/feature-v1-execution-plan.yaml"
+        in bootstrap_options["artifact_exclusions"]
+    )
+    candidate_exclusions = task_agent._issue_worker_structrr_artifact_exclusions(
+        {
+            "plan_id": "feature-v1",
+            "final_review_report_path": "docs/reports/final.json",
+        },
+        additional_paths=("tests/test_generated_feature.py",),
+    )
+    assert "tests/test_generated_feature.py" in candidate_exclusions
+    assert "docs/reports/final.json" in candidate_exclusions
     assert report["classification"] == "clean"
     assert checkpoint_commit != base_commit
     assert git("rev-parse", "HEAD") == checkpoint_commit
@@ -974,8 +1014,17 @@ def test_issue_worker_blocks_structrr_subject_changed_since_plan(
             {"id": "existing", "type": "Module", "description": "changed elsewhere"}
         ],
     }
-    _commit_test_structrr_baseline(repo_root, latest)
+    _committed_snapshot, manifest = _commit_test_structrr_baseline(repo_root, latest)
     base_commit = git("rev-parse", "HEAD")
+    monkeypatch.setattr(
+        task_agent,
+        "bootstrap_structrr",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            document=latest,
+            source_manifest=manifest,
+            validation=SimpleNamespace(successful=True, issues=()),
+        ),
+    )
 
     with pytest.raises(PowdrrExecutionError, match="intervening repository work"):
         _issue_worker_structrr_context(
@@ -1151,15 +1200,17 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
         baseline_manifest,
         source_revision="b" * 40,
     )
-    monkeypatch.setattr(
-        task_agent,
-        "bootstrap_structrr",
-        lambda *_args, **_kwargs: SimpleNamespace(
+    bootstrap_exclusions: list[tuple[str, ...]] = []
+
+    def fake_bootstrap(*_args: Any, **kwargs: Any) -> SimpleNamespace:
+        bootstrap_exclusions.append(tuple(kwargs.get("artifact_exclusions", ())))
+        return SimpleNamespace(
             document=baseline,
             validation=SimpleNamespace(successful=True, issues=[]),
             source_manifest=candidate_manifest,
-        ),
-    )
+        )
+
+    monkeypatch.setattr(task_agent, "bootstrap_structrr", fake_bootstrap)
     reconciled_allowed_paths: list[tuple[str, ...]] = []
     reconcile = task_agent.reconcile_item_candidate
 
@@ -1244,10 +1295,18 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
         "tests/integration/test_feature_e2e.py"
     ]
     assert result["attempts"][0]["structrr"]["passed"] is False
-    assert reconciled_allowed_paths == [
-        ("src", "tests/integration/test_feature_e2e.py"),
-        ("src", "tests/integration/test_feature_e2e.py"),
-    ]
+    assert reconciled_allowed_paths == [("src",), ("src",)]
+    assert (
+        bootstrap_exclusions.count(
+            (
+                "docs/plans/feature-v1-execution-plan.yaml",
+                "docs/plans/feature-v1-structrr-proposal.json",
+                "docs/workflows/feature-v1/",
+                "tests/integration/test_feature_e2e.py",
+            )
+        )
+        == 2
+    )
     assert review_phases == ["planning", "implementation", "implementation"]
     assert "Observed issue:" in provider_requests[1].prompt
     assert "active_intent:api-stable" in provider_requests[1].prompt

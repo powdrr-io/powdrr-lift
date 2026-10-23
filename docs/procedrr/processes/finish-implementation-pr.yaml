@@ -56,6 +56,7 @@ steps:
         - Set workflow_context.feature-name from task_context.proposed_pr_context.title. Prefer the reviewed item title verbatim; only shorten it when needed to fit the title limit.
         - Make the feature-name a concise, human-readable description of the code change. Never use the plan ID, proposed PR ID, issue number, workflow ID, or a generic workflow label as the pull-request title.
         - Include the objective, scope, implementation details, acceptance criteria, and exact validation commands and results in the PR description.
+        - Include implementation_result.integration_tests.quality_notes in an advisory test-quality section; unresolved test-quality concerns never block publication.
         - Set base-branch to main.
         - Set publication-branch to powdrr/<proposed-pr-id>-implementation, using task_context.proposed_pr_id exactly.
         - Provide a clear commit message and a complete populated PR description. Do not claim any unrun check passed.

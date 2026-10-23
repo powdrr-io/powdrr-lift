@@ -369,45 +369,13 @@ def test_execute_proposed_pr_workflow_enforces_implementation_and_pr_calls(
     unshaped_execution_error: bool,
 ) -> None:
     from procedrr import parse_and_validate
-    from powdrr_lift.workrr.task_agent import _issue_worker_plan_defect_evidence
 
     plan_defect_evidence = (
-        _issue_worker_plan_defect_evidence(
-            [
-                {
-                    "attempt": {
-                        "attempt_id": "attempt-01",
-                        "status": "completed",
-                        "stdout": "candidate validation passed",
-                    },
-                    "structrr_repair_findings": [
-                        "operation:add:files:file:.github/workflows/ci.yml: "
-                        "contradictory; candidate content differs from proposal"
-                    ],
-                },
-                {
-                    "attempt": {
-                        "attempt_id": "attempt-02",
-                        "status": "completed",
-                        "stdout": """
-Test the exact accepted proposal content:
-FAILED attestation/tests/test_ci.py::test_T03_workflow_triggers_on_pull_request
-FAILED attestation/tests/test_ci.py::test_T05_verify_command_runs_for_pull_requests
-2 failed, 3 passed in 0.02s
-""",
-                    },
-                    "structrr_repair_findings": [],
-                },
-                {
-                    "attempt": {
-                        "attempt_id": "attempt-03",
-                        "status": "policy_denied",
-                        "out_of_scope_paths": ["attestation/tests/test_ci.py"],
-                    },
-                    "structrr_repair_findings": [],
-                },
-            ]
-        )
+        [
+            "The reviewed plan directs creating "
+            "attestation/scripts/verify-all.sh, "
+            "which already exists in the repository baseline."
+        ]
         if plan_defect_detected
         else []
     )
@@ -501,9 +469,7 @@ steps:
             if "Does the recorded failure demonstrate" in question:
                 if plan_defect_detected and not unshaped_execution_error:
                     assert "plan_defect_evidence" in question
-                    assert ".github/workflows/ci.yml" in question
-                    assert "T03" in question
-                    assert "T05" in question
+                    assert "attestation/scripts/verify-all.sh" in question
                 return {
                     "classification": (
                         "unclear"

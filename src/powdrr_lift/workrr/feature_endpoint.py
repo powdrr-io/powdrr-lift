@@ -2695,8 +2695,41 @@ def _run_code_agent_phase(
                 implementation_packet,
                 behavior_scenarios=compile_behavior_scenarios(repaired_scenarios),
             )
+        pre_coding_findings = behavior_scenario_probe_findings(repaired_scenarios)
+        rejected_scenario_ids = {
+            finding["scenario_id"] for finding in pre_coding_findings
+        }
+        retained_scenarios = tuple(
+            scenario
+            for scenario in repaired_scenarios
+            if str(scenario.get("scenario_id", "")) not in rejected_scenario_ids
+        )
+        if pre_coding_findings and retained_scenarios:
+            implementation_packet = replace(
+                implementation_packet,
+                behavior_scenarios=compile_behavior_scenarios(retained_scenarios),
+            )
+        pre_coding_status = (
+            "passed"
+            if not pre_coding_findings
+            else "partial"
+            if retained_scenarios
+            else "blocked"
+        )
+        excluded_scenarios = [
+            {
+                "scenario_id": finding["scenario_id"],
+                "failed_criteria": finding["failed_criteria"],
+                "reason": finding["reason"],
+            }
+            for finding in pre_coding_findings
+        ]
         repair_body = dict(repair_artifact)
-        repair_body["fingerprint"] = content_fingerprint(repair_artifact)
+        repair_body["excluded_scenarios"] = excluded_scenarios
+        repair_body["implementation_scenario_ids"] = [
+            str(scenario.get("scenario_id", "")) for scenario in retained_scenarios
+        ]
+        repair_body["fingerprint"] = content_fingerprint(repair_body)
         repair_path = output_root / "artifacts" / "behavior-probe-repair.json"
         repair_path.parent.mkdir(parents=True, exist_ok=True)
         repair_path.write_text(
@@ -2705,11 +2738,14 @@ def _run_code_agent_phase(
         )
         state["behavior_probe_repair_path"] = repair_path
         state["behavior_probe_repair_status"] = repair_artifact.get("status")
-        pre_coding_findings = behavior_scenario_probe_findings(repaired_scenarios)
         pre_coding_review = {
             "schema_version": "pre-coding-probe-quality-review-v1",
-            "status": "blocked" if pre_coding_findings else "passed",
+            "status": pre_coding_status,
             "findings": pre_coding_findings,
+            "included_scenario_ids": [
+                str(scenario.get("scenario_id", "")) for scenario in retained_scenarios
+            ],
+            "excluded_scenario_ids": sorted(rejected_scenario_ids),
             "behavior_probe_repair_status": repair_artifact.get("status"),
         }
         pre_coding_review_path = (
@@ -2721,7 +2757,7 @@ def _run_code_agent_phase(
             encoding="utf-8",
         )
         state["pre_coding_probe_quality_review_path"] = pre_coding_review_path
-        if pre_coding_findings:
+        if pre_coding_findings and not retained_scenarios:
             failed_scenarios = ", ".join(
                 item["scenario_id"] for item in pre_coding_findings
             )
@@ -2751,6 +2787,27 @@ def _run_code_agent_phase(
             "status": repair_document.get("status"),
             "artifact_path": str(behavior_probe_repair_path),
             "fingerprint": repair_document.get("fingerprint"),
+        }
+    pre_coding_review_path_value = state.get("pre_coding_probe_quality_review_path")
+    if (
+        isinstance(pre_coding_review_path_value, Path)
+        and pre_coding_review_path_value.is_file()
+    ):
+        try:
+            pre_coding_review = json.loads(
+                pre_coding_review_path_value.read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError) as error:
+            raise PowdrrExecutionError(
+                f"pre-coding quality review cannot be read: {error}"
+            ) from error
+        if not isinstance(pre_coding_review, Mapping):
+            raise PowdrrExecutionError("pre-coding quality review is malformed")
+        packet_document["pre_coding_probe_quality_review"] = {
+            "status": pre_coding_review.get("status"),
+            "artifact_path": str(pre_coding_review_path_value),
+            "included_scenario_ids": pre_coding_review.get("included_scenario_ids", []),
+            "excluded_scenario_ids": pre_coding_review.get("excluded_scenario_ids", []),
         }
     implementation_packet_path.write_text(
         json.dumps(packet_document, indent=2, sort_keys=True) + "\n",

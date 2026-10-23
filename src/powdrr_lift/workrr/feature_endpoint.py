@@ -3647,7 +3647,9 @@ def _generate_miniswe_postrun_probes(
         suite_document = {
             "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
             "generation_status": (
-                "partial" if rejected_baseline_probes else "generated"
+                "partial"
+                if rejected_baseline_probes or rejected_interactions
+                else "generated"
             ),
             "generation_method": "minisweagent_pre_coding",
             "source_instruction": instruction,

@@ -393,6 +393,72 @@ def test_probe_suite_must_cover_each_required_interaction() -> None:
         )
 
 
+def test_unrelated_probe_interaction_is_rejected_without_discarding_probe() -> None:
+    instruction = (
+        "selector behavior. first unrelated behavior. second unrelated behavior."
+    )
+    scenarios = (
+        {"scenario_id": "selector", "evidence": ["selector behavior"]},
+        {"scenario_id": "other-a", "evidence": ["first unrelated behavior"]},
+        {"scenario_id": "other-b", "evidence": ["second unrelated behavior"]},
+    )
+    source = _source()
+    obligations = ast.literal_eval(
+        source.split("OBLIGATIONS = ", 1)[1].split("\n", 1)[0]
+    )
+    obligations.extend(
+        {
+            "obligation_id": f"{scenario_id}-obligation",
+            "scenario_id": scenario_id,
+            "category": "other",
+            "rule": "unresolved",
+            "supported": False,
+            "unresolved_reason": "No supported probe is needed for this scenario.",
+        }
+        for scenario_id in ("other-a", "other-b")
+    )
+    interaction = {
+        "interaction_id": "unrelated-pair",
+        "scenario_ids": ["other-a", "other-b"],
+        "condition": "Both unrelated scenarios apply.",
+        "operation": "Exercise both behaviors together.",
+        "expected": "The behaviors remain independent.",
+    }
+    metadata = ast.literal_eval(
+        source.split("PROBE_METADATA = ", 1)[1].split("\n", 1)[0]
+    )
+    metadata["test_probe_selector"]["interaction_ids"] = ["unrelated-pair"]
+    source = source.replace(
+        source.split("OBLIGATIONS = ", 1)[1].split("\n", 1)[0], repr(obligations)
+    )
+    source = source.replace("INTERACTIONS = []", f"INTERACTIONS = {[interaction]!r}")
+    source = source.replace(
+        source.split("PROBE_METADATA = ", 1)[1].split("\n", 1)[0], repr(metadata)
+    )
+    rejected: list[dict[str, str]] = []
+
+    _, interactions, probes = parse_generated_postrun_probe_source(
+        source,
+        scenarios,
+        instruction=instruction,
+        rejected_interactions=rejected,
+    )
+
+    assert len(interactions) == 1
+    assert len(probes) == 1
+    assert probes[0].interaction_ids == ()
+    assert rejected == [
+        {
+            "interaction_id": "unrelated-pair",
+            "probe_id": "selector-result",
+            "error": (
+                "probe 'selector-result' scenario is unrelated to interaction "
+                "'unrelated-pair'"
+            ),
+        }
+    ]
+
+
 def test_probe_parser_preserves_mapping_key_and_value_roles() -> None:
     source = _source()
     obligation_literal = source.split("OBLIGATIONS = ", 1)[1].split("\n", 1)[0]

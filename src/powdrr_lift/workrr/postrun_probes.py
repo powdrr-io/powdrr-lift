@@ -297,23 +297,49 @@ def parse_generated_postrun_probe_source(
             raise ValueError(
                 f"probe {probe_id!r} does not match its obligation scenario"
             )
-        unknown_interactions = set(interaction_ids) - known_interactions
-        if unknown_interactions:
-            raise ValueError(
-                f"probe {probe_id!r} refers to unknown interactions: "
-                + ", ".join(sorted(unknown_interactions))
-            )
+        invalid_interactions: set[str] = set()
         for interaction_id in interaction_ids:
+            if interaction_id not in known_interactions:
+                error_message = (
+                    f"probe {probe_id!r} refers to unknown interaction "
+                    f"{interaction_id!r}"
+                )
+                if rejected_interactions is None:
+                    raise ValueError(error_message)
+                rejected_interactions.append(
+                    {
+                        "interaction_id": interaction_id,
+                        "probe_id": probe_id,
+                        "error": error_message,
+                    }
+                )
+                invalid_interactions.add(interaction_id)
+                continue
             interaction = next(
                 item
                 for item in interaction_obligations
                 if item["interaction_id"] == interaction_id
             )
             if scenario_id not in interaction["scenario_ids"]:
-                raise ValueError(
+                error_message = (
                     f"probe {probe_id!r} scenario is unrelated to interaction "
                     f"{interaction_id!r}"
                 )
+                if rejected_interactions is None:
+                    raise ValueError(error_message)
+                rejected_interactions.append(
+                    {
+                        "interaction_id": interaction_id,
+                        "probe_id": probe_id,
+                        "error": error_message,
+                    }
+                )
+                invalid_interactions.add(interaction_id)
+        interaction_ids = tuple(
+            interaction_id
+            for interaction_id in interaction_ids
+            if interaction_id not in invalid_interactions
+        )
         seen_probe_ids.add(probe_id)
         covered_obligations.add(obligation_id)
         covered_interactions.update(interaction_ids)
@@ -346,9 +372,20 @@ def parse_generated_postrun_probe_source(
         )
     missing_interactions = known_interactions - covered_interactions
     if missing_interactions:
-        raise ValueError(
-            "probe suite omitted required interactions: "
-            + ", ".join(sorted(missing_interactions))
+        if rejected_interactions is None:
+            raise ValueError(
+                "probe suite omitted required interactions: "
+                + ", ".join(sorted(missing_interactions))
+            )
+        already_reported = {
+            item.get("interaction_id") for item in rejected_interactions
+        }
+        rejected_interactions.extend(
+            {
+                "interaction_id": interaction_id,
+                "error": "no valid probe covers this interaction",
+            }
+            for interaction_id in sorted(missing_interactions - already_reported)
         )
     return obligations, interaction_obligations, tuple(probes)
 

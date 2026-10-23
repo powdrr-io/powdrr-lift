@@ -502,7 +502,14 @@ steps:
                     "workflow_context": {
                         "feature-name": "Feature",
                         "commit-message": "Implement feature",
-                        "populated-pr-description": "Implements the feature.",
+                        "populated-pr-description": (
+                            "## Objective\n\nImplement the feature.\n\n"
+                            "## Scope\n\n- Add the feature.\n\n"
+                            "## Implementation Details\n\n- Update code.\n\n"
+                            "## Acceptance Criteria\n\n- Feature works.\n\n"
+                            "## Validation\n\n- `pytest`: passed.\n\n"
+                            "## Advisory Test-Quality Notes\n\nNone."
+                        ),
                         # Simulate an incomplete model response. The publisher
                         # must receive the implementation result's full list.
                         "files-to-publish": ["attestation/component-00.py"],
@@ -516,7 +523,14 @@ steps:
                     "workflow_context": {
                         "feature-name": "Correct plan: verifier scope",
                         "commit-message": "Correct reviewed plan scope",
-                        "populated-pr-description": "Corrects the plan scope.",
+                        "populated-pr-description": (
+                            "## Objective\n\nCorrect the plan.\n\n"
+                            "## Scope\n\n- Update the plan.\n\n"
+                            "## Implementation Details\n\n- Narrow the criteria.\n\n"
+                            "## Acceptance Criteria\n\n- Scope is corrected.\n\n"
+                            "## Validation\n\n- `pytest`: passed.\n\n"
+                            "## Advisory Test-Quality Notes\n\nNone."
+                        ),
                         "base-branch": "main",
                         "publication-branch": "powdrr/pr-01-plan-amendment",
                     },

@@ -55,8 +55,11 @@ steps:
         - Ground the request and every description claim in task_context, implementation_result, and validation_results.
         - Set workflow_context.feature-name from task_context.proposed_pr_context.title. Prefer the reviewed item title verbatim; only shorten it when needed to fit the title limit.
         - Make the feature-name a concise, human-readable description of the code change. Never use the plan ID, proposed PR ID, issue number, workflow ID, or a generic workflow label as the pull-request title.
-        - Include the objective, scope, implementation details, acceptance criteria, and exact validation commands and results in the PR description.
-        - Include implementation_result.integration_tests.quality_notes in an advisory test-quality section; unresolved test-quality concerns never block publication.
+        - "Format populated-pr-description as Markdown with these exact headings, in this order, each on its own line with a blank line after it: ## Objective, ## Scope, ## Implementation Details, ## Acceptance Criteria, ## Validation, and ## Advisory Test-Quality Notes."
+        - Put each section's content on following lines. Use concise paragraphs or bullets; never put multiple headings or sections in one paragraph or line.
+        - Include the objective, scope, implementation details, acceptance criteria, and exact validation commands and results in their matching sections.
+        - "In Advisory Test-Quality Notes, include each distinct implementation_result.integration_tests.quality_notes concern once. Group multiple labels for the same test into one concise bullet, summarize the concern and evidence in at most two sentences, and never copy full model reasoning or raw prompts. Write `None.` when there are no concerns. These notes are advisory and never block publication."
+        - Keep the description focused on this PR. Do not add empty sections, template instructions, or placeholder text.
         - Set base-branch to main.
         - Set publication-branch to powdrr/<proposed-pr-id>-implementation, using task_context.proposed_pr_id exactly.
         - Provide a clear commit message and a complete populated PR description. Do not claim any unrun check passed.
@@ -76,7 +79,11 @@ steps:
               properties:
                 feature-name: {type: string, minLength: 1, maxLength: 100}
                 commit-message: {type: string, minLength: 1}
-                populated-pr-description: {type: string, minLength: 1}
+                populated-pr-description:
+                  type: string
+                  minLength: 1
+                  maxLength: 12000
+                  pattern: '^## Objective\n\n[\s\S]+\n\n## Scope\n\n[\s\S]+\n\n## Implementation Details\n\n[\s\S]+\n\n## Acceptance Criteria\n\n[\s\S]+\n\n## Validation\n\n[\s\S]+\n\n## Advisory Test-Quality Notes\n\n[\s\S]+$'
                 base-branch: {type: string, const: main}
                 publication-branch: {type: string, minLength: 1}
       validation: {kind: json_schema}

@@ -588,13 +588,21 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
             f"    assert module.public_api('value') == '{expected}'\n",
             encoding="utf-8",
         )
-        if len(requests) == 1:
-            _git(worktree_root, "add", "-f", "probe_suite.py")
-            _git(worktree_root, "commit", "-qm", "author initial probe suite")
-            worker_commit_shas.append(
-                _git(worktree_root, "rev-parse", "HEAD").stdout.strip()
-            )
-        return subprocess.CompletedProcess(["mini"], 0, "", "")
+        _git(worktree_root, "add", "-f", "probe_suite.py")
+        _git(
+            worktree_root,
+            "commit",
+            "-qm",
+            "author initial probe suite"
+            if len(requests) == 1
+            else "repair probe suite",
+        )
+        worker_commit_shas.append(
+            _git(worktree_root, "rev-parse", "HEAD").stdout.strip()
+        )
+        return subprocess.CompletedProcess(
+            ["mini"], 0 if len(requests) == 1 else 125, "", "format error after commit"
+        )
 
     monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
     config = FeatureEndpointConfig(
@@ -643,7 +651,10 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     assert (
         suite["authoring_attempts"][0]["worker_commit_sha"] == (worker_commit_shas[0])
     )
-    assert suite["authoring_attempts"][1]["status"] == "completed"
+    assert suite["authoring_attempts"][1]["status"] == "failed"
+    assert suite["authoring_attempts"][1]["worker_committed"] is True
+    assert suite["authoring_attempts"][1]["worker_commit_sha"] == worker_commit_shas[1]
+    assert suite["authoring_commits"][1]["sha"] == worker_commit_shas[1]
     assert suite["baseline_results"][0]["status"] == "failed"
 
 

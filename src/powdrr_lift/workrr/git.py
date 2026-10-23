@@ -1186,7 +1186,17 @@ def validate_workflow_git_state(
     branch.  The task id remains part of the diagnostic and claim identity,
     but it must not imply a task branch or task worktree.
     """
-    report = inspect_workflow_run(repo_root, state.proposed_pr_id)
+    worktree_name = (
+        state.proposed_pr_id
+        if state.integration_branch == integration_branch_name(state.proposed_pr_id)
+        else state.integration_branch
+    )
+    report = inspect_workflow_run(
+        repo_root,
+        state.proposed_pr_id,
+        integration_branch=state.integration_branch,
+        worktree_name=worktree_name,
+    )
     errors = list(report["inconsistencies"])
     if not report["integration_branch_exists"]:
         errors.append(f"integration branch {state.integration_branch!r} does not exist")

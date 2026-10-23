@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
 import pytest
 
+from powdrr_lift import intrinsic_git_gh
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.intrinsic_git_gh import (
     execute_intrinsic_git_gh_tool,
@@ -18,6 +20,33 @@ def test_git_intrinsic_operations_have_expected_commands() -> None:
         "status",
         "--short",
     ]
+    review_threads = intrinsic_command(
+        {
+            "operation": "pr_review_threads",
+            "repository": "powdrr-io/powdrr-lift",
+            "pr_reference": "432",
+        },
+        tool="gh",
+    )
+    assert review_threads[:2] == ["api", "graphql"]
+    assert "reviewThreads(first: 100, after: $after)" in review_threads[3]
+    assert "owner=powdrr-io" in review_threads
+    assert "name=powdrr-lift" in review_threads
+    assert "number=432" in review_threads
+    reply = intrinsic_command(
+        {
+            "operation": "pr_review_reply",
+            "thread_id": "PRRT_thread-id",
+            "body": "This is addressed in the latest push.",
+        },
+        tool="gh",
+    )
+    assert reply[-2:] == ["-f", "body=This is addressed in the latest push."]
+    resolve = intrinsic_command(
+        {"operation": "pr_review_resolve", "thread_id": "PRRT_thread-id"},
+        tool="gh",
+    )
+    assert resolve[-2:] == ["-f", "threadId=PRRT_thread-id"]
     assert intrinsic_command({"operation": "head"}, tool="git") == [
         "rev-parse",
         "HEAD",
@@ -244,3 +273,161 @@ def test_existing_pull_request_makes_create_idempotent(
     assert result["returncode"] == 0
     assert result["no_op"] is True
     assert result["stdout"] == "https://github.com/example/repo/pull/7\n"
+
+
+def test_review_thread_query_collects_every_page(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def page(
+        thread_id: str, *, has_next_page: bool, end_cursor: str | None
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            ["gh", "api", "graphql"],
+            0,
+            json.dumps(
+                {
+                    "data": {
+                        "repository": {
+                            "pullRequest": {
+                                "id": "PR_kwDOA",
+                                "number": 432,
+                                "title": "Add feature",
+                                "body": "Proposed PR: feature-part-2",
+                                "state": "OPEN",
+                                "baseRefName": "main",
+                                "headRefName": "feature/part-2",
+                                "headRefOid": "abc123",
+                                "reviewThreads": {
+                                    "nodes": [
+                                        {
+                                            "id": thread_id,
+                                            "isResolved": False,
+                                            "isOutdated": False,
+                                            "path": "src/example.py",
+                                            "line": 12,
+                                            "comments": {
+                                                "nodes": [],
+                                                "pageInfo": {
+                                                    "hasNextPage": False,
+                                                    "endCursor": None,
+                                                },
+                                            },
+                                        }
+                                    ],
+                                    "pageInfo": {
+                                        "hasNextPage": has_next_page,
+                                        "endCursor": end_cursor,
+                                    },
+                                },
+                            }
+                        }
+                    }
+                }
+            ),
+            "",
+        )
+
+    pages = [
+        page("THREAD_1", has_next_page=True, end_cursor="cursor-1"),
+        page("THREAD_2", has_next_page=False, end_cursor=None),
+    ]
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return pages.pop(0)
+
+    monkeypatch.setattr(intrinsic_git_gh.subprocess, "run", fake_run)
+    result = execute_intrinsic_git_gh_tool(
+        "gh",
+        {
+            "operation": "pr_review_threads",
+            "repository": "powdrr-io/powdrr-lift",
+            "pr_reference": "432",
+        },
+        worktree_root=tmp_path,
+    )
+
+    payload = json.loads(result["stdout"])
+    assert result["returncode"] == 0
+    assert payload["pull_request"]["headRefOid"] == "abc123"
+    assert [thread["id"] for thread in payload["review_threads"]] == [
+        "THREAD_1",
+        "THREAD_2",
+    ]
+    assert commands[0][:3] == ["gh", "api", "graphql"]
+    assert commands[1][-2:] == ["-f", "after=cursor-1"]
+
+
+def test_review_thread_query_collects_all_replies_in_a_thread(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    thread_page = {
+        "data": {
+            "repository": {
+                "pullRequest": {
+                    "id": "PR_kwDOA",
+                    "number": 432,
+                    "title": "Add feature",
+                    "body": "",
+                    "state": "OPEN",
+                    "baseRefName": "main",
+                    "headRefName": "feature/part-2",
+                    "headRefOid": "abc123",
+                    "reviewThreads": {
+                        "nodes": [
+                            {
+                                "id": "THREAD_1",
+                                "isResolved": False,
+                                "isOutdated": False,
+                                "path": "src/example.py",
+                                "line": 12,
+                                "comments": {
+                                    "nodes": [{"id": "COMMENT_1"}],
+                                    "pageInfo": {
+                                        "hasNextPage": True,
+                                        "endCursor": "comment-cursor-1",
+                                    },
+                                },
+                            }
+                        ],
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                    },
+                }
+            }
+        }
+    }
+    comment_page = {
+        "data": {
+            "node": {
+                "comments": {
+                    "nodes": [{"id": "COMMENT_2"}],
+                    "pageInfo": {"hasNextPage": False, "endCursor": None},
+                }
+            }
+        }
+    }
+    responses = [thread_page, comment_page]
+    commands: list[list[str]] = []
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 0, json.dumps(responses.pop(0)), "")
+
+    monkeypatch.setattr(intrinsic_git_gh.subprocess, "run", fake_run)
+    result = execute_intrinsic_git_gh_tool(
+        "gh",
+        {
+            "operation": "pr_review_threads",
+            "repository": "powdrr-io/powdrr-lift",
+            "pr_reference": 432,
+        },
+        worktree_root=tmp_path,
+    )
+
+    payload = json.loads(result["stdout"])
+    comments = payload["review_threads"][0]["comments"]["nodes"]
+    assert result["returncode"] == 0
+    assert [comment["id"] for comment in comments] == ["COMMENT_1", "COMMENT_2"]
+    assert "threadId=THREAD_1" in commands[1]
+    assert "after=comment-cursor-1" in commands[1]

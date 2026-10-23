@@ -1305,6 +1305,8 @@ class ExecutionRuntime:
             "pr_publish_clean",
             "pr_edit",
             "pr_review_comment",
+            "pr_review_reply",
+            "pr_review_resolve",
         }:
             return request
         if request.arguments.get("idempotency_key"):

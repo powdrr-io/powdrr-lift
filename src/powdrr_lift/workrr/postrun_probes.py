@@ -743,16 +743,37 @@ def run_postrun_probes(
 def baseline_probe_failures(
     results: Sequence[PostRunProbeResult],
 ) -> list[str]:
-    """Return probes that did not execute and fail through an assertion."""
+    """Return probes that passed or failed for an unexpected baseline reason."""
     problems = []
     for result in results:
-        if result.status != "failed" or "AssertionError" not in result.output:
+        if not baseline_probe_is_expected_failure(result):
             problems.append(
                 f"{result.probe_id} ({result.scenario_id}) returned "
-                f"{result.status}; expected an AssertionError. "
+                f"{result.status}; expected a baseline failure through "
+                "AssertionError, TypeError, or ImportError. "
                 f"{_truncate(result.output or result.error or '', 1600)}"
             )
     return problems
+
+
+def baseline_probe_is_expected_failure(result: PostRunProbeResult) -> bool:
+    """Recognize baseline exceptions that mean the requested API is absent."""
+    if result.status != "failed":
+        return False
+    terminal_line = next(
+        (line.strip() for line in reversed(result.output.splitlines()) if line.strip()),
+        "",
+    )
+    match = re.match(r"^([A-Za-z_][A-Za-z0-9_.]*)(?::|$)", terminal_line)
+    if match is None:
+        return False
+    exception_name = match.group(1).rsplit(".", 1)[-1]
+    return exception_name in {
+        "AssertionError",
+        "ImportError",
+        "ModuleNotFoundError",
+        "TypeError",
+    }
 
 
 def probe_failures(results: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]:
@@ -806,6 +827,7 @@ __all__ = [
     "PostRunProbe",
     "PostRunProbeResult",
     "baseline_probe_failures",
+    "baseline_probe_is_expected_failure",
     "parse_generated_postrun_probe_source",
     "probe_failures",
     "run_postrun_probes",

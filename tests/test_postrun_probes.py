@@ -492,16 +492,43 @@ def test_run_postrun_probes_executes_each_function_from_same_module(
     assert "assert module.public_api('value') == 'wrong'" in failures[0]["reason"]
 
 
-def test_baseline_requires_assertion_failure_not_a_pass_or_execution_error() -> None:
+def test_baseline_accepts_assertion_type_and_import_failures() -> None:
     results = (
         PostRunProbeResult("pass", "scenario", "passed"),
-        PostRunProbeResult("import", "scenario", "failed", output="ImportError"),
+        PostRunProbeResult("value", "scenario", "failed", output="ValueError"),
         PostRunProbeResult("expected", "scenario", "failed", output="AssertionError"),
+        PostRunProbeResult("type", "scenario", "failed", output="TypeError"),
+        PostRunProbeResult("import", "scenario", "failed", output="ImportError"),
+        PostRunProbeResult(
+            "missing-module", "scenario", "failed", output="ModuleNotFoundError"
+        ),
     )
     problems = baseline_probe_failures(results)
     assert len(problems) == 2
     assert any("pass" in item for item in problems)
-    assert any("import" in item for item in problems)
+    assert any("value" in item for item in problems)
+
+
+def test_baseline_classifies_the_terminal_exception_not_traceback_text() -> None:
+    results = (
+        PostRunProbeResult(
+            "expected",
+            "scenario",
+            "failed",
+            output="AssertionError mentioned in source\nTypeError: unexpected keyword",
+        ),
+        PostRunProbeResult(
+            "unexpected",
+            "scenario",
+            "failed",
+            output="TypeError mentioned in source\nValueError: bad fixture",
+        ),
+    )
+
+    problems = baseline_probe_failures(results)
+
+    assert len(problems) == 1
+    assert "unexpected" in problems[0]
 
 
 def test_unavailable_postrun_probe_is_a_repair_finding() -> None:

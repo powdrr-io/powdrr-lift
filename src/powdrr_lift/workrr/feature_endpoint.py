@@ -130,6 +130,7 @@ from powdrr_lift.workrr.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     PostRunProbe,
     baseline_probe_failures,
+    baseline_probe_is_expected_failure,
     parse_generated_postrun_probe_source,
     probe_failures,
     run_postrun_probes,
@@ -3382,6 +3383,10 @@ def _generate_miniswe_postrun_probes(
             "when the supplied contract does not define a safe oracle. A public "
             "API call may happen in setup or exception handling before the "
             "assertion; the assertion must observe the resulting behavior. "
+            "On the untouched baseline, AssertionError, TypeError, or ImportError "
+            "(including ModuleNotFoundError) from the direct feature call counts "
+            "as expected evidence that the requested behavior or API is absent. "
+            "Other runtime errors do not count as a valid baseline failure. "
             "Requirements that name public fields, properties, methods, or return "
             "types are directly probeable: test the stated member/type contract "
             "instead of labeling it unresolved. For properties whose semantics "
@@ -3438,6 +3443,7 @@ def _generate_miniswe_postrun_probes(
         validation_error: str | None = None
         rejected_interactions: list[dict[str, str]] = []
         baseline_results: tuple[Any, ...] = ()
+        rejected_baseline_probes: list[dict[str, Any]] = []
         for attempt_number in range(1, 3):
             if attempt_number == 2:
                 probe_request = replace(
@@ -3458,9 +3464,13 @@ def _generate_miniswe_postrun_probes(
                         "use Python literal assignments for metadata, never JSON "
                         "strings or docstrings. Preserve source-grounded "
                         "behavior and scenario provenance. Every probe must run "
-                        "successfully as Python and fail on the untouched baseline "
-                        "through its assertion (not through syntax, import, or "
-                        "runtime errors). At module scope, allow only the three "
+                        "as valid Python and fail on the untouched baseline with "
+                        "AssertionError, TypeError, or ImportError (including "
+                        "ModuleNotFoundError). TypeError and ImportError are "
+                        "expected when the requested API or "
+                        "argument is not present in the baseline. Other runtime "
+                        "errors do not prove the requested behavior and must be "
+                        "fixed. At module scope, allow only the three "
                         "required literal assignments, imports, an optional module "
                         "docstring, and function definitions. Fix "
                         "the exact validation error above before returning. Do "
@@ -3544,9 +3554,82 @@ def _generate_miniswe_postrun_probes(
                 )
                 baseline_problems = baseline_probe_failures(baseline_results)
                 if baseline_problems:
-                    raise ValueError(
-                        "baseline probe checks failed: " + "\n".join(baseline_problems)
+                    expected_probe_ids = {
+                        result.probe_id
+                        for result in baseline_results
+                        if baseline_probe_is_expected_failure(result)
+                    }
+                    retained_probes = tuple(
+                        probe
+                        for probe in probes
+                        if probe.probe_id in expected_probe_ids
                     )
+                    if not retained_probes:
+                        raise ValueError(
+                            "baseline probe checks failed: "
+                            + "\n".join(baseline_problems)
+                        )
+                    retained_probe_ids = {probe.probe_id for probe in retained_probes}
+                    rejected_baseline_probes = [
+                        {
+                            "probe_id": result.probe_id,
+                            "scenario_id": result.scenario_id,
+                            "status": result.status,
+                            "reason": (
+                                "baseline probe did not fail with an expected "
+                                "assertion, TypeError, or ImportError"
+                            ),
+                            "output": result.output or result.error,
+                        }
+                        for result in baseline_results
+                        if result.probe_id not in retained_probe_ids
+                    ]
+                    probes = retained_probes
+                    retained_interaction_ids = {
+                        interaction_id
+                        for probe in retained_probes
+                        for interaction_id in probe.interaction_ids
+                    }
+                    planned_interaction_ids = {
+                        str(item.get("interaction_id"))
+                        for item in interaction_obligations
+                        if isinstance(item.get("interaction_id"), str)
+                    }
+                    uncovered_interaction_ids = (
+                        planned_interaction_ids - retained_interaction_ids
+                    )
+                    for interaction_id in sorted(uncovered_interaction_ids):
+                        rejected_interactions.append(
+                            {
+                                "interaction_id": interaction_id,
+                                "error": (
+                                    "no probe for this interaction passed baseline "
+                                    "execution checks"
+                                ),
+                            }
+                        )
+                    if uncovered_interaction_ids:
+                        interaction_plan["status"] = (
+                            "partial" if retained_interaction_ids else "failed"
+                        )
+                        interaction_plan["error"] = "; ".join(
+                            item["error"] for item in rejected_interactions
+                        )
+                        interaction_plan["rejected_interactions"] = list(
+                            rejected_interactions
+                        )
+                        (probe_output / "interaction-plan.json").write_text(
+                            json.dumps(
+                                {
+                                    "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
+                                    **interaction_plan,
+                                },
+                                indent=2,
+                                sort_keys=True,
+                            )
+                            + "\n",
+                            encoding="utf-8",
+                        )
                 validation_error = None
                 break
             except (OSError, ValueError) as error:
@@ -3563,7 +3646,9 @@ def _generate_miniswe_postrun_probes(
             )
         suite_document = {
             "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
-            "generation_status": "generated",
+            "generation_status": (
+                "partial" if rejected_baseline_probes else "generated"
+            ),
             "generation_method": "minisweagent_pre_coding",
             "source_instruction": instruction,
             "obligations": list(obligations),
@@ -3583,6 +3668,7 @@ def _generate_miniswe_postrun_probes(
             "probe_source": suite_source,
             "probes": [item.to_data() for item in probes],
             "baseline_results": [item.to_data() for item in baseline_results],
+            "rejected_baseline_probes": rejected_baseline_probes,
             "scenarios_without_executable_probe": sorted(
                 {str(item["scenario_id"]) for item in scenarios}
                 - {item.scenario_id for item in probes}
@@ -3663,9 +3749,11 @@ def _render_precode_probe_context(probes: Sequence[PostRunProbe]) -> str:
     rendered = [
         "## MiniSWE-authored post-coding probes",
         "These complete executable Python probes were authored before "
-        "implementation and run against the untouched baseline. Every probe "
-        "failed through its assertion before coding, so it detects behavior the "
-        "baseline lacks. Preserve their expected behavior; the workflow will run "
+        "implementation and run against the untouched baseline. Each probe "
+        "failed with AssertionError, TypeError, or ImportError (including "
+        "ModuleNotFoundError) before coding, "
+        "which shows behavior or API the baseline lacks. Preserve their expected "
+        "behavior; the workflow will run "
         "this exact module again after coding.",
     ]
     for probe in probes:

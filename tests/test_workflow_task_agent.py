@@ -1331,6 +1331,16 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
     plan_amendment: bool,
 ) -> None:
     workflow = _workflow(tmp_path)
+    save_workflow_git_state(
+        workflow.directory,
+        WorkflowGitState(
+            proposed_pr_id="feature-v1-pr-01",
+            base_branch="main",
+            integration_branch="powdrr/feature-v1-pr-01",
+            workflow_relative_directory=workflow.directory.name,
+            publication_id="stable-run-id",
+        ),
+    )
     task = replace(
         workflow.tasks[0],
         input_state={"proposed_pr_id": "feature-v1-pr-01"},
@@ -1390,9 +1400,9 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
     assert recorded[0]["command"] == ["gh", "pr", "create"]
     assert strategy.events[-1]["result"] == url
     assert published_parameters[0]["publication_branch"] == (
-        "powdrr/feature-v1-pr-01-plan-amendment"
+        "powdrr/feature-v1-pr-01-plan-amendment-stable-run-id"
         if plan_amendment
-        else "powdrr/feature-v1-pr-01-implementation"
+        else "powdrr/feature-v1-pr-01-implementation-stable-run-id"
     )
 
 

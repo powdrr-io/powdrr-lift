@@ -208,6 +208,8 @@ from powdrr_lift.workrr.git import (
     create_workflow_worktree,
     inspect_workflow_run,
     integration_branch_name,
+    load_workflow_git_state,
+    new_publication_id,
     resolve_git_repository_root,
     save_workflow_git_state,
     slugify_workflow_id,
@@ -2836,6 +2838,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                     workflow_relative_directory=(
                         workflow_dir.relative_to(integration_worktree).as_posix()
                     ),
+                    publication_id=execution_id,
                     depends_on_workflows=tuple(
                         planned.workflow_id
                         for dependency in item.dependencies
@@ -3193,11 +3196,20 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
                 template_values=template_values,
             )
         relative_workflow = output_directory.relative_to(repo_root)
+        existing_state = load_workflow_git_state(
+            output_directory,
+            workflow_id=proposed_pr_id,
+        )
         state = WorkflowGitState(
             proposed_pr_id=proposed_pr_id,
             base_branch="main",
             integration_branch=integration_branch,
             workflow_relative_directory=str(relative_workflow),
+            publication_id=(
+                existing_state.publication_id
+                if existing_state is not None
+                else new_publication_id()
+            ),
             depends_on_workflows=derived_dependencies,
             invariants=invariants,
             relationships=relationships,

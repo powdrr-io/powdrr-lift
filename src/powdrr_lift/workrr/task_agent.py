@@ -118,6 +118,7 @@ from powdrr_lift.workrr.git import (
     inspect_workflow_run,
     load_workflow_git_state,
     load_workflow_git_states,
+    publication_branch_name,
     resolve_git_repository_root,
     slugify_workflow_id,
     validate_workflow_git_state,
@@ -2961,8 +2962,14 @@ class _TaskWorkflowExecutionStrategy:
                     )
                     else "implementation"
                 )
-                expected_branch = (
-                    f"powdrr/{slugify_workflow_id(proposed_pr_id)}-{publication_kind}"
+                git_state = load_workflow_git_state(
+                    self.workflow.directory,
+                    workflow_id=proposed_pr_id,
+                )
+                expected_branch = publication_branch_name(
+                    proposed_pr_id,
+                    publication_kind,
+                    git_state.publication_id if git_state is not None else "",
                 )
                 if action.parameters.get("publication_branch") != expected_branch:
                     corrected_parameters = dict(action.parameters)
@@ -2973,8 +2980,8 @@ class _TaskWorkflowExecutionStrategy:
                         parameters=corrected_parameters,
                     )
                     print(
-                        "Corrected clean publication branch to the deterministic "
-                        f"workflow branch {expected_branch}.",
+                        "Corrected clean publication branch to the workflow branch "
+                        f"{expected_branch}.",
                         file=self.stderr,
                     )
         command_error = _workflow_file_command_error(

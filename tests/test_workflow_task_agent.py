@@ -1228,6 +1228,7 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
         phase: str,
         decisions: Sequence[Mapping[str, Any]],
         evidence: Mapping[str, Any],
+        **_kwargs: Any,
     ) -> tuple[dict[str, str], ...]:
         nonlocal implementation_reviews
         del evidence

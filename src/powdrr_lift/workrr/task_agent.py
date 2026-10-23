@@ -3320,6 +3320,9 @@ class _TaskWorkflowExecutionStrategy:
                         "conflict needs an explicit accepted Structrr amendment."
                     ),
                 },
+                max_provider_retries=self.config.max_timeout_retries,
+                retry_backoff_seconds=self.config.timeout_backoff_seconds,
+                stderr=self.stderr,
             )
             if current_structrr is not None and item_proposal is not None
             else ()
@@ -3612,6 +3615,9 @@ class _TaskWorkflowExecutionStrategy:
                             "proposal_comparison": comparison,
                             "validation": validation.to_data(),
                         },
+                        max_provider_retries=self.config.max_timeout_retries,
+                        retry_backoff_seconds=self.config.timeout_backoff_seconds,
+                        stderr=self.stderr,
                     )
                     continuity_findings = decision_continuity_findings(
                         implementation_decision_review

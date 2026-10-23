@@ -1399,12 +1399,16 @@ def test_implement_feature_stops_before_coding_when_generated_probe_is_invalid(
         nonlocal authoring_calls
         del self, request, attempt_id
         authoring_calls += 1
-        suffix = "(" if authoring_calls == 1 else "( :"
         (worktree_root / "probe_suite.py").write_text(
-            f"def test_probe_invalid{suffix}\n    pass\n", encoding="utf-8"
+            f"def test_probe_invalid({authoring_calls}\n    pass\n", encoding="utf-8"
         )
         subprocess.run(
             ["git", "add", "-f", "probe_suite.py"], cwd=worktree_root, check=True
+        )
+        subprocess.run(
+            ["git", "commit", "-qm", f"author invalid probe {authoring_calls}"],
+            cwd=worktree_root,
+            check=True,
         )
         return subprocess.CompletedProcess(["miniswe-test-double"], 0, "", "")
 
@@ -1446,6 +1450,7 @@ def test_implement_feature_stops_before_coding_when_generated_probe_is_invalid(
     assert suite["generation_status"] == "unavailable"
     assert suite["interaction_plan_status"] == "failed"
     assert "probe suite is not valid Python" in suite["generation_error"]
+    assert authoring_calls == 3
     assert (repo / "hello_world.py").read_text(encoding="utf-8") == (
         'print("Hello, world!")\n'
     )

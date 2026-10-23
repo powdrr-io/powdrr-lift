@@ -11,6 +11,10 @@ import pytest
 from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.coding_agent import ImplementationRequest
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
+from powdrr_lift.workrr.execute_pr_tests import (
+    ExecutePrTestError,
+    validate_test_correction,
+)
 
 
 def _git(root: Path, *args: str) -> str:
@@ -28,6 +32,112 @@ def _write(root: Path, relative_path: str, content: str) -> None:
     path = root / relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def test_test_correction_preserves_generated_paths_and_acceptance_coverage() -> None:
+    obligations = [{"obligation_id": "AC-01"}]
+    sources = {
+        "attestation/tests/test_ci.py": (
+            "# Covers: AC-01 test_pull_request_trigger\n"
+            "def test_pull_request_trigger():\n"
+            "    assert load_workflow()['on']['pull_request']\n"
+        )
+    }
+
+    validated, references = validate_test_correction(
+        sources,
+        expected_paths=tuple(sources),
+        obligations=obligations,
+        test_root="attestation/tests",
+    )
+
+    assert validated == sources
+    assert references == {"AC-01": ["test_pull_request_trigger"]}
+
+
+def test_test_correction_rejects_added_paths_or_lost_criteria() -> None:
+    with pytest.raises(ExecutePrTestError, match="originally generated"):
+        validate_test_correction(
+            {"tests/test_extra.py": "def test_extra():\n    assert True\n"},
+            expected_paths=("tests/test_generated.py",),
+            obligations=[{"obligation_id": "AC-01"}],
+        )
+    with pytest.raises(ExecutePrTestError, match=r"missing=\['AC-01'\]"):
+        validate_test_correction(
+            {"tests/test_generated.py": "def test_generated():\n    assert True\n"},
+            expected_paths=("tests/test_generated.py",),
+            obligations=[{"obligation_id": "AC-01"}],
+        )
+
+
+def test_test_correction_must_remain_red_on_a_fresh_baseline(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.name", "Powdrr Test")
+    _git(repository, "config", "user.email", "powdrr-test@example.invalid")
+    _write(repository, "sample.py", "value = 1\n")
+    original = {
+        "tests/test_behavior.py": (
+            "from sample import value\n"
+            "# Covers: AC-01 test_behavior\n"
+            "def test_behavior():\n    assert value == 3\n\n"
+            "# Covers: AC-01 test_existing_behavior\n"
+            "def test_existing_behavior():\n    assert value == 1\n"
+        )
+    }
+    _git(repository, "add", ".")
+    _git(repository, "commit", "-m", "baseline")
+    base_commit = _git(repository, "rev-parse", "HEAD")
+    obligations = [{"obligation_id": "AC-01"}]
+    profile = ValidationProfile(name="verify", command=(sys.executable, "-m", "pytest"))
+
+    validated, coverage, baseline = task_agent._validate_execute_pr_test_correction(
+        repository,
+        baseline_commit=base_commit,
+        original_sources=original,
+        corrected_sources={
+            "tests/test_behavior.py": (
+                "from sample import value\n"
+                "# Covers: AC-01 test_behavior\n"
+                "def test_behavior():\n    assert value == 2, 'AssertionError'\n\n"
+                "# Covers: AC-01 test_existing_behavior\n"
+                "def test_existing_behavior():\n    assert value == 1\n"
+            )
+        },
+        obligations=obligations,
+        test_root="tests",
+        baseline_worktree=tmp_path / "baseline-worktree",
+        validation_profile=profile,
+        timeout_seconds=30,
+    )
+    assert coverage == {"AC-01": ["test_behavior", "test_existing_behavior"]}
+    assert "assert value == 2, 'AssertionError'" in validated["tests/test_behavior.py"]
+    assert baseline["passed"] is False
+    assert "1 failed" in baseline["stdout"]
+
+    with pytest.raises(ExecutePrTestError, match="did not fail"):
+        task_agent._validate_execute_pr_test_correction(
+            repository,
+            baseline_commit=base_commit,
+            original_sources=original,
+            corrected_sources={
+                "tests/test_behavior.py": (
+                    "from sample import value\n"
+                    "# Covers: AC-01 test_behavior\n"
+                    "def test_behavior():\n    assert value == 1\n\n"
+                    "# Covers: AC-01 test_existing_behavior\n"
+                    "def test_existing_behavior():\n    assert value == 1\n"
+                )
+            },
+            obligations=obligations,
+            test_root="tests",
+            baseline_worktree=tmp_path / "baseline-worktree",
+            validation_profile=profile,
+            timeout_seconds=30,
+        )
 
 
 def test_test_install_cleanliness_ignores_only_workflow_runtime_changes(
@@ -229,7 +339,7 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     assert "never guess a branch name" in author_prompts[0]
     assert '"name": "main"' in author_prompts[0]
     assert '"source": "refs/remotes/origin/HEAD"' in author_prompts[0]
-    assert len(jev_calls) == 6
+    assert len(jev_calls) == 7
     assert jev_calls[0][1]["properties"]["shortcoming_present"]["type"] == "boolean"
     assert (
         "Does this test fail to demonstrate observable behavior"
@@ -354,7 +464,7 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
         config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
     )
 
-    assert len(jev_calls) == 6
+    assert len(jev_calls) == 7
     assert len(llm_calls) == 2
     assert jev_calls[0][1]["content"] == llm_calls[0][0][1]["content"]
     assert "tests/test_api.py::test_rejects_payload" in llm_calls[0][0][1]["content"]
@@ -408,7 +518,7 @@ def test_execute_pr_test_quality_accepts_jev_concern_as_advisory_on_disagreement
         config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
     )
     assert review["outcome"] == "advisory"
-    assert llm_calls == 6
+    assert llm_calls == 7
     assert review["suggestions"] == []
     assert any("disagreed" in note for note in review["notes"])
 
@@ -440,7 +550,7 @@ def test_execute_pr_test_quality_review_outage_is_advisory(
         config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
     )
     assert review["outcome"] == "advisory"
-    assert len(review["assessments"]) == 6
+    assert len(review["assessments"]) == 7
     assert all(
         item["jev_reports_shortcoming"] is None for item in review["assessments"]
     )

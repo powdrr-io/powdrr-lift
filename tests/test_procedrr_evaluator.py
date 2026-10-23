@@ -370,6 +370,16 @@ def test_execute_proposed_pr_workflow_enforces_implementation_and_pr_calls(
 ) -> None:
     from procedrr import parse_and_validate
 
+    plan_defect_evidence = (
+        [
+            "The reviewed plan directs creating "
+            "attestation/scripts/verify-all.sh, "
+            "which already exists in the repository baseline."
+        ]
+        if plan_defect_detected
+        else []
+    )
+
     processes = {
         "execute-proposed-pr": """\
 version: 1
@@ -549,15 +559,7 @@ steps:
             return {
                 "passed": implementation_passes,
                 "changed_paths": implementation_paths if implementation_passes else [],
-                "plan_defect_evidence": (
-                    [
-                        "The reviewed plan directs creating "
-                        "attestation/scripts/verify-all.sh, "
-                        "which already exists in the repository baseline."
-                    ]
-                    if plan_defect_detected
-                    else []
-                ),
+                "plan_defect_evidence": plan_defect_evidence,
                 "structrr": {"passed": True},
                 "integration_tests": {
                     "passed": True,

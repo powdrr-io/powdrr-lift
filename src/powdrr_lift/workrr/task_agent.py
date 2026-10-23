@@ -102,6 +102,7 @@ from powdrr_lift.workrr.execute_pr_tests import (
     run_generated_pytest,
     validate_coverage_references,
     validate_generated_test_files,
+    validate_test_correction,
 )
 from powdrr_lift.workrr.execution_loop import (
     _execute_shell_tool,
@@ -1372,6 +1373,84 @@ def _clone_execute_pr_test_worktree(
         raise
 
 
+def _validate_execute_pr_test_correction(
+    repo_root: Path,
+    *,
+    baseline_commit: str,
+    original_sources: Mapping[str, str],
+    corrected_sources: Mapping[str, str],
+    obligations: Sequence[Mapping[str, Any]],
+    test_root: str,
+    baseline_worktree: Path,
+    validation_profile: ValidationProfile,
+    timeout_seconds: float,
+) -> tuple[dict[str, str], dict[str, list[str]], dict[str, Any]]:
+    """Accept only corrections that preserve coverage and remain baseline-red."""
+    validated, coverage = validate_test_correction(
+        corrected_sources,
+        expected_paths=tuple(original_sources),
+        obligations=obligations,
+        test_root=test_root,
+    )
+
+    def test_case_fingerprints(files: Mapping[str, str]) -> dict[str, str]:
+        cases: dict[str, str] = {}
+        for path, source in files.items():
+            tree = ast.parse(source)
+            for node in tree.body:
+                if isinstance(
+                    node, (ast.FunctionDef, ast.AsyncFunctionDef)
+                ) and node.name.startswith("test_"):
+                    cases[f"{path}::{node.name}"] = ast.dump(
+                        node, include_attributes=False
+                    )
+        return cases
+
+    original_cases = test_case_fingerprints(original_sources)
+    corrected_cases = test_case_fingerprints(validated)
+    removed_cases = set(original_cases) - set(corrected_cases)
+    if removed_cases:
+        raise ExecutePrTestError(
+            "test correction may not remove generated test cases: "
+            f"{sorted(removed_cases)}"
+        )
+    corrected_test_ids = {
+        test_id
+        for test_id, fingerprint in corrected_cases.items()
+        if original_cases.get(test_id) != fingerprint
+    }
+    if not corrected_test_ids:
+        raise ExecutePrTestError(
+            "test correction must change or add at least one behavior test case"
+        )
+    shutil.rmtree(baseline_worktree, ignore_errors=True)
+    try:
+        _clone_execute_pr_test_worktree(
+            repo_root, baseline_worktree, base_commit=baseline_commit
+        )
+        install_frozen_test_files(baseline_worktree, validated)
+        baseline_result = run_generated_pytest(
+            validation_profile,
+            root=baseline_worktree,
+            paths=tuple(validated),
+            timeout_seconds=timeout_seconds,
+        )
+        require_behavioral_red_result(baseline_result)
+        output = "\n".join(
+            str(baseline_result.get(key, "")) for key in ("stdout", "stderr")
+        )
+        failed_cases = set(re.findall(r"(?m)^FAILED\s+(\S+::test_\S+)", output))
+        if not corrected_test_ids.issubset(failed_cases):
+            raise ExecutePrTestError(
+                "each corrected test must still fail through its behavior assertion "
+                "on the untouched baseline; "
+                f"missing failures={sorted(corrected_test_ids - failed_cases)}"
+            )
+        return validated, coverage, baseline_result
+    finally:
+        shutil.rmtree(baseline_worktree, ignore_errors=True)
+
+
 def _review_execute_pr_test_quality(
     quality_client: WorkflowLLMClient,
     suite_evidence: Mapping[str, Any],
@@ -1385,6 +1464,11 @@ def _review_execute_pr_test_quality(
             "observable_coverage",
             "Does this test fail to demonstrate observable behavior for its linked "
             "acceptance criterion?",
+        ),
+        (
+            "criterion_mismatch",
+            "Does this test assert behavior that is absent from or contradicts its "
+            "linked acceptance criterion or the supplied repository evidence?",
         ),
         (
             "tautological_assertion",
@@ -2027,6 +2111,7 @@ def _author_execute_pr_tests(
             "generation_method": "miniswe_pre_coding",
             "status": "baseline_red",
             "base_commit": base_commit,
+            "test_root": test_root_relative,
             "paths": sorted(test_sources),
             "test_sources": test_sources,
             "test_sha256": fingerprint_test_files(test_sources),
@@ -3408,15 +3493,25 @@ class _TaskWorkflowExecutionStrategy:
             install_frozen_test_files(self.repo_root, integration_test_sources)
         except ExecutePrTestError as error:
             raise PowdrrExecutionError(str(error)) from error
-        request = replace(request, allow_existing_changes=True)
+        request = replace(
+            request,
+            allow_existing_changes=True,
+            allowed_paths=tuple(
+                dict.fromkeys((*request.allowed_paths, *integration_test_sources))
+            ),
+        )
         rendered_tests = [
             "## Independent pre-coding integration tests",
             "A separate MiniSWE test author created these tests before the "
             "implementation. They were run against the untouched baseline and "
-            "failed through behavior assertions. The workflow has installed these "
-            "exact files in the worktree for you to run. Read and run them there. "
-            "Do not edit, weaken, skip, or replace them; make the implementation "
-            "satisfy them.",
+            "failed through behavior assertions. The workflow has installed them "
+            "in the worktree. Make the implementation satisfy the accepted "
+            "criteria. You may correct these generated test files only when the "
+            "test contradicts its linked criterion or repository evidence. Keep "
+            "all acceptance criteria covered; do not skip, xfail, remove cases, "
+            "or weaken assertions merely to make the implementation pass. Any "
+            "correction is checked against a fresh baseline and the candidate, "
+            "then reviewed per test. Test-quality review findings are advisory.",
             "Baseline test command: `"
             + " ".join(
                 str(token)
@@ -3424,10 +3519,10 @@ class _TaskWorkflowExecutionStrategy:
             )
             + "`",
             "Baseline result: behavioral assertion failure, as required.",
-            "Frozen test files:",
+            "Generated test files (the only tests you may correct):",
         ]
         rendered_tests.extend(
-            f"- `{path}` (SHA-256: `{digest}`)"
+            f"- `{path}` (initial SHA-256: `{digest}`)"
             for path, digest in integration_test_authoring["test_sha256"].items()
         )
         quality_notes = integration_test_authoring.get("quality_review", {}).get(
@@ -3453,11 +3548,12 @@ class _TaskWorkflowExecutionStrategy:
             store=CodingAgentAttemptStore(store_root),
         )
         test_files_installed = True
+        test_correction_count = 0
 
         def run_attempt(
             attempt_number: int, recovery_issue: Mapping[str, Any] | None
         ) -> dict[str, Any]:
-            nonlocal test_files_installed
+            nonlocal test_files_installed, test_correction_count
             attempt_request = request
             if recovery_issue is not None:
                 attempt_request = replace(
@@ -3476,16 +3572,72 @@ class _TaskWorkflowExecutionStrategy:
                 f"{request.request_id}-attempt-{attempt_number:02d}-"
                 f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
             )
-            frozen_test_tampering: list[str] = []
             attempt = runner.run(
                 attempt_request,
                 worktree_root=self.repo_root,
                 attempt_id=attempt_id,
             )
-            if test_files_installed and integration_test_sources:
-                frozen_test_tampering.extend(
-                    candidate_test_changes(self.repo_root, integration_test_sources)
-                )
+            test_correction_error: str | None = None
+            corrected_test_sources: dict[str, str] | None = None
+            test_correction_accepted = False
+            changed_test_paths = (
+                candidate_test_changes(self.repo_root, integration_test_sources)
+                if test_files_installed and integration_test_sources
+                else ()
+            )
+            if changed_test_paths:
+                test_correction_count += 1
+                try:
+                    if test_correction_count > 1:
+                        raise ExecutePrTestError(
+                            "only one generated acceptance-test correction is allowed"
+                        )
+                    proposed_test_sources = {
+                        path: (self.repo_root / path).read_text(encoding="utf-8")
+                        for path in integration_test_sources
+                    }
+                    baseline_worktree = (
+                        store_root
+                        / "integration-tests"
+                        / f"correction-baseline-{attempt_number:02d}"
+                    )
+                    (
+                        corrected_test_sources,
+                        corrected_coverage,
+                        corrected_baseline,
+                    ) = _validate_execute_pr_test_correction(
+                        self.repo_root,
+                        baseline_commit=base_commit,
+                        original_sources=integration_test_sources,
+                        corrected_sources=proposed_test_sources,
+                        obligations=integration_test_authoring["test_obligations"],
+                        test_root=str(integration_test_authoring["test_root"]),
+                        baseline_worktree=baseline_worktree,
+                        validation_profile=validation_profile,
+                        timeout_seconds=(
+                            self.config.coding_agent_validation_timeout_seconds
+                        ),
+                    )
+                    integration_test_sources.clear()
+                    integration_test_sources.update(corrected_test_sources)
+                    integration_test_authoring["coverage_references"] = (
+                        corrected_coverage
+                    )
+                    integration_test_authoring["test_sha256"] = fingerprint_test_files(
+                        corrected_test_sources
+                    )
+                    integration_test_authoring["correction_baseline"] = (
+                        corrected_baseline
+                    )
+                    integration_test_authoring.setdefault("corrections", []).append(
+                        {
+                            "attempt_id": attempt_id,
+                            "paths": list(changed_test_paths),
+                        }
+                    )
+                    test_correction_accepted = True
+                except (OSError, ExecutePrTestError, ValueError) as error:
+                    test_correction_error = str(error)
             try:
                 install_frozen_test_files(self.repo_root, integration_test_sources)
             except ExecutePrTestError as error:
@@ -3496,10 +3648,34 @@ class _TaskWorkflowExecutionStrategy:
                 paths=tuple(integration_test_sources),
                 timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
             )
-            if frozen_test_tampering:
-                integration_test_result["frozen_tests_modified_by_coder"] = sorted(
-                    set(frozen_test_tampering)
+            if test_correction_error:
+                integration_test_result["test_correction_rejected"] = (
+                    test_correction_error
                 )
+            if test_correction_accepted:
+                correction_review = _review_execute_pr_test_quality(
+                    self.client,
+                    {
+                        "contract": test_authoring_context,
+                        "test_obligations": integration_test_authoring[
+                            "test_obligations"
+                        ],
+                        "coverage_references": integration_test_authoring[
+                            "coverage_references"
+                        ],
+                        "test_sources": integration_test_sources,
+                        "baseline_result": integration_test_authoring[
+                            "correction_baseline"
+                        ],
+                        "candidate_result": integration_test_result,
+                        "correction_attempt_id": attempt_id,
+                    },
+                    config=self.config,
+                    suggest_tests=False,
+                )
+                integration_test_authoring.setdefault(
+                    "correction_quality_reviews", []
+                ).append(correction_review)
             try:
                 execution_evidence = pytest_execution_evidence(integration_test_result)
                 expected_test_functions = {
@@ -3705,7 +3881,7 @@ class _TaskWorkflowExecutionStrategy:
             integration_test_findings: list[str] = []
             if integration_test_result.get("passed") is not True:
                 integration_test_findings.append(
-                    "frozen pre-coding integration tests did not pass: "
+                    "pre-coding generated integration tests did not pass: "
                     + json.dumps(integration_test_result, sort_keys=True)
                 )
             if integration_test_result.get("coverage_evidence_error"):
@@ -3714,11 +3890,19 @@ class _TaskWorkflowExecutionStrategy:
                     "contract: "
                     + str(integration_test_result["coverage_evidence_error"])
                 )
-            if frozen_test_tampering:
-                integration_test_findings.append(
-                    "coding agent edited or removed frozen independently authored "
-                    "tests; the workflow restored the original test sources: "
-                    + ", ".join(sorted(set(frozen_test_tampering)))
+            correction_quality_reviews = integration_test_authoring.get(
+                "correction_quality_reviews", []
+            )
+            quality_notes = list(
+                integration_test_authoring.get("quality_review", {}).get("notes", [])
+            )
+            for review in correction_quality_reviews:
+                quality_notes.extend(review.get("notes", []))
+            if test_correction_error:
+                quality_notes.append(
+                    "A proposed generated-test correction was discarded because "
+                    "it did not pass the bounded correction checks; the original "
+                    "tests were retained. " + test_correction_error
                 )
             integration_test_report = {
                 "passed": not integration_test_findings,
@@ -3734,6 +3918,11 @@ class _TaskWorkflowExecutionStrategy:
                     "coverage_references", {}
                 ),
                 "quality_review": integration_test_authoring.get("quality_review"),
+                "correction_quality_reviews": integration_test_authoring.get(
+                    "correction_quality_reviews", []
+                ),
+                "corrections": integration_test_authoring.get("corrections", []),
+                "quality_notes": quality_notes,
                 "baseline_execution_evidence": integration_test_authoring.get(
                     "baseline_execution_evidence"
                 ),
@@ -3741,6 +3930,9 @@ class _TaskWorkflowExecutionStrategy:
                     "authoring_attempts", []
                 ),
                 "baseline": integration_test_authoring["baseline_result"],
+                "correction_baseline": integration_test_authoring.get(
+                    "correction_baseline"
+                ),
                 "candidate": integration_test_result,
                 "repair_findings": integration_test_findings,
             }
@@ -3782,6 +3974,14 @@ class _TaskWorkflowExecutionStrategy:
                 "integration_test_repair_findings", []
             )
             if integration_test_findings:
+                test_correction_rule = (
+                    "One generated-test correction has already been considered; "
+                    "leave those tests unchanged and repair the implementation."
+                    if test_correction_count
+                    else "You may correct the generated test file once if it "
+                    "contradicts its linked acceptance criterion or repository "
+                    "evidence."
+                )
                 return CodingAgentRecoveryDecision(
                     passed=False,
                     issue={
@@ -3794,16 +3994,30 @@ class _TaskWorkflowExecutionStrategy:
                         ),
                         "candidate_evidence": record.get("integration_tests"),
                         "validation_evidence": record.get("validation"),
+                        "test_correction_evidence": {
+                            "rejected_reason": (
+                                record.get("integration_tests", {})
+                                .get("candidate", {})
+                                .get("test_correction_rejected")
+                            ),
+                            "accepted_correction_count": len(
+                                record.get("integration_tests", {}).get(
+                                    "corrections", []
+                                )
+                            ),
+                        },
                         "inherited_decision_findings": record.get(
                             "structrr_repair_findings", []
                         ),
                         "instruction": (
                             "Repair the implementation so the independently "
                             "authored integration tests pass against real public "
-                            "behavior. These tests failed by assertion on the "
-                            "untouched baseline and their exact sources are frozen. "
-                            "Do not edit, delete, skip, xfail, mock around, or weaken "
-                            "the tests. Also repair any declared verification "
+                            "behavior. " + test_correction_rule + " Preserve every "
+                            "criterion and keep the correction behavioral; the "
+                            "workflow checks that each corrected test remains red "
+                            "on a fresh baseline and passes on this candidate. Do "
+                            "not skip, xfail, delete cases, or weaken assertions. "
+                            "Also repair any declared verification "
                             "failures and preserve every inherited decision and "
                             "invariant listed in the findings. Fix the product "
                             "behavior or its runtime wiring, then rerun the focused "

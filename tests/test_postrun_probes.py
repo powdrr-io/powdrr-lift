@@ -86,6 +86,21 @@ def test_parse_generated_probe_source_preserves_complete_code_and_metadata() -> 
     assert probes[0].obligation_id == "selector-obligation"
 
 
+def test_probe_suite_stops_when_all_probes_are_invalid() -> None:
+    rejected: list[dict[str, str]] = []
+
+    with pytest.raises(ValueError, match="no valid probes after isolation"):
+        parse_generated_postrun_probe_source(
+            _source("module.public_api('value')"),
+            ({"scenario_id": "selector", "evidence": ["Add selector handling."]},),
+            instruction="Add selector handling.",
+            rejected_probes=rejected,
+        )
+
+    assert rejected[0]["probe_id"] == "selector-result"
+    assert "observable assertion" in rejected[0]["error"]
+
+
 def test_probe_obligation_evidence_resolves_from_scenario_deterministically() -> None:
     obligations, _, _ = _parse(_source(), ({"scenario_id": "selector"},))
     assert obligations[0]["evidence"] == [

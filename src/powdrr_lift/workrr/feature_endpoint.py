@@ -3442,6 +3442,7 @@ def _generate_miniswe_postrun_probes(
         probes: tuple[PostRunProbe, ...] = ()
         validation_error: str | None = None
         rejected_interactions: list[dict[str, str]] = []
+        rejected_generated_probes: list[dict[str, str]] = []
         baseline_results: tuple[Any, ...] = ()
         rejected_baseline_probes: list[dict[str, Any]] = []
         for attempt_number in range(1, 3):
@@ -3510,6 +3511,7 @@ def _generate_miniswe_postrun_probes(
             try:
                 suite_source = suite_path.read_text(encoding="utf-8")
                 rejected_interactions.clear()
+                rejected_generated_probes.clear()
                 obligations, interaction_obligations, probes = (
                     parse_generated_postrun_probe_source(
                         suite_source,
@@ -3518,6 +3520,7 @@ def _generate_miniswe_postrun_probes(
                         repository_contract=repository_contract,
                         instruction_ledger_clauses=instruction_ledger_clauses,
                         rejected_interactions=rejected_interactions,
+                        rejected_probes=rejected_generated_probes,
                     )
                 )
                 rejection_errors = [item["error"] for item in rejected_interactions]
@@ -3648,7 +3651,11 @@ def _generate_miniswe_postrun_probes(
             "schema_version": POSTRUN_PROBE_SCHEMA_VERSION,
             "generation_status": (
                 "partial"
-                if rejected_baseline_probes or rejected_interactions
+                if (
+                    rejected_baseline_probes
+                    or rejected_interactions
+                    or rejected_generated_probes
+                )
                 else "generated"
             ),
             "generation_method": "minisweagent_pre_coding",
@@ -3658,6 +3665,7 @@ def _generate_miniswe_postrun_probes(
             "interaction_plan_status": interaction_plan["status"],
             "interaction_plan_error": interaction_plan["error"],
             "rejected_interactions": interaction_plan["rejected_interactions"],
+            "rejected_generated_probes": rejected_generated_probes,
             "authoring_attempts": authoring_attempts,
             "authoring_commits": [
                 {

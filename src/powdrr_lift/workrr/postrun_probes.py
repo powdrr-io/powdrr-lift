@@ -186,6 +186,7 @@ def parse_generated_postrun_probe_source(
     repository_contract: Mapping[str, Any] | None = None,
     instruction_ledger_clauses: Sequence[Mapping[str, Any]] = (),
     rejected_interactions: list[dict[str, str]] | None = None,
+    rejected_probes: list[dict[str, str]] | None = None,
 ) -> tuple[
     tuple[dict[str, Any], ...],
     tuple[dict[str, Any], ...],
@@ -286,6 +287,7 @@ def parse_generated_postrun_probe_source(
         )
         if probe_id in seen_probe_ids:
             raise ValueError(f"probe suite has duplicate probe id {probe_id!r}")
+        seen_probe_ids.add(probe_id)
         if scenario_id not in known_scenarios:
             raise ValueError(f"probe refers to unknown scenario {scenario_id!r}")
         obligation = obligation_by_id.get(obligation_id)
@@ -340,10 +342,22 @@ def parse_generated_postrun_probe_source(
             for interaction_id in interaction_ids
             if interaction_id not in invalid_interactions
         )
-        seen_probe_ids.add(probe_id)
+        try:
+            _validate_probe_function(function, tree)
+        except ValueError as error:
+            if rejected_probes is None:
+                raise
+            rejected_probes.append(
+                {
+                    "probe_id": probe_id,
+                    "scenario_id": scenario_id,
+                    "obligation_id": obligation_id,
+                    "error": str(error),
+                }
+            )
+            continue
         covered_obligations.add(obligation_id)
         covered_interactions.update(interaction_ids)
-        _validate_probe_function(function, tree)
         probes.append(
             PostRunProbe(
                 probe_id,
@@ -366,10 +380,30 @@ def parse_generated_postrun_probe_source(
         covered_obligations,
     )
     if missing_obligations:
-        raise ValueError(
-            "probe suite omitted supported obligations: "
-            + ", ".join(sorted(missing_obligations))
+        if rejected_probes is None:
+            raise ValueError(
+                "probe suite omitted supported obligations: "
+                + ", ".join(sorted(missing_obligations))
+            )
+        scenarios_by_obligation = {
+            str(item["obligation_id"]): str(item["scenario_id"]) for item in obligations
+        }
+        rejected_obligation_ids = {
+            item.get("obligation_id") for item in rejected_probes
+        }
+        rejected_probes.extend(
+            {
+                "probe_id": "",
+                "scenario_id": scenarios_by_obligation[obligation_id],
+                "obligation_id": obligation_id,
+                "error": (f"supported obligation {obligation_id!r} has no valid probe"),
+            }
+            for obligation_id in sorted(
+                set(missing_obligations) - rejected_obligation_ids
+            )
         )
+    if not probes and any(item["supported"] is True for item in obligations):
+        raise ValueError("probe suite contains no valid probes after isolation")
     missing_interactions = known_interactions - covered_interactions
     if missing_interactions:
         if rejected_interactions is None:

@@ -557,7 +557,13 @@ def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_cras
     base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
     output_root = tmp_path / "artifacts"
     instruction = "The public API returns handled output."
-    scenario_ids = ("assertion", "type-error", "import-error", "unexpected-error")
+    scenario_ids = (
+        "assertion",
+        "type-error",
+        "import-error",
+        "unexpected-error",
+        "no-assertion",
+    )
     scenarios = tuple(
         {
             "scenario_id": scenario_id,
@@ -597,6 +603,7 @@ def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_cras
             "module.unexpected_error()\n"
             "assert module.public_api('value') == 'handled:value'"
         ),
+        "test_probe_no_assertion": "module.public_api('value')",
     }
     metadata = {
         function_name: {
@@ -675,10 +682,16 @@ def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_cras
     )
     assert suite["generation_status"] == "partial"
     assert len(suite["baseline_results"]) == 4
+    assert [item["probe_id"] for item in suite["rejected_generated_probes"]] == [
+        "no-assertion"
+    ]
     assert [item["probe_id"] for item in suite["rejected_baseline_probes"]] == [
         "unexpected-error"
     ]
-    assert suite["scenarios_without_executable_probe"] == ["unexpected-error"]
+    assert suite["scenarios_without_executable_probe"] == [
+        "no-assertion",
+        "unexpected-error",
+    ]
     assert _git(repository, "status", "--porcelain").stdout == ""
 
 

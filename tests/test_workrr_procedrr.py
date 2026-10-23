@@ -275,7 +275,7 @@ def test_procedrr_retries_transient_provider_failures_with_backoff(
             self, _messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             self.calls += 1
-            if self.calls < 3:
+            if self.calls <= 5:
                 error = RuntimeError("upstream failure")
                 error.status_code = 503  # type: ignore[attr-defined]
                 raise error
@@ -285,7 +285,6 @@ def test_procedrr_retries_transient_provider_failures_with_backoff(
     client = WorkrrProcedrrClient(
         cast(Any, provider),
         process_directory=tmp_path,
-        provider_retry_delay_seconds=2.0,
     )
     delays: list[float] = []
     monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", delays.append)
@@ -296,8 +295,8 @@ def test_procedrr_retries_transient_provider_failures_with_backoff(
     )
 
     assert result == {"complete": True}
-    assert provider.calls == 3
-    assert delays == [2.0, 4.0]
+    assert provider.calls == 6
+    assert delays == [1.0, 2.0, 4.0, 8.0, 16.0]
 
 
 def test_procedrr_retries_empty_stream_provider_failures(

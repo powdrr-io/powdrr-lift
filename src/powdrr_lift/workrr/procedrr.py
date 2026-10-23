@@ -163,7 +163,7 @@ class WorkrrProcedrrClient:
         *,
         process_directory: Path,
         max_retries: int = 3,
-        provider_retry_attempts: int = 3,
+        provider_retry_attempts: int = 5,
         provider_retry_delay_seconds: float = 1.0,
         replay_responses: Mapping[str, Mapping[str, Any]] | None = None,
         telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None,

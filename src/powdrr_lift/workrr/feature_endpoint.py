@@ -3421,7 +3421,16 @@ def _generate_miniswe_postrun_probes(
                 attempt_id=(f"{request.request_id}-probe-authoring-{attempt_number}"),
             )
             authoring_attempts.append(attempt.to_data())
-            if attempt.status is not CodingAgentStatus.COMPLETED:
+            scoped_committed_suite = (
+                attempt.worker_committed
+                and attempt.worker_commit_sha is not None
+                and attempt.changed_paths == ("probe_suite.py",)
+                and not attempt.out_of_scope_paths
+            )
+            if (
+                attempt.status is not CodingAgentStatus.COMPLETED
+                and not scoped_committed_suite
+            ):
                 raise PowdrrExecutionError(
                     "MiniSWE probe authoring did not produce an in-scope result: "
                     f"{attempt.to_data()}"

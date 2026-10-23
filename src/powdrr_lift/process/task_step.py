@@ -74,7 +74,13 @@ _TOOL_PACKAGES: dict[str, tuple[dict[str, Any], ...]] = {
     ),
     "gh_readonly": tuple(
         {"tool": "gh", "operation": operation}
-        for operation in ("pr_view", "pr_diff", "pr_checks", "pr_comments")
+        for operation in (
+            "pr_view",
+            "pr_diff",
+            "pr_checks",
+            "pr_comments",
+            "pr_review_threads",
+        )
     ),
     "gh_write": tuple(
         {"tool": "gh", "operation": operation}
@@ -83,6 +89,8 @@ _TOOL_PACKAGES: dict[str, tuple[dict[str, Any], ...]] = {
             "pr_publish_clean",
             "pr_edit",
             "pr_review_comment",
+            "pr_review_reply",
+            "pr_review_resolve",
         )
     ),
 }

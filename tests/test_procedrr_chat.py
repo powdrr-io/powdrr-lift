@@ -102,6 +102,26 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
     } <= names
 
 
+def test_address_review_comments_flow_uses_structrr_and_thread_aware_gh_tools() -> None:
+    process = ProcessCatalog.load(Path("docs/procedrr/processes")).get(
+        "address-review-comments"
+    )
+    specialize = process.document["steps"][0]["specialize"]
+    question = " ".join(specialize["question"].split())
+
+    assert "pr_review_threads" in question
+    assert "gather_context" in question
+    assert "proposed-PR" in question
+    assert "pr_review_reply" in question
+    assert "pr_review_resolve" in question
+    assert (
+        "Leave deferred, blocked, or clarification-needed threads unresolved."
+        in question
+    )
+    assert "Do not use the clean-branch PR publisher" in question
+    assert "gather_context" in specialize["allowed_tools"]
+
+
 def test_chat_operation_adapter_converts_line_edits() -> None:
     action = _operation_to_action(
         {

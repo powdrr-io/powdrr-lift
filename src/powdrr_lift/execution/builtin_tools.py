@@ -85,6 +85,9 @@ class IntrinsicRepositoryAdapter:
             "pr_publish_clean",
             "pr_edit",
             "pr_review_comment",
+            "pr_review_threads",
+            "pr_review_reply",
+            "pr_review_resolve",
         }
         if operation not in supported:
             return ToolValidationReport(
@@ -111,6 +114,8 @@ class IntrinsicRepositoryAdapter:
             "pr_publish_clean",
             "pr_edit",
             "pr_review_comment",
+            "pr_review_reply",
+            "pr_review_resolve",
         }
         effect = (
             ToolEffect.GITHUB_MUTATION
@@ -135,6 +140,8 @@ class IntrinsicRepositoryAdapter:
                         "pr_publish_clean",
                         "pr_edit",
                         "pr_review_comment",
+                        "pr_review_reply",
+                        "pr_review_resolve",
                     }
                     else ToolEffect.WORKSPACE_READ
                 }
@@ -918,6 +925,8 @@ def invoke_intrinsic_capability(
                 "pr_publish_clean",
                 "pr_edit",
                 "pr_review_comment",
+                "pr_review_reply",
+                "pr_review_resolve",
             }
             else "inspect_pull_request"
         )

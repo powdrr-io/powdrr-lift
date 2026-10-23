@@ -14,6 +14,62 @@ from powdrr_lift.errors import PowdrrExecutionError
 GIT_TOOL = "git"
 GH_TOOL = "gh"
 
+_REVIEW_THREADS_QUERY = """
+query($owner: String!, $name: String!, $number: Int!, $after: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $number) {
+      id number title body state baseRefName headRefName headRefOid
+      reviewThreads(first: 100, after: $after) {
+        nodes {
+          id isResolved isOutdated path line originalLine startLine
+          originalStartLine diffSide startDiffSide
+          comments(first: 100) {
+            nodes {
+              id databaseId body createdAt updatedAt path line originalLine
+              outdated url author { login } replyTo { id } commit { oid }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}
+""".strip()
+_REVIEW_THREAD_COMMENTS_QUERY = """
+query($threadId: ID!, $after: String) {
+  node(id: $threadId) {
+    ... on PullRequestReviewThread {
+      comments(first: 100, after: $after) {
+        nodes {
+          id databaseId body createdAt updatedAt path line originalLine
+          outdated url author { login } replyTo { id } commit { oid }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}
+""".strip()
+_REVIEW_REPLY_MUTATION = """
+mutation($threadId: ID!, $body: String!) {
+  addPullRequestReviewThreadReply(input: {
+    pullRequestReviewThreadId: $threadId,
+    body: $body
+  }) {
+    comment { id body url }
+  }
+}
+""".strip()
+_REVIEW_RESOLVE_MUTATION = """
+mutation($threadId: ID!) {
+  resolveReviewThread(input: {threadId: $threadId}) {
+    thread { id isResolved }
+  }
+}
+""".strip()
+
 
 def execute_intrinsic_git_gh_tool(
     tool: str,
@@ -74,6 +130,8 @@ def execute_intrinsic_git_gh_tool(
             "pull_request_url": pull_request_url,
             "no_op": False,
         }
+    if tool == GH_TOOL and parameters.get("operation") == "pr_review_threads":
+        return _execute_review_threads(command, worktree_root=worktree_root)
     result = subprocess.run(
         [executable, *command],
         cwd=worktree_root,
@@ -84,6 +142,53 @@ def execute_intrinsic_git_gh_tool(
     normalized_returncode = result.returncode
     normalized_stdout = result.stdout
     normalized_stderr = result.stderr
+    if (
+        tool == GH_TOOL
+        and parameters.get("operation") in {"pr_review_reply", "pr_review_resolve"}
+        and result.returncode == 0
+    ):
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            payload = None
+        data = payload.get("data") if isinstance(payload, Mapping) else None
+        operation = parameters.get("operation")
+        mutation_result = (
+            data.get(
+                "addPullRequestReviewThreadReply"
+                if operation == "pr_review_reply"
+                else "resolveReviewThread"
+            )
+            if isinstance(data, Mapping)
+            else None
+        )
+        if operation == "pr_review_reply":
+            mutation_succeeded = (
+                isinstance(mutation_result, Mapping)
+                and isinstance(mutation_result.get("comment"), Mapping)
+                and isinstance(mutation_result["comment"].get("id"), str)
+            )
+        else:
+            resolved_thread = (
+                mutation_result.get("thread")
+                if isinstance(mutation_result, Mapping)
+                else None
+            )
+            mutation_succeeded = (
+                isinstance(resolved_thread, Mapping)
+                and resolved_thread.get("isResolved") is True
+            )
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("errors")
+            or not mutation_succeeded
+        ):
+            normalized_returncode = 1
+            normalized_stderr = json.dumps(
+                payload.get("errors", "GitHub returned an invalid GraphQL response")
+                if isinstance(payload, Mapping)
+                else "GitHub returned an invalid GraphQL response"
+            )
     no_op = False
     if tool == GIT_TOOL and parameters.get("operation") == "commit":
         normalized_returncode, normalized_stdout, normalized_stderr, no_op = (
@@ -99,6 +204,252 @@ def execute_intrinsic_git_gh_tool(
         "stdout": normalized_stdout,
         "stderr": normalized_stderr,
         "no_op": no_op,
+    }
+
+
+def _execute_review_threads(
+    command: list[str], *, worktree_root: Path
+) -> dict[str, Any]:
+    """Fetch every review-thread page and preserve PR identity with the result."""
+    threads: list[dict[str, Any]] = []
+    pull_request: Mapping[str, Any] | None = None
+    cursor: str | None = None
+    while True:
+        page_command = [*command]
+        if cursor is not None:
+            page_command.extend(["-f", f"after={cursor}"])
+        result = subprocess.run(
+            ["gh", *page_command],
+            cwd=worktree_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return {
+                "tool": GH_TOOL,
+                "command": ["gh", *page_command],
+                "returncode": result.returncode,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "no_op": False,
+            }
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            payload = None
+        if not isinstance(payload, Mapping) or payload.get("errors"):
+            detail = (
+                json.dumps(payload.get("errors"))
+                if isinstance(payload, Mapping)
+                else "GitHub returned invalid review-thread JSON"
+            )
+            return {
+                "tool": GH_TOOL,
+                "command": ["gh", *page_command],
+                "returncode": 1,
+                "stdout": result.stdout,
+                "stderr": detail,
+                "no_op": False,
+            }
+        data = payload.get("data")
+        repository = data.get("repository") if isinstance(data, Mapping) else None
+        page_pr = (
+            repository.get("pullRequest") if isinstance(repository, Mapping) else None
+        )
+        connection = (
+            page_pr.get("reviewThreads") if isinstance(page_pr, Mapping) else None
+        )
+        if not isinstance(page_pr, Mapping) or not isinstance(connection, Mapping):
+            return {
+                "tool": GH_TOOL,
+                "command": ["gh", *page_command],
+                "returncode": 1,
+                "stdout": result.stdout,
+                "stderr": "GitHub returned no pull-request review-thread data",
+                "no_op": False,
+            }
+        if pull_request is None:
+            pull_request = {
+                key: page_pr.get(key)
+                for key in (
+                    "id",
+                    "number",
+                    "title",
+                    "body",
+                    "state",
+                    "baseRefName",
+                    "headRefName",
+                    "headRefOid",
+                )
+            }
+        nodes = connection.get("nodes")
+        page_info = connection.get("pageInfo")
+        if not isinstance(nodes, list):
+            return {
+                "tool": GH_TOOL,
+                "command": ["gh", *page_command],
+                "returncode": 1,
+                "stdout": result.stdout,
+                "stderr": "GitHub returned an invalid review-thread list",
+                "no_op": False,
+            }
+        if not isinstance(page_info, Mapping) or not isinstance(
+            page_info.get("hasNextPage"), bool
+        ):
+            return {
+                "tool": GH_TOOL,
+                "command": ["gh", *page_command],
+                "returncode": 1,
+                "stdout": result.stdout,
+                "stderr": "GitHub returned invalid review-thread pagination data",
+                "no_op": False,
+            }
+        threads.extend(node for node in nodes if isinstance(node, dict))
+        if page_info.get("hasNextPage") is False:
+            break
+        next_cursor = page_info.get("endCursor")
+        if not isinstance(next_cursor, str) or not next_cursor or next_cursor == cursor:
+            return {
+                "tool": GH_TOOL,
+                "command": ["gh", *page_command],
+                "returncode": 1,
+                "stdout": result.stdout,
+                "stderr": "GitHub review-thread pagination returned no new cursor",
+                "no_op": False,
+            }
+        cursor = next_cursor
+    for thread in threads:
+        comment_connection = thread.get("comments")
+        if not isinstance(comment_connection, dict):
+            return {
+                "tool": GH_TOOL,
+                "command": ["gh", *command],
+                "returncode": 1,
+                "stdout": "",
+                "stderr": "GitHub returned invalid review-thread comments",
+                "no_op": False,
+            }
+        if not isinstance(comment_connection.get("nodes"), list):
+            return {
+                "tool": GH_TOOL,
+                "command": ["gh", *command],
+                "returncode": 1,
+                "stdout": "",
+                "stderr": "GitHub returned an invalid review-comment list",
+                "no_op": False,
+            }
+        page_info = comment_connection.get("pageInfo")
+        if not isinstance(page_info, Mapping) or not isinstance(
+            page_info.get("hasNextPage"), bool
+        ):
+            return {
+                "tool": GH_TOOL,
+                "command": ["gh", *command],
+                "returncode": 1,
+                "stdout": "",
+                "stderr": "GitHub returned invalid review-comment pagination data",
+                "no_op": False,
+            }
+        cursor = page_info.get("endCursor")
+        while page_info.get("hasNextPage") is True:
+            if not isinstance(cursor, str) or not cursor:
+                return {
+                    "tool": GH_TOOL,
+                    "command": ["gh", *command],
+                    "returncode": 1,
+                    "stdout": "",
+                    "stderr": "GitHub review-comment pagination returned no cursor",
+                    "no_op": False,
+                }
+            comments_command = [
+                "api",
+                "graphql",
+                "-f",
+                f"query={_REVIEW_THREAD_COMMENTS_QUERY}",
+                "-f",
+                f"threadId={thread.get('id', '')}",
+                "-f",
+                f"after={cursor}",
+            ]
+            comment_result = subprocess.run(
+                ["gh", *comments_command],
+                cwd=worktree_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if comment_result.returncode != 0:
+                return {
+                    "tool": GH_TOOL,
+                    "command": ["gh", *comments_command],
+                    "returncode": comment_result.returncode,
+                    "stdout": comment_result.stdout,
+                    "stderr": comment_result.stderr,
+                    "no_op": False,
+                }
+            try:
+                comment_payload = json.loads(comment_result.stdout)
+            except json.JSONDecodeError:
+                comment_payload = None
+            comment_data = (
+                comment_payload.get("data")
+                if isinstance(comment_payload, Mapping)
+                else None
+            )
+            node = (
+                comment_data.get("node") if isinstance(comment_data, Mapping) else None
+            )
+            page_connection = (
+                node.get("comments") if isinstance(node, Mapping) else None
+            )
+            if (
+                not isinstance(page_connection, Mapping)
+                or not isinstance(comment_payload, Mapping)
+                or comment_payload.get("errors")
+                or not isinstance(page_connection.get("nodes"), list)
+                or not isinstance(page_connection.get("pageInfo"), Mapping)
+                or not isinstance(page_connection["pageInfo"].get("hasNextPage"), bool)
+            ):
+                errors = (
+                    json.dumps(comment_payload.get("errors"))
+                    if isinstance(comment_payload, Mapping)
+                    and comment_payload.get("errors")
+                    else "GitHub returned invalid review-comment pagination data"
+                )
+                return {
+                    "tool": GH_TOOL,
+                    "command": ["gh", *comments_command],
+                    "returncode": 1,
+                    "stdout": comment_result.stdout,
+                    "stderr": errors,
+                    "no_op": False,
+                }
+            previous_cursor = cursor
+            comment_connection["nodes"].extend(
+                item for item in page_connection["nodes"] if isinstance(item, dict)
+            )
+            page_info = page_connection["pageInfo"]
+            cursor = page_info.get("endCursor")
+            comment_connection["pageInfo"] = page_info
+            if page_info.get("hasNextPage") is True and (
+                not isinstance(cursor, str) or not cursor or cursor == previous_cursor
+            ):
+                return {
+                    "tool": GH_TOOL,
+                    "command": ["gh", *comments_command],
+                    "returncode": 1,
+                    "stdout": comment_result.stdout,
+                    "stderr": "GitHub review-comment pagination returned no new cursor",
+                    "no_op": False,
+                }
+    return {
+        "tool": GH_TOOL,
+        "command": ["gh", *command],
+        "returncode": 0,
+        "stdout": json.dumps({"pull_request": pull_request, "review_threads": threads}),
+        "stderr": "",
+        "no_op": False,
     }
 
 
@@ -344,10 +695,49 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
             "-f",
             f"side={side}",
         ]
+    elif operation == "pr_review_threads":
+        owner, name = _repository_owner_name(parameters.get("repository"))
+        number = _pull_request_number(reference)
+        command = [
+            "api",
+            "graphql",
+            "-f",
+            f"query={_REVIEW_THREADS_QUERY}",
+            "-F",
+            f"owner={owner}",
+            "-F",
+            f"name={name}",
+            "-F",
+            f"number={number}",
+        ]
+    elif operation == "pr_review_reply":
+        thread_id = _required_text(parameters.get("thread_id"), "thread_id")
+        body = _required_text(parameters.get("body"), "body")
+        command = [
+            "api",
+            "graphql",
+            "-f",
+            f"query={_REVIEW_REPLY_MUTATION}",
+            "-f",
+            f"threadId={thread_id}",
+            "-f",
+            f"body={body}",
+        ]
+    elif operation == "pr_review_resolve":
+        thread_id = _required_text(parameters.get("thread_id"), "thread_id")
+        command = [
+            "api",
+            "graphql",
+            "-f",
+            f"query={_REVIEW_RESOLVE_MUTATION}",
+            "-f",
+            f"threadId={thread_id}",
+        ]
     else:
         raise PowdrrExecutionError(
             "gh intrinsic tool requires structured operation pr_view, pr_diff, "
-            "pr_checks, pr_create, pr_edit, pr_comments, or pr_review_comment."
+            "pr_checks, pr_create, pr_edit, pr_comments, pr_review_comment, "
+            "pr_review_threads, pr_review_reply, or pr_review_resolve."
         )
     if (
         len(command) < 2
@@ -369,6 +759,28 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
             "inspect operations."
         )
     return command
+
+
+def _repository_owner_name(value: object) -> tuple[str, str]:
+    repository = _required_text(value, "repository")
+    parts = repository.split("/")
+    if len(parts) != 2 or any(not part for part in parts):
+        raise PowdrrExecutionError("gh intrinsic repository must use owner/name form.")
+    return parts[0], parts[1]
+
+
+def _pull_request_number(value: object) -> int:
+    if isinstance(value, bool):
+        raise PowdrrExecutionError("gh intrinsic pr_reference must be a PR number.")
+    if isinstance(value, int):
+        number = value
+    elif isinstance(value, str) and value.isdecimal():
+        number = int(value)
+    else:
+        raise PowdrrExecutionError("gh intrinsic pr_reference must be a PR number.")
+    if number < 1:
+        raise PowdrrExecutionError("gh intrinsic pr_reference must be a PR number.")
+    return number
 
 
 def _relative_paths(value: object, *, field: str) -> list[str]:

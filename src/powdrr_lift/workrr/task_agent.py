@@ -59,6 +59,7 @@ from powdrr_lift.process.tasks import (
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.structrr.proposal import ProposalRevision
 from powdrr_lift.structrr.rebase import snapshot_digest
+from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.workrr.action_operations import (
     _apply_file_edits,
     _apply_yaml_operations,
@@ -643,93 +644,17 @@ def _issue_worker_structrr_context(
             "a test plan: " + "; ".join(file_overlap_findings)
         )
 
-    # Plan and workflow artifacts are inputs to this run, not product code. Keep
-    # them out of the repository snapshot so unrelated generated files do not
-    # look like changes interlaced with this feature.
-    plan_slug = slugify_workflow_id(plan_proposal.plan_id)
-    exclusions = (
-        f"docs/plans/{plan_slug}-execution-plan.yaml",
-        f"docs/plans/{plan_slug}-structrr-proposal.json",
-        f"docs/workflows/{plan_slug}/",
-        *(
-            (str(proposed["final_review_report_path"]),)
-            if isinstance(proposed.get("final_review_report_path"), str)
-            else ()
-        ),
+    current, current_manifest = _load_committed_issue_worker_structrr_baseline(
+        repo_root,
+        base_commit=base_commit,
     )
-    from powdrr_lift.workrr.feature_endpoint import _structrr_taxonomy_path
-
-    bootstrap_path = (
-        Path(tempfile.gettempdir())
-        / "powdrr-lift-issue-worker"
-        / plan_slug
-        / f"bootstrap-{base_commit}.yaml"
-    )
-    # The workflow integration worktree can contain checkpoints from earlier
-    # attempts. `submission_base` records the comparison base in the manifest,
-    # but bootstrap still reads the checked-out files. Bootstrap a detached
-    # worktree at the target branch commit so prior checkpoint code cannot be
-    # mistaken for the repository baseline.
-    baseline_temp_parent = Path(tempfile.gettempdir())
-    baseline_temp_parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(
-        prefix="powdrr-structrr-baseline-", dir=baseline_temp_parent
-    ) as temp_root:
-        baseline_worktree = Path(temp_root) / "checkout"
-        add_worktree = subprocess.run(
-            [
-                "git",
-                "worktree",
-                "add",
-                "--quiet",
-                "--detach",
-                str(baseline_worktree),
-                base_commit,
-            ],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if add_worktree.returncode != 0:
-            raise PowdrrExecutionError(
-                "could not prepare the target-branch Structrr baseline worktree: "
-                + add_worktree.stderr.strip()
-            )
-        try:
-            current = bootstrap_structrr(
-                baseline_worktree,
-                output_path=bootstrap_path,
-                taxonomy_path=_structrr_taxonomy_path(baseline_worktree),
-                include_untracked=False,
-                artifact_exclusions=exclusions,
-                submission_base=base_commit,
-            )
-        finally:
-            remove_worktree = subprocess.run(
-                ["git", "worktree", "remove", "--force", str(baseline_worktree)],
-                cwd=repo_root,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            if remove_worktree.returncode != 0:
-                raise PowdrrExecutionError(
-                    "could not remove the temporary Structrr baseline worktree: "
-                    + remove_worktree.stderr.strip()
-                )
-    if not current.validation.successful or current.source_manifest is None:
-        raise PowdrrExecutionError(
-            "current Structrr bootstrap failed before coding: "
-            f"{current.validation.issues}"
-        )
     if final_review:
         # Check the latest tree against the projected plan result. Unrelated
         # interlaced work carries forward; changes to plan-owned subjects require
         # a human plan review instead of an automatic repair that could overwrite it.
         rebase = rebase_final_plan_state(
             plan_proposal.expected_final_snapshot,
-            current.document,
+            current,
             item_proposal,
         )
         if rebase.get("classification") != "clean":
@@ -740,7 +665,7 @@ def _issue_worker_structrr_context(
                 f"{json.dumps(rebase, sort_keys=True)}"
             )
         decision_drift = active_decision_drift_findings(
-            plan_proposal.baseline_snapshot, current.document
+            plan_proposal.baseline_snapshot, current
         )
         if decision_drift:
             raise PowdrrExecutionError(
@@ -751,9 +676,7 @@ def _issue_worker_structrr_context(
     else:
         assert expected_baseline is not None
         try:
-            rebase = rebase_item_proposal(
-                expected_baseline, current.document, item_proposal
-            )
+            rebase = rebase_item_proposal(expected_baseline, current, item_proposal)
         except ValueError as error:
             raise PowdrrExecutionError(
                 f"could not rebase Structrr proposal: {error}"
@@ -764,9 +687,7 @@ def _issue_worker_structrr_context(
                 "PR's Structrr subjects; review and revise the plan proposal before "
                 f"continuing: {json.dumps(rebase, sort_keys=True)}"
             )
-        decision_drift = active_decision_drift_findings(
-            expected_baseline, current.document
-        )
+        decision_drift = active_decision_drift_findings(expected_baseline, current)
         if decision_drift:
             raise PowdrrExecutionError(
                 "coding is blocked because accepted decisions changed since the "
@@ -775,9 +696,60 @@ def _issue_worker_structrr_context(
             )
     rebased_proposal = replace(
         item_proposal,
-        structrr_baseline_fingerprint=snapshot_digest(current.document),
+        structrr_baseline_fingerprint=snapshot_digest(current),
     )
-    return current.document, rebased_proposal, current.source_manifest, rebase
+    return current, rebased_proposal, current_manifest, rebase
+
+
+def _load_committed_issue_worker_structrr_baseline(
+    repo_root: Path,
+    *,
+    base_commit: str,
+) -> tuple[Mapping[str, Any], SourceManifest]:
+    """Load the committed bootstrap that belongs to the PR branch's base."""
+    baseline_path = "docs/structrr/current/baseline-bootstrap.yaml"
+    result = subprocess.run(
+        ["git", "show", f"{base_commit}:{baseline_path}"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise PowdrrExecutionError(
+            f"target commit {base_commit} has no committed Structrr baseline at "
+            f"{baseline_path}; refresh and commit the repository bootstrap before "
+            "running implementation workflows"
+        )
+    try:
+        document = yaml.safe_load(result.stdout)
+    except yaml.YAMLError as error:
+        raise PowdrrExecutionError(
+            f"committed Structrr baseline {baseline_path} is invalid YAML: {error}"
+        ) from error
+    if not isinstance(document, Mapping):
+        raise PowdrrExecutionError(
+            f"committed Structrr baseline {baseline_path} must be a mapping"
+        )
+    raw_manifest = document.get("source_manifest")
+    if not isinstance(raw_manifest, Mapping):
+        raise PowdrrExecutionError(
+            f"committed Structrr baseline {baseline_path} has no source manifest"
+        )
+    try:
+        manifest = SourceManifest.from_data(raw_manifest)
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            f"committed Structrr baseline {baseline_path} has an invalid source "
+            f"manifest: {error}"
+        ) from error
+    if not manifest.coverage_complete:
+        raise PowdrrExecutionError(
+            f"committed Structrr baseline {baseline_path} has incomplete source "
+            "coverage; refresh and commit the repository bootstrap before running "
+            "implementation workflows"
+        )
+    return document, manifest
 
 
 def _preflight_proposed_file_additions(
@@ -3449,7 +3421,7 @@ class _TaskWorkflowExecutionStrategy:
                             else ()
                         ),
                     ),
-                    submission_base=base_commit,
+                    submission_base=baseline_manifest.submission_base,
                 )
                 if (
                     not candidate_bootstrap.validation.successful

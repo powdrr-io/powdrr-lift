@@ -76,6 +76,63 @@ from powdrr_lift.workrr.task_agent import (
 from powdrr_lift.workrr.test_obligations import acceptance_criteria_contract
 
 
+def _commit_test_structrr_baseline(
+    repo_root: Path,
+    snapshot: Mapping[str, Any],
+) -> tuple[Mapping[str, Any], SourceManifest]:
+    from powdrr_lift.structrr.source_manifest import compile_source_manifest
+
+    source_revision = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    tracked_paths = subprocess.run(
+        ["git", "ls-files"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    manifest = compile_source_manifest(
+        repo_root,
+        tracked_paths,
+        submission_base=source_revision,
+        source_revision=source_revision,
+        taxonomy_fingerprint="test-taxonomy",
+    )
+    document = {**snapshot, "source_manifest": manifest.to_data()}
+    baseline_path = repo_root / "docs/structrr/current/baseline-bootstrap.yaml"
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    baseline_path.write_text(
+        yaml.safe_dump(document, sort_keys=False), encoding="utf-8"
+    )
+    subprocess.run(
+        ["git", "add", "docs/structrr/current/baseline-bootstrap.yaml"],
+        cwd=repo_root,
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test User",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "Commit Structrr baseline bootstrap",
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return document, manifest
+
+
 def test_execute_pr_test_findings_retry_provider_429_with_backoff(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -675,8 +732,6 @@ inputs:
 def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from powdrr_lift.workrr import feature_endpoint
-
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
 
@@ -696,7 +751,21 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     (repo_root / "baseline.txt").write_text("target branch\n", encoding="utf-8")
     git("add", "baseline.txt")
     git("commit", "-qm", "Target branch baseline")
+    baseline = {
+        "entities": [{"id": "existing", "type": "Module", "description": "old"}],
+        "entity_relationships": [],
+        "source_subjects": [],
+    }
+    latest = {
+        **baseline,
+        "entities": [
+            *baseline["entities"],
+            {"id": "other-feature", "type": "Module", "description": "landed"},
+        ],
+    }
+    committed_bootstrap, manifest = _commit_test_structrr_baseline(repo_root, latest)
     base_commit = git("rev-parse", "HEAD")
+
     checkpoint_file = repo_root / ".github/workflows/ci.yml"
     checkpoint_file.parent.mkdir(parents=True)
     checkpoint_file.write_text("name: checkpoint\n", encoding="utf-8")
@@ -704,11 +773,6 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     git("commit", "-qm", "Persist earlier workflow checkpoint")
     checkpoint_commit = git("rev-parse", "HEAD")
 
-    baseline = {
-        "entities": [{"id": "existing", "type": "Module", "description": "old"}],
-        "entity_relationships": [],
-        "source_subjects": [],
-    }
     proposal = compile_multi_pr_proposal(
         plan_id="feature-v1",
         baseline_snapshot=baseline,
@@ -732,56 +796,12 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     proposal_path = repo_root / "docs/plans/feature-v1-structrr-proposal.json"
     proposal_path.parent.mkdir(parents=True)
     write_multi_pr_proposal(proposal_path, proposal)
-    latest = {
-        **baseline,
-        "entities": [
-            *baseline["entities"],
-            {"id": "other-feature", "type": "Module", "description": "landed"},
-        ],
-    }
-    manifest = SourceManifest(
-        submission_base=base_commit,
-        source_revision=base_commit,
-        extractor_version="test",
-        taxonomy_fingerprint="taxonomy",
-        excluded_paths=(),
-        files=(),
-        coverage_complete=True,
-        extraction_errors=(),
-        product_digest="empty-product",
-    )
-    bootstrap_revisions: list[tuple[str, str, bool]] = []
-
-    def bootstrap(root: Path, **_kwargs: Any) -> Any:
-        revision = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout.strip()
-        bootstrap_revisions.append(
-            (
-                str(root),
-                revision,
-                (root / ".github/workflows/ci.yml").exists(),
-            )
-        )
-        return SimpleNamespace(
-            document=latest,
-            validation=SimpleNamespace(successful=True, issues=[]),
-            source_manifest=manifest,
-        )
-
-    monkeypatch.setattr(
-        feature_endpoint,
-        "_structrr_taxonomy_path",
-        lambda _root: tmp_path / "taxonomy.yaml",
-    )
     monkeypatch.setattr(
         task_agent,
         "bootstrap_structrr",
-        bootstrap,
+        lambda *_args, **_kwargs: pytest.fail(
+            "worker must reuse the committed baseline instead of bootstrapping it"
+        ),
     )
 
     result = _issue_worker_structrr_context(
@@ -797,19 +817,12 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
 
     assert result is not None
     current, rebased_proposal, current_manifest, report = result
-    assert current == latest
+    assert current == committed_bootstrap
     assert rebased_proposal.structrr_baseline_fingerprint == task_agent.snapshot_digest(
-        latest
+        committed_bootstrap
     )
-    assert current_manifest is manifest
+    assert current_manifest == manifest
     assert report["classification"] == "clean"
-    assert len(bootstrap_revisions) == 1
-    baseline_root, baseline_revision, baseline_has_checkpoint_file = (
-        bootstrap_revisions[0]
-    )
-    assert Path(baseline_root) != repo_root
-    assert baseline_revision == base_commit
-    assert baseline_has_checkpoint_file is False
     assert checkpoint_commit != base_commit
     assert git("rev-parse", "HEAD") == checkpoint_commit
     assert (repo_root / ".github/workflows/ci.yml").is_file()
@@ -906,8 +919,6 @@ def test_issue_worker_blocks_file_addition_overlap_before_structrr_bootstrap(
 def test_issue_worker_blocks_structrr_subject_changed_since_plan(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from powdrr_lift.workrr import feature_endpoint
-
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
 
@@ -963,31 +974,8 @@ def test_issue_worker_blocks_structrr_subject_changed_since_plan(
             {"id": "existing", "type": "Module", "description": "changed elsewhere"}
         ],
     }
-    manifest = SourceManifest(
-        submission_base=base_commit,
-        source_revision=base_commit,
-        extractor_version="test",
-        taxonomy_fingerprint="taxonomy",
-        excluded_paths=(),
-        files=(),
-        coverage_complete=True,
-        extraction_errors=(),
-        product_digest="empty-product",
-    )
-    monkeypatch.setattr(
-        feature_endpoint,
-        "_structrr_taxonomy_path",
-        lambda _root: tmp_path / "taxonomy.yaml",
-    )
-    monkeypatch.setattr(
-        task_agent,
-        "bootstrap_structrr",
-        lambda *_args, **_kwargs: SimpleNamespace(
-            document=latest,
-            validation=SimpleNamespace(successful=True, issues=[]),
-            source_manifest=manifest,
-        ),
-    )
+    _commit_test_structrr_baseline(repo_root, latest)
+    base_commit = git("rev-parse", "HEAD")
 
     with pytest.raises(PowdrrExecutionError, match="intervening repository work"):
         _issue_worker_structrr_context(
@@ -1008,8 +996,6 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from powdrr_lift.workrr import feature_endpoint
-
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
     (tmp_path / "README.md").write_text("initial\n", encoding="utf-8")
     (tmp_path / "pyproject.toml").write_text(
@@ -1065,6 +1051,9 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
         cwd=tmp_path,
         check=True,
         capture_output=True,
+    )
+    _committed_baseline, baseline_manifest = _commit_test_structrr_baseline(
+        tmp_path, baseline
     )
     task = replace(
         workflow.tasks[0],
@@ -1158,21 +1147,9 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
             },
         ),
     )
-    manifest = SourceManifest(
-        submission_base="a" * 40,
+    candidate_manifest = replace(
+        baseline_manifest,
         source_revision="b" * 40,
-        extractor_version="test",
-        taxonomy_fingerprint="taxonomy",
-        excluded_paths=(),
-        files=(),
-        coverage_complete=True,
-        extraction_errors=(),
-        product_digest="empty-product",
-    )
-    monkeypatch.setattr(
-        feature_endpoint,
-        "_structrr_taxonomy_path",
-        lambda _root: tmp_path / "taxonomy.yaml",
     )
     monkeypatch.setattr(
         task_agent,
@@ -1180,7 +1157,7 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
         lambda *_args, **_kwargs: SimpleNamespace(
             document=baseline,
             validation=SimpleNamespace(successful=True, issues=[]),
-            source_manifest=manifest,
+            source_manifest=candidate_manifest,
         ),
     )
     reconciled_allowed_paths: list[tuple[str, ...]] = []

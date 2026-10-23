@@ -1221,6 +1221,94 @@ def _normalize_execute_pr_coding_attempt(value: Any) -> dict[str, Any]:
     }
 
 
+def _issue_worker_plan_defect_evidence(
+    attempt_records: Sequence[Mapping[str, Any]],
+) -> list[str]:
+    """Summarize concrete proposal/test conflicts for the outer plan-defect judge.
+
+    Keep this evidence compact: nested Procedrr outputs intentionally omit raw
+    coding-agent transcripts, which otherwise hide the relevant findings when
+    several repair attempts have run.
+    """
+    structural_conflicts: list[tuple[str, str]] = []
+    exact_proposal_test_failures: list[tuple[str, str, tuple[str, ...]]] = []
+    denied_test_paths: list[tuple[str, str]] = []
+
+    for record in attempt_records:
+        attempt_value = record.get("attempt")
+        if not isinstance(attempt_value, Mapping):
+            continue
+        attempt_id = str(attempt_value.get("attempt_id", "unknown attempt"))
+        status = str(attempt_value.get("status", ""))
+
+        raw_structural_findings = record.get("structrr_repair_findings", ())
+        if isinstance(raw_structural_findings, Sequence) and not isinstance(
+            raw_structural_findings, (str, bytes)
+        ):
+            for finding in raw_structural_findings:
+                if isinstance(finding, str) and "contradictory" in finding.casefold():
+                    structural_conflicts.append((attempt_id, finding))
+
+        stdout = attempt_value.get("stdout")
+        if status == "completed" and isinstance(stdout, str):
+            has_exact_proposal_probe = bool(
+                re.search(
+                    r"exact(?:ly)?\s+(?:(?:the|accepted)\s+)*proposal",
+                    stdout,
+                    re.IGNORECASE,
+                )
+            )
+            failed_summary = next(
+                (
+                    line.strip()
+                    for line in stdout.splitlines()
+                    if re.search(r"\b\d+\s+failed\b", line)
+                ),
+                None,
+            )
+            failed_cases = tuple(
+                line.strip()
+                for line in stdout.splitlines()
+                if line.strip().startswith("FAILED ")
+            )
+            if has_exact_proposal_probe and failed_summary and failed_cases:
+                exact_proposal_test_failures.append(
+                    (attempt_id, failed_summary, failed_cases)
+                )
+
+        raw_out_of_scope = attempt_value.get("out_of_scope_paths", ())
+        if status == "policy_denied" and isinstance(raw_out_of_scope, Sequence):
+            denied_test_paths.extend(
+                (attempt_id, path)
+                for path in raw_out_of_scope
+                if isinstance(path, str) and re.search(r"(?:^|/)tests?/", path)
+            )
+
+    if (
+        not structural_conflicts
+        or not exact_proposal_test_failures
+        or not denied_test_paths
+    ):
+        return []
+
+    evidence: list[str] = []
+    evidence.extend(
+        f"Attempt {attempt_id} reported a contradictory accepted Structrr operation: "
+        f"{finding}"
+        for attempt_id, finding in structural_conflicts
+    )
+    evidence.extend(
+        f"Attempt {attempt_id} tested the exact accepted proposal content and got "
+        f"{summary}; failing cases: {', '.join(cases)}"
+        for attempt_id, summary, cases in exact_proposal_test_failures
+    )
+    evidence.extend(
+        f"Attempt {attempt_id} was policy-denied for changing frozen test path {path}"
+        for attempt_id, path in denied_test_paths
+    )
+    return evidence
+
+
 def _execute_pr_test_author_prompt(
     *,
     authoring_worktree: Path,
@@ -3861,6 +3949,9 @@ class _TaskWorkflowExecutionStrategy:
 
         final_attempt = attempt_records[-1]
         attempt_data = final_attempt["attempt"]
+        attempt_plan_defect_evidence = _issue_worker_plan_defect_evidence(
+            attempt_records
+        )
         result = {
             "passed": bool(final_attempt["passed"]),
             "attempt_id": attempt_data["attempt_id"],
@@ -3870,6 +3961,7 @@ class _TaskWorkflowExecutionStrategy:
             "structrr": final_attempt.get("structrr"),
             "integration_tests": final_attempt.get("integration_tests"),
             "error": attempt_data.get("error"),
+            "plan_defect_evidence": attempt_plan_defect_evidence,
             "attempts": attempt_records,
             "continuations": len(attempt_records) - 1,
         }

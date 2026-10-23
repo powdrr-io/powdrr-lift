@@ -118,6 +118,7 @@ from powdrr_lift.workrr.git import (
     integration_branch_name,
     load_workflow_git_state,
     load_workflow_git_states,
+    resolve_git_repository_root,
     slugify_workflow_id,
     validate_workflow_git_state,
     workflow_dependencies_completion,
@@ -804,6 +805,7 @@ def _bootstrap_issue_worker_structrr_baseline(
             baseline_worktree,
             output_path=temporary_root / "baseline-bootstrap.yaml",
             taxonomy_path=_structrr_taxonomy_path(baseline_worktree),
+            repository_name=_issue_worker_repository_name(repo_root),
             include_untracked=False,
             artifact_exclusions=_issue_worker_structrr_artifact_exclusions(proposed),
             submission_base=base_commit,
@@ -832,6 +834,11 @@ def _bootstrap_issue_worker_structrr_baseline(
                 "could not remove the temporary PR-base bootstrap worktree: "
                 + (removed.stderr.strip() or removed.stdout.strip())
             )
+
+
+def _issue_worker_repository_name(repo_root: Path) -> str:
+    """Use the shared checkout name, not an ephemeral worktree directory name."""
+    return resolve_git_repository_root(repo_root).name
 
 
 def _issue_worker_structrr_artifact_exclusions(
@@ -3556,6 +3563,7 @@ class _TaskWorkflowExecutionStrategy:
                         store_root / "structrr" / f"candidate-{attempt_number:02d}.yaml"
                     ),
                     taxonomy_path=_structrr_taxonomy_path(self.repo_root),
+                    repository_name=_issue_worker_repository_name(self.repo_root),
                     include_untracked=True,
                     artifact_exclusions=_issue_worker_structrr_artifact_exclusions(
                         proposed,

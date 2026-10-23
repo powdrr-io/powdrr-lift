@@ -848,6 +848,7 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     bootstrap_root, bootstrap_options = bootstrap_calls[0]
     assert not bootstrap_root.exists()
     assert bootstrap_options["include_untracked"] is False
+    assert bootstrap_options["repository_name"] == "repo"
     assert bootstrap_options["submission_base"] == base_commit
     assert (
         "docs/plans/feature-v1-execution-plan.yaml"

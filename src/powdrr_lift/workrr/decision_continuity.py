@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import json
+import sys
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, TextIO
 
-from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
+from powdrr_lift.workrr.llm import (
+    WorkflowLLMClient,
+    complete_json_with_timeout_retry,
+)
 
 _DECISION_REVIEW_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -25,6 +29,9 @@ def review_inherited_decisions(
     phase: str,
     decisions: Sequence[Mapping[str, Any]],
     evidence: Mapping[str, Any],
+    max_provider_retries: int = 8,
+    retry_backoff_seconds: float = 10.0,
+    stderr: TextIO | None = None,
 ) -> tuple[dict[str, Any], ...]:
     """Review each inherited decision independently and fail closed on gaps."""
     if phase not in {"planning", "implementation"}:
@@ -93,8 +100,14 @@ def review_inherited_decisions(
             },
         ]
         try:
-            result = complete_json(
-                client, messages, response_schema=_DECISION_REVIEW_SCHEMA
+            result = complete_json_with_timeout_retry(
+                client,
+                messages,
+                model="inherited-decision-review",
+                stderr=stderr if stderr is not None else sys.stderr,
+                max_timeout_retries=max_provider_retries,
+                timeout_backoff_seconds=retry_backoff_seconds,
+                response_schema=_DECISION_REVIEW_SCHEMA,
             )
         except Exception as error:  # noqa: BLE001 - unknown is a review failure.
             results.append(

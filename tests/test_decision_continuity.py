@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import io
 import json
 from typing import Any
+
+import pytest
 
 from powdrr_lift.workrr.decision_continuity import (
     decision_continuity_findings,
     review_inherited_decisions,
 )
+from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
 from powdrr_lift.workrr.multipr_structrr import inherited_decision_records
 
 
@@ -117,3 +121,39 @@ def test_provider_legacy_verdict_reason_shape_is_normalized() -> None:
         },
     )
     assert decision_continuity_findings(result) == ()
+
+
+def test_inherited_decision_review_retries_http_429_with_backoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class RateLimitedThenPass:
+        calls = 0
+
+        def complete_json(
+            self,
+            _messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, str]:
+            del response_schema
+            self.calls += 1
+            if self.calls == 1:
+                raise WorkflowLLMHTTPError("OpenAI", 429, "engine overloaded")
+            return {"outcome": "pass", "explanation": "Reviewed after retry."}
+
+    delays: list[float] = []
+    monkeypatch.setattr("powdrr_lift.workrr.llm.time.sleep", delays.append)
+    client = RateLimitedThenPass()
+    results = review_inherited_decisions(
+        client,
+        phase="planning",
+        decisions=({"decision_id": "guidance:one"},),
+        evidence={"plan_item": {"objective": "Add CI."}},
+        max_provider_retries=2,
+        retry_backoff_seconds=1.5,
+        stderr=io.StringIO(),
+    )
+
+    assert results[0]["outcome"] == "pass"
+    assert client.calls == 2
+    assert delays == [1.5]

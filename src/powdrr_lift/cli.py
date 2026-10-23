@@ -207,6 +207,7 @@ from powdrr_lift.workrr.git import (
     commit_and_push_workflow_initialization,
     create_workflow_worktree,
     inspect_workflow_run,
+    integration_branch_name,
     resolve_git_repository_root,
     save_workflow_git_state,
     slugify_workflow_id,
@@ -2415,6 +2416,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Work-item proposed PR id used to name the workflow branches.",
     )
     workflow_recovery_parser.add_argument(
+        "--integration-branch",
+        help="Specific workflow attempt branch to inspect or clean up.",
+    )
+    workflow_recovery_parser.add_argument(
         "--repo-root",
         type=Path,
         help="Repository root to inspect; defaults to the current worktree.",
@@ -2793,13 +2798,19 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 raise PlanGenerationError(
                     "workflow definition ID does not match its plan item"
                 )
+            execution_id = uuid.uuid4().hex[:12]
+            workflow_instance_id = _plan_workflow_instance_id(
+                workflow_id, instance.inputs, worker_id, attempt_id=execution_id
+            )
+            integration_branch = integration_branch_name(
+                f"{workflow_id}-attempt-{execution_id}"
+            )
             integration_worktree, integration_branch = create_workflow_worktree(
                 repo_root,
                 workflow_id,
                 base_branch="main",
-            )
-            workflow_instance_id = _plan_workflow_instance_id(
-                workflow_id, instance.inputs, worker_id
+                branch_name=integration_branch,
+                worktree_name=integration_branch,
             )
             runtime_relative_directory = (
                 Path("docs")
@@ -2927,9 +2938,13 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
 
 
 def _plan_workflow_instance_id(
-    workflow_id: str, input_state: Mapping[str, Any], worker_id: str
+    workflow_id: str,
+    input_state: Mapping[str, Any],
+    worker_id: str,
+    *,
+    attempt_id: str | None = None,
 ) -> str:
-    """Keep each durable Procedrr worker attempt distinct and resumable."""
+    """Give every issue-worker attempt its own durable Procedrr run directory."""
     serialized = json.dumps(
         input_state,
         ensure_ascii=False,
@@ -2937,7 +2952,10 @@ def _plan_workflow_instance_id(
         sort_keys=True,
     )
     fingerprint = hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:12]
-    return f"{workflow_id}-task-{fingerprint}-{slugify_workflow_id(worker_id)}"
+    suffix = f"-{slugify_workflow_id(worker_id)}"
+    if attempt_id:
+        suffix += f"-attempt-{slugify_workflow_id(attempt_id)}"
+    return f"{workflow_id}-task-{fingerprint}{suffix}"
 
 
 def _bundled_procedrr_process_directory() -> Path:
@@ -3653,7 +3671,13 @@ def _load_structured_mapping(path: Path) -> dict[str, Any]:
 def _run_workflow_recovery(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     try:
-        report = inspect_workflow_run(repo_root, args.proposed_pr_id)
+        integration_branch = getattr(args, "integration_branch", None)
+        report = inspect_workflow_run(
+            repo_root,
+            args.proposed_pr_id,
+            integration_branch=integration_branch,
+            worktree_name=integration_branch,
+        )
         if args.cleanup:
             report = cleanup_workflow_run(
                 repo_root,

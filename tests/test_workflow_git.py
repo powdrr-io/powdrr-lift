@@ -131,6 +131,11 @@ def test_workflow_dependency_requires_merged_implementation_pull_request(
         "_related_pull_requests",
         related_pull_requests,
     )
+    monkeypatch.setattr(
+        workflow_git,
+        "_related_workflow_attempt_pull_requests",
+        lambda *_args: ([], None),
+    )
 
     assert workflow_dependencies_completion(tmp_path, state) == (
         False,
@@ -141,6 +146,33 @@ def test_workflow_dependency_requires_merged_implementation_pull_request(
         ["powdrr/core", "powdrr/core-implementation"],
         ["powdrr/core", "powdrr/core-implementation"],
     ]
+
+
+def test_workflow_dependency_accepts_merged_worker_attempt_branch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state = WorkflowGitState(
+        proposed_pr_id="integration",
+        base_branch="main",
+        integration_branch="powdrr/integration-attempt-current",
+        workflow_relative_directory="docs/workflows/feature",
+        depends_on_workflows=("core",),
+    )
+    monkeypatch.setattr(
+        workflow_git,
+        "_related_pull_requests",
+        lambda *_args: ([{"state": "CLOSED"}], None),
+    )
+    monkeypatch.setattr(
+        workflow_git,
+        "_related_workflow_attempt_pull_requests",
+        lambda _repo, prefix: (
+            ([{"state": "MERGED", "headRefName": f"{prefix}-attempt-old"}], None)
+        ),
+    )
+
+    assert workflow_dependencies_completion(tmp_path, state) == (True, ())
 
 
 def test_force_synchronization_resets_stale_integration_branch(
@@ -212,6 +244,47 @@ def test_create_task_worktree_starts_from_integration_branch(tmp_path: Path) -> 
             text=True,
         ).stdout.strip()
         == task_branch
+    )
+
+
+def test_issue_attempt_worktree_starts_fresh_from_base_branch(tmp_path: Path) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "README.md").write_text("main\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "main baseline")
+    main_commit = subprocess.run(
+        ["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    old_worktree, _ = create_workflow_worktree(tmp_path, "feature-17")
+    (old_worktree / "stale-candidate.txt").write_text("stale\n", encoding="utf-8")
+    _git(old_worktree, "add", "stale-candidate.txt")
+    _git(old_worktree, "commit", "-m", "old attempt candidate")
+
+    fresh_branch = "powdrr/feature-17-attempt-new"
+    fresh_worktree, branch = create_workflow_worktree(
+        tmp_path,
+        "feature-17",
+        branch_name=fresh_branch,
+        worktree_name=fresh_branch,
+    )
+
+    assert branch == fresh_branch
+    assert (fresh_worktree / "README.md").read_text(encoding="utf-8") == "main\n"
+    assert not (fresh_worktree / "stale-candidate.txt").exists()
+    assert (
+        subprocess.run(
+            ["git", "-C", str(fresh_worktree), "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        == main_commit
     )
 
 

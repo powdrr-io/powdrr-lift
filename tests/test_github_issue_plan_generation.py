@@ -1416,7 +1416,10 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
     monkeypatch.setattr(
         cli,
         "create_workflow_worktree",
-        lambda *_args, **_kwargs: (integration_worktree, "powdrr/foundation"),
+        lambda *_args, **kwargs: (
+            integration_worktree,
+            kwargs["branch_name"],
+        ),
     )
 
     def run_workflow_task(config: Any, **_kwargs: Any) -> int:
@@ -1461,8 +1464,14 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
     assert runtime_directory.is_relative_to(integration_worktree)
     assert runtime_directory != workflow_file.parent
     workflow_instance = cli.load_plan_workflow_instance(workflow_file)
+    state = load_workflow_git_state(runtime_directory, plan.items[0].workflow_id)
+    assert state is not None
+    attempt_id = state.integration_branch.rsplit("-attempt-", maxsplit=1)[1]
     instance_id = cli._plan_workflow_instance_id(
-        plan.items[0].workflow_id, workflow_instance.inputs, "worker"
+        plan.items[0].workflow_id,
+        workflow_instance.inputs,
+        "worker",
+        attempt_id=attempt_id,
     )
     assert runtime_directory.name == cli.slugify_workflow_id(instance_id)
     task_files = sorted(runtime_directory.glob("*.yaml"))
@@ -1470,11 +1479,12 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
     assert task_files[0].stem.startswith(
         f"{cli.slugify_workflow_id(plan.items[0].workflow_id)}-task-"
     )
-    state = load_workflow_git_state(runtime_directory, plan.items[0].workflow_id)
-    assert state is not None
     assert (
         state.workflow_relative_directory
         == runtime_directory.relative_to(integration_worktree).as_posix()
+    )
+    assert state.integration_branch.startswith(
+        f"powdrr/{cli.slugify_workflow_id(plan.items[0].workflow_id)}-attempt-"
     )
 
 

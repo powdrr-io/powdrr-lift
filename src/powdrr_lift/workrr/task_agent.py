@@ -115,6 +115,7 @@ from powdrr_lift.workrr.git import (
     claim_workflow_task,
     create_workflow_worktree,
     inspect_workflow_run,
+    integration_branch_name,
     load_workflow_git_state,
     load_workflow_git_states,
     slugify_workflow_id,
@@ -4873,7 +4874,12 @@ def _validate_workflow_task_state(
     if not locked_tasks:
         return
 
-    report = inspect_workflow_run(repo_root, workflow_git_state.proposed_pr_id)
+    report = inspect_workflow_run(
+        repo_root,
+        workflow_git_state.proposed_pr_id,
+        integration_branch=workflow_git_state.integration_branch,
+        worktree_name=_workflow_git_worktree_name(workflow_git_state),
+    )
     claim_refs = [
         claim_ref
         for claim_ref in report.get("claim_refs", [])
@@ -4892,7 +4898,8 @@ def _validate_workflow_task_state(
                 "inconsistencies": details,
                 "recovery_command": (
                     "powdrr-lift workflow-recovery --proposed-pr-id "
-                    f"{workflow_git_state.proposed_pr_id} --cleanup"
+                    f"{workflow_git_state.proposed_pr_id} --integration-branch "
+                    f"{workflow_git_state.integration_branch} --cleanup"
                 ),
             },
             indent=2,
@@ -4956,6 +4963,8 @@ def _resolve_workflow_task_context(
             project_root,
             workflow_git_state.proposed_pr_id,
             base_branch=workflow_git_state.base_branch,
+            branch_name=workflow_git_state.integration_branch,
+            worktree_name=_workflow_git_worktree_name(workflow_git_state),
         )
     except RuntimeError as exc:
         raise WorkflowGitInconsistency(
@@ -4981,6 +4990,15 @@ def _resolve_workflow_task_context(
         integration_worktree,
         integration_worktree / workflow_git_state.workflow_relative_directory,
     )
+
+
+def _workflow_git_worktree_name(workflow_git_state: WorkflowGitState) -> str:
+    """Keep legacy paths while isolating new issue-worker attempt worktrees."""
+    if workflow_git_state.integration_branch == integration_branch_name(
+        workflow_git_state.proposed_pr_id
+    ):
+        return workflow_git_state.proposed_pr_id
+    return workflow_git_state.integration_branch
 
 
 def _publish_workflow_progress(

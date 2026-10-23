@@ -1,0 +1,270 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1114
+title: Start issue worker attempts from fresh main branches
+intent:
+  problem: Issue worker retries reused a persistent integration branch that could
+    contain files and workflow state from older attempts.
+  goal: Give each issue worker attempt a new branch and worktree based on the current
+    main commit while retaining dependency checks and recovery support.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 210
+    end_line: 210
+  summary: Record the attempt-isolation change in src/powdrr_lift/cli.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2418
+    end_line: 2421
+  summary: Record the attempt-isolation change in src/powdrr_lift/cli.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2801
+    end_line: 2807
+  summary: Record the attempt-isolation change in src/powdrr_lift/cli.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2812
+    end_line: 2813
+  summary: Record the attempt-isolation change in src/powdrr_lift/cli.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2941
+    end_line: 2945
+  summary: Record the attempt-isolation change in src/powdrr_lift/cli.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2947
+    end_line: 2947
+  summary: Record the attempt-isolation change in src/powdrr_lift/cli.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2955
+    end_line: 2958
+  summary: Record the attempt-isolation change in src/powdrr_lift/cli.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3674
+    end_line: 3680
+  summary: Record the attempt-isolation change in src/powdrr_lift/cli.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 198
+    end_line: 211
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/git.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 269
+    end_line: 270
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/git.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 273
+    end_line: 274
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/git.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 604
+    end_line: 606
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/git.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 611
+    end_line: 611
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/git.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 625
+    end_line: 625
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/git.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 1331
+    end_line: 1368
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/git.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 118
+    end_line: 118
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/task_agent.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4877
+    end_line: 4882
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/task_agent.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4901
+    end_line: 4902
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/task_agent.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4966
+    end_line: 4967
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/task_agent.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4995
+    end_line: 5003
+  summary: Record the attempt-isolation change in src/powdrr_lift/workrr/task_agent.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1419
+    end_line: 1422
+  summary: Record the attempt-isolation change in tests/test_github_issue_plan_generation.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1467
+    end_line: 1469
+  summary: Record the attempt-isolation change in tests/test_github_issue_plan_generation.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1471
+    end_line: 1474
+  summary: Record the attempt-isolation change in tests/test_github_issue_plan_generation.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1473
+    end_line: 1474
+  summary: Assert the stored attempt branch in the issue worker runtime test.
+  rationale: Prevent regression to a shared branch for new executions.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1486
+    end_line: 1488
+  summary: Record the attempt-isolation change in tests/test_github_issue_plan_generation.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: tests/test_workflow_git.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 138
+  summary: Record the attempt-isolation change in tests/test_workflow_git.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: tests/test_workflow_git.py
+  type: modified
+  span:
+    start_line: 151
+    end_line: 177
+  summary: Record the attempt-isolation change in tests/test_workflow_git.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: tests/test_workflow_git.py
+  type: modified
+  span:
+    start_line: 250
+    end_line: 290
+  summary: Record the attempt-isolation change in tests/test_workflow_git.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 2864
+    end_line: 2864
+  summary: Record the attempt-isolation change in tests/test_workflow_task_agent.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 2878
+    end_line: 2879
+  summary: Record the attempt-isolation change in tests/test_workflow_task_agent.py.
+  rationale: Describe the exact worker branch, worktree, dependency, recovery, or
+    regression-test change.
+entities:
+- id: github-issue-worker-attempt-branch
+  type: Branch
+  action: added
+  summary: Each issue worker attempt now uses a distinct branch based on the current
+    main commit.
+  rationale: Isolate retries from stale candidate changes while keeping each final
+    PR based on main.
+entity_relationships: []
+invariants:
+- id: issue-worker-attempt-starts-at-main
+  action: added
+  description: Every newly started GitHub issue worker attempt creates its branch
+    and worktree from the latest fetched base branch and does not reuse another attempt's
+    candidate tree.
+  rationale: Ensure the Structrr baseline and candidate bootstrap compare the same
+    main-based repository state against the attempt's changes.
+guidance: []
+features: []
+proposed_prs: []

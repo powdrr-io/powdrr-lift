@@ -195,7 +195,20 @@ def workflow_dependencies_completion(
         if error:
             incomplete.append(f"{dependency}: could not inspect pull request: {error}")
             continue
-        if not any(item.get("state") == "MERGED" for item in pull_requests):
+        merged = any(item.get("state") == "MERGED" for item in pull_requests)
+        if not merged:
+            attempt_pull_requests, error = _related_workflow_attempt_pull_requests(
+                repo_root_path, branch
+            )
+            if error:
+                incomplete.append(
+                    f"{dependency}: could not inspect pull request: {error}"
+                )
+                continue
+            merged = any(
+                item.get("state") == "MERGED" for item in attempt_pull_requests
+            )
+        if not merged:
             incomplete.append(
                 f"{dependency}: implementation PR for {branch} is not merged"
             )
@@ -253,10 +266,12 @@ def create_workflow_worktree(
     proposed_pr_id: str,
     *,
     base_branch: str = "main",
+    branch_name: str | None = None,
+    worktree_name: str | None = None,
 ) -> tuple[Path, str]:
     repo_root_path = Path(repo_root).resolve()
-    branch = integration_branch_name(proposed_pr_id)
-    worktree = workflow_worktree_path(repo_root_path, proposed_pr_id)
+    branch = branch_name or integration_branch_name(proposed_pr_id)
+    worktree = workflow_worktree_path(repo_root_path, worktree_name or proposed_pr_id)
     worktree.parent.mkdir(parents=True, exist_ok=True)
     base_ref = _refresh_workflow_refs(repo_root_path, branch, base_branch)
     if worktree.exists():
@@ -586,11 +601,14 @@ def _workflow_task_files_from_branch(
 def inspect_workflow_run(
     repo_root: str | Path,
     proposed_pr_id: str,
+    *,
+    integration_branch: str | None = None,
+    worktree_name: str | None = None,
 ) -> dict[str, Any]:
     """Collect Git-backed state for one workflow run without changing it."""
     repo_root_path = Path(repo_root).resolve()
     slug = slugify_workflow_id(proposed_pr_id)
-    integration_branch = integration_branch_name(proposed_pr_id)
+    integration_branch = integration_branch or integration_branch_name(proposed_pr_id)
     task_prefix = f"powdrr/{slug}-task/"
     claim_prefix = f"refs/agents/claims/{slug}/"
     task_branches = _for_each_ref(repo_root_path, f"refs/heads/{task_prefix}")
@@ -604,7 +622,7 @@ def inspect_workflow_run(
     integration_worktree = (
         registered_integration_worktrees[0]
         if registered_integration_worktrees
-        else workflow_worktree_path(repo_root_path, proposed_pr_id)
+        else workflow_worktree_path(repo_root_path, worktree_name or proposed_pr_id)
     )
     state_paths: list[Path] = []
     if integration_worktree.is_dir():
@@ -1308,6 +1326,44 @@ def _related_pull_requests(
         if isinstance(values, list):
             pull_requests.extend(value for value in values if isinstance(value, dict))
     return pull_requests, None
+
+
+def _related_workflow_attempt_pull_requests(
+    repo_root: Path,
+    branch_prefix: str,
+) -> tuple[list[dict[str, Any]], str | None]:
+    """Find merged PRs from uniquely named worker attempt branches."""
+    result = _gh(
+        repo_root,
+        [
+            "pr",
+            "list",
+            "--state",
+            "all",
+            "--limit",
+            "1000",
+            "--json",
+            "number,state,url,headRefName,baseRefName",
+        ],
+    )
+    if result.returncode != 0:
+        return [], result.stderr.strip() or "gh pr list failed"
+    try:
+        values = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError:
+        return [], "gh pr list returned invalid JSON"
+    if not isinstance(values, list):
+        return [], "gh pr list returned invalid JSON"
+    return (
+        [
+            value
+            for value in values
+            if isinstance(value, dict)
+            and isinstance(value.get("headRefName"), str)
+            and value["headRefName"].startswith(f"{branch_prefix}-attempt-")
+        ],
+        None,
+    )
 
 
 def _remote_exists(repo_root: Path, remote: str) -> bool:

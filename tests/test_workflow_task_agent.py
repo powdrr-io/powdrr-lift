@@ -2861,7 +2861,7 @@ def test_locked_workflow_task_reports_recovery_command(
     )
     monkeypatch.setattr(
         "powdrr_lift.workrr.task_agent.inspect_workflow_run",
-        lambda _repo_root, _proposed_pr_id: {
+        lambda _repo_root, _proposed_pr_id, **_kwargs: {
             "claim_refs": [
                 "refs/agents/claims/feature-17/agent-task",
             ]
@@ -2875,7 +2875,8 @@ def test_locked_workflow_task_reports_recovery_command(
     assert "agent-task is locked" in message
     assert "refs/agents/claims/feature-17/agent-task" in message
     assert (
-        "powdrr-lift workflow-recovery --proposed-pr-id feature-17 --cleanup" in message
+        "powdrr-lift workflow-recovery --proposed-pr-id feature-17 "
+        "--integration-branch powdrr/feature-17 --cleanup" in message
     )
 
 

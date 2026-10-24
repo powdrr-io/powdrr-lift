@@ -227,25 +227,24 @@ def test_subq_bad_request_fails_without_planning_fallback(
     assert fallback.calls == 0
 
 
-def test_preferred_classifier_uses_jev_key_before_subq(monkeypatch: Any) -> None:
+def test_preferred_classifier_uses_subq_key_before_jev(monkeypatch: Any) -> None:
     monkeypatch.setenv("TYPESAFEAI_API_KEY", "jev-key")
     monkeypatch.setenv("SUBQ_API_KEY", "subq-key")
 
     client = preferred_semantic_classifier_client(_Fallback())
 
-    assert isinstance(client, JevSemanticClassifierClient)
+    assert isinstance(client, SubQSemanticClassifierClient)
 
 
-def test_preferred_classifier_leaves_llm_client_in_place_without_jev(
+def test_preferred_classifier_uses_jev_when_subq_key_is_missing(
     monkeypatch: Any,
 ) -> None:
-    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("SUBQ_API_KEY", "subq-key")
+    monkeypatch.delenv("SUBQ_API_KEY", raising=False)
+    monkeypatch.setenv("TYPESAFEAI_API_KEY", "jev-key")
 
     client = preferred_semantic_classifier_client(_Fallback())
 
-    assert client is None
+    assert isinstance(client, JevSemanticClassifierClient)
 
 
 def test_jev_missing_key_fails_without_using_fallback(monkeypatch: Any) -> None:

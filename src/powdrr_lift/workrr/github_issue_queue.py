@@ -14,7 +14,7 @@ import re
 import subprocess
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from time import sleep
 from typing import Any
@@ -36,6 +36,17 @@ _MARKER_END = " -->"
 _TASK_CHECKPOINT_START = "<!-- powdrr-task-checkpoint:v1 -->"
 _FULFILLMENT_MARKER = "<!-- powdrr-issue-fulfillment:v1 -->"
 _FULFILLMENT_SCHEMA = "https://powdrr.io/schemas/github-issue-fulfillment-v1"
+_PLAN_ADJUSTMENT_MARKER = "<!-- powdrr-plan-adjustment:v1 -->"
+_PLAN_ADJUSTMENT_SCHEMA = "https://powdrr.io/schemas/github-issue-plan-adjustment-v1"
+_PLAN_ADJUSTMENT_AUTHORS = {"OWNER", "MEMBER", "COLLABORATOR"}
+_PLAN_ADJUSTABLE_FIELDS = {
+    "title",
+    "objective",
+    "scope",
+    "acceptance_criteria",
+    "implementation_steps",
+    "allowed_paths",
+}
 _PLAN_AMENDMENT_TITLE_PREFIX = "Correct plan:"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 _GITHUB_STATUS_SETTLE_SECONDS = 1.0
@@ -54,6 +65,7 @@ class PlannedWorkItem:
     workflow_file: str | None = None
     implementation_steps: tuple[str, ...] = ()
     allowed_paths: tuple[str, ...] = (".",)
+    inline_adjustments: tuple[Mapping[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -625,10 +637,31 @@ def run_worker_once(
                 labels=_replace_queue_status(issue.labels, "claimed"),
             )
             client.add_comment(issue, f"Powdrr worker {worker_id} claimed this item.")
+            detail: str | None = None
+            planned_item = item
+            try:
+                item = _apply_issue_plan_adjustments(
+                    item=item,
+                    plan_id=plan.plan_id,
+                    comments=client.list_comments(issue.number),
+                )
+                if item != planned_item and item.workflow_file is None:
+                    raise GitHubIssueQueueError(
+                        "inline adjustments require a workflow instance file"
+                    )
+            except GitHubIssueQueueError as error:
+                detail = f"inline plan adjustment could not be applied: {error}"
+                client.update_issue(
+                    issue,
+                    labels=_replace_queue_status(
+                        _replace_queue_status(issue.labels, "claimed"), "blocked"
+                    ),
+                )
+                client.add_comment(issue, f"Powdrr worker blocked this item: {detail}.")
+                return WorkerReport("blocked", issue.number, item.item_id, detail)
             workflow_reference = item.workflow_file or item.workflow_directory
             assert workflow_reference is not None
             workflow_path = (root / workflow_reference).resolve()
-            detail: str | None = None
             expected_kind_exists = (
                 workflow_path.is_file()
                 if item.workflow_file is not None
@@ -786,6 +819,124 @@ def fulfill_issue_without_pr(
         labels=labels,
         url=issue.url,
     )
+
+
+def _apply_issue_plan_adjustments(
+    *,
+    item: PlannedWorkItem,
+    plan_id: str,
+    comments: Sequence[Mapping[str, Any]],
+) -> PlannedWorkItem:
+    """Apply trusted, structured issue-comment edits without changing the plan."""
+    effective = item
+    for comment in comments:
+        body = comment.get("body")
+        if not isinstance(body, str) or _PLAN_ADJUSTMENT_MARKER not in body:
+            continue
+        if (
+            str(comment.get("author_association", "")).upper()
+            not in _PLAN_ADJUSTMENT_AUTHORS
+        ):
+            continue
+        match = re.search(r"```json\s*(.*?)\s*```", body, re.DOTALL)
+        if match is None:
+            raise GitHubIssueQueueError("marked comment must contain a JSON code block")
+        try:
+            payload = json.loads(match.group(1))
+        except json.JSONDecodeError as error:
+            raise GitHubIssueQueueError("comment JSON is malformed") from error
+        if not isinstance(payload, Mapping) or set(payload) != {
+            "schema",
+            "plan_id",
+            "item_id",
+            "reason",
+            "changes",
+        }:
+            raise GitHubIssueQueueError("comment has unknown or missing fields")
+        if payload.get("schema") != _PLAN_ADJUSTMENT_SCHEMA:
+            raise GitHubIssueQueueError("comment has an unsupported schema")
+        if payload.get("plan_id") != plan_id or payload.get("item_id") != item.item_id:
+            raise GitHubIssueQueueError("comment does not match this plan item")
+        reason = payload.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise GitHubIssueQueueError("reason must not be empty")
+        changes = payload.get("changes")
+        if (
+            not isinstance(changes, Mapping)
+            or not changes
+            or not set(changes).issubset(_PLAN_ADJUSTABLE_FIELDS)
+        ):
+            raise GitHubIssueQueueError("changes must contain supported item fields")
+
+        values: dict[str, Any] = {}
+        for field, value in changes.items():
+            if field in {"title", "objective"}:
+                maximum_length = 120 if field == "title" else 2000
+                if (
+                    not isinstance(value, str)
+                    or not value.strip()
+                    or len(value.strip()) > maximum_length
+                ):
+                    raise GitHubIssueQueueError(
+                        f"{field} must contain 1 to {maximum_length} characters"
+                    )
+                values[field] = value.strip()
+                continue
+            if not isinstance(value, list) or not all(
+                isinstance(entry, str) and entry.strip() for entry in value
+            ):
+                raise GitHubIssueQueueError(
+                    f"{field} must be a list of unique non-empty strings"
+                )
+            normalized = tuple(entry.strip() for entry in value)
+            if len(set(normalized)) != len(normalized):
+                raise GitHubIssueQueueError(
+                    f"{field} must be a list of unique non-empty strings"
+                )
+            if field == "scope" and not 1 <= len(normalized) <= 5:
+                raise GitHubIssueQueueError(
+                    "scope must contain between 1 and 5 entries"
+                )
+            if field == "acceptance_criteria" and not normalized:
+                raise GitHubIssueQueueError("acceptance_criteria must not be empty")
+            if field == "acceptance_criteria" and len(normalized) > 10:
+                raise GitHubIssueQueueError(
+                    "acceptance_criteria must contain at most 10 entries"
+                )
+            if field == "implementation_steps" and not 1 <= len(normalized) <= 8:
+                raise GitHubIssueQueueError(
+                    "implementation_steps must contain between 1 and 8 entries"
+                )
+            if field == "allowed_paths":
+                if (
+                    not normalized
+                    or len(normalized) > 20
+                    or any(
+                        Path(path).is_absolute() or ".." in Path(path).parts
+                        for path in normalized
+                    )
+                ):
+                    raise GitHubIssueQueueError(
+                        "allowed_paths must contain at most 20 "
+                        "repository-relative paths"
+                    )
+            values[field] = normalized
+        adjustment_record = {
+            "reason": reason.strip(),
+            "changes": {
+                field: list(value) if isinstance(value, tuple) else value
+                for field, value in values.items()
+            },
+        }
+        effective = replace(
+            effective,
+            **values,
+            inline_adjustments=(
+                *effective.inline_adjustments,
+                adjustment_record,
+            ),
+        )
+    return effective
 
 
 def render_fulfilled_without_pr_comment(

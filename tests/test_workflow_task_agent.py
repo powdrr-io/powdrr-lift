@@ -50,6 +50,7 @@ from powdrr_lift.workrr.multipr_structrr import (
 )
 from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
+    _append_inline_plan_adjustments_to_pr_body,
     _apply_task_edits,
     _build_workflow_client,
     _durable_task_action_output_state,
@@ -74,6 +75,44 @@ from powdrr_lift.workrr.task_agent import (
     run_workflow_task,
 )
 from powdrr_lift.workrr.test_obligations import acceptance_criteria_contract
+
+
+def test_pr_body_discloses_inline_plan_adjustments_to_reviewer() -> None:
+    action = WorkflowAction(
+        kind="invoke_tool",
+        tool="gh",
+        parameters={
+            "operation": "pr_create",
+            "title": "Implement CI verification",
+            "body": "## Summary\n\nAdd the verification workflow.",
+        },
+    )
+    task_input_state = {
+        "proposed_pr_context": {
+            "plan_id": "feature-v1",
+            "item_id": "PR-04",
+            "inline_plan_adjustments": [
+                {
+                    "reason": "Step 4 updates repository CI.",
+                    "changes": {
+                        "allowed_paths": ["src", "tests", ".github/workflows/ci.yml"]
+                    },
+                }
+            ],
+        }
+    }
+
+    updated = _append_inline_plan_adjustments_to_pr_body(
+        action,
+        task_input_state,
+    )
+
+    assert "## Summary\n\nAdd the verification workflow." in updated.parameters["body"]
+    assert "## Inline plan adjustments" in updated.parameters["body"]
+    assert "feature-v1/PR-04" in updated.parameters["body"]
+    assert "Step 4 updates repository CI." in updated.parameters["body"]
+    assert ".github/workflows/ci.yml" in updated.parameters["body"]
+    assert action.parameters["body"] == "## Summary\n\nAdd the verification workflow."
 
 
 def _commit_test_structrr_baseline(

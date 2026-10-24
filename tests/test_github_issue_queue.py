@@ -153,7 +153,14 @@ class FakeIssueClient:
 
     def list_comments(self, issue_number: int) -> tuple[dict[str, str], ...]:
         return tuple(
-            {"body": body} for number, body in self.comments if number == issue_number
+            {
+                "body": body,
+                "author_association": (
+                    "OWNER" if "<!-- powdrr-plan-adjustment:v1 -->" in body else "NONE"
+                ),
+            }
+            for number, body in self.comments
+            if number == issue_number
         )
 
     def pull_request(self, number: int) -> dict[str, object]:
@@ -709,6 +716,94 @@ def test_worker_passes_explicit_no_pr_dependency_to_workflow(
     assert report.outcome == "blocked"
     assert report.item_id == "followup"
     assert received == [("base",)]
+
+
+def test_worker_applies_inline_issue_adjustment_to_effective_item(
+    tmp_path: Path,
+) -> None:
+    workflow_file = tmp_path / "docs/workflows/base.yaml"
+    workflow_file.parent.mkdir(parents=True)
+    _write_process_workflow(
+        workflow_file,
+        plan_id="feature-v1",
+        item_id="base",
+        workflow_id="base",
+    )
+    plan_with_paths = ReviewedExecutionPlan(
+        "feature-v1",
+        (
+            PlannedWorkItem(
+                "base",
+                "Base work",
+                "Add the shared base.",
+                ("src/base.py",),
+                ("Base behavior is covered.",),
+                (),
+                None,
+                "base",
+                workflow_file="docs/workflows/base.yaml",
+                allowed_paths=("src", "tests"),
+            ),
+        ),
+    )
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan_with_paths,
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    client.comments.append(
+        (
+            client.issues[0].number,
+            """<!-- powdrr-plan-adjustment:v1 -->
+```json
+{
+  "schema": "https://powdrr.io/schemas/github-issue-plan-adjustment-v1",
+  "plan_id": "feature-v1",
+  "item_id": "base",
+  "reason": "The implementation steps update the CI workflow.",
+  "changes": {
+    "allowed_paths": ["src", "tests", ".github/workflows/ci.yml"]
+  }
+}
+```""",
+        )
+    )
+    received: list[PlannedWorkItem] = []
+
+    def load_plan(
+        _path: str, _commit: str, *, repo_root: str | Path
+    ) -> ReviewedExecutionPlan:
+        assert Path(repo_root) == tmp_path
+        return plan_with_paths
+
+    def run_task(
+        _directory: Path,
+        _workflow_id: str,
+        _worker_id: str,
+        item: PlannedWorkItem,
+        _plan: ReviewedExecutionPlan,
+        _fulfilled_without_pr_dependencies: tuple[str, ...],
+        _checkpoint: TaskCheckpointCallback,
+    ) -> int:
+        received.append(item)
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-inline-adjustment",
+        run_task=run_task,
+        plan_loader=load_plan,
+    )
+
+    assert report.outcome == "awaiting_review"
+    assert received[0].allowed_paths == (
+        "src",
+        "tests",
+        ".github/workflows/ci.yml",
+    )
 
 
 def test_fulfill_issue_without_pr_records_explicit_reason_and_closes_issue() -> None:

@@ -144,6 +144,8 @@ def render_implementation_specification_template(
         "    action: null",
         "    relative_location: null",
         "    purpose: null",
+        "    quality_tier: null",
+        "    legacy_behavior: null",
         "tools:",
         "  - id: null",
         "    action: null",

@@ -127,6 +127,9 @@ def test_specify_feature_interviews_until_structured_spec_has_no_open_assumption
 
     assert interview["actions"] == ["prompt_user"]
     assert "distinct user-visible features" in details
+    assert "must be preserved" in details
+    assert "legacy_behavior" in details
+    assert "quality_tier" in details
     assert all(
         level in details
         for level in ("prototyping", "internal beta", "production ready")

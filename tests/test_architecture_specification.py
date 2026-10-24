@@ -157,11 +157,15 @@ def test_validate_architecture_specification_accepts_modules_and_tools(
         action: added
         relative_location: src/core
         purpose: Shared core behavior.
+        quality_tier: production_ready
+        legacy_behavior: No prior behavior; this is a new module.
       - id: cli
         action: changed
         related_modules:
           - core
         purpose: Command line surface.
+        quality_tier: internal_beta
+        legacy_behavior: Preserve existing command names and output formats.
     tools:
       - id: formatter
         action: added
@@ -188,6 +192,39 @@ def test_validate_architecture_specification_accepts_modules_and_tools(
     assert report.validation_successful is True
     assert report.module_ids == ["cli", "core"]
     assert report.tool_ids == ["formatter"]
+
+
+def test_validate_architecture_specification_rejects_unknown_module_quality_tier(
+    tmp_path: Path,
+) -> None:
+    _write_system_specification(tmp_path)
+    proposed_spec = """
+    version: 1
+    id: 2026-06-19
+
+    entities: []
+    modules:
+      - id: core
+        action: added
+        relative_location: src/core
+        purpose: Shared core behavior.
+        quality_tier: enterprise
+        legacy_behavior: Not applicable because this module is new.
+    tools: []
+    entity_relationships: []
+    invariants: []
+    guidance: []
+    """
+
+    report = build_architecture_specification_validation_report(
+        proposed_spec,
+        entity_types=["Service"],
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "invalid_module_quality_tier" for issue in report.issues)
 
 
 def test_validate_architecture_specification_accepts_case_insensitive_entity_type(

@@ -196,7 +196,7 @@ steps:
     assert "Done: Inspect this fixture." in stdout.getvalue()
 
 
-def test_chat_jev_provider_uses_the_decision_classifier_with_planning_fallback(
+def test_chat_jev_provider_uses_the_decision_classifier(
     tmp_path: Path, monkeypatch: Any
 ) -> None:
     process_dir = tmp_path / "processes"

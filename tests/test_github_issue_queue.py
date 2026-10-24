@@ -8,6 +8,7 @@ import pytest
 
 import powdrr_lift.workrr.github_issue_queue as github_issue_queue
 from powdrr_lift.workrr.github_issue_queue import (
+    FULFILLED_WITHOUT_PR_LABEL,
     QUEUE_LABELS,
     GitHubIssueClient,
     GitHubIssueQueueError,
@@ -20,6 +21,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     _parse_plan,
     _plan_label,
     find_plan_issues,
+    fulfill_issue_without_pr,
     parse_issue_pointer,
     publish_plan_issues,
     render_task_checkpoint_comment,
@@ -78,11 +80,18 @@ class FakeIssueClient:
         self.comments: list[tuple[int, str]] = []
         self.pull_requests: dict[int, dict[str, object]] = {}
         self.labels_ensured = False
+        self.fulfillment_label_ensured = False
         self.merged_commit: str | None = None
         self._next_number = 100
 
     def ensure_queue_labels(self) -> None:
         self.labels_ensured = True
+
+    def ensure_fulfilled_without_pr_label(self) -> None:
+        self.fulfillment_label_ensured = True
+
+    def get_issue(self, issue_number: int) -> QueueIssue:
+        return next(issue for issue in self.issues if issue.number == issue_number)
 
     def ensure_plan_label(self, plan_id: str) -> str:
         return _plan_label(plan_id)
@@ -121,7 +130,10 @@ class FakeIssueClient:
         *,
         body: str | None = None,
         labels: tuple[str, ...] | None = None,
+        state: str | None = None,
+        state_reason: str | None = None,
     ) -> None:
+        assert state_reason in (None, "completed")
         index = next(
             index
             for index, value in enumerate(self.issues)
@@ -131,7 +143,7 @@ class FakeIssueClient:
             issue.number,
             issue.title,
             body if body is not None else issue.body,
-            issue.state,
+            state if state is not None else issue.state,
             labels if labels is not None else issue.labels,
             issue.url,
         )
@@ -373,6 +385,50 @@ def test_github_issue_client_filters_issue_state_locally_for_labeled_queries() -
     )
 
 
+def test_github_issue_client_closes_fulfilled_issue_with_completed_reason() -> None:
+    commands: list[list[str]] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        if arguments[1] == "api" and arguments[2].startswith("repos/"):
+            return subprocess.CompletedProcess(
+                arguments,
+                0,
+                json.dumps(
+                    {
+                        "number": 63,
+                        "title": "Powdrr work item",
+                        "body": "pointer",
+                        "state": "open",
+                        "labels": [],
+                        "html_url": "https://github.com/example/project/issues/63",
+                    }
+                )
+                if "GET" in arguments
+                else "{}",
+                "",
+            )
+        return subprocess.CompletedProcess(arguments, 0, "{}", "")
+
+    client = GitHubIssueClient("example/project", run=run)
+    issue = client.get_issue(63)
+    client.update_issue(
+        issue,
+        labels=(FULFILLED_WITHOUT_PR_LABEL,),
+        state="closed",
+        state_reason="completed",
+    )
+
+    patch_arguments = commands[1]
+    assert patch_arguments[3] == "--method"
+    assert "PATCH" in patch_arguments
+    assert f"labels[]={FULFILLED_WITHOUT_PR_LABEL}" in patch_arguments
+    assert "state=closed" in patch_arguments
+    assert "state_reason=completed" in patch_arguments
+
+
 def test_github_client_skips_labels_that_already_exist() -> None:
     commands: list[list[str]] = []
 
@@ -546,6 +602,7 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(
         _worker_id: str,
         _item: PlannedWorkItem,
         _plan: ReviewedExecutionPlan,
+        _fulfilled_without_pr_dependencies: tuple[str, ...],
         _checkpoint: TaskCheckpointCallback,
     ) -> int:
         executed.append(workflow_id)
@@ -598,6 +655,87 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(
     assert executed == ["base", "followup"]
     assert QUEUE_LABELS["awaiting_review"] in client.issues[1].labels
     assert waits == [1.0]
+
+
+def test_worker_passes_explicit_no_pr_dependency_to_workflow(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "docs/workflows/base").mkdir(parents=True)
+    (tmp_path / "docs/workflows/followup").mkdir(parents=True)
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    prerequisite = client.issues[0]
+    client.issues[0] = QueueIssue(
+        prerequisite.number,
+        prerequisite.title,
+        prerequisite.body,
+        "closed",
+        (FULFILLED_WITHOUT_PR_LABEL, _plan_label("feature-v1")),
+        prerequisite.url,
+    )
+    received: list[tuple[str, ...]] = []
+
+    def load_plan(
+        _path: str, _commit: str, *, repo_root: str | Path
+    ) -> ReviewedExecutionPlan:
+        assert Path(repo_root) == tmp_path
+        return plan()
+
+    def run_task(
+        _directory: Path,
+        _workflow_id: str,
+        _worker_id: str,
+        _item: PlannedWorkItem,
+        _plan: ReviewedExecutionPlan,
+        fulfilled_without_pr_dependencies: tuple[str, ...],
+        _checkpoint: TaskCheckpointCallback,
+    ) -> int:
+        received.append(fulfilled_without_pr_dependencies)
+        return 1
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-after-no-pr-completion",
+        run_task=run_task,
+        plan_loader=load_plan,
+    )
+
+    assert report.outcome == "blocked"
+    assert report.item_id == "followup"
+    assert received == [("base",)]
+
+
+def test_fulfill_issue_without_pr_records_explicit_reason_and_closes_issue() -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+
+    result = fulfill_issue_without_pr(
+        issue_number=100,
+        reason="The verifier and fixtures are already present on main.",
+        client=client,  # type: ignore[arg-type]
+    )
+
+    assert client.fulfillment_label_ensured
+    assert result.state == "closed"
+    assert FULFILLED_WITHOUT_PR_LABEL in result.labels
+    assert not (set(QUEUE_LABELS.values()) & set(result.labels))
+    assert len(client.comments) == 1
+    issue_number, comment = client.comments[0]
+    assert issue_number == 100
+    assert "powdrr-issue-fulfillment:v1" in comment
+    assert '"fulfillment": "without_implementation_pr"' in comment
+    assert "already present on main" in comment
 
 
 def test_publisher_reconciles_old_ready_issues_with_plan_dependencies() -> None:
@@ -674,6 +812,7 @@ def test_worker_accepts_one_file_workflow_definition(tmp_path: Path) -> None:
         _worker_id: str,
         _item: PlannedWorkItem,
         _plan: ReviewedExecutionPlan,
+        _fulfilled_without_pr_dependencies: tuple[str, ...],
         _checkpoint: TaskCheckpointCallback,
     ) -> int:
         observed.append(path)
@@ -789,6 +928,7 @@ def test_worker_marks_failed_execution_blocked(tmp_path: Path) -> None:
         _worker_id: str,
         _item: PlannedWorkItem,
         _plan: ReviewedExecutionPlan,
+        _fulfilled_without_pr_dependencies: tuple[str, ...],
         _checkpoint: TaskCheckpointCallback,
     ) -> int:
         return 1
@@ -826,6 +966,7 @@ def test_worker_persists_task_checkpoint_as_issue_comment(tmp_path: Path) -> Non
         _worker_id: str,
         _item: PlannedWorkItem,
         _plan: ReviewedExecutionPlan,
+        _fulfilled_without_pr_dependencies: tuple[str, ...],
         checkpoint: TaskCheckpointCallback,
     ) -> int:
         checkpoint(
@@ -925,6 +1066,7 @@ def test_worker_repins_and_requeues_issue_when_plan_amendment_merges(
         _worker_id: str,
         _item: PlannedWorkItem,
         reviewed_plan: ReviewedExecutionPlan,
+        _fulfilled_without_pr_dependencies: tuple[str, ...],
         _checkpoint: TaskCheckpointCallback,
     ) -> int:
         executed_commits.append(loaded_commits[-1])

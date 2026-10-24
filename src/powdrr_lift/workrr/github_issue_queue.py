@@ -30,9 +30,12 @@ QUEUE_LABELS = {
     "blocked_on_dependency": "powdrr:blocked-on-dependency",
     "blocked": "powdrr:blocked",
 }
+FULFILLED_WITHOUT_PR_LABEL = "powdrr:fulfilled-without-pr"
 _MARKER_START = "<!-- powdrr-queue-item:v1 "
 _MARKER_END = " -->"
 _TASK_CHECKPOINT_START = "<!-- powdrr-task-checkpoint:v1 -->"
+_FULFILLMENT_MARKER = "<!-- powdrr-issue-fulfillment:v1 -->"
+_FULFILLMENT_SCHEMA = "https://powdrr.io/schemas/github-issue-fulfillment-v1"
 _PLAN_AMENDMENT_TITLE_PREFIX = "Correct plan:"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 _GITHUB_STATUS_SETTLE_SECONDS = 1.0
@@ -217,6 +220,17 @@ class GitHubIssueClient:
                 description=f"Powdrr queue state: {status.replace('_', ' ')}",
             )
 
+    def ensure_fulfilled_without_pr_label(self) -> None:
+        self._ensure_label(
+            FULFILLED_WITHOUT_PR_LABEL,
+            color="0E8A16",
+            description="Powdrr work completed without an implementation pull request",
+        )
+
+    def get_issue(self, issue_number: int) -> QueueIssue:
+        result = self._api("GET", f"repos/{self.repository}/issues/{issue_number}")
+        return _issue_from_api(result.stdout)
+
     def _ensure_label(self, label: str, *, color: str, description: str) -> None:
         endpoint = f"repos/{self.repository}/labels/{quote(label, safe='')}"
         existing = self._invoke(["api", endpoint], check=False)
@@ -273,6 +287,8 @@ class GitHubIssueClient:
         *,
         body: str | None = None,
         labels: Sequence[str] | None = None,
+        state: str | None = None,
+        state_reason: str | None = None,
     ) -> None:
         arguments = ["PATCH", f"repos/{self.repository}/issues/{issue.number}"]
         if body is not None:
@@ -280,6 +296,10 @@ class GitHubIssueClient:
         if labels is not None:
             for label in labels:
                 arguments.extend(("-f", f"labels[]={label}"))
+        if state is not None:
+            arguments.extend(("-f", f"state={state}"))
+        if state_reason is not None:
+            arguments.extend(("-f", f"state_reason={state_reason}"))
         self._api(*arguments)
 
     def add_comment(self, issue: QueueIssue, body: str) -> None:
@@ -521,6 +541,7 @@ def run_worker_once(
             str,
             PlannedWorkItem,
             ReviewedExecutionPlan,
+            tuple[str, ...],
             TaskCheckpointCallback,
         ],
         int,
@@ -663,12 +684,24 @@ def run_worker_once(
                     )
                     return WorkerReport("blocked", issue.number, item.item_id, detail)
             try:
+                item_by_id = {candidate.item_id: candidate for candidate in plan.items}
+                fulfilled_without_pr_dependencies = tuple(
+                    item_by_id[dependency].workflow_id
+                    for dependency in item.dependencies
+                    if (
+                        (dependency_issue := indexed.get((plan.plan_id, dependency)))
+                        is not None
+                        and dependency_issue.state == "closed"
+                        and FULFILLED_WITHOUT_PR_LABEL in dependency_issue.labels
+                    )
+                )
                 return_code = run_task(
                     workflow_path,
                     item.workflow_id,
                     worker_id,
                     item,
                     plan,
+                    fulfilled_without_pr_dependencies,
                     _task_checkpoint_callback(
                         client=client,
                         issue=issue,
@@ -698,6 +731,80 @@ def run_worker_once(
             client.add_comment(issue, note)
             return WorkerReport(outcome, issue.number, item.item_id, detail)
     return WorkerReport("no_eligible_work")
+
+
+def fulfill_issue_without_pr(
+    *,
+    issue_number: int,
+    reason: str,
+    client: GitHubIssueClient,
+) -> QueueIssue:
+    """Record that a planned item is already fulfilled without an implementation PR."""
+    normalized_reason = reason.strip()
+    if not normalized_reason:
+        raise GitHubIssueQueueError(
+            "a reason is required to fulfill an issue without a PR"
+        )
+    issue = client.get_issue(issue_number)
+    pointer = parse_issue_pointer(issue.body)
+    if pointer is None:
+        raise GitHubIssueQueueError(
+            f"issue #{issue_number} is not a Powdrr plan work item"
+        )
+    client.ensure_fulfilled_without_pr_label()
+    labels = tuple(
+        sorted(
+            (set(issue.labels) - set(QUEUE_LABELS.values()))
+            | {FULFILLED_WITHOUT_PR_LABEL}
+        )
+    )
+    comments = client.list_comments(issue_number)
+    if not any(
+        isinstance(comment.get("body"), str)
+        and _FULFILLMENT_MARKER in str(comment.get("body"))
+        for comment in comments
+    ):
+        client.add_comment(
+            issue,
+            render_fulfilled_without_pr_comment(
+                plan_id=pointer["plan_id"],
+                item_id=pointer["item_id"],
+                reason=normalized_reason,
+            ),
+        )
+    client.update_issue(
+        issue,
+        labels=labels,
+        state="closed",
+        state_reason="completed",
+    )
+    return QueueIssue(
+        number=issue.number,
+        title=issue.title,
+        body=issue.body,
+        state="closed",
+        labels=labels,
+        url=issue.url,
+    )
+
+
+def render_fulfilled_without_pr_comment(
+    *, plan_id: str, item_id: str, reason: str
+) -> str:
+    payload = {
+        "schema": _FULFILLMENT_SCHEMA,
+        "plan_id": plan_id,
+        "item_id": item_id,
+        "fulfillment": "without_implementation_pr",
+        "reason": reason,
+    }
+    return (
+        "### Powdrr work item fulfilled without an implementation PR\n\n"
+        f"{_FULFILLMENT_MARKER}\n"
+        "```json\n"
+        f"{json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True)}\n"
+        "```"
+    )
 
 
 def render_task_checkpoint_comment(checkpoint: TaskCheckpoint) -> str:

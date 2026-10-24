@@ -199,8 +199,12 @@ retry it.
    and merge commit. Repeating the command reuses issues by stable plan/item ID.
 3. Run one worker item at a time. Issues with unmet dependencies remain
    `powdrr:blocked-on-dependency` until the worker observes that their
-   prerequisite issues are closed. Close an issue only after its implementation
-   PR is merged.
+   prerequisite issues are closed. Close an issue after its implementation PR
+   is merged. If the work is already fulfilled on the base branch and needs no
+   implementation PR, use `fulfill-plan-issue-without-pr` instead of simply
+   closing it. That command adds the `powdrr:fulfilled-without-pr` label and a
+   structured issue comment; downstream workflows then accept the declared
+   dependency without looking for a merged implementation PR.
 4. To retry blocked work, resolve the issue and replace its `powdrr:blocked`
    label with `powdrr:ready`.
 
@@ -218,4 +222,9 @@ powdrr-lift list-plan-issues \
 powdrr-lift github-issue-worker \
   --repository owner/repository \
   --repo-root .
+
+powdrr-lift fulfill-plan-issue-without-pr \
+  --repository owner/repository \
+  --issue-number 63 \
+  --reason "The planned verifier and fixtures already exist on main."
 ```

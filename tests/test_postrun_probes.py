@@ -53,6 +53,8 @@ def _parse(
     *,
     instruction: str = "Add selector handling.",
     instruction_ledger_clauses: tuple[dict[str, object], ...] = (),
+    repository_contract: dict[str, Any] | None = None,
+    rejected_probes: list[dict[str, str]] | None = None,
 ) -> tuple[
     tuple[dict[str, Any], ...],
     tuple[dict[str, Any], ...],
@@ -68,9 +70,19 @@ def _parse(
             for scenario in scenarios
         ),
         instruction=instruction,
-        repository_contract={},
+        repository_contract=repository_contract or {},
         instruction_ledger_clauses=instruction_ledger_clauses,
+        rejected_probes=rejected_probes,
     )
+
+
+def _paired_engine_contract() -> dict[str, Any]:
+    return {
+        "records": [
+            {"kind": "class", "name": "SyncEngine"},
+            {"kind": "class", "name": "AsyncEngine"},
+        ]
+    }
 
 
 def test_parse_generated_probe_source_preserves_complete_code_and_metadata() -> None:
@@ -84,6 +96,65 @@ def test_parse_generated_probe_source_preserves_complete_code_and_metadata() -> 
     assert obligations[0]["category"] == "transformation"
     assert interactions == ()
     assert probes[0].obligation_id == "selector-obligation"
+    assert probes[0].execution_path == "sync"
+
+
+def test_paired_engines_require_async_probe_for_supported_obligations() -> None:
+    rejected: list[dict[str, str]] = []
+
+    _, _, probes = _parse(
+        _source(),
+        ({"scenario_id": "selector"},),
+        repository_contract=_paired_engine_contract(),
+        rejected_probes=rejected,
+    )
+
+    assert len(probes) == 1
+    assert any(
+        item["obligation_id"] == "selector-obligation"
+        and "needs an async-path probe" in item["error"]
+        for item in rejected
+    )
+
+
+def test_async_probe_must_use_asyncio_run_wrapper() -> None:
+    rejected: list[dict[str, str]] = []
+    source = _source("assert asyncio.run(exercise()) is None").replace(
+        "'oracle_basis': 'The instruction defines this result.'}",
+        "'oracle_basis': 'The instruction defines this result.', "
+        "'execution_path': 'async'}",
+    )
+    source = source.replace(
+        "import module\n",
+        "import asyncio\nimport module\n\n"
+        "async def exercise():\n"
+        "    assert await module.public_api_async('value') == 'handled:value'\n",
+    )
+
+    _, _, probes = _parse(
+        source,
+        ({"scenario_id": "selector"},),
+        repository_contract=_paired_engine_contract(),
+        rejected_probes=rejected,
+    )
+
+    assert len(probes) == 1
+    assert probes[0].execution_path == "async"
+    assert any("needs a sync-path probe" in item["error"] for item in rejected)
+
+
+def test_async_probe_rejects_wrapper_without_awaited_async_operation() -> None:
+    source = _source(
+        "assert asyncio.run(module.public_api_async('value')) == 'handled:value'"
+    ).replace(
+        "'oracle_basis': 'The instruction defines this result.'}",
+        "'oracle_basis': 'The instruction defines this result.', "
+        "'execution_path': 'async'}",
+    )
+    source = source.replace("import module\n", "import asyncio\nimport module\n")
+
+    with pytest.raises(ValueError, match="local async helper that awaits"):
+        _parse(source, ({"scenario_id": "selector"},))
 
 
 def test_probe_suite_stops_when_all_probes_are_invalid() -> None:

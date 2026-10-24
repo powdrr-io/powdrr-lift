@@ -157,19 +157,18 @@ def test_async_probe_rejects_wrapper_without_awaited_async_operation() -> None:
         _parse(source, ({"scenario_id": "selector"},))
 
 
-def test_probe_suite_stops_when_all_probes_are_invalid() -> None:
+def test_probe_without_literal_assertion_is_accepted_for_baseline_check() -> None:
     rejected: list[dict[str, str]] = []
 
-    with pytest.raises(ValueError, match="no valid probes after isolation"):
-        parse_generated_postrun_probe_source(
-            _source("module.public_api('value')"),
-            ({"scenario_id": "selector", "evidence": ["Add selector handling."]},),
-            instruction="Add selector handling.",
-            rejected_probes=rejected,
-        )
+    _, _, probes = parse_generated_postrun_probe_source(
+        _source("module.public_api('value')"),
+        ({"scenario_id": "selector", "evidence": ["Add selector handling."]},),
+        instruction="Add selector handling.",
+        rejected_probes=rejected,
+    )
 
-    assert rejected[0]["probe_id"] == "selector-result"
-    assert "observable assertion" in rejected[0]["error"]
+    assert len(probes) == 1
+    assert rejected == []
 
 
 def test_probe_obligation_evidence_resolves_from_scenario_deterministically() -> None:
@@ -305,10 +304,6 @@ def test_probe_can_call_public_api_in_exception_handling_before_assertion() -> N
     [
         ("def test_probe_bad(:\n    pass\n", "valid Python"),
         (
-            _source("assert True"),
-            "non-built-in software call",
-        ),
-        (
             _source("import subprocess\n    assert True"),
             "disallowed system module",
         ),
@@ -327,6 +322,26 @@ def test_parser_rejects_invalid_or_unsafe_probe_code(
 ) -> None:
     with pytest.raises(ValueError, match=expected_error):
         _parse(source, ({"scenario_id": "selector"},))
+
+
+def test_parser_accepts_expected_exception_probe_without_assert_statement() -> None:
+    source = _source(
+        "try:\n        module.public_api('invalid')\n"
+        "    except ValueError:\n        return\n"
+        "    raise AssertionError('expected ValueError')"
+    )
+
+    _, _, probes = _parse(source, ({"scenario_id": "selector"},))
+
+    assert len(probes) == 1
+
+
+def test_parser_accepts_importability_probe_without_function_call() -> None:
+    source = _source("assert callable(module.public_api)")
+
+    _, _, probes = _parse(source, ({"scenario_id": "selector"},))
+
+    assert len(probes) == 1
 
 
 def test_probe_parser_rejects_unknown_scenario() -> None:

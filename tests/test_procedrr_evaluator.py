@@ -870,10 +870,14 @@ def test_evaluator_bounds_large_judge_context() -> None:
                 }
             ],
         },
-        {"large": {"document": "x" * 10000}},
+        {"large": {f"document_{index}": "x" * 10000 for index in range(6)}},
     )
     assert len(bounded.messages[1]["content"]) < 500
     assert "<truncated>" in bounded.messages[1]["content"]
+    bounded_context = json.loads(
+        bounded.messages[1]["content"].rsplit("Context:\n", 1)[1]
+    )
+    assert len(json.dumps(bounded_context)) <= 120
 
 
 def test_evaluator_resolves_embedded_references_in_operation_parameters() -> None:

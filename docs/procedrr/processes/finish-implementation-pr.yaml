@@ -61,7 +61,7 @@ steps:
         - "In Advisory Test-Quality Notes, include each distinct implementation_result.integration_tests.quality_notes concern once. Group multiple labels for the same test into one concise bullet, summarize the concern and evidence in at most two sentences, and never copy full model reasoning or raw prompts. Write `None.` when there are no concerns. These notes are advisory and never block publication."
         - Keep the description focused on this PR. Do not add empty sections, template instructions, or placeholder text.
         - Set base-branch to main.
-        - Set publication-branch to powdrr/<proposed-pr-id>-implementation, using task_context.proposed_pr_id exactly.
+        - "Set publication-branch to powdrr/<proposed-pr-id>-implementation, using task_context.proposed_pr_id exactly. When workflow metadata includes a publication ID, Workrr appends it to create a unique branch for this PR; do not invent the ID."
         - Provide a clear commit message and a complete populated PR description. Do not claim any unrun check passed.
       context: [task_context, implementation_result, publication_scope, validation_results]
       output:

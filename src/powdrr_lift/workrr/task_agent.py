@@ -118,6 +118,7 @@ from powdrr_lift.workrr.git import (
     inspect_workflow_run,
     load_workflow_git_state,
     load_workflow_git_states,
+    publication_branch_name,
     resolve_git_repository_root,
     slugify_workflow_id,
     validate_workflow_git_state,
@@ -2953,16 +2954,24 @@ class _TaskWorkflowExecutionStrategy:
         ):
             proposed_pr_id = self.task.input_state.get("proposed_pr_id")
             if isinstance(proposed_pr_id, str) and proposed_pr_id.strip():
-                publication_kind = (
-                    "plan-amendment"
-                    if any(
+                requested_branch = str(
+                    action.parameters.get("publication_branch", "")
+                ).casefold()
+                publication_kind = _publication_kind_from_request(
+                    requested_branch,
+                    has_plan_amendment_event=any(
                         event.get("kind") == "plan_amendment_agent"
                         for event in self.events
-                    )
-                    else "implementation"
+                    ),
                 )
-                expected_branch = (
-                    f"powdrr/{slugify_workflow_id(proposed_pr_id)}-{publication_kind}"
+                git_state = load_workflow_git_state(
+                    self.workflow.directory,
+                    workflow_id=proposed_pr_id,
+                )
+                expected_branch = publication_branch_name(
+                    proposed_pr_id,
+                    publication_kind,
+                    git_state.publication_id if git_state is not None else "",
                 )
                 if action.parameters.get("publication_branch") != expected_branch:
                     corrected_parameters = dict(action.parameters)
@@ -2973,8 +2982,8 @@ class _TaskWorkflowExecutionStrategy:
                         parameters=corrected_parameters,
                     )
                     print(
-                        "Corrected clean publication branch to the deterministic "
-                        f"workflow branch {expected_branch}.",
+                        "Corrected clean publication branch to the workflow branch "
+                        f"{expected_branch}.",
                         file=self.stderr,
                     )
         command_error = _workflow_file_command_error(
@@ -5774,6 +5783,23 @@ def _gh_result(
 def _workflow_branch_name(workflow: WorkflowInstance) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", workflow.directory.name.casefold()).strip("-")
     return f"workflow/{slug or 'execution'}"
+
+
+def _publication_kind_from_request(
+    requested_branch: str,
+    *,
+    has_plan_amendment_event: bool,
+) -> str:
+    """Prefer the current PR intent over older amendment events in this task."""
+    if requested_branch.endswith("-plan-amendment") or "-plan-amendment-" in (
+        requested_branch
+    ):
+        return "plan-amendment"
+    if requested_branch.endswith("-implementation") or "-implementation-" in (
+        requested_branch
+    ):
+        return "implementation"
+    return "plan-amendment" if has_plan_amendment_event else "implementation"
 
 
 def _default_branch(repo_root: Path, *, runtime: ExecutionRuntime | None = None) -> str:

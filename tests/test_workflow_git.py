@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,8 @@ from powdrr_lift.workrr.git import (
     inspect_workflow_run,
     integration_branch_name,
     load_workflow_git_state,
+    new_publication_id,
+    publication_branch_name,
     resolve_git_repository_root,
     save_workflow_git_state,
     synchronize_workflow_initialization,
@@ -60,6 +63,26 @@ def test_workflow_git_state_round_trips_and_names_branches(tmp_path: Path) -> No
     )
 
 
+def test_publication_branches_are_unique_and_stable_per_workflow() -> None:
+    publication_id = new_publication_id()
+    implementation_branch = publication_branch_name(
+        "Feature Request 17", "implementation", publication_id
+    )
+    another_branch = publication_branch_name(
+        "Feature Request 17", "implementation", new_publication_id()
+    )
+
+    assert implementation_branch.startswith("powdrr/feature-request-17-implementation-")
+    assert implementation_branch != another_branch
+    assert publication_branch_name("Feature Request 17", "implementation") == (
+        "powdrr/feature-request-17-implementation"
+    )
+    assert (
+        publication_branch_name("Feature Request 17", "plan-amendment", publication_id)
+        == f"powdrr/feature-request-17-plan-amendment-{publication_id}"
+    )
+
+
 def test_workflow_git_state_loads_by_workflow_id_when_directory_is_shared(
     tmp_path: Path,
 ) -> None:
@@ -97,6 +120,7 @@ def test_workflow_git_state_round_trips_workflow_dependencies() -> None:
         base_branch="main",
         integration_branch="powdrr/integration",
         workflow_relative_directory="docs/workflows/feature",
+        publication_id="pub-token",
         depends_on_workflows=("core",),
     )
 
@@ -173,6 +197,43 @@ def test_workflow_dependency_accepts_merged_worker_attempt_branch(
     )
 
     assert workflow_dependencies_completion(tmp_path, state) == (True, ())
+
+
+def test_related_workflow_pr_lookup_includes_unique_publication_branches(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        workflow_git,
+        "_gh",
+        lambda *_args: subprocess.CompletedProcess(
+            ["gh", "pr", "list"],
+            0,
+            json.dumps(
+                [
+                    {
+                        "state": "MERGED",
+                        "headRefName": "powdrr/core-implementation-run-123",
+                    },
+                    {
+                        "state": "OPEN",
+                        "headRefName": "powdrr/core-plan-amendment-run-456",
+                    },
+                ]
+            ),
+            "",
+        ),
+    )
+
+    pull_requests, error = workflow_git._related_workflow_attempt_pull_requests(
+        tmp_path,
+        "powdrr/core",
+    )
+
+    assert error is None
+    assert [item["headRefName"] for item in pull_requests] == [
+        "powdrr/core-implementation-run-123"
+    ]
 
 
 def test_force_synchronization_resets_stale_integration_branch(

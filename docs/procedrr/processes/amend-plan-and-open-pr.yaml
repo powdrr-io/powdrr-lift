@@ -47,7 +47,7 @@ steps:
         - Explain the plan defect and correction in Objective, list the plan files and related scope in Scope, summarize the edit in Implementation Details, and include the plan criteria and exact validation commands and results in their matching sections.
         - "The advisory test-quality section is reserved for concise concerns relevant to the amendment; write `None.` when none apply. Never include full model reasoning or raw prompts."
         - Keep the description focused on this amendment. Do not add empty sections, template instructions, or placeholder text.
-        - Set base-branch to main and publication-branch to powdrr/<proposed-pr-id>-plan-amendment.
+        - "Set base-branch to main and publication-branch to powdrr/<proposed-pr-id>-plan-amendment. When workflow metadata includes a publication ID, Workrr appends it to create a unique branch for this PR; do not invent the ID."
         - Provide a clear commit message and populated PR description. Do not claim any unrun check passed.
       context: [task_context, implementation_result, failure_review, amendment_result, validation_results]
       output:

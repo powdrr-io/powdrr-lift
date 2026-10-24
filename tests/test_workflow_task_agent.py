@@ -1331,6 +1331,16 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
     plan_amendment: bool,
 ) -> None:
     workflow = _workflow(tmp_path)
+    save_workflow_git_state(
+        workflow.directory,
+        WorkflowGitState(
+            proposed_pr_id="feature-v1-pr-01",
+            base_branch="main",
+            integration_branch="powdrr/feature-v1-pr-01",
+            workflow_relative_directory=workflow.directory.name,
+            publication_id="stable-run-id",
+        ),
+    )
     task = replace(
         workflow.tasks[0],
         input_state={"proposed_pr_id": "feature-v1-pr-01"},
@@ -1390,10 +1400,81 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
     assert recorded[0]["command"] == ["gh", "pr", "create"]
     assert strategy.events[-1]["result"] == url
     assert published_parameters[0]["publication_branch"] == (
-        "powdrr/feature-v1-pr-01-plan-amendment"
+        "powdrr/feature-v1-pr-01-plan-amendment-stable-run-id"
         if plan_amendment
-        else "powdrr/feature-v1-pr-01-implementation"
+        else "powdrr/feature-v1-pr-01-implementation-stable-run-id"
     )
+
+
+def test_implementation_pr_after_amendment_uses_a_distinct_branch(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workflow = _workflow(tmp_path)
+    save_workflow_git_state(
+        workflow.directory,
+        WorkflowGitState(
+            proposed_pr_id="feature-v1-pr-01",
+            base_branch="main",
+            integration_branch="powdrr/feature-v1-pr-01",
+            workflow_relative_directory=workflow.directory.name,
+            publication_id="stable-run-id",
+        ),
+    )
+    task = replace(
+        workflow.tasks[0],
+        input_state={"proposed_pr_id": "feature-v1-pr-01"},
+    )
+    published_parameters: list[Mapping[str, Any]] = []
+
+    def publish(_tool: str, parameters: Mapping[str, Any], **_kwargs: Any) -> str:
+        published_parameters.append(dict(parameters))
+        return "https://github.com/example/repo/pull/42"
+
+    class RuntimeStub:
+        def require_publish_readiness(self) -> None:
+            pass
+
+    monkeypatch.setattr(task_agent, "invoke_intrinsic_capability", publish)
+    monkeypatch.setattr(
+        task_agent, "_record_task_pull_request", lambda *args, **_kwargs: None
+    )
+    strategy = task_agent._TaskWorkflowExecutionStrategy(
+        config=cast(Any, SimpleNamespace(verbose=False)),
+        workflow=workflow,
+        task=task,
+        repo_root=tmp_path,
+        error_log_root=tmp_path,
+        client=cast(Any, None),
+        compaction_client=cast(Any, None),
+        model="test-model",
+        mapping_provider="test-provider",
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+        action_engine=cast(Any, None),
+        events=[{"kind": "plan_amendment_agent"}],
+        repair_fallback_client=None,
+        repair_fallback_model=None,
+        runtime=cast(Any, RuntimeStub()),
+    )
+
+    for kind in ("plan-amendment", "implementation"):
+        strategy._execute_tool(
+            WorkflowAction(
+                kind="invoke_tool",
+                tool="gh",
+                parameters={
+                    "operation": "pr_publish_clean",
+                    "files_to_publish": ["src/example.py"],
+                    "publication_branch": f"powdrr/feature-v1-pr-01-{kind}",
+                },
+            )
+        )
+
+    assert [item["publication_branch"] for item in published_parameters] == [
+        "powdrr/feature-v1-pr-01-plan-amendment-stable-run-id",
+        "powdrr/feature-v1-pr-01-implementation-stable-run-id",
+    ]
 
 
 def test_plan_amendment_recovers_reviewed_context_for_nested_failure(

@@ -1510,7 +1510,7 @@ def _positive_limit(limits: Mapping[str, Any], key: str, default: int) -> int:
     return value if isinstance(value, int) and value > 0 else default
 
 
-def _compact_value(value: Any, *, max_chars: int) -> Any:
+def _compact_value(value: Any, *, max_chars: int, max_items: int = 32) -> Any:
     if isinstance(value, str):
         if len(value) <= max_chars:
             return value
@@ -1518,18 +1518,19 @@ def _compact_value(value: Any, *, max_chars: int) -> Any:
     if isinstance(value, Mapping):
         items = list(value.items())
         compacted = {
-            str(key): _compact_value(item, max_chars=max_chars)
-            for key, item in items[:32]
+            str(key): _compact_value(item, max_chars=max_chars, max_items=max_items)
+            for key, item in items[:max_items]
         }
-        if len(items) > 32:
-            compacted["__truncated_items__"] = len(items) - 32
+        if len(items) > max_items:
+            compacted["__truncated_items__"] = len(items) - max_items
         return compacted
     if isinstance(value, (list, tuple)):
         compacted_list = [
-            _compact_value(item, max_chars=max_chars) for item in value[:32]
+            _compact_value(item, max_chars=max_chars, max_items=max_items)
+            for item in value[:max_items]
         ]
-        if len(value) > 32:
-            compacted_list.append({"__truncated_items__": len(value) - 32})
+        if len(value) > max_items:
+            compacted_list.append({"__truncated_items__": len(value) - max_items})
         return compacted_list
     return value
 
@@ -1538,7 +1539,35 @@ def _bounded_context_text(value: Any, max_chars: int) -> str:
     encoded = _json_text(value)
     if len(encoded) <= max_chars:
         return encoded
-    return encoded[:max_chars] + "...<context truncated>"
+
+    # Keep the context parseable for structured providers such as JEV. Cutting
+    # serialized JSON at the character limit can leave an invalid document.
+    for max_items in (32, 16, 8, 4, 2, 1, 0):
+        low, high = 0, 6000
+        best: str | None = None
+        while low <= high:
+            max_value_chars = (low + high) // 2
+            candidate = _json_text(
+                _compact_value(
+                    value,
+                    max_chars=max_value_chars,
+                    max_items=max_items,
+                )
+            )
+            if len(candidate) <= max_chars:
+                best = candidate
+                low = max_value_chars + 1
+            else:
+                high = max_value_chars - 1
+        if best is not None:
+            return best
+
+    # A very small configured limit may not fit the original object's keys.
+    # Return a valid JSON value and make the loss of context explicit.
+    marker = _json_text({"__context_truncated__": True})
+    if len(marker) <= max_chars:
+        return marker
+    return "{}" if max_chars >= 2 else ""
 
 
 def _context_fits(value: Any, max_chars: int) -> bool:

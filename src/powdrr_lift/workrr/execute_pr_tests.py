@@ -344,9 +344,18 @@ def run_generated_pytest(
     environment.pop("VIRTUAL_ENV", None)
     existing_pythonpath = environment.get("PYTHONPATH", "")
     pythonpath = [str(root), str(root / "src")]
+    for raw_path in paths:
+        relative_path = PurePosixPath(raw_path)
+        for index, part in enumerate(relative_path.parts[:-1]):
+            if part not in {"test", "tests"}:
+                continue
+            package_root = root.joinpath(*relative_path.parts[:index])
+            nested_src = package_root / "src"
+            if nested_src.is_dir():
+                pythonpath.append(str(nested_src))
     if existing_pythonpath:
         pythonpath.append(existing_pythonpath)
-    environment["PYTHONPATH"] = os.pathsep.join(pythonpath)
+    environment["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(pythonpath))
     try:
         completed = subprocess.run(
             list(command),

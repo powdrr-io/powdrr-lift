@@ -178,6 +178,23 @@ def test_list_plan_issues_prints_item_to_issue_mapping(
     assert result["missing_item_ids"] == ["followup"]
 
 
+def test_fulfill_plan_issue_without_pr_cli_dispatches() -> None:
+    args = build_parser().parse_args(
+        [
+            "fulfill-plan-issue-without-pr",
+            "--repository",
+            "owner/repository",
+            "--issue-number",
+            "63",
+            "--reason",
+            "The implementation is already on main.",
+        ]
+    )
+
+    assert args.func.__name__ == "_run_fulfill_plan_issue_without_pr"
+    assert args.issue_number == 63
+
+
 def test_harbor_feature_returns_success_for_completed_run_with_issues(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

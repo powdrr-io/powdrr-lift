@@ -1433,6 +1433,7 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
             "worker",
             plan.items[0],
             plan,
+            (),
             lambda *_args: None,
         )
         return SimpleNamespace(

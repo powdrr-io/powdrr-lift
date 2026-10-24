@@ -122,9 +122,50 @@ def test_workflow_git_state_round_trips_workflow_dependencies() -> None:
         workflow_relative_directory="docs/workflows/feature",
         publication_id="pub-token",
         depends_on_workflows=("core",),
+        fulfilled_without_pr_dependencies=("core",),
     )
 
     assert WorkflowGitState.from_data(state.to_data()) == state
+
+
+def test_fulfilled_without_pr_dependency_does_not_require_a_merged_pr(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state = WorkflowGitState(
+        proposed_pr_id="integration",
+        base_branch="main",
+        integration_branch="powdrr/integration",
+        workflow_relative_directory="docs/workflows/feature",
+        depends_on_workflows=("core",),
+        fulfilled_without_pr_dependencies=("core",),
+    )
+
+    def unexpected_pr_lookup(*_args: Any) -> Any:
+        pytest.fail("a fulfilled-without-PR dependency should not need PR lookup")
+
+    monkeypatch.setattr(workflow_git, "_related_pull_requests", unexpected_pr_lookup)
+    monkeypatch.setattr(
+        workflow_git,
+        "_related_workflow_attempt_pull_requests",
+        unexpected_pr_lookup,
+    )
+
+    assert workflow_dependencies_completion(tmp_path, state) == (True, ())
+
+
+def test_workflow_git_state_rejects_non_dependency_fulfillment() -> None:
+    data = WorkflowGitState(
+        proposed_pr_id="integration",
+        base_branch="main",
+        integration_branch="powdrr/integration",
+        workflow_relative_directory="docs/workflows/feature",
+        depends_on_workflows=("core",),
+        fulfilled_without_pr_dependencies=("other",),
+    ).to_data()
+
+    with pytest.raises(ValueError, match="subset of depends_on_workflows"):
+        WorkflowGitState.from_data(data)
 
 
 def test_workflow_dependency_requires_merged_implementation_pull_request(

@@ -32,6 +32,7 @@ class WorkflowGitState:
     workflow_relative_directory: str
     publication_id: str = ""
     depends_on_workflows: tuple[str, ...] = ()
+    fulfilled_without_pr_dependencies: tuple[str, ...] = ()
     invariants: tuple[Mapping[str, Any], ...] = ()
     relationships: tuple[Mapping[str, Any], ...] = ()
 
@@ -44,6 +45,10 @@ class WorkflowGitState:
         }
         if self.depends_on_workflows:
             data["depends_on_workflows"] = list(self.depends_on_workflows)
+        if self.fulfilled_without_pr_dependencies:
+            data["fulfilled_without_pr_dependencies"] = list(
+                self.fulfilled_without_pr_dependencies
+            )
         if self.publication_id:
             data["publication_id"] = self.publication_id
         if self.invariants:
@@ -77,6 +82,22 @@ class WorkflowGitState:
             raise ValueError(
                 "Workflow Git state depends_on_workflows must be an array."
             )
+        fulfilled_without_pr = data.get("fulfilled_without_pr_dependencies", [])
+        if not isinstance(fulfilled_without_pr, list) or not all(
+            isinstance(item, str) and item.strip() for item in fulfilled_without_pr
+        ):
+            raise ValueError(
+                "Workflow Git state fulfilled_without_pr_dependencies must be an array."
+            )
+        normalized_dependencies = tuple(item.strip() for item in dependencies)
+        normalized_fulfilled_without_pr = tuple(
+            item.strip() for item in fulfilled_without_pr
+        )
+        if not set(normalized_fulfilled_without_pr) <= set(normalized_dependencies):
+            raise ValueError(
+                "Workflow Git state fulfilled_without_pr_dependencies must be a subset "
+                "of depends_on_workflows."
+            )
         invariants = _read_relationship_metadata(data.get("invariants"), "invariants")
         relationships = _read_relationship_metadata(
             data.get("relationships"), "relationships"
@@ -84,7 +105,8 @@ class WorkflowGitState:
         return cls(
             **values,
             publication_id=publication_id.strip(),
-            depends_on_workflows=tuple(item.strip() for item in dependencies),
+            depends_on_workflows=normalized_dependencies,
+            fulfilled_without_pr_dependencies=normalized_fulfilled_without_pr,
             invariants=invariants,
             relationships=relationships,
         )
@@ -213,6 +235,8 @@ def workflow_dependencies_completion(
     incomplete: list[str] = []
     repo_root_path = Path(repo_root).resolve()
     for dependency in state.depends_on_workflows:
+        if dependency in state.fulfilled_without_pr_dependencies:
+            continue
         branch = integration_branch_name(dependency)
         implementation_branch = f"{branch}-implementation"
         pull_requests, error = _related_pull_requests(

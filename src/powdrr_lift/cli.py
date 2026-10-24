@@ -231,6 +231,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     ReviewedExecutionPlan,
     TaskCheckpointCallback,
     find_plan_issues,
+    fulfill_issue_without_pr,
     load_reviewed_plan_at_commit,
     publish_plan_issues,
     run_worker_once,
@@ -383,6 +384,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--repo-root", type=Path, help="Checkout containing the pinned plan revision."
     )
     list_plan_issues_parser.set_defaults(func=_run_list_plan_issues)
+
+    fulfill_plan_issue_parser = subparsers.add_parser(
+        "fulfill-plan-issue-without-pr",
+        help=(
+            "Mark a planned issue fulfilled by existing work without an "
+            "implementation PR."
+        ),
+    )
+    fulfill_plan_issue_parser.add_argument("--repository", required=True)
+    fulfill_plan_issue_parser.add_argument("--issue-number", type=int, required=True)
+    fulfill_plan_issue_parser.add_argument(
+        "--reason", required=True, help="Why the planned work is already fulfilled."
+    )
+    fulfill_plan_issue_parser.set_defaults(func=_run_fulfill_plan_issue_without_pr)
 
     github_issue_worker_parser = subparsers.add_parser(
         "github-issue-worker",
@@ -2781,6 +2796,30 @@ def _run_list_plan_issues(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_fulfill_plan_issue_without_pr(args: argparse.Namespace) -> int:
+    try:
+        issue = fulfill_issue_without_pr(
+            issue_number=args.issue_number,
+            reason=args.reason,
+            client=GitHubIssueClient(args.repository),
+        )
+    except GitHubIssueQueueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "issue_number": issue.number,
+                "state": issue.state,
+                "fulfillment": "without_implementation_pr",
+                "label": "powdrr:fulfilled-without-pr",
+            },
+            indent=2,
+        )
+    )
+    return 0
+
+
 def _run_github_issue_worker(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
 
@@ -2790,6 +2829,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
         worker_id: str,
         item: Any,
         plan: ReviewedExecutionPlan,
+        fulfilled_without_pr_dependencies: tuple[str, ...],
         checkpoint_callback: TaskCheckpointCallback,
     ) -> int:
         if workflow_path.is_dir():
@@ -2844,6 +2884,9 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                         for dependency in item.dependencies
                         for planned in plan.items
                         if planned.item_id == dependency
+                    ),
+                    fulfilled_without_pr_dependencies=(
+                        fulfilled_without_pr_dependencies
                     ),
                 ),
             )

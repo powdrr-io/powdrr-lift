@@ -432,11 +432,12 @@ class JevSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
 
 
 class SubQSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
-    """Use SubQ Decisions for classifier judges with planning as fallback."""
+    """Use SubQ Decisions for classifier judges without an LLM fallback."""
 
     provider = "SUBQ"
     default_model = SUBQ_MODEL
     default_endpoint = SUBQ_DEFAULT_BASE_URL
+    fallback_on_error = False
 
     def __init__(
         self,
@@ -467,15 +468,13 @@ class SubQSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
 def preferred_semantic_classifier_client(
     fallback: WorkflowLLMClient, *, fail_closed: bool = False
 ) -> _DecisionApiSemanticClassifierClient | None:
-    """Choose Jev when configured, then SubQ, without requiring credentials."""
+    """Choose Jev when configured; otherwise let the caller use its LLM client."""
     if (
         os.environ.get("TYPESAFEAI_API_KEY")
         or os.environ.get("TYPESAFE_API_KEY")
         or os.environ.get("SYSTEM_ONE_API_KEY")
     ):
         return JevSemanticClassifierClient(fallback, fail_closed=fail_closed)
-    if os.environ.get("SUBQ_API_KEY"):
-        return SubQSemanticClassifierClient(fallback, fail_closed=fail_closed)
     return None
 
 

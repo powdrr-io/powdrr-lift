@@ -179,6 +179,26 @@ def test_subq_uses_typed_choice_and_maps_to_workflow_result(monkeypatch: Any) ->
     assert calls == [
         ("subq-key", "https://api.subq.ai/v1/systemone", "subq-snap-preview")
     ]
+
+
+def test_subq_bad_request_fails_without_planning_fallback(
+    monkeypatch: Any,
+) -> None:
+    fallback = _Fallback()
+
+    def fail(*_: Any) -> Any:
+        raise HTTPError(
+            "https://api.subq.ai/v1/systemone", 400, "bad request", Message(), None
+        )
+
+    monkeypatch.setattr(jev_classifier, "_call_subq", fail)
+
+    with pytest.raises(HTTPError) as error:
+        SubQSemanticClassifierClient(fallback, api_key="key").complete_json(
+            _messages("polarity"), response_schema=_decision_schema()
+        )
+
+    assert error.value.code == 400
     assert fallback.calls == 0
 
 
@@ -191,7 +211,7 @@ def test_preferred_classifier_uses_jev_key_before_subq(monkeypatch: Any) -> None
     assert isinstance(client, JevSemanticClassifierClient)
 
 
-def test_preferred_classifier_uses_subq_when_jev_key_is_missing(
+def test_preferred_classifier_leaves_llm_client_in_place_without_jev(
     monkeypatch: Any,
 ) -> None:
     for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
@@ -200,7 +220,7 @@ def test_preferred_classifier_uses_subq_when_jev_key_is_missing(
 
     client = preferred_semantic_classifier_client(_Fallback())
 
-    assert isinstance(client, SubQSemanticClassifierClient)
+    assert client is None
 
 
 def test_jev_missing_key_fails_without_using_fallback(monkeypatch: Any) -> None:

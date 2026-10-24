@@ -98,6 +98,31 @@ def _routing_messages() -> list[dict[str, str]]:
     ]
 
 
+def _candidate_relation_messages() -> list[dict[str, str]]:
+    request = {
+        "spec": {
+            "decision_kind": "candidate_relation",
+            "proposition_text": "state_data is injected into callbacks.",
+        },
+        "question": "Does this candidate denote the exact source subject?",
+        "instructions": ["Use the candidate evidence and repository relations."],
+        "allowed_values": ["matches", "does_not_match", "insufficient_evidence"],
+        "candidate": {
+            "record": {"qualified_name": "statemachine.event_data.EventData"},
+            "source_excerpt": "class EventData: ...",
+        },
+        "repository_relationships": ["imports|statemachine.event.Event"],
+    }
+    return [
+        {"role": "system", "content": "Return JSON."},
+        {
+            "role": "user",
+            "content": "Question:\nReview this candidate.\n\nContext:\n"
+            + json.dumps({"candidate_relation_request": request}),
+        },
+    ]
+
+
 def _decision_schema() -> dict[str, Any]:
     return {
         "type": "object",
@@ -448,6 +473,32 @@ def test_jev_routes_other_semantic_classifier_kinds(monkeypatch: Any) -> None:
     )
 
     assert result == {"status": "resolved", "value": "present", "reason_code": None}
+
+
+def test_jev_maps_candidate_relation_requests(monkeypatch: Any) -> None:
+    fallback = _Fallback()
+    captured: list[Mapping[str, Any]] = []
+
+    def classify(request: Mapping[str, Any], *_: Any) -> dict[str, str]:
+        captured.append(request)
+        return {"choice": "matches"}
+
+    monkeypatch.setattr(jev_classifier, "_call_jev", classify)
+
+    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+        _candidate_relation_messages(), response_schema=_decision_schema()
+    )
+
+    assert result == {"status": "resolved", "value": "matches", "reason_code": None}
+    assert captured[0]["kind"] == "candidate_relation"
+    assert captured[0]["state"]["source_text"] == (
+        "state_data is injected into callbacks."
+    )
+    assert (
+        captured[0]["state"]["request"]["candidate"]["record"]["qualified_name"]
+        == "statemachine.event_data.EventData"
+    )
+    assert fallback.calls == 0
     assert fallback.calls == 0
 
 

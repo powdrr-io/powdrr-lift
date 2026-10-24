@@ -1,0 +1,89 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 9999
+title: Apply inline plan adjustments from GitHub issue comments
+intent:
+  problem: Small corrections to execution details require changing the reviewed plan even when only one issue needs a bounded adjustment.
+  goal: Let trusted issue comments adjust supported work item fields for execution while preserving the pinned plan and workflow identity.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 39, end_line: 49}
+    summary: Define the structured inline adjustment comment schema and permitted fields.
+    rationale: Give issue comments a stable format and restrict edits to supported item details.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 17, end_line: 17}
+    summary: Import dataclass replacement support for building an effective execution item.
+    rationale: Apply validated issue edits to a copy without modifying the parsed plan.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 631, end_line: 631}
+    summary: Replace the original workflow validation detail initialization with adjustment-aware state.
+    rationale: Keep the worker's failure detail available through adjustment and workflow validation.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 639, end_line: 660}
+    summary: Apply validated inline adjustments from trusted issue comments before executing a claimed item.
+    rationale: Persist small task corrections on the issue and ensure malformed adjustments stop execution clearly.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 823, end_line: 926}
+    summary: Validate adjustment schema, author association, item identity, reason, and supported field values.
+    rationale: Keep inline edits bounded, auditable, and restricted to repository collaborators.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2843, end_line: 2859}
+    summary: Overlay the effective issue item fields onto the generated Procedrr workflow inputs.
+    rationale: Ensure accepted issue adjustments affect the actual worker policy and task context.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2862, end_line: 2862}
+    summary: Derive the workflow instance identity from the effective inputs.
+    rationale: Keep task identity aligned with the adjusted execution context.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2884, end_line: 2884}
+    summary: Instantiate the Procedrr workflow with the effective issue item fields.
+    rationale: Pass adjustments into the actual workflow process state.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 156, end_line: 163}
+    summary: Preserve simulated author association data for structured adjustment comments.
+    rationale: Exercise the same trusted-author check used with GitHub API responses.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 721, end_line: 808}
+    summary: Verify the worker applies an authorized inline allowed-path adjustment.
+    rationale: Prevent issue adjustments from being recorded without reaching the effective work item.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 178, end_line: 217}
+    summary: Document supported inline adjustment fields, limits, authorship, and a CI path example.
+    rationale: Make the issue comment format usable without changing the pinned plan.
+entities:
+  - id: github-issue-inline-plan-adjustments
+    type: Task
+    action: added
+  - id: apply-issue-plan-adjustments
+    type: Function
+    action: added
+  - id: inline-allowed-path-adjustment-regression-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: inline-adjustment-test-verifies-worker-application
+    type: verifies
+    source: inline-allowed-path-adjustment-regression-test
+    target: apply-issue-plan-adjustments
+    action: added
+    description: The regression test verifies the worker passes the adjusted allowed paths into the effective item.
+invariants:
+  - id: pinned-plan-remains-unchanged-by-inline-adjustment
+    description: Inline issue adjustments affect only the execution copy of supported work item fields and never modify the pinned plan document.
+    action: added
+  - id: workflow-identity-and-dependencies-remain-plan-controlled
+    description: Inline adjustments cannot change workflow identity, dependencies, or workflow definitions.
+    action: added
+guidance: []

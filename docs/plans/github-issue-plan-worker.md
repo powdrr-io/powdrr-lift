@@ -175,6 +175,46 @@ state. These comments form a task-by-task history alongside the issue's queue
 labels and claim/final-status comments. They are scoped to one issue; plan-level
 dependencies continue to determine when an item becomes eligible to run.
 
+## Small inline plan adjustments
+
+Small corrections to one item's execution details can be recorded directly on
+its issue without changing the pinned plan or workflow file. Add a comment with
+the `powdrr-plan-adjustment:v1` marker and a JSON block. The worker applies
+adjustments in comment order when it next claims the issue. Only repository
+owners, members, and collaborators may author adjustments. Supported fields are
+`title`, `objective`, `scope`, `acceptance_criteria`, `implementation_steps`,
+and `allowed_paths`; each supplied field replaces that item's value for this
+execution. Adjustments apply to generated workflow instance files. `title` is
+limited to 120 characters, `objective` to 2,000, `scope` to five entries,
+`acceptance_criteria` and `implementation_steps` to ten and eight entries, and
+`allowed_paths` to twenty repository-relative paths. Each adjustment needs a
+reason. Dependencies, workflow IDs, and workflow definitions cannot be changed
+inline because they affect the plan's execution graph or reviewed workflow
+identity; correct those in a reviewed plan PR.
+
+For example, to allow an item to update a CI workflow required by its listed
+implementation steps:
+
+````markdown
+<!-- powdrr-plan-adjustment:v1 -->
+```json
+{
+  "schema": "https://powdrr.io/schemas/github-issue-plan-adjustment-v1",
+  "plan_id": "feature-v1",
+  "item_id": "PR-04",
+  "reason": "Step 4 updates the repository CI workflow.",
+  "changes": {
+    "allowed_paths": ["src", "tests", ".github/workflows/ci.yml"]
+  }
+}
+```
+````
+
+The issue comment is the durable adjustment record; the source plan remains
+unchanged. Malformed trusted adjustment comments block execution with a specific
+error instead of being silently ignored. After resolving a blocked item, move
+it back to `powdrr:ready` as usual.
+
 `powdrr-lift list-plan-issues` reads the pinned plan and GitHub issue pointers,
 then prints one result per plan item with its issue number, URL, state, and
 labels. Items without a published issue appear in `missing_item_ids`; the

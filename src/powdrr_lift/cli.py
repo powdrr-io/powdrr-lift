@@ -2840,9 +2840,26 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 raise PlanGenerationError(
                     "workflow definition ID does not match its plan item"
                 )
+            workflow_inputs = dict(instance.inputs)
+            workflow_context = dict(workflow_inputs["proposed_pr_context"])
+            workflow_context.update(
+                {
+                    "title": item.title,
+                    "objective": item.objective,
+                    "scope": list(item.scope),
+                    "acceptance_criteria": list(item.acceptance_criteria),
+                    "allowed_paths": list(item.allowed_paths),
+                }
+            )
+            workflow_inputs["feature_description"] = item.objective
+            if item.implementation_steps:
+                workflow_context["implementation_steps"] = list(
+                    item.implementation_steps
+                )
+            workflow_inputs["proposed_pr_context"] = workflow_context
             execution_id = uuid.uuid4().hex[:12]
             workflow_instance_id = _plan_workflow_instance_id(
-                workflow_id, instance.inputs, worker_id, attempt_id=execution_id
+                workflow_id, workflow_inputs, worker_id, attempt_id=execution_id
             )
             integration_branch = integration_branch_name(
                 f"{workflow_id}-attempt-{execution_id}"
@@ -2864,7 +2881,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
             workflow_dir, _tasks = instantiate_procedrr_process_workflow(
                 process_id=instance.process_id,
                 process_directory=_bundled_procedrr_process_directory(),
-                input_state=instance.inputs,
+                input_state=workflow_inputs,
                 work_item_name=workflow_instance_id,
                 workflow_instance_name=workflow_instance_id,
                 output_root=(integration_worktree / runtime_relative_directory.parent),

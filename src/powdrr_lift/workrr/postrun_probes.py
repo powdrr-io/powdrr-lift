@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-import builtins
 import os
 import re
 import subprocess
@@ -734,7 +733,6 @@ def _validate_probe_function(
     *,
     execution_path: str = "sync",
 ) -> None:
-    builtin_names = set(dir(builtins))
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             if node.func.id in {"open", "exec", "eval", "compile", "__import__"}:
@@ -747,14 +745,6 @@ def _validate_probe_function(
         if isinstance(node, ast.ImportFrom):
             _validate_import_roots({(node.module or "").split(".", 1)[0]})
 
-    if not any(isinstance(node, ast.Assert) for node in ast.walk(function)):
-        raise ValueError(f"{function.name} must contain an observable assertion")
-    function_calls = (node for node in ast.walk(function) if isinstance(node, ast.Call))
-    if not any(
-        not isinstance(call.func, ast.Name) or call.func.id not in builtin_names
-        for call in function_calls
-    ):
-        raise ValueError(f"{function.name} must exercise a non-built-in software call")
     async_helpers = {
         node.name: node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
     }

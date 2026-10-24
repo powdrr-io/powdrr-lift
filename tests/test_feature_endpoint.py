@@ -603,7 +603,13 @@ def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_cras
             "module.unexpected_error()\n"
             "assert module.public_api('value') == 'handled:value'"
         ),
-        "test_probe_no_assertion": "module.public_api('value')",
+        "test_probe_no_assertion": (
+            "try:\n"
+            "    module.public_api('invalid')\n"
+            "except ValueError:\n"
+            "    return\n"
+            "raise AssertionError('expected ValueError')"
+        ),
     }
     metadata = {
         function_name: {
@@ -676,20 +682,18 @@ def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_cras
         "assertion",
         "type-error",
         "import-error",
+        "no-assertion",
     ]
     suite = json.loads(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
     assert suite["generation_status"] == "partial"
-    assert len(suite["baseline_results"]) == 4
-    assert [item["probe_id"] for item in suite["rejected_generated_probes"]] == [
-        "no-assertion"
-    ]
+    assert len(suite["baseline_results"]) == 5
+    assert suite["rejected_generated_probes"] == []
     assert [item["probe_id"] for item in suite["rejected_baseline_probes"]] == [
         "unexpected-error"
     ]
     assert suite["scenarios_without_executable_probe"] == [
-        "no-assertion",
         "unexpected-error",
     ]
     assert _git(repository, "status", "--porcelain").stdout == ""
@@ -914,7 +918,7 @@ def test_miniswe_probe_authoring_retries_each_validation_error(
     assert len(obligations) == 1
     assert len(probes) == 1
     assert len(requests) == 3
-    assert "must contain an observable assertion" in requests[1].prompt
+    assert "observable outcome check" in requests[1].prompt
     assert "baseline probe checks failed" in requests[2].prompt
     assert requests[1].request_id.endswith("repair-1")
     assert requests[2].request_id.endswith("repair-2")

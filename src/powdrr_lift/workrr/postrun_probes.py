@@ -186,6 +186,7 @@ def parse_generated_postrun_probe_source(
     repository_contract: Mapping[str, Any] | None = None,
     instruction_ledger_clauses: Sequence[Mapping[str, Any]] = (),
     rejected_interactions: list[dict[str, str]] | None = None,
+    rejected_probes: list[dict[str, str]] | None = None,
 ) -> tuple[
     tuple[dict[str, Any], ...],
     tuple[dict[str, Any], ...],
@@ -286,6 +287,7 @@ def parse_generated_postrun_probe_source(
         )
         if probe_id in seen_probe_ids:
             raise ValueError(f"probe suite has duplicate probe id {probe_id!r}")
+        seen_probe_ids.add(probe_id)
         if scenario_id not in known_scenarios:
             raise ValueError(f"probe refers to unknown scenario {scenario_id!r}")
         obligation = obligation_by_id.get(obligation_id)
@@ -297,27 +299,65 @@ def parse_generated_postrun_probe_source(
             raise ValueError(
                 f"probe {probe_id!r} does not match its obligation scenario"
             )
-        unknown_interactions = set(interaction_ids) - known_interactions
-        if unknown_interactions:
-            raise ValueError(
-                f"probe {probe_id!r} refers to unknown interactions: "
-                + ", ".join(sorted(unknown_interactions))
-            )
+        invalid_interactions: set[str] = set()
         for interaction_id in interaction_ids:
+            if interaction_id not in known_interactions:
+                error_message = (
+                    f"probe {probe_id!r} refers to unknown interaction "
+                    f"{interaction_id!r}"
+                )
+                if rejected_interactions is None:
+                    raise ValueError(error_message)
+                rejected_interactions.append(
+                    {
+                        "interaction_id": interaction_id,
+                        "probe_id": probe_id,
+                        "error": error_message,
+                    }
+                )
+                invalid_interactions.add(interaction_id)
+                continue
             interaction = next(
                 item
                 for item in interaction_obligations
                 if item["interaction_id"] == interaction_id
             )
             if scenario_id not in interaction["scenario_ids"]:
-                raise ValueError(
+                error_message = (
                     f"probe {probe_id!r} scenario is unrelated to interaction "
                     f"{interaction_id!r}"
                 )
-        seen_probe_ids.add(probe_id)
+                if rejected_interactions is None:
+                    raise ValueError(error_message)
+                rejected_interactions.append(
+                    {
+                        "interaction_id": interaction_id,
+                        "probe_id": probe_id,
+                        "error": error_message,
+                    }
+                )
+                invalid_interactions.add(interaction_id)
+        interaction_ids = tuple(
+            interaction_id
+            for interaction_id in interaction_ids
+            if interaction_id not in invalid_interactions
+        )
+        try:
+            _validate_probe_function(function, tree)
+        except ValueError as error:
+            if rejected_probes is None:
+                raise
+            rejected_probes.append(
+                {
+                    "probe_id": probe_id,
+                    "scenario_id": scenario_id,
+                    "obligation_id": obligation_id,
+                    "error": str(error),
+                }
+            )
+            continue
         covered_obligations.add(obligation_id)
         covered_interactions.update(interaction_ids)
-        _validate_probe_function(function, tree)
         probes.append(
             PostRunProbe(
                 probe_id,
@@ -340,15 +380,54 @@ def parse_generated_postrun_probe_source(
         covered_obligations,
     )
     if missing_obligations:
+        if rejected_probes is None:
+            raise ValueError(
+                "probe suite omitted supported obligations: "
+                + ", ".join(sorted(missing_obligations))
+            )
+        scenarios_by_obligation = {
+            str(item["obligation_id"]): str(item["scenario_id"]) for item in obligations
+        }
+        rejected_obligation_ids = {
+            item.get("obligation_id") for item in rejected_probes
+        }
+        rejected_probes.extend(
+            {
+                "probe_id": "",
+                "scenario_id": scenarios_by_obligation[obligation_id],
+                "obligation_id": obligation_id,
+                "error": (f"supported obligation {obligation_id!r} has no valid probe"),
+            }
+            for obligation_id in sorted(
+                set(missing_obligations) - rejected_obligation_ids
+            )
+        )
+    if not probes and any(item["supported"] is True for item in obligations):
+        rejected_details = "; ".join(
+            f"{item.get('probe_id') or item.get('obligation_id')}: {item['error']}"
+            for item in rejected_probes or ()
+            if item.get("error")
+        )
+        detail_suffix = f": {rejected_details}" if rejected_details else ""
         raise ValueError(
-            "probe suite omitted supported obligations: "
-            + ", ".join(sorted(missing_obligations))
+            f"probe suite contains no valid probes after isolation{detail_suffix}"
         )
     missing_interactions = known_interactions - covered_interactions
     if missing_interactions:
-        raise ValueError(
-            "probe suite omitted required interactions: "
-            + ", ".join(sorted(missing_interactions))
+        if rejected_interactions is None:
+            raise ValueError(
+                "probe suite omitted required interactions: "
+                + ", ".join(sorted(missing_interactions))
+            )
+        already_reported = {
+            item.get("interaction_id") for item in rejected_interactions
+        }
+        rejected_interactions.extend(
+            {
+                "interaction_id": interaction_id,
+                "error": "no valid probe covers this interaction",
+            }
+            for interaction_id in sorted(missing_interactions - already_reported)
         )
     return obligations, interaction_obligations, tuple(probes)
 
@@ -743,16 +822,37 @@ def run_postrun_probes(
 def baseline_probe_failures(
     results: Sequence[PostRunProbeResult],
 ) -> list[str]:
-    """Return probes that did not execute and fail through an assertion."""
+    """Return probes that passed or failed for an unexpected baseline reason."""
     problems = []
     for result in results:
-        if result.status != "failed" or "AssertionError" not in result.output:
+        if not baseline_probe_is_expected_failure(result):
             problems.append(
                 f"{result.probe_id} ({result.scenario_id}) returned "
-                f"{result.status}; expected an AssertionError. "
+                f"{result.status}; expected a baseline failure through "
+                "AssertionError, TypeError, or ImportError. "
                 f"{_truncate(result.output or result.error or '', 1600)}"
             )
     return problems
+
+
+def baseline_probe_is_expected_failure(result: PostRunProbeResult) -> bool:
+    """Recognize baseline exceptions that mean the requested API is absent."""
+    if result.status != "failed":
+        return False
+    terminal_line = next(
+        (line.strip() for line in reversed(result.output.splitlines()) if line.strip()),
+        "",
+    )
+    match = re.match(r"^([A-Za-z_][A-Za-z0-9_.]*)(?::|$)", terminal_line)
+    if match is None:
+        return False
+    exception_name = match.group(1).rsplit(".", 1)[-1]
+    return exception_name in {
+        "AssertionError",
+        "ImportError",
+        "ModuleNotFoundError",
+        "TypeError",
+    }
 
 
 def probe_failures(results: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]:
@@ -806,6 +906,7 @@ __all__ = [
     "PostRunProbe",
     "PostRunProbeResult",
     "baseline_probe_failures",
+    "baseline_probe_is_expected_failure",
     "parse_generated_postrun_probe_source",
     "probe_failures",
     "run_postrun_probes",

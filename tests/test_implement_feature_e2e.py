@@ -30,6 +30,7 @@ def _write_supported_probe_module(
     scenarios: list[dict[str, Any]],
     *,
     evidence: str,
+    evidence_by_scenario_id: Mapping[str, str] | None = None,
     operation: str,
     expected: str,
     imports: tuple[str, ...],
@@ -53,7 +54,14 @@ def _write_supported_probe_module(
                 "operation": operation,
                 "expected": expected,
                 "operands": [],
-                "evidence": [{"source": "instruction", "quote": evidence}],
+                "evidence": [
+                    {
+                        "source": "instruction",
+                        "quote": (evidence_by_scenario_id or {}).get(
+                            scenario_id, evidence
+                        ),
+                    }
+                ],
                 "unresolved_reason": "",
             }
         )
@@ -848,6 +856,47 @@ class UnrepairableWeakProbePlanningClient(WeakProbePlanningClient):
         return super().complete_json(messages, response_schema=response_schema)
 
 
+class OneUnrepairableWeakProbePlanningClient(ProbeEnabledPlanningClient):
+    """Leave the first weak scenario unresolved while keeping later ones valid."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._weakened_scenario = False
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        required = set((response_schema or {}).get("required", ()))
+        if required == {"revisions"}:
+            payload = json.loads(messages[-1]["content"])
+            return {
+                "revisions": [
+                    {
+                        key: item["scenario"][key]
+                        for key in ("scenario_id", "given", "when", "then")
+                    }
+                    for item in payload["flagged_scenarios"]
+                ]
+            }
+        response = super().complete_json(messages, response_schema=response_schema)
+        if (
+            required == {"status", "unresolved_dimensions", "scenario"}
+            and not self._weakened_scenario
+        ):
+            self._weakened_scenario = True
+            scenario = response["scenario"]
+            scenario["given"] = (
+                "The implementation is evaluated against: "
+                "Add a second greeting to hello_world.py."
+            )
+            scenario["when"] = "The instruction's behavior is exercised"
+            scenario["then"] = "Add a second greeting to hello_world.py."
+        return response
+
+
 class InvalidSyntaxProbePlanningClient(ProbeEnabledPlanningClient):
     """Return malformed Python so the pipeline's probe failure path is exercised."""
 
@@ -1378,6 +1427,120 @@ def test_implement_feature_blocks_coding_when_probe_repair_stays_generic(
     assert (repo / "hello_world.py").read_text(encoding="utf-8") == (
         'print("Hello, world!")\n'
     )
+
+
+def test_implement_feature_continues_with_valid_scenarios_when_one_stays_generic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo = _fixture_repo(tmp_path)
+    fake_opencode = _fake_opencode(tmp_path / "fake-opencode")
+    output_root = tmp_path / "feature-output"
+    authored_scenario_ids: list[str] = []
+
+    def author_valid_scenario_probes(
+        self: MiniSWEAgentProvider,
+        request: Any,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        del self, attempt_id
+        scenarios = json.loads(
+            request.prompt.split("Preserve each `scenario_id` as provenance:\n", 1)[
+                1
+            ].split("\n\nBaseline repository contract", 1)[0]
+        )
+        authored_scenario_ids.extend(item["scenario_id"] for item in scenarios)
+        ledger = json.loads(
+            (output_root / "instruction-ledger.json").read_text(encoding="utf-8")
+        )
+        source_by_id = {
+            str(clause["clause_id"]): str(clause["text"])
+            for clause in ledger["clauses"]
+        }
+        evidence_by_scenario_id = {
+            item["scenario_id"]: source_by_id[
+                item["scenario_id"].removeprefix("scenario:")
+            ]
+            for item in scenarios
+        }
+        _write_supported_probe_module(
+            worktree_root,
+            scenarios,
+            evidence="Add a second greeting to hello_world.py.",
+            evidence_by_scenario_id=evidence_by_scenario_id,
+            operation="Run hello_world.py and capture stdout.",
+            expected="The original greeting is followed by the requested greeting.",
+            imports=("contextlib", "io", "runpy"),
+            body=(
+                "output = io.StringIO()\n"
+                "with contextlib.redirect_stdout(output):\n"
+                "    runpy.run_path('hello_world.py')\n"
+                "assert output.getvalue() == 'Hello, world!\\nHello from Powdrr!\\n'"
+            ),
+        )
+        return subprocess.CompletedProcess(["miniswe-test-double"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_valid_scenario_probes)
+    result = run_feature_in_place(
+        FeatureEndpointConfig(
+            feature_description=(
+                "Add a second greeting to hello_world.py. Keep the existing "
+                "Hello, world! output first and print Hello from Powdrr! second."
+            ),
+            work_item_name="hello-world-partial-scenario-quality",
+            repo_root=repo,
+            allowed_paths=("hello_world.py",),
+            output_root=output_root,
+            validation_command=(
+                sys.executable,
+                "-m",
+                "pytest",
+                "-q",
+                "--import-mode=importlib",
+            ),
+            code_agent="opencode",
+            opencode_executable=str(fake_opencode),
+            opencode_model="deterministic-test-model",
+            open_pr=False,
+            push_changes=False,
+            planning_client=OneUnrepairableWeakProbePlanningClient(),
+        )
+    )
+
+    assert result.status == "completed", (
+        result.failure.message if result.failure else None
+    )
+    assert result.review["postrun_probe_generation"]["status"] == "generated"
+    assert result.review["postrun_probe_results"]
+    assert all(
+        item["status"] == "passed" for item in result.review["postrun_probe_results"]
+    )
+    repair_document = json.loads(
+        (output_root / "artifacts" / "behavior-probe-repair.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert len(repair_document["original_scenarios"]) >= 2
+    assert len(repair_document["excluded_scenarios"]) == 1
+    assert len(authored_scenario_ids) == len(repair_document["original_scenarios"]) - 1
+    assert repair_document["implementation_scenario_ids"] == authored_scenario_ids
+    quality_review = json.loads(
+        (output_root / "postrun-probes" / "pre-coding-quality-review.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert quality_review["status"] == "partial"
+    assert quality_review["included_scenario_ids"] == authored_scenario_ids
+    assert len(quality_review["excluded_scenario_ids"]) == 1
+    packet = json.loads(
+        (output_root / "implementation-packet.json").read_text(encoding="utf-8")
+    )
+    assert packet["pre_coding_probe_quality_review"]["status"] == "partial"
+    assert [
+        scenario["scenario_id"] for scenario in packet["behavior_scenarios"]
+    ] == authored_scenario_ids
 
 
 def test_implement_feature_stops_before_coding_when_generated_probe_is_invalid(

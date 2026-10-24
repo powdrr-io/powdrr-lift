@@ -86,6 +86,21 @@ def test_parse_generated_probe_source_preserves_complete_code_and_metadata() -> 
     assert probes[0].obligation_id == "selector-obligation"
 
 
+def test_probe_suite_stops_when_all_probes_are_invalid() -> None:
+    rejected: list[dict[str, str]] = []
+
+    with pytest.raises(ValueError, match="no valid probes after isolation"):
+        parse_generated_postrun_probe_source(
+            _source("module.public_api('value')"),
+            ({"scenario_id": "selector", "evidence": ["Add selector handling."]},),
+            instruction="Add selector handling.",
+            rejected_probes=rejected,
+        )
+
+    assert rejected[0]["probe_id"] == "selector-result"
+    assert "observable assertion" in rejected[0]["error"]
+
+
 def test_probe_obligation_evidence_resolves_from_scenario_deterministically() -> None:
     obligations, _, _ = _parse(_source(), ({"scenario_id": "selector"},))
     assert obligations[0]["evidence"] == [
@@ -393,6 +408,72 @@ def test_probe_suite_must_cover_each_required_interaction() -> None:
         )
 
 
+def test_unrelated_probe_interaction_is_rejected_without_discarding_probe() -> None:
+    instruction = (
+        "selector behavior. first unrelated behavior. second unrelated behavior."
+    )
+    scenarios = (
+        {"scenario_id": "selector", "evidence": ["selector behavior"]},
+        {"scenario_id": "other-a", "evidence": ["first unrelated behavior"]},
+        {"scenario_id": "other-b", "evidence": ["second unrelated behavior"]},
+    )
+    source = _source()
+    obligations = ast.literal_eval(
+        source.split("OBLIGATIONS = ", 1)[1].split("\n", 1)[0]
+    )
+    obligations.extend(
+        {
+            "obligation_id": f"{scenario_id}-obligation",
+            "scenario_id": scenario_id,
+            "category": "other",
+            "rule": "unresolved",
+            "supported": False,
+            "unresolved_reason": "No supported probe is needed for this scenario.",
+        }
+        for scenario_id in ("other-a", "other-b")
+    )
+    interaction = {
+        "interaction_id": "unrelated-pair",
+        "scenario_ids": ["other-a", "other-b"],
+        "condition": "Both unrelated scenarios apply.",
+        "operation": "Exercise both behaviors together.",
+        "expected": "The behaviors remain independent.",
+    }
+    metadata = ast.literal_eval(
+        source.split("PROBE_METADATA = ", 1)[1].split("\n", 1)[0]
+    )
+    metadata["test_probe_selector"]["interaction_ids"] = ["unrelated-pair"]
+    source = source.replace(
+        source.split("OBLIGATIONS = ", 1)[1].split("\n", 1)[0], repr(obligations)
+    )
+    source = source.replace("INTERACTIONS = []", f"INTERACTIONS = {[interaction]!r}")
+    source = source.replace(
+        source.split("PROBE_METADATA = ", 1)[1].split("\n", 1)[0], repr(metadata)
+    )
+    rejected: list[dict[str, str]] = []
+
+    _, interactions, probes = parse_generated_postrun_probe_source(
+        source,
+        scenarios,
+        instruction=instruction,
+        rejected_interactions=rejected,
+    )
+
+    assert len(interactions) == 1
+    assert len(probes) == 1
+    assert probes[0].interaction_ids == ()
+    assert rejected == [
+        {
+            "interaction_id": "unrelated-pair",
+            "probe_id": "selector-result",
+            "error": (
+                "probe 'selector-result' scenario is unrelated to interaction "
+                "'unrelated-pair'"
+            ),
+        }
+    ]
+
+
 def test_probe_parser_preserves_mapping_key_and_value_roles() -> None:
     source = _source()
     obligation_literal = source.split("OBLIGATIONS = ", 1)[1].split("\n", 1)[0]
@@ -492,16 +573,43 @@ def test_run_postrun_probes_executes_each_function_from_same_module(
     assert "assert module.public_api('value') == 'wrong'" in failures[0]["reason"]
 
 
-def test_baseline_requires_assertion_failure_not_a_pass_or_execution_error() -> None:
+def test_baseline_accepts_assertion_type_and_import_failures() -> None:
     results = (
         PostRunProbeResult("pass", "scenario", "passed"),
-        PostRunProbeResult("import", "scenario", "failed", output="ImportError"),
+        PostRunProbeResult("value", "scenario", "failed", output="ValueError"),
         PostRunProbeResult("expected", "scenario", "failed", output="AssertionError"),
+        PostRunProbeResult("type", "scenario", "failed", output="TypeError"),
+        PostRunProbeResult("import", "scenario", "failed", output="ImportError"),
+        PostRunProbeResult(
+            "missing-module", "scenario", "failed", output="ModuleNotFoundError"
+        ),
     )
     problems = baseline_probe_failures(results)
     assert len(problems) == 2
     assert any("pass" in item for item in problems)
-    assert any("import" in item for item in problems)
+    assert any("value" in item for item in problems)
+
+
+def test_baseline_classifies_the_terminal_exception_not_traceback_text() -> None:
+    results = (
+        PostRunProbeResult(
+            "expected",
+            "scenario",
+            "failed",
+            output="AssertionError mentioned in source\nTypeError: unexpected keyword",
+        ),
+        PostRunProbeResult(
+            "unexpected",
+            "scenario",
+            "failed",
+            output="TypeError mentioned in source\nValueError: bad fixture",
+        ),
+    )
+
+    problems = baseline_probe_failures(results)
+
+    assert len(problems) == 1
+    assert "unexpected" in problems[0]
 
 
 def test_unavailable_postrun_probe_is_a_repair_finding() -> None:

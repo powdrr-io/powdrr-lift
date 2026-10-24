@@ -537,6 +537,164 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
     assert suite["baseline_results"][0]["status"] == "failed"
 
 
+def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_crashes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "module.py").write_text(
+        "def public_api(value): return 'handled:' + value\n"
+        "def type_error(): raise TypeError('data keyword is unavailable')\n"
+        "def import_error(): raise ImportError('DataVar is unavailable')\n"
+        "def unexpected_error(): raise ValueError('invalid probe setup')\n",
+        encoding="utf-8",
+    )
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.email", "test@example.com")
+    _git(repository, "config", "user.name", "Test")
+    _git(repository, "add", "module.py")
+    _git(repository, "commit", "-qm", "baseline")
+    base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
+    output_root = tmp_path / "artifacts"
+    instruction = "The public API returns handled output."
+    scenario_ids = (
+        "assertion",
+        "type-error",
+        "import-error",
+        "unexpected-error",
+        "no-assertion",
+    )
+    scenarios = tuple(
+        {
+            "scenario_id": scenario_id,
+            "given": "The public API receives a value.",
+            "when": "Call the public API.",
+            "then": "The public API returns handled output.",
+            "evidence": [instruction],
+        }
+        for scenario_id in scenario_ids
+    )
+    obligations = [
+        {
+            "obligation_id": f"obligation-{scenario_id}",
+            "scenario_id": scenario_id,
+            "category": "transformation",
+            "rule": "other",
+            "supported": True,
+            "summary": "The public API returns handled output.",
+            "condition": "The public API receives a value.",
+            "operation": "Call the public API.",
+            "expected": "The result is handled.",
+            "operands": [],
+            "unresolved_reason": "",
+        }
+        for scenario_id in scenario_ids
+    ]
+    probe_functions = {
+        "test_probe_assertion": "assert module.public_api('value') == 'wrong'",
+        "test_probe_type_error": (
+            "module.type_error()\nassert module.public_api('value') == 'handled:value'"
+        ),
+        "test_probe_import_error": (
+            "module.import_error()\n"
+            "assert module.public_api('value') == 'handled:value'"
+        ),
+        "test_probe_unexpected_error": (
+            "module.unexpected_error()\n"
+            "assert module.public_api('value') == 'handled:value'"
+        ),
+        "test_probe_no_assertion": "module.public_api('value')",
+    }
+    metadata = {
+        function_name: {
+            "probe_id": scenario_id,
+            "scenario_id": scenario_id,
+            "obligation_id": f"obligation-{scenario_id}",
+            "oracle_basis": instruction,
+        }
+        for function_name, scenario_id in zip(
+            probe_functions, scenario_ids, strict=True
+        )
+    }
+
+    def author_probe_suite(
+        self: MiniSWEAgentProvider,
+        request: ImplementationRequest,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        del self, request, attempt_id
+        source = (
+            f"OBLIGATIONS = {obligations!r}\n"
+            "INTERACTIONS = []\n"
+            f"PROBE_METADATA = {metadata!r}\n"
+            "import module\n\n"
+            + "\n\n".join(
+                f"def {function_name}():\n"
+                + "\n".join(f"    {line}" for line in body.splitlines())
+                for function_name, body in probe_functions.items()
+            )
+            + "\n"
+        )
+        (worktree_root / "probe_suite.py").write_text(source, encoding="utf-8")
+        _git(worktree_root, "add", "-f", "probe_suite.py")
+        _git(worktree_root, "commit", "-qm", "author probe suite")
+        return subprocess.CompletedProcess(["mini"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
+    config = FeatureEndpointConfig(
+        feature_description=instruction,
+        work_item_name="partial-baseline-probes",
+        repo_root=repository,
+        allowed_paths=("module.py",),
+    )
+    request = ImplementationRequest(
+        request_id="partial-baseline-probes",
+        objective=instruction,
+        prompt="Implement the public API behavior.",
+        base_commit=base_commit,
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("module.py",),
+        acceptance_criteria=(instruction,),
+        validation_profiles=(),
+    )
+
+    _, probes = _generate_miniswe_postrun_probes(
+        config,
+        runner=subprocess.run,
+        worktree=repository,
+        output_root=output_root,
+        base_commit=base_commit,
+        request=request,
+        scenarios=scenarios,
+        instruction=instruction,
+        repository_contract={},
+    )
+
+    assert [probe.probe_id for probe in probes] == [
+        "assertion",
+        "type-error",
+        "import-error",
+    ]
+    suite = json.loads(
+        (output_root / "postrun-probes" / "probe-suite.json").read_text()
+    )
+    assert suite["generation_status"] == "partial"
+    assert len(suite["baseline_results"]) == 4
+    assert [item["probe_id"] for item in suite["rejected_generated_probes"]] == [
+        "no-assertion"
+    ]
+    assert [item["probe_id"] for item in suite["rejected_baseline_probes"]] == [
+        "unexpected-error"
+    ]
+    assert suite["scenarios_without_executable_probe"] == [
+        "no-assertion",
+        "unexpected-error",
+    ]
+    assert _git(repository, "status", "--porcelain").stdout == ""
+
+
 def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -644,7 +802,7 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     assert len(probes) == 1
     assert len(requests) == 2
     assert "baseline execution check" in requests[1].prompt
-    assert "AssertionError" in requests[1].prompt
+    assert "returned passed" in requests[1].prompt
     suite = json.loads(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )

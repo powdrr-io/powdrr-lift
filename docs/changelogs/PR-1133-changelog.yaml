@@ -24,29 +24,44 @@ files:
     rationale: Keep the worker's failure detail available through adjustment and workflow validation.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 639, end_line: 660}
+    span: {start_line: 640, end_line: 661}
     summary: Apply validated inline adjustments from trusted issue comments before executing a claimed item.
     rationale: Persist small task corrections on the issue and ensure malformed adjustments stop execution clearly.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 823, end_line: 926}
+    span: {start_line: 68, end_line: 68}
+    summary: Retain validated inline adjustment reasons and values on the effective work item.
+    rationale: Carry the audit details forward so they can be disclosed to the implementation PR reviewer.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 824, end_line: 941}
     summary: Validate adjustment schema, author association, item identity, reason, and supported field values.
     rationale: Keep inline edits bounded, auditable, and restricted to repository collaborators.
   - path: src/powdrr_lift/cli.py
     type: modified
-    span: {start_line: 2843, end_line: 2859}
+    span: {start_line: 2843, end_line: 2863}
     summary: Overlay the effective issue item fields onto the generated Procedrr workflow inputs.
     rationale: Ensure accepted issue adjustments affect the actual worker policy and task context.
   - path: src/powdrr_lift/cli.py
     type: modified
-    span: {start_line: 2862, end_line: 2862}
+    span: {start_line: 2866, end_line: 2866}
     summary: Derive the workflow instance identity from the effective inputs.
     rationale: Keep task identity aligned with the adjusted execution context.
   - path: src/powdrr_lift/cli.py
     type: modified
-    span: {start_line: 2884, end_line: 2884}
+    span: {start_line: 2888, end_line: 2888}
     summary: Instantiate the Procedrr workflow with the effective issue item fields.
     rationale: Pass adjustments into the actual workflow process state.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2310, end_line: 2354}
+    summary: Append a deterministic plan-adjustment summary and its reasons to worker implementation PR descriptions.
+    rationale: Make issue-recorded plan changes visible to human reviewers.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 3114, end_line: 3117}
+    summary: Intercept worker PR creation actions to add the adjustment disclosure.
+    rationale: Ensure the reviewer note is present even when the coding agent omits it.
   - path: tests/test_github_issue_queue.py
     type: modified
     span: {start_line: 156, end_line: 163}
@@ -57,9 +72,19 @@ files:
     span: {start_line: 721, end_line: 808}
     summary: Verify the worker applies an authorized inline allowed-path adjustment.
     rationale: Prevent issue adjustments from being recorded without reaching the effective work item.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 53, end_line: 53}
+    summary: Import the PR body adjustment-disclosure helper for regression coverage.
+    rationale: Exercise reviewer-visible issue adjustments in a focused test.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 80, end_line: 117}
+    summary: Verify inline adjustment details and rationale are appended to a worker PR body without replacing its existing summary.
+    rationale: Ensure reviewers see the exact issue-recorded plan adjustment in the PR description.
   - path: docs/plans/github-issue-plan-worker.md
     type: modified
-    span: {start_line: 178, end_line: 217}
+    span: {start_line: 178, end_line: 219}
     summary: Document supported inline adjustment fields, limits, authorship, and a CI path example.
     rationale: Make the issue comment format usable without changing the pinned plan.
 entities:

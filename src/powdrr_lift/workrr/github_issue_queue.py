@@ -65,6 +65,7 @@ class PlannedWorkItem:
     workflow_file: str | None = None
     implementation_steps: tuple[str, ...] = ()
     allowed_paths: tuple[str, ...] = (".",)
+    inline_adjustments: tuple[Mapping[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -920,7 +921,21 @@ def _apply_issue_plan_adjustments(
                         "repository-relative paths"
                     )
             values[field] = normalized
-        effective = replace(effective, **values)
+        adjustment_record = {
+            "reason": reason.strip(),
+            "changes": {
+                field: list(value) if isinstance(value, tuple) else value
+                for field, value in values.items()
+            },
+        }
+        effective = replace(
+            effective,
+            **values,
+            inline_adjustments=(
+                *effective.inline_adjustments,
+                adjustment_record,
+            ),
+        )
     return effective
 
 

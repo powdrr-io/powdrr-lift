@@ -2307,6 +2307,51 @@ class _WorkflowTaskDisplayClient:
         return response
 
 
+def _append_inline_plan_adjustments_to_pr_body(
+    action: WorkflowAction,
+    task_input_state: Mapping[str, Any],
+) -> WorkflowAction:
+    """Add the issue-recorded plan edits to a worker implementation PR body."""
+    if action.tool != GH_TOOL or action.parameters.get("operation") not in {
+        "pr_create",
+        "pr_publish_clean",
+    }:
+        return action
+    proposed = task_input_state.get("proposed_pr_context")
+    if not isinstance(proposed, Mapping):
+        return action
+    adjustments = proposed.get("inline_plan_adjustments")
+    if not isinstance(adjustments, list) or not adjustments:
+        return action
+    parameters = dict(action.parameters)
+    body = parameters.get("body")
+    current_body = body if isinstance(body, str) else ""
+    marker = "<!-- powdrr-inline-plan-adjustments:v1 -->"
+    if marker in current_body:
+        return action
+    plan_id = str(proposed.get("plan_id", "")).strip()
+    item_id = str(proposed.get("item_id", "")).strip()
+    note = "\n\n".join(
+        (
+            "## Inline plan adjustments",
+            (
+                "These issue-recorded changes were applied to the work item for "
+                f"`{plan_id}/{item_id}`."
+            ),
+            marker,
+            "```json\n"
+            f"{json.dumps(adjustments, indent=2, ensure_ascii=False, sort_keys=True)}\n"
+            "```",
+        )
+    )
+    parameters["body"] = f"{current_body.rstrip()}\n\n{note}".lstrip()
+    return WorkflowAction(
+        kind=action.kind,
+        tool=action.tool,
+        parameters=parameters,
+    )
+
+
 @dataclass(slots=True)
 class _TaskWorkflowExecutionStrategy:
     """Durable task operation adapter called by the Procedrr evaluator."""
@@ -3066,6 +3111,10 @@ class _TaskWorkflowExecutionStrategy:
                         f"{expected_branch}.",
                         file=self.stderr,
                     )
+        action = _append_inline_plan_adjustments_to_pr_body(
+            action,
+            self.task.input_state,
+        )
         command_error = _workflow_file_command_error(
             action.parameters,
             self.workflow.directory,

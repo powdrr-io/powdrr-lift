@@ -2856,6 +2856,10 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 workflow_context["implementation_steps"] = list(
                     item.implementation_steps
                 )
+            if item.inline_adjustments:
+                workflow_context["inline_plan_adjustments"] = [
+                    dict(adjustment) for adjustment in item.inline_adjustments
+                ]
             workflow_inputs["proposed_pr_context"] = workflow_context
             execution_id = uuid.uuid4().hex[:12]
             workflow_instance_id = _plan_workflow_instance_id(

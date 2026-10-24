@@ -213,7 +213,9 @@ implementation steps:
 The issue comment is the durable adjustment record; the source plan remains
 unchanged. Malformed trusted adjustment comments block execution with a specific
 error instead of being silently ignored. After resolving a blocked item, move
-it back to `powdrr:ready` as usual.
+it back to `powdrr:ready` as usual. The worker copies each adjustment and its
+reason into a dedicated section of the implementation PR description so the
+reviewer can see what changed from the pinned plan.
 
 `powdrr-lift list-plan-issues` reads the pinned plan and GitHub issue pointers,
 then prints one result per plan item with its issue number, URL, state, and

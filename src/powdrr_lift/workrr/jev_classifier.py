@@ -507,21 +507,7 @@ def _classifier_request(
     if not isinstance(context, Mapping):
         return None
     prompt_prefix = content.split(marker, 1)[0]
-    classifier = next(
-        (
-            value
-            for value in context.values()
-            if isinstance(value, Mapping)
-            and "allowed_values" in value
-            and (
-                {"question", "instructions", "subject_text"} <= value.keys()
-                or {"question", "instructions", "source_text", "candidate_field"}
-                <= value.keys()
-                or _is_candidate_relation_request(value)
-            )
-        ),
-        None,
-    )
+    classifier = _find_classifier_request(context)
     output_property = _single_output_property(response_schema)
     if isinstance(classifier, Mapping):
         spec = classifier.get("spec")
@@ -529,9 +515,7 @@ def _classifier_request(
         allowed = classifier.get("allowed_values")
         prompt = classifier.get("question")
         instructions = classifier.get("instructions")
-        source = classifier.get("subject_text", classifier.get("source_text"))
-        if kind == "candidate_relation" and not isinstance(source, str):
-            source = spec.get("proposition_text") if isinstance(spec, Mapping) else None
+        source = _classifier_source_text(classifier, spec)
         if isinstance(allowed, list) and isinstance(source, str):
             criteria = classifier.get("criteria")
             if criteria is not None and (
@@ -642,14 +626,34 @@ def _classifier_request(
     return None
 
 
-def _is_candidate_relation_request(value: Mapping[str, Any]) -> bool:
-    spec = value.get("spec")
-    return (
-        isinstance(spec, Mapping)
-        and spec.get("decision_kind") == "candidate_relation"
-        and isinstance(spec.get("proposition_text"), str)
-        and {"question", "instructions", "candidate"} <= value.keys()
-    )
+def _find_classifier_request(context: Mapping[str, Any]) -> Mapping[str, Any] | None:
+    for value in context.values():
+        if not isinstance(value, Mapping):
+            continue
+        if not {"question", "instructions", "allowed_values"} <= value.keys():
+            continue
+        spec = value.get("spec")
+        has_proposition = isinstance(spec, Mapping) and isinstance(
+            spec.get("proposition_text"), str
+        )
+        has_legacy_source = isinstance(value.get("subject_text"), str) or isinstance(
+            value.get("source_text"), str
+        )
+        if has_proposition or has_legacy_source:
+            return value
+    return None
+
+
+def _classifier_source_text(request: Mapping[str, Any], spec: Any) -> str | None:
+    for key in ("subject_text", "source_text"):
+        value = request.get(key)
+        if isinstance(value, str):
+            return value
+    if isinstance(spec, Mapping):
+        proposition = spec.get("proposition_text")
+        if isinstance(proposition, str):
+            return proposition
+    return None
 
 
 def _single_output_property(

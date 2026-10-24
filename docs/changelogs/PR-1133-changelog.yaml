@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 9999
+change_id: 1133
 title: Apply inline plan adjustments from GitHub issue comments
 intent:
   problem: Small corrections to execution details require changing the reviewed plan even when only one issue needs a bounded adjustment.

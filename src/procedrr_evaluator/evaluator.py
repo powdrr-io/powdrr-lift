@@ -1540,34 +1540,64 @@ def _bounded_context_text(value: Any, max_chars: int) -> str:
     if len(encoded) <= max_chars:
         return encoded
 
-    # Keep the context parseable for structured providers such as JEV. Cutting
-    # serialized JSON at the character limit can leave an invalid document.
-    for max_items in (32, 16, 8, 4, 2, 1, 0):
-        low, high = 0, 6000
-        best: str | None = None
-        while low <= high:
-            max_value_chars = (low + high) // 2
-            candidate = _json_text(
-                _compact_value(
-                    value,
-                    max_chars=max_value_chars,
-                    max_items=max_items,
-                )
-            )
-            if len(candidate) <= max_chars:
-                best = candidate
-                low = max_value_chars + 1
-            else:
-                high = max_value_chars - 1
-        if best is not None:
-            return best
+    # Add context records until the next one would exceed the budget. Truncate
+    # an oversized record recursively, then retain the last complete JSON value.
+    bounded = _fit_context_value(value, max_chars)
+    encoded = _json_text(bounded)
+    if len(encoded) <= max_chars:
+        return encoded
+    return "{}" if max_chars >= 2 else "0"
 
-    # A very small configured limit may not fit the original object's keys.
-    # Return a valid JSON value and make the loss of context explicit.
-    marker = _json_text({"__context_truncated__": True})
-    if len(marker) <= max_chars:
-        return marker
-    return "{}" if max_chars >= 2 else ""
+
+def _fit_context_value(value: Any, max_chars: int) -> Any:
+    encoded = _json_text(value)
+    if len(encoded) <= max_chars:
+        return value
+    if isinstance(value, Mapping):
+        bounded: dict[str, Any] = {}
+        for key, item in value.items():
+            normalized_key = str(key)
+            key_chars = len(_json_text(normalized_key))
+            overhead = key_chars + (2 if not bounded else 4)
+            value_budget = max_chars - len(_json_text(bounded)) - overhead
+            if value_budget < 1:
+                break
+            bounded_value = _fit_context_value(item, value_budget)
+            bounded[normalized_key] = bounded_value
+            if len(_json_text(bounded)) > max_chars:
+                del bounded[normalized_key]
+                break
+        return bounded
+    if isinstance(value, (list, tuple)):
+        bounded_list: list[Any] = []
+        for item in value:
+            closing_overhead = 0 if not bounded_list else 2
+            value_budget = max_chars - len(_json_text(bounded_list)) - closing_overhead
+            if value_budget < 1:
+                break
+            bounded_item = _fit_context_value(item, value_budget)
+            bounded_list.append(bounded_item)
+            if len(_json_text(bounded_list)) > max_chars:
+                bounded_list.pop()
+                break
+        return bounded_list
+    if isinstance(value, str):
+        suffix = "...<truncated>"
+        suffix_chars = len(_json_text(suffix)) - 2
+        remaining = max(0, max_chars - suffix_chars - 2)
+        prefix: list[str] = []
+        used_chars = 0
+        for char in value:
+            escaped_char_chars = len(_json_text(char)) - 2
+            if used_chars + escaped_char_chars > remaining:
+                break
+            prefix.append(char)
+            used_chars += escaped_char_chars
+        bounded_string = "".join(prefix) + suffix
+        if len(_json_text(bounded_string)) <= max_chars:
+            return bounded_string
+        return ""
+    return value
 
 
 def _context_fits(value: Any, max_chars: int) -> bool:

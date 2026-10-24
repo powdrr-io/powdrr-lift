@@ -461,6 +461,65 @@ def test_jev_maps_boolean_atomicity_classifier(monkeypatch: Any) -> None:
     assert fallback.calls == 0
 
 
+def test_jev_http_payload_gives_boolean_choices_descriptions(
+    monkeypatch: Any,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    class _Response:
+        def __enter__(self) -> _Response:
+            return self
+
+        def __exit__(self, *_: Any) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "model": "jev-test-revision",
+                    "answers": {"decision": {"choice": "true", "confidence": 0.94}},
+                }
+            ).encode()
+
+    def open_request(request: Any, timeout: int) -> _Response:
+        captured["body"] = json.loads(request.data)
+        captured["timeout"] = timeout
+        return _Response()
+
+    messages = [
+        {"role": "system", "content": "Return JSON."},
+        {
+            "role": "user",
+            "content": (
+                "Question:\nIs the shortcoming present?\n\nContext:\n"
+                '{"test_suite": {"text": "test context"}}'
+            ),
+        },
+    ]
+    monkeypatch.setattr(jev_classifier, "urlopen", open_request)
+    request = jev_classifier._classifier_request(
+        messages,
+        {
+            "type": "object",
+            "required": ["shortcoming_present"],
+            "properties": {"shortcoming_present": {"type": "boolean"}},
+        },
+    )
+    assert request is not None
+
+    response = jev_classifier._call_jev(
+        request, "test-key", "https://example.test", "jev-test"
+    )
+
+    body = captured["body"]
+    question = body["questions"]["decision"]
+    assert question["type"] == "choice"
+    assert question["criteria"]["true"]
+    assert question["criteria"]["false"]
+    assert all(isinstance(value, str) for value in question["criteria"].values())
+    assert response["answer"]["choice"] == "true"
+
+
 def test_jev_handles_field_entailment_classifiers(monkeypatch: Any) -> None:
     fallback = _Fallback()
     monkeypatch.setattr(

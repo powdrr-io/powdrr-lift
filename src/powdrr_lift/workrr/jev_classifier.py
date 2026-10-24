@@ -468,7 +468,9 @@ class SubQSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
 def preferred_semantic_classifier_client(
     fallback: WorkflowLLMClient, *, fail_closed: bool = False
 ) -> _DecisionApiSemanticClassifierClient | None:
-    """Choose Jev when configured; otherwise let the caller use its LLM client."""
+    """Prefer SubQ, then Jev, and let the caller use its LLM if neither is set."""
+    if os.environ.get("SUBQ_API_KEY"):
+        return SubQSemanticClassifierClient(fallback, fail_closed=fail_closed)
     if (
         os.environ.get("TYPESAFEAI_API_KEY")
         or os.environ.get("TYPESAFE_API_KEY")

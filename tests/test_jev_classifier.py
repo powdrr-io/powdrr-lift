@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from email.message import Message
 from typing import Any
+from urllib.error import HTTPError
 
 import pytest
 
@@ -201,33 +203,30 @@ def test_preferred_classifier_uses_subq_when_jev_key_is_missing(
     assert isinstance(client, SubQSemanticClassifierClient)
 
 
-def test_jev_fail_closed_boolean_decision_never_uses_fallback(
-    monkeypatch: Any,
-) -> None:
+def test_jev_missing_key_fails_without_using_fallback(monkeypatch: Any) -> None:
     for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     fallback = _Fallback()
     client = JevSemanticClassifierClient(fallback, fail_closed=True)
 
-    result = client.complete_json(
-        [
-            {"role": "system", "content": "Return a binary decision."},
-            {
-                "role": "user",
-                "content": (
-                    "Question:\nIs the test suite acceptable?\n\nContext:\n"
-                    '{"test_suite": {"text": "suite evidence"}}'
-                ),
+    with pytest.raises(RuntimeError, match="JEV classifier requires an API key"):
+        client.complete_json(
+            [
+                {"role": "system", "content": "Return a binary decision."},
+                {
+                    "role": "user",
+                    "content": (
+                        "Question:\nIs the test suite acceptable?\n\nContext:\n"
+                        '{"test_suite": {"text": "suite evidence"}}'
+                    ),
+                },
+            ],
+            response_schema={
+                "type": "object",
+                "required": ["passed"],
+                "properties": {"passed": {"type": "boolean"}},
             },
-        ],
-        response_schema={
-            "type": "object",
-            "required": ["passed"],
-            "properties": {"passed": {"type": "boolean"}},
-        },
-    )
-
-    assert result == {"passed": False}
+        )
     assert fallback.calls == 0
 
 
@@ -555,7 +554,7 @@ def test_jev_handles_field_entailment_classifiers(monkeypatch: Any) -> None:
     assert fallback.calls == 0
 
 
-def test_jev_abstention_falls_back(monkeypatch: Any) -> None:
+def test_jev_abstention_maps_to_unresolved_result(monkeypatch: Any) -> None:
     fallback = _Fallback()
     monkeypatch.setattr(
         jev_classifier, "_call_jev", lambda *_: {"choice": "unresolved"}
@@ -573,28 +572,57 @@ def test_jev_abstention_falls_back(monkeypatch: Any) -> None:
     assert fallback.calls == 0
 
 
-def test_jev_provider_failure_falls_back(
+def test_jev_batch_bad_request_fails_without_planning_fallback(
+    monkeypatch: Any,
+) -> None:
+    fallback = _Fallback()
+    error = HTTPError(
+        "https://api.typesafe.ai/v1/systemone", 400, "bad request", Message(), None
+    )
+
+    def fail(*_: Any) -> Any:
+        raise error
+
+    monkeypatch.setattr(jev_classifier, "_call_jev_batch", fail)
+    client = JevSemanticClassifierClient(fallback, api_key="key")
+
+    with pytest.raises(HTTPError) as raised:
+        client.complete_json_batch(
+            [
+                (_messages("polarity"), _decision_schema()),
+                (_messages("has_exception"), _decision_schema()),
+            ]
+        )
+
+    assert raised.value.code == 400
+    assert fallback.calls == 0
+
+
+def test_jev_bad_request_fails_without_planning_fallback(
     monkeypatch: Any, caplog: pytest.LogCaptureFixture
 ) -> None:
     fallback = _Fallback()
 
     def fail(*_: Any) -> Any:
-        raise RuntimeError("provider unavailable")
+        raise HTTPError(
+            "https://api.typesafe.ai/v1/systemone", 400, "bad request", Message(), None
+        )
 
     monkeypatch.setattr(jev_classifier, "_call_jev", fail)
 
-    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
-        _messages("polarity"), response_schema=_decision_schema()
-    )
+    with pytest.raises(HTTPError) as error:
+        JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+            _messages("polarity"), response_schema=_decision_schema()
+        )
 
-    assert result["value"] == "absent"
-    assert fallback.calls == 1
+    assert error.value.code == 400
+    assert fallback.calls == 0
     assert "JEV_REQUEST_STARTED" in caplog.text
-    assert "JEV_FALLBACK" in caplog.text
+    assert "JEV_FAILED" in caplog.text
 
 
 @pytest.mark.parametrize("answer", [None, "unresolved", "invalid"])
-def test_jev_enum_gate_retains_planning_fallback(
+def test_jev_enum_gate_failure_does_not_use_planning_fallback(
     monkeypatch: Any, answer: str | None
 ) -> None:
     class GateFallback(_Fallback):
@@ -612,25 +640,25 @@ def test_jev_enum_gate_retains_planning_fallback(
         return {"choice": answer}
 
     monkeypatch.setattr(jev_classifier, "_call_jev", fail)
-    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
-        [
-            {"role": "system", "content": "Return JSON."},
-            {
-                "role": "user",
-                "content": (
-                    "Question:\nResearch?\n\nContext:\n"
-                    '{"feature_description": "Local behavior."}'
-                ),
+    with pytest.raises((RuntimeError, ValueError)):
+        JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+            [
+                {"role": "system", "content": "Return JSON."},
+                {
+                    "role": "user",
+                    "content": (
+                        "Question:\nResearch?\n\nContext:\n"
+                        '{"feature_description": "Local behavior."}'
+                    ),
+                },
+            ],
+            response_schema={
+                "type": "object",
+                "required": ["decision"],
+                "properties": {
+                    "decision": {"type": "string", "enum": ["research", "skip"]}
+                },
             },
-        ],
-        response_schema={
-            "type": "object",
-            "required": ["decision"],
-            "properties": {
-                "decision": {"type": "string", "enum": ["research", "skip"]}
-            },
-        },
-    )
+        )
     assert observed[0]["allowed_values"] == ["research", "skip"]
-    assert fallback.calls == 1
-    assert result == {"decision": "skip"}
+    assert fallback.calls == 0

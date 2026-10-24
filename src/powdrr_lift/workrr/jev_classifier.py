@@ -37,11 +37,12 @@ class _PendingDecision:
 
 
 class _DecisionApiSemanticClassifierClient:
-    """Common typed-decision API adapter with a planning fallback."""
+    """Common typed-decision API adapter with optional planning fallback."""
 
     provider = "DECISION_API"
     default_model = ""
     default_endpoint = ""
+    fallback_on_error = True
 
     def __init__(
         self,
@@ -86,9 +87,11 @@ class _DecisionApiSemanticClassifierClient:
                 request_id,
                 endpoint_host,
             )
-            if self._fail_closed:
-                return self._fallback_or_false(messages, response_schema)
-            return _fallback(self._fallback, messages, response_schema)
+            return self._fallback_or_raise(
+                messages,
+                response_schema,
+                RuntimeError(f"{self.provider} classifier requires an API key"),
+            )
         if request_data is None:
             LOGGER.warning(
                 "%s_CALL_SKIPPED "
@@ -97,9 +100,11 @@ class _DecisionApiSemanticClassifierClient:
                 request_id,
                 endpoint_host,
             )
-            if self._fail_closed:
-                return self._fallback_or_false(messages, response_schema)
-            return _fallback(self._fallback, messages, response_schema)
+            return self._fallback_or_raise(
+                messages,
+                response_schema,
+                ValueError(f"{self.provider} does not support this classifier request"),
+            )
 
         started_at = time.monotonic()
         LOGGER.warning(
@@ -129,13 +134,15 @@ class _DecisionApiSemanticClassifierClient:
             choice = answer.get("choice")
             result = _format_classifier_result(choice, request_data, response_schema)
         except Exception as exc:  # noqa: BLE001
-            # Decision APIs are optional classifier providers.
             http_status = getattr(exc, "code", "none")
-            log_event = (
-                f"{self.provider}_FAIL_CLOSED"
-                if self._fail_closed
-                else f"{self.provider}_FALLBACK"
-            )
+            if self.fallback_on_error:
+                log_event = (
+                    f"{self.provider}_FAIL_CLOSED"
+                    if self._fail_closed
+                    else f"{self.provider}_FALLBACK"
+                )
+            else:
+                log_event = f"{self.provider}_FAILED"
             LOGGER.warning(
                 "%s request_id=%s endpoint_host=%s phase=%s "
                 "error_type=%s http_status=%s duration_ms=%d",
@@ -147,7 +154,7 @@ class _DecisionApiSemanticClassifierClient:
                 http_status,
                 round((time.monotonic() - started_at) * 1000),
             )
-            return self._fallback_or_false(messages, response_schema)
+            return self._fallback_or_raise(messages, response_schema, exc)
         LOGGER.warning(
             "%s_RESULT_ACCEPTED request_id=%s endpoint_host=%s model=%s duration_ms=%d",
             self.provider,
@@ -220,7 +227,7 @@ class _DecisionApiSemanticClassifierClient:
                         item.response_schema,
                     )
                 except Exception as exc:  # noqa: BLE001
-                    self._log_batch_fallback(
+                    self._log_batch_error(
                         item,
                         batch_id,
                         endpoint_host,
@@ -228,7 +235,7 @@ class _DecisionApiSemanticClassifierClient:
                         error=exc,
                         started_at=item_started,
                     )
-                    self._complete_fallback(item)
+                    self._complete_fallback(item, error=exc)
                     continue
                 LOGGER.warning(
                     "%s_RESPONSE_RECEIVED request_id=%s batch_id=%s "
@@ -253,7 +260,7 @@ class _DecisionApiSemanticClassifierClient:
                 item.future.set_result(result)
         except Exception as exc:  # noqa: BLE001
             for item in batch:
-                self._log_batch_fallback(
+                self._log_batch_error(
                     item,
                     batch_id,
                     endpoint_host,
@@ -261,17 +268,23 @@ class _DecisionApiSemanticClassifierClient:
                     error=exc,
                     started_at=item.started_at,
                 )
-                self._complete_fallback(item)
+                self._complete_fallback(item, error=exc)
 
-    def _complete_fallback(self, item: _PendingDecision) -> None:
+    def _complete_fallback(
+        self, item: _PendingDecision, *, error: Exception | None = None
+    ) -> None:
         try:
-            result = self._fallback_or_false(item.messages, item.response_schema)
+            result = self._fallback_or_raise(
+                item.messages,
+                item.response_schema,
+                error or RuntimeError(f"{self.provider} classifier request failed"),
+            )
         except Exception as exc:  # noqa: BLE001
             item.future.set_exception(exc)
         else:
             item.future.set_result(result)
 
-    def _log_batch_fallback(
+    def _log_batch_error(
         self,
         item: _PendingDecision,
         batch_id: str,
@@ -281,10 +294,15 @@ class _DecisionApiSemanticClassifierClient:
         error: Exception,
         started_at: float,
     ) -> None:
+        event = (
+            f"{self.provider}_FALLBACK"
+            if self.fallback_on_error
+            else f"{self.provider}_FAILED"
+        )
         LOGGER.warning(
-            "%s_FALLBACK request_id=%s batch_id=%s endpoint_host=%s "
+            "%s request_id=%s batch_id=%s endpoint_host=%s "
             "phase=%s error_type=%s http_status=%s duration_ms=%d",
-            self.provider,
+            event,
             item.request_id,
             batch_id,
             endpoint_host,
@@ -308,6 +326,16 @@ class _DecisionApiSemanticClassifierClient:
             )
         return _fallback(self._fallback, messages, response_schema)
 
+    def _fallback_or_raise(
+        self,
+        messages: list[dict[str, str]],
+        response_schema: Mapping[str, Any] | None,
+        error: Exception,
+    ) -> dict[str, Any]:
+        if not self.fallback_on_error:
+            raise error
+        return self._fallback_or_false(messages, response_schema)
+
     def _call(
         self, request_data: Mapping[str, Any], api_key: str, endpoint: str
     ) -> Mapping[str, Any]:
@@ -323,11 +351,12 @@ class _DecisionApiSemanticClassifierClient:
 
 
 class JevSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
-    """Use Jev for classifier judges, retaining planning as an error fallback."""
+    """Use Jev for classifier judges and propagate provider errors."""
 
     provider = "JEV"
     default_model = JEV_MODEL
     default_endpoint = JEV_DEFAULT_BASE_URL
+    fallback_on_error = False
 
     def __init__(
         self,
@@ -360,12 +389,13 @@ class JevSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
         """Complete independent classifier requests in explicit JEV batches."""
         results: list[dict[str, Any] | None] = [None] * len(requests)
         pending: list[_PendingDecision] = []
+        if not self._api_key:
+            raise RuntimeError("JEV classifier requires an API key")
         for index, (messages, response_schema) in enumerate(requests):
             request_id = uuid.uuid4().hex
             request_data = _classifier_request(messages, response_schema)
-            if not self._api_key or request_data is None:
-                results[index] = _fallback(self._fallback, messages, response_schema)
-                continue
+            if request_data is None:
+                raise ValueError("JEV does not support this classifier request")
             pending.append(
                 _PendingDecision(
                     result_index=index,

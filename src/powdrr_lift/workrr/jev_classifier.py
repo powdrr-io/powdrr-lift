@@ -518,6 +518,7 @@ def _classifier_request(
                 {"question", "instructions", "subject_text"} <= value.keys()
                 or {"question", "instructions", "source_text", "candidate_field"}
                 <= value.keys()
+                or _is_candidate_relation_request(value)
             )
         ),
         None,
@@ -530,6 +531,8 @@ def _classifier_request(
         prompt = classifier.get("question")
         instructions = classifier.get("instructions")
         source = classifier.get("subject_text", classifier.get("source_text"))
+        if kind == "candidate_relation" and not isinstance(source, str):
+            source = spec.get("proposition_text") if isinstance(spec, Mapping) else None
         if isinstance(allowed, list) and isinstance(source, str):
             criteria = classifier.get("criteria")
             if criteria is not None and (
@@ -638,6 +641,16 @@ def _classifier_request(
                 "output_property": output_property,
             }
     return None
+
+
+def _is_candidate_relation_request(value: Mapping[str, Any]) -> bool:
+    spec = value.get("spec")
+    return (
+        isinstance(spec, Mapping)
+        and spec.get("decision_kind") == "candidate_relation"
+        and isinstance(spec.get("proposition_text"), str)
+        and {"question", "instructions", "candidate"} <= value.keys()
+    )
 
 
 def _single_output_property(

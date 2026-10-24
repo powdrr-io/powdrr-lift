@@ -444,7 +444,16 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
     monkeypatch.setattr(task_agent, "complete_json_with_timeout_retry", request_llm)
     evidence = {
-        "contract": {"acceptance_criteria": ["AC-01: Reject invalid payloads."]},
+        "contract": {
+            "title": "Validate public API inputs",
+            "objective": "Reject invalid payloads through the public API.",
+            "scope": ["Relevant public API behavior."],
+            "acceptance_criteria": [
+                "AC-01: Reject invalid payloads.",
+                "AC-99: Unrelated criterion that must not reach this Jev question.",
+            ],
+            "unrelated_repository_dump": "unrelated evidence " * 20_000,
+        },
         "test_obligations": [
             {"obligation_id": "AC-01", "source_text": "Reject invalid payloads."}
         ],
@@ -453,9 +462,28 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
             "tests/test_api.py": (
                 "# Covers: AC-01 test_rejects_payload\n"
                 "def test_rejects_payload():\n    assert True\n"
-            )
+            ),
+            "tests/test_unrelated.py": (
+                "def test_unrelated_repository_behavior():\n"
+                "    assert unrelated_public_api()\n"
+            ),
         },
-        "baseline_result": {"stdout": "1 failed in 0.01s", "passed": False},
+        "baseline_result": {
+            "stdout": (
+                "_________________________ test_rejects_payload "
+                "_________________________\n"
+                "E   AssertionError: expected a rejection\n"
+                "_______________________ test_unrelated_repository_behavior "
+                "_______________________\n"
+                + "unrelated traceback detail "
+                * 500
+                + "\n============================== short test summary info "
+                "==============================\n"
+                "FAILED tests/test_api.py::test_rejects_payload\n"
+            ),
+            "passed": False,
+            "returncode": 1,
+        },
     }
 
     review = task_agent._review_execute_pr_test_quality(
@@ -469,7 +497,12 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
     assert jev_calls[0][1]["content"] == llm_calls[0][0][1]["content"]
     assert "tests/test_api.py::test_rejects_payload" in llm_calls[0][0][1]["content"]
     assert "AC-01: Reject invalid payloads." in llm_calls[0][0][1]["content"]
+    assert "test_unrelated_repository_behavior" not in jev_calls[0][1]["content"]
+    assert "AC-99" not in jev_calls[0][1]["content"]
+    assert "unrelated evidence" not in jev_calls[0][1]["content"]
+    assert len(jev_calls[0][1]["content"]) < 8_000
     assert "baseline_result" in llm_calls[1][0][1]["content"]
+    assert "unrelated_repository_dump" in llm_calls[1][0][1]["content"]
     assert review["outcome"] == "advisory"
     assert review["suggestions"][0]["test_name"] == "test_rejects_invalid_payload"
     assert review["assessments"][0]["check_id"] == "observable_coverage"
@@ -526,6 +559,8 @@ def test_execute_pr_test_quality_accepts_jev_concern_as_advisory_on_disagreement
 def test_execute_pr_test_quality_review_outage_is_advisory(
     monkeypatch: Any,
 ) -> None:
+    llm_calls = 0
+
     class BrokenJevClient:
         def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
             assert fail_closed
@@ -533,7 +568,15 @@ def test_execute_pr_test_quality_review_outage_is_advisory(
         def complete_json(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
             raise RuntimeError("Jev is unavailable")
 
+    def must_not_replace_jev(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+        nonlocal llm_calls
+        llm_calls += 1
+        raise AssertionError("LLM must not replace a failed Jev judgment")
+
     monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", BrokenJevClient)
+    monkeypatch.setattr(
+        task_agent, "complete_json_with_timeout_retry", must_not_replace_jev
+    )
     review = task_agent._review_execute_pr_test_quality(
         object(),  # type: ignore[arg-type]
         {
@@ -551,9 +594,12 @@ def test_execute_pr_test_quality_review_outage_is_advisory(
     )
     assert review["outcome"] == "advisory"
     assert len(review["assessments"]) == 7
+    assert llm_calls == 0
     assert all(
         item["jev_reports_shortcoming"] is None for item in review["assessments"]
     )
+    assert len(review["notes"]) == 7
+    assert all("Jev test-quality check" in note for note in review["notes"])
 
 
 def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(

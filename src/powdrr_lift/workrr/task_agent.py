@@ -1526,6 +1526,7 @@ def _review_execute_pr_test_quality(
     suggestions: list[dict[str, str]] = []
 
     for target in _execute_pr_test_review_targets(suite_evidence):
+        review_context = _execute_pr_test_review_context(suite_evidence, target)
         for check_id, question in checks:
             question_text = (
                 "Answer yes only when the specific shortcoming in the question is "
@@ -1534,9 +1535,9 @@ def _review_execute_pr_test_quality(
                 f"{question}\n\nContext:\n"
                 + json.dumps(
                     {
-                        "test_suite": {
+                        "test_review": {
                             "text": json.dumps(
-                                {**suite_evidence, "review_target": target},
+                                review_context,
                                 ensure_ascii=False,
                                 sort_keys=True,
                             )
@@ -1760,11 +1761,90 @@ def _execute_pr_test_review_targets(
     return scoped_targets
 
 
+def _execute_pr_test_review_context(
+    suite_evidence: Mapping[str, Any], target: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Keep each Jev decision to the named test and its linked evidence."""
+    contract = suite_evidence.get("contract")
+    contract_context: dict[str, Any] = {}
+    if isinstance(contract, Mapping):
+        for key in ("title", "objective", "repository_default_branch"):
+            value = contract.get(key)
+            if isinstance(value, str) and value.strip():
+                contract_context[key] = value
+            elif key == "repository_default_branch" and isinstance(value, Mapping):
+                contract_context[key] = dict(value)
+
+    test_id = str(target.get("test_id", ""))
+    test_name = str(target.get("test_name", ""))
+    result = suite_evidence.get("baseline_result")
+    baseline_context: dict[str, Any] = {}
+    if isinstance(result, Mapping):
+        baseline_context["passed"] = result.get("passed")
+        baseline_context["returncode"] = result.get("returncode")
+        output = "\n".join(str(result.get(key, "")) for key in ("stdout", "stderr"))
+        if test_name and output:
+            excerpt = _execute_pr_test_baseline_failure_excerpt(
+                output, test_name=test_name
+            )
+            if excerpt:
+                baseline_context["target_failure_excerpt"] = excerpt
+
+    acceptance_criteria = [
+        f"{criterion.get('obligation_id')}: {criterion.get('source_text')}"
+        if criterion.get("obligation_id")
+        else str(criterion.get("source_text", ""))
+        for criterion in target.get("acceptance_criteria", [])
+        if isinstance(criterion, Mapping)
+    ]
+    context: dict[str, Any] = {
+        "test_id": test_id,
+        "criterion_ids": list(target.get("criterion_ids", [])),
+        "acceptance_criteria": acceptance_criteria,
+        "test_source": str(target.get("test_source", "")),
+        "baseline_result": baseline_context,
+    }
+    if contract_context:
+        context["plan_context"] = contract_context
+    return context
+
+
+def _execute_pr_test_baseline_failure_excerpt(
+    output: str, *, test_name: str, max_chars: int = 4000
+) -> str:
+    """Return only the named baseline failure, avoiding the entire pytest log."""
+    failure_start = re.compile(
+        rf"(?m)^_{{5,}}\s*{re.escape(test_name)}\s*_{{5,}}\s*$"
+    ).search(output)
+    if failure_start is None:
+        matching_line = re.search(rf"(?m)^.*{re.escape(test_name)}.*$", output)
+        if matching_line is None:
+            return ""
+        return output[
+            max(0, matching_line.start() - 400) : min(
+                len(output), matching_line.end() + 1200
+            )
+        ][:max_chars]
+
+    next_failure = re.compile(r"(?m)^_{5,}\s+test_").search(output, failure_start.end())
+    summary = re.search(r"(?m)^=+ short test summary info =+", output)
+    ends = [match.start() for match in (next_failure, summary) if match is not None]
+    end = min(ends) if ends else len(output)
+    return output[failure_start.start() : end][:max_chars]
+
+
 def _execute_pr_test_quality_notes(
     assessments: Sequence[Mapping[str, Any]],
 ) -> list[str]:
     notes: list[str] = []
     for assessment in assessments:
+        if assessment.get("jev_error"):
+            notes.append(
+                f"{assessment.get('test_id')}: Jev test-quality check "
+                f"{assessment.get('check_id')} was unavailable "
+                f"({assessment.get('jev_error')}); review manually."
+            )
+            continue
         if assessment.get("jev_reports_shortcoming") is True:
             explanation = assessment.get("llm_explanation")
             if assessment.get("llm_agrees_shortcoming") is True:

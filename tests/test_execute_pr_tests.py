@@ -315,3 +315,26 @@ def test_generated_contract_tests_can_prove_red_baseline_with_shell_validation(
     assert result["command"][:3] == [sys.executable, "-m", "pytest"]
     assert result["passed"] is False
     require_behavioral_red_result(result)
+
+
+def test_generated_tests_include_nested_src_package_paths(tmp_path: Path) -> None:
+    source_root = tmp_path / "attestation" / "verifier" / "src"
+    package = source_root / "powdrr_attestation"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text('VALUE = "available"\n')
+    test_root = tmp_path / "attestation" / "verifier" / "tests"
+    test_root.mkdir(parents=True)
+    (test_root / "test_nested_package.py").write_text(
+        "from powdrr_attestation import VALUE\n\n"
+        "def test_nested_package_is_importable():\n"
+        "    assert VALUE == 'available'\n"
+    )
+
+    result = run_generated_pytest(
+        ValidationProfile("verify", ("bash", "scripts/verify-all.sh")),
+        root=tmp_path,
+        paths=("attestation/verifier/tests/test_nested_package.py",),
+        timeout_seconds=30,
+    )
+
+    assert result["passed"] is True, result

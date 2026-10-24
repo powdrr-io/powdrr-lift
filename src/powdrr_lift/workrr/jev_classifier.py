@@ -583,6 +583,10 @@ def _classifier_request(
         return {
             "kind": "boolean_classifier",
             "allowed_values": ["true", "false"],
+            "criteria": {
+                "true": "The proposition being evaluated is true.",
+                "false": "The proposition being evaluated is false.",
+            },
             "question": _question_from_prompt(prompt_prefix),
             "instructions": [prompt_prefix],
             "state": {"source_text": clause["text"], "context": context_suffix},

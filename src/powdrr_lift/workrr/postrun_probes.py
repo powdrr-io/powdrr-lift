@@ -141,6 +141,7 @@ class PostRunProbe:
     obligation_category: str = "other"
     obligation_rule: str = "not_applicable"
     interaction_ids: tuple[str, ...] = ()
+    execution_path: str = "sync"
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -153,6 +154,7 @@ class PostRunProbe:
             "obligation_category": self.obligation_category,
             "obligation_rule": self.obligation_rule,
             "interaction_ids": list(self.interaction_ids),
+            "execution_path": self.execution_path,
         }
 
 
@@ -249,6 +251,7 @@ def parse_generated_postrun_probe_source(
     known_scenarios = {str(item["scenario_id"]) for item in scenarios}
     seen_probe_ids: set[str] = set()
     covered_obligations: set[str] = set()
+    covered_execution_paths: dict[str, set[str]] = {}
     known_interactions = {
         str(item["interaction_id"]) for item in interaction_obligations
     }
@@ -270,6 +273,14 @@ def parse_generated_postrun_probe_source(
         scenario_id = _required_text(metadata, "scenario_id")
         oracle_basis = _required_text(metadata, "oracle_basis")
         obligation_id = _required_text(metadata, "obligation_id")
+        execution_path = metadata.get("execution_path", "sync")
+        if not isinstance(execution_path, str) or execution_path not in {
+            "sync",
+            "async",
+        }:
+            raise ValueError(
+                f"{function.name} execution_path must be 'sync' or 'async'"
+            )
         raw_interaction_ids = metadata.get("interaction_ids", [])
         if not isinstance(raw_interaction_ids, list) or any(
             not isinstance(value, str) for value in raw_interaction_ids
@@ -343,7 +354,7 @@ def parse_generated_postrun_probe_source(
             if interaction_id not in invalid_interactions
         )
         try:
-            _validate_probe_function(function, tree)
+            _validate_probe_function(function, tree, execution_path=execution_path)
         except ValueError as error:
             if rejected_probes is None:
                 raise
@@ -357,6 +368,7 @@ def parse_generated_postrun_probe_source(
             )
             continue
         covered_obligations.add(obligation_id)
+        covered_execution_paths.setdefault(obligation_id, set()).add(execution_path)
         covered_interactions.update(interaction_ids)
         probes.append(
             PostRunProbe(
@@ -369,6 +381,7 @@ def parse_generated_postrun_probe_source(
                 str(obligation["category"]),
                 str(obligation["rule"]),
                 interaction_ids,
+                execution_path,
             )
         )
     missing_obligations = missing_obligation_ids(
@@ -402,6 +415,44 @@ def parse_generated_postrun_probe_source(
                 set(missing_obligations) - rejected_obligation_ids
             )
         )
+    if _repository_has_paired_sync_async_engines(repository_contract):
+        for obligation in obligations:
+            if (
+                obligation.get("supported") is not True
+                or obligation.get("category") == "validation"
+            ):
+                continue
+            obligation_id = str(obligation["obligation_id"])
+            covered_paths = covered_execution_paths.get(obligation_id, set())
+            for missing_path in sorted({"sync", "async"} - covered_paths):
+                if missing_path == "async":
+                    message = (
+                        f"supported obligation {obligation_id!r} needs an async-path "
+                        "probe because the repository exposes paired sync and async "
+                        "engines; author a synchronous wrapper that exercises the "
+                        "async engine with asyncio.run"
+                    )
+                else:
+                    message = (
+                        f"supported obligation {obligation_id!r} needs a sync-path "
+                        "probe because the repository exposes paired sync and async "
+                        "engines"
+                    )
+                if rejected_probes is None:
+                    raise ValueError(message)
+                if not any(
+                    item.get("obligation_id") == obligation_id
+                    and message in item.get("error", "")
+                    for item in rejected_probes
+                ):
+                    rejected_probes.append(
+                        {
+                            "probe_id": "",
+                            "scenario_id": str(obligation["scenario_id"]),
+                            "obligation_id": obligation_id,
+                            "error": message,
+                        }
+                    )
     if not probes and any(item["supported"] is True for item in obligations):
         rejected_details = "; ".join(
             f"{item.get('probe_id') or item.get('obligation_id')}: {item['error']}"
@@ -677,7 +728,12 @@ def _normalize_obligation_operands(
     return normalized
 
 
-def _validate_probe_function(function: ast.FunctionDef, tree: ast.Module) -> None:
+def _validate_probe_function(
+    function: ast.FunctionDef,
+    tree: ast.Module,
+    *,
+    execution_path: str = "sync",
+) -> None:
     builtin_names = set(dir(builtins))
     for node in ast.walk(tree):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
@@ -699,6 +755,77 @@ def _validate_probe_function(function: ast.FunctionDef, tree: ast.Module) -> Non
         for call in function_calls
     ):
         raise ValueError(f"{function.name} must exercise a non-built-in software call")
+    async_helpers = {
+        node.name: node for node in tree.body if isinstance(node, ast.AsyncFunctionDef)
+    }
+    async_runner_calls = [
+        node
+        for node in ast.walk(function)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "asyncio"
+        and node.func.attr == "run"
+    ]
+    if execution_path == "async" and not any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id in async_helpers
+        and _async_helper_awaits_public_call(async_helpers[node.func.id])
+        for runner_call in async_runner_calls
+        for node in runner_call.args[:1]
+    ):
+        raise ValueError(
+            f"{function.name} is marked async but must use asyncio.run in its "
+            "synchronous wrapper on a local async helper that awaits a public "
+            "operation"
+        )
+
+
+def _async_helper_awaits_public_call(function: ast.AsyncFunctionDef) -> bool:
+    for node in ast.walk(function):
+        if not isinstance(node, ast.Await) or not isinstance(node.value, ast.Call):
+            continue
+        called = node.value.func
+        if (
+            isinstance(called, ast.Attribute)
+            and isinstance(called.value, ast.Name)
+            and called.value.id == "asyncio"
+        ):
+            continue
+        return True
+    return False
+
+
+def _repository_has_paired_sync_async_engines(
+    repository_contract: Mapping[str, Any] | None,
+) -> bool:
+    """Detect explicit AsyncX/SyncX engine pairs in repository evidence."""
+    if not isinstance(repository_contract, Mapping):
+        return False
+    records = repository_contract.get("records")
+    if not isinstance(records, list):
+        return False
+    async_families: set[str] = set()
+    sync_families: set[str] = set()
+    for record in records:
+        if not isinstance(record, Mapping) or record.get("kind") != "class":
+            continue
+        path = record.get("path")
+        if isinstance(path, str) and any(
+            part.casefold() in {"test", "tests"}
+            for part in path.replace("\\", "/").split("/")[:-1]
+        ):
+            continue
+        name = record.get("name")
+        if not isinstance(name, str):
+            continue
+        folded = name.casefold()
+        if folded.startswith("async") and len(folded) > len("async"):
+            async_families.add(folded[len("async") :])
+        elif folded.startswith("sync") and len(folded) > len("sync"):
+            sync_families.add(folded[len("sync") :])
+    return bool(async_families & sync_families)
 
 
 def _validate_import_roots(roots: set[str]) -> None:

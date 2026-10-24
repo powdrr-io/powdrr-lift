@@ -3292,6 +3292,46 @@ def test_candidate_structural_gate_routes_in_scope_additions_to_review() -> None
     assert blockers == []
 
 
+def test_candidate_structural_gate_rejects_safety_findings() -> None:
+    proposal = compile_proposal_revision(
+        "candidate-gate",
+        {"entities": [], "entity_relationships": []},
+        {"files": []},
+        acceptance_criteria=("Implement the requested behavior.",),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src", "tests"),
+        source_refs=("instruction:scope",),
+    )
+    actual_diff = StructrrActualDiff(
+        baseline_snapshot_fingerprint="baseline",
+        candidate_snapshot_fingerprint="candidate",
+        baseline_manifest_fingerprint="baseline-manifest",
+        candidate_manifest_fingerprint="candidate-manifest",
+        baseline_product_digest="baseline-product",
+        candidate_product_digest="candidate-product",
+        submission_base="base",
+        baseline_revision="base",
+        candidate_revision="candidate",
+        structural_operations=(),
+        source_observations=(),
+        declaration_changes=(),
+        behavioral_review_candidates=(),
+        extraction_complete=True,
+        unknowns=(),
+    )
+
+    passed, blockers = _candidate_structural_gate(
+        proposal,
+        actual_diff,
+        {"extraction_complete": True, "findings": []},
+        safety_blockers=("existing compatibility test changed",),
+    )
+
+    assert passed is False
+    assert blockers == ["existing compatibility test changed"]
+
+
 def test_candidate_validation_expectations_do_not_require_test_file_changes() -> None:
     result = _candidate_validation_expectations(
         {

@@ -90,6 +90,10 @@ from powdrr_lift.structrr.verification_obligations import (
 )
 from powdrr_lift.workrr.actualization import reconcile_actualization
 from powdrr_lift.workrr.candidate_checkpoint import checkpoint_candidate_changes
+from powdrr_lift.workrr.candidate_safety import (
+    existing_test_contract_changes,
+    unapproved_public_default_changes,
+)
 from powdrr_lift.workrr.coding_agent import (
     DEFAULT_CODING_AGENT_TIMEOUT_SECONDS,
     DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
@@ -3372,8 +3376,16 @@ def _generate_miniswe_postrun_probes(
             "what is missing in `unresolved_reason`. Mark unsupported behavior "
             "unresolved instead of guessing. "
             "`PROBE_METADATA` maps each function name to a dictionary with "
-            "`probe_id`, `scenario_id`, `obligation_id`, `oracle_basis`, and "
-            "optional `interaction_ids`. Each function must call the "
+            "`probe_id`, `scenario_id`, `obligation_id`, `oracle_basis`, "
+            "`execution_path` (`sync` or `async`), and optional `interaction_ids`. "
+            "Inspect the supplied repository contract for paired synchronous "
+            "and asynchronous engines. When both exist, author both routes for "
+            "each supported non-validation obligation. Mark each route in its "
+            "probe metadata. Keep probe functions synchronous; an `async` route "
+            "must define a module-level async helper that awaits the repository's "
+            "async engine or callback path, then invoke that helper from its "
+            "synchronous probe with `asyncio.run`. Do not label a sync call as "
+            "async merely by wrapping it in a coroutine. Each function must call the "
             "public software "
             "under test and assert an instruction-supported outcome. Prefer "
             "boundary, negative, and interaction cases that are not merely "
@@ -6694,7 +6706,12 @@ def _compile_initial_worker_prompt(
             objective=config.feature_description,
             paths=config.allowed_paths,
             validation_profiles=profile_names,
-            acceptance_criteria=tuple(item["description"] for item in tests),
+            acceptance_criteria=(
+                *(item["description"] for item in tests),
+                "Preserve existing public defaults and compatibility behavior. "
+                "Do not rewrite or weaken existing tests; add new tests for the "
+                "requested feature instead.",
+            ),
             planned_additions=tuple(planned_additions),
             planned_deletions=tuple(planned_deletions),
             source_refs=(
@@ -7549,8 +7566,17 @@ def _prepare_final_implementation_review(
             _load_yaml_mapping(Path(state["plan_path"]))
         ),
     )
+    safety_blockers = _candidate_safety_blockers(
+        proposal,
+        actual_diff,
+        runner=runner,
+        worktree=worktree,
+    )
     comparison_passed, comparison_blockers = _candidate_structural_gate(
-        proposal, actual_diff, candidate_comparison
+        proposal,
+        actual_diff,
+        candidate_comparison,
+        safety_blockers=safety_blockers,
     )
     diff_json_file = _write_flow_artifact(
         output_root, "actual-structrr-diff.json", actual_diff.to_data()
@@ -7691,9 +7717,11 @@ def _prepare_final_implementation_review(
             "predicate": (
                 "every semantic change in the observed diff is explained by an "
                 "accepted proposal operation or is a necessary implementation "
-                "detail; review the grouped reviewable additions by path, and do "
-                "not treat a test-file edit as required when the behavior has "
-                "separate validation evidence"
+                "detail; preserve unrelated public defaults and existing "
+                "compatibility behavior. Existing test functions, fixtures, and "
+                "imports must remain unchanged unless the accepted proposal "
+                "explicitly names that change; add tests instead of weakening "
+                "existing checks"
             ),
             "evidence_fingerprint": diff_fingerprint,
         }
@@ -8211,6 +8239,8 @@ def _candidate_structural_gate(
     proposal: ProposalRevision,
     actual_diff: StructrrActualDiff,
     comparison: Mapping[str, Any],
+    *,
+    safety_blockers: Sequence[str] = (),
 ) -> tuple[bool, list[str]]:
     """Require planned operations; route in-scope additions to semantic review."""
     structural_sections = {"entities", "entity_relationships", "files"}
@@ -8220,7 +8250,7 @@ def _candidate_structural_gate(
         if operation.section in structural_sections
     }
     findings = comparison.get("findings")
-    blockers: list[str] = []
+    blockers: list[str] = list(safety_blockers)
     if (
         not actual_diff.extraction_complete
         or comparison.get("extraction_complete") is not True
@@ -8261,6 +8291,72 @@ def _candidate_structural_gate(
     for operation_id in sorted(structural_operation_ids - observed_operation_ids):
         blockers.append(f"{operation_id}: no structural comparison finding")
     return not blockers, blockers
+
+
+def _candidate_safety_blockers(
+    proposal: ProposalRevision,
+    actual_diff: StructrrActualDiff,
+    *,
+    runner: Runner,
+    worktree: Path,
+) -> tuple[str, ...]:
+    """Protect pre-existing tests and unrelated public defaults in candidates."""
+    accepted_contract = json.dumps(proposal.to_data(), sort_keys=True)
+    findings: list[str] = []
+    for observation in actual_diff.source_observations:
+        path = observation.get("path")
+        status = observation.get("status")
+        if not isinstance(path, str) or status not in {"modified", "removed"}:
+            continue
+        relative_path = Path(path)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            findings.append(f"candidate source observation has unsafe path: {path}")
+            continue
+        is_test_path = (
+            relative_path.name.startswith("test_")
+            or relative_path.name.endswith("_test.py")
+            or any(
+                part.casefold() in {"test", "tests"}
+                for part in relative_path.parts[:-1]
+            )
+        )
+        is_python_source = relative_path.suffix == ".py"
+        if not is_test_path and not is_python_source:
+            continue
+        if status == "removed":
+            if is_test_path:
+                findings.append(f"pre-existing test file was removed: {path}")
+            continue
+        try:
+            baseline_source = _git_output(
+                runner,
+                worktree,
+                ["git", "show", f"{actual_diff.baseline_revision}:{path}"],
+            )
+            candidate_path = worktree / relative_path
+            candidate_path.resolve().relative_to(worktree.resolve())
+            candidate_source = candidate_path.read_text(encoding="utf-8")
+        except (OSError, ValueError, PowdrrExecutionError) as error:
+            findings.append(f"could not verify candidate safety for {path}: {error}")
+            continue
+        if is_test_path:
+            findings.extend(
+                existing_test_contract_changes(
+                    path,
+                    baseline_source,
+                    candidate_source,
+                    accepted_contract=accepted_contract,
+                )
+            )
+        findings.extend(
+            unapproved_public_default_changes(
+                path,
+                baseline_source,
+                candidate_source,
+                accepted_contract=accepted_contract,
+            )
+        )
+    return tuple(dict.fromkeys(findings))
 
 
 def _candidate_validation_expectations(

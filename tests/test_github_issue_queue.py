@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+import powdrr_lift.workrr.github_issue_queue as github_issue_queue
 from powdrr_lift.workrr.github_issue_queue import (
     QUEUE_LABELS,
     GitHubIssueClient,
@@ -516,7 +517,9 @@ def test_publisher_creates_minimal_pointer_issues_and_is_idempotent() -> None:
     assert "https://github.com/example/project/blob/" in client.issues[0].body
 
 
-def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) -> None:
+def test_worker_skips_unmet_dependency_then_executes_ready_item(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     root = tmp_path
     (root / "docs/workflows/base").mkdir(parents=True)
     (root / "docs/workflows/followup").mkdir(parents=True)
@@ -528,6 +531,8 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) 
         client=client,  # type: ignore[arg-type]
     )
     executed: list[str] = []
+    waits: list[float] = []
+    monkeypatch.setattr(github_issue_queue, "sleep", waits.append)
 
     def load_plan(
         _path: str, _commit: str, *, repo_root: str | Path
@@ -556,6 +561,7 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) 
     assert first.outcome == "awaiting_review"
     assert first.item_id == "base"
     assert executed == ["base"]
+    assert waits == []
     assert QUEUE_LABELS["awaiting_review"] in client.issues[0].labels
     assert QUEUE_LABELS["blocked_on_dependency"] in client.issues[1].labels
     assert QUEUE_LABELS["ready"] not in client.issues[1].labels
@@ -569,6 +575,7 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) 
     )
     assert waiting.outcome == "no_eligible_work"
     assert executed == ["base"]
+    assert waits == []
 
     client.issues[0] = QueueIssue(
         client.issues[0].number,
@@ -590,6 +597,7 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(tmp_path: Path) 
     assert second.item_id == "followup"
     assert executed == ["base", "followup"]
     assert QUEUE_LABELS["awaiting_review"] in client.issues[1].labels
+    assert waits == [1.0]
 
 
 def test_publisher_reconciles_old_ready_issues_with_plan_dependencies() -> None:

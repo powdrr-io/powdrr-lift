@@ -102,6 +102,7 @@ from powdrr_lift.workrr.execute_pr_tests import (
     run_generated_pytest,
     validate_coverage_references,
     validate_generated_test_files,
+    validate_test_correction,
 )
 from powdrr_lift.workrr.execution_loop import (
     _execute_shell_tool,
@@ -115,9 +116,10 @@ from powdrr_lift.workrr.git import (
     claim_workflow_task,
     create_workflow_worktree,
     inspect_workflow_run,
-    integration_branch_name,
     load_workflow_git_state,
     load_workflow_git_states,
+    publication_branch_name,
+    resolve_git_repository_root,
     slugify_workflow_id,
     validate_workflow_git_state,
     workflow_dependencies_completion,
@@ -645,10 +647,18 @@ def _issue_worker_structrr_context(
             "a test plan: " + "; ".join(file_overlap_findings)
         )
 
-    current, current_manifest = _load_committed_issue_worker_structrr_baseline(
+    committed_baseline, _committed_manifest = (
+        _load_committed_issue_worker_structrr_baseline(
+            repo_root,
+            base_commit=base_commit,
+        )
+    )
+    current, current_manifest = _bootstrap_issue_worker_structrr_baseline(
         repo_root,
+        proposed=proposed,
         base_commit=base_commit,
     )
+    current = _merge_structrr_decision_sections(current, committed_baseline)
     if final_review:
         # Check the latest tree against the projected plan result. Unrelated
         # interlaced work carries forward; changes to plan-owned subjects require
@@ -751,6 +761,146 @@ def _load_committed_issue_worker_structrr_baseline(
             "implementation workflows"
         )
     return document, manifest
+
+
+def _bootstrap_issue_worker_structrr_baseline(
+    repo_root: Path,
+    *,
+    proposed: Mapping[str, Any],
+    base_commit: str,
+) -> tuple[Mapping[str, Any], SourceManifest]:
+    """Bootstrap the exact branch base in a clean temporary Git worktree."""
+    temporary_parent = Path(tempfile.gettempdir())
+    temporary_parent.mkdir(parents=True, exist_ok=True)
+    temporary_root = Path(
+        tempfile.mkdtemp(
+            prefix="powdrr-lift-issue-worker-structrr-",
+            dir=temporary_parent,
+        )
+    )
+    baseline_worktree = temporary_root / "baseline"
+    added = subprocess.run(
+        [
+            "git",
+            "worktree",
+            "add",
+            "--detach",
+            str(baseline_worktree),
+            base_commit,
+        ],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if added.returncode != 0:
+        shutil.rmtree(temporary_root, ignore_errors=True)
+        raise PowdrrExecutionError(
+            "could not create a clean worktree for the PR base bootstrap: "
+            + (added.stderr.strip() or added.stdout.strip())
+        )
+    try:
+        from powdrr_lift.workrr.feature_endpoint import _structrr_taxonomy_path
+
+        bootstrap = bootstrap_structrr(
+            baseline_worktree,
+            output_path=temporary_root / "baseline-bootstrap.yaml",
+            taxonomy_path=_structrr_taxonomy_path(baseline_worktree),
+            repository_name=_issue_worker_repository_name(repo_root),
+            include_untracked=False,
+            artifact_exclusions=_issue_worker_structrr_artifact_exclusions(proposed),
+            submission_base=base_commit,
+        )
+        if not bootstrap.validation.successful:
+            issues = "; ".join(issue.message for issue in bootstrap.validation.issues)
+            raise PowdrrExecutionError(
+                "Structrr could not bootstrap the clean PR base: " + issues
+            )
+        if bootstrap.source_manifest is None:
+            raise PowdrrExecutionError(
+                "Structrr base bootstrap did not produce a source manifest"
+            )
+        return bootstrap.document, bootstrap.source_manifest
+    finally:
+        removed = subprocess.run(
+            ["git", "worktree", "remove", "--force", str(baseline_worktree)],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        shutil.rmtree(temporary_root, ignore_errors=True)
+        if removed.returncode != 0:
+            raise PowdrrExecutionError(
+                "could not remove the temporary PR-base bootstrap worktree: "
+                + (removed.stderr.strip() or removed.stdout.strip())
+            )
+
+
+def _issue_worker_repository_name(repo_root: Path) -> str:
+    """Use the shared checkout name, not an ephemeral worktree directory name."""
+    return resolve_git_repository_root(repo_root).name
+
+
+def _issue_worker_structrr_artifact_exclusions(
+    proposed: Mapping[str, Any],
+    *,
+    additional_paths: Sequence[str] = (),
+) -> tuple[str, ...]:
+    """Exclude generated plan/runtime artifacts from product-state comparison."""
+    plan_slug = slugify_workflow_id(str(proposed.get("plan_id", "")))
+    exclusions = [
+        f"docs/plans/{plan_slug}-execution-plan.yaml",
+        f"docs/plans/{plan_slug}-structrr-proposal.json",
+        f"docs/workflows/{plan_slug}/",
+    ]
+    final_report = proposed.get("final_review_report_path")
+    if isinstance(final_report, str) and final_report:
+        exclusions.append(final_report)
+    exclusions.extend(additional_paths)
+    return tuple(dict.fromkeys(exclusions))
+
+
+def _merge_structrr_decision_sections(
+    current_snapshot: Mapping[str, Any],
+    committed_snapshot: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Carry accepted decision records into a fresh source bootstrap."""
+    merged = dict(current_snapshot)
+    for section, identity_key in (
+        ("active_intent", "clause_id"),
+        ("human-decisions", "id"),
+        ("invariants", "id"),
+        ("guidance", "id"),
+    ):
+        committed_records = committed_snapshot.get(section)
+        if not isinstance(committed_records, list):
+            continue
+        current_records = merged.get(section)
+        records = (
+            [dict(record) for record in current_records if isinstance(record, Mapping)]
+            if isinstance(current_records, list)
+            else []
+        )
+        indexes = {
+            str(record[identity_key]): index
+            for index, record in enumerate(records)
+            if isinstance(record.get(identity_key), str)
+        }
+        for committed_record in committed_records:
+            if not isinstance(committed_record, Mapping):
+                continue
+            identity = committed_record.get(identity_key)
+            if not isinstance(identity, str):
+                continue
+            existing_index = indexes.get(identity)
+            if existing_index is None:
+                indexes[identity] = len(records)
+                records.append(dict(committed_record))
+            else:
+                records[existing_index] = dict(committed_record)
+        merged[section] = records
+    return merged
 
 
 def _preflight_proposed_file_additions(
@@ -1224,6 +1374,84 @@ def _clone_execute_pr_test_worktree(
         raise
 
 
+def _validate_execute_pr_test_correction(
+    repo_root: Path,
+    *,
+    baseline_commit: str,
+    original_sources: Mapping[str, str],
+    corrected_sources: Mapping[str, str],
+    obligations: Sequence[Mapping[str, Any]],
+    test_root: str,
+    baseline_worktree: Path,
+    validation_profile: ValidationProfile,
+    timeout_seconds: float,
+) -> tuple[dict[str, str], dict[str, list[str]], dict[str, Any]]:
+    """Accept only corrections that preserve coverage and remain baseline-red."""
+    validated, coverage = validate_test_correction(
+        corrected_sources,
+        expected_paths=tuple(original_sources),
+        obligations=obligations,
+        test_root=test_root,
+    )
+
+    def test_case_fingerprints(files: Mapping[str, str]) -> dict[str, str]:
+        cases: dict[str, str] = {}
+        for path, source in files.items():
+            tree = ast.parse(source)
+            for node in tree.body:
+                if isinstance(
+                    node, (ast.FunctionDef, ast.AsyncFunctionDef)
+                ) and node.name.startswith("test_"):
+                    cases[f"{path}::{node.name}"] = ast.dump(
+                        node, include_attributes=False
+                    )
+        return cases
+
+    original_cases = test_case_fingerprints(original_sources)
+    corrected_cases = test_case_fingerprints(validated)
+    removed_cases = set(original_cases) - set(corrected_cases)
+    if removed_cases:
+        raise ExecutePrTestError(
+            "test correction may not remove generated test cases: "
+            f"{sorted(removed_cases)}"
+        )
+    corrected_test_ids = {
+        test_id
+        for test_id, fingerprint in corrected_cases.items()
+        if original_cases.get(test_id) != fingerprint
+    }
+    if not corrected_test_ids:
+        raise ExecutePrTestError(
+            "test correction must change or add at least one behavior test case"
+        )
+    shutil.rmtree(baseline_worktree, ignore_errors=True)
+    try:
+        _clone_execute_pr_test_worktree(
+            repo_root, baseline_worktree, base_commit=baseline_commit
+        )
+        install_frozen_test_files(baseline_worktree, validated)
+        baseline_result = run_generated_pytest(
+            validation_profile,
+            root=baseline_worktree,
+            paths=tuple(validated),
+            timeout_seconds=timeout_seconds,
+        )
+        require_behavioral_red_result(baseline_result)
+        output = "\n".join(
+            str(baseline_result.get(key, "")) for key in ("stdout", "stderr")
+        )
+        failed_cases = set(re.findall(r"(?m)^FAILED\s+(\S+::test_\S+)", output))
+        if not corrected_test_ids.issubset(failed_cases):
+            raise ExecutePrTestError(
+                "each corrected test must still fail through its behavior assertion "
+                "on the untouched baseline; "
+                f"missing failures={sorted(corrected_test_ids - failed_cases)}"
+            )
+        return validated, coverage, baseline_result
+    finally:
+        shutil.rmtree(baseline_worktree, ignore_errors=True)
+
+
 def _review_execute_pr_test_quality(
     quality_client: WorkflowLLMClient,
     suite_evidence: Mapping[str, Any],
@@ -1237,6 +1465,11 @@ def _review_execute_pr_test_quality(
             "observable_coverage",
             "Does this test fail to demonstrate observable behavior for its linked "
             "acceptance criterion?",
+        ),
+        (
+            "criterion_mismatch",
+            "Does this test assert behavior that is absent from or contradicts its "
+            "linked acceptance criterion or the supplied repository evidence?",
         ),
         (
             "tautological_assertion",
@@ -1879,6 +2112,7 @@ def _author_execute_pr_tests(
             "generation_method": "miniswe_pre_coding",
             "status": "baseline_red",
             "base_commit": base_commit,
+            "test_root": test_root_relative,
             "paths": sorted(test_sources),
             "test_sources": test_sources,
             "test_sha256": fingerprint_test_files(test_sources),
@@ -2720,16 +2954,24 @@ class _TaskWorkflowExecutionStrategy:
         ):
             proposed_pr_id = self.task.input_state.get("proposed_pr_id")
             if isinstance(proposed_pr_id, str) and proposed_pr_id.strip():
-                publication_kind = (
-                    "plan-amendment"
-                    if any(
+                requested_branch = str(
+                    action.parameters.get("publication_branch", "")
+                ).casefold()
+                publication_kind = _publication_kind_from_request(
+                    requested_branch,
+                    has_plan_amendment_event=any(
                         event.get("kind") == "plan_amendment_agent"
                         for event in self.events
-                    )
-                    else "implementation"
+                    ),
                 )
-                expected_branch = (
-                    f"powdrr/{slugify_workflow_id(proposed_pr_id)}-{publication_kind}"
+                git_state = load_workflow_git_state(
+                    self.workflow.directory,
+                    workflow_id=proposed_pr_id,
+                )
+                expected_branch = publication_branch_name(
+                    proposed_pr_id,
+                    publication_kind,
+                    git_state.publication_id if git_state is not None else "",
                 )
                 if action.parameters.get("publication_branch") != expected_branch:
                     corrected_parameters = dict(action.parameters)
@@ -2740,8 +2982,8 @@ class _TaskWorkflowExecutionStrategy:
                         parameters=corrected_parameters,
                     )
                     print(
-                        "Corrected clean publication branch to the deterministic "
-                        f"workflow branch {expected_branch}.",
+                        "Corrected clean publication branch to the workflow branch "
+                        f"{expected_branch}.",
                         file=self.stderr,
                     )
         command_error = _workflow_file_command_error(
@@ -3178,6 +3420,9 @@ class _TaskWorkflowExecutionStrategy:
                         "conflict needs an explicit accepted Structrr amendment."
                     ),
                 },
+                max_provider_retries=self.config.max_timeout_retries,
+                retry_backoff_seconds=self.config.timeout_backoff_seconds,
+                stderr=self.stderr,
             )
             if current_structrr is not None and item_proposal is not None
             else ()
@@ -3257,15 +3502,25 @@ class _TaskWorkflowExecutionStrategy:
             install_frozen_test_files(self.repo_root, integration_test_sources)
         except ExecutePrTestError as error:
             raise PowdrrExecutionError(str(error)) from error
-        request = replace(request, allow_existing_changes=True)
+        request = replace(
+            request,
+            allow_existing_changes=True,
+            allowed_paths=tuple(
+                dict.fromkeys((*request.allowed_paths, *integration_test_sources))
+            ),
+        )
         rendered_tests = [
             "## Independent pre-coding integration tests",
             "A separate MiniSWE test author created these tests before the "
             "implementation. They were run against the untouched baseline and "
-            "failed through behavior assertions. The workflow has installed these "
-            "exact files in the worktree for you to run. Read and run them there. "
-            "Do not edit, weaken, skip, or replace them; make the implementation "
-            "satisfy them.",
+            "failed through behavior assertions. The workflow has installed them "
+            "in the worktree. Make the implementation satisfy the accepted "
+            "criteria. You may correct these generated test files only when the "
+            "test contradicts its linked criterion or repository evidence. Keep "
+            "all acceptance criteria covered; do not skip, xfail, remove cases, "
+            "or weaken assertions merely to make the implementation pass. Any "
+            "correction is checked against a fresh baseline and the candidate, "
+            "then reviewed per test. Test-quality review findings are advisory.",
             "Baseline test command: `"
             + " ".join(
                 str(token)
@@ -3273,10 +3528,10 @@ class _TaskWorkflowExecutionStrategy:
             )
             + "`",
             "Baseline result: behavioral assertion failure, as required.",
-            "Frozen test files:",
+            "Generated test files (the only tests you may correct):",
         ]
         rendered_tests.extend(
-            f"- `{path}` (SHA-256: `{digest}`)"
+            f"- `{path}` (initial SHA-256: `{digest}`)"
             for path, digest in integration_test_authoring["test_sha256"].items()
         )
         quality_notes = integration_test_authoring.get("quality_review", {}).get(
@@ -3302,11 +3557,12 @@ class _TaskWorkflowExecutionStrategy:
             store=CodingAgentAttemptStore(store_root),
         )
         test_files_installed = True
+        test_correction_count = 0
 
         def run_attempt(
             attempt_number: int, recovery_issue: Mapping[str, Any] | None
         ) -> dict[str, Any]:
-            nonlocal test_files_installed
+            nonlocal test_files_installed, test_correction_count
             attempt_request = request
             if recovery_issue is not None:
                 attempt_request = replace(
@@ -3325,16 +3581,72 @@ class _TaskWorkflowExecutionStrategy:
                 f"{request.request_id}-attempt-{attempt_number:02d}-"
                 f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
             )
-            frozen_test_tampering: list[str] = []
             attempt = runner.run(
                 attempt_request,
                 worktree_root=self.repo_root,
                 attempt_id=attempt_id,
             )
-            if test_files_installed and integration_test_sources:
-                frozen_test_tampering.extend(
-                    candidate_test_changes(self.repo_root, integration_test_sources)
-                )
+            test_correction_error: str | None = None
+            corrected_test_sources: dict[str, str] | None = None
+            test_correction_accepted = False
+            changed_test_paths = (
+                candidate_test_changes(self.repo_root, integration_test_sources)
+                if test_files_installed and integration_test_sources
+                else ()
+            )
+            if changed_test_paths:
+                test_correction_count += 1
+                try:
+                    if test_correction_count > 1:
+                        raise ExecutePrTestError(
+                            "only one generated acceptance-test correction is allowed"
+                        )
+                    proposed_test_sources = {
+                        path: (self.repo_root / path).read_text(encoding="utf-8")
+                        for path in integration_test_sources
+                    }
+                    baseline_worktree = (
+                        store_root
+                        / "integration-tests"
+                        / f"correction-baseline-{attempt_number:02d}"
+                    )
+                    (
+                        corrected_test_sources,
+                        corrected_coverage,
+                        corrected_baseline,
+                    ) = _validate_execute_pr_test_correction(
+                        self.repo_root,
+                        baseline_commit=base_commit,
+                        original_sources=integration_test_sources,
+                        corrected_sources=proposed_test_sources,
+                        obligations=integration_test_authoring["test_obligations"],
+                        test_root=str(integration_test_authoring["test_root"]),
+                        baseline_worktree=baseline_worktree,
+                        validation_profile=validation_profile,
+                        timeout_seconds=(
+                            self.config.coding_agent_validation_timeout_seconds
+                        ),
+                    )
+                    integration_test_sources.clear()
+                    integration_test_sources.update(corrected_test_sources)
+                    integration_test_authoring["coverage_references"] = (
+                        corrected_coverage
+                    )
+                    integration_test_authoring["test_sha256"] = fingerprint_test_files(
+                        corrected_test_sources
+                    )
+                    integration_test_authoring["correction_baseline"] = (
+                        corrected_baseline
+                    )
+                    integration_test_authoring.setdefault("corrections", []).append(
+                        {
+                            "attempt_id": attempt_id,
+                            "paths": list(changed_test_paths),
+                        }
+                    )
+                    test_correction_accepted = True
+                except (OSError, ExecutePrTestError, ValueError) as error:
+                    test_correction_error = str(error)
             try:
                 install_frozen_test_files(self.repo_root, integration_test_sources)
             except ExecutePrTestError as error:
@@ -3345,10 +3657,34 @@ class _TaskWorkflowExecutionStrategy:
                 paths=tuple(integration_test_sources),
                 timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
             )
-            if frozen_test_tampering:
-                integration_test_result["frozen_tests_modified_by_coder"] = sorted(
-                    set(frozen_test_tampering)
+            if test_correction_error:
+                integration_test_result["test_correction_rejected"] = (
+                    test_correction_error
                 )
+            if test_correction_accepted:
+                correction_review = _review_execute_pr_test_quality(
+                    self.client,
+                    {
+                        "contract": test_authoring_context,
+                        "test_obligations": integration_test_authoring[
+                            "test_obligations"
+                        ],
+                        "coverage_references": integration_test_authoring[
+                            "coverage_references"
+                        ],
+                        "test_sources": integration_test_sources,
+                        "baseline_result": integration_test_authoring[
+                            "correction_baseline"
+                        ],
+                        "candidate_result": integration_test_result,
+                        "correction_attempt_id": attempt_id,
+                    },
+                    config=self.config,
+                    suggest_tests=False,
+                )
+                integration_test_authoring.setdefault(
+                    "correction_quality_reviews", []
+                ).append(correction_review)
             try:
                 execution_evidence = pytest_execution_evidence(integration_test_result)
                 expected_test_functions = {
@@ -3411,16 +3747,11 @@ class _TaskWorkflowExecutionStrategy:
                         store_root / "structrr" / f"candidate-{attempt_number:02d}.yaml"
                     ),
                     taxonomy_path=_structrr_taxonomy_path(self.repo_root),
+                    repository_name=_issue_worker_repository_name(self.repo_root),
                     include_untracked=True,
-                    artifact_exclusions=(
-                        f"docs/plans/{slugify_workflow_id(str(proposed['plan_id']))}-execution-plan.yaml",
-                        f"docs/plans/{slugify_workflow_id(str(proposed['plan_id']))}-structrr-proposal.json",
-                        f"docs/workflows/{slugify_workflow_id(str(proposed['plan_id']))}/",
-                        *(
-                            (str(proposed["final_review_report_path"]),)
-                            if isinstance(proposed.get("final_review_report_path"), str)
-                            else ()
-                        ),
+                    artifact_exclusions=_issue_worker_structrr_artifact_exclusions(
+                        proposed,
+                        additional_paths=tuple(integration_test_sources),
                     ),
                     submission_base=baseline_manifest.submission_base,
                 )
@@ -3444,31 +3775,21 @@ class _TaskWorkflowExecutionStrategy:
                         "rebase": rebase_report,
                     }
                 else:
-                    # These frozen acceptance tests are checked in with the PR,
-                    # but their names are generated only after plan review. Let
-                    # Structrr report their exact paths as validation changes.
-                    candidate_proposal = replace(
-                        item_proposal,
-                        allowed_paths=tuple(
-                            dict.fromkeys(
-                                (
-                                    *item_proposal.allowed_paths,
-                                    *integration_test_sources,
-                                )
-                            )
-                        ),
+                    candidate_snapshot = _merge_structrr_decision_sections(
+                        candidate_bootstrap.document,
+                        current_structrr,
                     )
                     actual_diff, comparison = reconcile_item_candidate(
-                        proposal=candidate_proposal,
+                        proposal=item_proposal,
                         baseline_snapshot=current_structrr,
-                        candidate_snapshot=candidate_bootstrap.document,
+                        candidate_snapshot=candidate_snapshot,
                         baseline_manifest=baseline_manifest,
                         candidate_manifest=candidate_bootstrap.source_manifest,
                     )
                     structural_findings = (
                         *structural_repair_findings(comparison),
                         *active_decision_drift_findings(
-                            current_structrr, candidate_bootstrap.document
+                            current_structrr, candidate_snapshot
                         ),
                     )
                     implementation_decision_review = review_inherited_decisions(
@@ -3486,6 +3807,9 @@ class _TaskWorkflowExecutionStrategy:
                             "proposal_comparison": comparison,
                             "validation": validation.to_data(),
                         },
+                        max_provider_retries=self.config.max_timeout_retries,
+                        retry_backoff_seconds=self.config.timeout_backoff_seconds,
+                        stderr=self.stderr,
                     )
                     continuity_findings = decision_continuity_findings(
                         implementation_decision_review
@@ -3566,7 +3890,7 @@ class _TaskWorkflowExecutionStrategy:
             integration_test_findings: list[str] = []
             if integration_test_result.get("passed") is not True:
                 integration_test_findings.append(
-                    "frozen pre-coding integration tests did not pass: "
+                    "pre-coding generated integration tests did not pass: "
                     + json.dumps(integration_test_result, sort_keys=True)
                 )
             if integration_test_result.get("coverage_evidence_error"):
@@ -3575,11 +3899,19 @@ class _TaskWorkflowExecutionStrategy:
                     "contract: "
                     + str(integration_test_result["coverage_evidence_error"])
                 )
-            if frozen_test_tampering:
-                integration_test_findings.append(
-                    "coding agent edited or removed frozen independently authored "
-                    "tests; the workflow restored the original test sources: "
-                    + ", ".join(sorted(set(frozen_test_tampering)))
+            correction_quality_reviews = integration_test_authoring.get(
+                "correction_quality_reviews", []
+            )
+            quality_notes = list(
+                integration_test_authoring.get("quality_review", {}).get("notes", [])
+            )
+            for review in correction_quality_reviews:
+                quality_notes.extend(review.get("notes", []))
+            if test_correction_error:
+                quality_notes.append(
+                    "A proposed generated-test correction was discarded because "
+                    "it did not pass the bounded correction checks; the original "
+                    "tests were retained. " + test_correction_error
                 )
             integration_test_report = {
                 "passed": not integration_test_findings,
@@ -3595,6 +3927,11 @@ class _TaskWorkflowExecutionStrategy:
                     "coverage_references", {}
                 ),
                 "quality_review": integration_test_authoring.get("quality_review"),
+                "correction_quality_reviews": integration_test_authoring.get(
+                    "correction_quality_reviews", []
+                ),
+                "corrections": integration_test_authoring.get("corrections", []),
+                "quality_notes": quality_notes,
                 "baseline_execution_evidence": integration_test_authoring.get(
                     "baseline_execution_evidence"
                 ),
@@ -3602,6 +3939,9 @@ class _TaskWorkflowExecutionStrategy:
                     "authoring_attempts", []
                 ),
                 "baseline": integration_test_authoring["baseline_result"],
+                "correction_baseline": integration_test_authoring.get(
+                    "correction_baseline"
+                ),
                 "candidate": integration_test_result,
                 "repair_findings": integration_test_findings,
             }
@@ -3643,6 +3983,14 @@ class _TaskWorkflowExecutionStrategy:
                 "integration_test_repair_findings", []
             )
             if integration_test_findings:
+                test_correction_rule = (
+                    "One generated-test correction has already been considered; "
+                    "leave those tests unchanged and repair the implementation."
+                    if test_correction_count
+                    else "You may correct the generated test file once if it "
+                    "contradicts its linked acceptance criterion or repository "
+                    "evidence."
+                )
                 return CodingAgentRecoveryDecision(
                     passed=False,
                     issue={
@@ -3655,16 +4003,30 @@ class _TaskWorkflowExecutionStrategy:
                         ),
                         "candidate_evidence": record.get("integration_tests"),
                         "validation_evidence": record.get("validation"),
+                        "test_correction_evidence": {
+                            "rejected_reason": (
+                                record.get("integration_tests", {})
+                                .get("candidate", {})
+                                .get("test_correction_rejected")
+                            ),
+                            "accepted_correction_count": len(
+                                record.get("integration_tests", {}).get(
+                                    "corrections", []
+                                )
+                            ),
+                        },
                         "inherited_decision_findings": record.get(
                             "structrr_repair_findings", []
                         ),
                         "instruction": (
                             "Repair the implementation so the independently "
                             "authored integration tests pass against real public "
-                            "behavior. These tests failed by assertion on the "
-                            "untouched baseline and their exact sources are frozen. "
-                            "Do not edit, delete, skip, xfail, mock around, or weaken "
-                            "the tests. Also repair any declared verification "
+                            "behavior. " + test_correction_rule + " Preserve every "
+                            "criterion and keep the correction behavioral; the "
+                            "workflow checks that each corrected test remains red "
+                            "on a fresh baseline and passes on this candidate. Do "
+                            "not skip, xfail, delete cases, or weaken assertions. "
+                            "Also repair any declared verification "
                             "failures and preserve every inherited decision and "
                             "invariant listed in the findings. Fix the product "
                             "behavior or its runtime wiring, then rerun the focused "
@@ -4878,7 +5240,7 @@ def _validate_workflow_task_state(
         repo_root,
         workflow_git_state.proposed_pr_id,
         integration_branch=workflow_git_state.integration_branch,
-        worktree_name=_workflow_git_worktree_name(workflow_git_state),
+        worktree_name=workflow_git_state.integration_branch,
     )
     claim_refs = [
         claim_ref
@@ -4964,7 +5326,7 @@ def _resolve_workflow_task_context(
             workflow_git_state.proposed_pr_id,
             base_branch=workflow_git_state.base_branch,
             branch_name=workflow_git_state.integration_branch,
-            worktree_name=_workflow_git_worktree_name(workflow_git_state),
+            worktree_name=workflow_git_state.integration_branch,
         )
     except RuntimeError as exc:
         raise WorkflowGitInconsistency(
@@ -4990,15 +5352,6 @@ def _resolve_workflow_task_context(
         integration_worktree,
         integration_worktree / workflow_git_state.workflow_relative_directory,
     )
-
-
-def _workflow_git_worktree_name(workflow_git_state: WorkflowGitState) -> str:
-    """Keep legacy paths while isolating new issue-worker attempt worktrees."""
-    if workflow_git_state.integration_branch == integration_branch_name(
-        workflow_git_state.proposed_pr_id
-    ):
-        return workflow_git_state.proposed_pr_id
-    return workflow_git_state.integration_branch
 
 
 def _publish_workflow_progress(
@@ -5430,6 +5783,23 @@ def _gh_result(
 def _workflow_branch_name(workflow: WorkflowInstance) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", workflow.directory.name.casefold()).strip("-")
     return f"workflow/{slug or 'execution'}"
+
+
+def _publication_kind_from_request(
+    requested_branch: str,
+    *,
+    has_plan_amendment_event: bool,
+) -> str:
+    """Prefer the current PR intent over older amendment events in this task."""
+    if requested_branch.endswith("-plan-amendment") or "-plan-amendment-" in (
+        requested_branch
+    ):
+        return "plan-amendment"
+    if requested_branch.endswith("-implementation") or "-implementation-" in (
+        requested_branch
+    ):
+        return "implementation"
+    return "plan-amendment" if has_plan_amendment_event else "implementation"
 
 
 def _default_branch(repo_root: Path, *, runtime: ExecutionRuntime | None = None) -> str:

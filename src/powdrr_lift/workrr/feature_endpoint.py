@@ -3445,11 +3445,15 @@ def _generate_miniswe_postrun_probes(
         rejected_generated_probes: list[dict[str, str]] = []
         baseline_results: tuple[Any, ...] = ()
         rejected_baseline_probes: list[dict[str, Any]] = []
-        for attempt_number in range(1, 3):
-            if attempt_number == 2:
+        max_probe_authoring_attempts = 3
+        for attempt_number in range(1, max_probe_authoring_attempts + 1):
+            if attempt_number > 1:
                 probe_request = replace(
                     probe_request,
-                    request_id=f"{request.request_id}-probe-authoring-repair",
+                    request_id=(
+                        f"{request.request_id}-probe-authoring-repair-"
+                        f"{attempt_number - 1}"
+                    ),
                     base_commit=_git_output(
                         runner, probe_worktree, ["git", "rev-parse", "HEAD"]
                     ),
@@ -3475,7 +3479,12 @@ def _generate_miniswe_postrun_probes(
                         "required literal assignments, imports, an optional module "
                         "docstring, and function definitions. Fix "
                         "the exact validation error above before returning. Do "
-                        "not emit evidence fields; Powdrr derives obligation "
+                        "not stop after fixing an earlier issue if validation "
+                        "reports a new one. Each `test_probe_*` function must "
+                        "contain a literal Python `assert` statement in its own "
+                        "body; raising `AssertionError` or calling a helper that "
+                        "asserts does not satisfy this syntax check. "
+                        "Do not emit evidence fields; Powdrr derives obligation "
                         "evidence from the scenario ID and instruction ledger. "
                         "Use "
                         "only the supplied contract and "
@@ -3637,10 +3646,11 @@ def _generate_miniswe_postrun_probes(
                 break
             except (OSError, ValueError) as error:
                 validation_error = str(error)
-                if attempt_number == 2:
+                if attempt_number == max_probe_authoring_attempts:
                     raise PowdrrExecutionError(
                         "MiniSWE executable probe suite failed validation or did "
-                        "not fail on the baseline after one tailored repair: "
+                        "not fail on the baseline after "
+                        f"{max_probe_authoring_attempts - 1} tailored repairs: "
                         f"{error}"
                     ) from error
         if not obligations:

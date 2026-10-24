@@ -154,6 +154,24 @@ def validate_coverage_references(
     return {key: sorted(value) for key, value in sorted(references.items())}
 
 
+def validate_test_correction(
+    files: Mapping[str, str],
+    *,
+    expected_paths: Sequence[str],
+    obligations: Sequence[Mapping[str, Any]],
+    test_root: str = "tests",
+) -> tuple[dict[str, str], dict[str, list[str]]]:
+    """Validate a bounded correction to the generated acceptance-test suite."""
+    if set(files) != set(expected_paths):
+        raise ExecutePrTestError(
+            "test correction must edit only the originally generated test files; "
+            f"expected={sorted(expected_paths)}, actual={sorted(files)}"
+        )
+    validated = validate_generated_test_files(files, test_root=test_root)
+    references = validate_coverage_references(validated, obligations)
+    return validated, references
+
+
 def pytest_execution_evidence(result: Mapping[str, Any]) -> dict[str, Any]:
     """Extract actual collected and executed test counts from pytest output."""
     output = "\n".join(str(result.get(key, "")) for key in ("stdout", "stderr"))
@@ -480,4 +498,5 @@ __all__ = [
     "generated_test_source_paths",
     "install_frozen_test_files",
     "validate_generated_test_files",
+    "validate_test_correction",
 ]

@@ -36,6 +36,7 @@ steps:
             instructions:
               - If implementation_result.plan_defect_evidence is non-empty, classify plan_defect and cite that concrete repository evidence.
               - Classify plan_defect only when concrete repository evidence or contradictory acceptance criteria show that the reviewed plan cannot be implemented as written.
+              - A failure in generated acceptance tests is not by itself evidence of a plan defect. Those tests may be corrected within the execute-proposed-pr process, subject to its test-correction checks.
               - Classify implementation_defect when the failure is caused by incomplete, incorrect, or insufficiently verified implementation work.
               - Use unclear when the evidence does not establish which is true; unclear must stop for human review.
               - Cite the exact attempt, validation, baseline test, or Structrr finding that supports the classification. Never infer a plan defect only from a failed attempt.

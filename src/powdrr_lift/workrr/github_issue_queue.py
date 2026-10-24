@@ -16,6 +16,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from time import sleep
 from typing import Any
 from urllib.parse import quote
 
@@ -34,6 +35,7 @@ _MARKER_END = " -->"
 _TASK_CHECKPOINT_START = "<!-- powdrr-task-checkpoint:v1 -->"
 _PLAN_AMENDMENT_TITLE_PREFIX = "Correct plan:"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
+_GITHUB_STATUS_SETTLE_SECONDS = 1.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -767,6 +769,7 @@ def _promote_unblocked_issues(
     )
     loaded_plans: dict[tuple[str, str, str], ReviewedExecutionPlan] = {}
     issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
+    status_changed = False
     for issue in sorted(blocked, key=lambda value: value.number):
         if (
             QUEUE_LABELS["blocked_on_dependency"] not in issue.labels
@@ -814,6 +817,11 @@ def _promote_unblocked_issues(
                 issue,
                 labels=_replace_queue_status(issue.labels, "ready"),
             )
+            status_changed = True
+    if status_changed:
+        # The next worker step queries for ready issues. Give GitHub's issue
+        # listing a moment to reflect the label update before that read.
+        sleep(_GITHUB_STATUS_SETTLE_SECONDS)
 
 
 def _requeue_merged_plan_amendments(

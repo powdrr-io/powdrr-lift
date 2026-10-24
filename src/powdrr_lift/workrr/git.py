@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -29,6 +30,7 @@ class WorkflowGitState:
     base_branch: str
     integration_branch: str
     workflow_relative_directory: str
+    publication_id: str = ""
     depends_on_workflows: tuple[str, ...] = ()
     invariants: tuple[Mapping[str, Any], ...] = ()
     relationships: tuple[Mapping[str, Any], ...] = ()
@@ -42,6 +44,8 @@ class WorkflowGitState:
         }
         if self.depends_on_workflows:
             data["depends_on_workflows"] = list(self.depends_on_workflows)
+        if self.publication_id:
+            data["publication_id"] = self.publication_id
         if self.invariants:
             data["invariants"] = [dict(item) for item in self.invariants]
         if self.relationships:
@@ -63,6 +67,9 @@ class WorkflowGitState:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"Workflow Git state requires {key!r}.")
             values[key] = value.strip()
+        publication_id = data.get("publication_id", "")
+        if not isinstance(publication_id, str):
+            raise ValueError("Workflow Git state publication_id must be a string.")
         dependencies = data.get("depends_on_workflows", [])
         if not isinstance(dependencies, list) or not all(
             isinstance(item, str) and item.strip() for item in dependencies
@@ -76,6 +83,7 @@ class WorkflowGitState:
         )
         return cls(
             **values,
+            publication_id=publication_id.strip(),
             depends_on_workflows=tuple(item.strip() for item in dependencies),
             invariants=invariants,
             relationships=relationships,
@@ -178,6 +186,25 @@ def integration_branch_name(proposed_pr_id: str) -> str:
     return f"powdrr/{slugify_workflow_id(proposed_pr_id)}"
 
 
+def new_publication_id() -> str:
+    """Return a stable token to distinguish one workflow's PR publication."""
+    return uuid.uuid4().hex
+
+
+def publication_branch_name(
+    proposed_pr_id: str,
+    publication_kind: str,
+    publication_id: str = "",
+) -> str:
+    """Build a publication branch, retaining legacy names for old workflow state."""
+    if publication_kind not in {"implementation", "plan-amendment"}:
+        raise ValueError("publication_kind must be implementation or plan-amendment")
+    branch = f"powdrr/{slugify_workflow_id(proposed_pr_id)}-{publication_kind}"
+    if publication_id:
+        branch = f"{branch}-{slugify_workflow_id(publication_id)}"
+    return branch
+
+
 def workflow_dependencies_completion(
     repo_root: str | Path,
     state: WorkflowGitState,
@@ -271,7 +298,7 @@ def create_workflow_worktree(
 ) -> tuple[Path, str]:
     repo_root_path = Path(repo_root).resolve()
     branch = branch_name or integration_branch_name(proposed_pr_id)
-    worktree = workflow_worktree_path(repo_root_path, worktree_name or proposed_pr_id)
+    worktree = workflow_worktree_path(repo_root_path, worktree_name or branch)
     worktree.parent.mkdir(parents=True, exist_ok=True)
     base_ref = _refresh_workflow_refs(repo_root_path, branch, base_branch)
     if worktree.exists():
@@ -622,7 +649,7 @@ def inspect_workflow_run(
     integration_worktree = (
         registered_integration_worktrees[0]
         if registered_integration_worktrees
-        else workflow_worktree_path(repo_root_path, worktree_name or proposed_pr_id)
+        else workflow_worktree_path(repo_root_path, worktree_name or integration_branch)
     )
     state_paths: list[Path] = []
     if integration_worktree.is_dir():
@@ -1186,7 +1213,12 @@ def validate_workflow_git_state(
     branch.  The task id remains part of the diagnostic and claim identity,
     but it must not imply a task branch or task worktree.
     """
-    report = inspect_workflow_run(repo_root, state.proposed_pr_id)
+    report = inspect_workflow_run(
+        repo_root,
+        state.proposed_pr_id,
+        integration_branch=state.integration_branch,
+        worktree_name=state.integration_branch,
+    )
     errors = list(report["inconsistencies"])
     if not report["integration_branch_exists"]:
         errors.append(f"integration branch {state.integration_branch!r} does not exist")
@@ -1360,7 +1392,10 @@ def _related_workflow_attempt_pull_requests(
             for value in values
             if isinstance(value, dict)
             and isinstance(value.get("headRefName"), str)
-            and value["headRefName"].startswith(f"{branch_prefix}-attempt-")
+            and (
+                value["headRefName"].startswith(f"{branch_prefix}-attempt-")
+                or value["headRefName"].startswith(f"{branch_prefix}-implementation-")
+            )
         ],
         None,
     )

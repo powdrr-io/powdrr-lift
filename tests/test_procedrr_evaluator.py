@@ -370,6 +370,16 @@ def test_execute_proposed_pr_workflow_enforces_implementation_and_pr_calls(
 ) -> None:
     from procedrr import parse_and_validate
 
+    plan_defect_evidence = (
+        [
+            "The reviewed plan directs creating "
+            "attestation/scripts/verify-all.sh, "
+            "which already exists in the repository baseline."
+        ]
+        if plan_defect_detected
+        else []
+    )
+
     processes = {
         "execute-proposed-pr": """\
 version: 1
@@ -492,7 +502,14 @@ steps:
                     "workflow_context": {
                         "feature-name": "Feature",
                         "commit-message": "Implement feature",
-                        "populated-pr-description": "Implements the feature.",
+                        "populated-pr-description": (
+                            "## Objective\n\nImplement the feature.\n\n"
+                            "## Scope\n\n- Add the feature.\n\n"
+                            "## Implementation Details\n\n- Update code.\n\n"
+                            "## Acceptance Criteria\n\n- Feature works.\n\n"
+                            "## Validation\n\n- `pytest`: passed.\n\n"
+                            "## Advisory Test-Quality Notes\n\nNone."
+                        ),
                         # Simulate an incomplete model response. The publisher
                         # must receive the implementation result's full list.
                         "files-to-publish": ["attestation/component-00.py"],
@@ -506,7 +523,14 @@ steps:
                     "workflow_context": {
                         "feature-name": "Correct plan: verifier scope",
                         "commit-message": "Correct reviewed plan scope",
-                        "populated-pr-description": "Corrects the plan scope.",
+                        "populated-pr-description": (
+                            "## Objective\n\nCorrect the plan.\n\n"
+                            "## Scope\n\n- Update the plan.\n\n"
+                            "## Implementation Details\n\n- Narrow the criteria.\n\n"
+                            "## Acceptance Criteria\n\n- Scope is corrected.\n\n"
+                            "## Validation\n\n- `pytest`: passed.\n\n"
+                            "## Advisory Test-Quality Notes\n\nNone."
+                        ),
                         "base-branch": "main",
                         "publication-branch": "powdrr/pr-01-plan-amendment",
                     },
@@ -549,15 +573,7 @@ steps:
             return {
                 "passed": implementation_passes,
                 "changed_paths": implementation_paths if implementation_passes else [],
-                "plan_defect_evidence": (
-                    [
-                        "The reviewed plan directs creating "
-                        "attestation/scripts/verify-all.sh, "
-                        "which already exists in the repository baseline."
-                    ]
-                    if plan_defect_detected
-                    else []
-                ),
+                "plan_defect_evidence": plan_defect_evidence,
                 "structrr": {"passed": True},
                 "integration_tests": {
                     "passed": True,

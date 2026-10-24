@@ -78,21 +78,31 @@ _HELP: dict[str, dict[str, Any]] = {
         "summary": "Perform an allow-listed GitHub pull-request operation.",
         "when_to_use": (
             "Use for pull-request inspection, creation, editing, checks, comments, "
-            "and inline review comments. Use the GitHub intrinsic rather than "
+            "and review-thread replies/resolution. Use the GitHub intrinsic "
+            "rather than "
             "shelling out to arbitrary network commands."
         ),
         "parameters": {
             "operation": (
                 "One of pr_view, pr_diff, pr_checks, pr_create, pr_publish_clean, "
-                "pr_edit, "
-                "pr_comments, or pr_review_comment."
+                "pr_edit, pr_comments, pr_review_comment, pr_review_threads, "
+                "pr_review_reply, or pr_review_resolve."
             ),
             "pr_reference": (
                 "Pull-request number or branch for inspection operations only; "
                 "the runtime selects the target for pr_edit."
             ),
+            "repository": (
+                "Repository owner/name for pull-request review-thread inspection."
+            ),
+            "thread_id": (
+                "GitHub GraphQL review-thread ID for replying to or resolving a thread."
+            ),
             "title": "Pull-request title for create, publish-clean, or edit.",
-            "body": "Pull-request body for create, publish-clean, or edit.",
+            "body": (
+                "Pull-request body for create, publish-clean, or edit; reply text "
+                "for pr_review_reply."
+            ),
             "help": "Set true to request the tool's conventional --help guidance.",
         },
         "examples": [

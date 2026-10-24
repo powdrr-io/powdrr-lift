@@ -42,7 +42,12 @@ steps:
         - State that this is a plan amendment PR linked to the original plan and the affected proposed PR issue.
         - Preserve the existing plan ID, item ID, workflow ID, and dependency graph unless the evidence proves one of those fields itself is defective.
         - "Set workflow_context.feature-name to a clear title beginning with `Correct plan:` and describing the affected item. Do not use IDs as the title."
-        - Set base-branch to main and publication-branch to powdrr/<proposed-pr-id>-plan-amendment.
+        - "Format populated-pr-description as Markdown with these exact headings, in this order, each on its own line with a blank line after it: ## Objective, ## Scope, ## Implementation Details, ## Acceptance Criteria, ## Validation, and ## Advisory Test-Quality Notes."
+        - Put each section's content on following lines. Use concise paragraphs or bullets; never put multiple headings or sections in one paragraph or line.
+        - Explain the plan defect and correction in Objective, list the plan files and related scope in Scope, summarize the edit in Implementation Details, and include the plan criteria and exact validation commands and results in their matching sections.
+        - "The advisory test-quality section is reserved for concise concerns relevant to the amendment; write `None.` when none apply. Never include full model reasoning or raw prompts."
+        - Keep the description focused on this amendment. Do not add empty sections, template instructions, or placeholder text.
+        - "Set base-branch to main and publication-branch to powdrr/<proposed-pr-id>-plan-amendment. When workflow metadata includes a publication ID, Workrr appends it to create a unique branch for this PR; do not invent the ID."
         - Provide a clear commit message and populated PR description. Do not claim any unrun check passed.
       context: [task_context, implementation_result, failure_review, amendment_result, validation_results]
       output:
@@ -60,7 +65,11 @@ steps:
               properties:
                 feature-name: {type: string, minLength: 1, maxLength: 100}
                 commit-message: {type: string, minLength: 1}
-                populated-pr-description: {type: string, minLength: 1}
+                populated-pr-description:
+                  type: string
+                  minLength: 1
+                  maxLength: 12000
+                  pattern: '^## Objective\n\n[\s\S]+\n\n## Scope\n\n[\s\S]+\n\n## Implementation Details\n\n[\s\S]+\n\n## Acceptance Criteria\n\n[\s\S]+\n\n## Validation\n\n[\s\S]+\n\n## Advisory Test-Quality Notes\n\n[\s\S]+$'
                 base-branch: {type: string, const: main}
                 publication-branch: {type: string, minLength: 1}
       validation: {kind: json_schema}

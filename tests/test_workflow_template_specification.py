@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from powdrr_lift.process.task_step import ToolInvocation
@@ -393,6 +394,38 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
         ]["maxLength"]
         == 100
     )
+    description_schema = title_judge["output"]["schema"]["properties"][
+        "workflow_context"
+    ]["properties"]["populated-pr-description"]
+    valid_description = """## Objective
+
+Explain the goal.
+
+## Scope
+
+- Include the implementation.
+
+## Implementation Details
+
+- Update the workflow.
+
+## Acceptance Criteria
+
+- The workflow runs.
+
+## Validation
+
+- `pytest`: passed.
+
+## Advisory Test-Quality Notes
+
+None."""
+    collapsed_description = (
+        "## Objective Explain the goal. ## Scope Include the implementation."
+    )
+    assert description_schema["maxLength"] == 12000
+    assert re.search(description_schema["pattern"], valid_description)
+    assert not re.search(description_schema["pattern"], collapsed_description)
     assert implementation_steps[5]["call"]["inputs"]["files_to_publish"] == {
         "type": "reference",
         "value": "implementation_result.changed_paths",
@@ -405,6 +438,10 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     amendment_call = amendment_process["steps"][0]["operation"]["parameters"]
     assert amendment_call["parameters"]["mode"] == "plan-amendment"
     assert amendment_process["steps"][1]["gate"]["subject"] == "amendment_result.passed"
+    amendment_description_schema = amendment_process["steps"][3]["judge"]["output"][
+        "schema"
+    ]["properties"]["workflow_context"]["properties"]["populated-pr-description"]
+    assert amendment_description_schema["pattern"] == description_schema["pattern"]
 
 
 def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files() -> (

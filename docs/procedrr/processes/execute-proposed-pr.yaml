@@ -28,18 +28,28 @@ outputs:
           generation_method: {type: string}
           paths: {type: array, items: {type: string}}
           test_sha256: {type: object}
+          test_obligations: {type: array, items: {type: object}}
+          coverage_references: {type: object}
+          quality_review: {type: object}
+          correction_quality_reviews: {type: array, items: {type: object}}
+          corrections: {type: array, items: {type: object}}
+          quality_notes: {type: array, items: {type: string}}
           authoring_attempts: {type: array, items: {type: object}}
           baseline: {type: object}
+          correction_baseline: {type: [object, "null"]}
           candidate: {type: object}
           repair_findings: {type: array, items: {type: string}}
       validation: {type: object}
 description: >-
   Have MiniSWE author independent integration tests before coding and prove
   they fail by behavioral assertion on the untouched baseline. Implement one
-  reviewed plan item, run those exact frozen tests and the plan's verification
-  command, and validate the re-bootstrapped candidate against its accepted
-  Structrr diff and inherited decision reviews. Complete only after the tests,
-  implementation, Structrr comparison, decision continuity, and validation pass.
+  reviewed plan item. Permit one bounded correction to generated tests when
+  they conflict with their linked criterion or repository evidence; require
+  each corrected test to remain behaviorally red on a fresh baseline and pass
+  on the candidate, then review each test with Jev and the LLM. Keep test-quality
+  findings advisory and include unresolved concerns in the PR. Validate the
+  re-bootstrapped candidate against its accepted Structrr diff and inherited
+  decision reviews.
 limits: {max_epochs: 1, context_chars: 12000, context_value_chars: 4000}
 steps:
   - operation:

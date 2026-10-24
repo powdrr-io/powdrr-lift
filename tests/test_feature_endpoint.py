@@ -816,6 +816,118 @@ def test_miniswe_probe_authoring_repairs_probes_that_pass_on_baseline(
     assert suite["baseline_results"][0]["status"] == "failed"
 
 
+def test_miniswe_probe_authoring_retries_each_validation_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    (repository / "module.py").write_text("def public_api(value): return value\n")
+    _git(repository, "init", "-q")
+    _git(repository, "config", "user.email", "test@example.com")
+    _git(repository, "config", "user.name", "Test")
+    _git(repository, "add", "module.py")
+    _git(repository, "commit", "-qm", "baseline")
+    base_commit = _git(repository, "rev-parse", "HEAD").stdout.strip()
+    output_root = tmp_path / "artifacts"
+    requests: list[ImplementationRequest] = []
+    worker_commit_shas: list[str] = []
+
+    def author_probe_suite(
+        self: MiniSWEAgentProvider,
+        request: ImplementationRequest,
+        *,
+        worktree_root: Path,
+        attempt_id: str,
+    ) -> subprocess.CompletedProcess[str]:
+        del self, attempt_id
+        requests.append(request)
+        attempt_number = len(requests)
+        expected = "value" if attempt_number == 2 else "handled:value"
+        obligation = {
+            "obligation_id": "selector-obligation",
+            "scenario_id": "selector",
+            "category": "transformation",
+            "rule": "other",
+            "supported": True,
+            "summary": "The selector returns its matching result.",
+            "condition": "A selector matches a finding.",
+            "operation": "Call the public API.",
+            "expected": "The matching result is returned.",
+            "operands": [],
+            "unresolved_reason": "",
+        }
+        source = (
+            f"OBLIGATIONS = {[obligation]!r}\nINTERACTIONS = []\n"
+            "PROBE_METADATA = {'test_probe_selector': {'probe_id': 'selector-result', "
+            "'scenario_id': 'selector', 'obligation_id': 'selector-obligation', "
+            "'oracle_basis': 'The instruction defines this result.'}}\n"
+            "import module\n\ndef test_probe_selector():\n"
+        )
+        if attempt_number > 1:
+            source += f"    assert module.public_api('value') == '{expected}'\n"
+        else:
+            source += "    result = module.public_api('value')\n"
+        (worktree_root / "probe_suite.py").write_text(source, encoding="utf-8")
+        _git(worktree_root, "add", "-f", "probe_suite.py")
+        _git(worktree_root, "commit", "-qm", f"author probe attempt {attempt_number}")
+        worker_commit_shas.append(
+            _git(worktree_root, "rev-parse", "HEAD").stdout.strip()
+        )
+        return subprocess.CompletedProcess(["mini"], 0, "", "")
+
+    monkeypatch.setattr(MiniSWEAgentProvider, "run", author_probe_suite)
+    config = FeatureEndpointConfig(
+        feature_description="Add selector handling.",
+        work_item_name="selector-handling",
+        repo_root=repository,
+        allowed_paths=("src", "tests"),
+    )
+    request = ImplementationRequest(
+        request_id="selector-validation-retries",
+        objective="Add selector handling.",
+        prompt="Implement selector handling.",
+        base_commit=base_commit,
+        plan_fingerprint="plan-fingerprint",
+        allowed_paths=("src", "tests"),
+        acceptance_criteria=("Handle the selector contract.",),
+        validation_profiles=("pytest",),
+    )
+
+    obligations, probes = _generate_miniswe_postrun_probes(
+        config,
+        runner=subprocess.run,
+        worktree=repository,
+        output_root=output_root,
+        base_commit=base_commit,
+        request=request,
+        scenarios=(
+            {
+                "scenario_id": "selector",
+                "then": "return handled value",
+                "evidence": ["Add selector handling."],
+            },
+        ),
+        instruction="Add selector handling.",
+        repository_contract={},
+    )
+
+    assert len(obligations) == 1
+    assert len(probes) == 1
+    assert len(requests) == 3
+    assert "must contain an observable assertion" in requests[1].prompt
+    assert "baseline probe checks failed" in requests[2].prompt
+    assert requests[1].request_id.endswith("repair-1")
+    assert requests[2].request_id.endswith("repair-2")
+    suite = json.loads(
+        (output_root / "postrun-probes" / "probe-suite.json").read_text()
+    )
+    assert [
+        attempt["worker_commit_sha"] for attempt in suite["authoring_attempts"]
+    ] == worker_commit_shas
+    assert len(suite["authoring_commits"]) == 3
+    assert suite["baseline_results"][0]["status"] == "failed"
+
+
 def test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes(
     tmp_path: Path,
 ) -> None:

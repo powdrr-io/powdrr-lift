@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,8 @@ from powdrr_lift.workrr.git import (
     inspect_workflow_run,
     integration_branch_name,
     load_workflow_git_state,
+    new_publication_id,
+    publication_branch_name,
     resolve_git_repository_root,
     save_workflow_git_state,
     synchronize_workflow_initialization,
@@ -60,6 +63,26 @@ def test_workflow_git_state_round_trips_and_names_branches(tmp_path: Path) -> No
     )
 
 
+def test_publication_branches_are_unique_and_stable_per_workflow() -> None:
+    publication_id = new_publication_id()
+    implementation_branch = publication_branch_name(
+        "Feature Request 17", "implementation", publication_id
+    )
+    another_branch = publication_branch_name(
+        "Feature Request 17", "implementation", new_publication_id()
+    )
+
+    assert implementation_branch.startswith("powdrr/feature-request-17-implementation-")
+    assert implementation_branch != another_branch
+    assert publication_branch_name("Feature Request 17", "implementation") == (
+        "powdrr/feature-request-17-implementation"
+    )
+    assert (
+        publication_branch_name("Feature Request 17", "plan-amendment", publication_id)
+        == f"powdrr/feature-request-17-plan-amendment-{publication_id}"
+    )
+
+
 def test_workflow_git_state_loads_by_workflow_id_when_directory_is_shared(
     tmp_path: Path,
 ) -> None:
@@ -97,6 +120,7 @@ def test_workflow_git_state_round_trips_workflow_dependencies() -> None:
         base_branch="main",
         integration_branch="powdrr/integration",
         workflow_relative_directory="docs/workflows/feature",
+        publication_id="pub-token",
         depends_on_workflows=("core",),
     )
 
@@ -175,6 +199,43 @@ def test_workflow_dependency_accepts_merged_worker_attempt_branch(
     assert workflow_dependencies_completion(tmp_path, state) == (True, ())
 
 
+def test_related_workflow_pr_lookup_includes_unique_publication_branches(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        workflow_git,
+        "_gh",
+        lambda *_args: subprocess.CompletedProcess(
+            ["gh", "pr", "list"],
+            0,
+            json.dumps(
+                [
+                    {
+                        "state": "MERGED",
+                        "headRefName": "powdrr/core-implementation-run-123",
+                    },
+                    {
+                        "state": "OPEN",
+                        "headRefName": "powdrr/core-plan-amendment-run-456",
+                    },
+                ]
+            ),
+            "",
+        ),
+    )
+
+    pull_requests, error = workflow_git._related_workflow_attempt_pull_requests(
+        tmp_path,
+        "powdrr/core",
+    )
+
+    assert error is None
+    assert [item["headRefName"] for item in pull_requests] == [
+        "powdrr/core-implementation-run-123"
+    ]
+
+
 def test_force_synchronization_resets_stale_integration_branch(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -234,6 +295,7 @@ def test_create_task_worktree_starts_from_integration_branch(tmp_path: Path) -> 
     task_worktree, task_branch = create_task_worktree(tmp_path, state, "task-001")
 
     assert integration_worktree.is_dir()
+    assert integration_worktree.name == "powdrr-feature-17"
     assert task_worktree.is_dir()
     assert task_branch == "powdrr/feature-17-task/task-001"
     assert (
@@ -433,6 +495,86 @@ def test_claim_workflow_task_reports_ref_creation_errors(
         PowdrrExecutionError, match="could not create task claim.*permission denied"
     ):
         claim_workflow_task(tmp_path, state, "task-001")
+
+
+def test_validate_workflow_git_state_uses_attempt_branch_and_worktree(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "initial")
+    attempt_branch = "powdrr/feature-17-attempt-abc123"
+    worktree, _ = create_workflow_worktree(
+        tmp_path,
+        "feature-17",
+        branch_name=attempt_branch,
+        worktree_name=attempt_branch,
+    )
+    workflow_dir = worktree / "docs" / "workflows" / "feature-17"
+    workflow_dir.mkdir(parents=True)
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch=attempt_branch,
+        workflow_relative_directory="docs/workflows/feature-17",
+    )
+    save_workflow_git_state(workflow_dir, state)
+    monkeypatch.setattr(workflow_git, "_related_pull_requests", lambda *_: ([], None))
+    monkeypatch.setattr(
+        workflow_git, "_related_workflow_attempt_pull_requests", lambda *_: ([], None)
+    )
+
+    report = workflow_git.validate_workflow_git_state(
+        tmp_path, state, "feature-17-task-001"
+    )
+
+    assert report["integration_branch"] == attempt_branch
+    assert report["integration_worktree"] == str(worktree)
+    assert report["integration_worktree_exists"] is True
+    assert report["worktrees"] == [{"path": str(worktree), "branch": attempt_branch}]
+
+
+def test_validate_workflow_git_state_uses_integration_branch_worktree_by_default(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init", "-b", "main")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test User")
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    _git(tmp_path, "add", "README.md")
+    _git(tmp_path, "commit", "-m", "initial")
+    integration_worktree, integration_branch = create_workflow_worktree(
+        tmp_path,
+        "feature-17",
+    )
+    workflow_dir = integration_worktree / "docs" / "workflows" / "feature-17"
+    workflow_dir.mkdir(parents=True)
+    state = WorkflowGitState(
+        proposed_pr_id="feature-17",
+        base_branch="main",
+        integration_branch=integration_branch,
+        workflow_relative_directory="docs/workflows/feature-17",
+    )
+    save_workflow_git_state(workflow_dir, state)
+    monkeypatch.setattr(workflow_git, "_related_pull_requests", lambda *_: ([], None))
+    monkeypatch.setattr(
+        workflow_git, "_related_workflow_attempt_pull_requests", lambda *_: ([], None)
+    )
+
+    report = workflow_git.validate_workflow_git_state(
+        tmp_path,
+        state,
+        "feature-17-task-001",
+    )
+
+    assert integration_branch == "powdrr/feature-17"
+    assert integration_worktree.name == "powdrr-feature-17"
+    assert report["integration_worktree"] == str(integration_worktree)
 
 
 def test_inspection_and_cleanup_preserve_integration_checkpoint(tmp_path: Path) -> None:

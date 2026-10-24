@@ -403,7 +403,15 @@ def parse_generated_postrun_probe_source(
             )
         )
     if not probes and any(item["supported"] is True for item in obligations):
-        raise ValueError("probe suite contains no valid probes after isolation")
+        rejected_details = "; ".join(
+            f"{item.get('probe_id') or item.get('obligation_id')}: {item['error']}"
+            for item in rejected_probes or ()
+            if item.get("error")
+        )
+        detail_suffix = f": {rejected_details}" if rejected_details else ""
+        raise ValueError(
+            f"probe suite contains no valid probes after isolation{detail_suffix}"
+        )
     missing_interactions = known_interactions - covered_interactions
     if missing_interactions:
         if rejected_interactions is None:

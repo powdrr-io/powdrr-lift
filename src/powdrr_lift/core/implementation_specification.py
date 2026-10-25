@@ -15,7 +15,10 @@ from powdrr_lift.core.spec_paths import (
     implementation_specification_path,
 )
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
-from powdrr_lift.core.specification_v1 import validate_module_tool_references
+from powdrr_lift.core.specification_v1 import (
+    validate_module_tool_references,
+    validate_related_module_references,
+)
 from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import (
     ValidationError,
@@ -117,6 +120,9 @@ def render_implementation_specification_template(
         "# - Give each feature a unique id, description, and functional",
         "#   requirements.",
         "# - Give each decision a unique id and description.",
+        "# - Scope decisions and other entities to every affected module with",
+        "#   related_modules; omit it for a genuinely global item.",
+        '# - For a module-targeted context lookup use filters: {module_id: "<id>"}.',
         "# - Delete these instructions and replace them with this comment at the top:",
         '#   "# This file is read-only and should never be edited by a tool or agent."',
         "#",
@@ -139,6 +145,7 @@ def render_implementation_specification_template(
         "  - id: null",
         "    action: null",
         "    rationale: null",
+        "    related_modules: []",
         "modules:",
         "  - id: null",
         "    action: null",
@@ -146,16 +153,19 @@ def render_implementation_specification_template(
         "    purpose: null",
         "    quality_tier: null",
         "    legacy_behavior: null",
+        "    related_modules: []",
         "tools:",
         "  - id: null",
         "    action: null",
         "    when_to_use: null",
         "    template: null",
         "    how_to_use: null",
+        "    related_modules: []",
         "entity_relationships:",
         "  - id: null",
         "    action: null",
         "    rationale: null",
+        "    related_modules: []",
         "features:",
         "  - id: null",
         "    action: null",
@@ -163,11 +173,13 @@ def render_implementation_specification_template(
         "    supercedes: null",
         "    functional_requirements:",
         "      - null",
+        "    related_modules: []",
         "decisions:",
         "  - id: null",
         "    action: null",
         "    description: null",
         "    supercedes: null",
+        "    related_modules: []",
         "",
     ]
 
@@ -410,6 +422,24 @@ def build_implementation_specification_validation_report(
         available_ids=decision_ids,
         issues=issues,
         item_label="decision",
+    )
+    scoped_sections: dict[str, Sequence[object]] = {}
+    for section in (
+        "entities",
+        "entity_relationships",
+        "features",
+        "decisions",
+    ):
+        value = raw_spec.get(section)
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            scoped_sections[section] = value
+    issues.extend(
+        ImplementationSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
+        )
+        for issue in validate_related_module_references(
+            scoped_sections, module_ids=set(architecture_summary.module_ids)
+        )
     )
     return ImplementationSpecificationValidationReport(
         validation_successful=not issues,

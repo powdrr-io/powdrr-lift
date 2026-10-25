@@ -608,7 +608,25 @@ def _execute_procedrr_flow(
                 isinstance(item, str) for item in types
             ):
                 raise PowdrrExecutionError("gather_context types are malformed")
-            report = gather_specification_context(worktree, types=types)
+            keywords = parameters.get("keywords")
+            if keywords is not None and (
+                not isinstance(keywords, list)
+                or not all(isinstance(item, str) for item in keywords)
+            ):
+                raise PowdrrExecutionError("gather_context keywords are malformed")
+            filters = parameters.get("filters")
+            if filters is not None and not isinstance(filters, Mapping):
+                raise PowdrrExecutionError("gather_context filters are malformed")
+            feature_id = parameters.get("feature_id")
+            if feature_id is not None and not isinstance(feature_id, str):
+                raise PowdrrExecutionError("gather_context feature_id is malformed")
+            report = gather_specification_context(
+                worktree,
+                types=types,
+                keywords=keywords,
+                filters=dict(filters) if isinstance(filters, Mapping) else None,
+                feature_id=feature_id,
+            )
             rendered = json.loads(render_gather_context_report(report))
             if "required_test_cases" in types:
                 rendered["verification_inventory"] = list(

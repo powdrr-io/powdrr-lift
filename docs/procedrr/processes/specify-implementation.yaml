@@ -41,9 +41,9 @@ steps:
       \      - \"--work-item-name\"\n      - \"<work-item-name>\"\n  outputs:\n  - name: implementation_specification_template\n\
       \    type: any\n    required_for_next_step: true\n    schema: {type: object, additionalProperties:\
       \ true}\n- id: fill-implementation\n  description: Fill out the feature and decision\
-      \ sections so they stay aligned with\n    the architecture id.\n  actions: [edit, yaml_edit,\
+      \ sections so they stay aligned with\n    the architecture id.\n  actions: [edit, yaml_edit, gather_context,\
       \ file_management, read_document]\n  step_type: governed\n  llm_type: standard_reasoning\n\
-      \  details: >-\n    Use the yaml_edit action for every YAML change. Its shape is\n \
+      \  details: >-\n    Before editing a module, gather applicable decisions with gather_context using types [decisions] and filters {module_id: <module-id>}; this includes global decisions and decisions linked to that module while excluding decisions linked only to other modules. For each decision or other entity, set related_modules to every affected architecture module id. Use the yaml_edit action for every YAML change. Its shape is\n \
       \   {\"action\":\"yaml_edit\",\"file_path\":\"docs/proposals/<work-item-name>/implementation-specification.yaml\"\
       ,\"operations\":[{\"op\":\"set_value\",\"path\":[\"architecture_id\"],\"value\":\"<architecture-id>\"\
       },{\"op\":\"upsert_item\",\"section\":\"features\",\"id\":\"feature-id\",\"value\":{\"\
@@ -94,6 +94,7 @@ steps:
     allowed_tools:
     - edit
     - file_management
+    - gather_context
     - read_document
     - yaml_edit
     - invoke_tool

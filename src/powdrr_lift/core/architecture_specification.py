@@ -16,7 +16,10 @@ from powdrr_lift.core.spec_paths import (
     existing_specification_path,
 )
 from powdrr_lift.core.specification_actions import ENTITY_ACTIONS
-from powdrr_lift.core.specification_v1 import validate_module_tool_sections
+from powdrr_lift.core.specification_v1 import (
+    validate_module_tool_sections,
+    validate_related_module_references,
+)
 from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import (
     ValidationError,
@@ -84,8 +87,8 @@ def render_architecture_specification_template(
         "#   guidance item present in the `entities` section.",
         "# - Use `action: added`, `removed`, or `changed` for every entity,",
         "#   module, and tool.",
-        "# - Every related_modules reference must name an id declared in the",
-        "#   modules section; omit related_modules when it is empty.",
+        "# - Scope entities, relationships, invariants, and guidance with",
+        "#   related_modules when they apply to one or more specific modules.",
         "# - Set each module's quality_tier to prototyping, internal_beta, or",
         "#   production_ready, inheriting the initiative tier unless overridden.",
         "# - Record preserved or intentionally changed existing behavior in",
@@ -104,6 +107,7 @@ def render_architecture_specification_template(
         "    action: null",
         "    summary: null",
         "    rationale: null",
+        "    related_modules: []",
         "modules:",
         "  - id: null",
         "    action: null",
@@ -111,9 +115,11 @@ def render_architecture_specification_template(
         "    purpose: null",
         "    quality_tier: null",
         "    legacy_behavior: null",
+        "    related_modules: []",
         "tools:",
         "  - id: null",
         "    action: null",
+        "    related_modules: []",
         "    when_to_use: null",
         "    template: null",
         "    how_to_use: null",
@@ -124,6 +130,7 @@ def render_architecture_specification_template(
         "    relationship: null",
         "    description: null",
         "    rationale: null",
+        "    related_modules: []",
         "invariants:",
         "  - id: null",
         "    description: null",
@@ -131,6 +138,7 @@ def render_architecture_specification_template(
         "    related:",
         "      entities: []",
         "      entity_relationships: []",
+        "    related_modules: []",
         "guidance:",
         "  - id: null",
         "    description: null",
@@ -138,6 +146,7 @@ def render_architecture_specification_template(
         "    related:",
         "      entities: []",
         "      entity_relationships: []",
+        "    related_modules: []",
         "",
     ]
 
@@ -299,6 +308,19 @@ def build_architecture_specification_validation_report(
         ),
         module_ids=module_ids,
         issues=issues,
+    )
+    scoped_sections: dict[str, Sequence[object]] = {}
+    for section in ("entities", "entity_relationships", "invariants", "guidance"):
+        value = raw_spec.get(section)
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            scoped_sections[section] = value
+    issues.extend(
+        ArchitectureSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
+        )
+        for issue in validate_related_module_references(
+            scoped_sections, module_ids=module_ids
+        )
     )
     relationship_ids = _collect_relationship_ids(
         _coerce_sequence(

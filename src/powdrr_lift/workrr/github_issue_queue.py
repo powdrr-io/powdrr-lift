@@ -27,6 +27,7 @@ QUEUE_LABELS = {
     "ready": "powdrr:ready",
     "claimed": "powdrr:claimed",
     "awaiting_review": "powdrr:awaiting-review",
+    "awaiting_human": "powdrr:awaiting-human",
     "blocked_on_dependency": "powdrr:blocked-on-dependency",
     "blocked": "powdrr:blocked",
 }
@@ -66,6 +67,7 @@ class PlannedWorkItem:
     implementation_steps: tuple[str, ...] = ()
     allowed_paths: tuple[str, ...] = (".",)
     inline_adjustments: tuple[Mapping[str, Any], ...] = ()
+    github_issue_number: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -717,6 +719,7 @@ def run_worker_once(
                     )
                     return WorkerReport("blocked", issue.number, item.item_id, detail)
             try:
+                item = replace(item, github_issue_number=issue.number)
                 item_by_id = {candidate.item_id: candidate for candidate in plan.items}
                 fulfilled_without_pr_dependencies = tuple(
                     item_by_id[dependency].workflow_id
@@ -746,9 +749,22 @@ def run_worker_once(
                 return_code = 1
                 detail = f"{type(error).__name__}: {error}"
             if return_code == 0:
-                status = "awaiting_review"
-                outcome = "awaiting_review"
-                note = "Powdrr execution finished. Human review is still required."
+                prerequisite = latest_manual_prerequisite_checkpoint(
+                    client.list_comments(issue.number)
+                )
+                if prerequisite is not None:
+                    status = "awaiting_human"
+                    outcome = "awaiting_human"
+                    note = (
+                        "Powdrr staged the workflow pull request with manual "
+                        "prerequisite instructions. After completing them, resume "
+                        "with `powdrr-lift github-issue-worker-continue --repository "
+                        f"{client.repository} --issue-number {issue.number}`."
+                    )
+                else:
+                    status = "awaiting_review"
+                    outcome = "awaiting_review"
+                    note = "Powdrr execution finished. Human review is still required."
             else:
                 status = "blocked"
                 outcome = "blocked"
@@ -764,6 +780,261 @@ def run_worker_once(
             client.add_comment(issue, note)
             return WorkerReport(outcome, issue.number, item.item_id, detail)
     return WorkerReport("no_eligible_work")
+
+
+def latest_manual_prerequisite_checkpoint(
+    comments: Sequence[Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    """Return the newest valid manual-prerequisite checkpoint from issue comments."""
+    for comment in reversed(comments):
+        body = comment.get("body")
+        if not isinstance(body, str) or _TASK_CHECKPOINT_START not in body:
+            continue
+        match = re.search(r"```json\s*(.*?)\s*```", body, re.DOTALL)
+        if match is None:
+            continue
+        try:
+            payload = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(payload, Mapping):
+            continue
+        if payload.get("output_state_type") != "manual-prerequisite-checkpoint-v1":
+            if payload.get("output_state_type") == "manual-prerequisite-completed-v1":
+                return None
+            continue
+        state = payload.get("output_state")
+        if (
+            isinstance(state, Mapping)
+            and state.get("schema")
+            == "https://powdrr.io/schemas/manual-prerequisite-checkpoint-v1"
+            and all(
+                isinstance(state.get(field), str) and state[field].strip()
+                for field in (
+                    "human_task_id",
+                    "follow_up_task_id",
+                    "workflow_id",
+                    "workflow_directory",
+                    "integration_branch",
+                    "pull_request_url",
+                    "commit_sha",
+                )
+            )
+            and isinstance(state.get("prerequisite"), Mapping)
+            and isinstance(state.get("commit_sha"), str)
+            and re.fullmatch(r"[0-9a-fA-F]{40}", state["commit_sha"]) is not None
+            and isinstance(state.get("integration_branch"), str)
+            and re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9._/-]*", state["integration_branch"]
+            )
+            is not None
+            and ".." not in state["integration_branch"].split("/")
+            and isinstance(state.get("workflow_directory"), str)
+            and not Path(state["workflow_directory"]).is_absolute()
+            and ".." not in Path(state["workflow_directory"]).parts
+        ):
+            return state
+    return None
+
+
+def continue_manual_prerequisite_issue(
+    *,
+    client: GitHubIssueClient,
+    issue_number: int,
+    repo_root: str | Path,
+    resume_workflow: Callable[[Mapping[str, Any], TaskCheckpointCallback], int],
+) -> WorkerReport:
+    """Retry staged PR checks, then resume the durable workflow for one issue."""
+    with _worker_lock(Path(repo_root).resolve()):
+        return _continue_manual_prerequisite_issue_locked(
+            client=client,
+            issue_number=issue_number,
+            resume_workflow=resume_workflow,
+        )
+
+
+def _continue_manual_prerequisite_issue_locked(
+    *,
+    client: GitHubIssueClient,
+    issue_number: int,
+    resume_workflow: Callable[[Mapping[str, Any], TaskCheckpointCallback], int],
+) -> WorkerReport:
+    issue = client.get_issue(issue_number)
+    if issue.state != "open" or QUEUE_LABELS["awaiting_human"] not in issue.labels:
+        raise GitHubIssueQueueError(
+            f"issue #{issue_number} is not open and awaiting a manual prerequisite"
+        )
+    checkpoint = latest_manual_prerequisite_checkpoint(
+        client.list_comments(issue_number)
+    )
+    if checkpoint is None:
+        raise GitHubIssueQueueError(
+            f"issue #{issue_number} has no valid manual prerequisite checkpoint"
+        )
+    if not re.fullmatch(
+        rf"https://github\.com/{re.escape(client.repository)}/pull/[1-9][0-9]*",
+        str(checkpoint["pull_request_url"]),
+    ):
+        raise GitHubIssueQueueError(
+            "manual prerequisite checkpoint pull request does not belong to "
+            f"{client.repository}"
+        )
+    try:
+        _retry_manual_prerequisite_ci(client, checkpoint)
+    except GitHubIssueQueueError as error:
+        client.add_comment(
+            issue,
+            "Powdrr could not resume the workflow because the staged pull "
+            f"request checks have not passed: {error}. The issue remains "
+            "awaiting-human.",
+        )
+        raise
+    client.add_comment(
+        issue,
+        "CI passed after the manual prerequisite. Powdrr is resuming the same "
+        "durable workflow now.",
+    )
+    pointer = parse_issue_pointer(issue.body)
+    if pointer is None:
+        raise GitHubIssueQueueError(
+            f"issue #{issue_number} has no valid Powdrr plan pointer"
+        )
+
+    def checkpoint_callback(
+        task_id: str, output_state_type: str, output_state: Any, commit_sha: str | None
+    ) -> None:
+        client.add_comment(
+            issue,
+            render_task_checkpoint_comment(
+                TaskCheckpoint(
+                    plan_id=pointer["plan_id"],
+                    item_id=pointer["item_id"],
+                    workflow_id=str(checkpoint["workflow_id"]),
+                    task_id=task_id,
+                    output_state_type=output_state_type,
+                    output_state=output_state,
+                    commit_sha=commit_sha,
+                )
+            ),
+        )
+
+    detail: str | None = None
+    try:
+        return_code = resume_workflow(checkpoint, checkpoint_callback)
+    except Exception as error:
+        return_code = 1
+        detail = f"{type(error).__name__}: {error}"
+    comments = client.list_comments(issue_number)
+    pending_prerequisite = latest_manual_prerequisite_checkpoint(comments)
+    if pending_prerequisite is not None:
+        status = "awaiting_human"
+        outcome = "awaiting_human"
+        note = (
+            "Powdrr paused for another manual prerequisite. Follow the updated "
+            "instructions on the staged pull request, then run "
+            "`powdrr-lift github-issue-worker-continue --repository "
+            f"{client.repository} --issue-number {issue.number}`."
+        )
+    elif return_code == 0:
+        status = "awaiting_review"
+        outcome = "awaiting_review"
+        note = "Powdrr execution finished. Human review is still required."
+    else:
+        status = "blocked"
+        outcome = "blocked"
+        note = "Powdrr execution did not finish successfully."
+        if detail:
+            note += f" {detail}"
+    client.update_issue(
+        issue,
+        labels=_replace_queue_status(issue.labels, status),
+    )
+    client.add_comment(issue, note)
+    return WorkerReport(outcome, issue_number, detail=detail)
+
+
+def _retry_manual_prerequisite_ci(
+    client: GitHubIssueClient, checkpoint: Mapping[str, Any]
+) -> None:
+    branch = str(checkpoint["integration_branch"])
+    commit_sha = str(checkpoint["commit_sha"])
+    runs_result = client._invoke(
+        [
+            "run",
+            "list",
+            "--branch",
+            branch,
+            "--json",
+            "databaseId,headSha,status,conclusion",
+            "--limit",
+            "100",
+        ],
+        check=False,
+    )
+    if runs_result.returncode != 0:
+        raise GitHubIssueQueueError(
+            "could not inspect CI runs for the staged prerequisite PR: "
+            f"{runs_result.stderr.strip()}"
+        )
+    try:
+        runs = json.loads(runs_result.stdout)
+    except json.JSONDecodeError as error:
+        raise GitHubIssueQueueError(
+            "gh returned malformed workflow run data"
+        ) from error
+    matching = (
+        [
+            run
+            for run in runs
+            if isinstance(run, Mapping)
+            and run.get("headSha") == commit_sha
+            and isinstance(run.get("databaseId"), int)
+        ]
+        if isinstance(runs, list)
+        else []
+    )
+    if not matching:
+        raise GitHubIssueQueueError(
+            "no GitHub Actions runs were found for the staged PR commit "
+            f"{commit_sha}; the issue remains awaiting-human"
+        )
+    for run in matching:
+        run_id = str(run["databaseId"])
+        status = run.get("status")
+        conclusion = run.get("conclusion")
+        if status == "completed" and conclusion not in {
+            "success",
+            "neutral",
+            "skipped",
+        }:
+            rerun = client._invoke(["run", "rerun", run_id, "--failed"], check=False)
+            if rerun.returncode != 0:
+                raise GitHubIssueQueueError(
+                    f"could not rerun failed CI run {run_id}: {rerun.stderr.strip()}"
+                )
+        elif status not in {
+            "completed",
+            "queued",
+            "in_progress",
+            "waiting",
+            "requested",
+        }:
+            raise GitHubIssueQueueError(
+                f"CI run {run_id} is in unsupported state {status!r}"
+            )
+        watched = client._invoke(["run", "watch", run_id, "--exit-status"], check=False)
+        if watched.returncode != 0:
+            raise GitHubIssueQueueError(
+                f"CI run {run_id} did not pass: {watched.stderr.strip()}"
+            )
+    checks = client._invoke(
+        ["pr", "checks", str(checkpoint["pull_request_url"]), "--watch", "--fail-fast"],
+        check=False,
+    )
+    if checks.returncode != 0:
+        raise GitHubIssueQueueError(
+            f"the staged pull request still has failing checks: {checks.stderr.strip()}"
+        )
 
 
 def fulfill_issue_without_pr(
@@ -966,7 +1237,11 @@ def render_task_checkpoint_comment(checkpoint: TaskCheckpoint) -> str:
         "item_id": checkpoint.item_id,
         "workflow_id": checkpoint.workflow_id,
         "task_id": checkpoint.task_id,
-        "status": "completed",
+        "status": (
+            "awaiting_human"
+            if checkpoint.output_state_type == "manual-prerequisite-checkpoint-v1"
+            else "completed"
+        ),
         "output_state_type": checkpoint.output_state_type,
         "output_state": checkpoint.output_state,
         "commit_sha": checkpoint.commit_sha,
@@ -1512,6 +1787,7 @@ def _label_color(status: str) -> str:
         "ready": "0E8A16",
         "claimed": "1D76DB",
         "awaiting_review": "FBCA04",
+        "awaiting_human": "C5DEF5",
         "blocked_on_dependency": "D4C5F9",
         "blocked": "D93F0B",
     }[status]

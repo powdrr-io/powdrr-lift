@@ -246,6 +246,46 @@ items:
     assert plan.items[0].allowed_paths == ("src/first.py", "tests")
 
 
+def test_plan_validation_preserves_timed_manual_prerequisite() -> None:
+    text = """
+schema: https://powdrr.io/schemas/github-issue-execution-plan-v1
+plan_id: feature-v1
+items:
+  - id: first
+    title: First
+    objective: Use the configured credential.
+    scope: [src/client.py]
+    allowed_paths: [src/client.py]
+    implementation_steps: [Use the credential in the client.]
+    acceptance_criteria: [The client authenticates successfully.]
+    dependencies: []
+    workflow_file: docs/workflows/feature/first.yaml
+    workflow_id: feature-first
+    manual_prerequisite:
+      title: Install the CI credential
+      instructions: [Add the repository secret.]
+      verification: Confirm the secret is configured.
+      trigger: after_implementation_before_validation
+      unblocks: Running the verifier in pull request CI.
+"""
+
+    plan = _parse_plan(text)
+
+    assert plan.items[0].manual_prerequisite == {
+        "title": "Install the CI credential",
+        "instructions": ["Add the repository secret."],
+        "verification": "Confirm the secret is configured.",
+        "trigger": "after_implementation_before_validation",
+        "unblocks": "Running the verifier in pull request CI.",
+    }
+    with pytest.raises(GitHubIssueQueueError, match="trigger must be"):
+        _parse_plan(
+            text.replace(
+                "after_implementation_before_validation", "before_implementation"
+            )
+        )
+
+
 def test_plan_validation_rejects_traversing_allowed_paths() -> None:
     text = """
 schema: https://powdrr.io/schemas/github-issue-execution-plan-v1

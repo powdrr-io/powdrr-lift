@@ -32,6 +32,7 @@ QUEUE_LABELS = {
     "blocked": "powdrr:blocked",
 }
 FULFILLED_WITHOUT_PR_LABEL = "powdrr:fulfilled-without-pr"
+MANUAL_PREREQUISITE_TRIGGER = "after_implementation_before_validation"
 _MARKER_START = "<!-- powdrr-queue-item:v1 "
 _MARKER_END = " -->"
 _TASK_CHECKPOINT_START = "<!-- powdrr-task-checkpoint:v1 -->"
@@ -66,6 +67,7 @@ class PlannedWorkItem:
     workflow_file: str | None = None
     implementation_steps: tuple[str, ...] = ()
     allowed_paths: tuple[str, ...] = (".",)
+    manual_prerequisite: Mapping[str, Any] | None = None
     inline_adjustments: tuple[Mapping[str, Any], ...] = ()
     github_issue_number: int | None = None
 
@@ -704,7 +706,23 @@ def run_worker_once(
                             f"{workflow_instance.dependencies!r}"
                         )
                     else:
-                        detail = None
+                        context = workflow_instance.inputs.get("proposed_pr_context")
+                        actual_prerequisite = (
+                            context.get("manual_prerequisite")
+                            if isinstance(context, Mapping)
+                            else None
+                        )
+                        expected_prerequisite = (
+                            dict(item.manual_prerequisite)
+                            if item.manual_prerequisite is not None
+                            else None
+                        )
+                        detail = (
+                            "workflow manual prerequisite does not match the pinned "
+                            "plan item"
+                            if actual_prerequisite != expected_prerequisite
+                            else None
+                        )
                 except (PlanGenerationError, KeyError) as error:
                     detail = f"invalid workflow definition: {error}"
                 if detail is not None:
@@ -1541,20 +1559,13 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             "dependencies",
             "workflow_id",
         }
-        workflow_fields = (
-            {"workflow_directory"},
-            {"workflow_file"},
-        )
-        optional_fields: tuple[set[str], ...] = (
-            {"implementation_steps", "allowed_paths"},
-            {"allowed_paths"},
-            {"implementation_steps"},
-            set(),
-        )
-        if not any(
-            set(raw) == common_fields | workflow_field | optional_field
-            for workflow_field in workflow_fields
-            for optional_field in optional_fields
+        workflow_keys = set(raw) & {"workflow_directory", "workflow_file"}
+        optional_keys = set(raw) - common_fields - workflow_keys
+        if (
+            not common_fields <= set(raw)
+            or len(workflow_keys) != 1
+            or not optional_keys
+            <= {"implementation_steps", "allowed_paths", "manual_prerequisite"}
         ):
             raise GitHubIssueQueueError(f"{field} has unknown or missing fields")
         item_id = raw.get("id")
@@ -1596,6 +1607,11 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             ),
             allowed_paths=(
                 _repository_path_list(raw, field) if "allowed_paths" in raw else (".",)
+            ),
+            manual_prerequisite=(
+                parse_manual_prerequisite(raw["manual_prerequisite"], field)
+                if "manual_prerequisite" in raw
+                else None
             ),
         )
         if not item.scope or not item.acceptance_criteria:
@@ -1658,6 +1674,59 @@ def _repository_path_list(raw: Mapping[str, Any], field: str) -> tuple[str, ...]
             f"{field}.allowed_paths must contain unique repository-relative paths"
         )
     return paths
+
+
+def parse_manual_prerequisite(value: Any, field: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != {
+        "title",
+        "instructions",
+        "verification",
+        "trigger",
+        "unblocks",
+    }:
+        raise GitHubIssueQueueError(
+            f"{field}.manual_prerequisite must contain exactly title, instructions, "
+            "verification, trigger, and unblocks"
+        )
+    title = value.get("title")
+    instructions = value.get("instructions")
+    verification = value.get("verification")
+    trigger = value.get("trigger")
+    unblocks = value.get("unblocks")
+    if not isinstance(title, str) or not title.strip() or len(title.strip()) > 160:
+        raise GitHubIssueQueueError(
+            f"{field}.manual_prerequisite.title must be non-empty text of at most "
+            "160 characters"
+        )
+    if (
+        not isinstance(instructions, list)
+        or not instructions
+        or not all(isinstance(item, str) and item.strip() for item in instructions)
+    ):
+        raise GitHubIssueQueueError(
+            f"{field}.manual_prerequisite.instructions must be a non-empty list of "
+            "non-empty strings"
+        )
+    if not isinstance(verification, str) or not verification.strip():
+        raise GitHubIssueQueueError(
+            f"{field}.manual_prerequisite.verification must be non-empty text"
+        )
+    if trigger != MANUAL_PREREQUISITE_TRIGGER:
+        raise GitHubIssueQueueError(
+            f"{field}.manual_prerequisite.trigger must be "
+            f"{MANUAL_PREREQUISITE_TRIGGER!r}"
+        )
+    if not isinstance(unblocks, str) or not unblocks.strip():
+        raise GitHubIssueQueueError(
+            f"{field}.manual_prerequisite.unblocks must be non-empty text"
+        )
+    return {
+        "title": title.strip(),
+        "instructions": [item.strip() for item in instructions],
+        "verification": verification.strip(),
+        "trigger": trigger,
+        "unblocks": unblocks.strip(),
+    }
 
 
 def _has_dependency_cycle(items: Sequence[PlannedWorkItem]) -> bool:

@@ -176,6 +176,8 @@ def size_plan_items(
 def _merge_is_valid(group: Sequence[Mapping[str, Any]]) -> bool:
     if len(group) == 1:
         return len(_item_runtimes(group[0])) <= 1
+    if any("manual_prerequisite" in item for item in group):
+        return False
     if any(str(item.get("id", "")).startswith("ci-bootstrap") for item in group):
         return False
     if not _has_shared_component(group):
@@ -223,7 +225,18 @@ def _is_sizable_item(item: Mapping[str, Any], max_work_units: int) -> bool:
     dependencies = item.get("dependencies")
     return (
         set(item)
-        == {
+        <= {
+            "id",
+            "title",
+            "objective",
+            "scope",
+            "allowed_paths",
+            "implementation_steps",
+            "acceptance_criteria",
+            "dependencies",
+            "manual_prerequisite",
+        }
+        and {
             "id",
             "title",
             "objective",
@@ -233,6 +246,7 @@ def _is_sizable_item(item: Mapping[str, Any], max_work_units: int) -> bool:
             "acceptance_criteria",
             "dependencies",
         }
+        <= set(item)
         and isinstance(title, str)
         and isinstance(objective, str)
         and isinstance(scope, list)
@@ -330,6 +344,11 @@ def split_mixed_runtime_items(
             split_items.append(dict(item))
             item_expansions[source_id] = [source_id]
             continue
+        if "manual_prerequisite" in item:
+            raise PlanSizingError(
+                f"cannot split mixed-runtime item {source_id!r} with a "
+                "manual_prerequisite; assign it to one runtime-specific item"
+            )
 
         steps_by_runtime: dict[str, list[str]] = {runtime: [] for runtime in runtimes}
         for step in item["implementation_steps"]:

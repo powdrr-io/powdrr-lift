@@ -4115,6 +4115,8 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
     )
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        if tool == "gather_context":
+            return {"matches": []}
         assert tool == "internal"
         command = parameters["command"]
         return runtime.dispatch(command[0], list(command), parameters)

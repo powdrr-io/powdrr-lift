@@ -1168,6 +1168,8 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
+            if "govern or participate in this exact instruction clause" in question:
+                return {"relevant": True}
             if "independently verifiable requirement" in question:
                 return {"multiple": False}
             if (
@@ -1227,7 +1229,20 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
 
     def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
         if tool == "gather_context":
-            return [{"id": "existing", "description": "Existing evidence"}]
+            module_id = parameters.get("filters", {}).get("module_id")
+            if module_id is None:
+                return {
+                    "matches": [
+                        {
+                            "item": {
+                                "id": "existing",
+                                "description": "Existing evidence",
+                            }
+                        }
+                    ]
+                }
+            assert module_id == "existing"
+            return {"matches": [{"item": {"id": "decision-1"}}]}
         if tool == "internal":
             command = parameters.get("command", [])
             if command[0] == "compile_instruction_ledger":
@@ -1469,7 +1484,7 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
         },
     )
     assert result.bindings["feature_design"]["obligations"][0]["id"] == "sentence-1"
-    assert result.llm_activations == 15
+    assert result.llm_activations == 16
     judge_values = {
         event.data["output"]: event.data["value"]
         for event in result.events

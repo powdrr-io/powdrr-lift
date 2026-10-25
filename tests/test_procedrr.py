@@ -676,20 +676,20 @@ def test_design_interview_uses_single_field_source_classification() -> None:
 
     source = Path("docs/procedrr/processes/design-interview.yaml").read_text()
     document = parse_and_validate(source)
-    atomicity_body = document["steps"][1]["for_each"]["body"]
+    atomicity_body = document["steps"][2]["for_each"]["body"]
     atomicity_judge = atomicity_body[0]["judge"]
-    atomicity_loop = document["steps"][1]["for_each"]
-    split_body = document["steps"][3]["for_each"]["body"]
+    atomicity_loop = document["steps"][2]["for_each"]
+    split_body = document["steps"][4]["for_each"]["body"]
     split_judge = split_body[0]["judge"]
-    body = document["steps"][5]["for_each"]["body"]
-    root_loop = body[1]["for_each"]
+    body = document["steps"][6]["for_each"]["body"]
+    root_loop = body[2]["for_each"]
     root_judge = root_loop["body"][0]["judge"]
-    dependent_operation = body[3]["operation"]
-    classifier_loop = body[4]["for_each"]
+    dependent_operation = body[4]["operation"]
+    classifier_loop = body[5]["for_each"]
     classifier_judge = classifier_loop["body"][0]["judge"]
-    extraction_operation = body[6]["operation"]
-    behavior_judge = body[8]["judge"]
-    scenario_judge = body[17]["judge"]
+    extraction_operation = body[7]["operation"]
+    behavior_judge = body[9]["judge"]
+    scenario_judge = body[18]["judge"]
 
     assert atomicity_judge["question"] == (
         "Does this one instruction clause contain more than one independently "
@@ -735,6 +735,7 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     ]
     assert behavior_judge["output"]["name"] == "behavior_family_result"
     assert "atomic_instruction_ledger" in scenario_judge["context"]
+    assert "instruction_module_decision_contexts" in scenario_judge["context"]
     assert any(
         "complete atomic instruction ledger" in item
         for item in scenario_judge["instructions"]
@@ -749,6 +750,32 @@ def test_design_interview_uses_single_field_source_classification() -> None:
     assert "semantic_population" not in flow_text
     assert "semantic_oracle" not in flow_text
     assert "compile_partial_semantic_contract" in flow_text
+
+
+def test_design_interview_gathers_decisions_for_relevant_modules_only() -> None:
+    from pathlib import Path
+
+    document = parse_and_validate(
+        Path("docs/procedrr/processes/design-interview.yaml").read_text()
+    )
+    assert document["steps"][0]["operation"] == {
+        "tool": "gather_context",
+        "parameters": {"types": ["modules"]},
+        "bind": "repository_modules",
+    }
+    clause_loop = document["steps"][6]["for_each"]
+    module_loop = clause_loop["body"][0]["for_each"]
+    assert module_loop["snapshot"]["name"] == "repository_modules.matches"
+    relevance_judge = module_loop["body"][0]["judge"]
+    assert relevance_judge["output"]["schema"]["properties"] == {
+        "relevant": {"type": "boolean"}
+    }
+    decision_lookup = module_loop["body"][1]["branch"]["cases"][True][0]["operation"]
+    assert decision_lookup["tool"] == "gather_context"
+    assert decision_lookup["parameters"] == {
+        "types": ["decisions"],
+        "filters": {"module_id": "${module_candidate.item.id}"},
+    }
 
 
 def test_design_interview_has_no_acceptance_criteria_compiler_stage() -> None:

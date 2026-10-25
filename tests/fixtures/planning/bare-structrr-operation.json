@@ -1,0 +1,22 @@
+{
+  "case": "bare-structrr-operation",
+  "provenance": {
+    "captured_at": "2026-10-25T16:36:28.744106+00:00",
+    "source_exchange": "llm-20261025-163628-744106.json",
+    "source_exchange_sha256": "67b610112c92ae51a9b50734f6076011ee67ed43a395c6c8e5de624a8ee30e5c",
+    "selection": "$.output"
+  },
+  "response": {
+    "operation_id": "op-001",
+    "item_id": "pr-01",
+    "section": "files",
+    "subject_id": "file:.github/workflows/ci.yml",
+    "action": "added",
+    "content": {
+      "stable_key": ".github/workflows/ci.yml",
+      "path": ".github/workflows/ci.yml",
+      "type": "Configuration file",
+      "content": "name: CI\non:\n  pull_request:\n  push:\n    branches: [main]\njobs:\n  attestation-verify:\n    runs-on: macos-14\n    steps:\n      - uses: actions/checkout@v4\n      - run: bash attestation/scripts/verify-all.sh\n"
+    }
+  }
+}

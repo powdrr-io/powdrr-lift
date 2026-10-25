@@ -1,0 +1,40 @@
+{
+  "case": "runtime-in-test-subject",
+  "provenance": {
+    "captured_at": "2026-10-25T16:18:18.147373+00:00",
+    "source_exchange": "llm-20261025-161818-147373.json",
+    "source_exchange_sha256": "abc7d29a946090732fdaf7a92429f684198e9e4aba80228e3f15431848171819",
+    "selection": "$.output.items[id=PR-03]"
+  },
+  "response": {
+    "id": "PR-03",
+    "title": "Install protected macOS service and authenticated IPC",
+    "objective": "Establish the real privilege boundary on macOS: a signed native daemon, root-owned installation and state, a dedicated unprivileged worker account, authenticated IPC with OS-derived peer UID, and a sandboxed worker that can run shell/Python/Make children without access to developer files or controller state. Signing and execution of repository commands remain disabled.",
+    "scope": [
+      "Build signed native executables, root-owned installation/state paths, a system launch daemon, and the _powdrrattest worker identity.",
+      "Implement bounded IPC with OS-derived peer UID, profile ownership checks, and strict administrative/ordinary endpoint separation.",
+      "Implement the App Sandbox bootstrap for the worker and its children, with real macOS integration tests."
+    ],
+    "allowed_paths": [
+      "attestation/macos/",
+      "attestation/scripts/macos-security-smoke.sh",
+      "attestation/scripts/verify-all.sh"
+    ],
+    "implementation_steps": [
+      "Create the native daemon skeleton with Package.swift, launch daemon plist, root-owned installation paths under /Library/Application Support/PowdrrAttest/, and the _powdrrattest worker account; add health IPC with OS-derived peer UID checks.",
+      "Implement bounded IPC with protocol version 1, typed fields, caller-owned run IDs, and strict separation between ordinary run methods and administrative operations; add tests proving JSON fields cannot impersonate another user.",
+      "Implement the App Sandbox bootstrap for the worker and its children using Apple's supported sandbox inheritance mechanism; add real macOS integration tests proving the worker and its shell/Python/Make children can use their job container and network but cannot read developer-home fixtures, controller files, or an agent-controlled Python installation.",
+      "Add launch/library constraints and prevent user-owned dynamic dependencies; implement safe installation, upgrade, health, and explicit uninstall behavior with no automatic sudo invocation from run; add tests for caller-controlled paths and symlinks."
+    ],
+    "acceptance_criteria": [
+      "03-AC1: An ordinary enrolled developer UID can call health; a different unprovisioned UID and the worker UID cannot access profile operations.",
+      "03-AC2: Requests cannot impersonate another user by changing JSON fields.",
+      "03-AC3: Ordinary developer processes cannot modify the executable, daemon definition, profile state, socket parent directory, or future key directory.",
+      "03-AC4: PATH, Python packages, loader variables, caller cwd, and a repository executable named like the provider do not alter daemon code or dependencies.",
+      "03-AC5: Caller-controlled paths/symlinks cannot make installation or IPC write outside the fixed state locations."
+    ],
+    "dependencies": [
+      "PR-01"
+    ]
+  }
+}

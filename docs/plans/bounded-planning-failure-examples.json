@@ -1,0 +1,189 @@
+{
+  "schema": "planning-failure-examples-v1",
+  "description": "Selected exact provider output from October 25 Gaterr planning attempts. These excerpts omit requests and authentication; they are regression inputs, not accepted contracts.",
+  "examples": [
+    {
+      "case": "runtime-in-test-subject",
+      "captured_at": "2026-10-25T16:18:18.147373+00:00",
+      "source_exchange": "llm-20261025-161818-147373.json",
+      "source_exchange_sha256": "abc7d29a946090732fdaf7a92429f684198e9e4aba80228e3f15431848171819",
+      "selection": "$.output.items[id=PR-03]",
+      "captured_response": {
+        "id": "PR-03",
+        "title": "Install protected macOS service and authenticated IPC",
+        "objective": "Establish the real privilege boundary on macOS: a signed native daemon, root-owned installation and state, a dedicated unprivileged worker account, authenticated IPC with OS-derived peer UID, and a sandboxed worker that can run shell/Python/Make children without access to developer files or controller state. Signing and execution of repository commands remain disabled.",
+        "scope": [
+          "Build signed native executables, root-owned installation/state paths, a system launch daemon, and the _powdrrattest worker identity.",
+          "Implement bounded IPC with OS-derived peer UID, profile ownership checks, and strict administrative/ordinary endpoint separation.",
+          "Implement the App Sandbox bootstrap for the worker and its children, with real macOS integration tests."
+        ],
+        "allowed_paths": [
+          "attestation/macos/",
+          "attestation/scripts/macos-security-smoke.sh",
+          "attestation/scripts/verify-all.sh"
+        ],
+        "implementation_steps": [
+          "Create the native daemon skeleton with Package.swift, launch daemon plist, root-owned installation paths under /Library/Application Support/PowdrrAttest/, and the _powdrrattest worker account; add health IPC with OS-derived peer UID checks.",
+          "Implement bounded IPC with protocol version 1, typed fields, caller-owned run IDs, and strict separation between ordinary run methods and administrative operations; add tests proving JSON fields cannot impersonate another user.",
+          "Implement the App Sandbox bootstrap for the worker and its children using Apple's supported sandbox inheritance mechanism; add real macOS integration tests proving the worker and its shell/Python/Make children can use their job container and network but cannot read developer-home fixtures, controller files, or an agent-controlled Python installation.",
+          "Add launch/library constraints and prevent user-owned dynamic dependencies; implement safe installation, upgrade, health, and explicit uninstall behavior with no automatic sudo invocation from run; add tests for caller-controlled paths and symlinks."
+        ],
+        "acceptance_criteria": [
+          "03-AC1: An ordinary enrolled developer UID can call health; a different unprovisioned UID and the worker UID cannot access profile operations.",
+          "03-AC2: Requests cannot impersonate another user by changing JSON fields.",
+          "03-AC3: Ordinary developer processes cannot modify the executable, daemon definition, profile state, socket parent directory, or future key directory.",
+          "03-AC4: PATH, Python packages, loader variables, caller cwd, and a repository executable named like the provider do not alter daemon code or dependencies.",
+          "03-AC5: Caller-controlled paths/symlinks cannot make installation or IPC write outside the fixed state locations."
+        ],
+        "dependencies": [
+          "PR-01"
+        ]
+      }
+    },
+    {
+      "case": "bare-work-item",
+      "captured_at": "2026-10-25T16:26:22.027947+00:00",
+      "source_exchange": "llm-20261025-162622-027947.json",
+      "source_exchange_sha256": "08c1c5372badc737bae1b1a803947712fb46a380886555e0b229885777893185",
+      "selection": "$.output",
+      "captured_response": {
+        "id": "PR-01",
+        "title": "Define attestation schemas and shared fixtures",
+        "objective": "Freeze the protocol contracts and cross-language fixtures that every later component depends on.",
+        "scope": [
+          "Create versioned JSON schemas for policy, attestors registry, predicate, and IPC.",
+          "Implement strict policy and registry parsers in Swift and Python with duplicate-key and resource-limit enforcement.",
+          "Add golden fixtures for DSSE statements, PAE bytes, keys, signatures, snapshot digests, and configuration errors."
+        ],
+        "allowed_paths": [
+          "attestation/schemas/",
+          "attestation/fixtures/",
+          "attestation/verifier/",
+          "attestation/macos/Sources/AttestationProtocol/",
+          "attestation/macos/Tests/",
+          "attestation/examples/",
+          "attestation/scripts/verify-all.sh"
+        ],
+        "implementation_steps": [
+          "Add JSON schemas under attestation/schemas/ for policy-v1, attestors-v1, predicate-v1, and ipc-v1, encoding the field shapes and constraints from sections 4, 7, and 8.",
+          "Implement strict YAML parsers in Swift (using Yams with event auditing) and Python (using PyYAML with a custom loader) that reject duplicate keys, aliases, anchors, custom tags, unknown fields, and enforce size/step limits.",
+          "Implement raw-blob SHA-256 hashing, key fingerprint computation, snapshot record encoding, and step-definition digest computation in both languages, with unit tests.",
+          "Add fixture generators and golden files under attestation/fixtures/ covering valid and invalid policies, registries, snapshot digests, DSSE PAE bytes, and signed statements; wire them into attestation/scripts/verify-all.sh."
+        ],
+        "acceptance_criteria": [
+          "01-AC1: The sample Make and shell policies parse identically in Swift and Python; exact byte digests and ordered IDs match the frozen fixtures.",
+          "01-AC2: Every forbidden schema condition in section 4 has a rejecting fixture exercised by both implementations, including duplicate YAML keys and aliases.",
+          "01-AC3: Two fixtures with different YAML formatting have different raw policy digests even when their parsed meaning matches.",
+          "01-AC4: Snapshot digest fixtures cover ordinary files, executable files, symlinks, empty files, non-ASCII paths, and differing sort orders.",
+          "01-AC5: Unknown protocol/schema versions, floats in integer fields, oversized inputs, malformed dates, and key/fingerprint mismatches fail explicitly."
+        ],
+        "dependencies": []
+      }
+    },
+    {
+      "case": "bare-audit-assessment",
+      "captured_at": "2026-10-25T16:23:38.445479+00:00",
+      "source_exchange": "llm-20261025-162338-445479.json",
+      "source_exchange_sha256": "fbe828d86f95f8a81aef9cf3168bb5d7781e32a02c88655c22dee2e49a830191",
+      "selection": "$.output",
+      "captured_response": {
+        "item_id": "pr-01",
+        "status": "missing",
+        "scope_assessments": [
+          {
+            "requirement_id": "pr-01:scope-01",
+            "status": "missing",
+            "existing_evidence": [],
+            "remaining_requirement": "Add .github/workflows/ci.yml running bash attestation/scripts/verify-all.sh on macOS."
+          }
+        ],
+        "remaining_work": "Create .github/workflows/ci.yml with a single job on macos-14 that checks out the repository and runs bash attestation/scripts/verify-all.sh.",
+        "remaining_item": {
+          "title": "Bootstrap CI for attestation product verification",
+          "objective": "Add a minimal CI workflow that runs the product verification script so all later attestation work has a passing baseline.",
+          "scope": [
+            "Add .github/workflows/ci.yml running bash attestation/scripts/verify-all.sh on macOS."
+          ],
+          "allowed_paths": [
+            ".github/workflows/ci.yml"
+          ],
+          "implementation_steps": [
+            "Create .github/workflows/ci.yml with a single job on macos-14 that checks out the repository and runs bash attestation/scripts/verify-all.sh."
+          ],
+          "acceptance_criteria": [
+            "CI workflow exists and runs the verification command on pull requests and pushes to main.",
+            "The workflow is the only change in this PR."
+          ]
+        }
+      }
+    },
+    {
+      "case": "missing-audit-remaining-item",
+      "captured_at": "2026-10-25T16:32:23.300493+00:00",
+      "source_exchange": "llm-20261025-163223-300493.json",
+      "source_exchange_sha256": "8877ec7fd602e90fe6fa3e40162d0bd40a397260b8a941b30839aaea5bb34941",
+      "selection": "$.output.assessments[item_id=item-03]",
+      "captured_response": {
+        "item_id": "item-03",
+        "status": "missing",
+        "scope_assessments": [
+          {
+            "requirement_id": "item-03:scope-01",
+            "status": "missing",
+            "existing_evidence": [],
+            "remaining_requirement": "Build signed native executables, root-owned installation/state paths, a system launch daemon, and the _powdrrattest worker identity."
+          },
+          {
+            "requirement_id": "item-03:scope-02",
+            "status": "missing",
+            "existing_evidence": [],
+            "remaining_requirement": "Implement bounded IPC with OS-derived peer UID, profile ownership checks, and strict administrative/ordinary endpoint separation."
+          },
+          {
+            "requirement_id": "item-03:scope-03",
+            "status": "missing",
+            "existing_evidence": [],
+            "remaining_requirement": "Add launch/library constraints and prevent user-owned dynamic dependencies; implement safe install, upgrade, health, and uninstall."
+          }
+        ],
+        "remaining_work": "Create attestation/macos/Package.swift and sources for AttestationDaemon, AttestationCLI, AttestationWorker,"
+      }
+    },
+    {
+      "case": "placeholder-human-setup",
+      "captured_at": "2026-10-25T16:36:00.080197+00:00",
+      "source_exchange": "llm-20261025-163600-080197.json",
+      "source_exchange_sha256": "10822dc197993ec6938abdaaad5808a05762f662130e4893ae446ee36db2bcf1",
+      "selection": "$.output.items[id=pr-01].manual_prerequisite",
+      "captured_response": {
+        "title": "No manual prerequisite",
+        "instructions": [
+          "No manual prerequisite for this item."
+        ],
+        "verification": "bash attestation/scripts/verify-all.sh",
+        "trigger": "after_implementation_before_validation",
+        "unblocks": "pr-02"
+      }
+    },
+    {
+      "case": "bare-structrr-operation",
+      "captured_at": "2026-10-25T16:36:28.744106+00:00",
+      "source_exchange": "llm-20261025-163628-744106.json",
+      "source_exchange_sha256": "67b610112c92ae51a9b50734f6076011ee67ed43a395c6c8e5de624a8ee30e5c",
+      "selection": "$.output",
+      "captured_response": {
+        "operation_id": "op-001",
+        "item_id": "pr-01",
+        "section": "files",
+        "subject_id": "file:.github/workflows/ci.yml",
+        "action": "added",
+        "content": {
+          "stable_key": ".github/workflows/ci.yml",
+          "path": ".github/workflows/ci.yml",
+          "type": "Configuration file",
+          "content": "name: CI\non:\n  pull_request:\n  push:\n    branches: [main]\njobs:\n  attestation-verify:\n    runs-on: macos-14\n    steps:\n      - uses: actions/checkout@v4\n      - run: bash attestation/scripts/verify-all.sh\n"
+        }
+      }
+    }
+  ]
+}

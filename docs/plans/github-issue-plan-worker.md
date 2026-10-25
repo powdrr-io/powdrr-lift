@@ -32,6 +32,14 @@ items:
       - Add focused tests for valid input and malformed fields.
     acceptance_criteria: [Foundation behavior is covered by focused tests.]
     dependencies: []
+    manual_prerequisite:
+      title: Configure the protected signing credential
+      instructions:
+        - Create the required credential in the protected CI environment.
+        - Restrict access to the trusted default-branch workflow.
+      verification: Confirm the trusted workflow can read the credential without exposing its value.
+      trigger: after_implementation_before_validation
+      unblocks: bash scripts/verify-release.sh
     workflow_file: docs/workflows/feature-key/foundational-change.yaml
     workflow_id: foundational-change
 ```
@@ -60,9 +68,23 @@ object, including the proposed PR ID, reviewed item context, and verification
 command. Each workflow definition also lists prerequisite
 workflow IDs in its top-level `dependencies` field. The generator derives that
 list from the plan item's dependencies, and the worker verifies the two lists
-match before executing the workflow. The reviewed plan remains the source for
-the item's objective, scope, acceptance criteria, and dependency graph. The
-worker reads the definition and materializes a durable process-backed task when
+match before executing the workflow. An optional `manual_prerequisite` declares
+a human-owned setup task for that implementation item. It has a title, ordered
+actionable instructions, and a verification method; instructions must not
+contain secret values. Its `trigger` identifies when the handoff occurs, and
+`unblocks` names the validation that can proceed after the setup. V1 supports
+`after_implementation_before_validation`: the worker stages its code changes
+and instructions in a PR, pauses before that validation, and resumes it after
+the person completes setup. The generator copies this declaration into the
+workflow's reviewed item context, and the worker checks that it still matches
+the pinned plan. The durable workflow stages a PR with the instructions and
+records an issue checkpoint;
+`github-issue-worker-continue` retries CI and resumes the same issue after the
+person completes the setup. Items with manual prerequisites stay separate
+during automatic PR sizing so their setup tasks are not lost or merged into
+unrelated work. The reviewed plan remains the source for the item's objective,
+scope, acceptance criteria, and dependency graph. The worker reads the
+definition and materializes a durable process-backed task when it
 it claims the issue. The worker resolves this process from Powdrr-Lift's bundled
 process catalog; the target repository does not need to copy runtime process
 definitions into its own `docs/procedrr/processes/`. At task execution time,

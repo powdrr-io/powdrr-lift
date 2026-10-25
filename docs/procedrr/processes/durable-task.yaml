@@ -33,11 +33,20 @@ steps:
         complete another prerequisite before CI can pass, include a
         manual_prerequisite object in task_handoff with exactly these fields:
         title (short string), instructions (ordered list of actionable strings),
-        and verification (how the person can confirm the setup). Do not include
-        secret values in the instructions. This stages a draft PR containing the
-        instructions and records a resumable checkpoint on the linked GitHub
-        issue. Ordinary review questions and decisions must use task_handoff
-        without manual_prerequisite.
+        verification (how the person can confirm the setup), trigger
+        (after_implementation_before_validation), and unblocks (the named
+        validation that setup enables). Do not include secret values in the
+        instructions. This stages a PR containing the instructions and records
+        a resumable checkpoint on the linked GitHub issue. If
+        task_context.proposed_pr_context declares a
+        manual_prerequisite, implement the code first and use that exact object
+        to hand off at its declared trigger. For
+        after_implementation_before_validation, stage the changed code and
+        instructions in the PR, pause before running the named blocked
+        validation, and resume that validation after the person completes the
+        setup. Do not omit the prerequisite, rewrite its instructions, or invent
+        different setup steps. Ordinary review questions and decisions must use
+        task_handoff without manual_prerequisite.
       context: [task_context]
       allowed_tools:
         - internal

@@ -189,6 +189,30 @@ def test_plan_sizing_groups_cohesive_items_to_target_work_size() -> None:
     ]
 
 
+def test_plan_sizing_keeps_manual_prerequisite_on_its_own_work_item() -> None:
+    prerequisite_item = _item("credential-setup")
+    prerequisite_item["scope"] = ["component: repository", "Use CI credential"]
+    prerequisite_item["allowed_paths"] = ["src/ci/client.py"]
+    prerequisite_item["implementation_steps"] = ["Implement CI credential use."]
+    prerequisite_item["manual_prerequisite"] = {
+        "title": "Install the CI credential",
+        "instructions": ["Add the repository secret."],
+        "verification": "Confirm the secret is configured.",
+        "trigger": "after_implementation_before_validation",
+        "unblocks": "Running the workflow that uses the credential.",
+    }
+    followup = _item("credential-tests", dependencies=["credential-setup"])
+    followup["scope"] = ["component: repository", "Test credential workflow"]
+    followup["allowed_paths"] = ["tests/ci/test_client.py"]
+    followup["implementation_steps"] = ["Add credential workflow tests."]
+
+    sized = size_plan_items([prerequisite_item, followup])
+
+    assert [item["id"] for item in sized] == ["credential-setup", "credential-tests"]
+    assert sized[0]["manual_prerequisite"] == prerequisite_item["manual_prerequisite"]
+    assert sized[1]["dependencies"] == ["credential-setup"]
+
+
 def test_plan_sizing_keeps_incompatible_or_unrelated_items_separate() -> None:
     python_item = _item("python-codec")
     python_item["scope"] = ["component: codec", "Implement Python codec"]
@@ -1599,7 +1623,16 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
     client = FakePlanningClient(
         {
             "items": [
-                _item("foundation"),
+                {
+                    **_item("foundation"),
+                    "manual_prerequisite": {
+                        "title": "Install the CI credential",
+                        "instructions": ["Add the repository secret."],
+                        "verification": "Confirm the secret is configured.",
+                        "trigger": "after_implementation_before_validation",
+                        "unblocks": "Running the verifier in pull request CI.",
+                    },
+                },
                 _item("integration", dependencies=["foundation"]),
             ]
         }
@@ -1728,6 +1761,13 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
             "structrr_proposal_file": "docs/plans/proposal-v1-structrr-proposal.json",
             "structrr_item_id": "foundation",
             "require_structrr_proposal": True,
+            "manual_prerequisite": {
+                "title": "Install the CI credential",
+                "instructions": ["Add the repository secret."],
+                "verification": "Confirm the secret is configured.",
+                "trigger": "after_implementation_before_validation",
+                "unblocks": "Running the verifier in pull request CI.",
+            },
         },
     }
     assert not list((tmp_path / "docs/workflows/proposal-v1").glob("*-task-*.yaml"))

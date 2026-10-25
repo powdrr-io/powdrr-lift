@@ -19,10 +19,12 @@ from powdrr_lift.basedpyright_tools import find_workspace_symbols
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.git import slugify_workflow_id
 from powdrr_lift.workrr.github_issue_queue import (
+    MANUAL_PREREQUISITE_TRIGGER,
     QUEUE_SCHEMA,
     GitHubIssueQueueError,
     PlannedWorkItem,
     ReviewedExecutionPlan,
+    parse_manual_prerequisite,
     parse_reviewed_plan_yaml,
 )
 from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
@@ -51,6 +53,22 @@ MAX_CODE_LOOKUP_QUERY_CHARS = 120
 MAX_STRUCTRR_PROPOSAL_REPAIR_ATTEMPTS = 2
 PLAN_WORKFLOW_SCHEMA = "https://powdrr.io/schemas/plan-workflow-instance-v2"
 PLAN_WORKFLOW_PROCESS = "execute-proposed-pr-workflow"
+MANUAL_PREREQUISITE_RESPONSE_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["title", "instructions", "verification", "trigger", "unblocks"],
+    "properties": {
+        "title": {"type": "string", "minLength": 1, "maxLength": 160},
+        "instructions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"type": "string", "minLength": 1},
+        },
+        "verification": {"type": "string", "minLength": 1},
+        "trigger": {"type": "string", "enum": [MANUAL_PREREQUISITE_TRIGGER]},
+        "unblocks": {"type": "string", "minLength": 1},
+    },
+}
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 _IMPLEMENTATION_RUNTIMES = re.compile(
     r"\b(?:python|swift|rust|golang|java|javascript|typescript|kotlin|ruby|php|"
@@ -176,6 +194,7 @@ PLAN_ITEMS_RESPONSE_SCHEMA: dict[str, Any] = {
                             "maxLength": 100,
                         },
                     },
+                    "manual_prerequisite": MANUAL_PREREQUISITE_RESPONSE_SCHEMA,
                 },
             },
         }
@@ -1387,6 +1406,13 @@ def parse_plan_workflow_instance_yaml(text: str) -> PlanWorkflowInstance:
         raise PlanGenerationError(
             "proposed_pr_context.require_structrr_proposal must be true"
         )
+    if "manual_prerequisite" in context:
+        try:
+            parse_manual_prerequisite(
+                context["manual_prerequisite"], "proposed_pr_context"
+            )
+        except GitHubIssueQueueError as error:
+            raise PlanGenerationError(str(error)) from error
     proposal_path = Path(str(context["structrr_proposal_file"]))
     if proposal_path.is_absolute() or ".." in proposal_path.parts:
         raise PlanGenerationError(
@@ -1695,6 +1721,19 @@ def generate_execution_plan_yaml(
                     "primary deliverable and stay within one subsystem and one "
                     "language/runtime; split Python and Swift work into separate "
                     "dependent items even when they implement the same protocol. "
+                    "Preserve human-owned setup or authorization tasks from the "
+                    "source plan as a `manual_prerequisite` object on the "
+                    "implementation item whose PR or CI is blocked by that task. "
+                    "The object must contain an actionable title, ordered "
+                    "instructions that never include secret values, and a "
+                    "verification description. Set trigger to "
+                    "`after_implementation_before_validation` and set `unblocks` "
+                    "to the specific test, command, or CI validation that requires "
+                    "the setup. Do not turn these into code "
+                    "implementation steps or drop them as operational details. "
+                    "Do not attach the same prerequisite to multiple items; put it "
+                    "on the earliest item that needs it. If the source has no such "
+                    "human-owned prerequisite, omit the field. "
                     "Do not combine a protocol definition, multiple language "
                     "implementations, broad fixtures, and product tooling in one "
                     "foundation PR. Split broad foundations into the smallest "
@@ -1783,6 +1822,10 @@ def generate_execution_plan_yaml(
                     "and verification_command. Compare each proposed item with "
                     "repository_code_context, remove already implemented work, "
                     "and split off only the remaining behavior for partial work. "
+                    "Preserve every `manual_prerequisite` from the draft exactly "
+                    "on its owning item, and add one when the source plan requires "
+                    "human-owned setup before an implementation PR or its CI can "
+                    "complete. Do not drop human setup as operational detail. "
                     "The code excerpt alone is not proof that acceptance criteria "
                     "pass; check supplied tests or evidence. Test files do not "
                     "establish a passing result by their presence alone. A symbol "
@@ -1817,6 +1860,7 @@ def generate_execution_plan_yaml(
         ],
         response_schema=PLAN_ITEMS_RESPONSE_SCHEMA,
     )
+    response = _preserve_manual_prerequisites(initial_response.get("items"), response)
     for _ in range(MAX_PLAN_REFINEMENT_ATTEMPTS):
         if not isinstance(response, Mapping) or set(response) != {"items"}:
             raise PlanGenerationError("planning response must contain only `items`")
@@ -1858,6 +1902,11 @@ def generate_execution_plan_yaml(
                         "order. Compare planned items with repository code evidence; "
                         "remove completed work and narrow partial work, using tests "
                         "or other evidence before treating behavior as complete. "
+                        "Preserve declared manual_prerequisite objects on their "
+                        "owning item, and keep human-owned setup from the source "
+                        "plan as a manual_prerequisite rather than dropping it or "
+                        "turning it into code work. Attach each prerequisite only "
+                        "to the earliest item that needs it. "
                         "Test files do not establish a passing result by their "
                         "presence alone. Keep worktree changes marked absent from "
                         "the analyzed commit in the plan. "
@@ -1885,6 +1934,7 @@ def generate_execution_plan_yaml(
             ],
             response_schema=PLAN_ITEMS_RESPONSE_SCHEMA,
         )
+        response = _preserve_manual_prerequisites(raw_items, response)
     if not isinstance(response, Mapping) or set(response) != {"items"}:
         raise PlanGenerationError("planning response must contain only `items`")
     raw_items = response.get("items")
@@ -2031,7 +2081,8 @@ def generate_execution_plan_yaml(
                         "it. Keep one small, independently reviewable deliverable "
                         "per item and maintain the required CI setup and exact "
                         "verification command. Return the complete revised items "
-                        "in the requested schema."
+                        "in the requested schema, preserving each existing "
+                        "manual_prerequisite object on its owning item."
                     ),
                 },
                 {
@@ -2058,6 +2109,9 @@ def generate_execution_plan_yaml(
                 },
             ],
             response_schema=PLAN_ITEMS_RESPONSE_SCHEMA,
+        )
+        reconciliation = _preserve_manual_prerequisites(
+            audited_draft_items, reconciliation
         )
         if not isinstance(reconciliation, Mapping) or set(reconciliation) != {"items"}:
             raise PlanGenerationError(
@@ -2178,7 +2232,7 @@ def generate_execution_plan_yaml(
     for item in raw_items:
         if not isinstance(item, Mapping):
             raise PlanGenerationError("each proposed work item must be an object")
-        if set(item) != {
+        required_item_fields = {
             "id",
             "title",
             "objective",
@@ -2187,7 +2241,11 @@ def generate_execution_plan_yaml(
             "implementation_steps",
             "acceptance_criteria",
             "dependencies",
-        }:
+        }
+        if set(item) not in (
+            required_item_fields,
+            required_item_fields | {"manual_prerequisite"},
+        ):
             raise PlanGenerationError(
                 "each proposed work item has unknown or missing fields in the "
                 "complete planning contract"
@@ -2242,6 +2300,16 @@ def generate_execution_plan_yaml(
         item_id = item.get("id")
         if not isinstance(item_id, str) or not _SAFE_ID.fullmatch(item_id):
             raise PlanGenerationError("each item id must be a stable safe identifier")
+        if "manual_prerequisite" in item:
+            try:
+                item = {
+                    **dict(item),
+                    "manual_prerequisite": parse_manual_prerequisite(
+                        item["manual_prerequisite"], f"plan item {item_id!r}"
+                    ),
+                }
+            except GitHubIssueQueueError as error:
+                raise PlanGenerationError(str(error)) from error
         full_workflow_id = slugify_workflow_id(f"{plan_id}-{item_id}")
         workflow_id = full_workflow_id
         if len(workflow_id) > 100:
@@ -2412,6 +2480,11 @@ def write_execution_plan_artifacts(
                         "structrr_item_id": item.item_id,
                         "require_structrr_proposal": True,
                         **(
+                            {"manual_prerequisite": dict(item.manual_prerequisite)}
+                            if item.manual_prerequisite is not None
+                            else {}
+                        ),
+                        **(
                             {
                                 "final_integration_review": True,
                                 "final_review_report_path": (
@@ -2461,6 +2534,44 @@ def _require_dependency_order(plan: ReviewedExecutionPlan) -> None:
             )
 
 
+def _preserve_manual_prerequisites(prior_items: Any, revised: Any) -> Any:
+    if not isinstance(prior_items, list) or not isinstance(revised, Mapping):
+        return revised
+    revised_items = revised.get("items")
+    if not isinstance(revised_items, list):
+        return revised
+    declarations: dict[str, dict[str, Any]] = {}
+    try:
+        for item in prior_items:
+            if isinstance(item, Mapping) and "manual_prerequisite" in item:
+                item_id = str(item.get("id"))
+                declarations[item_id] = parse_manual_prerequisite(
+                    item["manual_prerequisite"], f"plan item {item_id!r}"
+                )
+    except GitHubIssueQueueError as error:
+        raise PlanGenerationError(str(error)) from error
+    if not declarations:
+        return revised
+    revised_by_id = {
+        str(item.get("id")): item for item in revised_items if isinstance(item, Mapping)
+    }
+    missing = sorted(set(declarations) - set(revised_by_id))
+    if missing:
+        raise PlanGenerationError(
+            "planning refinement removed work items that carry manual "
+            "prerequisites: " + ", ".join(missing)
+        )
+    preserved_items = [
+        (
+            {**dict(item), "manual_prerequisite": declarations[str(item.get("id"))]}
+            if isinstance(item, Mapping) and str(item.get("id")) in declarations
+            else item
+        )
+        for item in revised_items
+    ]
+    return {**dict(revised), "items": preserved_items}
+
+
 def _plan_item_refinement_issues(
     items: list[Any],
     *,
@@ -2468,6 +2579,7 @@ def _plan_item_refinement_issues(
     verification_command: str | None = None,
 ) -> list[str]:
     issues: list[str] = []
+    prerequisites_by_item: dict[str, str] = {}
     for item in items:
         if not isinstance(item, Mapping):
             continue
@@ -2497,6 +2609,22 @@ def _plan_item_refinement_issues(
             issues.append(
                 f"{item_id} combines implementation runtimes: {', '.join(runtimes)}"
             )
+        if "manual_prerequisite" in item:
+            try:
+                prerequisite = parse_manual_prerequisite(
+                    item["manual_prerequisite"], f"plan item {item_id!r}"
+                )
+                fingerprint = json.dumps(prerequisite, sort_keys=True)
+                prior_item_id = prerequisites_by_item.get(fingerprint)
+                if prior_item_id is not None:
+                    issues.append(
+                        f"{item_id} duplicates manual prerequisite from "
+                        f"{prior_item_id}; attach it only to the earliest item that "
+                        "needs it"
+                    )
+                prerequisites_by_item[fingerprint] = item_id
+            except GitHubIssueQueueError as error:
+                issues.append(str(error))
     if require_ci_bootstrap and len(items) > 1 and items:
         first_item = items[0]
         if isinstance(first_item, Mapping):

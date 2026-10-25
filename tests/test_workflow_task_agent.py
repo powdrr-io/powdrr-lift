@@ -2159,6 +2159,8 @@ def test_manual_prerequisite_contract_renders_actionable_public_instructions() -
                 "into GitHub.",
             ],
             "verification": "Rerun the pull request checks and confirm they pass.",
+            "trigger": "after_implementation_before_validation",
+            "unblocks": "Rerunning the pull request checks after adding the secret.",
         }
     )
 
@@ -2169,6 +2171,8 @@ def test_manual_prerequisite_contract_renders_actionable_public_instructions() -
         repository="powdrr-io/powdrr-gaterr",
     )
     assert "Manual prerequisite" in body
+    assert "after_implementation_before_validation" in body
+    assert "Rerunning the pull request checks after adding the secret." in body
     assert "add the required Actions secret" in body
     assert "never paste its value" in body
     assert (
@@ -2179,6 +2183,42 @@ def test_manual_prerequisite_contract_renders_actionable_public_instructions() -
     with pytest.raises(PowdrrExecutionError, match="exactly title, instructions"):
         task_agent._validate_manual_prerequisite(
             {"title": "Install", "instructions": ["Do it"]}
+        )
+
+
+def test_planned_manual_prerequisite_cannot_be_omitted_at_handoff() -> None:
+    declared = {
+        "title": "Install the CI credential",
+        "instructions": ["Add the repository secret."],
+        "verification": "Confirm the secret is configured.",
+        "trigger": "after_implementation_before_validation",
+        "unblocks": "Running the verifier in pull request CI.",
+    }
+    strategy: Any = SimpleNamespace(
+        workflow=SimpleNamespace(),
+        task=SimpleNamespace(
+            task_id="task-001",
+            process_checkpoint=None,
+            input_state={"proposed_pr_context": {"manual_prerequisite": declared}},
+        ),
+        runtime=None,
+        stdout=io.StringIO(),
+        events=[],
+    )
+    operations = _TaskProcedrrOperations(
+        strategy,
+        process_id="execute-proposed-pr-workflow",
+        process_catalog=cast(Any, SimpleNamespace()),
+        process_client=cast(Any, SimpleNamespace()),
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="must match the prerequisite"):
+        operations.execute(
+            "task_handoff",
+            {
+                "question": "Please complete setup.",
+                "continuation_instructions": "Resume validation.",
+            },
         )
 
 

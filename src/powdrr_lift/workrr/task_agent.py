@@ -125,6 +125,7 @@ from powdrr_lift.workrr.git import (
     workflow_dependencies_completion,
     workflow_id_from_task_id,
 )
+from powdrr_lift.workrr.github_issue_queue import MANUAL_PREREQUISITE_TRIGGER
 from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.llm import (
     DEFAULT_MAX_ROUNDTRIPS,
@@ -4687,6 +4688,19 @@ class _TaskProcedrrOperations:
         manual_prerequisite = _validate_manual_prerequisite(
             parameters.get("manual_prerequisite")
         )
+        proposed_context = self.task.input_state.get("proposed_pr_context")
+        if (
+            isinstance(proposed_context, Mapping)
+            and "manual_prerequisite" in proposed_context
+        ):
+            declared_prerequisite = _validate_manual_prerequisite(
+                proposed_context["manual_prerequisite"]
+            )
+            if manual_prerequisite != declared_prerequisite:
+                raise PowdrrExecutionError(
+                    "task_handoff manual_prerequisite must match the prerequisite "
+                    "declared by the reviewed plan"
+                )
         if isinstance(provided_handoff, Mapping):
             human_input = dict(provided_handoff)
             follow_up_spec = human_input.get("follow_up_task")
@@ -5714,14 +5728,18 @@ def _validate_manual_prerequisite(value: object) -> dict[str, Any] | None:
         "title",
         "instructions",
         "verification",
+        "trigger",
+        "unblocks",
     }:
         raise PowdrrExecutionError(
-            "manual_prerequisite must contain exactly title, instructions, and "
-            "verification."
+            "manual_prerequisite must contain exactly title, instructions, "
+            "verification, trigger, and unblocks."
         )
     title = value.get("title")
     verification = value.get("verification")
     instructions = value.get("instructions")
+    trigger = value.get("trigger")
+    unblocks = value.get("unblocks")
     if not isinstance(title, str) or not title.strip() or len(title.strip()) > 160:
         raise PowdrrExecutionError(
             "manual_prerequisite.title must be a non-empty string of at most 160 "
@@ -5730,6 +5748,14 @@ def _validate_manual_prerequisite(value: object) -> dict[str, Any] | None:
     if not isinstance(verification, str) or not verification.strip():
         raise PowdrrExecutionError(
             "manual_prerequisite.verification must be a non-empty string."
+        )
+    if trigger != MANUAL_PREREQUISITE_TRIGGER:
+        raise PowdrrExecutionError(
+            f"manual_prerequisite.trigger must be {MANUAL_PREREQUISITE_TRIGGER!r}."
+        )
+    if not isinstance(unblocks, str) or not unblocks.strip():
+        raise PowdrrExecutionError(
+            "manual_prerequisite.unblocks must be a non-empty string."
         )
     if (
         not isinstance(instructions, list)
@@ -5743,6 +5769,8 @@ def _validate_manual_prerequisite(value: object) -> dict[str, Any] | None:
         "title": title.strip(),
         "instructions": [item.strip() for item in instructions],
         "verification": verification.strip(),
+        "trigger": trigger,
+        "unblocks": unblocks.strip(),
     }
 
 
@@ -5763,6 +5791,8 @@ def _render_manual_prerequisite_pr_body(
     return (
         f"## Manual prerequisite{issue_line}\n\n"
         f"**{prerequisite['title']}**\n\n"
+        f"**Required stage:** `{prerequisite['trigger']}`\n\n"
+        f"**Unblocks:** {prerequisite['unblocks']}\n\n"
         "Complete these steps outside the worker:\n\n"
         f"{instructions}\n\n"
         "### Verify completion\n\n"

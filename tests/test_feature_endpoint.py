@@ -537,7 +537,7 @@ def test_miniswe_probe_authoring_requires_planned_interaction_coverage(
     assert suite["baseline_results"][0]["status"] == "failed"
 
 
-def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_crashes(
+def test_miniswe_probe_authoring_repairs_incomplete_baseline_probe_coverage(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repository = tmp_path / "repository"
@@ -604,11 +604,7 @@ def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_cras
             "assert module.public_api('value') == 'handled:value'"
         ),
         "test_probe_no_assertion": (
-            "try:\n"
-            "    module.public_api('invalid')\n"
-            "except ValueError:\n"
-            "    return\n"
-            "raise AssertionError('expected ValueError')"
+            "assert module.public_api('invalid') == 'expected'"
         ),
     }
     metadata = {
@@ -623,6 +619,8 @@ def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_cras
         )
     }
 
+    authoring_calls = 0
+
     def author_probe_suite(
         self: MiniSWEAgentProvider,
         request: ImplementationRequest,
@@ -630,7 +628,14 @@ def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_cras
         worktree_root: Path,
         attempt_id: str,
     ) -> subprocess.CompletedProcess[str]:
+        nonlocal authoring_calls
         del self, request, attempt_id
+        authoring_calls += 1
+        authored_probe_functions = dict(probe_functions)
+        if authoring_calls > 1:
+            authored_probe_functions["test_probe_unexpected_error"] = (
+                "assert module.public_api('value') == 'wrong'"
+            )
         source = (
             f"OBLIGATIONS = {obligations!r}\n"
             "INTERACTIONS = []\n"
@@ -639,7 +644,7 @@ def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_cras
             + "\n\n".join(
                 f"def {function_name}():\n"
                 + "\n".join(f"    {line}" for line in body.splitlines())
-                for function_name, body in probe_functions.items()
+                for function_name, body in authored_probe_functions.items()
             )
             + "\n"
         )
@@ -682,20 +687,18 @@ def test_miniswe_probe_authoring_keeps_valid_probes_when_one_baseline_probe_cras
         "assertion",
         "type-error",
         "import-error",
+        "unexpected-error",
         "no-assertion",
     ]
     suite = json.loads(
         (output_root / "postrun-probes" / "probe-suite.json").read_text()
     )
-    assert suite["generation_status"] == "partial"
+    assert suite["generation_status"] == "generated"
     assert len(suite["baseline_results"]) == 5
+    assert authoring_calls == 2
     assert suite["rejected_generated_probes"] == []
-    assert [item["probe_id"] for item in suite["rejected_baseline_probes"]] == [
-        "unexpected-error"
-    ]
-    assert suite["scenarios_without_executable_probe"] == [
-        "unexpected-error",
-    ]
+    assert suite["rejected_baseline_probes"] == []
+    assert suite["scenarios_without_executable_probe"] == []
     assert _git(repository, "status", "--porcelain").stdout == ""
 
 
@@ -3741,7 +3744,7 @@ def test_structural_comparison_mismatch_does_not_block_finalization(
     assert result["actualization_passed"] is True
 
 
-def test_instruction_coverage_records_unmet_must_without_blocking_finalization(
+def test_instruction_coverage_records_unmet_must_and_blocks_finalization(
     tmp_path: Path,
 ) -> None:
     review = {
@@ -3782,10 +3785,35 @@ def test_instruction_coverage_records_unmet_must_without_blocking_finalization(
     receipt = json.loads(
         Path(result["instruction_coverage_receipt_path"]).read_text(encoding="utf-8")
     )
-    assert result["accepted"] is True
+    assert result["accepted"] is False
     assert result["instruction_coverage_complete"] is False
     assert receipt["instruction_ledger_fingerprint"] == "sha256:ledger"
     assert receipt["outcomes"][0]["outcome"] == "unmet"
+
+
+def test_unresolved_behavior_probe_finding_blocks_finalization(tmp_path: Path) -> None:
+    result = _finalize_implementation_review(
+        {
+            "review": {
+                "proposal_fingerprint": "sha256:proposal",
+                "diff_fingerprint": "sha256:candidate",
+                "candidate_structural_gate_passed": True,
+                "semantic_worklist": {"specifications": []},
+                "invariant_worklist": {"specifications": []},
+                "instruction_coverage_worklist": {"specifications": []},
+                "behavior_probe_findings": [
+                    {"scenario_id": "state-data", "reason": "None case failed"}
+                ],
+            },
+            "deterministic_decisions": [{"outcome": "pass"}],
+            "semantic_decisions": [],
+            "invariant_decisions": [],
+            "instruction_coverage_decisions": [],
+        },
+        output_root=tmp_path,
+    )
+
+    assert result["accepted"] is False
 
 
 @pytest.mark.parametrize(

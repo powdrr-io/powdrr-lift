@@ -37,6 +37,17 @@ def test_build_current_state_specification_report_synthesizes_indexed_specs(
         "Beta",
         "Gamma",
     ]
+    assert report["modules"] == [
+        {
+            "id": "core",
+            "relative_location": "src/core",
+            "quality_tier": "production_ready",
+            "legacy_behavior": "Preserve the existing public API.",
+            "related_modules": ["cli"],
+            "purpose": "Shared core behavior.",
+            "action": "added",
+        }
+    ]
     assert all(item["id"] != "Delta" for item in report["entities"])
     assert [item["id"] for item in report["entity_relationships"]] == [
         "rel-1",
@@ -50,6 +61,7 @@ def test_build_current_state_specification_report_synthesizes_indexed_specs(
     assert report["features"][0]["action"] == "added"
     assert all(item["id"] != "feature-3" for item in report["features"])
     assert [item["id"] for item in report["decisions"]] == ["decision-1"]
+    assert report["decisions"][0]["related_modules"] == ["core"]
     assert all(item["id"] != "decision-2" for item in report["decisions"])
     assert [item["id"] for item in report["invariants"]] == ["inv-1"]
     assert all(item["id"] != "inv-2" for item in report["invariants"])
@@ -233,6 +245,14 @@ def _write_structured_specs(repo_root: Path) -> None:
             description: Delta depends on Beta.
             rationale: "req-1"
             action: removed
+        modules:
+          - id: core
+            action: added
+            relative_location: src/core
+            purpose: Shared core behavior.
+            quality_tier: production_ready
+            legacy_behavior: Preserve the existing public API.
+            related_modules: [cli]
         """,
         encoding="utf-8",
     )
@@ -284,6 +304,7 @@ def _write_structured_specs(repo_root: Path) -> None:
           - id: decision-1
             action: added
             description: Build the current state report from indexed docs.
+            related_modules: [core]
           - id: decision-2
             action: removed
             description: Old decision removed from the current state.

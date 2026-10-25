@@ -425,7 +425,26 @@ def _item_matches(
         return True
     if not isinstance(item, dict):
         return False
+    module_scope = filters.get("module_id")
+    if module_scope is not None:
+        scoped_ids = {value.casefold() for value in module_scope}
+        if section == "modules":
+            item_id = item.get("id")
+            if not isinstance(item_id, str) or item_id.casefold() not in scoped_ids:
+                return False
+        else:
+            item_modules = item.get("related_modules")
+            if item_modules is not None and not isinstance(
+                item_modules, (list, tuple, set)
+            ):
+                return False
+            if item_modules:
+                item_module_ids = {str(value).casefold() for value in item_modules}
+                if not item_module_ids.intersection(scoped_ids):
+                    return False
     for raw_field, values in filters.items():
+        if raw_field == "module_id":
+            continue
         field = "type" if raw_field == "entity_type" else raw_field
         item_value = item.get(field)
         if raw_field == "entity_type" and item_value is None:

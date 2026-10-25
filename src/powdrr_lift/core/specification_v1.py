@@ -302,6 +302,26 @@ def validate_module_tool_references(
     return issues
 
 
+def validate_related_module_references(
+    sections: Mapping[str, Sequence[object]],
+    *,
+    module_ids: set[str],
+) -> list[SpecificationV1Issue]:
+    """Validate module scopes attached to any specification entity section."""
+    issues: list[SpecificationV1Issue] = []
+    for section, entries in sections.items():
+        for index, entry in enumerate(entries):
+            if not isinstance(entry, Mapping) or "related_modules" not in entry:
+                continue
+            _validate_reference_list(
+                entry.get("related_modules"),
+                module_ids,
+                f"{section}[{index}].related_modules",
+                issues,
+            )
+    return issues
+
+
 def _required_string(
     value: object,
     path: str,

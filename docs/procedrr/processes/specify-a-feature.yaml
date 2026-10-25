@@ -56,7 +56,7 @@ steps:
       \ each\n    feature, establish actors, use cases, triggers, inputs and outputs,\
       \ state and\n    data behavior, boundaries, errors and recovery, integrations,\
       \ authorization and\n    privacy, compatibility, operations, and measurable\
-      \ acceptance criteria; identify\n    which topics do not apply and why. For each feature and affected existing module, ask what current user-visible behavior, compatibility, data, workflow, and operational behavior must be preserved, and what may intentionally change. Capture the answer per module as legacy_behavior and derive regression acceptance criteria from preserved behavior. For new modules with no prior behavior, record that legacy behavior is not applicable. Retain\
+      \ acceptance criteria; identify\n    which topics do not apply and why. For each feature, decision, and other scoped entity, identify every affected module; a single item may relate to multiple modules, and omit module scope only when the item is genuinely global. If the module mapping is ambiguous and changes implementation scope, ask the user. Carry these links as related_modules in the Structrr proposal. For each feature and affected existing module, ask what current user-visible behavior, compatibility, data, workflow, and operational behavior must be preserved, and what may intentionally change. Capture the answer per module as legacy_behavior and derive regression acceptance criteria from preserved behavior. For new modules with no prior behavior, record that legacy behavior is not applicable. Retain\
       \ any stated quality level; otherwise\n    ask for the expected level for each\
       \ feature or the initiative as a whole: prototyping,\n    internal beta, or\
       \ production ready. In the Structrr proposal, set quality_tier on every module record, inheriting the initiative or feature level unless the user specifies a different tier for that module. Retain any stated delivery order; otherwise,\n    for multiple\
@@ -77,7 +77,7 @@ steps:
       \ quality expectation, delivery order and dependencies,\n    confirmed user\
       \ decisions, acceptance criteria, non-goals, risks, and an explicit\n    list\
       \ of assistant-provided defaults to revisit. Preserve default provenance in\n\
-      \    the downstream Structrr-backed proposal. Include module-level quality_tier and legacy_behavior, preserving assistant-provided default provenance. Then emit_outputs with feature_description\n\
+      \    the downstream Structrr-backed proposal. Include module-level quality_tier and legacy_behavior, preserve related_modules on decisions and other entities, and keep assistant-provided default provenance. Then emit_outputs with feature_description\n\
       \    containing the complete interview record and confirmed answers.'\n  outputs:\n\
       \  - name: feature_description\n    type: string\n    required_for_next_step:\
       \ true\n    schema:\n      type: string\n      minLength: 1\n- id: conduct-design-interview\n\
@@ -90,8 +90,7 @@ steps:
       \ default as explicit specification\n    guidance that includes the selected\
       \ value, rationale, assistant-provided and unconfirmed\n    provenance, and\
       \ a revisit-later marker. Do not present these defaults as user-confirmed\n\
-      \    intent. Carry the quality expectation and delivery order into the structured\
-      \ proposal.\n  uses_process:\n    process: design-interview\n    inputs:\n \
+      \    intent. Carry the quality expectation and delivery order into the structured proposal, preserve related_modules on decisions and other entities, and keep module links distinct from global items.\n  uses_process:\n    process: design-interview\n    inputs:\n \
       \   - name: work_item_name\n      ref: work_item_name\n      schema:\n     \
       \   type: string\n        minLength: 1\n    - name: feature_description\n  \
       \    ref: feature_description\n      schema:\n        type: string\n       \

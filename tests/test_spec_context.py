@@ -66,6 +66,58 @@ def test_gather_context_filters_tools_by_entity_type_and_labels(
     assert [match.item["id"] for match in report.matches] == ["python-tests"]
 
 
+def test_gather_context_module_scope_returns_linked_and_global_decisions(
+    tmp_path: Path,
+) -> None:
+    current_path = tmp_path / "docs" / "current" / "implementation.yaml"
+    current_path.parent.mkdir(parents=True)
+    current_path.write_text(
+        """
+        decisions:
+          - id: lock-core
+            description: Use optimistic locks in the core module.
+            related_modules: [core]
+          - id: lock-cli
+            description: Use pessimistic locks in the CLI module.
+            related_modules: [cli]
+          - id: shared-cache
+            description: Cache shared queries.
+            related_modules: [core, cli]
+          - id: logging-standard
+            description: Use structured logging for all modules.
+          - id: legacy-global
+            description: An empty module scope means global.
+            related_modules: []
+        """,
+        encoding="utf-8",
+    )
+
+    report = gather_specification_context(
+        tmp_path,
+        types=["decisions"],
+        filters={"module_id": "core"},
+    )
+
+    assert [match.item["id"] for match in report.matches] == [
+        "lock-core",
+        "shared-cache",
+        "logging-standard",
+        "legacy-global",
+    ]
+
+    cli_report = gather_specification_context(
+        tmp_path,
+        types=["decisions"],
+        filters={"module_id": "cli"},
+    )
+    assert [match.item["id"] for match in cli_report.matches] == [
+        "lock-cli",
+        "shared-cache",
+        "logging-standard",
+        "legacy-global",
+    ]
+
+
 def test_gather_context_discovers_project_structure_artifact(tmp_path: Path) -> None:
     project_structure_path = tmp_path / "docs" / "project_structure"
     project_structure_path.mkdir(parents=True)

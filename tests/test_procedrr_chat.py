@@ -129,6 +129,8 @@ def test_specify_feature_interviews_until_structured_spec_has_no_open_assumption
     assert "distinct user-visible features" in details
     assert "must be preserved" in details
     assert "legacy_behavior" in details
+    assert "related_modules" in details
+    assert "multiple modules" in details
     assert "quality_tier" in details
     assert all(
         level in details
@@ -141,6 +143,40 @@ def test_specify_feature_interviews_until_structured_spec_has_no_open_assumption
     assert "later review in the resulting specification" in details
     assert "explicit specification guidance" in compiler["details"]
     assert "Carry the quality expectation and delivery order" in compiler["details"]
+    assert "related_modules" in compiler["details"]
+
+
+def test_feature_planning_retrieves_module_scoped_decisions() -> None:
+    import yaml
+
+    catalog = ProcessCatalog.load(Path("docs/procedrr/processes"))
+    specialize = catalog.get("start-implementing-feature").document["steps"][0][
+        "specialize"
+    ]
+    workflow = yaml.safe_load(
+        specialize["question"].split("Embedded workflow document:\n---\n", 1)[1]
+    )
+    planning = next(
+        step for step in workflow["steps"] if step.get("id") == "plan-proposed-prs"
+    )
+
+    assert "gather_context" in planning["actions"]
+    assert "filters: {module_id:" in planning["details"]
+    assert "excluding decisions linked only to other modules" in planning["details"]
+
+    implementation = catalog.get("specify-implementation").document["steps"][0][
+        "specialize"
+    ]
+    implementation_workflow = yaml.safe_load(
+        implementation["question"].split("Embedded workflow document:\n---\n", 1)[1]
+    )
+    fill = next(
+        step
+        for step in implementation_workflow["steps"]
+        if step.get("id") == "fill-implementation"
+    )
+    assert "gather_context" in fill["actions"]
+    assert "related_modules" in fill["details"]
 
 
 def test_address_review_comments_flow_uses_structrr_and_thread_aware_gh_tools() -> None:

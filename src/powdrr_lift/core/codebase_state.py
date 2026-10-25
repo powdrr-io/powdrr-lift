@@ -664,6 +664,9 @@ def _collect_current_specification_entities(
                 "rationale": _normalize_text(item.get("rationale")),
                 "action": "added",
             }
+            related_modules = _normalize_text_sequence(item.get("related_modules"))
+            if related_modules:
+                entity_data["related_modules"] = related_modules
             entities_by_id[item_id] = entity_data
 
     return [entities_by_id[item_id] for item_id in sorted(entities_by_id)]
@@ -694,12 +697,17 @@ def _collect_current_specification_modules(
             modules_by_id[item_id] = {
                 "id": item_id,
                 "relative_location": _normalize_text(item.get("relative_location")),
+                "quality_tier": _normalize_text(item.get("quality_tier")),
+                "legacy_behavior": _normalize_text(item.get("legacy_behavior")),
                 "related_modules": _normalize_text_sequence(
                     item.get("related_modules")
                 ),
                 "purpose": _normalize_text(item.get("purpose")),
                 "action": action,
             }
+            related_modules = _normalize_text_sequence(item.get("related_modules"))
+            if related_modules:
+                modules_by_id[item_id]["related_modules"] = related_modules
     return [modules_by_id[item_id] for item_id in sorted(modules_by_id)]
 
 
@@ -776,6 +784,9 @@ def _collect_current_specification_relationships(
                 "rationale": _normalize_text(item.get("rationale")),
                 "action": "added",
             }
+            related_modules = _normalize_text_sequence(item.get("related_modules"))
+            if related_modules:
+                relationship_data["related_modules"] = related_modules
             relationships_by_id[item_id] = relationship_data
 
     return [relationships_by_id[item_id] for item_id in sorted(relationships_by_id)]
@@ -818,6 +829,9 @@ def _collect_current_specification_features(
                 ],
                 "action": "added",
             }
+            related_modules = _normalize_text_sequence(item.get("related_modules"))
+            if related_modules:
+                feature_data["related_modules"] = related_modules
             features_by_id[item_id] = feature_data
 
     return [features_by_id[item_id] for item_id in sorted(features_by_id)]
@@ -857,6 +871,9 @@ def _collect_current_specification_decisions(
             supercedes = _normalize_text_sequence(item.get("supercedes"))
             if supercedes:
                 decision_data["supercedes"] = supercedes
+            related_modules = _normalize_text_sequence(item.get("related_modules"))
+            if related_modules:
+                decision_data["related_modules"] = related_modules
 
             decisions_by_id[item_id] = decision_data
 

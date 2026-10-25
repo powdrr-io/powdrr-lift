@@ -13,6 +13,7 @@ import yaml
 from powdrr_lift.core.codebase_state import build_codebase_state_report
 from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
 from powdrr_lift.core.spec_paths import CURRENT_ROOT, PROPOSALS_ROOT
+from powdrr_lift.core.specification_v1 import validate_related_module_references
 from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import (
     ValidationError,
@@ -183,6 +184,8 @@ def render_pr_specification_template(
         "#   (`entities`, `modules`, `tools`, `entity_relationships`, `features`,",
         "#   and `decisions`), record every action-bearing id once and label each",
         "#   item with the proposed_pr_id that will deliver it.",
+        "# - Preserve related_modules on each item to carry module scope through",
+        "#   planning and implementation. One item may reference many modules.",
         "#   These IDs and actions are copied from the authoritative v1 proposal",
         "#   specs and must not be changed, omitted, or duplicated.",
         "# - Delete these instructions and replace them with this comment at the top:",
@@ -238,11 +241,11 @@ def build_authoritative_effect_handoff(
         repo_root_path,
         work_item_name=work_item_name,
     )
-    effects: list[dict[str, str]] = []
-    referenced_effects: dict[str, tuple[str, str, str]] = {}
+    effects: list[dict[str, Any]] = []
+    referenced_effects: dict[str, tuple[str, str, str, tuple[str, ...]]] = {}
     for section in _EFFECT_SECTIONS:
-        for item_id, action in authoritative_effects[section]:
-            effect = (section, item_id, action)
+        for item_id, action, related_modules in authoritative_effects[section]:
+            effect = (section, item_id, action, related_modules)
             digest_input = json.dumps(
                 effect, ensure_ascii=False, separators=(",", ":")
             ).encode("utf-8")
@@ -260,6 +263,11 @@ def build_authoritative_effect_handoff(
                     "section": section,
                     "id": item_id,
                     "action": action,
+                    **(
+                        {"related_modules": list(related_modules)}
+                        if related_modules
+                        else {}
+                    ),
                 }
             )
     return {"effects": effects}
@@ -367,17 +375,20 @@ def compile_split_pr_specification(
     for index, raw_effect in enumerate(raw_effects):
         path = f"authoritative_effect_handoff.effects[{index}]"
         effect = _require_semantic_mapping(raw_effect, path=path)
-        _require_exact_keys(
-            effect,
-            expected={"effect_ref", "section", "id", "action"},
-            path=path,
-        )
-        effects.append(
-            {
-                field: _require_semantic_string(effect[field], path=f"{path}.{field}")
-                for field in ("effect_ref", "section", "id", "action")
-            }
-        )
+        required_effect_fields = {"effect_ref", "section", "id", "action"}
+        if not required_effect_fields <= set(effect) or set(effect) - (
+            required_effect_fields | {"related_modules"}
+        ):
+            raise ValueError(f"{path} has invalid keys.")
+        parsed_effect: dict[str, Any] = {
+            field: _require_semantic_string(effect[field], path=f"{path}.{field}")
+            for field in ("effect_ref", "section", "id", "action")
+        }
+        if "related_modules" in effect:
+            parsed_effect["related_modules"] = _require_semantic_string_list(
+                effect["related_modules"], path=f"{path}.related_modules"
+            )
+        effects.append(parsed_effect)
     if authoritative_effect_handoff != expected_handoff:
         raise ValueError(
             "authoritative_effect_handoff does not exactly match the current "
@@ -446,6 +457,11 @@ def compile_split_pr_specification(
             {
                 "id": effect["id"],
                 "action": effect["action"],
+                **(
+                    {"related_modules": effect["related_modules"]}
+                    if effect.get("related_modules")
+                    else {}
+                ),
                 "proposed_pr_id": assignments[effect["effect_ref"]],
             }
             for effect in effects
@@ -572,19 +588,29 @@ def _require_semantic_string(value: Any, *, path: str) -> str:
     return value.strip()
 
 
+def _require_semantic_string_list(value: Any, *, path: str) -> list[str]:
+    values = _require_semantic_sequence(value, path=path)
+    if not values:
+        raise ValueError(f"{path} must not be empty.")
+    return [
+        _require_semantic_string(item, path=f"{path}[{index}]")
+        for index, item in enumerate(values)
+    ]
+
+
 def _load_authoritative_effects(
     repo_root: Path,
     *,
     work_item_name: str | None,
-) -> dict[str, tuple[tuple[str, str], ...]]:
-    effects: dict[str, list[tuple[str, str]]] = {
+) -> dict[str, tuple[tuple[str, str, tuple[str, ...]], ...]]:
+    effects: dict[str, list[tuple[str, str, tuple[str, ...]]]] = {
         section: [] for section in _EFFECT_SECTIONS
     }
     if work_item_name is None:
         return {section: tuple(items) for section, items in effects.items()}
     proposal_dir = repo_root / PROPOSALS_ROOT / work_item_name
-    seen: dict[str, set[tuple[str, str]]] = {
-        section: set() for section in _EFFECT_SECTIONS
+    seen: dict[str, dict[tuple[str, str], int]] = {
+        section: {} for section in _EFFECT_SECTIONS
     }
     for filename in _EFFECT_SOURCE_FILES:
         path = proposal_dir / filename
@@ -608,25 +634,42 @@ def _load_authoritative_effects(
                 if item_id is None or action is None:
                     continue
                 effect = (item_id, action)
-                if effect not in seen[section]:
-                    seen[section].add(effect)
-                    effects[section].append(effect)
+                related_modules = tuple(
+                    dict.fromkeys(_string_values(item.get("related_modules")))
+                )
+                effect_index = seen[section].get(effect)
+                if effect_index is None:
+                    seen[section][effect] = len(effects[section])
+                    effects[section].append((*effect, related_modules))
+                elif related_modules:
+                    existing = effects[section][effect_index]
+                    if existing[2]:
+                        effects[section][effect_index] = (
+                            existing[0],
+                            existing[1],
+                            tuple(dict.fromkeys((*existing[2], *related_modules))),
+                        )
     return {section: tuple(items) for section, items in effects.items()}
 
 
 def _render_authoritative_effect_section(
     section: str,
-    effects: Sequence[tuple[str, str]],
+    effects: Sequence[tuple[str, str, tuple[str, ...]]],
 ) -> list[str]:
     lines = [f"{section}:"]
     if not effects:
         lines[-1] = f"{section}: []"
         return lines
-    for item_id, action in effects:
+    for item_id, action, related_modules in effects:
         lines.extend(
             [
                 f"  - id: {item_id}",
                 f"    action: {action}",
+                *(
+                    [f"    related_modules: {json.dumps(related_modules)}"]
+                    if related_modules
+                    else []
+                ),
                 "    proposed_pr_id: null",
             ]
         )
@@ -791,6 +834,28 @@ def build_pr_specification_validation_report(
     _validate_template_boilerplate_removed(
         proposed_pr_specification_yaml,
         issues=issues,
+    )
+    raw_modules = raw_spec.get("modules")
+    module_ids: set[str] = set()
+    if isinstance(raw_modules, list):
+        for item in raw_modules:
+            if not isinstance(item, Mapping):
+                continue
+            item_id = item.get("id")
+            if isinstance(item_id, str) and item_id.strip():
+                module_ids.add(item_id.strip())
+    scoped_sections = {
+        str(section): value
+        for section, value in raw_spec.items()
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes))
+    }
+    issues.extend(
+        PRSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
+        )
+        for issue in validate_related_module_references(
+            scoped_sections, module_ids=module_ids
+        )
     )
     if not any(raw_spec.get(section) for section in _CONTENT_SECTIONS):
         issues.append(
@@ -2220,6 +2285,14 @@ def _optional_string(raw_value: object) -> str | None:
 
     value = str(raw_value).strip()
     return value or None
+
+
+def _string_values(raw_value: object) -> list[str]:
+    if not isinstance(raw_value, Sequence) or isinstance(raw_value, (str, bytes)):
+        return []
+    return [
+        item.strip() for item in raw_value if isinstance(item, str) and item.strip()
+    ]
 
 
 def _resolve_output_path(

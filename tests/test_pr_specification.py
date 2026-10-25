@@ -352,6 +352,11 @@ def _write_semantic_compiler_specs(repo_root: Path) -> Path:
         entities:
           - id: entity-a
             action: added
+        modules:
+          - id: core
+            action: added
+          - id: cli
+            action: added
         """,
         encoding="utf-8",
     )
@@ -363,6 +368,7 @@ def _write_semantic_compiler_specs(repo_root: Path) -> Path:
         decisions:
           - id: decision-a
             action: changed
+            related_modules: [core, cli]
         """,
         encoding="utf-8",
     )
@@ -389,6 +395,18 @@ def _semantic_specification() -> dict[str, Any]:
             {
                 "section": "entities",
                 "id": "entity-a",
+                "action": "added",
+                "proposed_pr_id": "feature-a-core",
+            },
+            {
+                "section": "modules",
+                "id": "core",
+                "action": "added",
+                "proposed_pr_id": "feature-a-core",
+            },
+            {
+                "section": "modules",
+                "id": "cli",
                 "action": "added",
                 "proposed_pr_id": "feature-a-core",
             },
@@ -447,10 +465,16 @@ def test_split_pr_compiler_preserves_authoritative_effect_order_and_values(
         for effect in handoff["effects"]
     ] == [
         ("entities", "entity-a", "added"),
+        ("modules", "core", "added"),
+        ("modules", "cli", "added"),
         ("features", "feature-a", "added"),
         ("decisions", "decision-a", "changed"),
     ]
-    assert len({effect["effect_ref"] for effect in handoff["effects"]}) == 3
+    assert len({effect["effect_ref"] for effect in handoff["effects"]}) == 5
+    decision_effect = next(
+        effect for effect in handoff["effects"] if effect["section"] == "decisions"
+    )
+    assert decision_effect["related_modules"] == ["core", "cli"]
 
     compiled = pr_specification_module.compile_split_pr_specification(
         plan,
@@ -480,6 +504,7 @@ def test_split_pr_compiler_preserves_authoritative_effect_order_and_values(
             {
                 "id": "decision-a",
                 "action": "changed",
+                "related_modules": ["core", "cli"],
                 "proposed_pr_id": "feature-a-core",
             }
         ],

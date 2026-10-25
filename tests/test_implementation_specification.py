@@ -350,6 +350,7 @@ def test_validate_implementation_specification_reports_success_for_valid_spec(
       - id: decision-a
         action: removed
         description: Choose the main approach.
+        related_modules: [core, cli]
     """
 
     report = build_implementation_specification_validation_report(
@@ -360,6 +361,30 @@ def test_validate_implementation_specification_reports_success_for_valid_spec(
 
     assert report.validation_successful is True
     assert report.issues == []
+
+
+def test_validate_implementation_specification_rejects_unknown_related_module(
+    tmp_path: Path,
+) -> None:
+    _write_architecture_specification(tmp_path)
+    proposed_spec = """
+    version: 1
+    architecture_id: 2026-06-19
+    decisions:
+      - id: decision-a
+        action: added
+        description: Use optimistic locking.
+        related_modules: [missing-module, core]
+    """
+
+    report = build_implementation_specification_validation_report(
+        proposed_spec,
+        work_item_name="powdrr-lift",
+        repo_root=tmp_path,
+    )
+
+    assert report.validation_successful is False
+    assert any(issue.code == "unknown_module_reference" for issue in report.issues)
 
 
 def test_validate_implementation_specification_allows_sparse_spec(

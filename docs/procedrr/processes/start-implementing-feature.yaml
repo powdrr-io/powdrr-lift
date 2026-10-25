@@ -221,6 +221,7 @@ steps:
       - id: plan-proposed-prs
         description: Plan the proposed PR implementation sequence.
         actions:
+        - gather_context
         - invoke_tool
         - read_document
         step_type: governed
@@ -251,7 +252,13 @@ steps:
           and paths onward. Otherwise analyze the feature context and the project structure to define ordered
           proposed PRs with incremental validation, clear boundaries, low risk, dependencies, and stable names
           for the later single proposed-pr-specification.yaml file. For each proposed PR, record its goal, scope,
-          files, tests, acceptance criteria, validation commands, dependencies, and risks. Record every action-bearing
+          files, tests, acceptance criteria, validation commands, dependencies, and risks. Preserve module links on
+          decisions and other entities. For every planned module, gather its applicable decisions using
+          `gather_context` with `types: [decisions]` and `filters: {module_id: <module-id>}`; this returns global
+          decisions and decisions linked to that module, while excluding decisions linked only to other modules.
+          Carry these scoped decisions into the PR plan. Keep the decision set separate per module when a PR
+          touches several modules, and add a task instruction to repeat the module-filtered lookup before editing
+          each module. Never apply a decision to a module absent from its related_modules list. Record every action-bearing
           id from the feature-wide specification-v1 sections after the proposed_prs section, preserving source
           order and action. Label every change item with the proposed_pr_id that will deliver it. Use the read_document
           action to inspect docs/procedrr/processes/execute-proposed-pr-workflow.yaml; do not use shell commands

@@ -102,6 +102,47 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
     } <= names
 
 
+def test_specify_feature_interviews_until_structured_spec_has_no_open_assumptions() -> (
+    None
+):
+    import yaml
+
+    catalog = ProcessCatalog.load(Path("docs/procedrr/processes"))
+    specialize = catalog.get("specify-a-feature").document["steps"][0]["specialize"]
+    question = specialize["question"]
+    workflow = yaml.safe_load(
+        question.split("Embedded workflow document:\n---\n", 1)[1]
+    )
+    interview = next(
+        step
+        for step in workflow["steps"]
+        if step.get("id") == "conduct-spec-design-interview"
+    )
+    details = interview["details"]
+    compiler = next(
+        step
+        for step in workflow["steps"]
+        if step.get("id") == "conduct-design-interview"
+    )
+
+    assert interview["actions"] == ["prompt_user"]
+    assert "distinct user-visible features" in details
+    assert "must be preserved" in details
+    assert "legacy_behavior" in details
+    assert "quality_tier" in details
+    assert all(
+        level in details
+        for level in ("prototyping", "internal beta", "production ready")
+    )
+    assert "which should land first and in what order" in details
+    assert "enough detail to continue without assumptions" in details
+    assert "assistant-provided" in details
+    assert "not confirmed by the user" in details
+    assert "later review in the resulting specification" in details
+    assert "explicit specification guidance" in compiler["details"]
+    assert "Carry the quality expectation and delivery order" in compiler["details"]
+
+
 def test_address_review_comments_flow_uses_structrr_and_thread_aware_gh_tools() -> None:
     process = ProcessCatalog.load(Path("docs/procedrr/processes")).get(
         "address-review-comments"

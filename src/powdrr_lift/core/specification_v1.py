@@ -19,7 +19,10 @@ _MODULE_FIELDS = {
     "relative_location",
     "related_modules",
     "purpose",
+    "quality_tier",
+    "legacy_behavior",
 }
+_MODULE_QUALITY_TIERS = {"prototyping", "internal_beta", "production_ready"}
 _TOOL_FIELDS = {
     "id",
     "action",
@@ -163,6 +166,12 @@ def validate_module_tool_sections(
             continue
         _check_unknown_fields(raw_module, _MODULE_FIELDS, f"modules[{index}]", issues)
         issues.extend(validate_no_explicit_empty_values(raw_module, path=path))
+        _validate_module_quality_tier(
+            raw_module.get("quality_tier"), f"{path}.quality_tier", issues
+        )
+        _validate_module_legacy_behavior(
+            raw_module.get("legacy_behavior"), f"{path}.legacy_behavior", issues
+        )
         module_id = _required_string(
             raw_module.get("id"),
             f"{path}.id",
@@ -235,6 +244,37 @@ def validate_module_tool_sections(
     return ModuleToolValidationResult(
         discovered_module_ids, discovered_tool_ids, issues
     )
+
+
+def _validate_module_quality_tier(
+    value: object, path: str, issues: list[SpecificationV1Issue]
+) -> None:
+    if value is None:
+        return
+    if not isinstance(value, str) or value not in _MODULE_QUALITY_TIERS:
+        issues.append(
+            SpecificationV1Issue(
+                "invalid_module_quality_tier",
+                "Module quality_tier must be one of 'prototyping', "
+                "'internal_beta', or 'production_ready'.",
+                path,
+            )
+        )
+
+
+def _validate_module_legacy_behavior(
+    value: object, path: str, issues: list[SpecificationV1Issue]
+) -> None:
+    if value is None:
+        return
+    if not isinstance(value, str) or not value.strip():
+        issues.append(
+            SpecificationV1Issue(
+                "invalid_module_legacy_behavior",
+                "Module legacy_behavior must be a non-empty description.",
+                path,
+            )
+        )
 
 
 def validate_module_tool_references(

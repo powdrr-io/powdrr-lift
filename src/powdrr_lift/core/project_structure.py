@@ -80,6 +80,8 @@ _MODULE_FIELDS = {
     "relative_location",
     "related_modules",
     "purpose",
+    "quality_tier",
+    "legacy_behavior",
 }
 _REQUIRED_MODULE_FIELDS = {"id", "action", "relative_location", "purpose"}
 _TOOL_FIELDS = {

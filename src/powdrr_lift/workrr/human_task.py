@@ -38,6 +38,9 @@ class HumanTaskRunnerConfig:
     assignee_role: HumanRole | None = None
     answer: str | None = None
     answer_file: Path | None = None
+    task_checkpoint_callback: Callable[[str, str, object, str | None], None] | None = (
+        None
+    )
 
 
 def run_human_task(
@@ -122,13 +125,20 @@ def run_human_task(
     completed = workflow.complete_task(task.task_id, {"answer": answer})
     print(f"Completed human task: {completed.task_id}", file=stdout)
     if configured_git_state is not None:
-        publish_workflow_progress(
+        commit_sha = publish_workflow_progress(
             repo_root,
             workflow,
             reason=f"complete human task {completed.task_id}",
             stdout=stdout,
             open_pull_request=False,
         )
+        if config.task_checkpoint_callback is not None:
+            config.task_checkpoint_callback(
+                completed.task_id,
+                "manual-prerequisite-completed-v1",
+                {"human_task_id": completed.task_id, "completed": True},
+                commit_sha,
+            )
         workflow = WorkflowInstance.from_directory(workflow_dir)
         if workflow.tasks and all(
             item.status is TaskStatus.COMPLETED for item in workflow.tasks

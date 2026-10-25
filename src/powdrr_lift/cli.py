@@ -230,6 +230,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueQueueError,
     ReviewedExecutionPlan,
     TaskCheckpointCallback,
+    continue_manual_prerequisite_issue,
     find_plan_issues,
     fulfill_issue_without_pr,
     load_reviewed_plan_at_commit,
@@ -437,6 +438,50 @@ def build_parser() -> argparse.ArgumentParser:
     )
     github_issue_worker_parser.add_argument("--verbose", action="store_true")
     github_issue_worker_parser.set_defaults(func=_run_github_issue_worker)
+
+    continue_issue_worker_parser = subparsers.add_parser(
+        "github-issue-worker-continue",
+        help=(
+            "Retry CI for a staged manual prerequisite PR and resume its issue "
+            "workflow."
+        ),
+    )
+    continue_issue_worker_parser.add_argument("--repository", required=True)
+    continue_issue_worker_parser.add_argument("--issue-number", type=int, required=True)
+    continue_issue_worker_parser.add_argument(
+        "--repo-root", type=Path, help="Checkout containing the issue plan."
+    )
+    continue_issue_worker_parser.add_argument(
+        "--provider", choices=["auto", *ALL_PROVIDERS], default="auto"
+    )
+    continue_issue_worker_parser.add_argument("--api-key")
+    continue_issue_worker_parser.add_argument("--base-url")
+    continue_issue_worker_parser.add_argument(
+        "--code-agent", choices=("opencode", "minisweagent"), default="minisweagent"
+    )
+    continue_issue_worker_parser.add_argument(
+        "--opencode-executable", default="opencode"
+    )
+    continue_issue_worker_parser.add_argument("--opencode-model")
+    continue_issue_worker_parser.add_argument(
+        "--minisweagent-executable", default="mini"
+    )
+    continue_issue_worker_parser.add_argument(
+        "--minisweagent-model",
+        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+    )
+    continue_issue_worker_parser.add_argument(
+        "--coding-agent-timeout-seconds", type=float, default=1800.0
+    )
+    continue_issue_worker_parser.add_argument(
+        "--coding-agent-validation-timeout-seconds", type=float, default=1800.0
+    )
+    continue_issue_worker_parser.add_argument("--max-roundtrips", type=int, default=128)
+    continue_issue_worker_parser.add_argument(
+        "--context-compaction-threshold", type=float, default=0.75
+    )
+    continue_issue_worker_parser.add_argument("--verbose", action="store_true")
+    continue_issue_worker_parser.set_defaults(func=_run_github_issue_worker_continue)
 
     pull_request_description_parser = subparsers.add_parser(
         "pull-request-description",
@@ -2942,6 +2987,8 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                         args, "coding_agent_validation_timeout_seconds", 1800.0
                     ),
                     task_checkpoint_callback=checkpoint_callback,
+                    github_issue_number=item.github_issue_number,
+                    github_repository=args.repository,
                 ),
                 stdout=sys.stdout,
                 stderr=sys.stderr,
@@ -2975,6 +3022,8 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                     args, "coding_agent_validation_timeout_seconds", 1800.0
                 ),
                 task_checkpoint_callback=checkpoint_callback,
+                github_issue_number=item.github_issue_number,
+                github_repository=args.repository,
             ),
             stdout=sys.stdout,
             stderr=sys.stderr,
@@ -3001,7 +3050,101 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
             indent=2,
         )
     )
-    return 0 if report.outcome in {"no_eligible_work", "awaiting_review"} else 1
+    return (
+        0
+        if report.outcome in {"no_eligible_work", "awaiting_review", "awaiting_human"}
+        else 1
+    )
+
+
+def _run_github_issue_worker_continue(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root)
+    client = GitHubIssueClient(args.repository)
+
+    def resume_workflow(
+        checkpoint: Mapping[str, Any], checkpoint_callback: TaskCheckpointCallback
+    ) -> int:
+        workflow_id = str(checkpoint["workflow_id"])
+        branch = str(checkpoint["integration_branch"])
+        workflow_relative = Path(str(checkpoint["workflow_directory"]))
+        if workflow_relative.is_absolute() or ".." in workflow_relative.parts:
+            raise GitHubIssueQueueError(
+                "manual prerequisite checkpoint contains an unsafe workflow path"
+            )
+        integration_worktree, _ = create_workflow_worktree(
+            repo_root,
+            workflow_id,
+            base_branch="main",
+            branch_name=branch,
+            worktree_name=branch,
+        )
+        workflow_dir = integration_worktree / workflow_relative
+        human_result = run_human_task(
+            HumanTaskRunnerConfig(
+                workflow_dir=workflow_dir,
+                repo_root=integration_worktree,
+                task_id=str(checkpoint["human_task_id"]),
+                answer=(
+                    "The operator confirmed that the manual prerequisite instructions "
+                    "were completed. The staged pull request CI checks passed before "
+                    "Powdrr resumed this workflow."
+                ),
+                task_checkpoint_callback=checkpoint_callback,
+            ),
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
+        if human_result != 0:
+            return human_result
+        return run_workflow_task(
+            WorkflowTaskAgentConfig(
+                workflow_dir=workflow_dir,
+                repo_root=integration_worktree,
+                provider=args.provider,
+                workflow_id=workflow_id,
+                api_key=args.api_key,
+                base_url=args.base_url,
+                max_roundtrips=args.max_roundtrips,
+                context_compaction_threshold=args.context_compaction_threshold,
+                verbose=args.verbose,
+                code_agent=args.code_agent,
+                opencode_executable=args.opencode_executable,
+                opencode_model=args.opencode_model,
+                minisweagent_executable=args.minisweagent_executable,
+                minisweagent_model=args.minisweagent_model,
+                coding_agent_timeout_seconds=args.coding_agent_timeout_seconds,
+                coding_agent_validation_timeout_seconds=(
+                    args.coding_agent_validation_timeout_seconds
+                ),
+                task_checkpoint_callback=checkpoint_callback,
+                github_issue_number=args.issue_number,
+                github_repository=args.repository,
+            ),
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
+
+    try:
+        report = continue_manual_prerequisite_issue(
+            client=client,
+            issue_number=args.issue_number,
+            repo_root=repo_root,
+            resume_workflow=resume_workflow,
+        )
+    except GitHubIssueQueueError as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print(
+        json.dumps(
+            {
+                "outcome": report.outcome,
+                "issue_number": report.issue_number,
+                "detail": report.detail,
+            },
+            indent=2,
+        )
+    )
+    return 0 if report.outcome in {"awaiting_review", "awaiting_human"} else 1
 
 
 def _plan_workflow_instance_id(

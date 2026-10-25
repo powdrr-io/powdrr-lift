@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
@@ -20,8 +21,10 @@ from powdrr_lift.workrr.github_issue_queue import (
     TaskCheckpointCallback,
     _parse_plan,
     _plan_label,
+    continue_manual_prerequisite_issue,
     find_plan_issues,
     fulfill_issue_without_pr,
+    latest_manual_prerequisite_checkpoint,
     parse_issue_pointer,
     publish_plan_issues,
     render_task_checkpoint_comment,
@@ -1099,6 +1102,161 @@ def test_worker_persists_task_checkpoint_as_issue_comment(tmp_path: Path) -> Non
         "task_id": "base-task-02",
         "workflow_id": "base",
     }
+
+
+def test_worker_marks_manual_prerequisite_as_awaiting_human(tmp_path: Path) -> None:
+    (tmp_path / "docs/workflows/base").mkdir(parents=True)
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+
+    def run_task(
+        _directory: Path,
+        _workflow_id: str,
+        _worker_id: str,
+        _item: PlannedWorkItem,
+        _plan: ReviewedExecutionPlan,
+        _fulfilled_without_pr_dependencies: tuple[str, ...],
+        checkpoint: TaskCheckpointCallback,
+    ) -> int:
+        checkpoint(
+            "base-task-03",
+            "manual-prerequisite-checkpoint-v1",
+            {
+                "schema": "https://powdrr.io/schemas/manual-prerequisite-checkpoint-v1",
+                "workflow_id": "base",
+                "human_task_id": "base-task-04",
+                "follow_up_task_id": "base-task-05",
+                "workflow_directory": "docs/workflows/runtime/base",
+                "integration_branch": "powdrr/base-attempt-abc",
+                "pull_request_url": "https://github.com/example/project/pull/123",
+                "commit_sha": "b" * 40,
+                "prerequisite": {"title": "Install key", "instructions": ["Do it"]},
+            },
+            "b" * 40,
+        )
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-a",
+        run_task=run_task,
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    assert report.outcome == "awaiting_human"
+    assert QUEUE_LABELS["awaiting_human"] in client.issues[0].labels
+    assert QUEUE_LABELS["awaiting_review"] not in client.issues[0].labels
+    assert latest_manual_prerequisite_checkpoint(client.list_comments(100)) is not None
+    checkpoint_body = next(
+        body
+        for number, body in client.comments
+        if number == 100 and "manual-prerequisite-checkpoint-v1" in body
+    )
+    checkpoint_payload = json.loads(
+        checkpoint_body.split("```json\n", 1)[1].split("\n```", 1)[0]
+    )
+    assert checkpoint_payload["status"] == "awaiting_human"
+
+
+def test_continue_manual_prerequisite_retries_ci_then_resumes(tmp_path: Path) -> None:
+    commands: list[list[str]] = []
+
+    class FakeCIClient(FakeIssueClient):
+        def _invoke(
+            self, arguments: list[str], *, check: bool = True
+        ) -> subprocess.CompletedProcess[str]:
+            _ = check
+            commands.append(arguments)
+            if arguments[:2] == ["run", "list"]:
+                return subprocess.CompletedProcess(
+                    arguments,
+                    0,
+                    json.dumps(
+                        [
+                            {
+                                "databaseId": 77,
+                                "headSha": "b" * 40,
+                                "status": "completed",
+                                "conclusion": "failure",
+                            }
+                        ]
+                    ),
+                    "",
+                )
+            return subprocess.CompletedProcess(arguments, 0, "", "")
+
+    client = FakeCIClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    issue = client.issues[0]
+    client.update_issue(
+        issue,
+        labels=github_issue_queue._replace_queue_status(issue.labels, "awaiting_human"),
+    )
+    checkpoint = {
+        "schema": "https://powdrr.io/schemas/manual-prerequisite-checkpoint-v1",
+        "workflow_id": "base",
+        "human_task_id": "base-task-04",
+        "follow_up_task_id": "base-task-05",
+        "workflow_directory": "docs/workflows/runtime/base",
+        "integration_branch": "powdrr/base-attempt-abc",
+        "pull_request_url": "https://github.com/example/project/pull/123",
+        "commit_sha": "b" * 40,
+        "prerequisite": {"title": "Install key", "instructions": ["Do it"]},
+    }
+    client.add_comment(
+        issue,
+        render_task_checkpoint_comment(
+            TaskCheckpoint(
+                plan_id="feature-v1",
+                item_id="base",
+                workflow_id="base",
+                task_id="base-task-03",
+                output_state_type="manual-prerequisite-checkpoint-v1",
+                output_state=checkpoint,
+                commit_sha="b" * 40,
+            )
+        ),
+    )
+    resumed: list[Mapping[str, object]] = []
+
+    def resume(value: Mapping[str, object], callback: TaskCheckpointCallback) -> int:
+        resumed.append(value)
+        callback(
+            "base-task-04",
+            "manual-prerequisite-completed-v1",
+            {"human_task_id": "base-task-04", "completed": True},
+            "c" * 40,
+        )
+        return 0
+
+    report = continue_manual_prerequisite_issue(
+        client=client,  # type: ignore[arg-type]
+        issue_number=100,
+        repo_root=tmp_path,
+        resume_workflow=resume,
+    )
+
+    assert report.outcome == "awaiting_review"
+    assert resumed == [checkpoint]
+    assert [command[1:4] for command in commands] == [
+        ["list", "--branch", "powdrr/base-attempt-abc"],
+        ["rerun", "77", "--failed"],
+        ["watch", "77", "--exit-status"],
+        ["checks", "https://github.com/example/project/pull/123", "--watch"],
+    ]
+    assert QUEUE_LABELS["awaiting_review"] in client.get_issue(100).labels
+    assert latest_manual_prerequisite_checkpoint(client.list_comments(100)) is None
 
 
 def test_worker_repins_and_requeues_issue_when_plan_amendment_merges(

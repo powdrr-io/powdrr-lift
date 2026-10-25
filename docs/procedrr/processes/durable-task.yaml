@@ -29,6 +29,15 @@ steps:
         deterministic_output_state_required value, pass that exact value to
         task_complete without summarizing or changing it. Do not claim
         completion before the required work and validation are complete.
+        When progress requires a person to change external configuration or
+        complete another prerequisite before CI can pass, include a
+        manual_prerequisite object in task_handoff with exactly these fields:
+        title (short string), instructions (ordered list of actionable strings),
+        and verification (how the person can confirm the setup). Do not include
+        secret values in the instructions. This stages a draft PR containing the
+        instructions and records a resumable checkpoint on the linked GitHub
+        issue. Ordinary review questions and decisions must use task_handoff
+        without manual_prerequisite.
       context: [task_context]
       allowed_tools:
         - internal

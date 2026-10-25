@@ -312,6 +312,8 @@ class WorkflowTaskAgentConfig:
     run_deterministic_invoke_tool_pre_steps: bool = False
     guidance: tuple[str, ...] = ()
     task_checkpoint_callback: Callable[[str, str, Any, str | None], None] | None = None
+    github_issue_number: int | None = None
+    github_repository: str | None = None
 
 
 def _context_compaction_threshold(context_window: int, fraction: float) -> int:
@@ -4682,6 +4684,9 @@ class _TaskProcedrrOperations:
                 "task_handoff is not allowed by the task action contract"
             )
         provided_handoff = parameters.get("human_input")
+        manual_prerequisite = _validate_manual_prerequisite(
+            parameters.get("manual_prerequisite")
+        )
         if isinstance(provided_handoff, Mapping):
             human_input = dict(provided_handoff)
             follow_up_spec = human_input.get("follow_up_task")
@@ -4741,20 +4746,94 @@ class _TaskProcedrrOperations:
         follow_up = replace(follow_up, process_id=self.process_id)
         self.workflow.update_task(follow_up)
         self.follow_up_task_id = follow_up.task_id
-        _publish_workflow_progress(
+        prerequisite_checkpoint: dict[str, Any] | None = None
+        pull_request_body = None
+        if manual_prerequisite is not None:
+            pull_request_body = _render_manual_prerequisite_pr_body(
+                manual_prerequisite,
+                issue_number=self.strategy.config.github_issue_number,
+                repository=self.strategy.config.github_repository,
+            )
+        commit_sha = _publish_workflow_progress(
             self.strategy.repo_root,
             self.workflow,
             workflow_id=workflow_id_from_task_id(self.task.task_id),
             reason=f"Procedrr task handoff {self.task.task_id}",
             stdout=self.strategy.stdout,
-            open_pull_request=False,
+            open_pull_request=manual_prerequisite is not None,
+            pull_request_body=pull_request_body,
+            pull_request_title=(
+                f"Manual prerequisite: {manual_prerequisite['title']}"
+                if manual_prerequisite is not None
+                else None
+            ),
             events=self.strategy.events,
             runtime=self.strategy.runtime,
         )
+        if manual_prerequisite is not None:
+            branch = _git_output(
+                self.strategy.repo_root,
+                ["branch", "--show-current"],
+                runtime=self.strategy.runtime,
+            ).strip()
+            pull_request = _gh_result(
+                self.strategy.repo_root,
+                {
+                    "operation": "pr_view",
+                    "pr_reference": branch,
+                    "json_fields": ["url"],
+                },
+                runtime=self.strategy.runtime,
+            )
+            if pull_request.returncode != 0 or not pull_request.stdout.strip():
+                raise PowdrrExecutionError(
+                    "Manual prerequisite handoff requires a staged pull request; "
+                    f"could not find one for branch {branch!r}."
+                )
+            try:
+                pull_request_url = json.loads(pull_request.stdout)["url"]
+            except (json.JSONDecodeError, KeyError, TypeError) as error:
+                raise PowdrrExecutionError(
+                    "GitHub returned an invalid pull request URL for the manual "
+                    "prerequisite handoff."
+                ) from error
+            git_state = load_workflow_git_state(
+                self.workflow.directory,
+                workflow_id=workflow_id_from_task_id(self.task.task_id),
+            )
+            prerequisite_checkpoint = {
+                "schema": "https://powdrr.io/schemas/manual-prerequisite-checkpoint-v1",
+                "workflow_id": workflow_id_from_task_id(self.task.task_id),
+                "prerequisite": manual_prerequisite,
+                "human_task_id": human_task.task_id,
+                "follow_up_task_id": follow_up.task_id,
+                "workflow_directory": self.workflow.directory.relative_to(
+                    self.strategy.repo_root
+                ).as_posix(),
+                "integration_branch": branch,
+                "pull_request_url": pull_request_url,
+                "commit_sha": commit_sha,
+                "publication_id": (
+                    git_state.publication_id if git_state is not None else None
+                ),
+            }
+            checkpoint_callback = self.strategy.config.task_checkpoint_callback
+            if checkpoint_callback is not None:
+                checkpoint_callback(
+                    self.task.task_id,
+                    "manual-prerequisite-checkpoint-v1",
+                    prerequisite_checkpoint,
+                    commit_sha,
+                )
         raise SuspendEvaluation(
             {
                 "human_task_id": human_task.task_id,
                 "follow_up_task_id": follow_up.task_id,
+                **(
+                    {"manual_prerequisite": prerequisite_checkpoint}
+                    if prerequisite_checkpoint is not None
+                    else {}
+                ),
             },
             f"waiting for human response in {human_task.task_id}",
         )
@@ -5491,6 +5570,8 @@ def _publish_workflow_progress(
     reason: str,
     stdout: TextIO,
     open_pull_request: bool = True,
+    pull_request_body: str | None = None,
+    pull_request_title: str | None = None,
     events: Sequence[Mapping[str, Any]] = (),
     runtime: ExecutionRuntime | None = None,
 ) -> str | None:
@@ -5564,7 +5645,24 @@ def _publish_workflow_progress(
         {"operation": "pr_view", "pr_reference": branch, "json_fields": ["url"]},
         runtime=runtime,
     )
+    title = pull_request_title or f"Workflow progress: {workflow.directory.name}"
     if existing_pr.returncode == 0 and existing_pr.stdout.strip():
+        if pull_request_body is not None:
+            edited = _gh_result(
+                repo_root,
+                {
+                    "operation": "pr_edit",
+                    "pr_reference": branch,
+                    "title": title,
+                    "body": pull_request_body,
+                },
+                runtime=runtime,
+            )
+            if edited.returncode != 0:
+                raise PowdrrExecutionError(
+                    "Could not add manual prerequisite instructions to the "
+                    f"workflow pull request: {edited.stderr.strip()}"
+                )
         _write_workflow_record(
             repo_root,
             workflow,
@@ -5578,8 +5676,7 @@ def _publish_workflow_progress(
         )
         return commit_sha
 
-    title = f"Workflow progress: {workflow.directory.name}"
-    body = (
+    body = pull_request_body or (
         "Automated durable workflow progress. This draft PR contains task state "
         "and worktree changes so execution can resume from the next task."
     )
@@ -5610,6 +5707,73 @@ def _publish_workflow_progress(
     return commit_sha
 
 
+def _validate_manual_prerequisite(value: object) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping) or set(value) != {
+        "title",
+        "instructions",
+        "verification",
+    }:
+        raise PowdrrExecutionError(
+            "manual_prerequisite must contain exactly title, instructions, and "
+            "verification."
+        )
+    title = value.get("title")
+    verification = value.get("verification")
+    instructions = value.get("instructions")
+    if not isinstance(title, str) or not title.strip() or len(title.strip()) > 160:
+        raise PowdrrExecutionError(
+            "manual_prerequisite.title must be a non-empty string of at most 160 "
+            "characters."
+        )
+    if not isinstance(verification, str) or not verification.strip():
+        raise PowdrrExecutionError(
+            "manual_prerequisite.verification must be a non-empty string."
+        )
+    if (
+        not isinstance(instructions, list)
+        or not instructions
+        or not all(isinstance(item, str) and item.strip() for item in instructions)
+    ):
+        raise PowdrrExecutionError(
+            "manual_prerequisite.instructions must be a non-empty list of strings."
+        )
+    return {
+        "title": title.strip(),
+        "instructions": [item.strip() for item in instructions],
+        "verification": verification.strip(),
+    }
+
+
+def _render_manual_prerequisite_pr_body(
+    prerequisite: Mapping[str, Any],
+    *,
+    issue_number: int | None = None,
+    repository: str | None = None,
+) -> str:
+    issue_line = f" for issue #{issue_number}" if isinstance(issue_number, int) else ""
+    continue_command = "powdrr-lift github-issue-worker-continue"
+    if repository and issue_number is not None:
+        continue_command += f" --repository {repository} --issue-number {issue_number}"
+    instructions = "\n".join(
+        f"{index}. {step}"
+        for index, step in enumerate(prerequisite["instructions"], start=1)
+    )
+    return (
+        f"## Manual prerequisite{issue_line}\n\n"
+        f"**{prerequisite['title']}**\n\n"
+        "Complete these steps outside the worker:\n\n"
+        f"{instructions}\n\n"
+        "### Verify completion\n\n"
+        f"{prerequisite['verification']}\n\n"
+        "After the manual step is complete, run "
+        f"`{continue_command}`. "
+        "That command retries this pull request's CI checks before resuming the "
+        "durable workflow. Do not put secret values in this PR or its issue."
+    )
+
+
 def publish_workflow_progress(
     repo_root: Path,
     workflow: WorkflowInstance,
@@ -5619,9 +5783,9 @@ def publish_workflow_progress(
     open_pull_request: bool = True,
     events: Sequence[Mapping[str, Any]] = (),
     runtime: ExecutionRuntime | None = None,
-) -> None:
+) -> str | None:
     """Publish workflow progress for non-LLM workflow participants."""
-    _publish_workflow_progress(
+    return _publish_workflow_progress(
         repo_root,
         workflow,
         reason=reason,

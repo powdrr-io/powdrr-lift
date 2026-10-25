@@ -2149,6 +2149,39 @@ def test_procedrr_task_handoff_persists_and_resumes_checkpoint(
     ).output_state == {"version": "v2"}
 
 
+def test_manual_prerequisite_contract_renders_actionable_public_instructions() -> None:
+    prerequisite = task_agent._validate_manual_prerequisite(
+        {
+            "title": "Install the CI credential",
+            "instructions": [
+                "Open repository settings and add the required Actions secret.",
+                "Use the documented credential name; never paste its value "
+                "into GitHub.",
+            ],
+            "verification": "Rerun the pull request checks and confirm they pass.",
+        }
+    )
+
+    assert prerequisite is not None
+    body = task_agent._render_manual_prerequisite_pr_body(
+        prerequisite,
+        issue_number=62,
+        repository="powdrr-io/powdrr-gaterr",
+    )
+    assert "Manual prerequisite" in body
+    assert "add the required Actions secret" in body
+    assert "never paste its value" in body
+    assert (
+        "powdrr-lift github-issue-worker-continue --repository "
+        "powdrr-io/powdrr-gaterr --issue-number 62"
+    ) in body
+    assert "Rerun the pull request checks and confirm they pass." in body
+    with pytest.raises(PowdrrExecutionError, match="exactly title, instructions"):
+        task_agent._validate_manual_prerequisite(
+            {"title": "Install", "instructions": ["Do it"]}
+        )
+
+
 def test_procedrr_task_dispatches_file_edits_through_task_authorization(
     tmp_path: Path,
 ) -> None:

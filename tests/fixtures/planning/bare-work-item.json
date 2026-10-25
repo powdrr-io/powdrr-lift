@@ -1,0 +1,42 @@
+{
+  "case": "bare-work-item",
+  "provenance": {
+    "captured_at": "2026-10-25T16:26:22.027947+00:00",
+    "source_exchange": "llm-20261025-162622-027947.json",
+    "source_exchange_sha256": "08c1c5372badc737bae1b1a803947712fb46a380886555e0b229885777893185",
+    "selection": "$.output"
+  },
+  "response": {
+    "id": "PR-01",
+    "title": "Define attestation schemas and shared fixtures",
+    "objective": "Freeze the protocol contracts and cross-language fixtures that every later component depends on.",
+    "scope": [
+      "Create versioned JSON schemas for policy, attestors registry, predicate, and IPC.",
+      "Implement strict policy and registry parsers in Swift and Python with duplicate-key and resource-limit enforcement.",
+      "Add golden fixtures for DSSE statements, PAE bytes, keys, signatures, snapshot digests, and configuration errors."
+    ],
+    "allowed_paths": [
+      "attestation/schemas/",
+      "attestation/fixtures/",
+      "attestation/verifier/",
+      "attestation/macos/Sources/AttestationProtocol/",
+      "attestation/macos/Tests/",
+      "attestation/examples/",
+      "attestation/scripts/verify-all.sh"
+    ],
+    "implementation_steps": [
+      "Add JSON schemas under attestation/schemas/ for policy-v1, attestors-v1, predicate-v1, and ipc-v1, encoding the field shapes and constraints from sections 4, 7, and 8.",
+      "Implement strict YAML parsers in Swift (using Yams with event auditing) and Python (using PyYAML with a custom loader) that reject duplicate keys, aliases, anchors, custom tags, unknown fields, and enforce size/step limits.",
+      "Implement raw-blob SHA-256 hashing, key fingerprint computation, snapshot record encoding, and step-definition digest computation in both languages, with unit tests.",
+      "Add fixture generators and golden files under attestation/fixtures/ covering valid and invalid policies, registries, snapshot digests, DSSE PAE bytes, and signed statements; wire them into attestation/scripts/verify-all.sh."
+    ],
+    "acceptance_criteria": [
+      "01-AC1: The sample Make and shell policies parse identically in Swift and Python; exact byte digests and ordered IDs match the frozen fixtures.",
+      "01-AC2: Every forbidden schema condition in section 4 has a rejecting fixture exercised by both implementations, including duplicate YAML keys and aliases.",
+      "01-AC3: Two fixtures with different YAML formatting have different raw policy digests even when their parsed meaning matches.",
+      "01-AC4: Snapshot digest fixtures cover ordinary files, executable files, symlinks, empty files, non-ASCII paths, and differing sort orders.",
+      "01-AC5: Unknown protocol/schema versions, floats in integer fields, oversized inputs, malformed dates, and key/fingerprint mismatches fail explicitly."
+    ],
+    "dependencies": []
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "case": "missing-audit-remaining-item",
+  "provenance": {
+    "captured_at": "2026-10-25T16:32:23.300493+00:00",
+    "source_exchange": "llm-20261025-163223-300493.json",
+    "source_exchange_sha256": "8877ec7fd602e90fe6fa3e40162d0bd40a397260b8a941b30839aaea5bb34941",
+    "selection": "$.output.assessments[item_id=item-03]"
+  },
+  "response": {
+    "item_id": "item-03",
+    "status": "missing",
+    "scope_assessments": [
+      {
+        "requirement_id": "item-03:scope-01",
+        "status": "missing",
+        "existing_evidence": [],
+        "remaining_requirement": "Build signed native executables, root-owned installation/state paths, a system launch daemon, and the _powdrrattest worker identity."
+      },
+      {
+        "requirement_id": "item-03:scope-02",
+        "status": "missing",
+        "existing_evidence": [],
+        "remaining_requirement": "Implement bounded IPC with OS-derived peer UID, profile ownership checks, and strict administrative/ordinary endpoint separation."
+      },
+      {
+        "requirement_id": "item-03:scope-03",
+        "status": "missing",
+        "existing_evidence": [],
+        "remaining_requirement": "Add launch/library constraints and prevent user-owned dynamic dependencies; implement safe install, upgrade, health, and uninstall."
+      }
+    ],
+    "remaining_work": "Create attestation/macos/Package.swift and sources for AttestationDaemon, AttestationCLI, AttestationWorker,"
+  }
+}

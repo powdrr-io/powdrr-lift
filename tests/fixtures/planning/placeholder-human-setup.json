@@ -1,0 +1,18 @@
+{
+  "case": "placeholder-human-setup",
+  "provenance": {
+    "captured_at": "2026-10-25T16:36:00.080197+00:00",
+    "source_exchange": "llm-20261025-163600-080197.json",
+    "source_exchange_sha256": "10822dc197993ec6938abdaaad5808a05762f662130e4893ae446ee36db2bcf1",
+    "selection": "$.output.items[id=pr-01].manual_prerequisite"
+  },
+  "response": {
+    "title": "No manual prerequisite",
+    "instructions": [
+      "No manual prerequisite for this item."
+    ],
+    "verification": "bash attestation/scripts/verify-all.sh",
+    "trigger": "after_implementation_before_validation",
+    "unblocks": "pr-02"
+  }
+}

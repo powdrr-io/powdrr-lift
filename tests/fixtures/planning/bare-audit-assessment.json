@@ -1,0 +1,39 @@
+{
+  "case": "bare-audit-assessment",
+  "provenance": {
+    "captured_at": "2026-10-25T16:23:38.445479+00:00",
+    "source_exchange": "llm-20261025-162338-445479.json",
+    "source_exchange_sha256": "fbe828d86f95f8a81aef9cf3168bb5d7781e32a02c88655c22dee2e49a830191",
+    "selection": "$.output"
+  },
+  "response": {
+    "item_id": "pr-01",
+    "status": "missing",
+    "scope_assessments": [
+      {
+        "requirement_id": "pr-01:scope-01",
+        "status": "missing",
+        "existing_evidence": [],
+        "remaining_requirement": "Add .github/workflows/ci.yml running bash attestation/scripts/verify-all.sh on macOS."
+      }
+    ],
+    "remaining_work": "Create .github/workflows/ci.yml with a single job on macos-14 that checks out the repository and runs bash attestation/scripts/verify-all.sh.",
+    "remaining_item": {
+      "title": "Bootstrap CI for attestation product verification",
+      "objective": "Add a minimal CI workflow that runs the product verification script so all later attestation work has a passing baseline.",
+      "scope": [
+        "Add .github/workflows/ci.yml running bash attestation/scripts/verify-all.sh on macOS."
+      ],
+      "allowed_paths": [
+        ".github/workflows/ci.yml"
+      ],
+      "implementation_steps": [
+        "Create .github/workflows/ci.yml with a single job on macos-14 that checks out the repository and runs bash attestation/scripts/verify-all.sh."
+      ],
+      "acceptance_criteria": [
+        "CI workflow exists and runs the verification command on pull requests and pushes to main.",
+        "The workflow is the only change in this PR."
+      ]
+    }
+  }
+}

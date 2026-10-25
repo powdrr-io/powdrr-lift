@@ -124,11 +124,6 @@ the ability to say no.
 
 ## Design
 
-The next-stage platform design is captured in
-[`docs/design/agent-platform-expansion.md`](docs/design/agent-platform-expansion.md).
-It describes the specification families, synthesis workflows, review flows,
-and context endpoints that will extend the current process platform.
-
 The proposed service boundary is detailed in
 [`docs/plans/hosted-instruction-compiler.md`](docs/plans/hosted-instruction-compiler.md).
 It moves instruction interpretation, design compilation, prompt assembly, and
@@ -140,10 +135,32 @@ and share the `https://powdrr.io/schemas/specification-v1` schema.
 
 ## How It Works
 
-1. Install Powdrr Lift in the repository where you want work done
-2. Start workflow chat and describe the outcome you want
-3. Answer the questions that shape the plan, or let an autonomous workflow continue
-4. Review the validated artifacts, execution summary, and proposed code changes
+Take a feature from a rough idea to reviewable pull requests through three connected
+phases. You set the direction; Powdrr carries the context and engineering work forward.
+
+### 1. Specify the feature
+
+Describe what you want in your own words. Powdrr runs an interactive design interview
+that turns your request into a complete, structured feature specification. It asks
+about the quality bar—from prototype to internal beta to production-ready—the order
+features should land, legacy behavior to preserve, and the details needed to implement
+and verify the feature. When you defer a choice, Powdrr records a sensible default and
+marks it for review instead of presenting it as your decision.
+
+### 2. Plan the implementation
+
+Powdrr turns the specification into a detailed, durable implementation plan made up of
+proposed pull requests. Each PR has a clear goal, scope, dependencies, and validation
+criteria, so you can review how the work will be delivered before implementation starts.
+The plan keeps the work tied to the original feature intent as it moves across PRs.
+
+### 3. Implement and iterate
+
+The autonomous implementation engine takes the approved plan through coding and
+validation, producing focused feature PRs with meaningful test coverage. It works
+through review feedback and plan changes while preserving the decisions and context
+behind the feature. You get changes that are ready for engineering review, with the
+evidence needed to understand what was built and how it was checked.
 
 ## What You Will Notice
 

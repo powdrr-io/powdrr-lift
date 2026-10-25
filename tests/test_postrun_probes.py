@@ -99,6 +99,81 @@ def test_parse_generated_probe_source_preserves_complete_code_and_metadata() -> 
     assert probes[0].execution_path == "sync"
 
 
+def test_return_alternatives_each_need_an_observable_assertion() -> None:
+    instruction = "get_state_data returns a dict or None."
+    source = (
+        _source(
+            "result = machine.get_state_data(state)\n"
+            "    assert isinstance(result, dict)"
+        )
+        .replace(
+            "The selector returns the matching result.",
+            "get_state_data returns a dict or None.",
+        )
+        .replace(
+            "The matching result is returned.",
+            "get_state_data returns a dict or None.",
+        )
+    )
+
+    with pytest.raises(ValueError, match="does not assert the documented None"):
+        _parse(
+            source,
+            ({"scenario_id": "selector"},),
+            instruction=instruction,
+        )
+    mutually_exclusive_source = source.replace(
+        "assert isinstance(result, dict)",
+        "assert isinstance(result, dict)\n    assert result is None",
+    )
+    with pytest.raises(ValueError, match="distinct probes"):
+        _parse(
+            mutually_exclusive_source,
+            ({"scenario_id": "selector"},),
+            instruction=instruction,
+        )
+
+    complete_source = source.replace(
+        "PROBE_METADATA = {'test_probe_selector': "
+        "{'probe_id': 'selector-result', 'scenario_id': 'selector', "
+        "'obligation_id': 'selector-obligation', "
+        "'oracle_basis': 'The instruction defines this result.'}}",
+        "PROBE_METADATA = {"
+        "'test_probe_selector': {'probe_id': 'selector-dict', "
+        "'scenario_id': 'selector', 'obligation_id': 'selector-obligation', "
+        "'oracle_basis': 'The instruction defines this result.'}, "
+        "'test_probe_selector_none': {'probe_id': 'selector-none', "
+        "'scenario_id': 'selector', 'obligation_id': 'selector-obligation', "
+        "'oracle_basis': 'The instruction defines this result.'}}",
+    )
+    complete_source += (
+        "\ndef test_probe_selector_none():\n"
+        "    result = machine.get_state_data(None)\n"
+        "    assert result is None\n"
+    )
+    _, _, probes = _parse(
+        complete_source,
+        ({"scenario_id": "selector"},),
+        instruction=instruction,
+    )
+    assert len(probes) == 2
+
+
+def test_invalid_state_machine_fixture_is_rejected_before_baseline_execution() -> None:
+    source = _source().replace(
+        "import module\n",
+        "from statemachine import State, StateMachine\n"
+        "import module\n\n"
+        "class ExampleMachine(StateMachine):\n"
+        "    active = State(initial=True)\n"
+        "    done = State(final=True)\n"
+        "    return_to_active = done.to(active)\n",
+    )
+
+    with pytest.raises(ValueError, match="transition from final state 'done'"):
+        _parse(source, ({"scenario_id": "selector"},))
+
+
 def test_paired_engines_require_async_probe_for_supported_obligations() -> None:
     rejected: list[dict[str, str]] = []
 

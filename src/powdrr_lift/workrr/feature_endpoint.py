@@ -137,6 +137,7 @@ from powdrr_lift.workrr.postrun_probes import (
     baseline_probe_is_expected_failure,
     parse_generated_postrun_probe_source,
     probe_failures,
+    required_probe_coverage_gaps,
     run_postrun_probes,
 )
 from powdrr_lift.workrr.probe_repair import repair_behavior_probes
@@ -3426,6 +3427,17 @@ def _generate_miniswe_postrun_probes(
             "are not specified, assert that the property exists without inventing "
             "its value semantics. Mark an obligation unresolved only when its "
             "source does not support any safe, observable assertion.\n\n"
+            "Probe completeness rules: author valid fixtures that can be "
+            "constructed before testing behavior. For state-machine fixtures, "
+            "a final state must have no outgoing transitions, and every non-final "
+            "state must have an outgoing transition. If a supported instruction "
+            "obligation explicitly documents alternatives such as `a dict or "
+            "None`, author a distinct probe for each alternative on each required "
+            "execution path. Do not assert mutually exclusive results for one "
+            "input in the same probe, and do not cover only the happy path. "
+            "Every supported obligation and every planned interaction must have "
+            "at least one valid probe; if baseline checks expose a probe defect, "
+            "repair the suite rather than silently dropping required coverage.\n\n"
             f"Task instruction:\n{instruction}\n\n"
             "Behavior scenarios. Treat each `then` as an oracle only when its "
             "`evidence` supports it. Use `related_requirements` to identify "
@@ -3524,6 +3536,13 @@ def _generate_miniswe_postrun_probes(
                         "Use "
                         "only the supplied contract and "
                         "scenario IDs. Do not edit implementation files or tests."
+                        " Repair invalid fixture topology, add assertions for all "
+                        "explicitly documented result alternatives (including "
+                        "both a value and None when stated), and preserve probe "
+                        "coverage for every supported obligation and planned "
+                        "interaction. Baseline probes must fail for an expected "
+                        "reason; an unrelated runtime error is a defect to fix, "
+                        "not a probe to drop."
                     ),
                     allow_existing_changes=True,
                 )
@@ -3556,6 +3575,7 @@ def _generate_miniswe_postrun_probes(
                 suite_source = suite_path.read_text(encoding="utf-8")
                 rejected_interactions.clear()
                 rejected_generated_probes.clear()
+                rejected_baseline_probes = []
                 obligations, interaction_obligations, probes = (
                     parse_generated_postrun_probe_source(
                         suite_source,
@@ -3677,6 +3697,30 @@ def _generate_miniswe_postrun_probes(
                             + "\n",
                             encoding="utf-8",
                         )
+                retained_interaction_ids = {
+                    interaction_id
+                    for probe in probes
+                    for interaction_id in probe.interaction_ids
+                }
+                uncovered_interaction_ids = {
+                    str(item["interaction_id"]) for item in interaction_obligations
+                } - retained_interaction_ids
+                coverage_gaps = required_probe_coverage_gaps(
+                    obligations,
+                    probes,
+                    repository_contract=repository_contract,
+                )
+                if uncovered_interaction_ids:
+                    coverage_gaps.extend(
+                        "planned interaction "
+                        f"{interaction_id!r} has no baseline-valid probe"
+                        for interaction_id in sorted(uncovered_interaction_ids)
+                    )
+                if coverage_gaps:
+                    raise ValueError(
+                        "baseline-valid probe suite is incomplete: "
+                        + "; ".join(coverage_gaps)
+                    )
                 validation_error = None
                 break
             except (OSError, ValueError) as error:
@@ -8479,6 +8523,11 @@ def _finalize_implementation_review(
     coverage_decisions = _flow_items(parameters.get("instruction_coverage_decisions"))
     coverage_gaps = _instruction_coverage_gaps(coverage_specs, coverage_decisions)
     coverage_complete = not coverage_gaps
+    behavior_probe_findings = _flow_items(review.get("behavior_probe_findings"))
+    if not coverage_complete or behavior_probe_findings:
+        # This is an invariant of the implementation gate, not a decision the
+        # final-review model may waive by returning a favorable verdict.
+        result["accepted"] = False
     coverage_outcomes = []
     for specification, decision in zip(coverage_specs, coverage_decisions, strict=True):
         outcome = decision.get("outcome")

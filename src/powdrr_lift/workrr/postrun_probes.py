@@ -202,6 +202,13 @@ def parse_generated_postrun_probe_source(
     except (SyntaxError, ValueError) as error:
         raise ValueError(f"probe suite is not valid Python: {error}") from error
 
+    fixture_errors = _state_machine_fixture_errors(tree)
+    if fixture_errors:
+        raise ValueError(
+            "probe suite contains invalid state-machine fixtures: "
+            + "; ".join(fixture_errors)
+        )
+
     functions = [
         item
         for item in tree.body
@@ -462,6 +469,12 @@ def parse_generated_postrun_probe_source(
         raise ValueError(
             f"probe suite contains no valid probes after isolation{detail_suffix}"
         )
+    outcome_gaps = _required_outcome_coverage_gaps(obligations, probes)
+    if outcome_gaps:
+        raise ValueError(
+            "probe suite does not cover every explicit return outcome: "
+            + "; ".join(outcome_gaps)
+        )
     missing_interactions = known_interactions - covered_interactions
     if missing_interactions:
         if rejected_interactions is None:
@@ -480,6 +493,280 @@ def parse_generated_postrun_probe_source(
             for interaction_id in sorted(missing_interactions - already_reported)
         )
     return obligations, interaction_obligations, tuple(probes)
+
+
+def _state_machine_fixture_errors(tree: ast.Module) -> list[str]:
+    """Reject statemachine fixtures that the library will reject at definition."""
+    state_names = {"State"}
+    machine_names = {"StateMachine", "StateChart"}
+    for node in tree.body:
+        if not isinstance(node, ast.ImportFrom) or not (node.module or "").startswith(
+            "statemachine"
+        ):
+            continue
+        for alias in node.names:
+            imported_as = alias.asname or alias.name
+            if alias.name == "State":
+                state_names.add(imported_as)
+            elif alias.name in {"StateMachine", "StateChart"}:
+                machine_names.add(imported_as)
+
+    errors: list[str] = []
+    for machine in (
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef)
+        and any(_ast_name(base) in machine_names for base in node.bases)
+    ):
+        states: dict[str, bool] = {}
+        outgoing: set[str] = set()
+        for statement in machine.body:
+            if isinstance(statement, (ast.Assign, ast.AnnAssign)):
+                value = statement.value
+                targets = (
+                    statement.targets
+                    if isinstance(statement, ast.Assign)
+                    else [statement.target]
+                )
+                if isinstance(value, ast.Call) and _ast_name(value.func) in state_names:
+                    final = any(
+                        keyword.arg == "final"
+                        and isinstance(keyword.value, ast.Constant)
+                        and keyword.value.value is True
+                        for keyword in value.keywords
+                    )
+                    for target in targets:
+                        if isinstance(target, ast.Name):
+                            states[target.id] = final
+                for call in ast.walk(value) if value is not None else ():
+                    if (
+                        not isinstance(call, ast.Call)
+                        or not isinstance(call.func, ast.Attribute)
+                        or call.func.attr != "to"
+                    ):
+                        continue
+                    source = call.func.value
+                    if isinstance(source, ast.Name):
+                        outgoing.add(source.id)
+        for state_name, is_final in states.items():
+            if is_final and state_name in outgoing:
+                errors.append(
+                    f"machine {machine.name!r} declares a transition from final "
+                    f"state {state_name!r}"
+                )
+            elif not is_final and state_name not in outgoing:
+                errors.append(
+                    f"machine {machine.name!r} has non-final state "
+                    f"{state_name!r} without an outgoing transition"
+                )
+    return errors
+
+
+def _ast_name(node: ast.expr) -> str | None:
+    if isinstance(node, ast.Name):
+        return node.id
+    if isinstance(node, ast.Attribute):
+        return node.attr
+    return None
+
+
+def _required_outcome_coverage_gaps(
+    obligations: Sequence[Mapping[str, Any]], probes: Sequence[PostRunProbe]
+) -> list[str]:
+    """Require probes for both branches of source clauses that say `or None`."""
+    probes_by_obligation: dict[str, list[PostRunProbe]] = {}
+    for probe in probes:
+        probes_by_obligation.setdefault(probe.obligation_id, []).append(probe)
+    gaps: list[str] = []
+    for obligation in obligations:
+        if obligation.get("supported") is not True:
+            continue
+        source_texts = [
+            str(obligation.get(field, "")) for field in ("summary", "expected")
+        ]
+        evidence = obligation.get("evidence")
+        if isinstance(evidence, Sequence) and not isinstance(evidence, (str, bytes)):
+            source_texts.extend(
+                str(item.get("quote", ""))
+                for item in evidence
+                if isinstance(item, Mapping)
+            )
+        if not any(
+            re.search(r"\breturns?\b[^\n.]*\bor\s+None\b", text, re.IGNORECASE)
+            for text in source_texts
+        ):
+            continue
+        grouped: dict[str, list[PostRunProbe]] = {}
+        for probe in probes_by_obligation.get(str(obligation["obligation_id"]), []):
+            grouped.setdefault(probe.execution_path, []).append(probe)
+        for execution_path, path_probes in grouped.items():
+            outcomes_by_probe = [
+                _probe_return_outcomes((probe,)) for probe in path_probes
+            ]
+            if any({"dict", "none"} <= outcomes for outcomes in outcomes_by_probe):
+                gaps.append(
+                    f"obligation {obligation['obligation_id']!r} "
+                    f"({execution_path}) asserts mutually exclusive return cases "
+                    "in one probe; use distinct probes for the dict and None cases"
+                )
+            observed = set().union(*outcomes_by_probe)
+            if "dict" not in observed:
+                gaps.append(
+                    f"obligation {obligation['obligation_id']!r} ({execution_path}) "
+                    "does not assert the documented dict return case"
+                )
+            if "none" not in observed:
+                gaps.append(
+                    f"obligation {obligation['obligation_id']!r} ({execution_path}) "
+                    "does not assert the documented None return case"
+                )
+        if not grouped:
+            gaps.append(
+                f"obligation {obligation['obligation_id']!r} has no probe for its "
+                "documented return cases"
+            )
+    return gaps
+
+
+def required_probe_coverage_gaps(
+    obligations: Sequence[Mapping[str, Any]],
+    probes: Sequence[PostRunProbe],
+    *,
+    repository_contract: Mapping[str, Any] | None = None,
+) -> list[str]:
+    """Return supported instruction outcomes that lack an executable probe."""
+    covered_paths: dict[str, set[str]] = {}
+    for probe in probes:
+        covered_paths.setdefault(probe.obligation_id, set()).add(probe.execution_path)
+
+    gaps: list[str] = []
+    paired_engines = _repository_has_paired_sync_async_engines(repository_contract)
+    for obligation in obligations:
+        if obligation.get("supported") is not True:
+            continue
+        obligation_id = str(obligation.get("obligation_id", ""))
+        paths = covered_paths.get(obligation_id, set())
+        if not paths:
+            gaps.append(f"supported obligation {obligation_id!r} has no valid probe")
+            continue
+        required_paths = (
+            set()
+            if not paired_engines or obligation.get("category") == "validation"
+            else {"sync", "async"}
+        )
+        for missing_path in sorted(required_paths - paths):
+            gaps.append(
+                f"supported obligation {obligation_id!r} has no valid "
+                f"{missing_path}-path probe"
+            )
+    gaps.extend(_required_outcome_coverage_gaps(obligations, probes))
+    return gaps
+
+
+def _probe_return_outcomes(probes: Sequence[PostRunProbe]) -> set[str]:
+    outcomes: set[str] = set()
+    for probe in probes:
+        try:
+            tree = ast.parse(probe.test_source)
+        except SyntaxError:
+            continue
+        functions = {
+            node.name: node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
+        root = functions.get(probe.function_name)
+        if root is None:
+            continue
+        reachable = _reachable_probe_functions(root, functions)
+        aliases: set[str] = set()
+        for function in reachable:
+            for node in ast.walk(function):
+                if isinstance(node, ast.Assign) and any(
+                    isinstance(target, ast.Name) for target in node.targets
+                ):
+                    if any(
+                        _is_get_state_data_call(call) for call in ast.walk(node.value)
+                    ):
+                        aliases.update(
+                            target.id
+                            for target in node.targets
+                            if isinstance(target, ast.Name)
+                        )
+                elif (
+                    isinstance(node, ast.AnnAssign)
+                    and isinstance(node.target, ast.Name)
+                    and node.value is not None
+                    and any(
+                        _is_get_state_data_call(call) for call in ast.walk(node.value)
+                    )
+                ):
+                    aliases.add(node.target.id)
+        for function in reachable:
+            for node in ast.walk(function):
+                if not isinstance(node, ast.Assert):
+                    continue
+                if _asserts_none_for_result(node.test, aliases):
+                    outcomes.add("none")
+                if _asserts_dict_for_result(node.test, aliases):
+                    outcomes.add("dict")
+    return outcomes
+
+
+def _reachable_probe_functions(
+    root: ast.FunctionDef | ast.AsyncFunctionDef,
+    functions: Mapping[str, ast.FunctionDef | ast.AsyncFunctionDef],
+) -> tuple[ast.FunctionDef | ast.AsyncFunctionDef, ...]:
+    reached: dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
+    pending = [root]
+    while pending:
+        function = pending.pop()
+        if function.name in reached:
+            continue
+        reached[function.name] = function
+        for node in ast.walk(function):
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id in functions
+            ):
+                pending.append(functions[node.func.id])
+    return tuple(reached.values())
+
+
+def _is_get_state_data_call(node: ast.AST) -> bool:
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "get_state_data"
+    )
+
+
+def _is_state_data_result(node: ast.AST, aliases: set[str]) -> bool:
+    return (isinstance(node, ast.Name) and node.id in aliases) or any(
+        _is_get_state_data_call(child) for child in ast.walk(node)
+    )
+
+
+def _asserts_none_for_result(node: ast.expr, aliases: set[str]) -> bool:
+    return (
+        isinstance(node, ast.Compare)
+        and len(node.ops) == 1
+        and isinstance(node.ops[0], ast.Is)
+        and isinstance(node.comparators[0], ast.Constant)
+        and node.comparators[0].value is None
+        and _is_state_data_result(node.left, aliases)
+    )
+
+
+def _asserts_dict_for_result(node: ast.expr, aliases: set[str]) -> bool:
+    if not isinstance(node, ast.Call) or _ast_name(node.func) != "isinstance":
+        return False
+    return (
+        len(node.args) == 2
+        and _is_state_data_result(node.args[0], aliases)
+        and _ast_name(node.args[1]) == "dict"
+    )
 
 
 def _probe_module_metadata(tree: ast.Module) -> dict[str, Any]:

@@ -900,8 +900,6 @@ def build_block_disposition_request(
 ) -> QuestionRequest[BlockDisposition]:
     """Build the per-block accounting question; no global completeness claim."""
     known_ids = set(requirement_ids)
-    if not known_ids:
-        raise ValueError("block disposition needs at least one known requirement ID")
     input_digest = _digest_json(
         {
             "block": source_block_input_digest(block),
@@ -923,10 +921,14 @@ def build_block_disposition_request(
             "reason": "Why it is context or duplicates listed requirements.",
         },
         excerpt=SourceExcerpt(block.id, block.text, block.start_offset),
-        valid_example={
-            "disposition": "normative",
-            "requirement_ids": [sorted(known_ids)[0]],
-        },
+        valid_example=(
+            {
+                "disposition": "normative",
+                "requirement_ids": [sorted(known_ids)[0]],
+            }
+            if known_ids
+            else {"disposition": "context", "reason": "This block is background."}
+        ),
         empty_example={
             "disposition": "context",
             "reason": "This block supplies background only.",

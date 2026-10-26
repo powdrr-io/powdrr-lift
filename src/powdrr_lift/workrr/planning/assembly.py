@@ -751,7 +751,10 @@ def build_work_unit_proposal_request(
         "page_after": page_after,
     }
     question = Question(
-        question_id=f"propose-units-{requirement_ids[0]}",
+        question_id=(
+            f"propose-units-{requirement_ids[0]}-"
+            f"{_digest({'page_after': page_after})[-12:]}"
+        ),
         kind="propose_work_units",
         contract_version=1,
         subject_ids=tuple(requirement_ids),

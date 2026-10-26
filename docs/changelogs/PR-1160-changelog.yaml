@@ -1,0 +1,110 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1160
+title: Clarify extraction pagination and retry transient GitHub failures
+intent:
+  problem: The planner can omit a required pagination cursor when indicating that more source requirements remain, and transient GitHub server errors can interrupt durable checkpoint writes.
+  goal: Show a parser-valid paginated answer in the extraction prompt and retry transient comment-write server failures with bounded backoff.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 155, end_line: 155}
+    summary: Name the retry bound for all comment-write failures.
+    rationale: Cover transient server errors as well as rate limits without broadening retries to unrelated API failures.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 163, end_line: 163}
+    summary: Store the comment-write retry bound on the GitHub issue client.
+    rationale: Apply one bounded retry policy to issue comment requests.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 356, end_line: 356}
+    summary: Use the comment-write retry limit for each comment request.
+    rationale: Permit transient server responses to use the same bounded retry window.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 360, end_line: 362}
+    summary: Classify rate-limit and transient server responses before deciding to retry.
+    rationale: Retry only recoverable GitHub responses while preserving immediate errors for unrelated failures.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 368, end_line: 368}
+    summary: Report exhausted comment-write retries with a general failure message.
+    rationale: Describe rate-limit and server-error exhaustion accurately.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 370, end_line: 370}
+    summary: Raise after exhausting the bounded comment-write retry attempts.
+    rationale: Stop retrying once the configured transient failure limit is reached.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 373, end_line: 378}
+    summary: Apply server-guided rate-limit waits or exponential delays for transient server errors.
+    rationale: Recover from temporary GitHub 5xx responses without busy retrying.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 448, end_line: 474}
+    summary: Recognize transient GitHub 5xx responses and calculate bounded retry delays.
+    rationale: Resume exact checkpoint comment writes after temporary server failures.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 801, end_line: 812}
+    summary: Replace the nonpaginated extraction example with a cursor-bearing example when candidates remain.
+    rationale: Demonstrate a valid continuation answer before requesting more source requirements.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 813, end_line: 824}
+    summary: Make the valid extraction example demonstrate both pagination fields when more source remains.
+    rationale: Show the planner a complete, parser-valid example with more results remaining.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 885, end_line: 888}
+    summary: State that has_more and next_anchor have coupled required values.
+    rationale: Prevent omission of a cursor when another extraction page remains.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 895, end_line: 898}
+    summary: Clarify the answer field definition for the pagination continuation flag.
+    rationale: Keep the schema explanation consistent with the valid paginated example.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 502, end_line: 525}
+    summary: Verify a transient HTTP 502 comment response retries the identical request after backoff.
+    rationale: Prevent a temporary GitHub server response from losing a checkpoint transition.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 426, end_line: 429}
+    summary: Verify the valid extraction example includes a required pagination cursor.
+    rationale: Ensure the model receives an answer example that satisfies the coupled pagination contract.
+entities:
+  - id: transient-github-comment-retry
+    type: Function
+    action: added
+  - id: coupled-source-pagination-answer-example
+    type: Function
+    action: added
+  - id: pagination-and-server-retry-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: retry-test-verifies-transient-comment-retry
+    type: verifies
+    source: pagination-and-server-retry-regression-tests
+    target: transient-github-comment-retry
+    action: added
+    description: The regression test verifies a transient HTTP 502 retries the same checkpoint comment request.
+  - id: source-test-verifies-coupled-pagination-example
+    type: verifies
+    source: pagination-and-server-retry-regression-tests
+    target: coupled-source-pagination-answer-example
+    action: added
+    description: The regression test parses the prompt's example with has_more true and a valid next_anchor.
+invariants:
+  - id: extraction-pagination-fields-remain-coupled
+    description: An extraction answer with has_more true includes a non-null next_anchor from the current block; a final page uses has_more false and next_anchor null.
+    action: altered
+  - id: transient-comment-retries-preserve-request-identity
+    description: A retry after a transient GitHub server error sends the exact same comment body so duplicate checkpoint digests remain safely deduplicable.
+    action: added
+guidance: []

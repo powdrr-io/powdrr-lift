@@ -358,8 +358,8 @@ class GitHubIssueClient:
             if result.returncode == 0:
                 return
             rate_limited = _is_github_rate_limit_response(result)
-            transient_server_error = _is_github_transient_server_error(result)
-            if not rate_limited and not transient_server_error:
+            transient_write_error = _is_github_transient_comment_write_error(result)
+            if not rate_limited and not transient_write_error:
                 raise GitHubIssueQueueError(
                     "GitHub API POST "
                     f"repos/{self.repository}/issues/{issue.number}/comments "
@@ -445,7 +445,7 @@ def _is_github_rate_limit_response(
     )
 
 
-def _is_github_transient_server_error(
+def _is_github_transient_comment_write_error(
     result: subprocess.CompletedProcess[str],
 ) -> bool:
     response = f"{result.stdout}\n{result.stderr}".lower()
@@ -464,6 +464,12 @@ def _is_github_transient_server_error(
             "status 502",
             "status 503",
             "status 504",
+            "connection reset by peer",
+            "connection timed out",
+            "i/o timeout",
+            "tls handshake timeout",
+            "unexpected eof",
+            "broken pipe",
         )
     )
 

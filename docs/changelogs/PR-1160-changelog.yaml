@@ -1,9 +1,9 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1160
-title: Clarify extraction pagination and retry transient GitHub failures
+title: Clarify extraction pagination and retry transient GitHub comment failures
 intent:
-  problem: The planner can omit a required pagination cursor when indicating that more source requirements remain, and transient GitHub server errors can interrupt durable checkpoint writes.
-  goal: Show a parser-valid paginated answer in the extraction prompt and retry transient comment-write server failures with bounded backoff.
+  problem: The planner can omit a required pagination cursor when indicating that more source requirements remain, and transient GitHub server or transport errors can interrupt durable checkpoint writes.
+  goal: Show a parser-valid paginated answer in the extraction prompt and retry transient comment-write failures with bounded backoff.
 human-decisions: []
 structured_files: []
 files:
@@ -45,8 +45,8 @@ files:
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
     span: {start_line: 448, end_line: 474}
-    summary: Recognize transient GitHub 5xx responses and calculate bounded retry delays.
-    rationale: Resume exact checkpoint comment writes after temporary server failures.
+    summary: Recognize transient GitHub 5xx and connection failures and calculate bounded retry delays.
+    rationale: Resume exact checkpoint comment writes after temporary server or transport failures.
   - path: src/powdrr_lift/workrr/planning/source.py
     type: modified
     span: {start_line: 801, end_line: 812}
@@ -72,6 +72,11 @@ files:
     span: {start_line: 502, end_line: 525}
     summary: Verify a transient HTTP 502 comment response retries the identical request after backoff.
     rationale: Prevent a temporary GitHub server response from losing a checkpoint transition.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 522, end_line: 548}
+    summary: Verify a connection reset retries the identical issue comment after backoff.
+    rationale: Preserve checkpoint writes when a transient network reset interrupts the GitHub response.
   - path: tests/test_planning_source.py
     type: modified
     span: {start_line: 426, end_line: 429}

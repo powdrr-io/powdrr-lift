@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any
 
 from ortools.sat.python import cp_model
@@ -45,6 +46,8 @@ _PATH_RUNTIME_SUFFIXES = {
     ".m": "objective-c",
     ".mm": "objective-c",
 }
+PATH_RUNTIME_SUFFIXES = dict(_PATH_RUNTIME_SUFFIXES)
+CANONICAL_RUNTIMES = frozenset(PATH_RUNTIME_SUFFIXES.values())
 _IMPLEMENTATION_ACTION = re.compile(
     r"\b(?:implement|create|build|develop|port|introduce|extend|add)\w*\b",
     re.IGNORECASE,
@@ -58,6 +61,132 @@ _CODE_ARTIFACT = re.compile(
 
 class PlanSizingError(ValueError):
     """A plan could not be represented as valid bounded PR slices."""
+
+
+@dataclass(frozen=True, slots=True)
+class ExplicitWorkUnit:
+    """Solver inputs whose runtime and cohesion facts are already typed."""
+
+    id: str
+    component: str
+    implementation_runtime: str
+    acceptance_criteria_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class ExplicitAllocation:
+    """A deterministic partition of typed work-unit IDs."""
+
+    groups: tuple[tuple[str, ...], ...]
+    objective_value: int
+
+
+def allocate_explicit_work_units(
+    units: Sequence[ExplicitWorkUnit],
+    *,
+    target_units: int = TARGET_PR_WORK_UNITS,
+    max_units: int = MAX_PR_WORK_UNITS,
+    max_criteria: int = 5,
+    max_components: int = 3,
+    standalone_unit_ids: frozenset[str] = frozenset(),
+) -> ExplicitAllocation:
+    """Partition explicitly classified units without inspecting description text."""
+    if target_units < 1 or max_units < target_units:
+        raise PlanSizingError("target and maximum work-unit counts are invalid")
+    if not units:
+        return ExplicitAllocation((), 0)
+    unit_ids = [unit.id for unit in units]
+    if len(set(unit_ids)) != len(unit_ids):
+        raise PlanSizingError("work-unit IDs must be unique")
+    if not standalone_unit_ids <= set(unit_ids):
+        raise PlanSizingError("standalone unit ID is unknown")
+    if any(
+        unit.acceptance_criteria_count < 0
+        or unit.implementation_runtime not in {*CANONICAL_RUNTIMES, "neutral"}
+        for unit in units
+    ):
+        raise PlanSizingError("work-unit sizing facts are invalid")
+
+    count = len(units)
+    model = cp_model.CpModel()
+    boundaries = [model.new_bool_var(f"boundary_{i}") for i in range(count + 1)]
+    model.add(boundaries[0] == 1)
+    model.add(boundaries[count] == 1)
+    group_count = model.new_int_var(1, count, "group_count")
+    model.add(group_count == sum(boundaries[1:count]) + 1)
+    segments: dict[tuple[int, int], Any] = {}
+    cohesion_costs: list[Any] = []
+    for start in range(count):
+        for end in range(start + 1, min(count, start + max_units) + 1):
+            chunk = units[start:end]
+            if any(unit.id in standalone_unit_ids for unit in chunk) and len(chunk) > 1:
+                continue
+            if sum(unit.acceptance_criteria_count for unit in chunk) > max_criteria:
+                continue
+            components = {unit.component for unit in chunk}
+            if len(components) > max_components:
+                continue
+            runtimes = {
+                unit.implementation_runtime
+                for unit in chunk
+                if unit.implementation_runtime != "neutral"
+            }
+            if len(runtimes) > 1:
+                continue
+            selected = model.new_bool_var(f"segment_{start}_{end}")
+            segments[(start, end)] = selected
+            model.add(selected <= boundaries[start])
+            for inner in range(start + 1, end):
+                model.add(selected + boundaries[inner] <= 1)
+            cohesion_costs.append(selected * (len(components) - 1))
+    for index in range(count):
+        model.add(
+            sum(
+                variable
+                for (start, end), variable in segments.items()
+                if start <= index < end
+            )
+            == 1
+        )
+    for boundary in range(count):
+        model.add(
+            boundaries[boundary]
+            == sum(
+                variable
+                for (start, _end), variable in segments.items()
+                if start == boundary
+            )
+        )
+    distance = model.new_int_var(0, count * target_units + count, "target_distance")
+    model.add_abs_equality(distance, group_count * target_units - count)
+    tie_break = sum((index + 1) * boundaries[index] for index in range(1, count))
+    model.minimize(distance * 1_000_000 + sum(cohesion_costs) * 1_000 + tie_break)
+    solver = cp_model.CpSolver()
+    solver.parameters.num_search_workers = 1
+    solver.parameters.random_seed = 0
+    status = solver.solve(model)
+    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
+        raise PlanSizingError(
+            "CP-SAT cannot allocate work units within hard constraints"
+        )
+    selected_segments = sorted(
+        (start, end)
+        for (start, end), variable in segments.items()
+        if solver.value(variable)
+    )
+    if (
+        not selected_segments
+        or selected_segments[0][0] != 0
+        or selected_segments[-1][1] != count
+    ):
+        raise PlanSizingError("CP-SAT returned incomplete work-unit coverage")
+    for prior, current in zip(selected_segments, selected_segments[1:], strict=False):
+        if prior[1] != current[0]:
+            raise PlanSizingError("CP-SAT returned overlapping work-unit groups")
+    return ExplicitAllocation(
+        tuple(tuple(unit_ids[start:end]) for start, end in selected_segments),
+        int(solver.objective_value),
+    )
 
 
 def size_plan_items(

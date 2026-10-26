@@ -18,7 +18,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
-from time import sleep
+from time import sleep, time
 from typing import Any
 from urllib.parse import quote
 
@@ -34,10 +34,17 @@ QUEUE_LABELS = {
     "blocked": "powdrr:blocked",
 }
 FULFILLED_WITHOUT_PR_LABEL = "powdrr:fulfilled-without-pr"
+PLAN_REPAIR_PENDING_LABEL = "powdrr:plan-repair-pending"
 MANUAL_PREREQUISITE_TRIGGER = "after_implementation_before_validation"
 _MARKER_START = "<!-- powdrr-queue-item:v1 "
 _MARKER_END = " -->"
 _TASK_CHECKPOINT_START = "<!-- powdrr-task-checkpoint:v1 -->"
+_PLAN_REPAIR_MARKER = "<!-- powdrr-plan-repair:v1 -->"
+_PLAN_REPAIR_PENDING_MARKER = "<!-- powdrr-plan-repair-pending:v1 -->"
+_PLAN_REPAIR_RECONCILED_MARKER = "<!-- powdrr-plan-repair-reconciled:v1 -->"
+_PLAN_REPAIR_RESOLVED_MARKER = "<!-- powdrr-plan-repair-resolved:v1 -->"
+_PLAN_REPAIR_SUPERSEDED_MARKER = "<!-- powdrr-plan-repair-superseded:v1 -->"
+_PLAN_REPAIR_INVALIDATION_MARKER = "<!-- powdrr-plan-repair-invalidation:v1 -->"
 _FULFILLMENT_MARKER = "<!-- powdrr-issue-fulfillment:v1 -->"
 _FULFILLMENT_SCHEMA = "https://powdrr.io/schemas/github-issue-fulfillment-v1"
 _PLAN_ADJUSTMENT_MARKER = "<!-- powdrr-plan-adjustment:v1 -->"
@@ -51,7 +58,6 @@ _PLAN_ADJUSTABLE_FIELDS = {
     "implementation_steps",
     "allowed_paths",
 }
-_PLAN_AMENDMENT_TITLE_PREFIX = "Correct plan:"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 _GITHUB_STATUS_SETTLE_SECONDS = 1.0
 
@@ -79,6 +85,7 @@ class ReviewedExecutionPlan:
     plan_id: str
     items: tuple[PlannedWorkItem, ...]
     source_document: str | None = None
+    planning: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +134,7 @@ class TaskCheckpoint:
     output_state_type: str
     output_state: Any
     commit_sha: str | None = None
+    input_contract_digest: str | None = None
 
 
 TaskCheckpointCallback = Callable[[str, str, Any, str | None], None]
@@ -145,12 +153,16 @@ class GitHubIssueClient:
         *,
         executable: str = "gh",
         run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+        sleep_fn: Callable[[float], None] = sleep,
+        rate_limit_retries: int = 6,
     ) -> None:
         if not re.fullmatch(r"[^/\s]+/[^/\s]+", repository):
             raise GitHubIssueQueueError("repository must use owner/name form")
         self.repository = repository
         self.executable = executable
         self._run = run
+        self._sleep = sleep_fn
+        self._rate_limit_retries = max(0, rate_limit_retries)
 
     def list_issues(
         self, *, labels: Sequence[str] = (), state: str = "all"
@@ -237,6 +249,19 @@ class GitHubIssueClient:
                 color=_label_color(status),
                 description=f"Powdrr queue state: {status.replace('_', ' ')}",
             )
+        self._ensure_label(
+            PLAN_REPAIR_PENDING_LABEL,
+            color="B60205",
+            description="Powdrr work item is impacted by a pending plan repair",
+        )
+
+    def ensure_planning_label(self) -> None:
+        """Ensure the session tracker label, separate from executable queue state."""
+        self._ensure_label(
+            "powdrr:planning",
+            color="1D76DB",
+            description="Powdrr planning session tracker; not executable work",
+        )
 
     def ensure_fulfilled_without_pr_label(self) -> None:
         self._ensure_label(
@@ -321,12 +346,31 @@ class GitHubIssueClient:
         self._api(*arguments)
 
     def add_comment(self, issue: QueueIssue, body: str) -> None:
-        self._api(
-            "POST",
+        arguments = [
+            "api",
+            "--include",
             f"repos/{self.repository}/issues/{issue.number}/comments",
+            "--method",
+            "POST",
             "-f",
             f"body={body}",
-        )
+        ]
+        for attempt in range(self._rate_limit_retries + 1):
+            result = self._invoke(arguments, check=False)
+            if result.returncode == 0:
+                return
+            if not _is_github_rate_limit_response(result):
+                raise GitHubIssueQueueError(
+                    "GitHub API POST "
+                    f"repos/{self.repository}/issues/{issue.number}/comments "
+                    f"failed: {result.stderr.strip()}"
+                )
+            if attempt >= self._rate_limit_retries:
+                raise GitHubIssueQueueError(
+                    "GitHub issue comment rate limit remained active after "
+                    f"{attempt} retries: {result.stderr.strip()}"
+                )
+            self._sleep(_github_retry_delay(result, attempt))
 
     def list_comments(self, issue_number: int) -> tuple[Mapping[str, Any], ...]:
         result = self._invoke(
@@ -379,6 +423,36 @@ class GitHubIssueClient:
         return result
 
 
+def _is_github_rate_limit_response(
+    result: subprocess.CompletedProcess[str],
+) -> bool:
+    response = f"{result.stdout}\n{result.stderr}".lower()
+    if "http 429" in response or "status 429" in response:
+        return True
+    return ("http 403" in response or "status 403" in response) and any(
+        marker in response
+        for marker in (
+            "rate limit",
+            "secondary rate",
+            "abuse detection",
+            "temporarily blocked from content creation",
+        )
+    )
+
+
+def _github_retry_delay(
+    result: subprocess.CompletedProcess[str], attempt: int
+) -> float:
+    response = f"{result.stdout}\n{result.stderr}"
+    retry_after = re.search(r"retry-after\s*[:=]\s*(\d+)", response, re.IGNORECASE)
+    if retry_after is not None:
+        return float(retry_after.group(1))
+    reset = re.search(r"x-ratelimit-reset\s*:\s*(\d+)", response, re.IGNORECASE)
+    if reset is not None:
+        return max(0.0, float(reset.group(1)) - time())
+    return float(min(60 * (2**attempt), 900))
+
+
 def load_reviewed_plan(
     plan_path: str | Path, *, repo_root: str | Path
 ) -> ReviewedExecutionPlan:
@@ -397,6 +471,40 @@ def load_reviewed_plan(
 def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
     """Parse and validate a GitHub issue execution plan document."""
     return _parse_plan(text)
+
+
+def serialize_reviewed_plan_yaml(plan: ReviewedExecutionPlan) -> str:
+    """Deterministically serialize a typed execution plan, including metadata."""
+    data: dict[str, Any] = {"schema": QUEUE_SCHEMA, "plan_id": plan.plan_id}
+    if plan.source_document is not None:
+        data["source_document"] = plan.source_document
+    items = []
+    for item in plan.items:
+        record: dict[str, Any] = {
+            "id": item.item_id,
+            "title": item.title,
+            "objective": item.objective,
+            "scope": list(item.scope),
+            "acceptance_criteria": list(item.acceptance_criteria),
+            "dependencies": list(item.dependencies),
+            "workflow_file": item.workflow_file or item.workflow_directory,
+            "workflow_id": item.workflow_id,
+        }
+        if item.implementation_steps:
+            record["implementation_steps"] = list(item.implementation_steps)
+        if item.allowed_paths != (".",):
+            record["allowed_paths"] = list(item.allowed_paths)
+        if item.manual_prerequisite is not None:
+            record["manual_prerequisite"] = dict(item.manual_prerequisite)
+        items.append(record)
+    data["items"] = items
+    if plan.planning is not None:
+        from powdrr_lift.workrr.planning.compiler import PlanningManifest
+
+        data["planning"] = PlanningManifest.from_data(plan.planning).to_data()
+    return yaml.safe_dump(
+        data, allow_unicode=True, default_flow_style=False, sort_keys=False
+    )
 
 
 def load_reviewed_plan_at_commit(
@@ -638,6 +746,7 @@ def run_worker_once(
             )
             if QUEUE_LABELS["ready"] not in issue.labels:
                 continue
+            issue = client.get_issue(issue.number)
             client.update_issue(
                 issue,
                 labels=_replace_queue_status(issue.labels, "claimed"),
@@ -761,10 +870,12 @@ def run_worker_once(
                     plan,
                     fulfilled_without_pr_dependencies,
                     _task_checkpoint_callback(
+                        client=client,
                         repo_root=root,
                         issue=issue,
                         plan=plan,
                         item=item,
+                        plan_loader=plan_loader,
                     ),
                 )
                 prerequisite = None
@@ -802,13 +913,20 @@ def run_worker_once(
                 note = "Powdrr execution did not finish successfully."
                 if detail:
                     note += f" {detail}"
+            issue = client.get_issue(issue.number)
             client.update_issue(
                 issue,
                 labels=_replace_queue_status(
                     _replace_queue_status(issue.labels, "claimed"), status
                 ),
             )
+            _refresh_pending_repair_prior_state(client, client.get_issue(issue.number))
             client.add_comment(issue, note)
+            _requeue_merged_plan_amendments(
+                client=client,
+                repo_root=root,
+                plan_loader=plan_loader,
+            )
             return WorkerReport(outcome, issue.number, item.item_id, detail)
     return WorkerReport("no_eligible_work")
 
@@ -906,6 +1024,7 @@ def _task_checkpoint_record(
         "output_state_type": checkpoint.output_state_type,
         "output_state": checkpoint.output_state,
         "commit_sha": checkpoint.commit_sha,
+        "input_contract_digest": checkpoint.input_contract_digest,
     }
 
 
@@ -990,11 +1109,12 @@ def continue_manual_prerequisite_issue(
     resume_workflow: Callable[[Mapping[str, Any], TaskCheckpointCallback], int],
 ) -> WorkerReport:
     """Retry staged PR checks, then resume the durable workflow for one issue."""
-    with _worker_lock(Path(repo_root).resolve()):
+    root = Path(repo_root).resolve()
+    with _worker_lock(root):
         return _continue_manual_prerequisite_issue_locked(
             client=client,
             issue_number=issue_number,
-            repo_root=Path(repo_root).resolve(),
+            repo_root=root,
             resume_workflow=resume_workflow,
         )
 
@@ -1053,6 +1173,18 @@ def _continue_manual_prerequisite_issue_locked(
     def checkpoint_callback(
         task_id: str, output_state_type: str, output_state: Any, commit_sha: str | None
     ) -> None:
+        active_repair = _active_plan_repair_pending(client.list_comments(issue.number))
+        if active_repair is not None:
+            raise GitHubIssueQueueError(
+                "workflow paused at a durable checkpoint because plan repair "
+                f"{active_repair.get('repair_id')} is pending review"
+            )
+        _mark_plan_repair_from_checkpoint(
+            client=client,
+            output_state_type=output_state_type,
+            output_state=output_state,
+            plan_id=pointer["plan_id"],
+        )
         _write_local_task_checkpoint(
             repo_root=repo_root,
             issue_number=issue_number,
@@ -1064,7 +1196,17 @@ def _continue_manual_prerequisite_issue_locked(
                 output_state_type=output_state_type,
                 output_state=output_state,
                 commit_sha=commit_sha,
+                input_contract_digest=(
+                    checkpoint.get("input_contract_digest")
+                    if isinstance(checkpoint.get("input_contract_digest"), str)
+                    else None
+                ),
             ),
+        )
+        _requeue_merged_plan_amendments(
+            client=client,
+            repo_root=repo_root,
+            plan_loader=load_reviewed_plan_at_commit,
         )
 
     detail: str | None = None
@@ -1079,7 +1221,16 @@ def _continue_manual_prerequisite_issue_locked(
         if latest_local_checkpoint is not None
         else latest_manual_prerequisite_checkpoint(client.list_comments(issue_number))
     )
-    if pending_prerequisite is not None:
+    comments = client.list_comments(issue_number)
+    active_repair = _active_plan_repair_pending(comments)
+    if active_repair is not None:
+        status = "blocked"
+        outcome = "blocked"
+        note = (
+            "Powdrr paused because plan repair "
+            f"{active_repair.get('repair_id')} is pending review."
+        )
+    elif pending_prerequisite is not None:
         status = "awaiting_human"
         outcome = "awaiting_human"
         note = (
@@ -1098,11 +1249,18 @@ def _continue_manual_prerequisite_issue_locked(
         note = "Powdrr execution did not finish successfully."
         if detail:
             note += f" {detail}"
+    issue = client.get_issue(issue_number)
     client.update_issue(
         issue,
         labels=_replace_queue_status(issue.labels, status),
     )
+    _refresh_pending_repair_prior_state(client, client.get_issue(issue.number))
     client.add_comment(issue, note)
+    _requeue_merged_plan_amendments(
+        client=client,
+        repo_root=repo_root,
+        plan_loader=load_reviewed_plan_at_commit,
+    )
     return WorkerReport(outcome, issue_number, detail=detail)
 
 
@@ -1382,12 +1540,59 @@ def render_fulfilled_without_pr_comment(
     )
 
 
+def render_task_checkpoint_comment(checkpoint: TaskCheckpoint) -> str:
+    """Render a readable GitHub comment with machine-readable checkpoint data."""
+    payload = {
+        "schema": "https://powdrr.io/schemas/github-issue-task-checkpoint-v1",
+        "plan_id": checkpoint.plan_id,
+        "item_id": checkpoint.item_id,
+        "workflow_id": checkpoint.workflow_id,
+        "task_id": checkpoint.task_id,
+        "status": (
+            "awaiting_human"
+            if checkpoint.output_state_type == "manual-prerequisite-checkpoint-v1"
+            else "completed"
+        ),
+        "output_state_type": checkpoint.output_state_type,
+        "output_state": checkpoint.output_state,
+        "commit_sha": checkpoint.commit_sha,
+        "input_contract_digest": checkpoint.input_contract_digest,
+    }
+    return (
+        "### Powdrr task checkpoint\n\n"
+        f"{_TASK_CHECKPOINT_START}\n"
+        "```json\n"
+        f"{json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True)}\n"
+        "```"
+    )
+
+
+def render_plan_repair_metadata(
+    *, plan_id: str, plan_path: str, repair: Mapping[str, Any]
+) -> str:
+    """Render the authoritative repair manifest embedded in an amendment PR."""
+    payload = {
+        "schema": "https://powdrr.io/schemas/github-issue-plan-repair-v1",
+        "plan_id": plan_id,
+        "plan_path": plan_path,
+        "repair": dict(repair),
+    }
+    return (
+        f"{_PLAN_REPAIR_MARKER}\n"
+        "```json\n"
+        f"{json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True)}\n"
+        "```"
+    )
+
+
 def _task_checkpoint_callback(
     *,
-    repo_root: Path,
+    client: GitHubIssueClient,
     issue: QueueIssue,
     plan: ReviewedExecutionPlan,
     item: PlannedWorkItem,
+    repo_root: Path | None = None,
+    plan_loader: Callable[..., ReviewedExecutionPlan] = load_reviewed_plan_at_commit,
 ) -> TaskCheckpointCallback:
     def persist(
         task_id: str,
@@ -1399,21 +1604,81 @@ def _task_checkpoint_callback(
         target_plan: ReviewedExecutionPlan = plan,
         target_item: PlannedWorkItem = item,
     ) -> None:
-        _write_local_task_checkpoint(
-            repo_root=repo_root,
-            issue_number=target_issue.number,
-            checkpoint=TaskCheckpoint(
-                plan_id=target_plan.plan_id,
-                item_id=target_item.item_id,
-                workflow_id=target_item.workflow_id,
-                task_id=task_id,
-                output_state_type=output_state_type,
-                output_state=output_state,
-                commit_sha=commit_sha,
-            ),
+        active_repair = _active_plan_repair_pending(
+            client.list_comments(target_issue.number)
         )
+        if active_repair is not None:
+            raise GitHubIssueQueueError(
+                "workflow paused at a durable checkpoint because plan repair "
+                f"{active_repair.get('repair_id')} is pending review"
+            )
+        _mark_plan_repair_from_checkpoint(
+            client=client,
+            output_state_type=output_state_type,
+            output_state=output_state,
+            plan_id=target_plan.plan_id,
+        )
+        from powdrr_lift.workrr.planning.repair import item_input_contract_digest
+
+        if repo_root is not None:
+            _write_local_task_checkpoint(
+                repo_root=repo_root,
+                issue_number=target_issue.number,
+                checkpoint=TaskCheckpoint(
+                    plan_id=target_plan.plan_id,
+                    item_id=target_item.item_id,
+                    workflow_id=target_item.workflow_id,
+                    task_id=task_id,
+                    output_state_type=output_state_type,
+                    output_state=output_state,
+                    commit_sha=commit_sha,
+                    input_contract_digest=item_input_contract_digest(
+                        target_item, target_plan.planning
+                    ),
+                ),
+            )
+        if repo_root is not None:
+            # A repair PR must block its full impact set before another durable
+            # checkpoint can be reached.
+            _requeue_merged_plan_amendments(
+                client=client,
+                repo_root=repo_root,
+                plan_loader=plan_loader,
+            )
 
     return persist
+
+
+def _mark_plan_repair_from_checkpoint(
+    *,
+    client: GitHubIssueClient,
+    output_state_type: str,
+    output_state: Any,
+    plan_id: str,
+) -> None:
+    if not isinstance(output_state, Mapping) or not output_state_type.endswith(
+        "result-state"
+    ):
+        return
+    pull_request_url = output_state.get("pull_request_url")
+    number = _same_repository_pull_request_number(
+        pull_request_url if isinstance(pull_request_url, str) else None,
+        client.repository,
+    )
+    if number is None:
+        return
+    metadata = _plan_repair_metadata_from_pr(client.pull_request(number))
+    if metadata is None:
+        return
+    if metadata["plan_id"] != plan_id:
+        raise GitHubIssueQueueError(
+            "worker-created plan repair PR does not match the issue plan"
+        )
+    _mark_plan_repair_pending(
+        client=client,
+        metadata=metadata,
+        pull_request_number=number,
+    )
 
 
 def _promote_unblocked_issues(
@@ -1489,86 +1754,584 @@ def _requeue_merged_plan_amendments(
     repo_root: Path,
     plan_loader: Callable[..., ReviewedExecutionPlan],
 ) -> None:
-    """Repin work items after a reviewed plan-amendment PR merges."""
-    awaiting = client.list_issues(
-        labels=(QUEUE_LABELS["awaiting_review"],), state="open"
-    )
-    for issue in sorted(awaiting, key=lambda value: value.number):
-        if issue.state != "open" or QUEUE_LABELS["awaiting_review"] not in issue.labels:
-            continue
-        pointer = parse_issue_pointer(issue.body)
-        if pointer is None:
-            continue
-        pull_request_url = _latest_checkpoint_pull_request_url(
-            client.list_comments(issue.number)
-        )
-        pull_request_number = _same_repository_pull_request_number(
-            pull_request_url, client.repository
-        )
-        if pull_request_number is None:
-            continue
+    """Reconcile pending plan repairs over every issue in their impact manifest."""
+    plan_issues = client.list_issues(labels=(PLAN_REPAIR_PENDING_LABEL,), state="all")
+    repairs: dict[int, Mapping[str, Any]] = {}
+    for issue in plan_issues:
+        comments = client.list_comments(issue.number)
+        pending = _active_plan_repair_pending(comments)
+        url = None
+        if pending is not None and isinstance(pending.get("pull_request_number"), int):
+            url = (
+                f"https://github.com/{client.repository}/pull/"
+                f"{pending['pull_request_number']}"
+            )
+        if url is None:
+            url = _latest_checkpoint_pull_request_url(comments)
+        number = _same_repository_pull_request_number(url, client.repository)
+        if number is not None:
+            repairs[number] = {"issue": issue}
+
+    for pull_request_number, discovery in sorted(repairs.items()):
         pull_request = client.pull_request(pull_request_number)
-        title = pull_request.get("title")
-        if not isinstance(title, str) or not title.startswith(
-            _PLAN_AMENDMENT_TITLE_PREFIX
+        metadata = _plan_repair_metadata_from_pr(pull_request)
+        if metadata is None:
+            continue
+        origin = discovery["issue"]
+        if not isinstance(origin, QueueIssue):
+            continue
+        origin_pointer = parse_issue_pointer(origin.body)
+        if origin_pointer is None or origin_pointer["plan_id"] != metadata["plan_id"]:
+            raise GitHubIssueQueueError(
+                f"plan-repair PR #{pull_request_number} does not match its issue plan"
+            )
+        state = pull_request.get("state")
+        if pull_request.get("merged") is True:
+            merge_commit = pull_request.get("merge_commit_sha")
+            if not isinstance(merge_commit, str) or not re.fullmatch(
+                r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit
+            ):
+                raise GitHubIssueQueueError(
+                    f"merged plan-repair PR #{pull_request_number} has no merge commit"
+                )
+            _reconcile_merged_plan_repair(
+                client=client,
+                repo_root=repo_root,
+                plan_loader=plan_loader,
+                metadata=metadata,
+                pull_request_number=pull_request_number,
+                merge_commit=merge_commit,
+            )
+        elif state == "closed":
+            _restore_closed_plan_repair(
+                client=client,
+                metadata=metadata,
+                pull_request_number=pull_request_number,
+            )
+        else:
+            _mark_plan_repair_pending(
+                client=client,
+                metadata=metadata,
+                pull_request_number=pull_request_number,
+            )
+
+
+def _plan_repair_metadata_from_pr(
+    pull_request: Mapping[str, Any],
+) -> Mapping[str, Any] | None:
+    body = pull_request.get("body")
+    if not isinstance(body, str) or _PLAN_REPAIR_MARKER not in body:
+        return None
+    payload = _json_payload_after_marker(body, _PLAN_REPAIR_MARKER)
+    if (
+        payload is None
+        or payload.get("schema")
+        != "https://powdrr.io/schemas/github-issue-plan-repair-v1"
+        or not isinstance(payload.get("plan_id"), str)
+        or not isinstance(payload.get("plan_path"), str)
+        or not isinstance(payload.get("repair"), Mapping)
+    ):
+        raise GitHubIssueQueueError("plan-repair PR has malformed repair metadata")
+    repair = payload["repair"]
+    if (
+        not isinstance(repair.get("repair_id"), str)
+        or not isinstance(repair.get("affected_item_ids"), list)
+        or any(not isinstance(item, str) for item in repair["affected_item_ids"])
+        or not repair["affected_item_ids"]
+        or not isinstance(repair.get("old_item_digests"), Mapping)
+        or not isinstance(repair.get("new_item_digests"), Mapping)
+        or not isinstance(repair.get("old_input_contract_digests"), Mapping)
+        or not isinstance(repair.get("new_input_contract_digests"), Mapping)
+        or not isinstance(repair.get("retired_items"), list)
+    ):
+        raise GitHubIssueQueueError("plan-repair PR has an incomplete impact manifest")
+    return {
+        "plan_id": payload["plan_id"],
+        "plan_path": payload["plan_path"],
+        "repair": dict(repair),
+    }
+
+
+def _json_payload_after_marker(body: str, marker: str) -> Mapping[str, Any] | None:
+    try:
+        content = body.split(marker, 1)[1]
+        payload_text = content.split("```json\n", 1)[1].split("\n```", 1)[0]
+        value = json.loads(payload_text)
+    except (IndexError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, Mapping) else None
+
+
+def _active_plan_repair_pending(
+    comments: Sequence[Mapping[str, Any]],
+) -> Mapping[str, Any] | None:
+    pending_records: list[Mapping[str, Any]] = []
+    resolved_ids: set[str] = set()
+    for comment in comments:
+        body = comment.get("body")
+        if not isinstance(body, str):
+            continue
+        if _PLAN_REPAIR_RESOLVED_MARKER in body:
+            resolved = _json_payload_after_marker(body, _PLAN_REPAIR_RESOLVED_MARKER)
+            if isinstance(resolved, Mapping) and isinstance(
+                resolved.get("repair_id"), str
+            ):
+                resolved_ids.add(str(resolved["repair_id"]))
+        if _PLAN_REPAIR_PENDING_MARKER in body:
+            pending = _json_payload_after_marker(body, _PLAN_REPAIR_PENDING_MARKER)
+            if isinstance(pending, Mapping) and isinstance(
+                pending.get("repair_id"), str
+            ):
+                pending_records.append(pending)
+    for pending in reversed(pending_records):
+        if pending.get("repair_id") not in resolved_ids:
+            return pending
+    return None
+
+
+def _plan_repair_comment(marker: str, payload: Mapping[str, Any], title: str) -> str:
+    return (
+        f"### {title}\n\n{marker}\n```json\n"
+        f"{json.dumps(dict(payload), indent=2, ensure_ascii=False, sort_keys=True)}\n"
+        "```"
+    )
+
+
+def _mark_plan_repair_pending(
+    *,
+    client: GitHubIssueClient,
+    metadata: Mapping[str, Any],
+    pull_request_number: int,
+) -> None:
+    repair = metadata["repair"]
+    repair_id = str(repair["repair_id"])
+    plan_id = str(metadata["plan_id"])
+    plan_label = _plan_label(plan_id)
+    client.ensure_queue_labels()
+    issues = client.list_issues(labels=(plan_label,), state="all")
+    by_item = _plan_issue_index(issues)
+    pull_request_url = (
+        f"https://github.com/{client.repository}/pull/{pull_request_number}"
+    )
+    active_by_item = {
+        item_id: _active_plan_repair_pending(client.list_comments(issue.number))
+        for item_id in repair["affected_item_ids"]
+        if (issue := by_item.get((plan_id, item_id))) is not None
+    }
+    for item_id, pending in active_by_item.items():
+        if pending is not None and pending.get("repair_id") != repair_id:
+            issue = by_item[(plan_id, item_id)]
+            raise GitHubIssueQueueError(
+                f"issue #{issue.number} is already blocked by plan repair "
+                f"{pending.get('repair_id')}"
+            )
+    for item_id in repair["affected_item_ids"]:
+        issue = by_item.get((plan_id, item_id))
+        if issue is None:
+            continue
+        comments = client.list_comments(issue.number)
+        pending = _active_plan_repair_pending(comments)
+        if pending is None or pending.get("repair_id") != repair_id:
+            pointer = parse_issue_pointer(issue.body)
+            if pointer is None:
+                continue
+            prior_status = next(
+                (
+                    status
+                    for status, label in QUEUE_LABELS.items()
+                    if label in issue.labels
+                ),
+                "blocked",
+            )
+            client.add_comment(
+                issue,
+                _plan_repair_comment(
+                    _PLAN_REPAIR_PENDING_MARKER,
+                    {
+                        "repair_id": repair_id,
+                        "item_id": item_id,
+                        "pull_request_number": pull_request_number,
+                        "pull_request_url": pull_request_url,
+                        "prior_queue_status": prior_status,
+                        "prior_issue_state": issue.state,
+                        "prior_plan_commit": pointer["plan_commit"],
+                    },
+                    "Plan repair pending review",
+                ),
+            )
+        if issue.state == "open" and QUEUE_LABELS["blocked"] not in issue.labels:
+            client.update_issue(
+                issue,
+                labels=tuple(
+                    sorted(
+                        set(_replace_queue_status(issue.labels, "blocked"))
+                        | {PLAN_REPAIR_PENDING_LABEL}
+                    )
+                ),
+            )
+        elif issue.state == "open" and PLAN_REPAIR_PENDING_LABEL not in issue.labels:
+            client.update_issue(
+                issue,
+                labels=tuple(sorted((*issue.labels, PLAN_REPAIR_PENDING_LABEL))),
+            )
+
+
+def _refresh_pending_repair_prior_state(
+    client: GitHubIssueClient, issue: QueueIssue
+) -> None:
+    """Record the queue state left by a worker that paused for an open repair."""
+    pending = _active_plan_repair_pending(client.list_comments(issue.number))
+    if pending is None:
+        return
+    current_status = next(
+        (status for status, label in QUEUE_LABELS.items() if label in issue.labels),
+        "blocked",
+    )
+    if (
+        pending.get("prior_queue_status") == current_status
+        and pending.get("prior_issue_state") == issue.state
+    ):
+        return
+    updated = dict(pending)
+    updated["prior_queue_status"] = current_status
+    updated["prior_issue_state"] = issue.state
+    pointer = parse_issue_pointer(issue.body)
+    if pointer is not None:
+        updated["prior_plan_commit"] = pointer["plan_commit"]
+    client.add_comment(
+        issue,
+        _plan_repair_comment(
+            _PLAN_REPAIR_PENDING_MARKER,
+            updated,
+            "Plan repair pending review; worker state checkpointed",
+        ),
+    )
+
+
+def _restore_closed_plan_repair(
+    *,
+    client: GitHubIssueClient,
+    metadata: Mapping[str, Any],
+    pull_request_number: int,
+) -> None:
+    plan_id = str(metadata["plan_id"])
+    repair_id = str(metadata["repair"]["repair_id"])
+    for issue in client.list_issues(labels=(_plan_label(plan_id),), state="all"):
+        pointer = parse_issue_pointer(issue.body)
+        if (
+            pointer is None
+            or pointer["item_id"] not in metadata["repair"]["affected_item_ids"]
         ):
             continue
-        if pull_request.get("merged") is not True:
+        comments = client.list_comments(issue.number)
+        pending = _active_plan_repair_pending(comments)
+        is_this_pending = (
+            pending is not None
+            and pending.get("repair_id") == repair_id
+            and pending.get("pull_request_number") == pull_request_number
+        )
+        if is_this_pending and pending is not None:
+            pointer = parse_issue_pointer(issue.body)
+            if (
+                issue.state == "open"
+                and pointer is not None
+                and pointer["plan_commit"] == pending.get("prior_plan_commit")
+            ):
+                prior_status = pending.get("prior_queue_status")
+                if prior_status not in QUEUE_LABELS:
+                    prior_status = "blocked"
+                labels = set(_replace_queue_status(issue.labels, str(prior_status)))
+                labels.discard(PLAN_REPAIR_PENDING_LABEL)
+                client.update_issue(issue, labels=tuple(sorted(labels)))
+            client.add_comment(
+                issue,
+                _plan_repair_comment(
+                    _PLAN_REPAIR_RESOLVED_MARKER,
+                    {"repair_id": repair_id, "disposition": "closed_unmerged"},
+                    "Plan repair closed without merging",
+                ),
+            )
+        latest_issue = client.get_issue(issue.number)
+        if PLAN_REPAIR_PENDING_LABEL in latest_issue.labels:
+            client.update_issue(
+                latest_issue,
+                labels=tuple(
+                    sorted(set(latest_issue.labels) - {PLAN_REPAIR_PENDING_LABEL})
+                ),
+            )
+
+
+def _reconcile_merged_plan_repair(
+    *,
+    client: GitHubIssueClient,
+    repo_root: Path,
+    plan_loader: Callable[..., ReviewedExecutionPlan],
+    metadata: Mapping[str, Any],
+    pull_request_number: int,
+    merge_commit: str,
+) -> None:
+    plan_id = str(metadata["plan_id"])
+    plan_path = str(metadata["plan_path"])
+    repair = metadata["repair"]
+    repair_id = str(repair["repair_id"])
+    plan = plan_loader(plan_path, merge_commit, repo_root=repo_root)
+    if plan.plan_id != plan_id:
+        raise GitHubIssueQueueError("merged repair changed the plan ID")
+    latest_repair = plan.planning.get("latest_repair") if plan.planning else None
+    if not isinstance(latest_repair, Mapping) or dict(latest_repair) != dict(repair):
+        raise GitHubIssueQueueError(
+            "merged plan repair metadata does not match the compiled plan manifest"
+        )
+    client.ensure_plan_commit_merged(merge_commit)
+    client.ensure_queue_labels()
+    plan_label = client.ensure_plan_label(plan_id)
+    active_items = {item.item_id: item for item in plan.items}
+    retired = {
+        str(record.get("item_id")): record
+        for record in repair["retired_items"]
+        if isinstance(record, Mapping) and isinstance(record.get("item_id"), str)
+    }
+    issues = client.list_issues(labels=(plan_label,), state="all")
+    by_item = _plan_issue_index(issues)
+    by_number = {issue.number: issue for issue in by_item.values()}
+    for item_id in repair["affected_item_ids"]:
+        issue = by_item.get((plan_id, item_id))
+        item = active_items.get(item_id)
+        disposition = retired.get(item_id)
+        if issue is None and item is not None:
+            initial = "ready" if not item.dependencies else "blocked_on_dependency"
+            issue = client.create_issue(
+                title=f"Powdrr work item: {plan_id}/{item_id}",
+                body=_issue_pointer_body(
+                    plan_id,
+                    item_id,
+                    plan_path,
+                    merge_commit,
+                    repository=client.repository,
+                ),
+                labels=(QUEUE_LABELS[initial], plan_label),
+            )
+            by_item[(plan_id, item_id)] = issue
+            by_number[issue.number] = issue
+        if issue is None:
             continue
-        merge_commit = pull_request.get("merge_commit_sha")
-        if not isinstance(merge_commit, str) or not re.fullmatch(
-            r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit
-        ):
-            raise GitHubIssueQueueError(
-                f"merged plan-amendment PR #{pull_request_number} has no merge commit"
+        comments = client.list_comments(issue.number)
+        pending = _active_plan_repair_pending(comments)
+        prior_status = (
+            str(pending.get("prior_queue_status"))
+            if pending is not None and pending.get("repair_id") == repair_id
+            else None
+        )
+        marker_key = (repair_id, item_id, merge_commit)
+        if _has_repair_reconciliation(comments, marker_key):
+            continue
+
+        if item is not None:
+            client.update_issue(
+                issue,
+                body=_issue_pointer_body(
+                    plan_id,
+                    item_id,
+                    plan_path,
+                    merge_commit,
+                    repository=client.repository,
+                ),
             )
-        plan = plan_loader(pointer["plan_path"], merge_commit, repo_root=repo_root)
-        if plan.plan_id != pointer["plan_id"]:
-            raise GitHubIssueQueueError(
-                f"merged plan-amendment PR #{pull_request_number} changed the plan ID"
+        elif disposition is not None and disposition.get("disposition") == "superseded":
+            successor_ids = disposition.get("successor_item_ids", [])
+            successor_links = [
+                by_item[(plan_id, successor)].url
+                for successor in successor_ids
+                if (plan_id, successor) in by_item
+            ]
+            was_open = issue.state == "open" or (
+                pending is not None
+                and pending.get("repair_id") == repair_id
+                and pending.get("prior_issue_state") == "open"
             )
-        item = next(
-            (
-                candidate
-                for candidate in plan.items
-                if candidate.item_id == pointer["item_id"]
-            ),
-            None,
-        )
-        if item is None:
-            raise GitHubIssueQueueError(
-                "merged plan-amendment PR "
-                f"#{pull_request_number} removed the issue item"
+            if issue.state == "open":
+                client.update_issue(
+                    issue,
+                    labels=tuple(
+                        sorted(set(issue.labels) - set(QUEUE_LABELS.values()))
+                    ),
+                    state="closed",
+                    state_reason="completed",
+                )
+            if was_open and not _has_repair_notice(
+                comments, _PLAN_REPAIR_SUPERSEDED_MARKER, repair_id, item_id
+            ):
+                client.add_comment(
+                    issue,
+                    _plan_repair_comment(
+                        _PLAN_REPAIR_SUPERSEDED_MARKER,
+                        {
+                            "repair_id": repair_id,
+                            "item_id": item_id,
+                            "successor_item_ids": successor_ids,
+                            "successor_urls": successor_links,
+                        },
+                        "Work item superseded by plan repair",
+                    ),
+                )
+
+        if item is not None:
+            new_digest = repair["new_input_contract_digests"].get(item_id)
+            if not isinstance(new_digest, str):
+                from powdrr_lift.workrr.planning.repair import (
+                    item_input_contract_digest,
+                )
+
+                new_digest = item_input_contract_digest(item, plan.planning)
+            stale_checkpoints: list[str] = []
+            checkpoint_payloads = _task_checkpoint_payloads(comments)
+            awaiting_human_unchanged = bool(checkpoint_payloads)
+            for checkpoint in checkpoint_payloads:
+                task_id = checkpoint.get("task_id")
+                digest = checkpoint.get("input_contract_digest")
+                if digest != new_digest:
+                    awaiting_human_unchanged = False
+                    if isinstance(task_id, str):
+                        stale_checkpoints.append(task_id)
+            keep_awaiting_human = (
+                prior_status == "awaiting_human" and awaiting_human_unchanged
             )
-        client.ensure_plan_commit_merged(merge_commit)
-        updated_body = _issue_pointer_body(
-            pointer["plan_id"],
-            pointer["item_id"],
-            pointer["plan_path"],
-            merge_commit,
-            repository=client.repository,
-        )
-        indexed = _plan_issue_index(
-            client.list_issues(labels=(_plan_label(plan.plan_id),))
-        )
-        by_number = {value.number: value for value in indexed.values()}
-        dependencies_closed = all(
-            _dependency_is_closed(indexed.get((plan.plan_id, dependency)), by_number)
-            for dependency in item.dependencies
-        )
-        status = "ready" if dependencies_closed else "blocked_on_dependency"
-        client.update_issue(
-            issue,
-            body=updated_body,
-            labels=_replace_queue_status(issue.labels, status),
-        )
+            if issue.state == "open":
+                if keep_awaiting_human:
+                    status = "awaiting_human"
+                else:
+                    dependencies_closed = all(
+                        _dependency_is_closed(
+                            by_item.get((plan_id, dependency)), by_number
+                        )
+                        for dependency in item.dependencies
+                    )
+                    status = "ready" if dependencies_closed else "blocked_on_dependency"
+                issue = client.get_issue(issue.number)
+                client.update_issue(
+                    issue,
+                    labels=_replace_queue_status(issue.labels, status),
+                )
+            manual_prerequisite_invalidated = (
+                prior_status == "awaiting_human" and not awaiting_human_unchanged
+            )
+            if (stale_checkpoints or manual_prerequisite_invalidated) and not (
+                _has_repair_notice(
+                    comments,
+                    _PLAN_REPAIR_INVALIDATION_MARKER,
+                    repair_id,
+                    item_id,
+                )
+            ):
+                client.add_comment(
+                    issue,
+                    _plan_repair_comment(
+                        _PLAN_REPAIR_INVALIDATION_MARKER,
+                        {
+                            "repair_id": repair_id,
+                            "item_id": item_id,
+                            "invalidated_task_ids": sorted(set(stale_checkpoints)),
+                            "manual_prerequisite_invalidated": (
+                                manual_prerequisite_invalidated
+                            ),
+                        },
+                        "Task checkpoints invalidated by plan repair",
+                    ),
+                )
         client.add_comment(
             issue,
-            "Powdrr detected that plan-amendment PR "
-            f"https://github.com/{client.repository}/pull/{pull_request_number} "
-            f"merged. This issue now points to the amended plan at `{merge_commit}` "
-            f"and was requeued as `{status.replace('_', ' ')}` for execution.",
+            _plan_repair_comment(
+                _PLAN_REPAIR_RECONCILED_MARKER,
+                {
+                    "repair_id": repair_id,
+                    "item_id": item_id,
+                    "merge_commit": merge_commit,
+                    "idempotency_key": list(marker_key),
+                },
+                "Plan repair reconciled",
+            ),
         )
+
+    # Clear pending state after all affected rows have their new revision and
+    # labels. A retry can safely finish this loop after any individual API error.
+    affected_ids = set(str(item_id) for item_id in repair["affected_item_ids"])
+    for item_id in affected_ids:
+        issue = by_item.get((plan_id, item_id))
+        if issue is None:
+            continue
+        comments = client.list_comments(issue.number)
+        pending = _active_plan_repair_pending(comments)
+        if pending is not None and pending.get("repair_id") == repair_id:
+            client.add_comment(
+                issue,
+                _plan_repair_comment(
+                    _PLAN_REPAIR_RESOLVED_MARKER,
+                    {
+                        "repair_id": repair_id,
+                        "disposition": "merged",
+                        "merge_commit": merge_commit,
+                    },
+                    "Plan repair applied",
+                ),
+            )
+        latest_issue = client.get_issue(issue.number)
+        if PLAN_REPAIR_PENDING_LABEL in latest_issue.labels:
+            client.update_issue(
+                latest_issue,
+                labels=tuple(
+                    sorted(set(latest_issue.labels) - {PLAN_REPAIR_PENDING_LABEL})
+                ),
+            )
+
+
+def _has_repair_reconciliation(
+    comments: Sequence[Mapping[str, Any]], key: tuple[str, str, str]
+) -> bool:
+    for comment in comments:
+        body = comment.get("body")
+        if not isinstance(body, str) or _PLAN_REPAIR_RECONCILED_MARKER not in body:
+            continue
+        payload = _json_payload_after_marker(body, _PLAN_REPAIR_RECONCILED_MARKER)
+        if (
+            isinstance(payload, Mapping)
+            and tuple(payload.get("idempotency_key", ())) == key
+        ):
+            return True
+    return False
+
+
+def _has_repair_notice(
+    comments: Sequence[Mapping[str, Any]],
+    marker: str,
+    repair_id: str,
+    item_id: str,
+) -> bool:
+    for comment in comments:
+        body = comment.get("body")
+        if not isinstance(body, str) or marker not in body:
+            continue
+        payload = _json_payload_after_marker(body, marker)
+        if (
+            isinstance(payload, Mapping)
+            and payload.get("repair_id") == repair_id
+            and payload.get("item_id") == item_id
+        ):
+            return True
+    return False
+
+
+def _task_checkpoint_payloads(
+    comments: Sequence[Mapping[str, Any]],
+) -> tuple[Mapping[str, Any], ...]:
+    checkpoints: list[Mapping[str, Any]] = []
+    for comment in comments:
+        body = comment.get("body")
+        if not isinstance(body, str) or _TASK_CHECKPOINT_START not in body:
+            continue
+        payload = _json_payload_after_marker(body, _TASK_CHECKPOINT_START)
+        if isinstance(payload, Mapping):
+            checkpoints.append(payload)
+    return tuple(checkpoints)
 
 
 def _latest_checkpoint_pull_request_url(
@@ -1632,10 +2395,9 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
         raise GitHubIssueQueueError(f"invalid plan YAML: {error}") from error
     if not isinstance(data, Mapping) or data.get("schema") != QUEUE_SCHEMA:
         raise GitHubIssueQueueError(f"plan schema must be {QUEUE_SCHEMA!r}")
-    if set(data) not in (
-        {"schema", "plan_id", "items"},
-        {"schema", "plan_id", "source_document", "items"},
-    ):
+    allowed_fields = {"schema", "plan_id", "source_document", "items", "planning"}
+    required_fields = {"schema", "plan_id", "items"}
+    if not required_fields <= set(data) or set(data) - allowed_fields:
         raise GitHubIssueQueueError("plan has unknown or missing top-level fields")
     plan_id = data.get("plan_id")
     source_document = data.get("source_document")
@@ -1748,7 +2510,23 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             )
     if _has_dependency_cycle(items):
         raise GitHubIssueQueueError("plan dependencies must be acyclic")
-    return ReviewedExecutionPlan(plan_id, tuple(items), source_document)
+    planning = data.get("planning")
+    if planning is not None:
+        if not isinstance(planning, Mapping):
+            raise GitHubIssueQueueError("planning metadata must be a mapping")
+        try:
+            # Local import keeps the legacy queue parser independent at module
+            # import time while validating new metadata when it is present.
+            from powdrr_lift.workrr.planning.compiler import PlanningManifest
+
+            PlanningManifest.from_data(planning)
+        except (ValueError, TypeError) as error:
+            raise GitHubIssueQueueError(
+                f"invalid planning metadata: {error}"
+            ) from error
+    return ReviewedExecutionPlan(
+        plan_id, tuple(items), source_document, dict(planning) if planning else None
+    )
 
 
 def _required_text(raw: Mapping[str, Any], key: str, field: str) -> str:

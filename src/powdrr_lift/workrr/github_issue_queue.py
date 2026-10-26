@@ -16,7 +16,7 @@ from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from pathlib import Path
-from time import sleep
+from time import sleep, time
 from typing import Any
 from urllib.parse import quote
 
@@ -151,12 +151,16 @@ class GitHubIssueClient:
         *,
         executable: str = "gh",
         run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+        sleep_fn: Callable[[float], None] = sleep,
+        rate_limit_retries: int = 6,
     ) -> None:
         if not re.fullmatch(r"[^/\s]+/[^/\s]+", repository):
             raise GitHubIssueQueueError("repository must use owner/name form")
         self.repository = repository
         self.executable = executable
         self._run = run
+        self._sleep = sleep_fn
+        self._rate_limit_retries = max(0, rate_limit_retries)
 
     def list_issues(
         self, *, labels: Sequence[str] = (), state: str = "all"
@@ -340,12 +344,31 @@ class GitHubIssueClient:
         self._api(*arguments)
 
     def add_comment(self, issue: QueueIssue, body: str) -> None:
-        self._api(
-            "POST",
+        arguments = [
+            "api",
+            "--include",
             f"repos/{self.repository}/issues/{issue.number}/comments",
+            "--method",
+            "POST",
             "-f",
             f"body={body}",
-        )
+        ]
+        for attempt in range(self._rate_limit_retries + 1):
+            result = self._invoke(arguments, check=False)
+            if result.returncode == 0:
+                return
+            if not _is_github_rate_limit_response(result):
+                raise GitHubIssueQueueError(
+                    "GitHub API POST "
+                    f"repos/{self.repository}/issues/{issue.number}/comments "
+                    f"failed: {result.stderr.strip()}"
+                )
+            if attempt >= self._rate_limit_retries:
+                raise GitHubIssueQueueError(
+                    "GitHub issue comment rate limit remained active after "
+                    f"{attempt} retries: {result.stderr.strip()}"
+                )
+            self._sleep(_github_retry_delay(result, attempt))
 
     def list_comments(self, issue_number: int) -> tuple[Mapping[str, Any], ...]:
         result = self._invoke(
@@ -396,6 +419,36 @@ class GitHubIssueClient:
                 f"GitHub command failed: {result.stderr.strip()}"
             )
         return result
+
+
+def _is_github_rate_limit_response(
+    result: subprocess.CompletedProcess[str],
+) -> bool:
+    response = f"{result.stdout}\n{result.stderr}".lower()
+    if "http 429" in response or "status 429" in response:
+        return True
+    return ("http 403" in response or "status 403" in response) and any(
+        marker in response
+        for marker in (
+            "rate limit",
+            "secondary rate",
+            "abuse detection",
+            "temporarily blocked from content creation",
+        )
+    )
+
+
+def _github_retry_delay(
+    result: subprocess.CompletedProcess[str], attempt: int
+) -> float:
+    response = f"{result.stdout}\n{result.stderr}"
+    retry_after = re.search(r"retry-after\s*[:=]\s*(\d+)", response, re.IGNORECASE)
+    if retry_after is not None:
+        return float(retry_after.group(1))
+    reset = re.search(r"x-ratelimit-reset\s*:\s*(\d+)", response, re.IGNORECASE)
+    if reset is not None:
+        return max(0.0, float(reset.group(1)) - time())
+    return float(min(60 * (2**attempt), 900))
 
 
 def load_reviewed_plan(

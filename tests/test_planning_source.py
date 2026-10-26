@@ -403,6 +403,37 @@ def test_requirement_extraction_pagination_cursor_must_advance_in_block() -> Non
         )
 
 
+def test_requirement_question_distinguishes_cursors_from_adjacent_citations() -> None:
+    segmented = segment_markdown_source(
+        _document(
+            "# Plan\n\n"
+            "First requirement must work. Second requirement must persist.\n\n"
+            "Adjacent context explains the first requirement.\n"
+        )
+    )
+    blocks = [block for block in segmented.blocks if block.kind == "paragraph"]
+    assert len(blocks) == 2
+    block, adjacent = blocks
+    request = build_extract_requirements_request(
+        block,
+        anchors={anchor.id: anchor for anchor in segmented.anchors},
+        related_blocks=(adjacent,),
+    )
+
+    candidates = ", ".join(block.anchor_ids)
+    assert candidates in request.exact_question
+    assert "must never be used as pagination cursors" in request.exact_question
+    assert adjacent.anchor_ids[0] not in block.anchor_ids
+    with pytest.raises(ValueError, match="current source block"):
+        request.parse_answer(
+            {
+                "records": [],
+                "has_more": True,
+                "next_anchor": adjacent.anchor_ids[0],
+            }
+        )
+
+
 def test_high_density_prose_is_subdivided_before_anchor_context_overflows() -> None:
     text = " ".join(
         f"Requirement number {index} must be preserved." for index in range(90)

@@ -270,15 +270,6 @@ def advance_planning_session(
 
     parent = journal.head.digest if journal.head is not None else None
     sequence = 1 if journal.head is None else journal.head.sequence + 1
-    started = PlanningCheckpoint.question_started(
-        session_id=session.session_id,
-        event_id=f"question-started-{sequence:06d}",
-        sequence=sequence,
-        parent_digest=parent,
-        question=question,
-        id_counters=journal.id_counters,
-    )
-    journal = checkpoint_store.append(started, expected_parent_digest=parent)
     result = run_question(
         client,
         request,
@@ -287,22 +278,18 @@ def advance_planning_session(
         max_transport_retries=options.max_transport_retries,
         transport_backoff_seconds=options.transport_backoff_seconds,
     )
-    head = journal.head
-    if head is None:
-        raise PlanningJournalError("question start checkpoint was not persisted")
-    next_sequence = head.sequence + 1
     if isinstance(result, NeedsQuestionAnswer):
         checkpoint = PlanningCheckpoint.needs_answer(
             session_id=session.session_id,
-            event_id=f"needs-answer-{next_sequence:06d}",
-            sequence=next_sequence,
-            parent_digest=head.digest,
+            event_id=f"needs-answer-{sequence:06d}",
+            sequence=sequence,
+            parent_digest=parent,
             question=result.question,
             error=result.error,
             previous_answer=result.previous_answer,
             id_counters=journal.id_counters,
         )
-        checkpoint_store.append(checkpoint, expected_parent_digest=head.digest)
+        checkpoint_store.append(checkpoint, expected_parent_digest=parent)
         return PlanningTransition(
             "needs_answer",
             session.session_id,
@@ -314,15 +301,15 @@ def advance_planning_session(
     assert isinstance(result, AcceptedQuestionAnswer)
     checkpoint = PlanningCheckpoint.answer_accepted(
         session_id=session.session_id,
-        event_id=f"answer-accepted-{next_sequence:06d}",
-        sequence=next_sequence,
-        parent_digest=head.digest,
+        event_id=f"answer-accepted-{sequence:06d}",
+        sequence=sequence,
+        parent_digest=parent,
         question=result.question,
         accepted_answer=result.raw_answer,
         validation_result={"accepted": True, "attempts": result.attempts},
         id_counters=journal.id_counters,
     )
-    checkpoint_store.append(checkpoint, expected_parent_digest=head.digest)
+    checkpoint_store.append(checkpoint, expected_parent_digest=parent)
     return PlanningTransition(
         "question_accepted",
         session.session_id,

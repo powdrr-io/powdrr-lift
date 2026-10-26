@@ -255,8 +255,7 @@ def advance_planning_session(
             for event in reversed(journal.events)
             if event.event_type == "answer_accepted"
             and isinstance(event.payload.get("question"), Mapping)
-            and event.payload["question"].get("question_id")
-            == question.question_id
+            and event.payload["question"].get("question_id") == question.question_id
         )
         if existing.payload.get("input_digest") != question.input_digest:
             raise PlanningServiceError(

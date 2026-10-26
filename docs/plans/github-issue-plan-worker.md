@@ -78,9 +78,14 @@ and instructions in a PR, pauses before that validation, and resumes it after
 the person completes setup. The generator copies this declaration into the
 workflow's reviewed item context, and the worker checks that it still matches
 the pinned plan. The durable workflow stages a PR with the instructions and
-records an issue checkpoint;
+stores its recovery checkpoint locally under
+`.powdrr/github-issue-worker/checkpoints/`. The issue is marked claimed while
+work runs, then receives its final status after the workflow finishes or exhausts
+its retries.
 `github-issue-worker-continue` retries CI and resumes the same issue after the
-person completes the setup. Items with manual prerequisites stay separate
+person completes the setup, using the local checkpoint. Existing issue
+checkpoint comments remain readable during rollout, but new task checkpoints
+are not posted as issue comments. Items with manual prerequisites stay separate
 during automatic PR sizing so their setup tasks are not lost or merged into
 unrelated work. The reviewed plan remains the source for the item's objective,
 scope, acceptance criteria, and dependency graph. The worker reads the
@@ -189,13 +194,13 @@ when all prerequisite issues are closed, then selects the lowest-numbered
 eligible item, marks it `claimed`, and invokes the existing
 `process-workflow-task` runtime for the workflow named by the pinned plan.
 
-When a workflow task finishes, the worker first commits and pushes its workflow
-state, then appends a `Powdrr task checkpoint` comment to that item's issue. The
-comment contains the plan, item, workflow, and task IDs; the declared output
-state type and value; and the commit SHA containing the persisted workflow
-state. These comments form a task-by-task history alongside the issue's queue
-labels and claim/final-status comments. They are scoped to one issue; plan-level
-dependencies continue to determine when an item becomes eligible to run.
+When a workflow task finishes, the worker commits and pushes its workflow state
+and atomically writes a local checkpoint containing the plan, item, workflow,
+and task IDs, output state, and commit SHA. The checkpoint is kept outside the
+issue discussion to avoid a GitHub API write for every completed task. The issue
+retains its claim state while the task runner retries; after execution returns,
+the worker records one final status and summary. A failure status is written
+only after the task runner has exhausted its retries.
 
 ## Small inline plan adjustments
 

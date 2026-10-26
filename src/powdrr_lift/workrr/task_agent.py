@@ -4918,8 +4918,8 @@ def run_workflow_task(
                     return 0
                 if workflow_git_state is not None:
                     # Workflow execution state is persisted at task boundaries;
-                    # issue-backed callers additionally record the checkpoint on
-                    # the issue. The workflow itself does not need a pull request.
+                    # issue-backed callers keep a local recovery checkpoint. The
+                    # workflow itself does not need a pull request.
                     return 0
                 if not _is_git_worktree(repo_root):
                     return 0

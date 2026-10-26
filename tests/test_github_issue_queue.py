@@ -431,10 +431,72 @@ def test_github_issue_client_filters_issue_state_locally_for_labeled_queries() -
     client = GitHubIssueClient("example/project", run=run)
     issues = client.list_issues(labels=(QUEUE_LABELS["ready"],), state="open")
     assert [issue.number for issue in issues] == [1]
-
     assert commands[0][-1] == (
         "repos/example/project/issues?state=all&per_page=100&labels=powdrr%3Aready"
     )
+
+
+def test_github_issue_comment_retries_github_rate_limits_with_backoff() -> None:
+    commands: list[list[str]] = []
+    delays: list[float] = []
+    responses = iter(
+        (
+            subprocess.CompletedProcess(
+                [],
+                1,
+                "",
+                "gh: You have exceeded a secondary rate limit (HTTP 403)",
+            ),
+            subprocess.CompletedProcess(
+                [], 1, "", "gh: API rate limited (HTTP 429) Retry-After: 3"
+            ),
+            subprocess.CompletedProcess([], 0, "{}", ""),
+        )
+    )
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        response = next(responses)
+        return subprocess.CompletedProcess(
+            arguments,
+            response.returncode,
+            response.stdout,
+            response.stderr,
+        )
+
+    client = GitHubIssueClient("example/project", run=run, sleep_fn=delays.append)
+    issue = QueueIssue(
+        42,
+        "Planning session",
+        "",
+        "open",
+        (),
+        "https://github.com/example/project/issues/42",
+    )
+
+    client.add_comment(issue, "checkpoint")
+
+    assert len(commands) == 3
+    assert delays == [60.0, 3.0]
+
+
+def test_github_issue_comment_does_not_retry_unrelated_forbidden_response() -> None:
+    delays: list[float] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(arguments, 1, "", "HTTP 403 Forbidden")
+
+    client = GitHubIssueClient("example/project", run=run, sleep_fn=delays.append)
+    issue = QueueIssue(42, "Planning session", "", "open", (), "")
+
+    with pytest.raises(GitHubIssueQueueError, match="HTTP 403 Forbidden"):
+        client.add_comment(issue, "checkpoint")
+
+    assert delays == []
 
 
 def test_github_issue_client_closes_fulfilled_issue_with_completed_reason() -> None:

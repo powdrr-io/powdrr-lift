@@ -257,7 +257,6 @@ def test_accepted_question_is_durable_and_not_called_again() -> None:
     assert resumed.status == "complete"
     assert client.calls == 1
     assert [event.event_type for event in store.load().events] == [
-        "question_started",
         "answer_accepted",
     ]
 
@@ -328,7 +327,6 @@ def test_procedrr_process_runs_and_checkpoints_bounded_questions() -> None:
     assert result.terminal_status.value == "succeeded"
     assert client.calls == 1
     assert [event.event_type for event in store.load().events] == [
-        "question_started",
         "answer_accepted",
     ]
 

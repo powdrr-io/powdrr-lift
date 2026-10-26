@@ -817,6 +817,11 @@ def build_extract_requirements_request(
     supplied_anchor_ids = tuple(
         dict.fromkeys(ref for item in supplied_blocks for ref in item.anchor_ids)
     )
+    cursor_index = -1 if after_anchor is None else block.anchor_ids.index(after_anchor)
+    pagination_candidates = block.anchor_ids[cursor_index + 1 :]
+    pagination_candidate_text = (
+        ", ".join(pagination_candidates) if pagination_candidates else "(none)"
+    )
     if any(ref not in anchors for ref in supplied_anchor_ids):
         raise PlanningSourceError("source block references a missing source anchor")
     excerpts = tuple(
@@ -871,7 +876,13 @@ def build_extract_requirements_request(
             "Cite direct anchors and related anchors from supplied adjacent blocks "
             "when needed. The anchor registry gives IDs and exact source ranges. "
             "Do not repeat accepted records. Return at most eight; if more remain, "
-            "set next_anchor to a later anchor in the current block."
+            "set next_anchor to one of the listed pagination candidates. "
+            f"Pagination candidates after the current cursor, in source order: "
+            f"{pagination_candidate_text}. Only these IDs may be used for "
+            "next_anchor; anchors from adjacent blocks may be cited by records "
+            "but must never be used as pagination cursors. next_anchor is a cursor, "
+            "not a citation. If this block has no further obligations, or there are "
+            "no pagination candidates, return has_more=false and next_anchor=null."
         ),
         field_definitions={
             "records": "Obligations with statement, kind, and source references.",
@@ -879,7 +890,11 @@ def build_extract_requirements_request(
             "source_refs": "One or more anchors directly imposing this obligation.",
             "related_source_refs": "Anchors for cross-references or dependencies.",
             "has_more": "Whether another page of obligations remains in this block.",
-            "next_anchor": "A later anchor, or null on the final page.",
+            "next_anchor": (
+                "If has_more is true, exactly one of these later anchors in this "
+                f"block: {pagination_candidate_text}. This is only a pagination "
+                "cursor, not a source citation. Otherwise null."
+            ),
         },
         excerpts=excerpts,
         accepted_facts=anchor_facts,

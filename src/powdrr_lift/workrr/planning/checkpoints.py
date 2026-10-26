@@ -114,7 +114,7 @@ class PlanningCheckpoint:
         session_id: str,
         event_id: str,
         sequence: int,
-        parent_digest: str,
+        parent_digest: str | None,
         question: Question,
         accepted_answer: Mapping[str, Any],
         validation_result: Mapping[str, Any],

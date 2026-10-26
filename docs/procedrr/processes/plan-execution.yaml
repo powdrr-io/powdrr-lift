@@ -1,0 +1,57 @@
+version: 1
+name: plan-execution
+description: >-
+  Advance one durable bounded-planning question at a time, then return control to
+  the planning service when every question in the current state machine is
+  accepted. The tracker issue is not an executable queue item.
+inputs:
+  - {name: session_id, type: string, required: true}
+  - {name: issue_number, type: integer, required: true}
+steps:
+  - operation:
+      tool: internal
+      command: [planning_initialize]
+      parameters:
+        session_id: {type: reference, value: session_id}
+        issue_number: {type: reference, value: issue_number}
+      returns:
+        type: object
+        required: [status, session_id, issue_number]
+        properties:
+          status: {type: string, enum: [question_accepted, needs_answer, complete]}
+          session_id: {type: string, minLength: 1}
+          issue_number: {type: integer, minimum: 1}
+          question_id: {type: [string, "null"]}
+          accepted_answer: {type: [object, "null"]}
+          error: {type: [string, "null"]}
+      bind: transition
+  - repeat:
+      max_iterations: 10000
+      until: {subject: transition.status, equals: complete}
+      body:
+        - operation:
+            tool: internal
+            command: [planning_advance]
+            parameters:
+              session_id: {type: reference, value: session_id}
+              issue_number: {type: reference, value: issue_number}
+            returns:
+              type: object
+              required: [status, session_id, issue_number]
+              properties:
+                status:
+                  type: string
+                  enum: [question_accepted, needs_answer, complete]
+                session_id: {type: string, minLength: 1}
+                issue_number: {type: integer, minimum: 1}
+                question_id: {type: [string, "null"]}
+                accepted_answer: {type: [object, "null"]}
+                error: {type: [string, "null"]}
+            bind: transition
+        - branch:
+            subject: transition.status
+            cases:
+              needs_answer:
+                - terminal: blocked
+            default: []
+  - terminal: succeeded

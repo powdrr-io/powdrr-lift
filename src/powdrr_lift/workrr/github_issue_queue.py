@@ -152,7 +152,7 @@ class GitHubIssueClient:
         executable: str = "gh",
         run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
         sleep_fn: Callable[[float], None] = sleep,
-        comment_write_retries: int = 6,
+        api_retries: int = 6,
     ) -> None:
         if not re.fullmatch(r"[^/\s]+/[^/\s]+", repository):
             raise GitHubIssueQueueError("repository must use owner/name form")
@@ -160,7 +160,7 @@ class GitHubIssueClient:
         self.executable = executable
         self._run = run
         self._sleep = sleep_fn
-        self._comment_write_retries = max(0, comment_write_retries)
+        self._api_retries = max(0, api_retries)
 
     def list_issues(
         self, *, labels: Sequence[str] = (), state: str = "all"
@@ -353,38 +353,20 @@ class GitHubIssueClient:
             "-f",
             f"body={body}",
         ]
-        for attempt in range(self._comment_write_retries + 1):
-            result = self._invoke(arguments, check=False)
-            if result.returncode == 0:
-                return
-            rate_limited = _is_github_rate_limit_response(result)
-            transient_write_error = _is_github_transient_comment_write_error(result)
-            if not rate_limited and not transient_write_error:
-                raise GitHubIssueQueueError(
-                    "GitHub API POST "
-                    f"repos/{self.repository}/issues/{issue.number}/comments "
-                    f"failed: {result.stderr.strip()}"
-                )
-            if attempt >= self._comment_write_retries:
-                raise GitHubIssueQueueError(
-                    "GitHub issue comment write remained unsuccessful after "
-                    f"{attempt} retries: {result.stderr.strip()}"
-                )
-            delay = (
-                _github_retry_delay(result, attempt)
-                if rate_limited
-                else _github_server_retry_delay(attempt)
-            )
-            self._sleep(delay)
+        self._invoke_comment_api(
+            arguments,
+            operation=(f"POST repos/{self.repository}/issues/{issue.number}/comments"),
+        )
 
     def list_comments(self, issue_number: int) -> tuple[Mapping[str, Any], ...]:
-        result = self._invoke(
+        result = self._invoke_comment_api(
             [
                 "api",
                 "--paginate",
                 "--slurp",
                 f"repos/{self.repository}/issues/{issue_number}/comments?per_page=100",
-            ]
+            ],
+            operation=(f"GET repos/{self.repository}/issues/{issue_number}/comments"),
         )
         try:
             pages = json.loads(result.stdout)
@@ -394,6 +376,34 @@ class GitHubIssueClient:
             ) from error
         return tuple(
             value for value in _flatten_pages(pages) if isinstance(value, Mapping)
+        )
+
+    def _invoke_comment_api(
+        self, arguments: Sequence[str], *, operation: str
+    ) -> subprocess.CompletedProcess[str]:
+        for attempt in range(self._api_retries + 1):
+            result = self._invoke(arguments, check=False)
+            if result.returncode == 0:
+                return result
+            rate_limited = _is_github_rate_limit_response(result)
+            transient_error = _is_github_transient_api_error(result)
+            if not rate_limited and not transient_error:
+                raise GitHubIssueQueueError(
+                    f"GitHub API {operation} failed: {result.stderr.strip()}"
+                )
+            if attempt >= self._api_retries:
+                raise GitHubIssueQueueError(
+                    f"GitHub API {operation} remained unsuccessful after "
+                    f"{attempt} retries: {result.stderr.strip()}"
+                )
+            delay = (
+                _github_retry_delay(result, attempt)
+                if rate_limited
+                else _github_server_retry_delay(attempt)
+            )
+            self._sleep(delay)
+        raise GitHubIssueQueueError(
+            f"GitHub API {operation} failed after the retry limit"
         )
 
     def pull_request(self, number: int) -> Mapping[str, Any]:
@@ -445,7 +455,7 @@ def _is_github_rate_limit_response(
     )
 
 
-def _is_github_transient_comment_write_error(
+def _is_github_transient_api_error(
     result: subprocess.CompletedProcess[str],
 ) -> bool:
     response = f"{result.stdout}\n{result.stderr}".lower()
@@ -466,6 +476,7 @@ def _is_github_transient_comment_write_error(
             "status 504",
             "connection reset by peer",
             "connection timed out",
+            "operation timed out",
             "i/o timeout",
             "tls handshake timeout",
             "unexpected eof",

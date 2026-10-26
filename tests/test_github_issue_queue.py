@@ -550,6 +550,35 @@ def test_github_issue_comment_retries_connection_reset() -> None:
     assert delays == [1.0]
 
 
+def test_github_issue_comment_listing_retries_transient_timeout() -> None:
+    commands: list[list[str]] = []
+    delays: list[float] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        if len(commands) == 1:
+            return subprocess.CompletedProcess(
+                arguments,
+                1,
+                "",
+                "Get https://api.github.com: read tcp: operation timed out",
+            )
+        return subprocess.CompletedProcess(
+            arguments, 0, json.dumps([[{"id": 1, "body": "checkpoint"}]]), ""
+        )
+
+    client = GitHubIssueClient("example/project", run=run, sleep_fn=delays.append)
+
+    comments = client.list_comments(42)
+
+    assert comments == ({"id": 1, "body": "checkpoint"},)
+    assert len(commands) == 2
+    assert commands[0] == commands[1]
+    assert delays == [1.0]
+
+
 def test_github_issue_client_closes_fulfilled_issue_with_completed_reason() -> None:
     commands: list[list[str]] = []
 

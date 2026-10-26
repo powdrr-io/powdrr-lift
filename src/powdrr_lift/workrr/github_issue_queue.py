@@ -77,6 +77,7 @@ class ReviewedExecutionPlan:
     plan_id: str
     items: tuple[PlannedWorkItem, ...]
     source_document: str | None = None
+    planning: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -395,6 +396,40 @@ def load_reviewed_plan(
 def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
     """Parse and validate a GitHub issue execution plan document."""
     return _parse_plan(text)
+
+
+def serialize_reviewed_plan_yaml(plan: ReviewedExecutionPlan) -> str:
+    """Deterministically serialize a typed execution plan, including metadata."""
+    data: dict[str, Any] = {"schema": QUEUE_SCHEMA, "plan_id": plan.plan_id}
+    if plan.source_document is not None:
+        data["source_document"] = plan.source_document
+    items = []
+    for item in plan.items:
+        record: dict[str, Any] = {
+            "id": item.item_id,
+            "title": item.title,
+            "objective": item.objective,
+            "scope": list(item.scope),
+            "acceptance_criteria": list(item.acceptance_criteria),
+            "dependencies": list(item.dependencies),
+            "workflow_file": item.workflow_file or item.workflow_directory,
+            "workflow_id": item.workflow_id,
+        }
+        if item.implementation_steps:
+            record["implementation_steps"] = list(item.implementation_steps)
+        if item.allowed_paths != (".",):
+            record["allowed_paths"] = list(item.allowed_paths)
+        if item.manual_prerequisite is not None:
+            record["manual_prerequisite"] = dict(item.manual_prerequisite)
+        items.append(record)
+    data["items"] = items
+    if plan.planning is not None:
+        from powdrr_lift.workrr.planning.compiler import PlanningManifest
+
+        data["planning"] = PlanningManifest.from_data(plan.planning).to_data()
+    return yaml.safe_dump(
+        data, allow_unicode=True, default_flow_style=False, sort_keys=False
+    )
 
 
 def load_reviewed_plan_at_commit(
@@ -1524,10 +1559,9 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
         raise GitHubIssueQueueError(f"invalid plan YAML: {error}") from error
     if not isinstance(data, Mapping) or data.get("schema") != QUEUE_SCHEMA:
         raise GitHubIssueQueueError(f"plan schema must be {QUEUE_SCHEMA!r}")
-    if set(data) not in (
-        {"schema", "plan_id", "items"},
-        {"schema", "plan_id", "source_document", "items"},
-    ):
+    allowed_fields = {"schema", "plan_id", "source_document", "items", "planning"}
+    required_fields = {"schema", "plan_id", "items"}
+    if not required_fields <= set(data) or set(data) - allowed_fields:
         raise GitHubIssueQueueError("plan has unknown or missing top-level fields")
     plan_id = data.get("plan_id")
     source_document = data.get("source_document")
@@ -1640,7 +1674,23 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
             )
     if _has_dependency_cycle(items):
         raise GitHubIssueQueueError("plan dependencies must be acyclic")
-    return ReviewedExecutionPlan(plan_id, tuple(items), source_document)
+    planning = data.get("planning")
+    if planning is not None:
+        if not isinstance(planning, Mapping):
+            raise GitHubIssueQueueError("planning metadata must be a mapping")
+        try:
+            # Local import keeps the legacy queue parser independent at module
+            # import time while validating new metadata when it is present.
+            from powdrr_lift.workrr.planning.compiler import PlanningManifest
+
+            PlanningManifest.from_data(planning)
+        except (ValueError, TypeError) as error:
+            raise GitHubIssueQueueError(
+                f"invalid planning metadata: {error}"
+            ) from error
+    return ReviewedExecutionPlan(
+        plan_id, tuple(items), source_document, dict(planning) if planning else None
+    )
 
 
 def _required_text(raw: Mapping[str, Any], key: str, field: str) -> str:

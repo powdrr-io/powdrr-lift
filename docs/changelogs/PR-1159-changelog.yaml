@@ -1,0 +1,159 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1159
+title: Make bounded planning resumable under GitHub comment limits
+intent:
+  problem: Bounded planning can reject valid source pagination answers when adjacent-block anchors are mistaken for cursors, and high-frequency issue checkpoints can hit GitHub content-creation limits.
+  goal: Clarify valid pagination cursors, persist only resumable planning outcomes, and retry GitHub comment rate limits using server guidance.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 19, end_line: 19}
+    summary: Import wall-clock time for interpreting GitHub reset headers.
+    rationale: Calculate a delay from the server-provided rate-limit reset timestamp.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 154, end_line: 155}
+    summary: Add injectable backoff and a bounded retry count to the issue client.
+    rationale: Recover checkpoint writes from temporary rate limiting and keep retry tests deterministic.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 162, end_line: 163}
+    summary: Store the injected retry settings on the issue client.
+    rationale: Use the configured sleep and retry bound for comment writes.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 347, end_line: 349}
+    summary: Request HTTP headers when creating issue comments.
+    rationale: Read Retry-After and rate-limit reset values from GitHub responses.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 351, end_line: 352}
+    summary: Build an explicit POST request for checkpoint comments.
+    rationale: Keep the content-creation request reusable for bounded retries.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 355, end_line: 371}
+    summary: Retry issue-comment creation on recognized rate limits using bounded delays.
+    rationale: Preserve durable planning progress across temporary GitHub content limits.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 424, end_line: 453}
+    summary: Classify rate-limit responses and calculate server-guided or exponential retry delays.
+    rationale: Retry known 429 and secondary-rate-limit 403 failures without masking unrelated forbidden responses.
+  - path: src/powdrr_lift/workrr/planning/service.py
+    type: modified
+    span: {start_line: 273, end_line: 281}
+    summary: Run the bounded question before writing its durable outcome.
+    rationale: An interrupted unanswered question can be reconstructed from the last accepted answer.
+  - path: src/powdrr_lift/workrr/planning/service.py
+    type: modified
+    span: {start_line: 284, end_line: 286}
+    summary: Sequence rejected-answer checkpoints directly after the prior durable event.
+    rationale: Keep a rejected answer resumable without first writing a separate started event.
+  - path: src/powdrr_lift/workrr/planning/service.py
+    type: modified
+    span: {start_line: 290, end_line: 293}
+    summary: Append the rejected-answer checkpoint using the prior journal digest.
+    rationale: Preserve the hash-linked journal while reducing issue comments.
+  - path: src/powdrr_lift/workrr/planning/service.py
+    type: modified
+    span: {start_line: 292, end_line: 292}
+    summary: Validate the previous journal digest when appending a rejected answer.
+    rationale: Prevent stale retry checkpoints from forking the planning journal.
+  - path: src/powdrr_lift/workrr/planning/service.py
+    type: modified
+    span: {start_line: 304, end_line: 306}
+    summary: Sequence accepted-answer checkpoints directly after the prior durable event.
+    rationale: Keep one durable comment per accepted bounded question.
+  - path: src/powdrr_lift/workrr/planning/service.py
+    type: modified
+    span: {start_line: 312, end_line: 312}
+    summary: Append accepted answers against the prior journal digest.
+    rationale: Retain parent validation without a question-started checkpoint.
+  - path: src/powdrr_lift/workrr/planning/checkpoints.py
+    type: modified
+    span: {start_line: 117, end_line: 117}
+    summary: Allow an accepted answer checkpoint to have no parent when it is the journal root.
+    rationale: Support sessions that persist only accepted outcomes and explicit retries.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 820, end_line: 824}
+    summary: Compute ordered pagination candidates from the current block and cursor.
+    rationale: Make the allowed cursor set explicit and exclude adjacent-block anchors.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 879, end_line: 885}
+    summary: State that only listed current-block anchors may advance extraction pagination.
+    rationale: Prevent an adjacent citation from being returned as the current block's next cursor.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 893, end_line: 897}
+    summary: Include valid cursor candidates and cursor-only semantics in the answer contract.
+    rationale: Give the model an explicit bounded set for the next_anchor field.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 434, end_line: 434}
+    summary: Keep the labeled-query URL assertion in its client test.
+    rationale: Preserve coverage of GitHub issue filtering while adding comment retry tests.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 439, end_line: 501}
+    summary: Cover rate-limit retries, Retry-After handling, and immediate failure for unrelated forbidden responses.
+    rationale: Verify checkpoint writes retry only recoverable GitHub rate-limit errors.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 260, end_line: 260}
+    summary: Verify accepted bounded answers remain durable and resume without reissuing completed questions.
+    rationale: Protect the reduced checkpoint sequence while preserving accepted-answer resume behavior.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 331, end_line: 331}
+    summary: Verify the Procedrr adapter persists one accepted outcome for a bounded question.
+    rationale: Ensure the production planning flow uses the reduced durable checkpoint sequence.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 406, end_line: 436}
+    summary: Verify pagination cursors advance within the current block and exclude adjacent citation anchors.
+    rationale: Reproduce and prevent the live planning contract failure.
+entities:
+  - id: bounded-planning-checkpoint-journal
+    type: Task
+    action: added
+  - id: github-issue-comment-rate-limit-retry
+    type: Function
+    action: added
+  - id: source-block-pagination-cursor-contract
+    type: Function
+    action: added
+  - id: planning-checkpoint-resume-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: checkpoint-tests-verify-rate-limit-recovery
+    type: verifies
+    source: planning-checkpoint-resume-regression-tests
+    target: github-issue-comment-rate-limit-retry
+    action: added
+    description: The tests verify rate-limited checkpoint comments back off and retry while unrelated 403 responses fail immediately.
+  - id: checkpoint-tests-verify-source-pagination
+    type: verifies
+    source: planning-checkpoint-resume-regression-tests
+    target: source-block-pagination-cursor-contract
+    action: added
+    description: The tests verify adjacent source-block anchors are not accepted or suggested as pagination cursors.
+invariants:
+  - id: accepted-planning-answers-remain-durable
+    description: Each accepted planning answer is durably checkpointed, and a resumed session does not reissue accepted questions.
+    action: altered
+  - id: unanswered-planning-questions-are-recomputable
+    description: An unanswered question has no accepted checkpoint and is recomputed from the latest accepted journal state after interruption.
+    action: added
+  - id: pagination-cursors-belong-to-the-current-source-block
+    description: A next_anchor cursor must be a later anchor from the current block; adjacent-block anchors remain eligible only as citations.
+    action: altered
+  - id: github-rate-limit-retries-are-bounded
+    description: Issue comment writes retry only HTTP 429 and rate-limit 403 responses, honoring server retry timing and using bounded exponential backoff otherwise.
+    action: added
+guidance: []

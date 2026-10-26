@@ -234,3 +234,6 @@ def test_repair_publisher_branches_from_fresh_main_and_limits_commit_paths(
     create = next(call for call in calls if call[:3] == ["gh", "pr", "create"])
     assert create[create.index("--base") + 1] == "main"
     assert create[create.index("--title") + 1].startswith("Correct plan:")
+    body = create[create.index("--body") + 1]
+    assert "<!-- powdrr-plan-repair:v1 -->" in body
+    assert '"repair_id":' in body

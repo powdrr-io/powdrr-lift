@@ -20,6 +20,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     PlannedWorkItem,
     ReviewedExecutionPlan,
     parse_reviewed_plan_yaml,
+    render_plan_repair_metadata,
     serialize_reviewed_plan_yaml,
 )
 from powdrr_lift.workrr.multipr_structrr import load_multi_pr_proposal
@@ -560,7 +561,7 @@ def _repair_pr_body(
                 )
     old_ready = _ready_items(draft.plan)
     new_ready = _ready_items(repaired.plan)
-    return "\n".join(
+    body = "\n".join(
         [
             "## Objective",
             "",
@@ -606,6 +607,14 @@ def _repair_pr_body(
             "",
             "None.",
         ]
+    )
+    latest_repair = repaired.manifest.get("latest_repair")
+    if not isinstance(latest_repair, Mapping):
+        raise PlanRepairServiceError("repaired plan has no latest repair manifest")
+    return f"{body}\n\n" + render_plan_repair_metadata(
+        plan_id=plan_id,
+        plan_path=plan_path,
+        repair=latest_repair,
     )
 
 

@@ -51,6 +51,7 @@ from powdrr_lift.workrr.multipr_structrr import (
 from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
     _append_inline_plan_adjustments_to_pr_body,
+    _append_plan_repair_metadata_to_pr_body,
     _apply_task_edits,
     _build_workflow_client,
     _durable_task_action_output_state,
@@ -113,6 +114,48 @@ def test_pr_body_discloses_inline_plan_adjustments_to_reviewer() -> None:
     assert "Step 4 updates repository CI." in updated.parameters["body"]
     assert ".github/workflows/ci.yml" in updated.parameters["body"]
     assert action.parameters["body"] == "## Summary\n\nAdd the verification workflow."
+
+
+def test_plan_amendment_pr_body_includes_typed_repair_manifest(
+    tmp_path: Path,
+) -> None:
+    plan_path = Path("docs/plans/feature.yaml")
+    destination = tmp_path / plan_path
+    destination.parent.mkdir(parents=True)
+    repair = {
+        "repair_id": "repair-01",
+        "discovery_ids": ["discovery-01"],
+        "affected_item_ids": ["PR-01"],
+        "old_item_digests": {"PR-01": "old"},
+        "new_item_digests": {"PR-01": "new"},
+        "old_input_contract_digests": {"PR-01": "old-input"},
+        "new_input_contract_digests": {"PR-01": "new-input"},
+        "retired_items": [],
+    }
+    destination.write_text(
+        yaml.safe_dump({"planning": {"latest_repair": repair}}),
+        encoding="utf-8",
+    )
+    action = WorkflowAction(
+        kind="invoke_tool",
+        tool="gh",
+        parameters={"operation": "pr_create", "body": "## Correct the plan"},
+    )
+    updated = _append_plan_repair_metadata_to_pr_body(
+        action,
+        task_input_state={
+            "proposed_pr_context": {
+                "plan_id": "feature-v1",
+                "execution_plan_file": plan_path.as_posix(),
+            }
+        },
+        repo_root=tmp_path,
+        events=({"kind": "typed_plan_repair"},),
+    )
+
+    assert "<!-- powdrr-plan-repair:v1 -->" in updated.parameters["body"]
+    assert '"repair_id": "repair-01"' in updated.parameters["body"]
+    assert action.parameters["body"] == "## Correct the plan"
 
 
 def _commit_test_structrr_baseline(

@@ -21,6 +21,7 @@ from powdrr_lift.workrr.planning.repair import (
     dependency_edge_digest,
     expand_repair_impact,
     item_content_digest,
+    item_input_contract_digest,
     plan_revision_digest,
 )
 from procedrr import ProcessCatalog
@@ -133,6 +134,43 @@ def _update_operation(item: PlannedWorkItem) -> dict[str, Any]:
         "replacement_unit_ids": ["unit-01-revised"],
         "reason": "Coverage evidence shows one required behavior remains.",
     }
+
+
+def test_input_contract_digest_includes_human_setup_and_validation_context() -> None:
+    item = _item("item-01")
+    manifest = {
+        "item_unit_ids": {"item-01": ["unit-01"]},
+        "units": [{"id": "unit-01", "validation_ids": ["validation-01"]}],
+        "setups": [
+            {
+                "id": "setup-01",
+                "owner_item_id": "item-01",
+                "unblocks_validation_ids": ["validation-01"],
+                "instructions": "Install the credential.",
+            }
+        ],
+        "validations": [{"id": "validation-01", "target": "CI credential"}],
+        "validation_coverage": [
+            {
+                "item_id": "item-01",
+                "criterion": "The configured credential is used.",
+                "validation_ids": ["validation-01"],
+            }
+        ],
+    }
+    changed_setup = dict(manifest)
+    changed_setup["setups"] = [
+        {
+            "id": "setup-01",
+            "owner_item_id": "item-01",
+            "unblocks_validation_ids": ["validation-01"],
+            "instructions": "Install the rotated credential.",
+        }
+    ]
+
+    assert item_input_contract_digest(item, manifest) != item_input_contract_digest(
+        item, changed_setup
+    )
 
 
 def test_coverage_discovery_expands_dependencies_and_preserves_unrelated_item() -> None:

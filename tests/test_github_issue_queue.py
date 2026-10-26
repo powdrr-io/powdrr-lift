@@ -10,6 +10,7 @@ import pytest
 import powdrr_lift.workrr.github_issue_queue as github_issue_queue
 from powdrr_lift.workrr.github_issue_queue import (
     FULFILLED_WITHOUT_PR_LABEL,
+    PLAN_REPAIR_PENDING_LABEL,
     QUEUE_LABELS,
     GitHubIssueClient,
     GitHubIssueQueueError,
@@ -27,6 +28,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     latest_manual_prerequisite_checkpoint,
     parse_issue_pointer,
     publish_plan_issues,
+    render_plan_repair_metadata,
     render_task_checkpoint_comment,
     run_worker_once,
 )
@@ -492,7 +494,7 @@ def test_github_client_skips_labels_that_already_exist() -> None:
     client.ensure_queue_labels()
     assert client.ensure_plan_label("feature-v1") == _plan_label("feature-v1")
 
-    assert len(commands) == len(QUEUE_LABELS) + 1
+    assert len(commands) == len(QUEUE_LABELS) + 2
     assert all("--method" not in command for command in commands)
 
 
@@ -509,7 +511,7 @@ def test_github_client_creates_missing_labels() -> None:
 
     GitHubIssueClient("example/project", run=run).ensure_queue_labels()
 
-    assert len(commands) == len(QUEUE_LABELS) * 2
+    assert len(commands) == (len(QUEUE_LABELS) + 1) * 2
     assert all("--method" in command for command in commands[1::2])
 
 
@@ -1083,6 +1085,8 @@ def test_worker_marks_failed_execution_blocked(tmp_path: Path) -> None:
 
 
 def test_worker_persists_task_checkpoint_as_issue_comment(tmp_path: Path) -> None:
+    from powdrr_lift.workrr.planning.repair import item_input_contract_digest
+
     (tmp_path / "docs/workflows/base").mkdir(parents=True)
     client = FakeIssueClient()
     publish_plan_issues(
@@ -1141,6 +1145,9 @@ def test_worker_persists_task_checkpoint_as_issue_comment(tmp_path: Path) -> Non
         "status": "completed",
         "task_id": "base-task-02",
         "workflow_id": "base",
+        "input_contract_digest": (
+            item_input_contract_digest(plan().items[0], plan().planning)
+        ),
     }
 
 
@@ -1299,10 +1306,7 @@ def test_continue_manual_prerequisite_retries_ci_then_resumes(tmp_path: Path) ->
     assert latest_manual_prerequisite_checkpoint(client.list_comments(100)) is None
 
 
-def test_worker_repins_and_requeues_issue_when_plan_amendment_merges(
-    tmp_path: Path,
-) -> None:
-    (tmp_path / "docs/workflows/base").mkdir(parents=True)
+def test_worker_does_not_use_plan_amendment_title_as_metadata(tmp_path: Path) -> None:
     client = FakeIssueClient()
     publish_plan_issues(
         plan=plan(),
@@ -1319,7 +1323,6 @@ def test_worker_repins_and_requeues_issue_when_plan_amendment_merges(
         (QUEUE_LABELS["awaiting_review"], _plan_label("feature-v1")),
         issue.url,
     )
-    amended_commit = "c" * 40
     client.comments.append(
         (
             issue.number,
@@ -1340,56 +1343,24 @@ def test_worker_repins_and_requeues_issue_when_plan_amendment_merges(
     client.pull_requests[77] = {
         "title": "Correct plan: Reuse the existing verifier",
         "merged": True,
-        "merge_commit_sha": amended_commit,
+        "merge_commit_sha": "c" * 40,
     }
-    loaded_commits: list[str] = []
-
-    def load_plan(
-        _path: str, commit: str, *, repo_root: str | Path
-    ) -> ReviewedExecutionPlan:
-        assert Path(repo_root) == tmp_path
-        loaded_commits.append(commit)
-        return plan()
-
-    executed_commits: list[str] = []
-
-    def run_task(
-        _directory: Path,
-        _workflow_id: str,
-        _worker_id: str,
-        _item: PlannedWorkItem,
-        reviewed_plan: ReviewedExecutionPlan,
-        _fulfilled_without_pr_dependencies: tuple[str, ...],
-        _checkpoint: TaskCheckpointCallback,
-    ) -> int:
-        executed_commits.append(loaded_commits[-1])
-        assert reviewed_plan.plan_id == "feature-v1"
-        return 1
 
     report = run_worker_once(
         client=client,  # type: ignore[arg-type]
         repo_root=tmp_path,
         worker_id="worker-after-amendment",
-        run_task=run_task,
-        plan_loader=load_plan,
+        run_task=lambda *_args: pytest.fail("no repair manifest means no requeue"),
+        plan_loader=lambda *_args, **_kwargs: plan(),
     )
 
-    assert report.outcome == "blocked"
-    assert amended_commit in loaded_commits
-    assert executed_commits == [amended_commit]
+    assert report.outcome == "no_eligible_work"
     assert parse_issue_pointer(client.issues[0].body) == {
         "plan_id": "feature-v1",
         "item_id": "base",
         "plan_path": "docs/plans/feature.yaml",
-        "plan_commit": amended_commit,
+        "plan_commit": PLAN_COMMIT,
     }
-    assert client.merged_commit == amended_commit
-    assert any(
-        "plan-amendment PR https://github.com/example/project/pull/77 merged" in body
-        and "requeued" in body
-        for number, body in client.comments
-        if number == issue.number
-    )
 
 
 def test_worker_does_not_requeue_unmerged_plan_amendment(tmp_path: Path) -> None:
@@ -1445,6 +1416,328 @@ def test_worker_does_not_requeue_unmerged_plan_amendment(tmp_path: Path) -> None
     assert pointer is not None
     assert pointer["plan_commit"] == PLAN_COMMIT
     assert QUEUE_LABELS["awaiting_review"] in client.issues[0].labels
+
+
+def test_plan_repair_reconciles_all_affected_issues_idempotently(
+    tmp_path: Path,
+) -> None:
+    from powdrr_lift.workrr.planning.repair import (
+        item_content_digest,
+        item_input_contract_digest,
+    )
+
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    base, followup = client.issues
+    client.issues[0] = QueueIssue(
+        base.number,
+        base.title,
+        base.body,
+        "open",
+        (QUEUE_LABELS["awaiting_review"], _plan_label("feature-v1")),
+        base.url,
+    )
+    client.issues[1] = QueueIssue(
+        followup.number,
+        followup.title,
+        followup.body,
+        "closed",
+        (FULFILLED_WITHOUT_PR_LABEL, _plan_label("feature-v1")),
+        followup.url,
+    )
+    client.comments.append(
+        (
+            base.number,
+            render_task_checkpoint_comment(
+                TaskCheckpoint(
+                    plan_id="feature-v1",
+                    item_id="base",
+                    workflow_id="base",
+                    task_id="base-task-01",
+                    output_state_type="implementation-state",
+                    output_state={"files": ["src/base.py"]},
+                    input_contract_digest="sha256:stale",
+                )
+            ),
+        )
+    )
+
+    amended_base = PlannedWorkItem(
+        "base",
+        "Updated base work",
+        "Add the revised shared base.",
+        ("src/base.py",),
+        ("Revised base behavior is covered.",),
+        (),
+        "docs/workflows/base",
+        "base",
+    )
+    new_item = PlannedWorkItem(
+        "followup-v2",
+        "Replacement work",
+        "Implement the newly allocated follow-up.",
+        ("src/followup.py",),
+        ("Replacement behavior works.",),
+        ("base",),
+        "docs/workflows/followup-v2",
+        "followup-v2",
+    )
+    repaired_plan = ReviewedExecutionPlan(
+        "feature-v1",
+        (amended_base, new_item),
+        planning={
+            "latest_repair": {
+                "repair_id": "repair-abc",
+                "discovery_ids": ["discovery-1"],
+                "old_semantic_revision_digest": "old-semantic",
+                "new_semantic_revision_digest": "new-semantic",
+                "old_plan_digest": "old-plan",
+                "new_plan_digest": "new-plan",
+                "affected_item_ids": ["base", "followup", "followup-v2"],
+                "old_item_digests": {"base": "old-base"},
+                "new_item_digests": {
+                    "base": item_content_digest(amended_base),
+                    "followup-v2": item_content_digest(new_item),
+                },
+                "old_input_contract_digests": {"base": "old-contract"},
+                "new_input_contract_digests": {
+                    "base": item_input_contract_digest(amended_base, None),
+                    "followup-v2": item_input_contract_digest(new_item, None),
+                },
+                "retired_items": [
+                    {
+                        "item_id": "followup",
+                        "disposition": "superseded",
+                        "reason": (
+                            "The remaining work was split into a new deliverable."
+                        ),
+                        "successor_item_ids": ["followup-v2"],
+                        "requirement_ids": [],
+                    }
+                ],
+            }
+        },
+    )
+    assert repaired_plan.planning is not None
+    repair = repaired_plan.planning["latest_repair"]
+    assert isinstance(repair, Mapping)
+    metadata = {
+        "plan_id": "feature-v1",
+        "plan_path": "docs/plans/feature.yaml",
+        "repair": repair,
+    }
+    pull_request_body = render_plan_repair_metadata(
+        plan_id="feature-v1",
+        plan_path="docs/plans/feature.yaml",
+        repair=repair,
+    )
+    client.pull_requests[77] = {
+        "title": "A title that does not follow a naming convention",
+        "body": pull_request_body,
+        "state": "open",
+        "merged": False,
+        "merge_commit_sha": None,
+    }
+    github_issue_queue._mark_plan_repair_pending(
+        client=client,  # type: ignore[arg-type]
+        metadata=metadata,
+        pull_request_number=77,
+    )
+    assert QUEUE_LABELS["blocked"] in client.issues[0].labels
+    assert PLAN_REPAIR_PENDING_LABEL in client.issues[0].labels
+    assert client.issues[1].state == "closed"
+    assert PLAN_REPAIR_PENDING_LABEL not in client.issues[1].labels
+
+    merge_commit = "c" * 40
+    client.pull_requests[77].update(
+        state="closed", merged=True, merge_commit_sha=merge_commit
+    )
+    load_calls: list[str] = []
+
+    def load_plan(
+        path: str, commit: str, *, repo_root: str | Path
+    ) -> ReviewedExecutionPlan:
+        assert path == "docs/plans/feature.yaml"
+        assert Path(repo_root) == tmp_path
+        load_calls.append(commit)
+        return repaired_plan
+
+    for _ in range(2):
+        github_issue_queue._requeue_merged_plan_amendments(
+            client=client,  # type: ignore[arg-type]
+            repo_root=tmp_path,
+            plan_loader=load_plan,
+        )
+
+    base_after, followup_after, created = client.issues
+    base_pointer = parse_issue_pointer(base_after.body)
+    assert base_pointer is not None
+    assert base_pointer["plan_commit"] == merge_commit
+    assert QUEUE_LABELS["ready"] in base_after.labels
+    assert PLAN_REPAIR_PENDING_LABEL not in base_after.labels
+    assert followup_after.state == "closed"
+    assert FULFILLED_WITHOUT_PR_LABEL in followup_after.labels
+    assert not any(
+        "was superseded" in body
+        for number, body in client.comments
+        if number == followup.number
+    )
+    assert created.title == "Powdrr work item: feature-v1/followup-v2"
+    assert QUEUE_LABELS["blocked_on_dependency"] in created.labels
+    created_pointer = parse_issue_pointer(created.body)
+    assert created_pointer is not None
+    assert created_pointer["plan_commit"] == merge_commit
+    assert any(
+        "Task checkpoints invalidated" in body
+        for number, body in client.comments
+        if number == base.number
+    )
+    assert load_calls == [merge_commit]
+    assert len(client.issues) == 3
+
+
+def test_closed_unmerged_plan_repair_restores_prior_queue_state() -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    issue = client.issues[0]
+    metadata = {
+        "plan_id": "feature-v1",
+        "plan_path": "docs/plans/feature.yaml",
+        "repair": {
+            "repair_id": "repair-closed",
+            "affected_item_ids": ["base"],
+            "old_item_digests": {},
+            "new_item_digests": {},
+            "old_input_contract_digests": {},
+            "new_input_contract_digests": {},
+            "retired_items": [],
+        },
+    }
+    client.pull_requests[88] = {"state": "closed", "merged": False}
+    github_issue_queue._mark_plan_repair_pending(
+        client=client,  # type: ignore[arg-type]
+        metadata=metadata,
+        pull_request_number=88,
+    )
+    assert QUEUE_LABELS["blocked"] in client.issues[0].labels
+    github_issue_queue._restore_closed_plan_repair(
+        client=client,  # type: ignore[arg-type]
+        metadata=metadata,
+        pull_request_number=88,
+    )
+    assert QUEUE_LABELS["ready"] in client.issues[0].labels
+    assert PLAN_REPAIR_PENDING_LABEL not in client.issues[0].labels
+    assert any(
+        "closed without merging" in body
+        for number, body in client.comments
+        if number == issue.number
+    )
+
+
+def test_worker_checkpoint_pauses_when_an_affected_repair_is_pending() -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    issue = client.issues[0]
+    metadata = {
+        "plan_id": "feature-v1",
+        "plan_path": "docs/plans/feature.yaml",
+        "repair": {
+            "repair_id": "repair-pending",
+            "affected_item_ids": ["base"],
+            "old_item_digests": {},
+            "new_item_digests": {},
+            "old_input_contract_digests": {},
+            "new_input_contract_digests": {},
+            "retired_items": [],
+        },
+    }
+    github_issue_queue._mark_plan_repair_pending(
+        client=client,  # type: ignore[arg-type]
+        metadata=metadata,
+        pull_request_number=89,
+    )
+    callback = github_issue_queue._task_checkpoint_callback(
+        client=client,  # type: ignore[arg-type]
+        issue=client.issues[0],
+        plan=plan(),
+        item=plan().items[0],
+    )
+    with pytest.raises(GitHubIssueQueueError, match="paused at a durable checkpoint"):
+        callback("base-task-02", "implementation-state", {"files": ["a.py"]}, None)
+    assert not any(
+        "base-task-02" in body
+        for number, body in client.comments
+        if number == issue.number
+    )
+
+
+def test_repair_pr_checkpoint_blocks_impact_before_checkpoint_is_written(
+    tmp_path: Path,
+) -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    repair = {
+        "repair_id": "repair-checkpoint",
+        "affected_item_ids": ["base"],
+        "old_item_digests": {},
+        "new_item_digests": {},
+        "old_input_contract_digests": {},
+        "new_input_contract_digests": {},
+        "retired_items": [],
+    }
+    client.pull_requests[90] = {
+        "state": "open",
+        "merged": False,
+        "body": render_plan_repair_metadata(
+            plan_id="feature-v1",
+            plan_path="docs/plans/feature.yaml",
+            repair=repair,
+        ),
+    }
+    checkpoint = github_issue_queue._task_checkpoint_callback(
+        client=client,  # type: ignore[arg-type]
+        issue=client.issues[0],
+        plan=plan(),
+        item=plan().items[0],
+        repo_root=tmp_path,
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    checkpoint(
+        "repair-pr-task",
+        "execute-proposed-pr-workflow-result-state",
+        {"pull_request_url": "https://github.com/example/project/pull/90"},
+        None,
+    )
+
+    issue = client.get_issue(100)
+    assert PLAN_REPAIR_PENDING_LABEL in issue.labels
+    assert QUEUE_LABELS["blocked"] in issue.labels
+    assert any(
+        "repair-pr-task" in body
+        for number, body in client.comments
+        if number == issue.number
+    )
 
 
 def test_task_checkpoint_comment_is_readable_and_structured() -> None:

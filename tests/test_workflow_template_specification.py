@@ -435,10 +435,10 @@ None."""
     }
     assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
     amendment_process = catalog.get("amend-plan-and-open-pr").document
-    amendment_call = amendment_process["steps"][0]["operation"]["parameters"]
+    amendment_call = amendment_process["steps"][1]["operation"]["parameters"]
     assert amendment_call["parameters"]["mode"] == "plan-amendment"
-    assert amendment_process["steps"][1]["gate"]["subject"] == "amendment_result.passed"
-    amendment_description_schema = amendment_process["steps"][3]["judge"]["output"][
+    assert amendment_process["steps"][2]["gate"]["subject"] == "amendment_result.passed"
+    amendment_description_schema = amendment_process["steps"][4]["judge"]["output"][
         "schema"
     ]["properties"]["workflow_context"]["properties"]["populated-pr-description"]
     assert amendment_description_schema["pattern"] == description_schema["pattern"]

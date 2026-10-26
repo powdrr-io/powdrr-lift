@@ -82,7 +82,6 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
     ValidationReportStatus,
     ValidationRunner,
-    execute_coding_agent_attempt,
     parse_validation_profile,
 )
 from powdrr_lift.workrr.decision_continuity import (
@@ -3249,217 +3248,74 @@ class _TaskWorkflowExecutionStrategy:
     def _run_plan_amendment_agent(
         self, mode_context: Mapping[str, Any]
     ) -> dict[str, Any]:
+        repair_request = mode_context.get("repair_request")
+        if not isinstance(repair_request, Mapping):
+            raise PowdrrExecutionError(
+                "plan amendment requires a typed repair_request produced from the "
+                "failure evidence; direct plan-file editing is disabled"
+            )
         task_context = mode_context.get("task_context")
-        failure_review = mode_context.get("failure_review")
-        implementation_result = mode_context.get("implementation_result")
         if not isinstance(task_context, Mapping) or not isinstance(
             task_context.get("proposed_pr_context"), Mapping
         ):
-            # The task input is the durable source of the reviewed plan item.
-            # Procedrr passes it through the parent process, but a nested
-            # amendment call may omit or truncate that binding. Keep the
-            # recorded failure evidence from the child call while recovering
-            # the authoritative proposal context from the claimed task.
             task_context = self.task.input_state
         proposed = task_context.get("proposed_pr_context")
         if not isinstance(proposed, Mapping):
             raise PowdrrExecutionError("plan amendment requires proposed_pr_context")
-        if not isinstance(failure_review, Mapping) or not isinstance(
-            implementation_result, Mapping
-        ):
-            raise PowdrrExecutionError(
-                "plan amendment requires failure review and implementation evidence"
-            )
         workflow_id = str(task_context.get("proposed_pr_id", "")).strip()
         if not workflow_id:
             raise PowdrrExecutionError("plan amendment requires proposed_pr_id")
-        base_commit = _workflow_base_commit(
-            self.repo_root,
-            self.workflow.directory,
-            workflow_id=workflow_id,
+        from powdrr_lift.workrr.planning.repair_service import (
+            PlanRepairServiceError,
+            apply_repair_request,
+            load_repair_draft,
+            write_repaired_artifacts,
         )
-        request, _validation_profile = _issue_worker_implementation_request(
-            proposed, workflow_id=workflow_id, base_commit=base_commit
-        )
-        allowed_paths = _issue_worker_plan_amendment_paths(
+
+        paths = _issue_worker_plan_amendment_paths(
             self.repo_root, proposed, workflow_id=workflow_id
         )
-        baselines = {
-            path: (self.repo_root / path).read_text(encoding="utf-8")
-            for path in allowed_paths
-        }
-        failure_review_json = json.dumps(
-            dict(failure_review), indent=2, sort_keys=True, default=str
-        )
-        implementation_result_json = json.dumps(
-            dict(implementation_result), indent=2, sort_keys=True, default=str
-        )
-        request = replace(
-            request,
-            request_id=f"{workflow_id}-plan-amendment",
-            objective=(
-                f"Correct plan item {proposed.get('item_id')} from "
-                f"{proposed.get('plan_id')} using the recorded failure evidence."
-            ),
-            prompt="\n\n".join(
-                (
-                    "This is a plan-amendment task, not an implementation task.",
-                    "Edit only the generated execution plan YAML, its Structrr "
-                    "proposal JSON, and the affected generated workflow YAML "
-                    "listed in allowed_paths. Keep the source plan document and "
-                    "all product code unchanged.",
-                    "Make the smallest correction supported by the evidence. "
-                    "Preserve the plan ID, item ID, workflow ID, unrelated plan "
-                    "items, and dependency graph unless the failure evidence "
-                    "proves one is defective. Keep the corrected item and "
-                    "workflow aligned on title, scope, acceptance criteria, "
-                    "implementation steps, and dependencies.",
-                    "Do not implement planned product changes. Produce a "
-                    "reviewable plan amendment so a later worker run can execute "
-                    "the corrected plan.",
-                    f"Failure classification and evidence:\n{failure_review_json}",
-                    f"Failed implementation evidence:\n{implementation_result_json}",
-                    "Allowed plan artifact paths:\n"
-                    f"{json.dumps(list(allowed_paths), indent=2)}",
-                )
-            ),
-            allowed_paths=allowed_paths,
-            validation_profiles=(),
-            acceptance_criteria=(
-                "The revised execution plan, Structrr proposal, and affected "
-                "workflow are valid and consistent.",
-                "Only the affected plan item and its linked proposal/workflow "
-                "are changed.",
-                "No source-plan or product-code file is changed.",
-            ),
-            planned_additions=tuple(
-                {"id": f"plan-artifact-{index:02d}", "description": path}
-                for index, path in enumerate(allowed_paths, start=1)
-            ),
-            implementation_packet=None,
-            allow_existing_changes=True,
-        )
-        store_root = (
-            Path(tempfile.gettempdir())
-            / "powdrr-lift-issue-worker"
-            / workflow_id
-            / "plan-amendment"
-        )
-        provider = build_coding_agent_provider(
-            self.config.code_agent,
-            opencode_executable=self.config.opencode_executable,
-            opencode_model=self.config.opencode_model,
-            minisweagent_executable=self.config.minisweagent_executable,
-            minisweagent_model=self.config.minisweagent_model,
-            timeout_seconds=self.config.coding_agent_timeout_seconds,
-            diagnostics_root=store_root / self.config.code_agent,
-            permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
-        )
-        runner = CodingAgentRunner(
-            provider=provider,
-            store=CodingAgentAttemptStore(store_root),
-        )
-
-        def run_attempt(
-            attempt_number: int, recovery_issue: Mapping[str, Any] | None
-        ) -> dict[str, Any]:
-            attempt_request = request
-            if recovery_issue is not None:
-                attempt_request = replace(
-                    request,
-                    prompt=request.repair_prompt(recovery_issue),
-                    allow_existing_changes=True,
-                )
-            attempt_id = (
-                f"{request.request_id}-attempt-{attempt_number:02d}-"
-                f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%fZ')}"
+        try:
+            draft = load_repair_draft(self.repo_root, self.repo_root / paths[0])
+            base_commit = _workflow_base_commit(
+                self.repo_root,
+                self.workflow.directory,
+                workflow_id=workflow_id,
             )
-            execution = execute_coding_agent_attempt(
-                runner,
-                attempt_request,
+            repaired = apply_repair_request(
+                draft,
+                repair_request,
+                base_commit=base_commit,
+            )
+            changed_paths = tuple(
+                path
+                for path, content in repaired.artifacts.items()
+                if draft.artifacts.get(path) != content
+            )
+            if not changed_paths:
+                raise PlanRepairServiceError("repair does not change plan artifacts")
+            invoke_file_mutation(
+                changed_paths,
                 worktree_root=self.repo_root,
-                attempt_id=attempt_id,
-                profiles={},
-                validation_timeout_seconds=(
-                    self.config.coding_agent_validation_timeout_seconds
+                executor=lambda: write_repaired_artifacts(
+                    self.repo_root, draft, repaired
                 ),
+                runtime=self.runtime,
             )
-            attempt = execution.attempt
-            validation = execution.validation
-            all_changed_paths = _implementation_paths_against_base(self.repo_root)
-            paths = tuple(path for path in all_changed_paths if path in allowed_paths)
-            unauthorized_paths = tuple(
-                path for path in all_changed_paths if path not in allowed_paths
-            )
-            findings = (
-                (f"plan amendment changed unauthorized paths: {unauthorized_paths}",)
-                if unauthorized_paths
-                else ()
-            )
-            if attempt.status.value == "completed" and paths:
-                findings = (
-                    *findings,
-                    *_validate_issue_worker_plan_amendment(
-                        self.repo_root,
-                        proposed,
-                        workflow_id=workflow_id,
-                        baselines=baselines,
-                    ),
-                )
-            passed = (
-                attempt.status.value == "completed"
-                and bool(paths)
-                and execution.diff_check.returncode == 0
-                and validation.status is ValidationReportStatus.PASSED
-                and not findings
-            )
-            return {
-                "attempt": attempt.to_data(),
-                "changed_paths": list(paths),
-                "validation": validation.to_data(),
-                "findings": list(findings),
-                "passed": passed,
-            }
-
-        def evaluate_attempt(record: Mapping[str, Any]) -> CodingAgentRecoveryDecision:
-            if record.get("passed") is True:
-                return CodingAgentRecoveryDecision(passed=True)
-            attempt = record.get("attempt")
-            if not isinstance(attempt, Mapping) or attempt.get("status") in {
-                "policy_denied",
-                "timed_out",
-            }:
-                return CodingAgentRecoveryDecision(passed=False, terminal=True)
-            return CodingAgentRecoveryDecision(
-                passed=False,
-                issue={
-                    "category": (
-                        "invalid_plan_amendment"
-                        if record.get("findings")
-                        else "amendment_validation_failed"
-                    ),
-                    "findings": record.get("findings", []),
-                    "validation": record.get("validation"),
-                    "instruction": (
-                        "Correct only the allowed plan artifacts. Ensure the plan, "
-                        "Structrr proposal, and workflow validate and agree. Do not "
-                        "change product code or unrelated plan items."
-                    ),
-                },
-            )
-
-        recovery = run_coding_agent_recovery(run_attempt, evaluate_attempt)
-        final = recovery.attempts[-1]
+            reloaded = load_repair_draft(self.repo_root, self.repo_root / paths[0])
+        except (OSError, PlanRepairServiceError) as error:
+            raise PowdrrExecutionError(f"typed plan repair failed: {error}") from error
+        if reloaded.plan != repaired.plan:
+            raise PowdrrExecutionError("written plan repair did not round-trip")
         result = {
-            "passed": bool(final["passed"]),
-            "attempt_id": final["attempt"]["attempt_id"],
-            "status": final["attempt"]["status"],
-            "changed_paths": final["changed_paths"],
-            "validation": final["validation"],
-            "findings": final["findings"],
-            "attempts": list(recovery.attempts),
+            "passed": True,
+            "repair_id": repaired.manifest["latest_repair"]["repair_id"],
+            "changed_paths": list(changed_paths),
+            "validation": {"status": "passed", "findings": []},
+            "findings": [],
+            "attempts": [],
         }
-        self.events.append({"kind": "plan_amendment_agent", "result": result})
+        self.events.append({"kind": "typed_plan_repair", "result": result})
         return result
 
     def _run_coding_agent(

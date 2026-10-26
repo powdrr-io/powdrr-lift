@@ -1615,55 +1615,39 @@ def test_plan_amendment_recovers_reviewed_context_for_nested_failure(
         proposal_path.as_posix(),
         workflow_path.as_posix(),
     ]
-    monkeypatch.setattr(
-        task_agent, "build_coding_agent_provider", lambda *_a, **_k: object()
+    from powdrr_lift.workrr.planning import repair_service
+
+    draft = SimpleNamespace(
+        plan=object(),
+        manifest={},
+        artifacts={path: "before\n" for path in expected_paths},
     )
-    monkeypatch.setattr(task_agent, "CodingAgentRunner", lambda *_a, **_k: object())
+    repaired = SimpleNamespace(
+        plan=draft.plan,
+        manifest={"latest_repair": {"repair_id": "repair-test"}},
+        artifacts={path: "after\n" for path in expected_paths},
+    )
+    load_count = 0
 
-    def execute_attempt(
-        _runner: object,
-        request: Any,
-        *,
-        attempt_id: str,
-        **_kwargs: Any,
-    ) -> Any:
-        captured_requests.append(request)
-        for path in expected_paths:
-            artifact = tmp_path / path
-            artifact.write_text(
-                artifact.read_text(encoding="utf-8") + "# amended\n",
-                encoding="utf-8",
-            )
-        attempt = SimpleNamespace(
-            status=SimpleNamespace(value="completed"),
-            to_data=lambda: {"attempt_id": attempt_id, "status": "completed"},
-        )
-        validation = SimpleNamespace(
-            status=task_agent.ValidationReportStatus.PASSED,
-            to_data=lambda: {"status": "passed"},
-        )
-        return SimpleNamespace(
-            attempt=attempt,
-            validation=validation,
-            diff_check=SimpleNamespace(returncode=0),
-        )
+    def load_draft(*_args: Any, **_kwargs: Any) -> Any:
+        nonlocal load_count
+        load_count += 1
+        return draft if load_count == 1 else repaired
 
-    monkeypatch.setattr(task_agent, "execute_coding_agent_attempt", execute_attempt)
+    monkeypatch.setattr(repair_service, "load_repair_draft", load_draft)
     monkeypatch.setattr(
-        task_agent,
-        "_implementation_paths_against_base",
-        lambda _root: tuple(expected_paths),
+        repair_service, "apply_repair_request", lambda *_args, **_kwargs: repaired
+    )
+    monkeypatch.setattr(
+        repair_service,
+        "write_repaired_artifacts",
+        lambda *_args, **_kwargs: expected_paths,
     )
     monkeypatch.setattr(
         task_agent,
-        "_validate_issue_worker_plan_amendment",
-        lambda *_args, **_kwargs: (),
+        "invoke_file_mutation",
+        lambda _paths, *, executor, **_kwargs: executor(),
     )
-
-    def one_amendment_attempt(run_attempt: Any, _evaluate_attempt: Any) -> Any:
-        return SimpleNamespace(attempts=[run_attempt(1, None)])
-
-    monkeypatch.setattr(task_agent, "run_coding_agent_recovery", one_amendment_attempt)
     failure_review = {
         "classification": "plan_defect",
         "evidence": [
@@ -1681,24 +1665,16 @@ def test_plan_amendment_recovers_reviewed_context_for_nested_failure(
     result = strategy._run_coding_agent(
         mode="plan-amendment",
         mode_context={
-            # Simulate the nested Procedrr call that carried identity metadata
-            # but dropped proposed_pr_context.
             "task_context": {"proposed_pr_id": workflow_id},
             "failure_review": failure_review,
             "implementation_result": implementation_result,
+            "repair_request": {"typed": "repair"},
         },
     )
-
     assert result["passed"] is True
+    assert result["repair_id"] == "repair-test"
     assert result["changed_paths"] == expected_paths
-    assert len(captured_requests) == 1
-    request = captured_requests[0]
-    assert request.objective == (
-        "Correct plan item PR-01 from feature-v1 using the recorded failure evidence."
-    )
-    assert request.allowed_paths == tuple(expected_paths)
-    assert "verify-all.sh already exists with different content" in request.prompt
-    assert "pre-coding feasibility check rejected the file addition" in request.prompt
+    assert captured_requests == []
 
 
 def test_edit_can_create_a_missing_file_from_line_one(tmp_path: Path) -> None:

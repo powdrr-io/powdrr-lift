@@ -496,6 +496,24 @@ steps:
                         else "The available evidence does not show a plan defect."
                     ),
                 }
+            if "What minimal typed plan repair" in question:
+                return {
+                    "discovery": {
+                        "kind": "scope_defect",
+                        "summary": "Correct the reviewed plan item.",
+                        "requirement_ids": [],
+                        "item_ids": ["PR-01"],
+                        "evidence_ids": [],
+                        "requested_outcome": (
+                            "Correct the item from the failure evidence."
+                        ),
+                    },
+                    "subjects": [{"subject_kind": "item", "reason": "Item defect."}],
+                    "operations": [],
+                    "replacement_items": {},
+                    "replacement_units": [],
+                    "replacement_requirements": {},
+                }
             if "What populated pull-request request" in question:
                 return {
                     "user_request": "Publish the implemented feature.",
@@ -547,6 +565,7 @@ steps:
         if _tool == "invoke_tool" and parameters.get("tool") == "coding-agent":
             calls.append("amend")
             assert parameters["parameters"]["mode"] == "plan-amendment"
+            assert "repair_request" in parameters["parameters"]
             return {
                 "passed": True,
                 "changed_paths": [

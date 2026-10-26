@@ -77,6 +77,16 @@ def test_plan_resume_cli_requires_repository_and_session_issue() -> None:
     assert args.session_issue == 42
 
 
+def test_plan_repair_cli_requires_reviewed_plan_and_typed_request() -> None:
+    args = build_parser().parse_args(
+        ["plan-repair", "--plan", "docs/plan.yaml", "--request", "repair.json"]
+    )
+
+    assert args.func.__name__ == "_run_plan_repair"
+    assert args.plan == Path("docs/plan.yaml")
+    assert args.request == Path("repair.json")
+
+
 def test_deepswe_probe_evaluation_skips_judge_for_empty_suite(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

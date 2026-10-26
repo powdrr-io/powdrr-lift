@@ -242,6 +242,12 @@ from powdrr_lift.workrr.planning.assembly import PathFact
 from powdrr_lift.workrr.planning.checkpoints import GitHubCommentCheckpointStore
 from powdrr_lift.workrr.planning.compiler import PlanningCompilationError
 from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
+from powdrr_lift.workrr.planning.repair_service import (
+    PlanRepairServiceError,
+    apply_repair_request,
+    load_repair_draft,
+    publish_repair_pull_request,
+)
 from powdrr_lift.workrr.planning.service import (
     PlanningOptions,
     PlanningServiceError,
@@ -401,6 +407,24 @@ def build_parser() -> argparse.ArgumentParser:
     plan_resume_parser.add_argument("--planning-base-url")
     plan_resume_parser.add_argument("--json", action="store_true")
     plan_resume_parser.set_defaults(func=_run_plan_resume)
+
+    plan_repair_parser = subparsers.add_parser(
+        "plan-repair",
+        help="Apply a typed repair to a reviewed plan and open an amendment PR.",
+    )
+    plan_repair_parser.add_argument("--plan", type=Path, required=True)
+    plan_repair_parser.add_argument(
+        "--request",
+        type=Path,
+        required=True,
+        help=(
+            "JSON containing one discovery, bounded impact, and typed replacement "
+            "records."
+        ),
+    )
+    plan_repair_parser.add_argument("--repo-root", type=Path)
+    plan_repair_parser.add_argument("--json", action="store_true")
+    plan_repair_parser.set_defaults(func=_run_plan_repair)
 
     list_plan_issues_parser = subparsers.add_parser(
         "list-plan-issues",
@@ -2638,6 +2662,55 @@ def _run_plan(args: argparse.Namespace) -> int:
 
 def _run_plan_resume(args: argparse.Namespace) -> int:
     return _run_plan_session(args, resume=True)
+
+
+def _run_plan_repair(args: argparse.Namespace) -> int:
+    repo_root = resolve_repo_root(args.repo_root).resolve()
+    plan_path = _repository_file_path(args.plan, repo_root, "Reviewed plan")
+    request_path = args.request.expanduser()
+    if not request_path.is_absolute():
+        request_path = repo_root / request_path
+    try:
+        request = json.loads(request_path.read_text(encoding="utf-8"))
+        if not isinstance(request, Mapping):
+            raise PlanRepairServiceError("repair request root must be an object")
+        draft = load_repair_draft(repo_root, plan_path)
+        repaired = apply_repair_request(
+            draft,
+            request,
+            base_commit=_git_head(repo_root),
+        )
+        plan_relative = plan_path.relative_to(repo_root).as_posix()
+        source_plan_path = draft.plan.source_document
+        if not source_plan_path:
+            raise PlanRepairServiceError("reviewed plan does not reference its source")
+        bound_discovery = {
+            **dict(request["discovery"]),
+            "id": repaired.manifest["latest_repair"]["repair_id"],
+        }
+        pull_request_url, changed_paths = publish_repair_pull_request(
+            repo_root=repo_root,
+            draft=draft,
+            repair=repaired,
+            plan_path=plan_relative,
+            source_plan_path=source_plan_path,
+            discovery=bound_discovery,
+        )
+    except (OSError, json.JSONDecodeError, PlanRepairServiceError) as error:
+        raise PowdrrExecutionError(f"plan repair failed: {error}") from error
+    result = {
+        "plan_id": repaired.plan.plan_id,
+        "repair_id": bound_discovery["id"],
+        "pull_request_url": pull_request_url,
+        "changed_paths": list(changed_paths),
+        "affected_item_ids": repaired.manifest["latest_repair"]["affected_item_ids"],
+    }
+    if args.json:
+        sys.stdout.write(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    else:
+        print(f"Plan repair PR: {pull_request_url}")
+        print("Changed artifacts: " + ", ".join(changed_paths))
+    return 0
 
 
 def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:

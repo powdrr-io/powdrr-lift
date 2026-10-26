@@ -237,6 +237,14 @@ class GitHubIssueClient:
                 description=f"Powdrr queue state: {status.replace('_', ' ')}",
             )
 
+    def ensure_planning_label(self) -> None:
+        """Ensure the session tracker label, separate from executable queue state."""
+        self._ensure_label(
+            "powdrr:planning",
+            color="1D76DB",
+            description="Powdrr planning session tracker; not executable work",
+        )
+
     def ensure_fulfilled_without_pr_label(self) -> None:
         self._ensure_label(
             FULFILLED_WITHOUT_PR_LABEL,

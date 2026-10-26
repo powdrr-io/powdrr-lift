@@ -9,9 +9,11 @@ from __future__ import annotations
 import fcntl
 import hashlib
 import json
+import os
 import posixpath
 import re
 import subprocess
+import tempfile
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
@@ -135,7 +137,7 @@ class GitHubIssueQueueError(RuntimeError):
 
 
 class GitHubIssueClient:
-    """Small ``gh api`` adapter; all mutable queue state remains on GitHub."""
+    """Small ``gh api`` adapter for issue status and plan pointers."""
 
     def __init__(
         self,
@@ -749,6 +751,8 @@ def run_worker_once(
                         and FULFILLED_WITHOUT_PR_LABEL in dependency_issue.labels
                     )
                 )
+                # The task runner owns its retry policy. Keep the GitHub issue
+                # untouched while it retries, then publish one final status below.
                 return_code = run_task(
                     workflow_path,
                     item.workflow_id,
@@ -757,19 +761,28 @@ def run_worker_once(
                     plan,
                     fulfilled_without_pr_dependencies,
                     _task_checkpoint_callback(
-                        client=client,
+                        repo_root=root,
                         issue=issue,
                         plan=plan,
                         item=item,
                     ),
                 )
+                prerequisite = None
+                if return_code == 0:
+                    local_record = _read_local_task_checkpoint(root, issue.number)
+                    if local_record is not None:
+                        prerequisite = _manual_prerequisite_checkpoint_from_record(
+                            local_record
+                        )
+                    else:
+                        # Read checkpoints written by older workers during rollout.
+                        prerequisite = latest_manual_prerequisite_checkpoint(
+                            client.list_comments(issue.number)
+                        )
             except Exception as error:
                 return_code = 1
                 detail = f"{type(error).__name__}: {error}"
             if return_code == 0:
-                prerequisite = latest_manual_prerequisite_checkpoint(
-                    client.list_comments(issue.number)
-                )
                 if prerequisite is not None:
                     status = "awaiting_human"
                     outcome = "awaiting_human"
@@ -803,7 +816,7 @@ def run_worker_once(
 def latest_manual_prerequisite_checkpoint(
     comments: Sequence[Mapping[str, Any]],
 ) -> Mapping[str, Any] | None:
-    """Return the newest valid manual-prerequisite checkpoint from issue comments."""
+    """Read a legacy manual-prerequisite checkpoint from issue comments."""
     for comment in reversed(comments):
         body = comment.get("body")
         if not isinstance(body, str) or _TASK_CHECKPOINT_START not in body:
@@ -817,42 +830,156 @@ def latest_manual_prerequisite_checkpoint(
             continue
         if not isinstance(payload, Mapping):
             continue
-        if payload.get("output_state_type") != "manual-prerequisite-checkpoint-v1":
-            if payload.get("output_state_type") == "manual-prerequisite-completed-v1":
-                return None
-            continue
-        state = payload.get("output_state")
-        if (
-            isinstance(state, Mapping)
-            and state.get("schema")
-            == "https://powdrr.io/schemas/manual-prerequisite-checkpoint-v1"
-            and all(
-                isinstance(state.get(field), str) and state[field].strip()
-                for field in (
-                    "human_task_id",
-                    "follow_up_task_id",
-                    "workflow_id",
-                    "workflow_directory",
-                    "integration_branch",
-                    "pull_request_url",
-                    "commit_sha",
-                )
-            )
-            and isinstance(state.get("prerequisite"), Mapping)
-            and isinstance(state.get("commit_sha"), str)
-            and re.fullmatch(r"[0-9a-fA-F]{40}", state["commit_sha"]) is not None
-            and isinstance(state.get("integration_branch"), str)
-            and re.fullmatch(
-                r"[A-Za-z0-9][A-Za-z0-9._/-]*", state["integration_branch"]
-            )
-            is not None
-            and ".." not in state["integration_branch"].split("/")
-            and isinstance(state.get("workflow_directory"), str)
-            and not Path(state["workflow_directory"]).is_absolute()
-            and ".." not in Path(state["workflow_directory"]).parts
-        ):
-            return state
+        checkpoint = _manual_prerequisite_checkpoint_from_record(payload)
+        if checkpoint is not None:
+            return checkpoint
+        if payload.get("output_state_type") == "manual-prerequisite-completed-v1":
+            return None
     return None
+
+
+def _manual_prerequisite_checkpoint_from_record(
+    record: Mapping[str, Any],
+) -> Mapping[str, Any] | None:
+    if record.get("output_state_type") != "manual-prerequisite-checkpoint-v1":
+        return None
+    state = record.get("output_state")
+    if not isinstance(state, Mapping):
+        return None
+    if (
+        state.get("schema")
+        != "https://powdrr.io/schemas/manual-prerequisite-checkpoint-v1"
+        or not all(
+            isinstance(state.get(field), str) and state[field].strip()
+            for field in (
+                "human_task_id",
+                "follow_up_task_id",
+                "workflow_id",
+                "workflow_directory",
+                "integration_branch",
+                "pull_request_url",
+                "commit_sha",
+            )
+        )
+        or not isinstance(state.get("prerequisite"), Mapping)
+        or not isinstance(state.get("commit_sha"), str)
+        or re.fullmatch(r"[0-9a-fA-F]{40}", state["commit_sha"]) is None
+        or not isinstance(state.get("integration_branch"), str)
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", state["integration_branch"])
+        is None
+        or ".." in state["integration_branch"].split("/")
+        or not isinstance(state.get("workflow_directory"), str)
+        or Path(state["workflow_directory"]).is_absolute()
+        or ".." in Path(state["workflow_directory"]).parts
+    ):
+        return None
+    return state
+
+
+def _issue_checkpoint_path(repo_root: str | Path, issue_number: int) -> Path:
+    if issue_number < 1:
+        raise GitHubIssueQueueError("issue number must be positive")
+    return (
+        Path(repo_root).resolve()
+        / ".powdrr"
+        / "github-issue-worker"
+        / "checkpoints"
+        / f"issue-{issue_number}.json"
+    )
+
+
+def _task_checkpoint_record(
+    checkpoint: TaskCheckpoint, *, issue_number: int
+) -> dict[str, Any]:
+    return {
+        "schema": "https://powdrr.io/schemas/github-issue-task-checkpoint-v1",
+        "issue_number": issue_number,
+        "plan_id": checkpoint.plan_id,
+        "item_id": checkpoint.item_id,
+        "workflow_id": checkpoint.workflow_id,
+        "task_id": checkpoint.task_id,
+        "status": (
+            "awaiting_human"
+            if checkpoint.output_state_type == "manual-prerequisite-checkpoint-v1"
+            else "completed"
+        ),
+        "output_state_type": checkpoint.output_state_type,
+        "output_state": checkpoint.output_state,
+        "commit_sha": checkpoint.commit_sha,
+    }
+
+
+def _write_local_task_checkpoint(
+    *,
+    repo_root: str | Path,
+    issue_number: int,
+    checkpoint: TaskCheckpoint,
+) -> Path:
+    path = _issue_checkpoint_path(repo_root, issue_number)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path.parent, 0o700)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".issue-{issue_number}-", suffix=".tmp", dir=path.parent
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(
+                _task_checkpoint_record(checkpoint, issue_number=issue_number),
+                stream,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+    return path
+
+
+def _read_local_task_checkpoint(
+    repo_root: str | Path, issue_number: int
+) -> Mapping[str, Any] | None:
+    path = _issue_checkpoint_path(repo_root, issue_number)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return None
+    except (OSError, json.JSONDecodeError) as error:
+        raise GitHubIssueQueueError(
+            f"could not read local checkpoint for issue #{issue_number}: {error}"
+        ) from error
+    if (
+        not isinstance(payload, Mapping)
+        or payload.get("schema")
+        != "https://powdrr.io/schemas/github-issue-task-checkpoint-v1"
+        or payload.get("issue_number") != issue_number
+        or not isinstance(payload.get("plan_id"), str)
+        or not isinstance(payload.get("item_id"), str)
+        or not isinstance(payload.get("workflow_id"), str)
+        or not isinstance(payload.get("task_id"), str)
+        or not isinstance(payload.get("output_state_type"), str)
+        or "output_state" not in payload
+    ):
+        raise GitHubIssueQueueError(
+            f"local checkpoint for issue #{issue_number} is malformed"
+        )
+    return payload
+
+
+def _local_manual_prerequisite_checkpoint(
+    repo_root: str | Path, issue_number: int
+) -> Mapping[str, Any] | None:
+    record = _read_local_task_checkpoint(repo_root, issue_number)
+    return (
+        _manual_prerequisite_checkpoint_from_record(record)
+        if record is not None
+        else None
+    )
 
 
 def continue_manual_prerequisite_issue(
@@ -867,6 +994,7 @@ def continue_manual_prerequisite_issue(
         return _continue_manual_prerequisite_issue_locked(
             client=client,
             issue_number=issue_number,
+            repo_root=Path(repo_root).resolve(),
             resume_workflow=resume_workflow,
         )
 
@@ -875,6 +1003,7 @@ def _continue_manual_prerequisite_issue_locked(
     *,
     client: GitHubIssueClient,
     issue_number: int,
+    repo_root: Path,
     resume_workflow: Callable[[Mapping[str, Any], TaskCheckpointCallback], int],
 ) -> WorkerReport:
     issue = client.get_issue(issue_number)
@@ -882,8 +1011,11 @@ def _continue_manual_prerequisite_issue_locked(
         raise GitHubIssueQueueError(
             f"issue #{issue_number} is not open and awaiting a manual prerequisite"
         )
-    checkpoint = latest_manual_prerequisite_checkpoint(
-        client.list_comments(issue_number)
+    local_record = _read_local_task_checkpoint(repo_root, issue_number)
+    checkpoint = (
+        _manual_prerequisite_checkpoint_from_record(local_record)
+        if local_record is not None
+        else latest_manual_prerequisite_checkpoint(client.list_comments(issue_number))
     )
     if checkpoint is None:
         raise GitHubIssueQueueError(
@@ -921,18 +1053,17 @@ def _continue_manual_prerequisite_issue_locked(
     def checkpoint_callback(
         task_id: str, output_state_type: str, output_state: Any, commit_sha: str | None
     ) -> None:
-        client.add_comment(
-            issue,
-            render_task_checkpoint_comment(
-                TaskCheckpoint(
-                    plan_id=pointer["plan_id"],
-                    item_id=pointer["item_id"],
-                    workflow_id=str(checkpoint["workflow_id"]),
-                    task_id=task_id,
-                    output_state_type=output_state_type,
-                    output_state=output_state,
-                    commit_sha=commit_sha,
-                )
+        _write_local_task_checkpoint(
+            repo_root=repo_root,
+            issue_number=issue_number,
+            checkpoint=TaskCheckpoint(
+                plan_id=pointer["plan_id"],
+                item_id=pointer["item_id"],
+                workflow_id=str(checkpoint["workflow_id"]),
+                task_id=task_id,
+                output_state_type=output_state_type,
+                output_state=output_state,
+                commit_sha=commit_sha,
             ),
         )
 
@@ -942,8 +1073,12 @@ def _continue_manual_prerequisite_issue_locked(
     except Exception as error:
         return_code = 1
         detail = f"{type(error).__name__}: {error}"
-    comments = client.list_comments(issue_number)
-    pending_prerequisite = latest_manual_prerequisite_checkpoint(comments)
+    latest_local_checkpoint = _read_local_task_checkpoint(repo_root, issue_number)
+    pending_prerequisite = (
+        _manual_prerequisite_checkpoint_from_record(latest_local_checkpoint)
+        if latest_local_checkpoint is not None
+        else latest_manual_prerequisite_checkpoint(client.list_comments(issue_number))
+    )
     if pending_prerequisite is not None:
         status = "awaiting_human"
         outcome = "awaiting_human"
@@ -1247,35 +1382,9 @@ def render_fulfilled_without_pr_comment(
     )
 
 
-def render_task_checkpoint_comment(checkpoint: TaskCheckpoint) -> str:
-    """Render a readable GitHub comment with machine-readable checkpoint data."""
-    payload = {
-        "schema": "https://powdrr.io/schemas/github-issue-task-checkpoint-v1",
-        "plan_id": checkpoint.plan_id,
-        "item_id": checkpoint.item_id,
-        "workflow_id": checkpoint.workflow_id,
-        "task_id": checkpoint.task_id,
-        "status": (
-            "awaiting_human"
-            if checkpoint.output_state_type == "manual-prerequisite-checkpoint-v1"
-            else "completed"
-        ),
-        "output_state_type": checkpoint.output_state_type,
-        "output_state": checkpoint.output_state,
-        "commit_sha": checkpoint.commit_sha,
-    }
-    return (
-        "### Powdrr task checkpoint\n\n"
-        f"{_TASK_CHECKPOINT_START}\n"
-        "```json\n"
-        f"{json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True)}\n"
-        "```"
-    )
-
-
 def _task_checkpoint_callback(
     *,
-    client: GitHubIssueClient,
+    repo_root: Path,
     issue: QueueIssue,
     plan: ReviewedExecutionPlan,
     item: PlannedWorkItem,
@@ -1290,18 +1399,17 @@ def _task_checkpoint_callback(
         target_plan: ReviewedExecutionPlan = plan,
         target_item: PlannedWorkItem = item,
     ) -> None:
-        client.add_comment(
-            target_issue,
-            render_task_checkpoint_comment(
-                TaskCheckpoint(
-                    plan_id=target_plan.plan_id,
-                    item_id=target_item.item_id,
-                    workflow_id=target_item.workflow_id,
-                    task_id=task_id,
-                    output_state_type=output_state_type,
-                    output_state=output_state,
-                    commit_sha=commit_sha,
-                )
+        _write_local_task_checkpoint(
+            repo_root=repo_root,
+            issue_number=target_issue.number,
+            checkpoint=TaskCheckpoint(
+                plan_id=target_plan.plan_id,
+                item_id=target_item.item_id,
+                workflow_id=target_item.workflow_id,
+                task_id=task_id,
+                output_state_type=output_state_type,
+                output_state=output_state,
+                commit_sha=commit_sha,
             ),
         )
 

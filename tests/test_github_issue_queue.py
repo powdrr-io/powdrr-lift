@@ -4,6 +4,7 @@ import json
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -27,11 +28,35 @@ from powdrr_lift.workrr.github_issue_queue import (
     latest_manual_prerequisite_checkpoint,
     parse_issue_pointer,
     publish_plan_issues,
-    render_task_checkpoint_comment,
     run_worker_once,
 )
 
 PLAN_COMMIT = "a" * 40
+
+
+def _legacy_checkpoint_comment(checkpoint: TaskCheckpoint) -> str:
+    payload = {
+        "schema": "https://powdrr.io/schemas/github-issue-task-checkpoint-v1",
+        "plan_id": checkpoint.plan_id,
+        "item_id": checkpoint.item_id,
+        "workflow_id": checkpoint.workflow_id,
+        "task_id": checkpoint.task_id,
+        "status": (
+            "awaiting_human"
+            if checkpoint.output_state_type == "manual-prerequisite-checkpoint-v1"
+            else "completed"
+        ),
+        "output_state_type": checkpoint.output_state_type,
+        "output_state": checkpoint.output_state,
+        "commit_sha": checkpoint.commit_sha,
+    }
+    return (
+        "### Powdrr task checkpoint\n\n"
+        f"{github_issue_queue._TASK_CHECKPOINT_START}\n"
+        "```json\n"
+        f"{json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True)}\n"
+        "```"
+    )
 
 
 def _write_process_workflow(
@@ -1082,7 +1107,62 @@ def test_worker_marks_failed_execution_blocked(tmp_path: Path) -> None:
     assert QUEUE_LABELS["blocked"] in client.issues[0].labels
 
 
-def test_worker_persists_task_checkpoint_as_issue_comment(tmp_path: Path) -> None:
+def test_worker_updates_issue_after_task_retries_are_exhausted(tmp_path: Path) -> None:
+    (tmp_path / "docs/workflows/base").mkdir(parents=True)
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    attempts: list[int] = []
+    statuses_during_attempts: list[str] = []
+
+    def run_task(*_args: Any) -> int:
+        for attempt in range(1, 4):
+            attempts.append(attempt)
+            statuses_during_attempts.append(
+                next(
+                    label
+                    for label in client.issues[0].labels
+                    if label in QUEUE_LABELS.values()
+                )
+            )
+            if attempt < 3:
+                continue
+            raise RuntimeError("final retry failed")
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-retrying",
+        run_task=run_task,
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    assert attempts == [1, 2, 3]
+    assert statuses_during_attempts == [QUEUE_LABELS["claimed"]] * 3
+    assert report.outcome == "blocked"
+    assert report.detail == "RuntimeError: final retry failed"
+    assert QUEUE_LABELS["blocked"] in client.issues[0].labels
+    final_status_comments = [
+        body
+        for issue_number, body in client.comments
+        if issue_number == 100 and "did not finish successfully" in body
+    ]
+    assert len(final_status_comments) == 1
+    assert not any(
+        "powdrr-task-checkpoint" in body
+        for issue_number, body in client.comments
+        if issue_number == 100
+    )
+
+
+def test_worker_persists_task_checkpoint_locally_without_issue_comment(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "docs/workflows/base").mkdir(parents=True)
     client = FakeIssueClient()
     publish_plan_issues(
@@ -1124,24 +1204,19 @@ def test_worker_persists_task_checkpoint_as_issue_comment(tmp_path: Path) -> Non
     )
 
     assert report.outcome == "awaiting_review"
+    record = github_issue_queue._read_local_task_checkpoint(tmp_path, 100)
+    assert record is not None
+    assert record["task_id"] == "base-task-02"
+    assert record["output_state"] == {"files": ["a.py"]}
+    assert record["commit_sha"] == "b" * 40
+    assert (
+        github_issue_queue._issue_checkpoint_path(tmp_path, 100).stat().st_mode & 0o777
+        == 0o600
+    )
     issue_comments = [
         body for issue_number, body in client.comments if issue_number == 100
     ]
-    checkpoint_body = next(
-        body for body in issue_comments if "powdrr-task-checkpoint" in body
-    )
-    payload = json.loads(checkpoint_body.split("```json\n", 1)[1].split("\n```", 1)[0])
-    assert payload == {
-        "commit_sha": "b" * 40,
-        "item_id": "base",
-        "output_state": {"files": ["a.py"]},
-        "output_state_type": "implementation-state",
-        "plan_id": "feature-v1",
-        "schema": "https://powdrr.io/schemas/github-issue-task-checkpoint-v1",
-        "status": "completed",
-        "task_id": "base-task-02",
-        "workflow_id": "base",
-    }
+    assert not any("powdrr-task-checkpoint" in body for body in issue_comments)
 
 
 def test_worker_marks_manual_prerequisite_as_awaiting_human(tmp_path: Path) -> None:
@@ -1192,16 +1267,16 @@ def test_worker_marks_manual_prerequisite_as_awaiting_human(tmp_path: Path) -> N
     assert report.outcome == "awaiting_human"
     assert QUEUE_LABELS["awaiting_human"] in client.issues[0].labels
     assert QUEUE_LABELS["awaiting_review"] not in client.issues[0].labels
-    assert latest_manual_prerequisite_checkpoint(client.list_comments(100)) is not None
-    checkpoint_body = next(
-        body
+    local_checkpoint = github_issue_queue._local_manual_prerequisite_checkpoint(
+        tmp_path, 100
+    )
+    assert local_checkpoint is not None
+    assert local_checkpoint["human_task_id"] == "base-task-04"
+    assert not any(
+        "powdrr-task-checkpoint" in body
         for number, body in client.comments
-        if number == 100 and "manual-prerequisite-checkpoint-v1" in body
+        if number == 100
     )
-    checkpoint_payload = json.loads(
-        checkpoint_body.split("```json\n", 1)[1].split("\n```", 1)[0]
-    )
-    assert checkpoint_payload["status"] == "awaiting_human"
 
 
 def test_continue_manual_prerequisite_retries_ci_then_resumes(tmp_path: Path) -> None:
@@ -1254,18 +1329,17 @@ def test_continue_manual_prerequisite_retries_ci_then_resumes(tmp_path: Path) ->
         "commit_sha": "b" * 40,
         "prerequisite": {"title": "Install key", "instructions": ["Do it"]},
     }
-    client.add_comment(
-        issue,
-        render_task_checkpoint_comment(
-            TaskCheckpoint(
-                plan_id="feature-v1",
-                item_id="base",
-                workflow_id="base",
-                task_id="base-task-03",
-                output_state_type="manual-prerequisite-checkpoint-v1",
-                output_state=checkpoint,
-                commit_sha="b" * 40,
-            )
+    github_issue_queue._write_local_task_checkpoint(
+        repo_root=tmp_path,
+        issue_number=issue.number,
+        checkpoint=TaskCheckpoint(
+            plan_id="feature-v1",
+            item_id="base",
+            workflow_id="base",
+            task_id="base-task-03",
+            output_state_type="manual-prerequisite-checkpoint-v1",
+            output_state=checkpoint,
+            commit_sha="b" * 40,
         ),
     )
     resumed: list[Mapping[str, object]] = []
@@ -1297,6 +1371,11 @@ def test_continue_manual_prerequisite_retries_ci_then_resumes(tmp_path: Path) ->
     ]
     assert QUEUE_LABELS["awaiting_review"] in client.get_issue(100).labels
     assert latest_manual_prerequisite_checkpoint(client.list_comments(100)) is None
+    assert not any(
+        "powdrr-task-checkpoint" in body
+        for number, body in client.comments
+        if number == 100
+    )
 
 
 def test_worker_repins_and_requeues_issue_when_plan_amendment_merges(
@@ -1323,7 +1402,7 @@ def test_worker_repins_and_requeues_issue_when_plan_amendment_merges(
     client.comments.append(
         (
             issue.number,
-            render_task_checkpoint_comment(
+            _legacy_checkpoint_comment(
                 TaskCheckpoint(
                     plan_id="feature-v1",
                     item_id="base",
@@ -1412,7 +1491,7 @@ def test_worker_does_not_requeue_unmerged_plan_amendment(tmp_path: Path) -> None
     client.comments.append(
         (
             issue.number,
-            render_task_checkpoint_comment(
+            _legacy_checkpoint_comment(
                 TaskCheckpoint(
                     plan_id="feature-v1",
                     item_id="base",
@@ -1447,8 +1526,8 @@ def test_worker_does_not_requeue_unmerged_plan_amendment(tmp_path: Path) -> None
     assert QUEUE_LABELS["awaiting_review"] in client.issues[0].labels
 
 
-def test_task_checkpoint_comment_is_readable_and_structured() -> None:
-    body = render_task_checkpoint_comment(
+def test_legacy_issue_checkpoint_is_readable_for_rolling_upgrade() -> None:
+    body = _legacy_checkpoint_comment(
         TaskCheckpoint(
             plan_id="plan-v1",
             item_id="PR-02",

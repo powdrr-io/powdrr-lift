@@ -2354,6 +2354,64 @@ def _append_inline_plan_adjustments_to_pr_body(
     )
 
 
+def _append_plan_repair_metadata_to_pr_body(
+    action: WorkflowAction,
+    *,
+    task_input_state: Mapping[str, Any],
+    repo_root: Path,
+    events: Sequence[Mapping[str, Any]],
+) -> WorkflowAction:
+    """Attach the typed repair manifest to a worker-created amendment PR."""
+    if action.tool != GH_TOOL or action.parameters.get("operation") not in {
+        "pr_create",
+        "pr_publish_clean",
+    }:
+        return action
+    if not any(event.get("kind") == "typed_plan_repair" for event in events):
+        return action
+    proposed = task_input_state.get("proposed_pr_context")
+    if not isinstance(proposed, Mapping):
+        return action
+    plan_id = str(proposed.get("plan_id", "")).strip()
+    raw_path = proposed.get("execution_plan_file")
+    if not isinstance(raw_path, str) or not raw_path.strip():
+        if not plan_id:
+            return action
+        raw_path = f"docs/plans/{slugify_workflow_id(plan_id)}-execution-plan.yaml"
+    plan_path = Path(raw_path)
+    if plan_path.is_absolute() or ".." in plan_path.parts:
+        raise PowdrrExecutionError(
+            "plan repair metadata path must be repository-relative"
+        )
+    try:
+        (repo_root / plan_path).resolve().relative_to(repo_root.resolve())
+        plan_data = yaml.safe_load((repo_root / plan_path).read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError) as error:
+        raise PowdrrExecutionError(
+            f"could not read repaired plan metadata for PR publication: {error}"
+        ) from error
+    planning = plan_data.get("planning") if isinstance(plan_data, Mapping) else None
+    repair = planning.get("latest_repair") if isinstance(planning, Mapping) else None
+    if not plan_id or not isinstance(repair, Mapping):
+        raise PowdrrExecutionError("typed plan repair has no published repair manifest")
+    from powdrr_lift.workrr.github_issue_queue import render_plan_repair_metadata
+
+    parameters = dict(action.parameters)
+    body_value = parameters.get("body")
+    body = body_value if isinstance(body_value, str) else ""
+    if "<!-- powdrr-plan-repair:v1 -->" not in body:
+        body = (
+            f"{body.rstrip()}\n\n"
+            + render_plan_repair_metadata(
+                plan_id=plan_id,
+                plan_path=plan_path.as_posix(),
+                repair=repair,
+            )
+        ).lstrip()
+        parameters["body"] = body
+    return WorkflowAction(kind=action.kind, tool=action.tool, parameters=parameters)
+
+
 @dataclass(slots=True)
 class _TaskWorkflowExecutionStrategy:
     """Durable task operation adapter called by the Procedrr evaluator."""
@@ -3116,6 +3174,12 @@ class _TaskWorkflowExecutionStrategy:
         action = _append_inline_plan_adjustments_to_pr_body(
             action,
             self.task.input_state,
+        )
+        action = _append_plan_repair_metadata_to_pr_body(
+            action,
+            task_input_state=self.task.input_state,
+            repo_root=self.repo_root,
+            events=self.events,
         )
         command_error = _workflow_file_command_error(
             action.parameters,

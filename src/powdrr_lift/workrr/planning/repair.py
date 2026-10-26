@@ -212,6 +212,81 @@ def item_content_digest(item: PlannedWorkItem) -> str:
     return _digest(value)
 
 
+def item_input_contract_digest(
+    item: PlannedWorkItem, manifest: Mapping[str, Any] | None
+) -> str:
+    """Hash the plan fields and validation/setup records consumed by one item."""
+    data = manifest if isinstance(manifest, Mapping) else {}
+    item_units = data.get("item_unit_ids", {})
+    unit_ids = (
+        item_units.get(item.item_id, []) if isinstance(item_units, Mapping) else []
+    )
+    unit_records = data.get("units", [])
+    units = (
+        [
+            record
+            for record in unit_records
+            if isinstance(record, Mapping) and record.get("id") in unit_ids
+        ]
+        if isinstance(unit_records, list)
+        else []
+    )
+    validation_ids = {
+        validation_id
+        for unit in units
+        for validation_id in (
+            unit.get("validation_ids", []) if isinstance(unit, Mapping) else []
+        )
+        if isinstance(validation_id, str)
+    }
+    setup_records = data.get("setups", [])
+    setups = (
+        [
+            setup
+            for setup in setup_records
+            if isinstance(setup, Mapping) and setup.get("owner_item_id") == item.item_id
+        ]
+        if isinstance(setup_records, list)
+        else []
+    )
+    validation_ids.update(
+        validation_id
+        for setup in setups
+        for validation_id in setup.get("unblocks_validation_ids", [])
+        if isinstance(validation_id, str)
+    )
+    validations = data.get("validations", [])
+    relevant_validations = (
+        [
+            validation
+            for validation in validations
+            if isinstance(validation, Mapping)
+            and validation.get("id") in validation_ids
+        ]
+        if isinstance(validations, list)
+        else []
+    )
+    coverage = data.get("validation_coverage", [])
+    item_coverage = (
+        [
+            record
+            for record in coverage
+            if isinstance(record, Mapping) and record.get("item_id") == item.item_id
+        ]
+        if isinstance(coverage, list)
+        else []
+    )
+    return _digest(
+        {
+            "item_content_digest": item_content_digest(item),
+            "units": units,
+            "setups": setups,
+            "validations": relevant_validations,
+            "validation_coverage": item_coverage,
+        }
+    )
+
+
 def plan_revision_digest(draft: RepairDraft) -> str:
     """Compute a canonical CAS identity for the plan and semantic manifest."""
     manifest_digest = _manifest_semantic_digest(draft.manifest)
@@ -459,6 +534,25 @@ def apply_plan_repair_patch(
     }
     if changed - set(resolved.affected_item_ids):
         raise PlanRepairError("patch changes an item outside its declared impact")
+    old_input_contract_digests = {
+        item.item_id: item_input_contract_digest(item, draft.manifest)
+        for item in draft.plan.items
+    }
+    new_input_contract_digests = {
+        item.item_id: item_input_contract_digest(item, candidate_manifest)
+        for item in candidate_plan.items
+    }
+    changed_input_contracts = {
+        item_id
+        for item_id in old_input_contract_digests.keys()
+        | new_input_contract_digests.keys()
+        if old_input_contract_digests.get(item_id)
+        != new_input_contract_digests.get(item_id)
+    }
+    if changed_input_contracts - set(resolved.affected_item_ids):
+        raise PlanRepairError(
+            "patch changes an item input contract outside its declared impact"
+        )
     prior_repair = draft.manifest.get("latest_repair")
     repair_record = {
         "repair_id": resolved.repair_id,
@@ -475,6 +569,18 @@ def apply_plan_repair_patch(
         "new_item_digests": {
             item_id: new_item_digests[item_id]
             for item_id in sorted(set(new_item_digests) & changed)
+        },
+        "old_input_contract_digests": {
+            item_id: old_input_contract_digests[item_id]
+            for item_id in sorted(
+                set(old_input_contract_digests) & changed_input_contracts
+            )
+        },
+        "new_input_contract_digests": {
+            item_id: new_input_contract_digests[item_id]
+            for item_id in sorted(
+                set(new_input_contract_digests) & changed_input_contracts
+            )
         },
         "retired_items": retired,
     }
@@ -1190,5 +1296,6 @@ __all__ = [
     "dependency_edge_digest",
     "expand_repair_impact",
     "item_content_digest",
+    "item_input_contract_digest",
     "plan_revision_digest",
 ]

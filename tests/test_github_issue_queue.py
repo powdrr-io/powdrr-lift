@@ -499,6 +499,30 @@ def test_github_issue_comment_does_not_retry_unrelated_forbidden_response() -> N
     assert delays == []
 
 
+def test_github_issue_comment_retries_transient_server_errors() -> None:
+    commands: list[list[str]] = []
+    delays: list[float] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        if len(commands) == 1:
+            return subprocess.CompletedProcess(
+                arguments, 1, "", "gh: Server Error (HTTP 502)"
+            )
+        return subprocess.CompletedProcess(arguments, 0, "{}", "")
+
+    client = GitHubIssueClient("example/project", run=run, sleep_fn=delays.append)
+    issue = QueueIssue(42, "Planning session", "", "open", (), "")
+
+    client.add_comment(issue, "checkpoint")
+
+    assert len(commands) == 2
+    assert commands[0] == commands[1]
+    assert delays == [1.0]
+
+
 def test_github_issue_client_closes_fulfilled_issue_with_completed_reason() -> None:
     commands: list[list[str]] = []
 

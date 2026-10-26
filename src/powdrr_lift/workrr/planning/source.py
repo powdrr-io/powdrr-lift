@@ -798,18 +798,6 @@ def build_extract_requirements_request(
 ) -> QuestionRequest[RequirementExtractionPage]:
     """Build one bounded obligation enumeration request for a source block."""
     anchor_id = block.anchor_ids[0]
-    valid = {
-        "records": [
-            {
-                "statement": "The block's independently checkable obligation.",
-                "kind": "behavior",
-                "source_refs": [anchor_id],
-                "related_source_refs": [],
-            }
-        ],
-        "has_more": False,
-        "next_anchor": None,
-    }
     empty = {"records": [], "has_more": False, "next_anchor": None}
     supplied_blocks = (block, *related_blocks)
     if after_anchor is not None and after_anchor not in block.anchor_ids:
@@ -822,6 +810,18 @@ def build_extract_requirements_request(
     pagination_candidate_text = (
         ", ".join(pagination_candidates) if pagination_candidates else "(none)"
     )
+    valid = {
+        "records": [
+            {
+                "statement": "The block's independently checkable obligation.",
+                "kind": "behavior",
+                "source_refs": [anchor_id],
+                "related_source_refs": [],
+            }
+        ],
+        "has_more": bool(pagination_candidates),
+        "next_anchor": (pagination_candidates[0] if pagination_candidates else None),
+    }
     if any(ref not in anchors for ref in supplied_anchor_ids):
         raise PlanningSourceError("source block references a missing source anchor")
     excerpts = tuple(
@@ -882,14 +882,20 @@ def build_extract_requirements_request(
             "next_anchor; anchors from adjacent blocks may be cited by records "
             "but must never be used as pagination cursors. next_anchor is a cursor, "
             "not a citation. If this block has no further obligations, or there are "
-            "no pagination candidates, return has_more=false and next_anchor=null."
+            "no pagination candidates, return has_more=false and next_anchor=null. "
+            "Always include both pagination fields: has_more=true requires a "
+            "non-null next_anchor from the candidates; has_more=false requires "
+            "next_anchor=null."
         ),
         field_definitions={
             "records": "Obligations with statement, kind, and source references.",
             "kind": "One of behavior, constraint, acceptance, or human_setup.",
             "source_refs": "One or more anchors directly imposing this obligation.",
             "related_source_refs": "Anchors for cross-references or dependencies.",
-            "has_more": "Whether another page of obligations remains in this block.",
+            "has_more": (
+                "Whether another page remains. When true, next_anchor is required; "
+                "when false, next_anchor must be null."
+            ),
             "next_anchor": (
                 "If has_more is true, exactly one of these later anchors in this "
                 f"block: {pagination_candidate_text}. This is only a pagination "

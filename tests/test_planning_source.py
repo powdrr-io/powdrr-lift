@@ -423,6 +423,10 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
     candidates = ", ".join(block.anchor_ids)
     assert candidates in request.exact_question
     assert "must never be used as pagination cursors" in request.exact_question
+    assert "has_more=true requires a non-null next_anchor" in request.exact_question
+    assert request.valid_example["has_more"] is True
+    assert request.valid_example["next_anchor"] == block.anchor_ids[0]
+    request.parse_answer(request.valid_example)
     assert adjacent.anchor_ids[0] not in block.anchor_ids
     with pytest.raises(ValueError, match="current source block"):
         request.parse_answer(

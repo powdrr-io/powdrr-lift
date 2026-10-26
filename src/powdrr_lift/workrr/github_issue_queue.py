@@ -152,7 +152,7 @@ class GitHubIssueClient:
         executable: str = "gh",
         run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
         sleep_fn: Callable[[float], None] = sleep,
-        rate_limit_retries: int = 6,
+        comment_write_retries: int = 6,
     ) -> None:
         if not re.fullmatch(r"[^/\s]+/[^/\s]+", repository):
             raise GitHubIssueQueueError("repository must use owner/name form")
@@ -160,7 +160,7 @@ class GitHubIssueClient:
         self.executable = executable
         self._run = run
         self._sleep = sleep_fn
-        self._rate_limit_retries = max(0, rate_limit_retries)
+        self._comment_write_retries = max(0, comment_write_retries)
 
     def list_issues(
         self, *, labels: Sequence[str] = (), state: str = "all"
@@ -353,22 +353,29 @@ class GitHubIssueClient:
             "-f",
             f"body={body}",
         ]
-        for attempt in range(self._rate_limit_retries + 1):
+        for attempt in range(self._comment_write_retries + 1):
             result = self._invoke(arguments, check=False)
             if result.returncode == 0:
                 return
-            if not _is_github_rate_limit_response(result):
+            rate_limited = _is_github_rate_limit_response(result)
+            transient_server_error = _is_github_transient_server_error(result)
+            if not rate_limited and not transient_server_error:
                 raise GitHubIssueQueueError(
                     "GitHub API POST "
                     f"repos/{self.repository}/issues/{issue.number}/comments "
                     f"failed: {result.stderr.strip()}"
                 )
-            if attempt >= self._rate_limit_retries:
+            if attempt >= self._comment_write_retries:
                 raise GitHubIssueQueueError(
-                    "GitHub issue comment rate limit remained active after "
+                    "GitHub issue comment write remained unsuccessful after "
                     f"{attempt} retries: {result.stderr.strip()}"
                 )
-            self._sleep(_github_retry_delay(result, attempt))
+            delay = (
+                _github_retry_delay(result, attempt)
+                if rate_limited
+                else _github_server_retry_delay(attempt)
+            )
+            self._sleep(delay)
 
     def list_comments(self, issue_number: int) -> tuple[Mapping[str, Any], ...]:
         result = self._invoke(
@@ -436,6 +443,33 @@ def _is_github_rate_limit_response(
             "temporarily blocked from content creation",
         )
     )
+
+
+def _is_github_transient_server_error(
+    result: subprocess.CompletedProcess[str],
+) -> bool:
+    response = f"{result.stdout}\n{result.stderr}".lower()
+    return any(
+        marker in response
+        for marker in (
+            "http 500",
+            "http 502",
+            "http 503",
+            "http 504",
+            "http/2.0 500",
+            "http/2.0 502",
+            "http/2.0 503",
+            "http/2.0 504",
+            "status 500",
+            "status 502",
+            "status 503",
+            "status 504",
+        )
+    )
+
+
+def _github_server_retry_delay(attempt: int) -> float:
+    return float(min(2**attempt, 30))
 
 
 def _github_retry_delay(

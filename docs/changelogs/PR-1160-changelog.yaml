@@ -44,7 +44,7 @@ files:
     rationale: Recover from temporary GitHub 5xx responses without busy retrying.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 448, end_line: 474}
+    span: {start_line: 448, end_line: 480}
     summary: Recognize transient GitHub 5xx and connection failures and calculate bounded retry delays.
     rationale: Resume exact checkpoint comment writes after temporary server or transport failures.
   - path: src/powdrr_lift/workrr/planning/source.py
@@ -69,14 +69,9 @@ files:
     rationale: Keep the schema explanation consistent with the valid paginated example.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 502, end_line: 525}
-    summary: Verify a transient HTTP 502 comment response retries the identical request after backoff.
-    rationale: Prevent a temporary GitHub server response from losing a checkpoint transition.
-  - path: tests/test_github_issue_queue.py
-    type: modified
-    span: {start_line: 522, end_line: 548}
-    summary: Verify a connection reset retries the identical issue comment after backoff.
-    rationale: Preserve checkpoint writes when a transient network reset interrupts the GitHub response.
+    span: {start_line: 502, end_line: 552}
+    summary: Verify transient HTTP 502 and connection-reset responses retry the identical issue comment after backoff.
+    rationale: Prevent temporary GitHub server and transport failures from losing checkpoint transitions.
   - path: tests/test_planning_source.py
     type: modified
     span: {start_line: 426, end_line: 429}

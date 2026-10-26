@@ -19,32 +19,27 @@ files:
     rationale: Apply one bounded retry policy to comment reads and writes.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 356, end_line: 356}
-    summary: Use the comment-write retry limit for each comment request.
-    rationale: Permit transient server responses to use the same bounded retry window.
+    span: {start_line: 356, end_line: 359}
+    summary: Route issue comment writes through the shared bounded retry helper.
+    rationale: Apply the same transient-error policy consistently to GitHub comment API requests.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 360, end_line: 362}
-    summary: Classify rate-limit and transient server responses before deciding to retry.
-    rationale: Retry only recoverable GitHub responses while preserving immediate errors for unrelated failures.
+    span: {start_line: 362, end_line: 362}
+    summary: Identify the issue-comment API request whose result or failure should be returned.
+    rationale: Keep the operation-specific endpoint available to the shared retry helper.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 368, end_line: 368}
-    summary: Report exhausted comment-write retries with a general failure message.
-    rationale: Describe rate-limit and server-error exhaustion accurately.
+    span: {start_line: 368, end_line: 369}
+    summary: Route issue comment reads through the shared bounded retry helper.
+    rationale: Allow planning resume to recover when GitHub times out while loading checkpoints.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 370, end_line: 370}
-    summary: Raise after exhausting the bounded comment-write retry attempts.
-    rationale: Stop retrying once the configured transient failure limit is reached.
+    span: {start_line: 381, end_line: 408}
+    summary: Retry transient comment API reads and writes with bounded backoff while returning unrelated errors immediately.
+    rationale: Keep issue checkpoint reads and writes resilient to rate limits, 5xx responses, and transport interruptions.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 373, end_line: 378}
-    summary: Apply server-guided rate-limit waits or exponential delays for transient server errors.
-    rationale: Recover from temporary GitHub 5xx responses without busy retrying.
-  - path: src/powdrr_lift/workrr/github_issue_queue.py
-    type: modified
-    span: {start_line: 448, end_line: 480}
+    span: {start_line: 458, end_line: 491}
     summary: Recognize transient GitHub 5xx, connection-reset, and timeout errors and calculate bounded retry delays.
     rationale: Resume issue comment reads and exact checkpoint writes after temporary server or transport failures.
   - path: src/powdrr_lift/workrr/planning/source.py
@@ -69,7 +64,7 @@ files:
     rationale: Keep the schema explanation consistent with the valid paginated example.
   - path: tests/test_github_issue_queue.py
     type: modified
-    span: {start_line: 502, end_line: 552}
+    span: {start_line: 502, end_line: 581}
     summary: Verify transient HTTP 502, connection-reset, and read-timeout errors retry issue comment requests after backoff.
     rationale: Prevent temporary GitHub server and transport failures from losing checkpoint transitions or blocking resume reads.
   - path: tests/test_planning_source.py

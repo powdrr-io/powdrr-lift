@@ -13,6 +13,7 @@ import re
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Protocol
 
 from powdrr_lift.workrr.github_issue_queue import (
@@ -31,6 +32,7 @@ from powdrr_lift.workrr.planning.questions import (
     QuestionRequest,
     run_question,
 )
+from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
@@ -261,12 +263,9 @@ def advance_planning_session(
             raise PlanningServiceError(
                 f"accepted question {question.question_id!r} changed its input digest"
             )
-        return PlanningTransition(
-            "question_accepted",
-            session.session_id,
-            session.issue.number,
-            question.question_id,
-            accepted[question.question_id],
+        raise PlanningServiceError(
+            f"planning state machine did not advance past accepted question "
+            f"{question.question_id!r}"
         )
 
     parent = journal.head.digest if journal.head is not None else None
@@ -395,6 +394,38 @@ def planning_operation_executor(
     return WorkrrOperationExecutor({"internal": dispatch})
 
 
+def run_planning_procedrr(
+    *,
+    process_directory: str | Path,
+    session: PlanningSession,
+    state_machine: PlanningStateMachine,
+    checkpoint_store: CheckpointStore,
+    client: WorkflowLLMClient,
+    options: PlanningOptions,
+    stderr: Any,
+) -> Any:
+    """Execute the bundled plan process around the durable question service."""
+    from procedrr import ProcessCatalog
+    from procedrr_evaluator.runtime import ProcedrrExecutionService
+
+    catalog = ProcessCatalog.load(Path(process_directory))
+    process_client = WorkrrProcedrrClient(
+        client, process_directory=Path(process_directory)
+    )
+    executor = planning_operation_executor(
+        session=session,
+        state_machine=state_machine,
+        checkpoint_store=checkpoint_store,
+        client=client,
+        options=options,
+        stderr=stderr,
+    )
+    return ProcedrrExecutionService(catalog, process_client, executor).execute(
+        "plan-execution",
+        {"session_id": session.session_id, "issue_number": session.issue.number},
+    )
+
+
 def _session_metadata(body: str) -> Mapping[str, Any]:
     if _SESSION_MARKER not in body:
         raise PlanningServiceError("issue does not contain planning session metadata")
@@ -422,4 +453,5 @@ __all__ = [
     "create_planning_session",
     "load_planning_session",
     "planning_operation_executor",
+    "run_planning_procedrr",
 ]

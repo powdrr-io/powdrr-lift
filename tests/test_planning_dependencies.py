@@ -532,16 +532,39 @@ def test_validation_description_and_dependency_questions_are_parser_bound() -> N
         valid_example=validation_example,
     )
     validation_request.validate()
+    next_validation_page = build_validation_description_request(
+        requirement,
+        source=source,
+        evidence={evidence.id: evidence},
+        anchor_order=[anchor, anchor + "-later"],
+        valid_example=validation_example,
+        after_anchor=anchor,
+    )
+    assert (
+        next_validation_page.question.question_id
+        != validation_request.question.question_id
+    )
     dependency_request = build_dependency_confirmation_request(
         _unit("unit-0001"),
         _unit("unit-0002", "req-0002"),
         "The controller configuration.",
         allowed_requirement_ids={"req-0001", "req-0002"},
     )
+    another_output_request = build_dependency_confirmation_request(
+        _unit("unit-0001"),
+        _unit("unit-0002", "req-0002"),
+        "The generated migration.",
+        allowed_requirement_ids={"req-0001", "req-0002"},
+    )
     dependency_request.validate()
+    another_output_request.validate()
 
     assert validation_request.question.kind == "describe_requirement_validations"
     assert dependency_request.question.kind == "confirm_dependency"
+    assert (
+        dependency_request.question.question_id
+        != another_output_request.question.question_id
+    )
 
 
 def test_output_and_setup_equivalence_questions_are_singular_and_valid() -> None:

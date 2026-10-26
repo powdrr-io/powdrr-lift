@@ -217,13 +217,8 @@ from powdrr_lift.workrr.git import (
 )
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanGenerationError,
-    generate_execution_plan_yaml,
-    generate_multi_pr_structrr_proposal,
-    inspect_repository_ci,
-    inspect_repository_code,
     load_plan_workflow_instance,
     publish_execution_plan_pull_request,
-    write_execution_plan_artifacts,
 )
 from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueClient,
@@ -242,6 +237,23 @@ from powdrr_lift.workrr.human_task import (
     run_human_task,
 )
 from powdrr_lift.workrr.local_model import download_local_qwen_model
+from powdrr_lift.workrr.plan_sizing import PATH_RUNTIME_SUFFIXES
+from powdrr_lift.workrr.planning.assembly import PathFact
+from powdrr_lift.workrr.planning.checkpoints import GitHubCommentCheckpointStore
+from powdrr_lift.workrr.planning.compiler import PlanningCompilationError
+from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
+from powdrr_lift.workrr.planning.service import (
+    PlanningOptions,
+    PlanningServiceError,
+    PlanningSession,
+    create_planning_session,
+    load_planning_session,
+    run_planning_procedrr,
+)
+from powdrr_lift.workrr.planning.source import (
+    read_pinned_source,
+    segment_markdown_source,
+)
 from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
 from powdrr_lift.workrr.prompt_benchmark_comparison import (
     PromptBenchmarkComparisonError,
@@ -373,6 +385,22 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser.add_argument("--planning-base-url")
     plan_parser.add_argument("--json", action="store_true")
     plan_parser.set_defaults(func=_run_plan)
+
+    plan_resume_parser = subparsers.add_parser(
+        "plan-resume",
+        help="Resume a durable bounded planning session by its GitHub issue number.",
+    )
+    plan_resume_parser.add_argument("--repository", required=True)
+    plan_resume_parser.add_argument("--session-issue", type=int, required=True)
+    plan_resume_parser.add_argument("--repo-root", type=Path)
+    plan_resume_parser.add_argument(
+        "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
+    )
+    plan_resume_parser.add_argument("--planning-model")
+    plan_resume_parser.add_argument("--planning-api-key")
+    plan_resume_parser.add_argument("--planning-base-url")
+    plan_resume_parser.add_argument("--json", action="store_true")
+    plan_resume_parser.set_defaults(func=_run_plan_resume)
 
     list_plan_issues_parser = subparsers.add_parser(
         "list-plan-issues",
@@ -2605,21 +2633,47 @@ def _run_repository_state(args: argparse.Namespace) -> int:
 
 
 def _run_plan(args: argparse.Namespace) -> int:
+    return _run_plan_session(args)
+
+
+def _run_plan_resume(args: argparse.Namespace) -> int:
+    return _run_plan_session(args, resume=True)
+
+
+def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
     repo_root = resolve_repo_root(args.repo_root).resolve()
+    github = GitHubIssueClient(args.repository) if resume else None
+    session: PlanningSession | None = None
     try:
-        source_path = _repository_file_path(args.source, repo_root, "Source plan")
-        if not source_path.is_file():
-            raise ValueError(f"Source plan does not exist: {source_path}")
-        source_plan = source_path.read_text(encoding="utf-8")
+        if resume:
+            assert github is not None
+            session = load_planning_session(github, args.session_issue)
+            if session.repository != args.repository:
+                raise PlanningServiceError(
+                    "planning session repository differs from --repository"
+                )
+            plan_id = session.plan_id
+            source_relative = session.source_path
+            verification_command = session.verification_command
+        else:
+            source_path = _repository_file_path(args.source, repo_root, "Source plan")
+            if not source_path.is_file():
+                raise ValueError(f"Source plan does not exist: {source_path}")
+            source_relative = source_path.relative_to(repo_root).as_posix()
+            plan_id = args.plan_id
+            verification_command = args.verification_command
+            repository_name = _discover_github_repository(repo_root)
+            github = GitHubIssueClient(repository_name)
+
         output_path = (
             _repository_file_path(args.output, repo_root, "Output plan")
-            if args.output is not None
+            if not resume and args.output is not None
             else repo_root
             / "docs"
             / "plans"
-            / f"{slugify_workflow_id(args.plan_id)}-execution-plan.yaml"
+            / f"{slugify_workflow_id(plan_id)}-execution-plan.yaml"
         )
-        if output_path == source_path:
+        if output_path == repo_root / source_relative:
             raise ValueError("Output plan must be different from the source plan")
         if output_path.exists():
             raise FileExistsError(
@@ -2627,31 +2681,31 @@ def _run_plan(args: argparse.Namespace) -> int:
                 "so the reviewed plan is not overwritten."
             )
 
-        planning_provider = resolve_workflow_provider(args.planning_provider)
-        planning_mapping = configured_model_mapping(
-            planning_provider, args.planning_model
+        base_commit = (
+            session.base_commit if session is not None else _git_head(repo_root)
         )
-        planning_credentials = resolve_provider_credentials(
-            planning_mapping.provider,
-            args.planning_api_key,
-            args.planning_base_url,
-        )
-        planning_client = build_workflow_client(
-            planning_credentials,
-            model=planning_mapping.model,
-            model_cache_dir=repo_root / ".powdrr" / "models",
-            progress_stream=sys.stderr,
-        )
-        set_output_limit = getattr(
-            planning_client, "set_structured_output_token_limit", None
-        )
-        if callable(set_output_limit):
-            set_output_limit(8192)
+        _require_clean_planning_checkout(repo_root, base_commit)
+        pinned_source = read_pinned_source(str(repo_root), base_commit, source_relative)
+        if session is None:
+            assert github is not None
+            session = create_planning_session(
+                github,
+                plan_id=plan_id,
+                base_commit=base_commit,
+                source_path=source_relative,
+                source_blob_sha=pinned_source.blob_sha,
+                verification_command=verification_command,
+            )
+        elif pinned_source.blob_sha != session.source_blob_sha:
+            raise PlanningServiceError(
+                "pinned source blob differs from the planning issue metadata"
+            )
+
         bootstrap_output = (
             repo_root
             / ".powdrr"
             / "plan-structrr-bootstrap"
-            / f"{slugify_workflow_id(args.plan_id)}.yaml"
+            / f"{session.session_id}.yaml"
         )
         bootstrap = bootstrap_structrr(
             repo_root,
@@ -2664,68 +2718,123 @@ def _run_plan(args: argparse.Namespace) -> int:
                 for issue in bootstrap.validation.issues
             )
             raise PlanGenerationError(
-                f"Structrr bootstrap failed before plan generation: {details}"
+                f"Structrr bootstrap failed before planning: {details}"
             )
-        source_plan_relative = source_path.relative_to(repo_root).as_posix()
-        rendered, plan = generate_execution_plan_yaml(
-            source_plan=source_plan,
-            plan_id=args.plan_id,
-            client=planning_client,
-            source_document=source_plan_relative,
-            verification_command=args.verification_command,
-            repository_ci_context=inspect_repository_ci(repo_root),
-            include_final_review=True,
+
+        planning_provider = resolve_workflow_provider(args.planning_provider)
+        planning_mapping = configured_model_mapping(
+            planning_provider, args.planning_model
+        )
+        credentials = resolve_provider_credentials(
+            planning_mapping.provider,
+            args.planning_api_key,
+            args.planning_base_url,
+        )
+        planning_client = build_workflow_client(
+            credentials,
+            model=planning_mapping.model,
+            model_cache_dir=repo_root / ".powdrr" / "models",
+            progress_stream=sys.stderr,
+        )
+        set_output_limit = getattr(
+            planning_client, "set_structured_output_token_limit", None
+        )
+        if callable(set_output_limit):
+            set_output_limit(8192)
+
+        source = segment_markdown_source(pinned_source)
+        taxonomy = load_entity_taxonomy(repo_root, _structrr_taxonomy_path(repo_root))
+        machine = SourceLedgerQuestionMachine(
+            source,
             repository_root=repo_root,
-            repository_code_context=inspect_repository_code(
-                repo_root, source_plan, planning_client
+            verification_command=verification_command,
+            repository_paths=_planning_repository_paths(
+                repo_root, base_commit, pinned_source.text
             ),
+            plan_id=plan_id,
+            structrr_baseline=bootstrap.document,
+            taxonomy_entity_types=taxonomy.entity_types,
         )
-        structrr_proposal = generate_multi_pr_structrr_proposal(
-            plan=plan,
-            baseline_snapshot=bootstrap.document,
-            source_plan=source_plan,
+        assert github is not None
+        store = GitHubCommentCheckpointStore(
+            github, session.issue, session_id=session.session_id
+        )
+        process_directory = (
+            Path(__file__).resolve().parents[2] / "docs" / "procedrr" / "processes"
+        )
+        result = run_planning_procedrr(
+            process_directory=process_directory,
+            session=session,
+            state_machine=machine,
+            checkpoint_store=store,
             client=planning_client,
+            options=PlanningOptions(model=planning_mapping.model),
+            stderr=sys.stderr,
         )
-        generated_files = write_execution_plan_artifacts(
-            rendered_plan=rendered,
-            plan=plan,
-            output_path=output_path,
-            repo_root=repo_root,
-            verification_command=args.verification_command,
-            structrr_proposal=structrr_proposal,
+        if result.terminal_status.value != "succeeded":
+            raise PlanningServiceError(
+                f"Procedrr planning process ended {result.terminal_status.value}"
+            )
+        journal = store.load()
+        accepted_answers = {
+            str(event.payload["question"]["question_id"]): dict(
+                event.payload["accepted_answer"]
+            )
+            for event in journal.events
+            if event.event_type == "answer_accepted"
+            and isinstance(event.payload.get("question"), Mapping)
+            and isinstance(event.payload.get("accepted_answer"), Mapping)
+        }
+        relative_output = output_path.relative_to(repo_root).as_posix()
+        plan_slug = slugify_workflow_id(plan_id)
+        proposal_relative = (
+            Path("docs") / "plans" / f"{plan_slug}-structrr-proposal.json"
+        ).as_posix()
+        compiled = machine.compile_accepted_plan(
+            accepted_answers,
+            plan_id=plan_id,
+            plan_path=relative_output,
+            proposal_path=proposal_relative,
         )
+        generated_files = _write_compiled_plan_files(repo_root, compiled.files)
         for generated_file in generated_files:
             _stage_generated_file(repo_root, generated_file)
         pull_request = publish_execution_plan_pull_request(
             repo_root=repo_root,
-            plan=plan,
+            plan=compiled.plan,
             generated_files=generated_files,
-            source_plan_path=source_plan_relative,
+            source_plan_path=source_relative,
+        )
+        github.add_comment(
+            session.issue,
+            "Planning completed and the review PR is open: "
+            f"{pull_request.pull_request_url}",
         )
     except (
         FileExistsError,
         GitHubIssueQueueError,
         OSError,
         PlanGenerationError,
+        PlanningServiceError,
         PowdrrExecutionError,
         ValueError,
     ) as error:
         print(f"Could not create execution plan: {error}", file=sys.stderr)
         return 2
 
-    relative_path = output_path.relative_to(repo_root).as_posix()
     if args.json:
         print(
             json.dumps(
                 {
-                    "plan_id": plan.plan_id,
-                    "path": relative_path,
-                    "items": [item.item_id for item in plan.items],
+                    "plan_id": plan_id,
+                    "session_issue_url": session.issue.url,
+                    "path": relative_output,
+                    "items": [item.item_id for item in compiled.plan.items],
                     "generated_files": [
                         path.relative_to(repo_root).as_posix()
                         for path in generated_files
                     ],
-                    "workflow_count": len(plan.items),
+                    "workflow_count": len(compiled.plan.items),
                     "branch": pull_request.branch_name,
                     "base_branch": pull_request.base_branch,
                     "commit": pull_request.commit_sha,
@@ -2738,12 +2847,118 @@ def _run_plan(args: argparse.Namespace) -> int:
             )
         )
     else:
-        print(f"Wrote reviewable execution plan to {relative_path}")
-        print(f"Proposed items: {len(plan.items)}")
-        print(f"Generated PR workflows: {len(plan.items)}")
+        print(f"Wrote reviewable execution plan to {relative_output}")
+        print(f"Planning session: {session.issue.url}")
+        print(f"Proposed items: {len(compiled.plan.items)}")
+        print(f"Generated PR workflows: {len(compiled.plan.items)}")
         print(f"Opened plan review PR: {pull_request.pull_request_url}")
-        print("No GitHub issues were published and no work was executed.")
+        print("No work-item issues were published and no work was executed.")
     return 0
+
+
+def _discover_github_repository(repo_root: Path) -> str:
+    result = subprocess.run(
+        ["gh", "repo", "view", "--json", "nameWithOwner"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise GitHubIssueQueueError(
+            "could not determine the current GitHub repository: "
+            + result.stderr.strip()
+        )
+    value = json.loads(result.stdout)
+    repository = value.get("nameWithOwner") if isinstance(value, Mapping) else None
+    if not isinstance(repository, str) or not repository:
+        raise GitHubIssueQueueError("gh repo view did not return nameWithOwner")
+    return repository
+
+
+def _git_head(repo_root: Path) -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", "HEAD^{commit}"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise ValueError("planning requires a committed base revision")
+    return result.stdout.strip()
+
+
+def _require_clean_planning_checkout(repo_root: Path, base_commit: str) -> None:
+    if _git_head(repo_root) != base_commit:
+        raise PlanningServiceError(
+            "resume requires a checkout at the session's pinned base commit"
+        )
+    result = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    if result.stdout:
+        raise PlanningServiceError(
+            "planning requires a clean checkout at the pinned base commit"
+        )
+
+
+def _planning_repository_paths(
+    repo_root: Path, base_commit: str, source_text: str
+) -> Mapping[str, PathFact]:
+    listing = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", base_commit],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    tracked = set(listing)
+    cited_paths = set(
+        re.findall(
+            r"(?<![A-Za-z0-9_./-])(?:[A-Za-z0-9_.-]+/)*[A-Za-z0-9_.-]+\.[A-Za-z0-9]+",
+            source_text,
+        )
+    )
+    return {
+        path: PathFact(path, PATH_RUNTIME_SUFFIXES.get(Path(path).suffix.lower()))
+        for path in sorted(tracked & cited_paths)
+    }
+
+
+def _write_compiled_plan_files(
+    repo_root: Path, files: Mapping[str, str]
+) -> tuple[Path, ...]:
+    destinations = tuple((repo_root / relative).resolve() for relative in files)
+    for destination in destinations:
+        try:
+            destination.relative_to(repo_root.resolve())
+        except ValueError as error:
+            raise PlanningCompilationError(
+                "compiled artifact destination escaped the repository"
+            ) from error
+        if destination.exists():
+            raise FileExistsError(
+                "compiled artifact already exists: "
+                f"{destination.relative_to(repo_root)}"
+            )
+    created: list[Path] = []
+    try:
+        for (_relative, content), destination in zip(
+            files.items(), destinations, strict=True
+        ):
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(content, encoding="utf-8")
+            created.append(destination)
+    except OSError:
+        for path in created:
+            path.unlink(missing_ok=True)
+        raise
+    return destinations
 
 
 def _repository_file_path(path: Path, repo_root: Path, label: str) -> Path:

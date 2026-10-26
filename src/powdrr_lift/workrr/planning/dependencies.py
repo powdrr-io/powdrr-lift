@@ -863,7 +863,10 @@ def build_validation_description_request(
 
     return QuestionRequest(
         question=Question(
-            question_id=f"validations-{requirement.id}",
+            question_id=(
+                f"validations-{requirement.id}-"
+                f"{_digest({'after_anchor': after_anchor})[-12:]}"
+            ),
             kind="describe_requirement_validations",
             contract_version=1,
             subject_ids=(requirement.id,),
@@ -1269,7 +1272,7 @@ def build_dependency_confirmation_request(
     }
     return QuestionRequest(
         question=Question(
-            f"confirm-dependency-{producer.id}-{consumer.id}",
+            f"confirm-dependency-{producer.id}-{consumer.id}-{_digest(output)[-12:]}",
             "confirm_dependency",
             1,
             (producer.id, consumer.id),

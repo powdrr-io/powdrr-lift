@@ -265,6 +265,11 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
     request.validate()
     assert request.question.kind == "propose_work_units"
 
+    next_page = build_work_unit_proposal_request(
+        context, ["req-0001"], valid_example=example, page_after=anchor
+    )
+    assert next_page.question.question_id != request.question.question_id
+
 
 def test_cohesion_question_example_passes_its_parser() -> None:
     context, anchor = _context()

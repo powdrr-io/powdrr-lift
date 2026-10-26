@@ -363,6 +363,24 @@ def test_source_question_builders_bind_context_examples_and_digests() -> None:
         request.validate()
 
 
+def test_block_without_extracted_requirements_can_be_classified_as_context() -> None:
+    block = next(
+        block
+        for block in segment_markdown_source(
+            _document("# Background\n\nContext only.\n")
+        ).blocks
+        if block.kind == "paragraph"
+    )
+
+    request = build_block_disposition_request(block, requirement_ids=())
+
+    request.validate()
+    assert request.empty_example == {
+        "disposition": "context",
+        "reason": "This block supplies background only.",
+    }
+
+
 def test_requirement_extraction_pagination_cursor_must_advance_in_block() -> None:
     page = {
         "records": [],

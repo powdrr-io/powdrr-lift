@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from argparse import Namespace
 from pathlib import Path
@@ -28,7 +29,11 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     publish_execution_plan_pull_request,
     write_execution_plan_artifacts,
 )
-from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_lift.workrr.github_issue_queue import (
+    PlannedWorkItem,
+    QueueIssue,
+    ReviewedExecutionPlan,
+)
 from powdrr_lift.workrr.multipr_structrr import compile_multi_pr_proposal
 from powdrr_lift.workrr.plan_sizing import PlanSizingError, size_plan_items
 
@@ -1611,34 +1616,81 @@ def test_generate_execution_plan_yaml_rejects_empty_and_oversized_sources() -> N
         )
 
 
-def test_plan_cli_writes_and_stages_reviewable_plan(
+def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     tmp_path: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    from powdrr_lift.workrr.planning.checkpoints import InMemoryCheckpointStore
+    from powdrr_lift.workrr.planning.source import PinnedSourceDocument
+
     source = tmp_path / "proposal.md"
-    source.write_text("# Proposal\nAdd a foundation and integration.", encoding="utf-8")
-    ci_config = tmp_path / ".github/workflows/verify.yml"
-    ci_config.parent.mkdir(parents=True)
-    ci_config.write_text("name: Verify\n", encoding="utf-8")
+    source.write_text("# Proposal\nAdd a foundation.", encoding="utf-8")
+    source_text = source.read_text(encoding="utf-8")
+    base_commit = "a" * 40
     staged: list[Any] = []
-    client = FakePlanningClient(
-        {
-            "items": [
-                {
-                    **_item("foundation"),
-                    "manual_prerequisite": {
-                        "title": "Install the CI credential",
-                        "instructions": ["Add the repository secret."],
-                        "verification": "Confirm the secret is configured.",
-                        "trigger": "after_implementation_before_validation",
-                        "unblocks": "Running the verifier in pull request CI.",
-                    },
-                },
-                _item("integration", dependencies=["foundation"]),
-            ]
-        }
-    )
+    store = InMemoryCheckpointStore(session_id="test-planning-session")
+    created_issues: list[QueueIssue] = []
+    comments: list[str] = []
+
+    class FakeIssueClient:
+        repository = "example/repo"
+
+        def ensure_planning_label(self) -> None:
+            pass
+
+        def create_issue(self, *, body: str, labels: Any, title: str) -> QueueIssue:
+            issue = QueueIssue(
+                42, title, body, "open", tuple(labels), "https://example/issues/42"
+            )
+            created_issues.append(issue)
+            return issue
+
+        def add_comment(self, _issue: QueueIssue, body: str) -> None:
+            comments.append(body)
+
+    issue_client = FakeIssueClient()
+    compiled_files = {
+        "docs/plans/proposal-v1-execution-plan.yaml": "plan: compiled\n",
+        "docs/plans/proposal-v1-structrr-proposal.json": "{}\n",
+        "docs/workflows/proposal-v1/proposal-v1-foundation.yaml": (
+            "workflow: compiled\n"
+        ),
+    }
+    machine_values: list[Any] = []
+    compile_calls: list[dict[str, Any]] = []
+
+    class FakeMachine:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            machine_values.append((args, kwargs))
+
+        def compile_accepted_plan(self, accepted: Any, **kwargs: Any) -> Any:
+            compile_calls.append({"accepted": accepted, **kwargs})
+            return SimpleNamespace(
+                plan=SimpleNamespace(
+                    plan_id="proposal-v1",
+                    items=[SimpleNamespace(item_id="proposal-v1-foundation")],
+                ),
+                files=compiled_files,
+            )
 
     monkeypatch.setattr(cli, "resolve_repo_root", lambda _path: tmp_path)
+    monkeypatch.setattr(
+        cli, "_discover_github_repository", lambda _root: "example/repo"
+    )
+    monkeypatch.setattr(cli, "_git_head", lambda _root: base_commit)
+    monkeypatch.setattr(cli, "_require_clean_planning_checkout", lambda *_args: None)
+    monkeypatch.setattr(cli, "_planning_repository_paths", lambda *_args: {})
+    monkeypatch.setattr(
+        cli,
+        "read_pinned_source",
+        lambda *_args: PinnedSourceDocument(
+            repository="example/repo",
+            commit_sha=base_commit,
+            path="proposal.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(source_text.encode()).hexdigest(),
+            text=source_text,
+        ),
+    )
     monkeypatch.setattr(cli, "resolve_workflow_provider", lambda value: value)
     monkeypatch.setattr(
         cli,
@@ -1648,40 +1700,34 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
         )(),
     )
     monkeypatch.setattr(cli, "resolve_provider_credentials", lambda *_args: object())
-    monkeypatch.setattr(cli, "build_workflow_client", lambda *_args, **_kwargs: client)
-    baseline_snapshot: dict[str, Any] = {
-        "entities": [],
-        "entity_relationships": [],
-        "source_subjects": [],
-    }
+    monkeypatch.setattr(
+        cli, "build_workflow_client", lambda *_args, **_kwargs: object()
+    )
+    monkeypatch.setattr(cli, "GitHubIssueClient", lambda _repository: issue_client)
+    monkeypatch.setattr(cli, "SourceLedgerQuestionMachine", FakeMachine)
+    monkeypatch.setattr(
+        cli, "load_entity_taxonomy", lambda *_args: SimpleNamespace(entity_types=())
+    )
     monkeypatch.setattr(
         cli,
         "bootstrap_structrr",
         lambda *_args, **_kwargs: SimpleNamespace(
-            document=baseline_snapshot,
+            document={"entities": [], "entity_relationships": [], "files": []},
             validation=SimpleNamespace(successful=True, issues=[]),
         ),
     )
     monkeypatch.setattr(
         cli,
-        "generate_multi_pr_structrr_proposal",
-        lambda *, plan, baseline_snapshot, **_kwargs: compile_multi_pr_proposal(
-            plan_id=plan.plan_id,
-            baseline_snapshot=baseline_snapshot,
-            items=[{"id": item.item_id} for item in plan.items],
-            proposed_operations=[],
-            source_ref=f"plan:{plan.plan_id}",
-        ),
+        "GitHubCommentCheckpointStore",
+        lambda *_args, **_kwargs: store,
     )
-    monkeypatch.setattr(
-        cli,
-        "inspect_repository_code",
-        lambda *_args: "existing repository implementation evidence",
-    )
-    monkeypatch.setattr(
-        "powdrr_lift.workrr.github_issue_plan_generation.inspect_repository_code",
-        lambda *_args: "targeted implementation and test evidence",
-    )
+    process_calls: list[dict[str, Any]] = []
+
+    def run_process(**kwargs: Any) -> Any:
+        process_calls.append(kwargs)
+        return SimpleNamespace(terminal_status=SimpleNamespace(value="succeeded"))
+
+    monkeypatch.setattr(cli, "run_planning_procedrr", run_process)
     monkeypatch.setattr(
         cli, "_stage_generated_file", lambda _root, path: staged.append(path)
     )
@@ -1715,93 +1761,37 @@ def test_plan_cli_writes_and_stages_reviewable_plan(
 
     output = tmp_path / "docs/plans/proposal-v1-execution-plan.yaml"
     workflow_file = tmp_path / "docs/workflows/proposal-v1/proposal-v1-foundation.yaml"
-    dependent_workflow_file = (
-        tmp_path / "docs/workflows/proposal-v1/proposal-v1-integration.yaml"
-    )
-    final_review_file = (
-        tmp_path
-        / "docs/workflows/proposal-v1/proposal-v1-final-integration-review.yaml"
-    )
     structrr_proposal_file = tmp_path / "docs/plans/proposal-v1-structrr-proposal.json"
     assert status == 0
     assert output.is_file()
     assert workflow_file.is_file()
-    assert dependent_workflow_file.is_file()
-    assert final_review_file.is_file()
     assert structrr_proposal_file.is_file()
-    workflow_definition = workflow_file.read_text(encoding="utf-8")
-    assert "process_id: execute-proposed-pr-workflow" in workflow_definition
-    assert "proposed_pr_id: proposal-v1-foundation" in workflow_definition
-    assert "verification_command: scripts/verify-all.sh" in workflow_definition
-    instance = load_plan_workflow_instance(workflow_file)
-    assert instance.workflow_id == "proposal-v1-foundation"
-    assert instance.process_id == "execute-proposed-pr-workflow"
-    assert instance.dependencies == ()
-    assert instance.inputs == {
-        "work_item_name": "proposal-v1",
-        "proposed_pr_id": "proposal-v1-foundation",
-        "feature_description": "Deliver foundation from the plan.",
-        "proposed_pr_context": {
-            "plan_id": "proposal-v1",
-            "execution_plan_file": "docs/plans/proposal-v1-execution-plan.yaml",
-            "item_id": "foundation",
-            "title": "Implement foundation",
-            "objective": "Deliver foundation from the plan.",
-            "scope": ["component: foundation"],
-            "allowed_paths": ["."],
-            "implementation_steps": [
-                "Implement the smallest behavior for foundation.",
-                "Add focused tests proving foundation works.",
-            ],
-            "acceptance_criteria": [
-                "foundation meets its documented acceptance criteria."
-            ],
-            "dependencies": [],
-            "verification_command": "scripts/verify-all.sh",
-            "structrr_proposal_file": "docs/plans/proposal-v1-structrr-proposal.json",
-            "structrr_item_id": "foundation",
-            "require_structrr_proposal": True,
-            "manual_prerequisite": {
-                "title": "Install the CI credential",
-                "instructions": ["Add the repository secret."],
-                "verification": "Confirm the secret is configured.",
-                "trigger": "after_implementation_before_validation",
-                "unblocks": "Running the verifier in pull request CI.",
-            },
-        },
-    }
-    assert not list((tmp_path / "docs/workflows/proposal-v1").glob("*-task-*.yaml"))
-    dependent_instance = load_plan_workflow_instance(dependent_workflow_file)
-    assert dependent_instance.dependencies == ("proposal-v1-foundation",)
-    final_review_instance = load_plan_workflow_instance(final_review_file)
-    assert final_review_instance.dependencies == (
-        "proposal-v1-foundation",
-        "proposal-v1-integration",
-    )
-    assert (
-        final_review_instance.inputs["proposed_pr_context"]["final_integration_review"]
-        is True
-    )
-    assert len(staged) == 5
+    assert len(staged) == 3
     assert publications[0]["repo_root"] == tmp_path
     assert publications[0]["generated_files"] == tuple(staged)
     assert publications[0]["source_plan_path"] == "proposal.md"
-    assert client.messages is not None
-    assert "scripts/verify-all.sh" in client.messages[1]["content"]
-    assert "name: Verify" in client.messages[1]["content"]
-    assert (
-        "existing repository implementation evidence" in client.messages[1]["content"]
-    )
-    assert "source_document: proposal.md" in output.read_text(encoding="utf-8")
+    assert created_issues[0].labels == ("powdrr:planning",)
+    assert created_issues[0].state == "open"
+    assert "planning-session-v1" in created_issues[0].body
+    assert not hasattr(issue_client, "create_work_item_issue")
+    assert len(machine_values) == 1
+    assert machine_values[0][1]["verification_command"] == "scripts/verify-all.sh"
+    assert process_calls[0]["session"].issue.number == 42
+    assert compile_calls[0]["plan_id"] == "proposal-v1"
+    assert compile_calls[0]["plan_path"] == "docs/plans/proposal-v1-execution-plan.yaml"
+    assert "scripts/verify-all.sh" in process_calls[0]["session"].verification_command
+    assert comments == [
+        "Planning completed and the review PR is open: "
+        "https://github.com/example/repo/pull/42"
+    ]
     assert set(staged) == {
         output,
         workflow_file,
-        dependent_workflow_file,
-        final_review_file,
         structrr_proposal_file,
     }
     response = capsys.readouterr().out
-    assert '"workflow_count": 3' in response
+    assert '"workflow_count": 1' in response
+    assert '"session_issue_url": "https://example/issues/42"' in response
     assert '"pull_request_url": "https://github.com/example/repo/pull/42"' in response
     assert '"status": "pull_request_opened"' in response
     assert '"published_issues": false' in response

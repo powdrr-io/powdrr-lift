@@ -26,7 +26,6 @@ from powdrr_lift.workrr.planning.contracts import (
 from powdrr_lift.workrr.planning.questions import (
     ContextRecord,
     QuestionRequest,
-    SourceExcerpt,
 )
 from powdrr_lift.workrr.planning.source import (
     PlanningSourceError,
@@ -368,19 +367,9 @@ def build_requirement_coverage_request(
     repository_root: str | Path,
 ) -> QuestionRequest[CoverageAnswer]:
     """Build one coverage question bound to one requirement and supplied evidence."""
-    anchors = {item.id: item for item in source.anchors}
-    excerpts: list[SourceExcerpt] = []
-    for source_ref in requirement.source_refs:
-        anchor = anchors.get(source_ref)
-        if anchor is None:
-            raise EvidenceError(f"requirement cites unknown source anchor {source_ref}")
-        excerpts.append(
-            SourceExcerpt(
-                source_ref,
-                source.document.text[anchor.start_offset : anchor.end_offset],
-                anchor.start_offset,
-            )
-        )
+    known_anchor_ids = {item.id for item in source.anchors}
+    if not set(requirement.source_refs) <= known_anchor_ids:
+        raise EvidenceError("requirement cites unknown source anchor")
     evidence_records = tuple(evidence)
     evidence_by_id = {item.id: item for item in evidence_records}
     if len(evidence_by_id) != len(evidence_records):
@@ -474,17 +463,14 @@ def build_requirement_coverage_request(
             contract_version=1,
             subject_ids=(requirement.id,),
             input_digest=input_digest,
-            context_ref_ids=tuple(
-                [item.ref_id for item in excerpts]
-                + list(supplied_ids)
-                + [requirement.id]
-            ),
+            context_ref_ids=tuple(list(supplied_ids) + [requirement.id]),
             expected_answer_schema="coverage-answer-v1",
             attempt=1,
         ),
         exact_question=(
-            "How much of this one source requirement is already implemented? "
-            "Use only supplied pinned evidence. Mark missing only when the bounded "
+            "This source-validated requirement is the unit of assessment. How much "
+            "of it is already implemented? Use only supplied pinned evidence. "
+            "Mark missing only when the bounded "
             "code investigation found no matching implementation; an empty lookup "
             "alone is not proof that it is absent."
         ),
@@ -494,7 +480,10 @@ def build_requirement_coverage_request(
             "reason": "What the evidence establishes or fails to establish.",
             "remaining_statement": "For partial, the concrete unmet obligation.",
         },
-        source_excerpts=tuple(excerpts),
+        # The requirement statement has already passed source-fidelity review.
+        # Repeating every cited source paragraph can exceed the bounded question
+        # size without adding information needed for coverage judgment.
+        source_excerpts=(),
         repository_evidence=tuple(evidence_context),
         accepted_facts=(accepted[-1],),
         valid_example=positive_example,

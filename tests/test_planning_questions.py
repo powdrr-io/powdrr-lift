@@ -473,5 +473,7 @@ def test_aggregate_input_bound_rejects_packet_without_truncating_context() -> No
         build_question_messages(request)
 
     assert error.value.size_chars > MAX_QUESTION_INPUT_CHARS
+    assert error.value.question_id == question.question_id
+    assert error.value.question_kind == question.kind
     assert all(len(item.value["body"]) == 4000 for item in evidence)
     assert len(evidence) == 7

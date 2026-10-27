@@ -1,0 +1,103 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1163
+title: Bound planning coverage question context
+intent:
+  problem: Coverage questions repeat source excerpts already checked during requirement fidelity review, which can exceed the bounded model input size for large plan sections.
+  goal: Assess coverage from the accepted requirement statement and supplied pinned repository evidence while keeping all stable identifiers code-generated.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Remove the source-excerpt request dependency from coverage question construction.
+    rationale: Coverage uses the already accepted requirement statement and repository evidence.
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 370, end_line: 372}
+    summary: Validate requirement anchor references without serializing their source text again.
+    rationale: Keep anchor integrity checks while avoiding repeated large source excerpts.
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 466, end_line: 466}
+    summary: Limit coverage context references to supplied evidence and the requirement.
+    rationale: Avoid carrying unused source anchor IDs into the model question.
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 471, end_line: 473}
+    summary: State that the fidelity-checked requirement is the coverage assessment unit.
+    rationale: Preserve the proper assessment boundary without repeating source text.
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 483, end_line: 486}
+    summary: Build coverage questions from the fidelity-checked requirement and supplied pinned evidence without repeating source excerpts.
+    rationale: Avoid oversized prompts while retaining the validated obligation and evidence needed to judge existing implementation.
+  - path: src/powdrr_lift/workrr/planning/questions.py
+    type: modified
+    span: {start_line: 32, end_line: 39}
+    summary: Include the deterministic question ID and kind in oversized-input errors.
+    rationale: Identify which bounded planning question needs subdivision when its context still exceeds the limit.
+  - path: src/powdrr_lift/workrr/planning/questions.py
+    type: modified
+    span: {start_line: 42, end_line: 43}
+    summary: Store code-generated question identity on oversized-input errors.
+    rationale: Track the failing planning question without asking the model to mint identifiers.
+  - path: src/powdrr_lift/workrr/planning/questions.py
+    type: modified
+    span: {start_line: 45, end_line: 49}
+    summary: Format the code-generated question identity in oversized-input errors.
+    rationale: Make the failing bounded question identifiable in diagnostics.
+  - path: src/powdrr_lift/workrr/planning/questions.py
+    type: modified
+    span: {start_line: 51, end_line: 51}
+    summary: Include question identity in the oversized-input error message.
+    rationale: Identify the failing question without relying on model-generated IDs.
+  - path: src/powdrr_lift/workrr/planning/questions.py
+    type: modified
+    span: {start_line: 274, end_line: 277}
+    summary: Attach code-generated question identity to oversized-input errors.
+    rationale: Make the failing question traceable without asking the model to generate identifiers.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 21, end_line: 24}
+    summary: Import question size helpers for bounded coverage regression tests.
+    rationale: Build and measure the full serialized request in the test.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 356, end_line: 356}
+    summary: Assert that coverage requests do not duplicate source excerpts.
+    rationale: Verify the smaller coverage context directly.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 359, end_line: 359}
+    summary: Verify the coverage request omits redundant source excerpts.
+    rationale: Keep source excerpts from exceeding the question input bound after fidelity review.
+  - path: tests/test_planning_evidence.py
+    type: added
+    span: {start_line: 367, end_line: 405}
+    summary: Verify coverage context retains the source-validated requirement and stays bounded for many source anchors.
+    rationale: Prevent source excerpts already checked by fidelity review from pushing coverage questions over the input cap.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 476, end_line: 477}
+    summary: Verify oversized-input errors identify the deterministic question.
+    rationale: Make a future context subdivision issue traceable to its exact question.
+entities:
+  - id: source-validated-bounded-coverage-question
+    type: Function
+    action: added
+  - id: bounded-question-context-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: coverage-context-tests-verify-source-validation-boundary
+    type: verifies
+    source: bounded-question-context-regression-tests
+    target: source-validated-bounded-coverage-question
+    action: added
+    description: Coverage uses the fidelity-checked requirement statement and supplied evidence without serializing all source excerpts again.
+invariants:
+  - id: coverage-uses-source-validated-requirement
+    description: Coverage assessment retains the full accepted requirement statement, whose source fidelity was checked earlier, and all supplied evidence records while omitting repeated source excerpts.
+    action: added
+guidance: []

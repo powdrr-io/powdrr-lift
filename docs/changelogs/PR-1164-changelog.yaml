@@ -2,183 +2,282 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1164
 title: Search pinned repository evidence during plan coverage
 intent:
-  problem: Coverage questions can receive no repository evidence, leaving the model to classify requirements without inspecting current code.
-  goal: Search bounded code and test candidates at the pinned commit, present them with the accepted requirement, and let missing requirements continue into implementation planning while keeping stable identifiers code-generated.
+  problem: Coverage questions in the Procedrr planner can lack repository evidence, so the model may classify
+    requirements without inspecting current code.
+  goal: Batch basedpyright symbol searches for Python and local rg searches for other relevant code, attach
+    bounded pinned evidence to coverage questions, and let missing requirements proceed into implementation
+    planning with code-generated IDs.
 human-decisions: []
 structured_files: []
 files:
-  - path: src/powdrr_lift/cli.py
-    type: modified
-    span: {start_line: 245, end_line: 245}
-    summary: Import the pinned repository evidence search for planning.
-    rationale: Connect the CLI to the coverage evidence provider.
-  - path: src/powdrr_lift/cli.py
-    type: modified
-    span: {start_line: 2824, end_line: 2831}
-    summary: Provide the pinned code search to the planning question machine.
-    rationale: Ensure CLI coverage questions receive repository evidence.
-  - path: src/powdrr_lift/workrr/planning/driver.py
-    type: modified
-    span: {start_line: 5, end_line: 5}
-    summary: Import callback typing for the evidence search provider.
-    rationale: Type the injectable repository evidence search.
-  - path: src/powdrr_lift/workrr/planning/driver.py
-    type: modified
-    span: {start_line: 41, end_line: 41}
-    summary: Import the maximum per-requirement evidence allocation.
-    rationale: Assign unique evidence IDs deterministically.
-  - path: src/powdrr_lift/workrr/planning/driver.py
-    type: modified
-    span: {start_line: 44, end_line: 44}
-    summary: Import the repository evidence search result type.
-    rationale: Carry search results into coverage question construction.
-  - path: src/powdrr_lift/workrr/planning/driver.py
-    type: modified
-    span: {start_line: 94, end_line: 95}
-    summary: Accept an optional evidence search provider.
-    rationale: Supply repository evidence during production planning while keeping tests injectable.
-  - path: src/powdrr_lift/workrr/planning/driver.py
-    type: modified
-    span: {start_line: 108, end_line: 109}
-    summary: Store and cache evidence searches by requirement.
-    rationale: Avoid repeating pinned repository searches as the question machine advances.
-  - path: src/powdrr_lift/workrr/planning/driver.py
-    type: modified
-    span: {start_line: 217, end_line: 221}
-    summary: Search each requirement and select its pinned evidence for coverage.
-    rationale: Base coverage judgments on the current repository implementation and tests.
-  - path: src/powdrr_lift/workrr/planning/driver.py
-    type: modified
-    span: {start_line: 227, end_line: 227}
-    summary: Include the search summary in coverage context.
-    rationale: Record the bounded investigation that produced candidate evidence.
-  - path: src/powdrr_lift/workrr/planning/driver.py
-    type: modified
-    span: {start_line: 250, end_line: 264}
-    summary: Cache search results and verify their base commit.
-    rationale: Keep evidence tied to the planning baseline and stable across resumes.
-  - path: src/powdrr_lift/workrr/planning/driver.py
-    type: modified
-    span: {start_line: 1111, end_line: 1115}
-    summary: Rebuild accepted coverage questions with the same cached evidence.
-    rationale: Preserve question identity when validating journaled answers.
-  - path: src/powdrr_lift/workrr/planning/driver.py
-    type: modified
-    span: {start_line: 1121, end_line: 1121}
-    summary: Reattach the repository search record during answer reconstruction.
-    rationale: Ensure accepted answer validation uses the original question context.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 9, end_line: 9}
-    summary: Import term frequency support for deterministic query selection.
-    rationale: Rank requirement search terms without assigning work to the model.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 41, end_line: 106}
-    summary: Define bounded search terms, candidate evidence limits, and repository code path scope.
-    rationale: Keep retrieval deterministic and coverage prompts bounded.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 251, end_line: 368}
-    summary: Search pinned source, tests, and configuration for requirement terms and record matched lines as code-owned evidence.
-    rationale: Give the model concrete repository context and allow missing requirements to become implementation work.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 553, end_line: 553}
-    summary: Accept the repository search record in coverage request construction.
-    rationale: Include bounded search results with the requirement and evidence.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 584, end_line: 590}
-    summary: Append repository search details to accepted question context.
-    rationale: Make the search scope and result counts available to the assessor.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 600, end_line: 602}
-    summary: Include search results in the question digest.
-    rationale: Make question identity depend on the pinned investigation context.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 662, end_line: 666}
-    summary: Reference repository search context from the coverage question.
-    rationale: Bind each coverage judgment to its search summary.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 671, end_line: 677}
-    summary: Explain that missing coverage becomes implementation work and irrelevant hits should be ignored.
-    rationale: Keep missing requirements in planning without allowing unsupported evidence citations.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 829, end_line: 849}
-    summary: Derive ranked search terms and classify test paths deterministically.
-    rationale: Keep query formation and evidence kind assignment code-owned.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 889, end_line: 889}
-    summary: Export the search result type.
-    rationale: Allow the question machine to type its evidence callback.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 899, end_line: 899}
-    summary: Export the pinned requirement search function.
-    rationale: Let CLI planning use the bounded evidence search.
-  - path: tests/test_planning_evidence.py
-    type: modified
-    span: {start_line: 20, end_line: 20}
-    summary: Import the pinned search helper.
-    rationale: Exercise repository search evidence in tests.
-  - path: tests/test_planning_evidence.py
-    type: modified
-    span: {start_line: 127, end_line: 228}
-    summary: Verify source and test discovery, runtime-owned evidence IDs, and valid missing coverage when there are no matches.
-    rationale: Ensure coverage uses repository evidence and missing work proceeds to implementation planning.
-  - path: tests/test_planning_service.py
-    type: modified
-    span: {start_line: 13, end_line: 13}
-    summary: Import the bounded search result type for question machine tests.
-    rationale: Verify repository context integration.
-  - path: tests/test_planning_service.py
-    type: modified
-    span: {start_line: 350, end_line: 360}
-    summary: Provide a fake pinned search result to the question machine.
-    rationale: Exercise evidence search without external repository state.
-  - path: tests/test_planning_service.py
-    type: modified
-    span: {start_line: 363, end_line: 363}
-    summary: Inject the evidence search provider.
-    rationale: Test the production coverage question path.
-  - path: tests/test_planning_service.py
-    type: modified
-    span: {start_line: 401, end_line: 402}
-    summary: Assert coverage requests include search facts.
-    rationale: Verify the model receives repository search results.
-  - path: tests/test_planning_service.py
-    type: modified
-    span: {start_line: 507, end_line: 507}
-    summary: Assert cached searches run once per requirement.
-    rationale: Avoid repeated repository scans during question advancement.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 245
+    end_line: 245
+  summary: Wire CLI planning to the batched pinned-repository evidence search.
+  rationale: Ensure Procedrr coverage questions receive search evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2824
+    end_line: 2828
+  summary: Wire CLI planning to the batched pinned-repository evidence search.
+  rationale: Ensure Procedrr coverage questions receive search evidence.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 43
+    end_line: 43
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 96
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 110
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 220
+    end_line: 223
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 229
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 252
+    end_line: 272
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 1119
+    end_line: 1119
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 1121
+    end_line: 1124
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 1130
+    end_line: 1130
+  summary: Batch, cache, and attach repository search results to coverage questions.
+  rationale: Avoid repeated searches and preserve question identity when rebuilding accepted answers.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 114
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 259
+    end_line: 534
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 719
+    end_line: 719
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 750
+    end_line: 756
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 766
+    end_line: 768
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 828
+    end_line: 832
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 837
+    end_line: 843
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 995
+    end_line: 1015
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1055
+    end_line: 1055
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1065
+    end_line: 1066
+  summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
+    to the pinned commit.
+  rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Test basedpyright symbol evidence, rg fallback, and valid missing coverage.
+  rationale: Verify both retrieval paths and ensure absence remains implementation work.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Test basedpyright symbol evidence, rg fallback, and valid missing coverage.
+  rationale: Verify both retrieval paths and ensure absence remains implementation work.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 128
+    end_line: 310
+  summary: Test basedpyright symbol evidence, rg fallback, and valid missing coverage.
+  rationale: Verify both retrieval paths and ensure absence remains implementation work.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Test batched search context and cache behavior in the question machine.
+  rationale: Verify repository evidence reaches each coverage judgment without repeated searches.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 350
+    end_line: 360
+  summary: Test batched search context and cache behavior in the question machine.
+  rationale: Verify repository evidence reaches each coverage judgment without repeated searches.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 363
+    end_line: 363
+  summary: Test batched search context and cache behavior in the question machine.
+  rationale: Verify repository evidence reaches each coverage judgment without repeated searches.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 401
+    end_line: 402
+  summary: Test batched search context and cache behavior in the question machine.
+  rationale: Verify repository evidence reaches each coverage judgment without repeated searches.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 507
+    end_line: 507
+  summary: Test batched search context and cache behavior in the question machine.
+  rationale: Verify repository evidence reaches each coverage judgment without repeated searches.
 entities:
-  - id: pinned-repository-coverage-search
-    type: Function
-    action: added
-  - id: requirement-evidence-search-result
-    type: Class
-    action: added
-  - id: pinned-coverage-search-tests
-    type: Regression test
-    action: added
+- id: pinned-repository-coverage-search
+  type: Function
+  action: added
+- id: requirement-evidence-search-result
+  type: Class
+  action: added
+- id: pinned-coverage-search-tests
+  type: Regression test
+  action: added
 entity_relationships:
-  - id: pinned-search-tests-verify-coverage-evidence
-    type: verifies
-    source: pinned-coverage-search-tests
-    target: pinned-repository-coverage-search
-    action: added
-    description: Tests verify that pinned code search supplies evidence and permits missing requirements to continue into implementation planning.
+- id: pinned-search-tests-verify-coverage-evidence
+  type: verifies
+  source: pinned-coverage-search-tests
+  target: pinned-repository-coverage-search
+  action: added
+  description: Tests verify that pinned code search supplies evidence and permits missing requirements
+    to continue into implementation planning.
 invariants:
-  - id: coverage-search-is-pinned-and-runtime-identified
-    description: Coverage search reads a clean checkout at the plan baseline, and evidence identifiers are generated by code.
-    action: added
-  - id: missing-coverage-remains-plannable
-    description: A requirement with no matching repository implementation is marked missing and passed into work unit planning.
-    action: added
+- id: coverage-search-is-pinned-and-runtime-identified
+  description: Coverage search reads a clean checkout at the plan baseline, and evidence identifiers are
+    generated by code.
+  action: added
+- id: missing-coverage-remains-plannable
+  description: A requirement with no matching repository implementation is marked missing and passed into
+    work unit planning.
+  action: added
 guidance: []

@@ -17,6 +17,7 @@ from powdrr_lift.workrr.planning.evidence import (
     lookup_symbols_in_pinned_file,
     read_pinned_code_file,
     record_file_evidence,
+    search_requirement_evidence,
 )
 from powdrr_lift.workrr.planning.questions import (
     MAX_QUESTION_INPUT_CHARS,
@@ -121,6 +122,108 @@ def test_pinned_file_evidence_reads_exact_commit_and_rejects_invented_paths(
         read_pinned_code_file(
             repository, _git(repository, "rev-parse", "HEAD"), "src/link.py"
         )
+
+
+def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
+    tmp_path: Path,
+) -> None:
+    repository, commit = _repository(tmp_path)
+    requirement, source = _requirement(commit)
+    requirement = Requirement(
+        requirement.id,
+        "Parse payload values with the existing parser.",
+        requirement.kind,
+        requirement.source_refs,
+        requirement.source_group_ids,
+        requirement.related_requirement_ids,
+    )
+
+    search = search_requirement_evidence(
+        repository,
+        commit,
+        requirement,
+        first_ordinal=17,
+    )
+    request = build_requirement_coverage_request(
+        requirement,
+        source=source,
+        evidence=search.evidence,
+        repository_root=repository,
+        repository_search=search.to_data(),
+    )
+
+    assert search.terms
+    assert search.matching_line_count >= 2
+    assert {item.kind for item in search.evidence} == {"implementation", "test"}
+    assert {item.id for item in search.evidence} == {
+        f"evidence-{ordinal:04d}" for ordinal in range(17, 17 + len(search.evidence))
+    }
+    assert request.question.context_ref_ids[-1] == "repository-search"
+    assert any(
+        "parse_payload" in record.value["source_excerpt"]
+        for record in request.repository_evidence
+    )
+    assert request.accepted_facts[-1].value["matching_path_count"] == 2
+    implementation = next(
+        item for item in search.evidence if item.kind == "implementation"
+    )
+    test = next(item for item in search.evidence if item.kind == "test")
+    assert (
+        request.parse_answer(
+            {
+                "status": "complete",
+                "evidence_ids": [implementation.id, test.id],
+                "reason": (
+                    "The pinned parser implementation and its test trim whitespace."
+                ),
+            }
+        ).status
+        == "complete"
+    )
+
+
+def test_requirement_search_with_no_matches_allows_missing_coverage(
+    tmp_path: Path,
+) -> None:
+    repository, commit = _repository(tmp_path)
+    requirement, source = _requirement(commit)
+    requirement = Requirement(
+        requirement.id,
+        "Implement an orbital telemetry compressor.",
+        requirement.kind,
+        requirement.source_refs,
+        requirement.source_group_ids,
+        requirement.related_requirement_ids,
+    )
+
+    search = search_requirement_evidence(
+        repository,
+        commit,
+        requirement,
+        first_ordinal=1,
+    )
+    request = build_requirement_coverage_request(
+        requirement,
+        source=source,
+        evidence=search.evidence,
+        repository_root=repository,
+        repository_search=search.to_data(),
+    )
+
+    assert search.evidence == ()
+    assert search.matching_line_count == 0
+    assert (
+        request.parse_answer(
+            {
+                "status": "missing",
+                "evidence_ids": [],
+                "reason": (
+                    "The bounded search found no implementation; this work remains."
+                ),
+            }
+        ).status
+        == "missing"
+    )
 
 
 def test_symbol_lookup_reads_file_before_search_and_never_searches_a_path(

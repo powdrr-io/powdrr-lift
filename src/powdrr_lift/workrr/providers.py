@@ -358,6 +358,7 @@ class OpenAIChatClient:
         structured_output_token_limit: int | None = None,
         progress_stream: TextIO | None = None,
         reasoning_effort: str | None = None,
+        unsupported_schema_keywords: frozenset[str] = frozenset(),
     ) -> None:
         self._model = model
         self._api_key = api_key
@@ -374,6 +375,7 @@ class OpenAIChatClient:
         )
         self._progress_stream = progress_stream
         self._reasoning_effort = reasoning_effort
+        self._unsupported_schema_keywords = unsupported_schema_keywords
         self.last_usage: dict[str, Any] = {}
         self.last_serialized_messages: str | None = None
 
@@ -409,7 +411,9 @@ class OpenAIChatClient:
                     "json_schema": {
                         "name": "workflow_action",
                         "strict": True,
-                        "schema": dict(response_schema),
+                        "schema": _remove_schema_keywords(
+                            response_schema, self._unsupported_schema_keywords
+                        ),
                     },
                 }
                 if response_schema is not None
@@ -914,6 +918,25 @@ def _serialize_messages(messages: Sequence[Mapping[str, str]]) -> str:
     return json.dumps(messages, ensure_ascii=False, separators=(",", ":"))
 
 
+def _remove_schema_keywords(
+    schema: Mapping[str, Any], unsupported: frozenset[str]
+) -> dict[str, Any]:
+    """Copy a JSON schema while removing provider-unsupported keywords."""
+
+    def convert(value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return {
+                key: convert(child)
+                for key, child in value.items()
+                if key not in unsupported
+            }
+        if isinstance(value, list):
+            return [convert(child) for child in value]
+        return value
+
+    return convert(schema)
+
+
 def _serialize_prompt_json(value: object) -> str:
     """Serialize structured prompt context without formatting-only whitespace."""
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
@@ -1086,6 +1109,11 @@ def build_provider_client(
         limits=limits,
         progress_stream=progress_stream,
         reasoning_effort="none" if provider.startswith("deepinfra") else None,
+        unsupported_schema_keywords=(
+            frozenset({"uniqueItems"})
+            if provider.startswith("deepinfra")
+            else frozenset()
+        ),
         timeout=timeout,
     )
 

@@ -18,6 +18,10 @@ from powdrr_lift.workrr.planning.evidence import (
     read_pinned_code_file,
     record_file_evidence,
 )
+from powdrr_lift.workrr.planning.questions import (
+    MAX_QUESTION_INPUT_CHARS,
+    build_question_messages,
+)
 from powdrr_lift.workrr.planning.source import (
     PinnedSourceDocument,
     Requirement,
@@ -352,12 +356,51 @@ def test_coverage_evidence_policy_and_request_context_are_strict(
     request.validate()
     assert "def parse_payload" in request.repository_evidence[0].value["source_excerpt"]
     assert request.question.subject_ids == (requirement.id,)
+    assert request.source_excerpts == ()
     assert set(request.question.context_ref_ids) == {
-        *requirement.source_refs,
         implementation.id,
         test.id,
         requirement.id,
     }
+
+
+def test_coverage_question_does_not_repeat_large_source_anchors(
+    tmp_path: Path,
+) -> None:
+    paragraph = "The repository must preserve this behavior " + ("with detail " * 520)
+    text = "# Plan\n\n" + "\n\n".join([paragraph] * 4) + "\n"
+    document = PinnedSourceDocument(
+        "repo",
+        "a" * 40,
+        "plan.md",
+        "b" * 40,
+        hashlib.sha256(text.encode()).hexdigest(),
+        text,
+    )
+    segmented = segment_markdown_source(document)
+    source_refs = tuple(item.id for item in segmented.anchors)
+    assert len(text) > MAX_QUESTION_INPUT_CHARS
+    requirement = Requirement(
+        "req-0001",
+        "Preserve the validated repository behavior.",
+        "behavior",
+        source_refs,
+        (),
+        (),
+    )
+
+    request = build_requirement_coverage_request(
+        requirement,
+        source=segmented,
+        evidence=(),
+        repository_root=tmp_path,
+    )
+    messages = build_question_messages(request)
+
+    assert request.source_excerpts == ()
+    assert request.accepted_facts[0].value["statement"] == requirement.statement
+    assert request.question.context_ref_ids == (requirement.id,)
+    assert len(messages[1]["content"]) < MAX_QUESTION_INPUT_CHARS
 
 
 def test_test_evidence_requires_a_test_or_fixture_path(tmp_path: Path) -> None:

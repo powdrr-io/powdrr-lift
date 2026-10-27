@@ -3909,6 +3909,7 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
             limits: object,
             progress_stream: object = None,
             reasoning_effort: str | None = None,
+            unsupported_schema_keywords: frozenset[str] = frozenset(),
             timeout: float = 120.0,
         ) -> None:
             _ = timeout
@@ -3918,6 +3919,9 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
                     "api_key": api_key,
                     "base_url": base_url,
                     "reasoning_effort": str(reasoning_effort),
+                    "unsupported_schema_keywords": ",".join(
+                        sorted(unsupported_schema_keywords)
+                    ),
                 }
             )
 
@@ -3944,6 +3948,7 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
         "api_key": "test-token",
         "base_url": "https://example.test",
         "reasoning_effort": "none",
+        "unsupported_schema_keywords": "uniqueItems",
     }
 
 

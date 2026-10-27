@@ -365,6 +365,8 @@ def search_requirements_evidence(
             "!node_modules/**",
             "--glob",
             "!.worktrees/**",
+            "--glob",
+            "!docs/**",
         ]
         for pattern in all_terms[offset : offset + MAX_RG_COVERAGE_TERMS_PER_PASS]:
             command.extend(("--regexp", pattern))

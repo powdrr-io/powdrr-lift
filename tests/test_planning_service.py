@@ -349,14 +349,14 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     source = segment_markdown_source(source_document)
     searched_requirements: list[str] = []
 
-    def search_evidence(
-        requirement: Any, first_ordinal: int
-    ) -> RequirementEvidenceSearch:
-        del first_ordinal
-        searched_requirements.append(requirement.id)
-        return RequirementEvidenceSearch(
-            (), ("behavior",), 0, 0, source_document.commit_sha
-        )
+    def search_evidence(requirements: Any) -> dict[str, RequirementEvidenceSearch]:
+        searched_requirements.extend(item.id for item in requirements)
+        return {
+            item.id: RequirementEvidenceSearch(
+                (), ("behavior",), 0, 0, source_document.commit_sha
+            )
+            for item in requirements
+        }
 
     machine = SourceLedgerQuestionMachine(
         source,

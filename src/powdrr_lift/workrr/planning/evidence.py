@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import subprocess
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -39,6 +40,8 @@ MAX_SYMBOL_QUERIES = 8
 MAX_SYMBOL_QUERY_CHARS = 120
 MAX_SYMBOL_EVIDENCE_CHARS = 8_000
 MAX_COVERAGE_SEARCH_TERMS = 8
+MAX_BASEDPYRIGHT_COVERAGE_QUERIES = 2_048
+MAX_RG_COVERAGE_TERMS_PER_PASS = 512
 MAX_COVERAGE_EVIDENCE_PER_KIND = 4
 MAX_COVERAGE_EVIDENCE_PER_REQUIREMENT = MAX_COVERAGE_EVIDENCE_PER_KIND * 2
 MAX_COVERAGE_EVIDENCE_LINE_CHARS = 1_200
@@ -97,12 +100,17 @@ _COVERAGE_SEARCH_PATHS = (
     "*.cc",
     "*.cpp",
     "*.hpp",
+    "*.sh",
+    "*.bash",
+    "*.zsh",
+    "*.sql",
     "*.toml",
     "*.yaml",
     "*.yml",
     "*.json",
     "Makefile",
     "makefile",
+    "Dockerfile",
 )
 _EVIDENCE_KINDS = frozenset(
     {"implementation", "test", "configuration", "execution_receipt"}
@@ -250,22 +258,30 @@ class RequirementCoverage:
 
 @dataclass(frozen=True, slots=True)
 class RequirementEvidenceSearch:
-    """Bounded lexical search results tied to one pinned repository commit."""
+    """Bounded symbol and text search results tied to one pinned commit."""
 
     evidence: tuple[Evidence, ...]
     terms: tuple[str, ...]
     matching_line_count: int
     matching_path_count: int
     base_commit: str
+    basedpyright_query_count: int = 0
+    basedpyright_match_count: int = 0
+    rg_match_count: int = 0
+    basedpyright_available: bool = True
 
     def to_data(self) -> dict[str, Any]:
         return {
-            "method": "git-grep-literal-terms-v1",
+            "method": "basedpyright-symbols-and-rg-v1",
             "base_commit": self.base_commit,
             "terms": list(self.terms),
             "matching_line_count": self.matching_line_count,
             "matching_path_count": self.matching_path_count,
             "evidence_count": len(self.evidence),
+            "basedpyright_query_count": self.basedpyright_query_count,
+            "basedpyright_match_count": self.basedpyright_match_count,
+            "rg_match_count": self.rg_match_count,
+            "basedpyright_available": self.basedpyright_available,
             "scope": "tracked source, test, and configuration files",
         }
 
@@ -277,93 +293,243 @@ def search_requirement_evidence(
     *,
     first_ordinal: int,
 ) -> RequirementEvidenceSearch:
-    """Find bounded candidate implementation and test lines at a pinned commit."""
-    terms = _coverage_search_terms(requirement.statement)
-    if not terms:
-        return RequirementEvidenceSearch((), (), 0, 0, base_commit)
+    """Find evidence for one requirement using the batched search implementation."""
+    return search_requirements_evidence(
+        repository_root,
+        base_commit,
+        (requirement,),
+        first_ordinal=first_ordinal,
+    )[requirement.id]
+
+
+def search_requirements_evidence(
+    repository_root: str | Path,
+    base_commit: str,
+    requirements: Sequence[Requirement],
+    *,
+    first_ordinal: int = 1,
+) -> dict[str, RequirementEvidenceSearch]:
+    """Search all plan requirements in one basedpyright session and rg passes."""
     root = Path(repository_root).resolve()
     _require_clean_pinned_checkout(root, base_commit)
-    command = [
-        "git",
-        "-C",
-        str(root),
-        "grep",
-        "-n",
-        "-I",
-        "-i",
-    ]
-    for term in terms:
-        command.extend(("-e", term))
-    command.extend(("--", *_COVERAGE_SEARCH_PATHS))
-    try:
-        result = subprocess.run(
-            command, check=False, capture_output=True, text=True, encoding="utf-8"
-        )
-    except OSError as error:
-        raise EvidenceError(f"could not search pinned repository: {error}") from error
-    if result.returncode not in {0, 1}:
-        details = result.stderr.strip() or f"git grep exited {result.returncode}"
-        raise EvidenceError(f"pinned repository search failed: {details}")
-
-    term_patterns = {
-        term: re.compile(rf"(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])", re.I)
-        for term in terms
+    requirements_by_id = {item.id: item for item in requirements}
+    if len(requirements_by_id) != len(requirements):
+        raise EvidenceError("requirement IDs must be unique for repository search")
+    terms_by_requirement = {
+        item.id: _coverage_search_terms(item.statement) for item in requirements
     }
-    rows: list[tuple[int, str, int, str, str]] = []
-    matching_paths: set[str] = set()
-    for raw_line in result.stdout.splitlines():
-        parts = raw_line.split(":", 2)
-        if len(parts) != 3:
-            continue
-        path, raw_line_number, text = parts
-        if (
-            not raw_line_number.isdigit()
-            or len(text) > MAX_COVERAGE_EVIDENCE_LINE_CHARS
-        ):
-            continue
-        matched_terms = sum(
-            bool(pattern.search(text)) for pattern in term_patterns.values()
-        )
-        if not matched_terms:
-            continue
-        kind = "test" if _is_test_path(path) else "implementation"
-        rows.append((matched_terms, path, int(raw_line_number), text, kind))
-        matching_paths.add(path)
-
-    # Keep the best matching lines from implementation and test files separately,
-    # so one large group of source hits cannot hide all relevant tests (or vice versa).
-    selected: list[tuple[int, str, int, str, str]] = []
-    for kind in ("implementation", "test"):
-        ranked = sorted(
-            (row for row in rows if row[4] == kind),
-            key=lambda row: (-row[0], row[1], row[2]),
-        )
-        selected.extend(ranked[:MAX_COVERAGE_EVIDENCE_PER_KIND])
-
-    evidence: list[Evidence] = []
-    pinned_files: dict[str, tuple[str, ...]] = {}
-    for offset, (_, path, line_number, _, kind) in enumerate(selected):
-        if path not in pinned_files:
-            _, content = read_pinned_code_file(repository_root, base_commit, path)
-            pinned_files[path] = tuple(content.splitlines(keepends=True))
-        lines = pinned_files[path]
-        if line_number > len(lines):
-            raise EvidenceError("pinned search result line exceeds its source file")
-        excerpt = lines[line_number - 1]
-        evidence.append(
-            Evidence(
-                id=_evidence_id(first_ordinal + offset),
-                base_commit=base_commit,
-                path=path,
-                start_line=line_number,
-                end_line=line_number,
-                content_sha256=hashlib.sha256(excerpt.encode("utf-8")).hexdigest(),
-                kind=kind,  # type: ignore[arg-type]
+    query_by_requirement = {
+        item.id: terms_by_requirement[item.id][0]
+        for item in requirements
+        if terms_by_requirement[item.id]
+    }
+    symbol_queries = tuple(dict.fromkeys(query_by_requirement.values()))[
+        :MAX_BASEDPYRIGHT_COVERAGE_QUERIES
+    ]
+    symbols_by_query: dict[str, list[dict[str, Any]]] = {}
+    basedpyright_available = True
+    if symbol_queries:
+        try:
+            symbols_by_query = find_workspace_symbols(
+                list(symbol_queries), worktree_root=root, limit=20
             )
+        except PowdrrExecutionError:
+            # Ripgrep still provides local multi-language evidence when the
+            # Python language server is unavailable or cannot index this repo.
+            basedpyright_available = False
+
+    rg_binary = shutil.which("rg")
+    if rg_binary is None:
+        raise EvidenceError("rg is required for local repository coverage search")
+    all_terms = tuple(
+        dict.fromkeys(
+            term for values in terms_by_requirement.values() for term in values
         )
-    return RequirementEvidenceSearch(
-        tuple(evidence), terms, len(rows), len(matching_paths), base_commit
     )
+    rg_rows: list[tuple[str, int, str]] = []
+    for offset in range(0, len(all_terms), MAX_RG_COVERAGE_TERMS_PER_PASS):
+        command = [
+            rg_binary,
+            "--line-number",
+            "--no-heading",
+            "--color",
+            "never",
+            "--hidden",
+            "--ignore-case",
+            "--fixed-strings",
+            "--glob",
+            "!.git/**",
+            "--glob",
+            "!.venv/**",
+            "--glob",
+            "!node_modules/**",
+            "--glob",
+            "!.worktrees/**",
+        ]
+        for pattern in all_terms[offset : offset + MAX_RG_COVERAGE_TERMS_PER_PASS]:
+            command.extend(("--regexp", pattern))
+        for glob in _COVERAGE_SEARCH_PATHS:
+            command.extend(("--glob", glob))
+        command.append(".")
+        try:
+            result = subprocess.run(
+                command,
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+            )
+        except OSError as error:
+            raise EvidenceError(
+                f"could not run rg in pinned repository: {error}"
+            ) from error
+        if result.returncode not in {0, 1}:
+            details = result.stderr.strip() or f"rg exited {result.returncode}"
+            raise EvidenceError(f"pinned repository rg search failed: {details}")
+        for raw_line in result.stdout.splitlines():
+            parts = raw_line.split(":", 2)
+            if len(parts) != 3 or not parts[1].isdigit():
+                continue
+            path = parts[0].removeprefix("./")
+            text = parts[2]
+            if len(text) <= MAX_COVERAGE_EVIDENCE_LINE_CHARS:
+                rg_rows.append((path, int(parts[1]), text))
+    rg_rows = list(dict.fromkeys(rg_rows))
+
+    output: dict[str, RequirementEvidenceSearch] = {}
+    pinned_files: dict[str, tuple[str, ...]] = {}
+    for req_index, requirement in enumerate(requirements):
+        terms = terms_by_requirement[requirement.id]
+        term_patterns = tuple(re.compile(re.escape(term), re.I) for term in terms)
+        candidates: list[tuple[int, int, str, int, int, str | None]] = []
+        # Source priority 0 is basedpyright symbol evidence; rg is the
+        # cross-language fallback and is ranked after those symbol matches.
+        symbol_query = query_by_requirement.get(requirement.id)
+        symbol_match_count = 0
+        matching_paths: set[str] = set()
+        if (
+            basedpyright_available
+            and symbol_query in symbol_queries
+            and symbol_query is not None
+        ):
+            for symbol in symbols_by_query.get(symbol_query, []):
+                symbol_path = symbol.get("path")
+                name = symbol.get("name")
+                location = symbol.get("range")
+                if (
+                    not isinstance(symbol_path, str)
+                    or not symbol_path.casefold().endswith((".py", ".pyi"))
+                    or not isinstance(name, str)
+                    or not isinstance(location, Mapping)
+                ):
+                    continue
+                start = location.get("start_line")
+                end = location.get("end_line")
+                if (
+                    isinstance(start, bool)
+                    or not isinstance(start, int)
+                    or isinstance(end, bool)
+                    or not isinstance(end, int)
+                    or start < 1
+                    or end < start
+                ):
+                    continue
+                symbol_match_count += 1
+                matching_paths.add(symbol_path)
+                candidates.append((0, 1, symbol_path, start, end, name))
+
+        rg_match_count = 0
+        for path, line_number, text in rg_rows:
+            matched_terms = sum(bool(pattern.search(text)) for pattern in term_patterns)
+            if not matched_terms:
+                continue
+            rg_match_count += 1
+            matching_paths.add(path)
+            candidates.append(
+                (
+                    1,
+                    matched_terms,
+                    path,
+                    line_number,
+                    line_number,
+                    None,
+                )
+            )
+
+        selected: list[tuple[int, int, str, int, int, str | None]] = []
+        for kind in ("implementation", "test"):
+            ranked = sorted(
+                (
+                    item
+                    for item in candidates
+                    if ("test" if _is_test_path(item[2]) else "implementation") == kind
+                ),
+                key=lambda item: (item[0], -item[1], item[2], item[3], item[4]),
+            )
+            distinct: list[tuple[int, int, str, int, int, str | None]] = []
+            for candidate in ranked:
+                _, _, path, start, end, _ = candidate
+                if any(
+                    existing[2] == path and start <= existing[4] and end >= existing[3]
+                    for existing in distinct
+                ):
+                    continue
+                distinct.append(candidate)
+            selected.extend(distinct[:MAX_COVERAGE_EVIDENCE_PER_KIND])
+
+        evidence: list[Evidence] = []
+        seen_spans: set[tuple[str, int, int, str]] = set()
+        for source_rank, _, path, start, end, symbol_name in selected:
+            del source_rank
+            evidence_kind = "test" if _is_test_path(path) else "implementation"
+            key = (path, start, end, evidence_kind)
+            if key in seen_spans:
+                continue
+            seen_spans.add(key)
+            if path not in pinned_files:
+                _, content = read_pinned_code_file(root, base_commit, path)
+                pinned_files[path] = tuple(content.splitlines(keepends=True))
+            lines = pinned_files[path]
+            if start > len(lines) or end > len(lines):
+                continue
+            excerpt = "".join(lines[start - 1 : end])
+            if len(excerpt) > MAX_SYMBOL_EVIDENCE_CHARS:
+                excerpt = lines[start - 1]
+                end = start
+            if len(excerpt) > MAX_COVERAGE_EVIDENCE_LINE_CHARS:
+                excerpt = lines[start - 1]
+                end = start
+            if len(excerpt) > MAX_COVERAGE_EVIDENCE_LINE_CHARS:
+                continue
+            evidence.append(
+                Evidence(
+                    id=_evidence_id(
+                        first_ordinal
+                        + req_index * MAX_COVERAGE_EVIDENCE_PER_REQUIREMENT
+                        + len(evidence)
+                    ),
+                    base_commit=base_commit,
+                    path=path,
+                    start_line=start,
+                    end_line=end,
+                    content_sha256=hashlib.sha256(excerpt.encode("utf-8")).hexdigest(),
+                    kind=evidence_kind,  # type: ignore[arg-type]
+                    symbol=symbol_name,
+                )
+            )
+        output[requirement.id] = RequirementEvidenceSearch(
+            tuple(evidence),
+            terms,
+            rg_match_count + symbol_match_count,
+            len(matching_paths),
+            base_commit,
+            len(symbol_queries),
+            symbol_match_count,
+            rg_match_count,
+            basedpyright_available,
+        )
+    return output
 
 
 def read_pinned_code_file(
@@ -897,4 +1063,5 @@ __all__ = [
     "read_pinned_code_file",
     "record_file_evidence",
     "search_requirement_evidence",
+    "search_requirements_evidence",
 ]

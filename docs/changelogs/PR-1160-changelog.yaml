@@ -1,0 +1,105 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1160
+title: Clarify extraction pagination and retry transient GitHub comment failures
+intent:
+  problem: The planner can omit a required pagination cursor when indicating that more source requirements remain, and transient GitHub server or transport errors can interrupt durable checkpoint reads and writes.
+  goal: Show a parser-valid paginated answer in the extraction prompt and retry transient GitHub comment API reads and writes with bounded backoff.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 155, end_line: 155}
+    summary: Name the bounded retry limit for GitHub comment API operations.
+    rationale: Apply bounded retries to transient failures while preserving immediate errors for unrelated API failures.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 163, end_line: 163}
+    summary: Store the API retry bound on the GitHub issue client.
+    rationale: Apply one bounded retry policy to comment reads and writes.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 356, end_line: 359}
+    summary: Route issue comment writes through the shared bounded retry helper.
+    rationale: Apply the same transient-error policy consistently to GitHub comment API requests.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 362, end_line: 362}
+    summary: Identify the issue-comment API request whose result or failure should be returned.
+    rationale: Keep the operation-specific endpoint available to the shared retry helper.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 368, end_line: 369}
+    summary: Route issue comment reads through the shared bounded retry helper.
+    rationale: Allow planning resume to recover when GitHub times out while loading checkpoints.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 381, end_line: 408}
+    summary: Retry transient comment API reads and writes with bounded backoff while returning unrelated errors immediately.
+    rationale: Keep issue checkpoint reads and writes resilient to rate limits, 5xx responses, and transport interruptions.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 458, end_line: 491}
+    summary: Recognize transient GitHub 5xx, connection-reset, and timeout errors and calculate bounded retry delays.
+    rationale: Resume issue comment reads and exact checkpoint writes after temporary server or transport failures.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 801, end_line: 812}
+    summary: Replace the nonpaginated extraction example with a cursor-bearing example when candidates remain.
+    rationale: Demonstrate a valid continuation answer before requesting more source requirements.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 813, end_line: 824}
+    summary: Make the valid extraction example demonstrate both pagination fields when more source remains.
+    rationale: Show the planner a complete, parser-valid example with more results remaining.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 885, end_line: 888}
+    summary: State that has_more and next_anchor have coupled required values.
+    rationale: Prevent omission of a cursor when another extraction page remains.
+  - path: src/powdrr_lift/workrr/planning/source.py
+    type: modified
+    span: {start_line: 895, end_line: 898}
+    summary: Clarify the answer field definition for the pagination continuation flag.
+    rationale: Keep the schema explanation consistent with the valid paginated example.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 502, end_line: 581}
+    summary: Verify transient HTTP 502, connection-reset, and read-timeout errors retry issue comment requests after backoff.
+    rationale: Prevent temporary GitHub server and transport failures from losing checkpoint transitions or blocking resume reads.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 426, end_line: 429}
+    summary: Verify the valid extraction example includes a required pagination cursor.
+    rationale: Ensure the model receives an answer example that satisfies the coupled pagination contract.
+entities:
+  - id: transient-github-comment-retry
+    type: Function
+    action: added
+  - id: coupled-source-pagination-answer-example
+    type: Function
+    action: added
+  - id: pagination-and-server-retry-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: retry-test-verifies-transient-comment-retry
+    type: verifies
+    source: pagination-and-server-retry-regression-tests
+    target: transient-github-comment-retry
+    action: added
+    description: The regression test verifies a transient HTTP 502 retries the same checkpoint comment request.
+  - id: source-test-verifies-coupled-pagination-example
+    type: verifies
+    source: pagination-and-server-retry-regression-tests
+    target: coupled-source-pagination-answer-example
+    action: added
+    description: The regression test parses the prompt's example with has_more true and a valid next_anchor.
+invariants:
+  - id: extraction-pagination-fields-remain-coupled
+    description: An extraction answer with has_more true includes a non-null next_anchor from the current block; a final page uses has_more false and next_anchor null.
+    action: altered
+  - id: transient-comment-retries-preserve-request-identity
+    description: A retry after a transient GitHub server error sends the exact same comment body so duplicate checkpoint digests remain safely deduplicable.
+    action: added
+guidance: []

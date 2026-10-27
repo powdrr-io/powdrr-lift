@@ -129,71 +129,71 @@ files:
   type: modified
   span:
     start_line: 259
-    end_line: 534
+    end_line: 536
   summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
     to the pinned commit.
   rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
 - path: src/powdrr_lift/workrr/planning/evidence.py
   type: modified
   span:
-    start_line: 719
-    end_line: 719
+    start_line: 721
+    end_line: 721
   summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
     to the pinned commit.
   rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
 - path: src/powdrr_lift/workrr/planning/evidence.py
   type: modified
   span:
-    start_line: 750
-    end_line: 756
+    start_line: 752
+    end_line: 758
   summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
     to the pinned commit.
   rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
 - path: src/powdrr_lift/workrr/planning/evidence.py
   type: modified
   span:
-    start_line: 766
-    end_line: 768
+    start_line: 768
+    end_line: 770
   summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
     to the pinned commit.
   rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
 - path: src/powdrr_lift/workrr/planning/evidence.py
   type: modified
   span:
-    start_line: 828
-    end_line: 832
+    start_line: 830
+    end_line: 834
   summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
     to the pinned commit.
   rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
 - path: src/powdrr_lift/workrr/planning/evidence.py
   type: modified
   span:
-    start_line: 837
-    end_line: 843
+    start_line: 839
+    end_line: 845
   summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
     to the pinned commit.
   rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
 - path: src/powdrr_lift/workrr/planning/evidence.py
   type: modified
   span:
-    start_line: 995
-    end_line: 1015
+    start_line: 997
+    end_line: 1017
   summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
     to the pinned commit.
   rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
 - path: src/powdrr_lift/workrr/planning/evidence.py
   type: modified
   span:
-    start_line: 1055
-    end_line: 1055
+    start_line: 1057
+    end_line: 1057
   summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
     to the pinned commit.
   rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.
 - path: src/powdrr_lift/workrr/planning/evidence.py
   type: modified
   span:
-    start_line: 1065
-    end_line: 1066
+    start_line: 1067
+    end_line: 1068
   summary: Search Python symbols with basedpyright and other local source with rg, then bind bounded results
     to the pinned commit.
   rationale: Provide implementation and test candidates without asking the model to assign evidence IDs.

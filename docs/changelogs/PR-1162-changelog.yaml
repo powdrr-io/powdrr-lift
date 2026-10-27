@@ -34,7 +34,7 @@ files:
     rationale: Avoid DeepInfra's grammar error for array uniqueness constraints in planning response schemas.
   - path: tests/test_provider_schema_compatibility.py
     type: added
-    span: {start_line: 1, end_line: 96}
+    span: {start_line: 1, end_line: 100}
     summary: Verify DeepInfra schema compatibility configuration, recursive keyword removal, and the transmitted request schema.
     rationale: Prevent the provider grammar error from recurring and ensure the original schema remains intact for local validation.
   - path: tests/test_workflow_task_agent.py

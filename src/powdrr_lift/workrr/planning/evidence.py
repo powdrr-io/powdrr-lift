@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import subprocess
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -37,6 +38,72 @@ from powdrr_lift.workrr.planning.source import (
 MAX_SYMBOL_QUERIES = 8
 MAX_SYMBOL_QUERY_CHARS = 120
 MAX_SYMBOL_EVIDENCE_CHARS = 8_000
+MAX_COVERAGE_SEARCH_TERMS = 8
+MAX_COVERAGE_EVIDENCE_PER_KIND = 4
+MAX_COVERAGE_EVIDENCE_PER_REQUIREMENT = MAX_COVERAGE_EVIDENCE_PER_KIND * 2
+MAX_COVERAGE_EVIDENCE_LINE_CHARS = 1_200
+_COVERAGE_STOPWORDS = frozenset(
+    {
+        "about",
+        "after",
+        "also",
+        "already",
+        "among",
+        "because",
+        "before",
+        "being",
+        "both",
+        "could",
+        "each",
+        "from",
+        "have",
+        "into",
+        "must",
+        "only",
+        "other",
+        "should",
+        "that",
+        "their",
+        "there",
+        "these",
+        "this",
+        "through",
+        "under",
+        "using",
+        "when",
+        "where",
+        "which",
+        "with",
+        "within",
+    }
+)
+_COVERAGE_SEARCH_PATHS = (
+    "*.py",
+    "*.pyi",
+    "*.go",
+    "*.rs",
+    "*.swift",
+    "*.js",
+    "*.jsx",
+    "*.ts",
+    "*.tsx",
+    "*.java",
+    "*.kt",
+    "*.rb",
+    "*.php",
+    "*.cs",
+    "*.c",
+    "*.h",
+    "*.cc",
+    "*.cpp",
+    "*.hpp",
+    "*.toml",
+    "*.yaml",
+    "*.yml",
+    "*.json",
+    "Makefile",
+    "makefile",
+)
 _EVIDENCE_KINDS = frozenset(
     {"implementation", "test", "configuration", "execution_receipt"}
 )
@@ -179,6 +246,124 @@ class RequirementCoverage:
     requirement_id: str
     answer: CoverageAnswer
     residual: ResidualRequirement | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RequirementEvidenceSearch:
+    """Bounded lexical search results tied to one pinned repository commit."""
+
+    evidence: tuple[Evidence, ...]
+    terms: tuple[str, ...]
+    matching_line_count: int
+    matching_path_count: int
+    base_commit: str
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "method": "git-grep-literal-terms-v1",
+            "base_commit": self.base_commit,
+            "terms": list(self.terms),
+            "matching_line_count": self.matching_line_count,
+            "matching_path_count": self.matching_path_count,
+            "evidence_count": len(self.evidence),
+            "scope": "tracked source, test, and configuration files",
+        }
+
+
+def search_requirement_evidence(
+    repository_root: str | Path,
+    base_commit: str,
+    requirement: Requirement,
+    *,
+    first_ordinal: int,
+) -> RequirementEvidenceSearch:
+    """Find bounded candidate implementation and test lines at a pinned commit."""
+    terms = _coverage_search_terms(requirement.statement)
+    if not terms:
+        return RequirementEvidenceSearch((), (), 0, 0, base_commit)
+    root = Path(repository_root).resolve()
+    _require_clean_pinned_checkout(root, base_commit)
+    command = [
+        "git",
+        "-C",
+        str(root),
+        "grep",
+        "-n",
+        "-I",
+        "-i",
+    ]
+    for term in terms:
+        command.extend(("-e", term))
+    command.extend(("--", *_COVERAGE_SEARCH_PATHS))
+    try:
+        result = subprocess.run(
+            command, check=False, capture_output=True, text=True, encoding="utf-8"
+        )
+    except OSError as error:
+        raise EvidenceError(f"could not search pinned repository: {error}") from error
+    if result.returncode not in {0, 1}:
+        details = result.stderr.strip() or f"git grep exited {result.returncode}"
+        raise EvidenceError(f"pinned repository search failed: {details}")
+
+    term_patterns = {
+        term: re.compile(rf"(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])", re.I)
+        for term in terms
+    }
+    rows: list[tuple[int, str, int, str, str]] = []
+    matching_paths: set[str] = set()
+    for raw_line in result.stdout.splitlines():
+        parts = raw_line.split(":", 2)
+        if len(parts) != 3:
+            continue
+        path, raw_line_number, text = parts
+        if (
+            not raw_line_number.isdigit()
+            or len(text) > MAX_COVERAGE_EVIDENCE_LINE_CHARS
+        ):
+            continue
+        matched_terms = sum(
+            bool(pattern.search(text)) for pattern in term_patterns.values()
+        )
+        if not matched_terms:
+            continue
+        kind = "test" if _is_test_path(path) else "implementation"
+        rows.append((matched_terms, path, int(raw_line_number), text, kind))
+        matching_paths.add(path)
+
+    # Keep the best matching lines from implementation and test files separately,
+    # so one large group of source hits cannot hide all relevant tests (or vice versa).
+    selected: list[tuple[int, str, int, str, str]] = []
+    for kind in ("implementation", "test"):
+        ranked = sorted(
+            (row for row in rows if row[4] == kind),
+            key=lambda row: (-row[0], row[1], row[2]),
+        )
+        selected.extend(ranked[:MAX_COVERAGE_EVIDENCE_PER_KIND])
+
+    evidence: list[Evidence] = []
+    pinned_files: dict[str, tuple[str, ...]] = {}
+    for offset, (_, path, line_number, _, kind) in enumerate(selected):
+        if path not in pinned_files:
+            _, content = read_pinned_code_file(repository_root, base_commit, path)
+            pinned_files[path] = tuple(content.splitlines(keepends=True))
+        lines = pinned_files[path]
+        if line_number > len(lines):
+            raise EvidenceError("pinned search result line exceeds its source file")
+        excerpt = lines[line_number - 1]
+        evidence.append(
+            Evidence(
+                id=_evidence_id(first_ordinal + offset),
+                base_commit=base_commit,
+                path=path,
+                start_line=line_number,
+                end_line=line_number,
+                content_sha256=hashlib.sha256(excerpt.encode("utf-8")).hexdigest(),
+                kind=kind,  # type: ignore[arg-type]
+            )
+        )
+    return RequirementEvidenceSearch(
+        tuple(evidence), terms, len(rows), len(matching_paths), base_commit
+    )
 
 
 def read_pinned_code_file(
@@ -365,6 +550,7 @@ def build_requirement_coverage_request(
     source: SegmentedSource,
     evidence: Sequence[Evidence],
     repository_root: str | Path,
+    repository_search: Mapping[str, Any] | None = None,
 ) -> QuestionRequest[CoverageAnswer]:
     """Build one coverage question bound to one requirement and supplied evidence."""
     known_anchor_ids = {item.id for item in source.anchors}
@@ -395,6 +581,13 @@ def build_requirement_coverage_request(
             },
         ),
     )
+    search_record = (
+        None
+        if repository_search is None
+        else ContextRecord("repository-search", dict(repository_search))
+    )
+    if search_record is not None:
+        accepted += (search_record,)
     digest_material = {
         "requirement": {
             "id": requirement.id,
@@ -404,6 +597,9 @@ def build_requirement_coverage_request(
             "source_group_ids": list(requirement.source_group_ids),
         },
         "evidence": [item.to_data() for item in evidence_records],
+        "repository_search": (
+            None if repository_search is None else dict(repository_search)
+        ),
     }
     input_digest = (
         "sha256:"
@@ -463,16 +659,22 @@ def build_requirement_coverage_request(
             contract_version=1,
             subject_ids=(requirement.id,),
             input_digest=input_digest,
-            context_ref_ids=tuple(list(supplied_ids) + [requirement.id]),
+            context_ref_ids=tuple(
+                list(supplied_ids)
+                + [requirement.id]
+                + ([] if search_record is None else [search_record.ref_id])
+            ),
             expected_answer_schema="coverage-answer-v1",
             attempt=1,
         ),
         exact_question=(
-            "This source-validated requirement is the unit of assessment. How much "
-            "of it is already implemented? Use only supplied pinned evidence. "
-            "Mark missing only when the bounded "
-            "code investigation found no matching implementation; an empty lookup "
-            "alone is not proof that it is absent."
+            "This source-validated requirement is the unit of assessment. Decide "
+            "whether it is already implemented in the pinned repository. Use only "
+            "the supplied code evidence and repository-search record. Search hits "
+            "are candidates; ignore irrelevant matches. If the supplied matches "
+            "do not implement this behavior, mark it missing. Missing means this "
+            "requirement is work to plan, not a reason to stop. A search with no "
+            "matches is a valid missing result; do not invent evidence."
         ),
         answer_field_definitions={
             "status": "missing, partial, or complete.",
@@ -624,6 +826,27 @@ def _validate_symbol_queries(queries: Sequence[str]) -> list[str]:
     return result
 
 
+def _coverage_search_terms(statement: str) -> tuple[str, ...]:
+    candidates = re.findall(r"[A-Za-z][A-Za-z0-9_]{2,}", statement)
+    frequency = Counter(candidate.casefold() for candidate in candidates)
+    ranked = sorted(
+        {
+            candidate.casefold()
+            for candidate in candidates
+            if candidate.casefold() not in _COVERAGE_STOPWORDS
+        },
+        key=lambda term: (-frequency[term], -len(term), term),
+    )
+    return tuple(ranked[:MAX_COVERAGE_SEARCH_TERMS])
+
+
+def _is_test_path(path: str) -> bool:
+    return any(
+        "test" in part.casefold() or "fixture" in part.casefold()
+        for part in PurePosixPath(path).parts
+    )
+
+
 def _validate_test_kind(path: str, kind: str) -> None:
     if kind == "test" and not any(
         "test" in part.casefold() or "fixture" in part.casefold()
@@ -663,6 +886,7 @@ __all__ = [
     "MAX_SYMBOL_EVIDENCE_CHARS",
     "MAX_SYMBOL_QUERIES",
     "MAX_SYMBOL_QUERY_CHARS",
+    "RequirementEvidenceSearch",
     "RequirementCoverage",
     "ResidualRequirement",
     "SymbolLookupResult",
@@ -672,4 +896,5 @@ __all__ = [
     "lookup_symbols_in_pinned_file",
     "read_pinned_code_file",
     "record_file_evidence",
+    "search_requirement_evidence",
 ]

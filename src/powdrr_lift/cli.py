@@ -242,6 +242,7 @@ from powdrr_lift.workrr.planning.assembly import PathFact
 from powdrr_lift.workrr.planning.checkpoints import GitHubCommentCheckpointStore
 from powdrr_lift.workrr.planning.compiler import PlanningCompilationError
 from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
+from powdrr_lift.workrr.planning.evidence import search_requirement_evidence
 from powdrr_lift.workrr.planning.repair_service import (
     PlanRepairServiceError,
     apply_repair_request,
@@ -2820,6 +2821,14 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
         machine = SourceLedgerQuestionMachine(
             source,
             repository_root=repo_root,
+            evidence_search=lambda requirement, first_ordinal: (
+                search_requirement_evidence(
+                    repo_root,
+                    base_commit,
+                    requirement,
+                    first_ordinal=first_ordinal,
+                )
+            ),
             verification_command=verification_command,
             repository_paths=_planning_repository_paths(
                 repo_root, base_commit, pinned_source.text

@@ -1,0 +1,73 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1162
+title: Preserve DeepInfra planning schemas with local uniqueness checks
+intent:
+  problem: DeepInfra's structured-output grammar rejects the JSON Schema keyword uniqueItems used by planning answers that cite evidence IDs.
+  goal: Omit uniqueItems from DeepInfra's provider-bound schema while preserving the complete schema for local answer validation.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 361, end_line: 361}
+    summary: Accept provider-specific unsupported schema keywords in the OpenAI-compatible client.
+    rationale: Keep constrained JSON output available for DeepInfra without weakening the planner's local answer validation.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 378, end_line: 378}
+    summary: Store the unsupported schema keyword set for each client instance.
+    rationale: Use provider-specific schema compatibility when building structured-output requests.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 414, end_line: 416}
+    summary: Remove provider-unsupported schema keywords recursively when building the API request.
+    rationale: Send DeepInfra a compatible schema while leaving caller-owned schemas unchanged.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 921, end_line: 939}
+    summary: Copy schemas recursively while omitting only provider-declared unsupported keywords.
+    rationale: Preserve the full caller schema for local validation and avoid mutating shared schema constants.
+  - path: src/powdrr_lift/workrr/providers.py
+    type: modified
+    span: {start_line: 1112, end_line: 1116}
+    summary: Declare uniqueItems unsupported for DeepInfra clients.
+    rationale: Avoid DeepInfra's grammar error for array uniqueness constraints in planning response schemas.
+  - path: tests/test_provider_schema_compatibility.py
+    type: added
+    span: {start_line: 1, end_line: 96}
+    summary: Verify DeepInfra schema compatibility configuration, recursive keyword removal, and the transmitted request schema.
+    rationale: Prevent the provider grammar error from recurring and ensure the original schema remains intact for local validation.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 3912, end_line: 3912}
+    summary: Accept the DeepInfra schema compatibility argument in the provider test double.
+    rationale: Keep the workflow-task provider test compatible with the client factory contract.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 3922, end_line: 3924}
+    summary: Record the unsupported schema keyword passed by the DeepInfra client factory.
+    rationale: Verify that provider construction wires the grammar capability through to the client.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 3951, end_line: 3951}
+    summary: Verify the DeepInfra client builder passes its schema compatibility capability.
+    rationale: Keep workflow-task provider construction aligned with the OpenAI-compatible client contract.
+entities:
+  - id: deepinfra-schema-compatibility
+    type: Function
+    action: added
+  - id: provider-schema-compatibility-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: provider-schema-tests-verify-deepinfra-compatibility
+    type: verifies
+    source: provider-schema-compatibility-regression-tests
+    target: deepinfra-schema-compatibility
+    action: added
+    description: The regression tests verify DeepInfra receives a schema without uniqueItems while the input schema remains unchanged.
+invariants:
+  - id: local-schema-validation-retains-unique-items
+    description: Provider-specific schema compatibility does not mutate the original response schema, so local validation still rejects duplicate evidence references.
+    action: added
+guidance: []

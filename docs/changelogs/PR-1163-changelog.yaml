@@ -1,103 +1,348 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1163
-title: Bound planning coverage question context
+title: Search pinned repository evidence during plan coverage
 intent:
-  problem: Coverage questions repeat source excerpts already checked during requirement fidelity review, which can exceed the bounded model input size for large plan sections.
-  goal: Assess coverage from the accepted requirement statement and supplied pinned repository evidence while keeping all stable identifiers code-generated.
+  problem: Coverage questions can omit repository evidence entirely, leaving the model to classify requirements
+    without inspecting the current implementation.
+  goal: Search bounded code and test candidates at the pinned commit, present those results with the accepted
+    requirement, and let missing requirements continue into implementation planning while keeping stable
+    identifiers code-generated.
 human-decisions: []
 structured_files: []
 files:
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 29, end_line: 29}
-    summary: Remove the source-excerpt request dependency from coverage question construction.
-    rationale: Coverage uses the already accepted requirement statement and repository evidence.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 370, end_line: 372}
-    summary: Validate requirement anchor references without serializing their source text again.
-    rationale: Keep anchor integrity checks while avoiding repeated large source excerpts.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 466, end_line: 466}
-    summary: Limit coverage context references to supplied evidence and the requirement.
-    rationale: Avoid carrying unused source anchor IDs into the model question.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 471, end_line: 473}
-    summary: State that the fidelity-checked requirement is the coverage assessment unit.
-    rationale: Preserve the proper assessment boundary without repeating source text.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 483, end_line: 486}
-    summary: Build coverage questions from the fidelity-checked requirement and supplied pinned evidence without repeating source excerpts.
-    rationale: Avoid oversized prompts while retaining the validated obligation and evidence needed to judge existing implementation.
-  - path: src/powdrr_lift/workrr/planning/questions.py
-    type: modified
-    span: {start_line: 32, end_line: 39}
-    summary: Include the deterministic question ID and kind in oversized-input errors.
-    rationale: Identify which bounded planning question needs subdivision when its context still exceeds the limit.
-  - path: src/powdrr_lift/workrr/planning/questions.py
-    type: modified
-    span: {start_line: 42, end_line: 43}
-    summary: Store code-generated question identity on oversized-input errors.
-    rationale: Track the failing planning question without asking the model to mint identifiers.
-  - path: src/powdrr_lift/workrr/planning/questions.py
-    type: modified
-    span: {start_line: 45, end_line: 49}
-    summary: Format the code-generated question identity in oversized-input errors.
-    rationale: Make the failing bounded question identifiable in diagnostics.
-  - path: src/powdrr_lift/workrr/planning/questions.py
-    type: modified
-    span: {start_line: 51, end_line: 51}
-    summary: Include question identity in the oversized-input error message.
-    rationale: Identify the failing question without relying on model-generated IDs.
-  - path: src/powdrr_lift/workrr/planning/questions.py
-    type: modified
-    span: {start_line: 274, end_line: 277}
-    summary: Attach code-generated question identity to oversized-input errors.
-    rationale: Make the failing question traceable without asking the model to generate identifiers.
-  - path: tests/test_planning_evidence.py
-    type: modified
-    span: {start_line: 21, end_line: 24}
-    summary: Import question size helpers for bounded coverage regression tests.
-    rationale: Build and measure the full serialized request in the test.
-  - path: tests/test_planning_evidence.py
-    type: modified
-    span: {start_line: 356, end_line: 356}
-    summary: Assert that coverage requests do not duplicate source excerpts.
-    rationale: Verify the smaller coverage context directly.
-  - path: tests/test_planning_evidence.py
-    type: modified
-    span: {start_line: 359, end_line: 359}
-    summary: Verify the coverage request omits redundant source excerpts.
-    rationale: Keep source excerpts from exceeding the question input bound after fidelity review.
-  - path: tests/test_planning_evidence.py
-    type: added
-    span: {start_line: 367, end_line: 405}
-    summary: Verify coverage context retains the source-validated requirement and stays bounded for many source anchors.
-    rationale: Prevent source excerpts already checked by fidelity review from pushing coverage questions over the input cap.
-  - path: tests/test_planning_questions.py
-    type: modified
-    span: {start_line: 476, end_line: 477}
-    summary: Verify oversized-input errors identify the deterministic question.
-    rationale: Make a future context subdivision issue traceable to its exact question.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 245
+    end_line: 245
+  summary: Import the pinned repository evidence search for planning
+  rationale: Connect the CLI to the coverage evidence provider.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2824
+    end_line: 2831
+  summary: Provide the pinned code search to the planning question machine
+  rationale: Ensure CLI coverage questions receive repository evidence.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Import callback typing for the evidence search provider
+  rationale: Type the injectable repository evidence search.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Import the maximum per-requirement evidence allocation
+  rationale: Assign unique evidence IDs deterministically.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 44
+    end_line: 44
+  summary: Import the repository evidence search result type
+  rationale: Carry search results into coverage question construction.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 95
+  summary: Accept an optional evidence search provider
+  rationale: Supply repository evidence during production planning while keeping isolated machine tests
+    injectable.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 108
+    end_line: 109
+  summary: Store and cache evidence searches by requirement
+  rationale: Avoid repeating pinned repository searches as the question machine advances.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 217
+    end_line: 221
+  summary: Search each requirement and select its pinned evidence for coverage
+  rationale: Base coverage judgments on the current repository implementation and tests.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 227
+    end_line: 227
+  summary: Include the search summary in coverage context
+  rationale: Record the bounded investigation that produced the candidate evidence.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 250
+    end_line: 264
+  summary: Cache search results and verify their base commit
+  rationale: Keep evidence tied to the planning baseline and stable across resumes.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 1111
+    end_line: 1115
+  summary: Rebuild accepted coverage questions with the same cached evidence
+  rationale: Preserve question identity when validating journaled answers.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 1121
+    end_line: 1121
+  summary: Reattach the repository search record during answer reconstruction
+  rationale: Ensure accepted answer validation uses the original question context.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Import term frequency support for deterministic query selection
+  rationale: Rank requirement search terms without assigning work to the model.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Remove source excerpt construction from coverage questions
+  rationale: Reuse the source-validated requirement statement without repeating long plan passages.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 106
+  summary: 'Define bounded search terms, candidate evidence limits, and repository code path scope'
+  rationale: Keep retrieval deterministic and coverage prompts bounded.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 251
+    end_line: 368
+  summary: 'Search pinned source, tests, and configuration for requirement terms and record matched lines as code-owned evidence'
+  rationale: Give the model concrete current repository context and permit valid missing results when
+    no candidate implementation is found.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 553
+    end_line: 553
+  summary: Accept the repository search record in coverage request construction
+  rationale: Include the bounded search result with the requirement and evidence.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 556
+    end_line: 558
+  summary: Validate source references without building repeated excerpts
+  rationale: Retain source anchor integrity while limiting prompt context.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 584
+    end_line: 590
+  summary: Append repository search details to accepted question context
+  rationale: Make the search scope and result counts available to the coverage assessor.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 600
+    end_line: 602
+  summary: Include search results in the question digest
+  rationale: Make question identity depend on the exact pinned investigation context.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 663
+    end_line: 663
+  summary: Reference the repository search record from the coverage question
+  rationale: Bind the question to the code search summary.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 665
+    end_line: 665
+  summary: Add the search context reference when available
+  rationale: Keep evidence context identifiers complete and deterministic.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 671
+    end_line: 677
+  summary: Explain that missing coverage becomes implementation work and irrelevant search hits should
+    be ignored
+  rationale: Prevent missing requirements from blocking planning or unsupported evidence from being cited.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 685
+    end_line: 688
+  summary: Omit repeated source excerpts from bounded coverage prompts
+  rationale: Avoid oversized input after source fidelity has already been checked.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 829
+    end_line: 849
+  summary: Derive ranked search terms and classify test paths deterministically
+  rationale: Keep query formation and evidence kind assignment code-owned.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 889
+    end_line: 889
+  summary: Export the search result type
+  rationale: Allow the question machine to type its evidence callback.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 899
+    end_line: 899
+  summary: Export the pinned requirement search function
+  rationale: Let CLI planning use the bounded evidence search.
+- path: src/powdrr_lift/workrr/planning/questions.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 39
+  summary: Include question identity in oversized-input errors
+  rationale: Identify which bounded planning question exceeded the limit.
+- path: src/powdrr_lift/workrr/planning/questions.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 43
+  summary: Store code-generated question identity on oversized-input errors
+  rationale: Keep stable IDs owned by runtime code.
+- path: src/powdrr_lift/workrr/planning/questions.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 49
+  summary: Format question identity in the error message
+  rationale: Make the failing question traceable.
+- path: src/powdrr_lift/workrr/planning/questions.py
+  type: modified
+  span:
+    start_line: 51
+    end_line: 51
+  summary: Include question identity in oversized-input diagnostics
+  rationale: Direct investigation to the specific question.
+- path: src/powdrr_lift/workrr/planning/questions.py
+  type: modified
+  span:
+    start_line: 274
+    end_line: 277
+  summary: Attach question identity when raising size errors
+  rationale: Preserve traceability from question construction to diagnostics.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 24
+  summary: Import pinned search and bounded question helpers
+  rationale: Test search evidence in the complete serialized request.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 127
+    end_line: 228
+  summary: Verify candidate source and test evidence
+  runtime-owned IDs: null
+  and missing coverage with no matches: null
+  rationale: Ensure search results support coverage judgments while absence remains implementable work.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 462
+    end_line: 462
+  summary: Assert source excerpts are omitted from coverage questions
+  rationale: Preserve the prompt size bound after fidelity review.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 356
+    end_line: 356
+  summary: Remove a redundant source anchor from the expected context
+  rationale: Coverage requests now refer to supplied evidence and the accepted requirement.
+- path: tests/test_planning_evidence.py
+  type: added
+  span:
+    start_line: 470
+    end_line: 508
+  summary: Verify large source anchors do not bloat coverage questions
+  rationale: Keep coverage context within its input bound.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 476
+    end_line: 477
+  summary: Verify oversized-input errors identify the exact question
+  rationale: Make context subdivision diagnostics actionable.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Import the bounded search result type for question-machine tests
+  rationale: Verify repository context integration.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 350
+    end_line: 360
+  summary: Provide a fake pinned search result to the question machine
+  rationale: Exercise evidence search without external repository state.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 363
+    end_line: 363
+  summary: Inject the evidence search provider
+  rationale: Test the production coverage question path.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 401
+    end_line: 402
+  summary: Assert coverage requests include search facts
+  rationale: Verify the LLM receives the repository search result.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 507
+    end_line: 507
+  summary: Assert cached searches run once per requirement
+  rationale: Avoid repeated repository scans during question advancement.
 entities:
-  - id: source-validated-bounded-coverage-question
-    type: Function
-    action: added
-  - id: bounded-question-context-regression-tests
-    type: Regression test
-    action: added
+- id: pinned-repository-coverage-search
+  type: Function
+  action: added
+- id: requirement-coverage-search-context
+  type: Function
+  action: added
+- id: pinned-coverage-search-tests
+  type: Regression test
+  action: added
+- id: source-validated-bounded-coverage-question
+  type: Function
+  action: added
+- id: bounded-question-context-regression-tests
+  type: Regression test
+  action: added
 entity_relationships:
-  - id: coverage-context-tests-verify-source-validation-boundary
-    type: verifies
-    source: bounded-question-context-regression-tests
-    target: source-validated-bounded-coverage-question
-    action: added
-    description: Coverage uses the fidelity-checked requirement statement and supplied evidence without serializing all source excerpts again.
+- id: coverage-context-tests-verify-source-validation-boundary
+  type: verifies
+  source: bounded-question-context-regression-tests
+  target: source-validated-bounded-coverage-question
+  action: added
+  description: Coverage uses the fidelity-checked requirement statement and supplied evidence without
+    serializing all source excerpts again.
 invariants:
-  - id: coverage-uses-source-validated-requirement
-    description: Coverage assessment retains the full accepted requirement statement, whose source fidelity was checked earlier, and all supplied evidence records while omitting repeated source excerpts.
-    action: added
+- id: coverage-uses-source-validated-requirement
+  description: Coverage assessment retains the full accepted requirement statement, whose source fidelity
+    was checked earlier, and all supplied evidence records while omitting repeated source excerpts.
+  action: added
 guidance: []

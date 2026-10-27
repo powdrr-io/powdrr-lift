@@ -29,12 +29,26 @@ _SYSTEM_INSTRUCTIONS = (
 class QuestionInputTooLarge(ValueError):
     """The complete question packet exceeds its bound and must be narrowed."""
 
-    def __init__(self, size_chars: int, *, correction: bool = False) -> None:
+    def __init__(
+        self,
+        size_chars: int,
+        *,
+        correction: bool = False,
+        question_id: str | None = None,
+        question_kind: str | None = None,
+    ) -> None:
         self.size_chars = size_chars
         self.correction = correction
+        self.question_id = question_id
+        self.question_kind = question_kind
         stage = "correction" if correction else "question"
+        identity = (
+            f" for {question_kind} question {question_id}"
+            if question_id is not None and question_kind is not None
+            else ""
+        )
         super().__init__(
-            f"Serialized {stage} input is {size_chars} characters; "
+            f"Serialized {stage} input{identity} is {size_chars} characters; "
             f"the limit is {MAX_QUESTION_INPUT_CHARS}. Subdivide or narrow the "
             "question context; no content was truncated."
         )
@@ -257,7 +271,10 @@ def build_question_messages(
     )
     if len(serialized_input) > MAX_QUESTION_INPUT_CHARS:
         raise QuestionInputTooLarge(
-            len(serialized_input), correction=correction is not None
+            len(serialized_input),
+            correction=correction is not None,
+            question_id=current_question.question_id,
+            question_kind=current_question.kind,
         )
     return messages
 

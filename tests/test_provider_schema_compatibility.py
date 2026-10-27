@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import json
-from typing import cast
+from typing import Any, cast
 from urllib.request import Request
 
 import pytest
 
+from powdrr_lift.workrr.protocol import SchemaAwareWorkflowLLMClient
 from powdrr_lift.workrr.providers import (
     OpenAIChatClient,
     _remove_schema_keywords,
@@ -28,7 +29,7 @@ def test_deepinfra_client_declares_unsupported_schema_keywords() -> None:
 
 
 def test_remove_schema_keywords_recursively_copies_schema() -> None:
-    schema = {
+    schema: dict[str, Any] = {
         "type": "object",
         "properties": {
             "refs": {
@@ -53,13 +54,16 @@ def test_remove_schema_keywords_recursively_copies_schema() -> None:
 def test_deepinfra_request_omits_unique_items_keyword(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = build_provider_client(
-        provider="deepinfra-cheap",
-        model="deepseek-ai/DeepSeek-V4-Flash-0731",
-        api_key="test-token",
-        base_url="https://api.deepinfra.com/v1/openai",
+    client = cast(
+        SchemaAwareWorkflowLLMClient,
+        build_provider_client(
+            provider="deepinfra-cheap",
+            model="deepseek-ai/DeepSeek-V4-Flash-0731",
+            api_key="test-token",
+            base_url="https://api.deepinfra.com/v1/openai",
+        ),
     )
-    schema = {
+    schema: dict[str, Any] = {
         "type": "object",
         "properties": {
             "evidence_ids": {
@@ -71,7 +75,7 @@ def test_deepinfra_request_omits_unique_items_keyword(
         "required": ["evidence_ids"],
         "additionalProperties": False,
     }
-    captured: dict[str, object] = {}
+    captured: dict[str, Any] = {}
 
     def capture_request(request: Request, *, timeout: float) -> object:
         del timeout

@@ -1,0 +1,72 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1167
+title: Include repository search in coverage question context
+intent:
+  problem: Coverage questions referenced repository-search data that was not included among their supplied context records, causing request validation to fail during plan resume.
+  goal: Include repository-search data in the model context while keeping the validated requirement as the accepted fact.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 741
+    end_line: 747
+  summary: Build the requirement accepted fact separately from repository evidence.
+  rationale: Keep the search record out of accepted facts while preparing it for repository context.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 754
+    end_line: 754
+  summary: Initialize repository context from the evidence records.
+  rationale: Provide one collection for all supplied repository evidence.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 756
+    end_line: 756
+  summary: Append the repository-search record to repository context.
+  rationale: Make the context reference resolve during request validation and prompt rendering.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 855
+    end_line: 856
+  summary: Supply the assembled repository context and requirement fact to the coverage question.
+  rationale: Ensure the search record is serialized for coverage judgment without misclassifying it as an accepted fact.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 181
+    end_line: 182
+  summary: Validate coverage requests and assert the repository-search record reaches the model messages.
+  rationale: Catch mismatched references and missing search context in request construction.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 195
+    end_line: 197
+  summary: Assert repository-search is supplied, accepted facts remain the requirement, and the search record is serialized.
+  rationale: Verify that the corrected context is present in the exact model prompt.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 202
+    end_line: 202
+  summary: Read match counts from repository-search context.
+  rationale: Assert search metadata comes from the supplied repository record.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 254
+    end_line: 254
+  summary: Validate coverage requests when repository search finds no matches.
+  rationale: Ensure the empty-search case still supplies consistent request context.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 401
+    end_line: 403
+  summary: Assert service coverage requests validate and include repository-search context.
+  rationale: Exercise the corrected context wiring through the planning service.

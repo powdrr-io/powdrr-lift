@@ -738,24 +738,22 @@ def build_requirement_coverage_request(
         evidence_context.append(
             ContextRecord(item.id, {**item.to_data(), "source_excerpt": excerpt})
         )
-    accepted = tuple(evidence_context)
-    accepted += (
-        ContextRecord(
-            requirement.id,
-            {
-                "statement": requirement.statement,
-                "kind": requirement.kind,
-                "source_group_ids": list(requirement.source_group_ids),
-            },
-        ),
+    requirement_context = ContextRecord(
+        requirement.id,
+        {
+            "statement": requirement.statement,
+            "kind": requirement.kind,
+            "source_group_ids": list(requirement.source_group_ids),
+        },
     )
     search_record = (
         None
         if repository_search is None
         else ContextRecord("repository-search", dict(repository_search))
     )
+    repository_context = tuple(evidence_context)
     if search_record is not None:
-        accepted += (search_record,)
+        repository_context += (search_record,)
     digest_material = {
         "requirement": {
             "id": requirement.id,
@@ -854,8 +852,8 @@ def build_requirement_coverage_request(
         # Repeating every cited source paragraph can exceed the bounded question
         # size without adding information needed for coverage judgment.
         source_excerpts=(),
-        repository_evidence=tuple(evidence_context),
-        accepted_facts=(accepted[-1],),
+        repository_evidence=repository_context,
+        accepted_facts=(requirement_context,),
         valid_example=positive_example,
         empty_example=negative_example,
         answer_schema=COVERAGE_ANSWER_JSON_SCHEMA,

@@ -398,8 +398,9 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
             else:
                 answer = {"disposition": "context", "reason": "Background information."}
         elif question.kind == "assess_requirement_coverage":
-            assert request.accepted_facts[-1].ref_id == "repository-search"
-            assert request.accepted_facts[-1].value["terms"] == ["behavior"]
+            request.validate()
+            assert request.repository_evidence[-1].ref_id == "repository-search"
+            assert request.repository_evidence[-1].value["terms"] == ["behavior"]
             answer = {
                 "status": "missing",
                 "evidence_ids": [],

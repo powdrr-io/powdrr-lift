@@ -178,6 +178,8 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
         repository_root=repository,
         repository_search=search.to_data(),
     )
+    request.validate()
+    messages = build_question_messages(request)
 
     assert search.terms
     assert search.matching_line_count >= 2
@@ -190,11 +192,14 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
         f"evidence-{ordinal:04d}" for ordinal in range(17, 17 + len(search.evidence))
     }
     assert request.question.context_ref_ids[-1] == "repository-search"
+    assert request.repository_evidence[-1].ref_id == "repository-search"
+    assert request.accepted_facts[0].ref_id == requirement.id
+    assert "repository-search" in messages[1]["content"]
     assert any(
         "parse_payload" in record.value["source_excerpt"]
         for record in request.repository_evidence
     )
-    assert request.accepted_facts[-1].value["matching_path_count"] == 2
+    assert request.repository_evidence[-1].value["matching_path_count"] == 2
     assert any(item.symbol == "parse_payload" for item in search.evidence)
     implementation = next(
         item for item in search.evidence if item.kind == "implementation"
@@ -246,6 +251,7 @@ def test_requirement_search_with_no_matches_allows_missing_coverage(
         repository_root=repository,
         repository_search=search.to_data(),
     )
+    request.validate()
 
     assert search.evidence == ()
     assert search.matching_line_count == 0

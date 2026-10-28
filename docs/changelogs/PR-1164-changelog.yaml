@@ -10,6 +10,13 @@ intent:
 human-decisions: []
 structured_files: []
 files:
+- path: .github/workflows/ci.yml
+  type: modified
+  span:
+    start_line: 29
+    end_line: 33
+  summary: Install ripgrep in the CI runner before tests.
+  rationale: Repository coverage search requires rg for local source and test evidence.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:

@@ -1,0 +1,418 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1166
+title: Parallelize independent planning questions
+intent:
+  problem: Initial planning runs issue many independent bounded model questions serially,
+    making total planning time grow with the sum of request latencies.
+  goal: Execute currently independent planning questions concurrently while preserving
+    dependency order and durable accepted-answer checkpoints.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/procedrr/processes/plan-execution.yaml
+  type: modified
+  span:
+    start_line: 4
+    end_line: 5
+  summary: Describe dependency-aware question batches in the planning process.
+  rationale: Keep the durable workflow description aligned with concurrent frontier
+    execution.
+- path: docs/procedrr/processes/plan-execution.yaml
+  type: modified
+  span:
+    start_line: 26
+    end_line: 27
+  summary: Extend the transition schema with the batch question IDs and accepted answers.
+  rationale: Carry batch results through the Procedrr operation contract.
+- path: docs/procedrr/processes/plan-execution.yaml
+  type: modified
+  span:
+    start_line: 51
+    end_line: 52
+  summary: Extend the transition schema with the batch question IDs and accepted answers.
+  rationale: Carry batch results through the Procedrr operation contract.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 391
+    end_line: 396
+  summary: Add the planning-concurrency setting to plan and plan-resume.
+  rationale: Let operators bound the number of concurrently requested planning answers.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 413
+    end_line: 418
+  summary: Add the planning-concurrency setting to plan and plan-resume.
+  rationale: Let operators bound the number of concurrently requested planning answers.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2862
+    end_line: 2869
+  summary: Apply the configured concurrency limit and keep local llama inference single-threaded.
+  rationale: Bound remote request fan-out while avoiding concurrent use of the shared
+    local model.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 122
+    end_line: 127
+  summary: Collect each source block’s next unanswered extraction page.
+  rationale: Allow independent blocks to be planned together while keeping page cursors
+    ordered within each block.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 130
+  summary: Collect each source block’s next unanswered extraction page.
+  rationale: Allow independent blocks to be planned together while keeping page cursors
+    ordered within each block.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 135
+    end_line: 135
+  summary: Collect each source block’s next unanswered extraction page.
+  rationale: Allow independent blocks to be planned together while keeping page cursors
+    ordered within each block.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 146
+    end_line: 148
+  summary: Collect each source block’s next unanswered extraction page.
+  rationale: Allow independent blocks to be planned together while keeping page cursors
+    ordered within each block.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 154
+    end_line: 158
+  summary: Collect each source block’s next unanswered extraction page.
+  rationale: Allow independent blocks to be planned together while keeping page cursors
+    ordered within each block.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 187
+    end_line: 187
+  summary: Collect all unanswered disposition and fidelity questions after global
+    requirement allocation.
+  rationale: Run independent source judgments from one stable requirement ledger.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 208
+    end_line: 212
+  summary: Collect all unanswered disposition and fidelity questions after global
+    requirement allocation.
+  rationale: Run independent source judgments from one stable requirement ledger.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 220
+    end_line: 222
+  summary: Collect all unanswered disposition and fidelity questions after global
+    requirement allocation.
+  rationale: Run independent source judgments from one stable requirement ledger.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 224
+    end_line: 224
+  summary: Collect all unanswered disposition and fidelity questions after global
+    requirement allocation.
+  rationale: Run independent source judgments from one stable requirement ledger.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 238
+  summary: Expose all currently ready coverage, work-unit, item-description, and dependency
+    questions.
+  rationale: Form a bounded frontier without crossing pagination or planning-stage
+    dependencies.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 241
+    end_line: 241
+  summary: Expose all currently ready coverage, work-unit, item-description, and dependency
+    questions.
+  rationale: Form a bounded frontier without crossing pagination or planning-stage
+    dependencies.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 255
+    end_line: 265
+  summary: Expose all currently ready coverage, work-unit, item-description, and dependency
+    questions.
+  rationale: Form a bounded frontier without crossing pagination or planning-stage
+    dependencies.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 267
+    end_line: 267
+  summary: Expose all currently ready coverage, work-unit, item-description, and dependency
+    questions.
+  rationale: Form a bounded frontier without crossing pagination or planning-stage
+    dependencies.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 270
+    end_line: 270
+  summary: Expose all currently ready coverage, work-unit, item-description, and dependency
+    questions.
+  rationale: Form a bounded frontier without crossing pagination or planning-stage
+    dependencies.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 274
+    end_line: 276
+  summary: Expose all currently ready coverage, work-unit, item-description, and dependency
+    questions.
+  rationale: Form a bounded frontier without crossing pagination or planning-stage
+    dependencies.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 282
+  summary: Expose all currently ready coverage, work-unit, item-description, and dependency
+    questions.
+  rationale: Form a bounded frontier without crossing pagination or planning-stage
+    dependencies.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 708
+    end_line: 708
+  summary: Batch missing Structrr change questions for subjects of the current item.
+  rationale: Subjects share a projected baseline; operations for later items still
+    wait for prior item results.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 730
+    end_line: 731
+  summary: Batch missing Structrr change questions for subjects of the current item.
+  rationale: Subjects share a projected baseline; operations for later items still
+    wait for prior item results.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 738
+    end_line: 739
+  summary: Batch missing Structrr change questions for subjects of the current item.
+  rationale: Subjects share a projected baseline; operations for later items still
+    wait for prior item results.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Import the bounded worker pool and ordered progress-output buffering.
+  rationale: Run ready model requests concurrently while keeping logs readable.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Import the bounded worker pool and ordered progress-output buffering.
+  rationale: Run ready model requests concurrently while keeping logs readable.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Import the bounded worker pool and ordered progress-output buffering.
+  rationale: Run ready model requests concurrently while keeping logs readable.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 76
+  summary: Include all question IDs and accepted answers in a batch transition.
+  rationale: Represent multiple completed questions in the durable Procedrr result.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 88
+    end_line: 89
+  summary: Include all question IDs and accepted answers in a batch transition.
+  rationale: Represent multiple completed questions in the durable Procedrr result.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 108
+    end_line: 112
+  summary: Configure a positive maximum number of concurrent questions.
+  rationale: Bound provider load and allow serial operation when needed.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 260
+    end_line: 266
+  summary: Resolve a ready-question frontier and validate unique unanswered question
+    IDs.
+  rationale: Dispatch only independent requests derived from the same accepted-answer
+    snapshot.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 275
+  summary: Resolve a ready-question frontier and validate unique unanswered question
+    IDs.
+  rationale: Dispatch only independent requests derived from the same accepted-answer
+    snapshot.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 292
+    end_line: 295
+  summary: Resolve a ready-question frontier and validate unique unanswered question
+    IDs.
+  rationale: Dispatch only independent requests derived from the same accepted-answer
+    snapshot.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 298
+    end_line: 330
+  summary: Persist accepted batch outcomes through one hash-linked checkpoint writer.
+  rationale: Keep journal appends serialized, preserve successful answers, and pause
+    when correction is needed.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 332
+    end_line: 344
+  summary: Persist accepted batch outcomes through one hash-linked checkpoint writer.
+  rationale: Keep journal appends serialized, preserve successful answers, and pause
+    when correction is needed.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 346
+    end_line: 354
+  summary: Persist accepted batch outcomes through one hash-linked checkpoint writer.
+  rationale: Keep journal appends serialized, preserve successful answers, and pause
+    when correction is needed.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 357
+    end_line: 357
+  summary: Persist accepted batch outcomes through one hash-linked checkpoint writer.
+  rationale: Keep journal appends serialized, preserve successful answers, and pause
+    when correction is needed.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 360
+    end_line: 364
+  summary: Persist accepted batch outcomes through one hash-linked checkpoint writer.
+  rationale: Keep journal appends serialized, preserve successful answers, and pause
+    when correction is needed.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 368
+    end_line: 409
+  summary: Execute each ready question in a bounded thread pool and return results
+    in frontier order.
+  rationale: Overlap provider latency without racing checkpoint writes or interleaving
+    progress output.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 279
+  summary: Validate that accepted frontier questions retain their original input digests.
+  rationale: Reject stale planning requests before provider calls.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: modified
+  span:
+    start_line: 312
+    end_line: 312
+  summary: Advance the journal parent and sequence after each accepted answer.
+  rationale: Append the rest of the frontier against the latest serialized checkpoint
+    head.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Verify two ready questions overlap and their accepted checkpoints remain
+    ordered.
+  rationale: Guard the concurrency behavior and serialized journal invariant with
+    a barrier-backed provider fixture.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 186
+    end_line: 188
+  summary: Verify two ready questions overlap and their accepted checkpoints remain
+    ordered.
+  rationale: Guard the concurrency behavior and serialized journal invariant with
+    a barrier-backed provider fixture.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 190
+    end_line: 190
+  summary: Verify two ready questions overlap and their accepted checkpoints remain
+    ordered.
+  rationale: Guard the concurrency behavior and serialized journal invariant with
+    a barrier-backed provider fixture.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 341
+  summary: Verify two ready questions overlap and their accepted checkpoints remain
+    ordered.
+  rationale: Guard the concurrency behavior and serialized journal invariant with
+    a barrier-backed provider fixture.
+entities:
+- id: planning-question-frontier
+  type: Function
+  action: added
+- id: bounded-planning-question-batch
+  type: Function
+  action: added
+- id: planning-concurrency-option
+  type: Command-line flag
+  action: added
+- id: parallel-planning-service-regression-test
+  type: Regression test
+  action: added
+entity_relationships:
+- id: parallel-planning-test-verifies-batch-service
+  type: verifies
+  source: parallel-planning-service-regression-test
+  target: bounded-planning-question-batch
+  action: added
+  description: A barrier-backed provider fixture verifies that independent questions
+    overlap and that checkpoint events remain ordered.
+invariants:
+- id: planning-question-frontiers-share-one-accepted-snapshot
+  description: Every question in a frontier is derived from the same accepted-answer
+    snapshot and retains its input digest when resumed.
+  action: added
+- id: planning-checkpoint-appends-remain-serialized
+  description: Concurrent provider calls never append hash-linked planning checkpoints
+    concurrently; accepted results are committed by one coordinator in frontier order.
+  action: added
+- id: planning-pagination-and-structrr-projection-order
+  description: Pagination within a question stream and Structrr projected baselines
+    across plan items remain sequential.
+  action: altered
+guidance: []

@@ -1,8 +1,9 @@
-"""GitHub-backed planning journal, resume reducer, and local diagnostics cache."""
+"""Local planning journal, legacy GitHub resume reducer, and diagnostics cache."""
 
 from __future__ import annotations
 
 import base64
+import fcntl
 import hashlib
 import json
 import os
@@ -713,6 +714,169 @@ class GitHubCommentCheckpointStore:
         self.client.add_comment(self.issue, body)
 
 
+class LocalCheckpointStore:
+    """Durable, hash-linked planning journal stored in the repository checkout."""
+
+    def __init__(self, repo_root: str | Path, *, session_id: str) -> None:
+        _validate_session_id(session_id)
+        self.session_id = session_id
+        self.directory = (
+            Path(repo_root).resolve() / ".powdrr" / "planning" / "checkpoints"
+        )
+        self.path = self.directory / f"{session_id}.json"
+        self.lock_path = self.directory / f"{session_id}.lock"
+
+    def load(self, *, selected_checkpoint_digest: str | None = None) -> JournalState:
+        if not self.path.exists():
+            return _reduce_events(
+                (),
+                selected_checkpoint_digest=selected_checkpoint_digest,
+                incomplete_manifest_digests=(),
+            )
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise PlanningJournalError(
+                "local planning journal is unreadable"
+            ) from error
+        if (
+            not isinstance(raw, Mapping)
+            or raw.get("schema") != "planning-checkpoint-journal-v1"
+            or raw.get("session_id") != self.session_id
+            or not isinstance(raw.get("events"), list)
+        ):
+            raise PlanningJournalError("local planning journal is malformed")
+        legacy_comments = raw.get("legacy_comments", [])
+        if not isinstance(legacy_comments, list):
+            raise PlanningJournalError(
+                "local planning journal legacy data is malformed"
+            )
+        if legacy_comments:
+            return reduce_checkpoint_comments(
+                legacy_comments,
+                session_id=self.session_id,
+                selected_checkpoint_digest=selected_checkpoint_digest,
+            )
+        events: list[PlanningCheckpoint] = []
+        for event_data in raw["events"]:
+            if not isinstance(event_data, Mapping):
+                raise PlanningJournalError("local planning journal event is malformed")
+            event = PlanningCheckpoint.from_data(event_data)
+            if event.session_id != self.session_id:
+                raise PlanningJournalError("local planning journal has a foreign event")
+            events.append(event)
+        return _reduce_events(
+            tuple(events),
+            selected_checkpoint_digest=selected_checkpoint_digest,
+            incomplete_manifest_digests=(),
+        )
+
+    def import_legacy_comments(
+        self, comments: Sequence[Mapping[str, Any]]
+    ) -> JournalState:
+        """Cache an older GitHub journal locally after one migration read."""
+        self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.directory, 0o700)
+        if not self.path.exists():
+            self._write_raw(
+                {
+                    "schema": "planning-checkpoint-journal-v1",
+                    "session_id": self.session_id,
+                    "events": [],
+                    "legacy_comments": list(comments),
+                }
+            )
+        return self.load()
+
+    def append(
+        self,
+        checkpoint: PlanningCheckpoint,
+        *,
+        expected_parent_digest: str | None,
+        selected_checkpoint_digest: str | None = None,
+    ) -> JournalState:
+        if checkpoint.session_id != self.session_id:
+            raise PlanningJournalError("checkpoint belongs to another planning session")
+        self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.directory, 0o700)
+        lock_descriptor = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+        try:
+            os.fchmod(lock_descriptor, 0o600)
+            fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
+            current = self.load(selected_checkpoint_digest=selected_checkpoint_digest)
+            if (
+                current.status == "conflicted"
+                or current.head is None
+                and current.events
+            ):
+                raise JournalForkError(
+                    "planning journal is conflicted; select a checkpoint to resume"
+                )
+            current_digest = None if current.head is None else current.head.digest
+            if current_digest != expected_parent_digest:
+                raise StaleCheckpointParent(
+                    "checkpoint parent is stale: expected "
+                    f"{expected_parent_digest!r}, current head is {current_digest!r}"
+                )
+            if checkpoint.parent_digest != current_digest:
+                raise StaleCheckpointParent(
+                    "new checkpoint does not extend the current head"
+                )
+            expected_sequence = 1 if current.head is None else current.head.sequence + 1
+            if checkpoint.sequence != expected_sequence:
+                raise StaleCheckpointParent(
+                    "new checkpoint sequence does not follow its parent"
+                )
+            events = (*current.events, checkpoint)
+            self._write(events)
+            updated = self.load(
+                selected_checkpoint_digest=(
+                    checkpoint.digest
+                    if selected_checkpoint_digest is not None
+                    else None
+                )
+            )
+            if updated.head is None or updated.head.digest != checkpoint.digest:
+                raise JournalForkError(
+                    "local checkpoint append did not produce a unique canonical head"
+                )
+            return updated
+        finally:
+            fcntl.flock(lock_descriptor, fcntl.LOCK_UN)
+            os.close(lock_descriptor)
+
+    def _write(self, events: Sequence[PlanningCheckpoint]) -> None:
+        self._write_raw(
+            {
+                "schema": "planning-checkpoint-journal-v1",
+                "session_id": self.session_id,
+                "events": [event.to_data() for event in events],
+            }
+        )
+
+    def _write_raw(self, record: Mapping[str, Any]) -> None:
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{self.session_id}-", suffix=".tmp", dir=self.directory
+        )
+        temporary_path = Path(temporary_name)
+        try:
+            os.fchmod(descriptor, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                json.dump(
+                    record,
+                    stream,
+                    ensure_ascii=False,
+                    indent=2,
+                    sort_keys=True,
+                )
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary_path, self.path)
+        finally:
+            temporary_path.unlink(missing_ok=True)
+
+
 class InMemoryCheckpointStore:
     """Append-only fake with the same parent and reducer semantics as GitHub."""
 
@@ -956,6 +1120,7 @@ __all__ = [
     "JournalForkError",
     "JournalState",
     "LocalDiagnosticCache",
+    "LocalCheckpointStore",
     "PlanningCheckpoint",
     "PlanningJournalError",
     "QuestionDiagnostic",

@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import json
 import re
+import sys
 import uuid
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from io import StringIO
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -69,6 +72,8 @@ class PlanningTransition:
     question_id: str | None = None
     accepted_answer: Mapping[str, Any] | None = None
     error: str | None = None
+    question_ids: tuple[str, ...] = ()
+    accepted_answers: tuple[Mapping[str, Any], ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -80,6 +85,8 @@ class PlanningTransition:
                 None if self.accepted_answer is None else dict(self.accepted_answer)
             ),
             "error": self.error,
+            "question_ids": list(self.question_ids),
+            "accepted_answers": [dict(answer) for answer in self.accepted_answers],
         }
 
 
@@ -98,6 +105,11 @@ class PlanningOptions:
     model: str
     max_transport_retries: int = 5
     transport_backoff_seconds: float = 1.0
+    max_concurrent_questions: int = 4
+
+    def __post_init__(self) -> None:
+        if self.max_concurrent_questions < 1:
+            raise ValueError("max_concurrent_questions must be positive")
 
 
 def create_planning_session(
@@ -245,13 +257,22 @@ def advance_planning_session(
             if isinstance(question_id, str):
                 accepted[question_id] = dict(answer)
 
-    request = state_machine.next_question(accepted)
-    if request is None:
+    ready_questions = getattr(state_machine, "ready_questions", None)
+    if callable(ready_questions):
+        requests = tuple(ready_questions(accepted))
+    else:
+        request = state_machine.next_question(accepted)
+        requests = () if request is None else (request,)
+    if not requests:
         return PlanningTransition("complete", session.session_id, session.issue.number)
-    request.validate()
-    question = request.question
-    if question.question_id in accepted:
-        # The state machine must not ask a stable question again with changed inputs.
+    question_ids = [request.question.question_id for request in requests]
+    if len(question_ids) != len(set(question_ids)):
+        raise PlanningServiceError("planning frontier contains duplicate question IDs")
+    for request in requests:
+        request.validate()
+        question = request.question
+        if question.question_id not in accepted:
+            continue
         existing = next(
             event
             for event in reversed(journal.events)
@@ -268,55 +289,122 @@ def advance_planning_session(
             f"{question.question_id!r}"
         )
 
+    outcomes = _run_question_batch(
+        requests,
+        client=client,
+        options=options,
+        stderr=stderr,
+    )
     parent = journal.head.digest if journal.head is not None else None
     sequence = 1 if journal.head is None else journal.head.sequence + 1
-    result = run_question(
-        client,
-        request,
-        model=options.model,
-        stderr=stderr,
-        max_transport_retries=options.max_transport_retries,
-        transport_backoff_seconds=options.transport_backoff_seconds,
-    )
-    if isinstance(result, NeedsQuestionAnswer):
-        checkpoint = PlanningCheckpoint.needs_answer(
-            session_id=session.session_id,
-            event_id=f"needs-answer-{sequence:06d}",
-            sequence=sequence,
-            parent_digest=parent,
-            question=result.question,
-            error=result.error,
-            previous_answer=result.previous_answer,
-            id_counters=journal.id_counters,
-        )
-        checkpoint_store.append(checkpoint, expected_parent_digest=parent)
-        return PlanningTransition(
-            "needs_answer",
-            session.session_id,
-            session.issue.number,
-            result.question_id,
-            error=str(result.error),
-        )
+    accepted_results: list[AcceptedQuestionAnswer[Any]] = []
+    needs_answers: list[NeedsQuestionAnswer] = []
+    errors: list[Exception] = []
+    for _request, result, error in outcomes:
+        if error is not None:
+            errors.append(error)
+        elif isinstance(result, AcceptedQuestionAnswer):
+            accepted_results.append(result)
+        elif isinstance(result, NeedsQuestionAnswer):
+            needs_answers.append(result)
 
-    assert isinstance(result, AcceptedQuestionAnswer)
-    checkpoint = PlanningCheckpoint.answer_accepted(
-        session_id=session.session_id,
-        event_id=f"answer-accepted-{sequence:06d}",
-        sequence=sequence,
-        parent_digest=parent,
-        question=result.question,
-        accepted_answer=result.raw_answer,
-        validation_result={"accepted": True, "attempts": result.attempts},
-        id_counters=journal.id_counters,
+    def append_checkpoint(checkpoint: PlanningCheckpoint) -> None:
+        nonlocal parent, sequence
+        state = checkpoint_store.append(checkpoint, expected_parent_digest=parent)
+        parent = state.head.digest if state.head is not None else None
+        sequence = 1 if state.head is None else state.head.sequence + 1
+
+    # Results are committed in frontier order through one writer. The providers
+    # run concurrently, but checkpoint heads never race.
+    for result in accepted_results:
+        append_checkpoint(
+            PlanningCheckpoint.answer_accepted(
+                session_id=session.session_id,
+                event_id=f"answer-accepted-{sequence:06d}",
+                sequence=sequence,
+                parent_digest=parent,
+                question=result.question,
+                accepted_answer=result.raw_answer,
+                validation_result={"accepted": True, "attempts": result.attempts},
+                id_counters=journal.id_counters,
+            )
+        )
+    if needs_answers:
+        result = needs_answers[0]
+        append_checkpoint(
+            PlanningCheckpoint.needs_answer(
+                session_id=session.session_id,
+                event_id=f"needs-answer-{sequence:06d}",
+                sequence=sequence,
+                parent_digest=parent,
+                question=result.question,
+                error=result.error,
+                previous_answer=result.previous_answer,
+                id_counters=journal.id_counters,
+            )
+        )
+    if errors:
+        raise errors[0]
+
+    accepted_ids = tuple(result.question_id for result in accepted_results)
+    selected_needs_answer = needs_answers[0] if needs_answers else None
+    selected_question_id = (
+        selected_needs_answer.question_id
+        if selected_needs_answer is not None
+        else (accepted_ids[0] if accepted_ids else None)
     )
-    checkpoint_store.append(checkpoint, expected_parent_digest=parent)
     return PlanningTransition(
-        "question_accepted",
+        "needs_answer" if selected_needs_answer is not None else "question_accepted",
         session.session_id,
         session.issue.number,
-        result.question_id,
-        result.raw_answer,
+        selected_question_id,
+        (None if not accepted_results else accepted_results[0].raw_answer),
+        None if selected_needs_answer is None else str(selected_needs_answer.error),
+        question_ids=tuple(question_ids),
+        accepted_answers=tuple(result.raw_answer for result in accepted_results),
     )
+
+
+def _run_question_batch(
+    requests: tuple[QuestionRequest[Any], ...],
+    *,
+    client: WorkflowLLMClient,
+    options: PlanningOptions,
+    stderr: Any,
+) -> tuple[tuple[QuestionRequest[Any], Any, Exception | None], ...]:
+    """Execute ready questions concurrently while keeping progress output ordered."""
+
+    def run_one(
+        request: QuestionRequest[Any],
+    ) -> tuple[QuestionRequest[Any], Any, Exception | None, str]:
+        output = StringIO()
+        try:
+            result = run_question(
+                client,
+                request,
+                model=options.model,
+                stderr=output,
+                max_transport_retries=options.max_transport_retries,
+                transport_backoff_seconds=options.transport_backoff_seconds,
+            )
+            return request, result, None, output.getvalue()
+        except Exception as error:
+            return request, None, error, output.getvalue()
+
+    with ThreadPoolExecutor(
+        max_workers=min(options.max_concurrent_questions, len(requests))
+    ) as executor:
+        futures = [executor.submit(run_one, request) for request in requests]
+        completed = [future.result() for future in futures]
+
+    output_stream = stderr if stderr is not None else sys.stdout
+    for _request, _result, _error, output in completed:
+        if output:
+            output_stream.write(output)
+    flush = getattr(output_stream, "flush", None)
+    if callable(flush):
+        flush()
+    return tuple((request, result, error) for request, result, error, _ in completed)
 
 
 def planning_operation_executor(

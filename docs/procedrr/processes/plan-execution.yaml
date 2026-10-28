@@ -1,8 +1,8 @@
 version: 1
 name: plan-execution
 description: >-
-  Advance one durable bounded-planning question at a time, then return control to
-  the planning service when every question in the current state machine is
+  Advance bounded-planning questions in dependency-aware batches, then return
+  control to the planning service when every question in the state machine is
   accepted. The tracker issue is not an executable queue item.
 inputs:
   - {name: session_id, type: string, required: true}
@@ -23,6 +23,8 @@ steps:
           issue_number: {type: integer, minimum: 1}
           question_id: {type: [string, "null"]}
           accepted_answer: {type: [object, "null"]}
+          question_ids: {type: array, items: {type: string}}
+          accepted_answers: {type: array, items: {type: object}}
           error: {type: [string, "null"]}
       bind: transition
   - repeat:
@@ -46,6 +48,8 @@ steps:
                 issue_number: {type: integer, minimum: 1}
                 question_id: {type: [string, "null"]}
                 accepted_answer: {type: [object, "null"]}
+                question_ids: {type: array, items: {type: string}}
+                accepted_answers: {type: array, items: {type: object}}
                 error: {type: [string, "null"]}
             bind: transition
         - branch:

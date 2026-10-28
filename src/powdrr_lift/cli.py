@@ -240,7 +240,7 @@ from powdrr_lift.workrr.human_task import (
 from powdrr_lift.workrr.local_model import download_local_qwen_model
 from powdrr_lift.workrr.plan_sizing import PATH_RUNTIME_SUFFIXES
 from powdrr_lift.workrr.planning.assembly import PathFact
-from powdrr_lift.workrr.planning.checkpoints import GitHubCommentCheckpointStore
+from powdrr_lift.workrr.planning.checkpoints import LocalCheckpointStore
 from powdrr_lift.workrr.planning.compiler import PlanningCompilationError
 from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
 from powdrr_lift.workrr.planning.evidence import search_requirements_evidence
@@ -389,6 +389,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
     )
     plan_parser.add_argument("--planning-model")
+    plan_parser.add_argument(
+        "--planning-concurrency",
+        type=int,
+        default=4,
+        help="Maximum ready planning questions to ask concurrently (default: 4).",
+    )
     plan_parser.add_argument("--planning-api-key")
     plan_parser.add_argument("--planning-base-url")
     plan_parser.add_argument("--json", action="store_true")
@@ -405,6 +411,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
     )
     plan_resume_parser.add_argument("--planning-model")
+    plan_resume_parser.add_argument(
+        "--planning-concurrency",
+        type=int,
+        default=4,
+        help="Maximum ready planning questions to ask concurrently (default: 4).",
+    )
     plan_resume_parser.add_argument("--planning-api-key")
     plan_resume_parser.add_argument("--planning-base-url")
     plan_resume_parser.add_argument("--json", action="store_true")
@@ -2820,9 +2832,11 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
             taxonomy_entity_types=taxonomy.entity_types,
         )
         assert github is not None
-        store = GitHubCommentCheckpointStore(
-            github, session.issue, session_id=session.session_id
-        )
+        store = LocalCheckpointStore(repo_root, session_id=session.session_id)
+        if resume and not store.path.exists():
+            # Read older sessions' issue-comment journal once during migration.
+            # All subsequent planning checkpoints stay in the local journal.
+            store.import_legacy_comments(github.list_comments(session.issue.number))
         process_directory = (
             Path(__file__).resolve().parents[2] / "docs" / "procedrr" / "processes"
         )
@@ -2832,7 +2846,14 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
             state_machine=machine,
             checkpoint_store=store,
             client=planning_client,
-            options=PlanningOptions(model=planning_mapping.model),
+            options=PlanningOptions(
+                model=planning_mapping.model,
+                max_concurrent_questions=(
+                    1
+                    if planning_mapping.provider == "local"
+                    else args.planning_concurrency
+                ),
+            ),
             stderr=sys.stderr,
         )
         if result.terminal_status.value != "succeeded":
@@ -2869,20 +2890,33 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
             generated_files=generated_files,
             source_plan_path=source_relative,
         )
-        github.add_comment(
-            session.issue,
-            "Planning completed and the review PR is open: "
-            f"{pull_request.pull_request_url}",
-        )
-    except (
-        FileExistsError,
-        GitHubIssueQueueError,
-        OSError,
-        PlanGenerationError,
-        PlanningServiceError,
-        PowdrrExecutionError,
-        ValueError,
-    ) as error:
+        try:
+            github.add_comment(
+                session.issue,
+                "Planning completed and the review PR is open: "
+                f"{pull_request.pull_request_url}",
+            )
+        except GitHubIssueQueueError as update_error:
+            print(
+                f"Could not write the completed planning status to GitHub: "
+                f"{update_error}",
+                file=sys.stderr,
+            )
+    except Exception as error:
+        if session is not None and github is not None:
+            try:
+                github.add_comment(
+                    session.issue,
+                    "Planning stopped after a terminal error. "
+                    f"Resume with `powdrr plan-resume --session-issue "
+                    f"{session.issue.number}`. Error: {error}",
+                )
+            except GitHubIssueQueueError as update_error:
+                print(
+                    f"Could not write the terminal planning status to GitHub: "
+                    f"{update_error}",
+                    file=sys.stderr,
+                )
         print(f"Could not create execution plan: {error}", file=sys.stderr)
         return 2
 

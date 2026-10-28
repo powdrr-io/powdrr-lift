@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import tempfile
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
@@ -715,13 +716,33 @@ class GitHubCommentCheckpointStore:
 
 
 class LocalCheckpointStore:
-    """Durable, hash-linked planning journal stored in the repository checkout."""
+    """Durable, hash-linked planning journal stored in Git metadata."""
 
     def __init__(self, repo_root: str | Path, *, session_id: str) -> None:
         _validate_session_id(session_id)
         self.session_id = session_id
+        root = Path(repo_root).resolve()
+        try:
+            result = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "rev-parse",
+                    "--path-format=absolute",
+                    "--git-common-dir",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as error:
+            raise PlanningJournalError(
+                "could not locate Git metadata for the local planning journal"
+            ) from error
+        common_git_directory = Path(result.stdout.strip()).resolve()
         self.directory = (
-            Path(repo_root).resolve() / ".powdrr" / "planning" / "checkpoints"
+            common_git_directory / "powdrr-lift" / "planning" / "checkpoints"
         )
         self.path = self.directory / f"{session_id}.json"
         self.lock_path = self.directory / f"{session_id}.lock"

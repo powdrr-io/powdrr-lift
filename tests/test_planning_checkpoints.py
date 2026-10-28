@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import stat
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -82,6 +83,11 @@ def _issue() -> QueueIssue:
     )
 
 
+def _initialize_git_repository(path: Path) -> Path:
+    subprocess.run(["git", "-C", str(path), "init", "--quiet"], check=True)
+    return path
+
+
 def test_question_start_survives_crash_before_answer_and_resume_reuses_identity() -> (
     None
 ):
@@ -111,6 +117,7 @@ def test_question_start_survives_crash_before_answer_and_resume_reuses_identity(
 def test_local_checkpoint_store_recovers_events_with_private_atomic_journal(
     tmp_path: Path,
 ) -> None:
+    _initialize_git_repository(tmp_path)
     store = LocalCheckpointStore(tmp_path, session_id="planning-session-1")
     checkpoint = _checkpoint(
         event_id="event-start-1",
@@ -131,6 +138,7 @@ def test_local_checkpoint_store_recovers_events_with_private_atomic_journal(
 
 
 def test_local_checkpoint_store_rejects_stale_parent(tmp_path: Path) -> None:
+    _initialize_git_repository(tmp_path)
     store = LocalCheckpointStore(tmp_path, session_id="planning-session-1")
     checkpoint = _checkpoint(
         event_id="event-start-1",
@@ -146,6 +154,7 @@ def test_local_checkpoint_store_rejects_stale_parent(tmp_path: Path) -> None:
 
 
 def test_local_checkpoint_store_imports_legacy_issue_comments(tmp_path: Path) -> None:
+    _initialize_git_repository(tmp_path)
     api = _FakeIssueComments()
     legacy_store = GitHubCommentCheckpointStore(
         api, _issue(), session_id="planning-session-1"
@@ -166,9 +175,54 @@ def test_local_checkpoint_store_imports_legacy_issue_comments(tmp_path: Path) ->
     assert local_store.load().pending_question == _question()
 
 
+def test_local_checkpoint_journal_does_not_dirty_pinned_checkout(
+    tmp_path: Path,
+) -> None:
+    repository = _initialize_git_repository(tmp_path)
+    store = LocalCheckpointStore(repository, session_id="planning-session-1")
+
+    store.import_legacy_comments([])
+
+    status = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--untracked-files=all",
+        ],
+        check=True,
+        capture_output=True,
+    ).stdout
+    assert status == b""
+    assert store.directory == (
+        Path(
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repository),
+                    "rev-parse",
+                    "--path-format=absolute",
+                    "--git-common-dir",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+        )
+        / "powdrr-lift"
+        / "planning"
+        / "checkpoints"
+    )
+
+
 def test_accepted_answer_and_id_counters_resume_without_a_local_cache(
     tmp_path: Path,
 ) -> None:
+    _initialize_git_repository(tmp_path)
     api = _FakeIssueComments()
     store = GitHubCommentCheckpointStore(api, _issue(), session_id="planning-session-1")
     question = _question()

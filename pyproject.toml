@@ -8,6 +8,10 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "powdrr-agent",
+    "powdrr-contracts",
+    "powdrr-local",
+    "powdrr-service",
     "PyYAML>=6.0.2",
     "huggingface-hub>=0.26.0",
     "mcp>=1.0.0",
@@ -50,11 +54,27 @@ build-backend = "uv_build"
 [tool.uv.build-backend]
 module-name = ["powdrr_lift", "procedrr", "procedrr_evaluator"]
 
+[tool.uv.workspace]
+members = ["packages/agent", "packages/contracts", "packages/local", "packages/service"]
+
+[tool.uv.sources]
+powdrr-agent = { workspace = true }
+powdrr-contracts = { workspace = true }
+powdrr-local = { workspace = true }
+powdrr-service = { workspace = true }
+
 [tool.uv.build-backend.data]
 purelib = "docs/procedrr/processes"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = [
+    "src",
+    "packages/agent/src",
+    "packages/contracts/src",
+    "packages/local/src",
+    "packages/service/src",
+]
 markers = [
     "real_coding_loop: opt-in live-LLM coding-loop integration test",
     "live_provider: opt-in live provider smoke test",

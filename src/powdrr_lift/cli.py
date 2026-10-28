@@ -5286,6 +5286,32 @@ def _run_artifact_state(args: argparse.Namespace) -> int:
     ]
     if args.pull_requests:
         requested_areas.append("pull_requests")
+    if requested_areas == ["workflows"]:
+        from powdrr_agent.artifact_state import collect_workflow_snapshot
+        from powdrr_local import JsonServiceBridge, LocalPowdrrService
+
+        try:
+            request = collect_workflow_snapshot(
+                repo_root,
+                branch=args.branch,
+                sha=args.sha,
+                repository_id=args.repository or "",
+                request_id=str(uuid.uuid4()),
+            )
+            update = JsonServiceBridge(LocalPowdrrService()).start(request)
+        except (OSError, ValueError) as error:
+            print(f"Could not build artifact state: {error}", file=sys.stderr)
+            return 1
+        if update.status != "succeeded" or not update.output_artifacts:
+            message = (
+                update.failure.message
+                if update.failure
+                else "service returned no projection"
+            )
+            print(f"Could not build artifact state: {message}", file=sys.stderr)
+            return 1
+        print(update.output_artifacts[0].data.decode("utf-8"))
+        return 0
     try:
         report = build_artifact_state(
             repo_root,

@@ -1,0 +1,16 @@
+[project]
+name = "powdrr-service"
+version = "0.1.0"
+description = "Powdrr-owned service-side operation policies and reconstruction."
+requires-python = ">=3.12"
+dependencies = ["powdrr-contracts"]
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "powdrr_service"
+
+[tool.uv.sources]
+powdrr-contracts = { workspace = true }

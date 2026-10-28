@@ -1,0 +1,18 @@
+[project]
+name = "powdrr-local"
+version = "0.1.0"
+description = "Local composition and JSON bridge for Powdrr agent and service."
+requires-python = ">=3.12"
+dependencies = ["powdrr-agent", "powdrr-contracts", "powdrr-service"]
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "powdrr_local"
+
+[tool.uv.sources]
+powdrr-agent = { workspace = true }
+powdrr-contracts = { workspace = true }
+powdrr-service = { workspace = true }

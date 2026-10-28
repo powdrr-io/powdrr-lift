@@ -119,12 +119,20 @@ class SourceLedgerQuestionMachine:
     def _next_source_question(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> QuestionRequest[Any] | None:
+        requests = self._next_source_questions(accepted_answers)
+        return requests[0] if requests else None
+
+    def _next_source_questions(
+        self, accepted_answers: Mapping[str, Mapping[str, Any]]
+    ) -> tuple[QuestionRequest[Any], ...]:
         raw_records: list[dict[str, Any]] = []
         anchor_by_id = {anchor.id: anchor for anchor in self.source.anchors}
+        pending_extractions: list[QuestionRequest[Any]] = []
 
         for block in self.source.blocks:
             after_anchor: str | None = None
             page_records: list[dict[str, Any]] = []
+            block_incomplete = False
             while True:
                 extract_request = build_extract_requirements_request(
                     block,
@@ -135,13 +143,19 @@ class SourceLedgerQuestionMachine:
                 )
                 answer = accepted_answers.get(extract_request.question.question_id)
                 if answer is None:
-                    return extract_request
+                    pending_extractions.append(extract_request)
+                    block_incomplete = True
+                    break
                 page = extract_request.parse_answer(answer)
                 page_records.extend(dict(record) for record in page.records)
                 if not page.has_more:
                     break
                 after_anchor = page.next_anchor
-            raw_records.extend(page_records)
+            if not block_incomplete:
+                raw_records.extend(page_records)
+
+        if pending_extractions:
+            return tuple(pending_extractions)
 
         requirements, drafts = allocate_requirements(
             raw_records,
@@ -170,6 +184,7 @@ class SourceLedgerQuestionMachine:
             for item in requirements
         )
 
+        pending_source_questions: list[QuestionRequest[Any]] = []
         for block in self.source.blocks:
             direct_ids = tuple(
                 dict.fromkeys(
@@ -190,10 +205,11 @@ class SourceLedgerQuestionMachine:
                 block, requirement_ids=known_ids
             )
             if disposition_request.question.question_id not in accepted_answers:
-                return disposition_request
-            disposition_request.parse_answer(
-                accepted_answers[disposition_request.question.question_id]
-            )
+                pending_source_questions.append(disposition_request)
+            else:
+                disposition_request.parse_answer(
+                    accepted_answers[disposition_request.question.question_id]
+                )
 
         for requirement in requirements:
             fidelity_request = build_fidelity_request(
@@ -201,21 +217,28 @@ class SourceLedgerQuestionMachine:
             )
             answer = accepted_answers.get(fidelity_request.question.question_id)
             if answer is None:
-                return fidelity_request
-            decision = fidelity_request.parse_answer(answer)
-            if decision.statement is not None:
-                requirement = replace(requirement, statement=decision.statement)
+                pending_source_questions.append(fidelity_request)
+            else:
+                fidelity_request.parse_answer(answer)
 
-        return None
+        return tuple(pending_source_questions)
 
     def next_question(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> QuestionRequest[Any] | None:
-        source_request = self._next_source_question(accepted_answers)
-        if source_request is not None:
-            return source_request
+        requests = self.ready_questions(accepted_answers)
+        return requests[0] if requests else None
+
+    def ready_questions(
+        self, accepted_answers: Mapping[str, Mapping[str, Any]]
+    ) -> tuple[QuestionRequest[Any], ...]:
+        """Return all independent questions ready from this accepted snapshot."""
+        source_requests = self._next_source_questions(accepted_answers)
+        if source_requests:
+            return source_requests
         ledger = self._parse_source_ledger(accepted_answers)
         self._search_requirements_evidence(ledger.requirements)
+        coverage_requests: list[QuestionRequest[Any]] = []
         for requirement in ledger.requirements:
             search = self._evidence_search_cache.get(requirement.id)
             evidence = self.evidence_by_requirement.get(
@@ -229,25 +252,34 @@ class SourceLedgerQuestionMachine:
                 repository_search=(None if search is None else search.to_data()),
             )
             if coverage_request.question.question_id not in accepted_answers:
-                return coverage_request
+                coverage_requests.append(coverage_request)
+        if coverage_requests:
+            return tuple(coverage_requests)
 
-        for request in self._work_unit_requests(accepted_answers):
-            if request is not None:
-                return request
+        work_unit_requests = tuple(
+            request
+            for request in self._work_unit_requests(accepted_answers)
+            if request is not None
+        )
+        if work_unit_requests:
+            return work_unit_requests
 
+        downstream_requests: list[QuestionRequest[Any]] = []
         for request in self._item_description_requests(accepted_answers):
             if request.question.question_id not in accepted_answers:
-                return request
+                downstream_requests.append(request)
 
         for request in self._dependency_requests(accepted_answers):
             if request.question.question_id not in accepted_answers:
-                return request
+                downstream_requests.append(request)
+        if downstream_requests:
+            return tuple(downstream_requests)
 
-        for request in self._structrr_requests(accepted_answers):
-            if request.question.question_id not in accepted_answers:
-                return request
-
-        return None
+        return tuple(
+            request
+            for request in self._structrr_requests(accepted_answers)
+            if request.question.question_id not in accepted_answers
+        )
 
     def _search_requirements_evidence(
         self, requirements: Sequence[Requirement]
@@ -673,6 +705,7 @@ class SourceLedgerQuestionMachine:
                 if not page.has_more:
                     break
                 page_ordinal += 1
+            pending_changes: list[QuestionRequest[Any]] = []
             for subject in prior_subjects:
                 change_request = build_structural_change_request(
                     subject,
@@ -694,13 +727,16 @@ class SourceLedgerQuestionMachine:
                     },
                 )
                 if change_request.question.question_id not in accepted_answers:
-                    return (change_request,)
+                    pending_changes.append(change_request)
+                    continue
                 change = change_request.parse_answer(
                     accepted_answers[change_request.question.question_id]
                 )
                 operation = bind_structural_operation(change)
                 if operation is not None:
                     prior_operations.append(operation)
+            if pending_changes:
+                return tuple(pending_changes)
         return ()
 
     def _accepted_structural_subjects(

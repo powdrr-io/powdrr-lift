@@ -388,6 +388,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
     )
     plan_parser.add_argument("--planning-model")
+    plan_parser.add_argument(
+        "--planning-concurrency",
+        type=int,
+        default=4,
+        help="Maximum ready planning questions to ask concurrently (default: 4).",
+    )
     plan_parser.add_argument("--planning-api-key")
     plan_parser.add_argument("--planning-base-url")
     plan_parser.add_argument("--json", action="store_true")
@@ -404,6 +410,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
     )
     plan_resume_parser.add_argument("--planning-model")
+    plan_resume_parser.add_argument(
+        "--planning-concurrency",
+        type=int,
+        default=4,
+        help="Maximum ready planning questions to ask concurrently (default: 4).",
+    )
     plan_resume_parser.add_argument("--planning-api-key")
     plan_resume_parser.add_argument("--planning-base-url")
     plan_resume_parser.add_argument("--json", action="store_true")
@@ -2847,7 +2859,14 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
             state_machine=machine,
             checkpoint_store=store,
             client=planning_client,
-            options=PlanningOptions(model=planning_mapping.model),
+            options=PlanningOptions(
+                model=planning_mapping.model,
+                max_concurrent_questions=(
+                    1
+                    if planning_mapping.provider == "local"
+                    else args.planning_concurrency
+                ),
+            ),
             stderr=sys.stderr,
         )
         if result.terminal_status.value != "succeeded":

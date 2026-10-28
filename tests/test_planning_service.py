@@ -4,6 +4,7 @@ import hashlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
+from threading import Barrier, Lock
 from typing import Any
 
 from powdrr_lift.workrr.github_issue_queue import QueueIssue
@@ -182,9 +183,11 @@ class _IssueClient:
         return self.issue
 
 
-def _request() -> QuestionRequest[EnumerationAnswer]:
+def _request(
+    question_id: str = "extract-requirements-block-01",
+) -> QuestionRequest[EnumerationAnswer]:
     question = Question(
-        question_id="extract-requirements-block-01",
+        question_id=question_id,
         kind="extract_requirements",
         contract_version=1,
         subject_ids=("block-01",),
@@ -260,6 +263,80 @@ def test_accepted_question_is_durable_and_not_called_again() -> None:
     assert [event.event_type for event in store.load().events] == [
         "answer_accepted",
     ]
+
+
+def test_ready_question_frontier_runs_concurrently_and_checkpoints_serially() -> None:
+    session_id = "session-batch"
+    store = InMemoryCheckpointStore(session_id=session_id)
+    session = PlanningSession(
+        session_id=session_id,
+        plan_id="bounded-plan",
+        repository="powdrr-io/example",
+        base_commit="a" * 40,
+        source_path="docs/plan.md",
+        source_blob_sha="b" * 40,
+        verification_command="make test",
+        issue=QueueIssue(
+            43, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
+        ),
+    )
+    requests = (_request("extract-block-01"), _request("extract-block-02"))
+
+    class BatchMachine:
+        def ready_questions(
+            self, accepted: Mapping[str, Mapping[str, Any]]
+        ) -> tuple[QuestionRequest[EnumerationAnswer], ...]:
+            return tuple(
+                request
+                for request in requests
+                if request.question.question_id not in accepted
+            )
+
+        def next_question(
+            self, accepted: Mapping[str, Mapping[str, Any]]
+        ) -> QuestionRequest[EnumerationAnswer] | None:
+            ready = self.ready_questions(accepted)
+            return ready[0] if ready else None
+
+    class ConcurrentClient:
+        def __init__(self) -> None:
+            self.barrier = Barrier(2, timeout=3)
+            self.lock = Lock()
+            self.calls = 0
+
+        def complete_json(
+            self,
+            _messages: list[dict[str, str]],
+            *,
+            response_schema: Mapping[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            del response_schema
+            self.barrier.wait()
+            with self.lock:
+                self.calls += 1
+            return {
+                "records": [{"statement": "An obligation."}],
+                "has_more": False,
+                "next_anchor": None,
+            }
+
+    client = ConcurrentClient()
+    transition = advance_planning_session(
+        session=session,
+        state_machine=BatchMachine(),
+        checkpoint_store=store,
+        client=client,
+        options=PlanningOptions(model="test-model", max_concurrent_questions=2),
+        stderr=None,
+    )
+
+    assert transition.status == "question_accepted"
+    assert transition.question_ids == tuple(
+        request.question.question_id for request in requests
+    )
+    assert len(transition.accepted_answers) == 2
+    assert client.calls == 2
+    assert [event.sequence for event in store.load().events] == [1, 2]
 
 
 def test_session_issue_is_created_as_a_non_queue_tracker_and_resumes_by_number() -> (

@@ -1,0 +1,86 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1171
+title: Keep planning checkpoints outside the pinned checkout
+intent:
+  problem: Importing legacy planning checkpoints into .powdrr made the pinned repository checkout unclean, so repository evidence lookup stopped before parallel planning could continue.
+  goal: Store local planning journals under Git metadata so journal persistence does not modify the pinned checkout.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Import subprocess support for locating Git metadata.
+  rationale: Place planning journals outside the working tree.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 719
+    end_line: 719
+  summary: Describe the local checkpoint store as Git metadata storage.
+  rationale: Document the journal's new location.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 724
+    end_line: 743
+  summary: Resolve the repository's Git common directory and report lookup failures.
+  rationale: Support linked worktrees while keeping checkpoints outside checkout status.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 745
+    end_line: 745
+  summary: Store session checkpoints under Git common metadata.
+  rationale: Prevent local journal files from making pinned repository searches fail.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Import subprocess for temporary Git repository coverage.
+  rationale: Exercise checkpoint storage against Git status.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 86
+    end_line: 90
+  summary: Add a helper to initialize Git repositories in checkpoint tests.
+  rationale: Provide realistic worktree metadata for journal storage tests.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 120
+  summary: Initialize a Git repository for journal recovery coverage.
+  rationale: Verify existing local journal behavior using the new storage location.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 141
+  summary: Initialize a Git repository for stale-parent coverage.
+  rationale: Keep checkpoint tests aligned with the Git-backed store.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 157
+    end_line: 157
+  summary: Initialize a Git repository for legacy-comment import coverage.
+  rationale: Exercise migration with the journal outside the worktree.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 178
+    end_line: 221
+  summary: Verify legacy checkpoint import leaves Git status clean and stores under the common directory.
+  rationale: Prevent journal persistence from breaking pinned repository evidence lookup.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 225
+    end_line: 225
+  summary: Initialize a Git repository for accepted-answer resume coverage.
+  rationale: Exercise local and legacy checkpoint behavior with Git metadata.

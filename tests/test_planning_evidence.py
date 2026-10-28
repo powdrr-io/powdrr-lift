@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.planning.contracts import PlanningContractError
 from powdrr_lift.workrr.planning.evidence import (
     Evidence,
@@ -17,6 +18,7 @@ from powdrr_lift.workrr.planning.evidence import (
     lookup_symbols_in_pinned_file,
     read_pinned_code_file,
     record_file_evidence,
+    search_requirement_evidence,
 )
 from powdrr_lift.workrr.planning.questions import (
     MAX_QUESTION_INPUT_CHARS,
@@ -121,6 +123,189 @@ def test_pinned_file_evidence_reads_exact_commit_and_rejects_invented_paths(
         read_pinned_code_file(
             repository, _git(repository, "rev-parse", "HEAD"), "src/link.py"
         )
+
+
+def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository, commit = _repository(tmp_path)
+    requirement, source = _requirement(commit)
+    requirement = Requirement(
+        requirement.id,
+        "Parse payload payload values with the existing parser.",
+        requirement.kind,
+        requirement.source_refs,
+        requirement.source_group_ids,
+        requirement.related_requirement_ids,
+    )
+
+    def find_symbols(
+        queries: list[str], *, worktree_root: Path, limit: int = 50
+    ) -> dict[str, list[dict[str, Any]]]:
+        assert worktree_root == repository.resolve()
+        assert limit == 20
+        assert "payload" in queries
+        return {
+            "payload": [
+                {
+                    "name": "parse_payload",
+                    "path": "src/schema.py",
+                    "range": {"start_line": 1, "end_line": 2},
+                },
+                {
+                    "name": "test_parse_payload",
+                    "path": "tests/test_schema.py",
+                    "range": {"start_line": 3, "end_line": 4},
+                },
+            ]
+        }
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.planning.evidence.find_workspace_symbols", find_symbols
+    )
+
+    search = search_requirement_evidence(
+        repository,
+        commit,
+        requirement,
+        first_ordinal=17,
+    )
+    request = build_requirement_coverage_request(
+        requirement,
+        source=source,
+        evidence=search.evidence,
+        repository_root=repository,
+        repository_search=search.to_data(),
+    )
+
+    assert search.terms
+    assert search.matching_line_count >= 2
+    assert search.basedpyright_query_count == 1
+    assert search.basedpyright_match_count == 2
+    assert search.basedpyright_available
+    assert search.rg_match_count > 0
+    assert {item.kind for item in search.evidence} == {"implementation", "test"}
+    assert {item.id for item in search.evidence} == {
+        f"evidence-{ordinal:04d}" for ordinal in range(17, 17 + len(search.evidence))
+    }
+    assert request.question.context_ref_ids[-1] == "repository-search"
+    assert any(
+        "parse_payload" in record.value["source_excerpt"]
+        for record in request.repository_evidence
+    )
+    assert request.accepted_facts[-1].value["matching_path_count"] == 2
+    assert any(item.symbol == "parse_payload" for item in search.evidence)
+    implementation = next(
+        item for item in search.evidence if item.kind == "implementation"
+    )
+    test = next(item for item in search.evidence if item.kind == "test")
+    assert (
+        request.parse_answer(
+            {
+                "status": "complete",
+                "evidence_ids": [implementation.id, test.id],
+                "reason": (
+                    "The pinned parser implementation and its test trim whitespace."
+                ),
+            }
+        ).status
+        == "complete"
+    )
+
+
+def test_requirement_search_with_no_matches_allows_missing_coverage(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository, commit = _repository(tmp_path)
+    requirement, source = _requirement(commit)
+    requirement = Requirement(
+        requirement.id,
+        "Implement an orbital telemetry compressor.",
+        requirement.kind,
+        requirement.source_refs,
+        requirement.source_group_ids,
+        requirement.related_requirement_ids,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.planning.evidence.find_workspace_symbols",
+        lambda queries, **kwargs: {},
+    )
+
+    search = search_requirement_evidence(
+        repository,
+        commit,
+        requirement,
+        first_ordinal=1,
+    )
+    request = build_requirement_coverage_request(
+        requirement,
+        source=source,
+        evidence=search.evidence,
+        repository_root=repository,
+        repository_search=search.to_data(),
+    )
+
+    assert search.evidence == ()
+    assert search.matching_line_count == 0
+    assert (
+        request.parse_answer(
+            {
+                "status": "missing",
+                "evidence_ids": [],
+                "reason": (
+                    "The bounded search found no implementation; this work remains."
+                ),
+            }
+        ).status
+        == "missing"
+    )
+
+
+def test_requirement_search_uses_rg_for_non_python_when_basedpyright_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository, _ = _repository(tmp_path)
+    (repository / "src/telemetry.swift").write_text(
+        'func encode_telemetry_payload() { print("telemetry") }\n',
+        encoding="utf-8",
+    )
+    _git(repository, "add", "src/telemetry.swift")
+    _git(repository, "commit", "-qm", "add telemetry encoder")
+    commit = _git(repository, "rev-parse", "HEAD")
+    requirement, _ = _requirement(commit)
+    requirement = Requirement(
+        requirement.id,
+        "Encode telemetry payload safely.",
+        requirement.kind,
+        requirement.source_refs,
+        requirement.source_group_ids,
+        requirement.related_requirement_ids,
+    )
+
+    def fail_basedpyright(*args: Any, **kwargs: Any) -> dict[str, list[dict[str, Any]]]:
+        del args, kwargs
+        raise PowdrrExecutionError("basedpyright is unavailable")
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.planning.evidence.find_workspace_symbols",
+        fail_basedpyright,
+    )
+
+    search = search_requirement_evidence(
+        repository,
+        commit,
+        requirement,
+        first_ordinal=1,
+    )
+
+    assert search.basedpyright_query_count == 1
+    assert search.basedpyright_match_count == 0
+    assert search.rg_match_count > 0
+    assert not search.basedpyright_available
+    assert any(item.path == "src/telemetry.swift" for item in search.evidence)
 
 
 def test_symbol_lookup_reads_file_before_search_and_never_searches_a_path(

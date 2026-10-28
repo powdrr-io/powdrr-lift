@@ -10,6 +10,7 @@ from powdrr_lift.workrr.github_issue_queue import QueueIssue
 from powdrr_lift.workrr.planning.checkpoints import InMemoryCheckpointStore
 from powdrr_lift.workrr.planning.contracts import EnumerationAnswer, Question
 from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
+from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
 from powdrr_lift.workrr.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
@@ -346,8 +347,20 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
         text=text,
     )
     source = segment_markdown_source(source_document)
+    searched_requirements: list[str] = []
+
+    def search_evidence(requirements: Any) -> dict[str, RequirementEvidenceSearch]:
+        searched_requirements.extend(item.id for item in requirements)
+        return {
+            item.id: RequirementEvidenceSearch(
+                (), ("behavior",), 0, 0, source_document.commit_sha
+            )
+            for item in requirements
+        }
+
     machine = SourceLedgerQuestionMachine(
         source,
+        evidence_search=search_evidence,
         plan_id="bounded-plan",
         structrr_baseline={
             "entities": [],
@@ -385,6 +398,8 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
             else:
                 answer = {"disposition": "context", "reason": "Background information."}
         elif question.kind == "assess_requirement_coverage":
+            assert request.accepted_facts[-1].ref_id == "repository-search"
+            assert request.accepted_facts[-1].value["terms"] == ["behavior"]
             answer = {
                 "status": "missing",
                 "evidence_ids": [],
@@ -489,6 +504,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     assert set(compiled.destinations) == set(compiled.files)
     assert compiled.ready_item_ids == ("item-0001",)
     assert machine.next_question(answers) is None
+    assert searched_requirements == ["req-0001"]
 
 
 def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(

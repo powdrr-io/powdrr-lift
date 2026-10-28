@@ -26,6 +26,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Install ripgrep
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ripgrep
+
       - name: Install uv
         uses: astral-sh/setup-uv@v3
         with:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -40,6 +40,7 @@ from powdrr_lift.workrr.planning.dependencies import (
 from powdrr_lift.workrr.planning.evidence import (
     Evidence,
     RequirementCoverage,
+    RequirementEvidenceSearch,
     build_requirement_coverage_request,
     create_requirement_coverage,
 )
@@ -89,6 +90,10 @@ class SourceLedgerQuestionMachine:
         *,
         repository_root: str | Path | None = None,
         evidence_by_requirement: Mapping[str, tuple[Evidence, ...]] | None = None,
+        evidence_search: Callable[
+            [Sequence[Requirement]], Mapping[str, RequirementEvidenceSearch]
+        ]
+        | None = None,
         verification_command: str = "make test",
         repository_paths: Mapping[str, PathFact] | None = None,
         plan_id: str = "planning-session",
@@ -101,6 +106,8 @@ class SourceLedgerQuestionMachine:
             repository_root or source.document.repository
         ).resolve()
         self.evidence_by_requirement = dict(evidence_by_requirement or {})
+        self.evidence_search = evidence_search
+        self._evidence_search_cache: dict[str, RequirementEvidenceSearch] = {}
         self.verification_command = verification_command
         self.repository_paths = dict(repository_paths or {})
         self.plan_id = plan_id
@@ -208,13 +215,18 @@ class SourceLedgerQuestionMachine:
         if source_request is not None:
             return source_request
         ledger = self._parse_source_ledger(accepted_answers)
+        self._search_requirements_evidence(ledger.requirements)
         for requirement in ledger.requirements:
-            evidence = self.evidence_by_requirement.get(requirement.id, ())
+            search = self._evidence_search_cache.get(requirement.id)
+            evidence = self.evidence_by_requirement.get(
+                requirement.id, () if search is None else search.evidence
+            )
             coverage_request = build_requirement_coverage_request(
                 requirement,
                 source=self.source,
                 evidence=evidence,
                 repository_root=self.repository_root,
+                repository_search=(None if search is None else search.to_data()),
             )
             if coverage_request.question.question_id not in accepted_answers:
                 return coverage_request
@@ -236,6 +248,27 @@ class SourceLedgerQuestionMachine:
                 return request
 
         return None
+
+    def _search_requirements_evidence(
+        self, requirements: Sequence[Requirement]
+    ) -> None:
+        if self.evidence_search is None:
+            return
+        missing = tuple(
+            item for item in requirements if item.id not in self._evidence_search_cache
+        )
+        if not missing:
+            return
+        results = self.evidence_search(missing)
+        missing_ids = {item.id for item in missing}
+        if set(results) != missing_ids:
+            raise ValueError("repository evidence search omitted or added requirements")
+        for requirement_id, result in results.items():
+            if result.base_commit != self.source.document.commit_sha:
+                raise ValueError(
+                    "repository evidence search used the wrong base commit"
+                )
+            self._evidence_search_cache[requirement_id] = result
 
     def _work_unit_requests(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -1083,13 +1116,18 @@ class SourceLedgerQuestionMachine:
         """Parse and bind the per-requirement coverage answers."""
         ledger = self.accepted_ledger(accepted_answers)
         coverage: list[RequirementCoverage] = []
+        self._search_requirements_evidence(ledger.requirements)
         for requirement in ledger.requirements:
-            evidence = self.evidence_by_requirement.get(requirement.id, ())
+            search = self._evidence_search_cache.get(requirement.id)
+            evidence = self.evidence_by_requirement.get(
+                requirement.id, () if search is None else search.evidence
+            )
             request = build_requirement_coverage_request(
                 requirement,
                 source=self.source,
                 evidence=evidence,
                 repository_root=self.repository_root,
+                repository_search=(None if search is None else search.to_data()),
             )
             answer = request.parse_answer(
                 accepted_answers[request.question.question_id]

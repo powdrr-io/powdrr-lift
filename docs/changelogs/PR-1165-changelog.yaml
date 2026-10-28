@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1165
+title: Keep planning bootstrap artifacts outside the checkout
+intent:
+  problem: Planning writes its Structrr bootstrap files into the pinned repository before repository evidence search, making the checkout appear dirty.
+  goal: Keep the Structrr baseline available to planning while ensuring generated bootstrap artifacts cannot invalidate pinned basedpyright and rg searches.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Import temporary-directory support for the planning bootstrap.
+  rationale: Keep generated files outside the repository checkout.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2779
+    end_line: 2780
+  summary: Build the Structrr baseline through a temporary bootstrap helper.
+  rationale: Preserve clean-checkout validation for repository evidence lookup.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2784
+    end_line: 2796
+  summary: Pass the in-memory Structrr baseline to the planning question machine.
+  rationale: The temporary bootstrap files are not needed after validation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2819
+    end_line: 2819
+  summary: Pass the in-memory Structrr baseline to the planning question machine.
+  rationale: Retain the validated baseline after temporary files are removed.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2923
+    end_line: 2942
+  summary: Validate the Structrr bootstrap and return its document before temporary files are removed.
+  rationale: Keep the generated baseline available without dirtying the pinned checkout.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Import the planning bootstrap helper for regression coverage.
+  rationale: Exercise the temporary bootstrap behavior directly.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 116
+  summary: Verify planning bootstrap files stay outside and are removed from the checkout.
+  rationale: Prevent generated artifacts from breaking pinned repository searches.

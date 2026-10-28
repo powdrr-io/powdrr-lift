@@ -1,0 +1,3415 @@
+{
+  "baseline_commit": "ff81b5cdce926f615ad647dafffcd837ac02bcfd",
+  "entries": [
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/address-review-comments.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/adversarial-pr-review.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/amend-plan-and-open-pr.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/bootstrap-code-structure.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/create-pull-request.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/dead-code-review.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/design-interview.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/durable-task.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/execute-proposed-pr-workflow.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/execute-proposed-pr.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/feature-functionality-review.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/feature-test-coverage-review.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/finish-implementation-pr.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/finish-pr-prep.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/fix-ci-failures.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/fix-merge-conflicts.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/fully-review-pr.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/generate-fragment.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/handle-ad-hoc.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/implement-feature.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/independent-skill-workflow-review.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/plan-execution.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/plan-repair-execution.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/resolve-external-contracts.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/review-architecture.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/review-skill-workflow.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/review-system.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/run-tests-and-fix.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/security-review.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/select-process.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/software_development_entity_taxonomy.md",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/spec-v1-design-review.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/specify-a-feature.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/specify-architecture.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/specify-implementation.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/specify-system.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "docs/procedrr/processes/start-implementing-feature.yaml",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "scripts/build-agent-service-ownership-inventory.py",
+      "rationale": "local development, repository, or verification harness",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "agent",
+      "path": "scripts/create-worktree.sh",
+      "rationale": "local development, repository, or verification harness",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "scripts/live-implement-feature-smoke.py",
+      "rationale": "local development, repository, or verification harness",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "agent",
+      "path": "scripts/run-deterministic-workflow-suite.sh",
+      "rationale": "local development, repository, or verification harness",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_lift.core.pr_specification"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "scripts/start-implementing-feature-harness.py",
+      "rationale": "local development, repository, or verification harness",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "scripts/workflow-chat-error-harness.py",
+      "rationale": "local development, repository, or verification harness",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_lift.process.tasks",
+        "powdrr_lift.process.templates",
+        "powdrr_lift.workrr.git"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "scripts/workflow-task-error-harness.py",
+      "rationale": "local development, repository, or verification harness",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_parser",
+        "powdrr_lift.change_log_template",
+        "powdrr_lift.change_log_validation",
+        "powdrr_lift.core.architecture_specification",
+        "powdrr_lift.core.blame_view",
+        "powdrr_lift.core.code_index",
+        "powdrr_lift.core.codebase_state",
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.edit_context",
+        "powdrr_lift.core.entity_context",
+        "powdrr_lift.core.feature_planning_specification",
+        "powdrr_lift.core.implementation_specification",
+        "powdrr_lift.core.index",
+        "powdrr_lift.core.plan_diff_specification",
+        "powdrr_lift.core.pr_specification",
+        "powdrr_lift.core.system_specification"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/__init__.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/6",
+      "internal_imports": [
+        "powdrr_lift.agent_runtime",
+        "powdrr_lift.core.entity_taxonomy",
+        "powdrr_lift.errors",
+        "powdrr_lift.structrr.bootstrap",
+        "powdrr_lift.structrr.source_manifest",
+        "powdrr_lift.workrr.run_artifacts"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/agent_bootstrap.py",
+      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.agent_bootstrap",
+        "powdrr_lift.agent_runtime",
+        "powdrr_lift.errors",
+        "powdrr_lift.workrr.feature_endpoint",
+        "powdrr_lift.workrr.run_artifacts"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/agent_feature.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/6",
+      "internal_imports": [
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/agent_runtime.py",
+      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_parser",
+        "powdrr_lift.core.index",
+        "powdrr_lift.workrr.github_issue_queue"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/artifact_state.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/6",
+      "internal_imports": [
+        "powdrr_lift.builtin_tool_help",
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/basedpyright_tools.py",
+      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/8",
+      "internal_imports": [
+        "powdrr_lift.core.blame_view",
+        "powdrr_lift.core.code_index",
+        "powdrr_lift.core.pr_analysis"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/blame_ui.py",
+      "rationale": "agent entry point and UI composed by the local application",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/builtin_tool_help.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_parser.parse_change_log"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/change_log_parser/__init__.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/change_log_parser/parse_change_log.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.code_index",
+        "powdrr_lift.core.template_generation"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/change_log_template.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_parser",
+        "powdrr_lift.change_log_template",
+        "powdrr_lift.core.architecture_specification",
+        "powdrr_lift.core.entity_taxonomy",
+        "powdrr_lift.core.implementation_specification",
+        "powdrr_lift.core.index",
+        "powdrr_lift.core.pr_specification",
+        "powdrr_lift.core.spec_paths",
+        "powdrr_lift.core.system_specification",
+        "powdrr_lift.core.validation_messages"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/change_log_validation.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/clean_pr_publisher.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/8",
+      "internal_imports": [
+        "powdrr_lift.agent_bootstrap",
+        "powdrr_lift.agent_feature",
+        "powdrr_lift.artifact_state",
+        "powdrr_lift.blame_ui",
+        "powdrr_lift.core",
+        "powdrr_lift.core.capability_exception",
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.effective_contract",
+        "powdrr_lift.core.entity_taxonomy",
+        "powdrr_lift.core.execution_plan",
+        "powdrr_lift.core.pr_specification",
+        "powdrr_lift.core.project_structure",
+        "powdrr_lift.core.specification_deduplication",
+        "powdrr_lift.core.specification_v1",
+        "powdrr_lift.core.workflow_relationships",
+        "powdrr_lift.errors",
+        "powdrr_lift.execution.acceptance",
+        "powdrr_lift.execution.builtin_tools",
+        "powdrr_lift.execution.capabilities",
+        "powdrr_lift.execution.checkpoints",
+        "powdrr_lift.execution.compaction",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.openai_proxy",
+        "powdrr_lift.process.tasks",
+        "powdrr_lift.process.templates",
+        "powdrr_lift.pull_request_description",
+        "powdrr_lift.repository_state",
+        "powdrr_lift.structrr.bootstrap",
+        "powdrr_lift.structrr.intent",
+        "powdrr_lift.structrr.intent_lineage",
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.structrr.verification_health",
+        "powdrr_lift.workrr.chat_config",
+        "powdrr_lift.workrr.chat_tui",
+        "powdrr_lift.workrr.coding_agent",
+        "powdrr_lift.workrr.coding_agent_validation",
+        "powdrr_lift.workrr.credential_check",
+        "powdrr_lift.workrr.deepswe_design_evaluation",
+        "powdrr_lift.workrr.deepswe_probe_evaluation",
+        "powdrr_lift.workrr.differential_verification",
+        "powdrr_lift.workrr.feature_endpoint",
+        "powdrr_lift.workrr.feature_run",
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.github_issue_plan_generation",
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.human_task",
+        "powdrr_lift.workrr.local_model",
+        "powdrr_lift.workrr.plan_sizing",
+        "powdrr_lift.workrr.planning.assembly",
+        "powdrr_lift.workrr.planning.checkpoints",
+        "powdrr_lift.workrr.planning.compiler",
+        "powdrr_lift.workrr.planning.driver",
+        "powdrr_lift.workrr.planning.evidence",
+        "powdrr_lift.workrr.planning.repair_service",
+        "powdrr_lift.workrr.planning.service",
+        "powdrr_lift.workrr.planning.source",
+        "powdrr_lift.workrr.procedrr_chat",
+        "powdrr_lift.workrr.prompt_benchmark_comparison",
+        "powdrr_lift.workrr.provider_config",
+        "powdrr_lift.workrr.provider_runtime",
+        "powdrr_lift.workrr.providers",
+        "powdrr_lift.workrr.repository_subject_binding",
+        "powdrr_lift.workrr.run_artifacts",
+        "powdrr_lift.workrr.scenario",
+        "powdrr_lift.workrr.task_agent",
+        "powdrr_lift.workrr.workflow_provider_selection",
+        "procedrr",
+        "procedrr.catalog"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/cli.py",
+      "rationale": "agent entry point and UI composed by the local application",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.contracts.agent"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/contracts/__init__.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/contracts/agent.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.action_relationship",
+        "powdrr_lift.core.architecture_specification",
+        "powdrr_lift.core.behavior_rule",
+        "powdrr_lift.core.blame_view",
+        "powdrr_lift.core.capability_exception",
+        "powdrr_lift.core.code_index",
+        "powdrr_lift.core.codebase_state",
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.edit_context",
+        "powdrr_lift.core.effective_contract",
+        "powdrr_lift.core.entity_context",
+        "powdrr_lift.core.execution_plan",
+        "powdrr_lift.core.execution_state",
+        "powdrr_lift.core.feature_planning_specification",
+        "powdrr_lift.core.implementation_specification",
+        "powdrr_lift.core.index",
+        "powdrr_lift.core.intent_packet",
+        "powdrr_lift.core.plan_diff_specification",
+        "powdrr_lift.core.pr_analysis",
+        "powdrr_lift.core.pr_specification",
+        "powdrr_lift.core.schemas",
+        "powdrr_lift.core.system_specification",
+        "powdrr_lift.core.template",
+        "powdrr_lift.core.tool_manifest",
+        "powdrr_lift.core.validate",
+        "powdrr_lift.core.verification_contract",
+        "powdrr_lift.structrr.intent"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/__init__.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/action_relationship.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.repo",
+        "powdrr_lift.core.spec_paths",
+        "powdrr_lift.core.specification_actions",
+        "powdrr_lift.core.specification_v1",
+        "powdrr_lift.core.template_generation",
+        "powdrr_lift.core.validation_messages"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/architecture_specification.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.semantic_decision"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/behavior_contract.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/behavior_rule.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.code_index",
+        "powdrr_lift.core.index",
+        "powdrr_lift.core.pr_analysis",
+        "powdrr_lift.core.repo",
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/blame_view.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.tool_manifest"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/capability_exception.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/classifier_input.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_parser",
+        "powdrr_lift.change_log_template",
+        "powdrr_lift.core.index",
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/code_index.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_template",
+        "powdrr_lift.core.code_index",
+        "powdrr_lift.core.index",
+        "powdrr_lift.core.spec_paths",
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/codebase_state.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/contract_closure.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/decision_obligation.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.validation_messages"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/delivery_profile.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.code_index",
+        "powdrr_lift.core.index",
+        "powdrr_lift.core.repo",
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/edit_context.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.structrr.intent"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/effective_contract.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.code_index",
+        "powdrr_lift.core.index",
+        "powdrr_lift.core.repo",
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/entity_context.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/entity_taxonomy.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/execution_plan.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.delivery_profile"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/execution_state.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.instruction_ledger",
+        "powdrr_lift.core.semantic_contract"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/feature_obligation.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_template",
+        "powdrr_lift.core.codebase_state",
+        "powdrr_lift.core.spec_paths",
+        "powdrr_lift.core.template_generation"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/feature_planning_specification.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.behavior_contract",
+        "powdrr_lift.core.contract_closure",
+        "powdrr_lift.structrr.obligation_evidence"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/implementation_packet.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.repo",
+        "powdrr_lift.core.spec_paths",
+        "powdrr_lift.core.specification_actions",
+        "powdrr_lift.core.specification_v1",
+        "powdrr_lift.core.template_generation",
+        "powdrr_lift.core.validation_messages"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/implementation_specification.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_parser",
+        "powdrr_lift.change_log_template",
+        "powdrr_lift.core.spec_paths"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/index.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/instruction_context.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/instruction_ledger.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/intent_packet.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/obligation_review.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_parser",
+        "powdrr_lift.core.repo",
+        "powdrr_lift.core.spec_paths",
+        "powdrr_lift.core.template_generation"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/plan_diff_specification.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_template"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/pr_analysis.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.codebase_state",
+        "powdrr_lift.core.repo",
+        "powdrr_lift.core.spec_paths",
+        "powdrr_lift.core.specification_v1",
+        "powdrr_lift.core.template_generation",
+        "powdrr_lift.core.validation_messages",
+        "powdrr_lift.core.verification_contract"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/pr_specification.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.repo",
+        "powdrr_lift.core.specification_v1",
+        "powdrr_lift.core.validation_messages"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/project_structure.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/python_tool_commands.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/repo.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/repository_inventory.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_parser"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/schemas.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.semantic_decision"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/semantic_contract.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/semantic_decision.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.semantic_contract",
+        "powdrr_lift.core.semantic_decision"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/semantic_faithfulness.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.repo",
+        "powdrr_lift.core.spec_paths"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/spec_context.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/spec_paths.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/specification_actions.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/specification_deduplication.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.specification_actions",
+        "powdrr_lift.core.validation_messages"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/specification_v1.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.repo",
+        "powdrr_lift.core.spec_paths",
+        "powdrr_lift.core.template_generation",
+        "powdrr_lift.core.validation_messages"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/system_specification.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_template"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/template.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/template_generation.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/tool_manifest.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.change_log_validation"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/validate.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.spec_context"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/validation_messages.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/verification_contract.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.core.spec_context"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/core/workflow_relationships.py",
+      "rationale": "classify each symbol as service policy or public exchanged data",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/errors.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.effective_contract",
+        "powdrr_lift.execution.builtin_tools",
+        "powdrr_lift.execution.capabilities",
+        "powdrr_lift.execution.checkpoints",
+        "powdrr_lift.execution.compaction",
+        "powdrr_lift.execution.compile",
+        "powdrr_lift.execution.evidence",
+        "powdrr_lift.execution.guidance",
+        "powdrr_lift.execution.kernel",
+        "powdrr_lift.execution.personas",
+        "powdrr_lift.execution.phases",
+        "powdrr_lift.execution.relationships",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.execution.shadow",
+        "powdrr_lift.execution.store",
+        "powdrr_lift.execution.tools"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/__init__.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.cli",
+        "powdrr_lift.core.architecture_specification",
+        "powdrr_lift.core.capability_exception",
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.execution_plan",
+        "powdrr_lift.core.execution_state",
+        "powdrr_lift.core.implementation_specification",
+        "powdrr_lift.core.pr_specification",
+        "powdrr_lift.core.system_specification",
+        "powdrr_lift.core.tool_manifest",
+        "powdrr_lift.errors",
+        "powdrr_lift.execution",
+        "powdrr_lift.execution.builtin_tools",
+        "powdrr_lift.execution.capabilities",
+        "powdrr_lift.execution.compile",
+        "powdrr_lift.execution.evidence",
+        "powdrr_lift.execution.personas",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.execution.tools",
+        "powdrr_lift.mcp_server",
+        "powdrr_lift.workrr.execution",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.observer",
+        "powdrr_lift.workrr.procedrr_chat",
+        "powdrr_lift.workrr.scenario",
+        "procedrr"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/acceptance.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.basedpyright_tools",
+        "powdrr_lift.core.tool_manifest",
+        "powdrr_lift.errors",
+        "powdrr_lift.execution.capabilities",
+        "powdrr_lift.execution.tools",
+        "powdrr_lift.fuzzy_match",
+        "powdrr_lift.intrinsic_edit",
+        "powdrr_lift.intrinsic_enrich",
+        "powdrr_lift.intrinsic_git_gh"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/builtin_tools.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.capability_exception",
+        "powdrr_lift.core.tool_manifest",
+        "powdrr_lift.errors",
+        "powdrr_lift.execution.tools"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/capabilities.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/checkpoints.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/compaction.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.execution_plan",
+        "powdrr_lift.errors",
+        "powdrr_lift.process.task_step",
+        "powdrr_lift.process.tasks"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/compile.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.execution_state"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/evidence.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.behavior_rule"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/guidance.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.action_relationship",
+        "powdrr_lift.core.execution_state",
+        "powdrr_lift.execution.relationships"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/kernel.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.behavior_rule",
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.execution_state",
+        "powdrr_lift.core.tool_manifest"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/personas.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.execution_state"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/phases.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.action_relationship",
+        "powdrr_lift.core.execution_state"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/relationships.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.behavior_rule",
+        "powdrr_lift.core.capability_exception",
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.effective_contract",
+        "powdrr_lift.core.execution_plan",
+        "powdrr_lift.core.execution_state",
+        "powdrr_lift.errors",
+        "powdrr_lift.execution.builtin_tools",
+        "powdrr_lift.execution.capabilities",
+        "powdrr_lift.execution.checkpoints",
+        "powdrr_lift.execution.compaction",
+        "powdrr_lift.execution.compile",
+        "powdrr_lift.execution.evidence",
+        "powdrr_lift.execution.guidance",
+        "powdrr_lift.execution.kernel",
+        "powdrr_lift.execution.personas",
+        "powdrr_lift.execution.phases",
+        "powdrr_lift.execution.store",
+        "powdrr_lift.execution.tools",
+        "powdrr_lift.process.tasks",
+        "powdrr_lift.structrr.intent"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/runtime.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.execution_state",
+        "powdrr_lift.execution.store"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/shadow.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.execution_state",
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/store.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/7",
+      "internal_imports": [
+        "powdrr_lift.core.tool_manifest"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/execution/tools.py",
+      "rationale": "agent local effects versus service process decisions",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/6",
+      "internal_imports": [
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/file_management.py",
+      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/fuzzy_match.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/integrations/__init__.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/integrations/harbor/__init__.py",
+      "rationale": "benchmark harness and local repository adapter",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/integrations/harbor/_env.py",
+      "rationale": "benchmark harness and local repository adapter",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [
+        "powdrr_lift.integrations.harbor._env"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/integrations/harbor/powdrr_agent.py",
+      "rationale": "benchmark harness and local repository adapter",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/6",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/intrinsic_edit.py",
+      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.test_failure_packet",
+        "powdrr_lift.workrr.llm"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/intrinsic_enrich.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/6",
+      "internal_imports": [
+        "powdrr_lift.builtin_tool_help",
+        "powdrr_lift.clean_pr_publisher",
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/intrinsic_git_gh.py",
+      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/8",
+      "internal_imports": [
+        "powdrr_lift.core",
+        "powdrr_lift.core.capability_exception",
+        "powdrr_lift.errors",
+        "powdrr_lift.execution.capabilities",
+        "powdrr_lift.execution.checkpoints",
+        "powdrr_lift.execution.runtime"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/mcp_server.py",
+      "rationale": "agent entry point and UI composed by the local application",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/6",
+      "internal_imports": [
+        "powdrr_lift.opencode_monitor"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/minisweagent_monitor.py",
+      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/6",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/minisweagent_session.py",
+      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_lift.core.repo"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/openai_proxy.py",
+      "rationale": "provider integration; diagnostic proxy is development-only",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/6",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/opencode_monitor.py",
+      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/pr_workflow_record.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/process/__init__.py",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_lift.basedpyright_tools"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/process/task_step.py",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.validation_messages",
+        "powdrr_lift.process.task_step"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/process/tasks.py",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.validation_messages",
+        "powdrr_lift.process.task_step",
+        "powdrr_lift.process.tasks",
+        "procedrr"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/process/templates.py",
+      "rationale": "private process-language implementation and resources",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/pull_request_description.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/repository_state.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/resources/__init__.py",
+      "rationale": "Powdrr-owned taxonomy and semantic policy resource",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "src/powdrr_lift/resources/software_development_entity_taxonomy.md",
+      "rationale": "Powdrr-owned taxonomy and semantic policy resource",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.structrr.active_intent",
+        "powdrr_lift.structrr.actual_diff",
+        "powdrr_lift.structrr.bootstrap",
+        "powdrr_lift.structrr.candidate_comparison",
+        "powdrr_lift.structrr.intent_lineage",
+        "powdrr_lift.structrr.invariant_review",
+        "powdrr_lift.structrr.obligation_evidence",
+        "powdrr_lift.structrr.proposal",
+        "powdrr_lift.structrr.proposal_review",
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.structrr.source_manifest",
+        "powdrr_lift.structrr.validation_models",
+        "powdrr_lift.structrr.verification_obligations"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/__init__.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/active_intent.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.structrr.source_manifest"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/actual_diff.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.change_log_parser",
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.core.entity_taxonomy",
+        "powdrr_lift.core.spec_paths",
+        "powdrr_lift.structrr.active_intent",
+        "powdrr_lift.structrr.python_topology",
+        "powdrr_lift.structrr.source_manifest",
+        "powdrr_lift.structrr.validation",
+        "powdrr_lift.structrr.validation_models"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/bootstrap.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.structrr.actual_diff",
+        "powdrr_lift.structrr.proposal",
+        "powdrr_lift.structrr.rebase"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/candidate_comparison.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.structrr.proposal",
+        "powdrr_lift.structrr.verification_obligations"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/gate_compiler.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.core.behavior_rule"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/intent.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.structrr.proposal",
+        "powdrr_lift.structrr.rebase"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/intent_lineage.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.structrr.actual_diff",
+        "powdrr_lift.structrr.candidate_comparison",
+        "powdrr_lift.structrr.obligation_evidence",
+        "powdrr_lift.structrr.proposal"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/invariant_review.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/obligation_evidence.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.structrr.rebase"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/proposal.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.structrr.gate_compiler",
+        "powdrr_lift.structrr.proposal"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/proposal_review.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/python_topology.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/rebase.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.core.spec_paths"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/source_manifest.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.structrr.python_topology",
+        "powdrr_lift.structrr.validation_models",
+        "powdrr_lift.structrr.validation_tasks"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/validation.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/validation_models.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/validation_tasks.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/verification_health.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.core.verification_contract",
+        "powdrr_lift.structrr.proposal"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/structrr/verification_obligations.py",
+      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3/8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/test_failure_packet.py",
+      "rationale": "classify public transport types versus private policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.actions",
+        "powdrr_lift.workrr.coding_agent",
+        "powdrr_lift.workrr.coding_agent_validation",
+        "powdrr_lift.workrr.context",
+        "powdrr_lift.workrr.exchanges",
+        "powdrr_lift.workrr.feature_endpoint",
+        "powdrr_lift.workrr.loop",
+        "powdrr_lift.workrr.progress",
+        "powdrr_lift.workrr.protocol",
+        "powdrr_lift.workrr.provider_config",
+        "powdrr_lift.workrr.repair",
+        "powdrr_lift.workrr.runner",
+        "powdrr_lift.workrr.verification_provider"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/__init__.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.execution.builtin_tools",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.intrinsic_git_gh",
+        "powdrr_lift.pr_workflow_record",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.operation_validation",
+        "powdrr_lift.workrr.paths"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/action_operations.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/actions.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.core.decision_obligation"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/actualization.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/candidate_checkpoint.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/candidate_safety.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.core",
+        "powdrr_lift.errors",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.paths"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/chat_action_serialization.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.basedpyright_tools",
+        "powdrr_lift.builtin_tool_help",
+        "powdrr_lift.core.spec_context",
+        "powdrr_lift.errors",
+        "powdrr_lift.execution.builtin_tools",
+        "powdrr_lift.file_management",
+        "powdrr_lift.fuzzy_match",
+        "powdrr_lift.intrinsic_edit",
+        "powdrr_lift.intrinsic_enrich",
+        "powdrr_lift.intrinsic_git_gh",
+        "powdrr_lift.workrr.action_operations",
+        "powdrr_lift.workrr.chat_action_serialization",
+        "powdrr_lift.workrr.chat_config",
+        "powdrr_lift.workrr.chat_io",
+        "powdrr_lift.workrr.execution_loop",
+        "powdrr_lift.workrr.execution_state",
+        "powdrr_lift.workrr.feature_context",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.operation_validation",
+        "powdrr_lift.workrr.paths"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/chat_actions.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.provider_config"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/chat_config.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.core",
+        "powdrr_lift.errors",
+        "powdrr_lift.execution.builtin_tools",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.intrinsic_git_gh",
+        "powdrr_lift.workrr.chat_io",
+        "powdrr_lift.workrr.context",
+        "powdrr_lift.workrr.paths"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/chat_context.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/chat_io.py",
+      "rationale": "agent user interaction; service interview policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5",
+      "internal_imports": [
+        "powdrr_lift.workrr.chat_config",
+        "powdrr_lift.workrr.execution_state",
+        "powdrr_lift.workrr.procedrr_chat"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/chat_tui.py",
+      "rationale": "agent user interaction; service interview policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_lift.core.behavior_contract",
+        "powdrr_lift.core.execution_plan",
+        "powdrr_lift.core.implementation_packet",
+        "powdrr_lift.core.intent_packet",
+        "powdrr_lift.minisweagent_monitor",
+        "powdrr_lift.opencode_monitor",
+        "powdrr_lift.workrr.coding_agent_validation"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/workrr/coding_agent.py",
+      "rationale": "local MiniSWE process, session, and execution monitoring",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.coding_agent"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/coding_agent_validation.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.core.behavior_contract",
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.core.feature_obligation",
+        "powdrr_lift.core.instruction_ledger",
+        "powdrr_lift.core.repository_inventory",
+        "powdrr_lift.core.semantic_contract",
+        "powdrr_lift.core.semantic_decision",
+        "powdrr_lift.core.semantic_faithfulness",
+        "powdrr_lift.errors",
+        "powdrr_lift.structrr.obligation_evidence",
+        "powdrr_lift.workrr",
+        "powdrr_lift.workrr.external_contract_research",
+        "powdrr_lift.workrr.repository_subject_binding",
+        "powdrr_lift.workrr.semantic_contract_compiler",
+        "powdrr_lift.workrr.uncertainty_decisions",
+        "procedrr.command_catalog"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/workrr/command_catalog.py",
+      "rationale": "local repository and command capabilities",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/context.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.errors",
+        "powdrr_lift.workrr.jev_classifier",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.provider_config",
+        "powdrr_lift.workrr.providers"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/credential_check.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.llm"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/decision_continuity.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/deepswe_design_evaluation.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/deepswe_probe_evaluation.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/differential_verification.py",
+      "rationale": "service probe/verification policy; agent runs local commands",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/error_logging.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.verification_evidence"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/evidence_reconciliation.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.protocol"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/exchanges.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [
+        "powdrr_lift.workrr.coding_agent_validation",
+        "powdrr_lift.workrr.test_obligations"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/execute_pr_tests.py",
+      "rationale": "service probe/verification policy; agent runs local commands",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.progress"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/execution.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.basedpyright_tools",
+        "powdrr_lift.builtin_tool_help",
+        "powdrr_lift.core.pr_specification",
+        "powdrr_lift.core.python_tool_commands",
+        "powdrr_lift.core.spec_context",
+        "powdrr_lift.errors",
+        "powdrr_lift.execution.builtin_tools",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.intrinsic_edit",
+        "powdrr_lift.intrinsic_enrich",
+        "powdrr_lift.intrinsic_git_gh",
+        "powdrr_lift.workrr.action_operations",
+        "powdrr_lift.workrr.chat_io",
+        "powdrr_lift.workrr.context",
+        "powdrr_lift.workrr.feature_context",
+        "powdrr_lift.workrr.operation_validation"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/execution_loop.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.execution.runtime"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/execution_state.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_lift.core.behavior_contract",
+        "powdrr_lift.workrr.http_retry"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/external_contract_research.py",
+      "rationale": "external search, source interpretation, and API credentials",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.fuzzy_match"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/feature_context.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.change_log_parser",
+        "powdrr_lift.core.behavior_contract",
+        "powdrr_lift.core.contract_closure",
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.core.execution_plan",
+        "powdrr_lift.core.implementation_packet",
+        "powdrr_lift.core.obligation_review",
+        "powdrr_lift.core.spec_context",
+        "powdrr_lift.core.verification_contract",
+        "powdrr_lift.errors",
+        "powdrr_lift.structrr.active_intent",
+        "powdrr_lift.structrr.actual_diff",
+        "powdrr_lift.structrr.bootstrap",
+        "powdrr_lift.structrr.candidate_comparison",
+        "powdrr_lift.structrr.gate_compiler",
+        "powdrr_lift.structrr.obligation_evidence",
+        "powdrr_lift.structrr.proposal",
+        "powdrr_lift.structrr.proposal_review",
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.structrr.source_manifest",
+        "powdrr_lift.structrr.validation",
+        "powdrr_lift.structrr.verification_obligations",
+        "powdrr_lift.workrr.actualization",
+        "powdrr_lift.workrr.candidate_checkpoint",
+        "powdrr_lift.workrr.candidate_safety",
+        "powdrr_lift.workrr.coding_agent",
+        "powdrr_lift.workrr.coding_agent_validation",
+        "powdrr_lift.workrr.command_catalog",
+        "powdrr_lift.workrr.evidence_reconciliation",
+        "powdrr_lift.workrr.external_contract_research",
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.jev_classifier",
+        "powdrr_lift.workrr.postrun_probes",
+        "powdrr_lift.workrr.probe_repair",
+        "powdrr_lift.workrr.procedrr",
+        "powdrr_lift.workrr.procedrr_operations",
+        "powdrr_lift.workrr.protocol",
+        "powdrr_lift.workrr.run_artifacts",
+        "powdrr_lift.workrr.verification_evidence",
+        "powdrr_lift.workrr.verification_provider",
+        "procedrr",
+        "procedrr_evaluator.evaluator",
+        "procedrr_evaluator.runtime"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/feature_endpoint.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/feature_run.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/workrr/git.py",
+      "rationale": "local repository and command capabilities",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4/7",
+      "internal_imports": [
+        "powdrr_lift.basedpyright_tools",
+        "powdrr_lift.errors",
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_lift.workrr.plan_sizing"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/github_issue_plan_generation.py",
+      "rationale": "service planning and GitHub policy; agent local Git effects",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.github_issue_plan_generation",
+        "powdrr_lift.workrr.planning.compiler",
+        "powdrr_lift.workrr.planning.repair"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/github_issue_queue.py",
+      "rationale": "service planning and GitHub policy; agent local Git effects",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/http_retry.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.process.tasks",
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.task_agent"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/human_task.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_lift.workrr.http_retry",
+        "powdrr_lift.workrr.protocol"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/jev_classifier.py",
+      "rationale": "provider access, model routing, and inference policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_lift.errors",
+        "powdrr_lift.execution.kernel",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.workrr.actions",
+        "powdrr_lift.workrr.loop",
+        "powdrr_lift.workrr.progress",
+        "powdrr_lift.workrr.protocol",
+        "powdrr_lift.workrr.repair"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/llm.py",
+      "rationale": "provider access, model routing, and inference policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_lift.errors",
+        "powdrr_lift.workrr.providers"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/local_model.py",
+      "rationale": "provider access, model routing, and inference policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.progress",
+        "powdrr_lift.workrr.protocol"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/loop.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4/7",
+      "internal_imports": [
+        "powdrr_lift.structrr.actual_diff",
+        "powdrr_lift.structrr.candidate_comparison",
+        "powdrr_lift.structrr.proposal",
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.structrr.source_manifest"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/multipr_structrr.py",
+      "rationale": "service planning and GitHub policy; agent local Git effects",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.repository_state",
+        "powdrr_lift.workrr.error_logging",
+        "powdrr_lift.workrr.llm"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/observer.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.core.execution_state",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.workrr.llm"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/operation_validation.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "3",
+      "internal_imports": [
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/workrr/paths.py",
+      "rationale": "local repository and command capabilities",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/plan_sizing.py",
+      "rationale": "service planning and GitHub policy; agent local Git effects",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.planning.driver",
+        "powdrr_lift.workrr.planning.service"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/__init__.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.plan_sizing",
+        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_lift.workrr.planning.evidence",
+        "powdrr_lift.workrr.planning.questions",
+        "powdrr_lift.workrr.planning.source"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/assembly.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.planning.contracts"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/checkpoints.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.github_issue_plan_generation",
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_lift.workrr.planning.evidence"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/compiler.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/contracts.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.planning.assembly",
+        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_lift.workrr.planning.evidence",
+        "powdrr_lift.workrr.planning.questions",
+        "powdrr_lift.workrr.planning.source"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/dependencies.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_lift.workrr.planning.assembly",
+        "powdrr_lift.workrr.planning.compiler",
+        "powdrr_lift.workrr.planning.dependencies",
+        "powdrr_lift.workrr.planning.evidence",
+        "powdrr_lift.workrr.planning.questions",
+        "powdrr_lift.workrr.planning.source",
+        "powdrr_lift.workrr.planning.structrr"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/planning/driver.py",
+      "rationale": "service policy; agent evidence collection",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.basedpyright_tools",
+        "powdrr_lift.errors",
+        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_lift.workrr.planning.questions",
+        "powdrr_lift.workrr.planning.source"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/planning/evidence.py",
+      "rationale": "service policy; agent evidence collection",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.errors",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_lift.workrr.protocol"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/questions.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.github_issue_queue"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/repair.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.github_issue_plan_generation",
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_lift.workrr.planning.repair"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/repair_service.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.planning.checkpoints",
+        "powdrr_lift.workrr.planning.questions",
+        "powdrr_lift.workrr.procedrr",
+        "powdrr_lift.workrr.procedrr_operations",
+        "powdrr_lift.workrr.protocol",
+        "procedrr",
+        "procedrr_evaluator.runtime"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/service.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.core.instruction_ledger",
+        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_lift.workrr.planning.questions"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/planning/source.py",
+      "rationale": "service policy; agent evidence collection",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_lift.workrr.planning.assembly",
+        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_lift.workrr.planning.questions",
+        "powdrr_lift.workrr.planning.source"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/planning/structrr.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [
+        "powdrr_lift.structrr.validation",
+        "powdrr_lift.workrr.test_obligations"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/postrun_probes.py",
+      "rationale": "service probe/verification policy; agent runs local commands",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [
+        "powdrr_lift.core.behavior_contract",
+        "powdrr_lift.core.decision_obligation",
+        "powdrr_lift.core.semantic_contract",
+        "powdrr_lift.core.semantic_faithfulness",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.protocol"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/probe_repair.py",
+      "rationale": "service probe/verification policy; agent runs local commands",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.errors",
+        "powdrr_lift.workrr.protocol",
+        "procedrr.fragments"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/procedrr.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5",
+      "internal_imports": [
+        "powdrr_lift.core",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.workrr.actions",
+        "powdrr_lift.workrr.chat_actions",
+        "powdrr_lift.workrr.chat_config",
+        "powdrr_lift.workrr.chat_context",
+        "powdrr_lift.workrr.chat_io",
+        "powdrr_lift.workrr.execution_state",
+        "powdrr_lift.workrr.jev_classifier",
+        "powdrr_lift.workrr.procedrr",
+        "powdrr_lift.workrr.procedrr_operations",
+        "powdrr_lift.workrr.provider_runtime",
+        "powdrr_lift.workrr.providers",
+        "procedrr",
+        "procedrr_evaluator.runtime"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/procedrr_chat.py",
+      "rationale": "agent user interaction; service interview policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.errors",
+        "procedrr.command_catalog"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/procedrr_operations.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/progress.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.deepswe_design_evaluation"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/prompt_benchmark_comparison.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.contracts"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/protocol.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_lift.errors"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/provider_config.py",
+      "rationale": "provider access, model routing, and inference policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_lift.workrr.exchanges",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.provider_config",
+        "powdrr_lift.workrr.providers"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/provider_runtime.py",
+      "rationale": "provider access, model routing, and inference policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_lift.errors",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.provider_config"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/providers.py",
+      "rationale": "provider access, model routing, and inference policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/repair.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.core.repository_inventory",
+        "powdrr_lift.core.semantic_contract",
+        "powdrr_lift.core.semantic_decision"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/repository_subject_binding.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/run_artifacts.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.contracts",
+        "powdrr_lift.workrr.protocol"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/runner.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.core",
+        "powdrr_lift.process.templates",
+        "powdrr_lift.workrr.task_scenario"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/scenario.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/powdrr_lift/workrr/semantic_classifier.py",
+      "rationale": "provider access, model routing, and inference policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.core.classifier_input",
+        "powdrr_lift.core.semantic_contract",
+        "powdrr_lift.core.semantic_decision",
+        "powdrr_lift.core.semantic_faithfulness",
+        "powdrr_lift.workrr.semantic_classifier"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/semantic_contract_compiler.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/semantic_prompt_cases.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.workrr.semantic_prompt_cases"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/semantic_prompt_variants.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.basedpyright_tools",
+        "powdrr_lift.core",
+        "powdrr_lift.core.delivery_profile",
+        "powdrr_lift.core.execution_plan",
+        "powdrr_lift.core.implementation_packet",
+        "powdrr_lift.core.spec_context",
+        "powdrr_lift.execution.builtin_tools",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.file_management",
+        "powdrr_lift.intrinsic_enrich",
+        "powdrr_lift.intrinsic_git_gh",
+        "powdrr_lift.pr_workflow_record",
+        "powdrr_lift.process.tasks",
+        "powdrr_lift.structrr.bootstrap",
+        "powdrr_lift.structrr.proposal",
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.structrr.source_manifest",
+        "powdrr_lift.workrr.action_operations",
+        "powdrr_lift.workrr.coding_agent",
+        "powdrr_lift.workrr.coding_agent_validation",
+        "powdrr_lift.workrr.decision_continuity",
+        "powdrr_lift.workrr.error_logging",
+        "powdrr_lift.workrr.execute_pr_tests",
+        "powdrr_lift.workrr.execution_loop",
+        "powdrr_lift.workrr.feature_endpoint",
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.github_issue_plan_generation",
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.jev_classifier",
+        "powdrr_lift.workrr.llm",
+        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_lift.workrr.observer",
+        "powdrr_lift.workrr.operation_validation",
+        "powdrr_lift.workrr.paths",
+        "powdrr_lift.workrr.planning.repair_service",
+        "powdrr_lift.workrr.procedrr",
+        "powdrr_lift.workrr.procedrr_chat",
+        "powdrr_lift.workrr.procedrr_operations",
+        "powdrr_lift.workrr.provider_config",
+        "powdrr_lift.workrr.provider_runtime",
+        "powdrr_lift.workrr.providers",
+        "powdrr_lift.workrr.test_obligations",
+        "procedrr",
+        "procedrr.fragments",
+        "procedrr_evaluator"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/task_agent.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.process.tasks",
+        "powdrr_lift.workrr.task_agent"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/task_scenario.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/test_obligations.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/uncertainty_decisions.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [
+        "powdrr_lift.structrr.verification_obligations",
+        "powdrr_lift.workrr.verification_provider"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/verification_evidence.py",
+      "rationale": "service probe/verification policy; agent runs local commands",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [
+        "powdrr_lift.structrr.validation"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/verification_provider.py",
+      "rationale": "service probe/verification policy; agent runs local commands",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "5/7",
+      "internal_imports": [
+        "powdrr_lift.errors",
+        "powdrr_lift.workrr.provider_config",
+        "powdrr_lift.workrr.providers"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/workflow_provider_selection.py",
+      "rationale": "separate service decisions from agent I/O and orchestration",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "procedrr.catalog",
+        "procedrr.command_catalog",
+        "procedrr.compiler",
+        "procedrr.editor",
+        "procedrr.fragments",
+        "procedrr.model",
+        "procedrr.parser"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr/__init__.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "procedrr.parser"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr/catalog.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr/command_catalog.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "procedrr.model"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr/compiler.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr/editor.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "procedrr.editor",
+        "procedrr.parser"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr/fragments.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr/model.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr/parser.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "procedrr_evaluator.evaluator",
+        "procedrr_evaluator.runtime"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr_evaluator/__init__.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_lift.workrr.procedrr",
+        "powdrr_lift.workrr.protocol",
+        "procedrr"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr_evaluator/evaluator.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_lift.workrr.protocol",
+        "procedrr.catalog",
+        "procedrr_evaluator.evaluator"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "src/procedrr_evaluator/runtime.py",
+      "rationale": "private process-language runtime",
+      "reviewed": false
+    }
+  ],
+  "inventory_scope": [
+    "tracked first-party Python source",
+    "tracked Powdrr process resources",
+    "tracked scripts"
+  ],
+  "review_rule": "Every entry is a first-pass classification. Review owner, rationale, and extraction PR before marking reviewed true.",
+  "schema_version": 1
+}

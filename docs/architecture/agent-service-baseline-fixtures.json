@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "baseline_commit": "ff81b5cd",
+  "fixtures": [
+    {
+      "flow": "interactive_design",
+      "tests": [
+        "tests/test_procedrr_chat.py::test_specify_feature_interviews_until_structured_spec_has_no_open_assumptions",
+        "tests/test_procedrr_chat.py::test_chat_entrypoint_executes_a_catalogued_procedrr_process",
+        "tests/test_feature_endpoint.py::test_product_flow_starts_with_shared_design_interview",
+        "tests/test_feature_endpoint.py::test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes"
+      ],
+      "stable_behavior": "Interview prompts retain user-visible features, existing behavior, legacy behavior, related modules, delivery order, and explicit unresolved assumptions; the compiled design/Structrr path agrees across benchmark and PR modes."
+    },
+    {
+      "flow": "autonomous_planning",
+      "tests": [
+        "tests/test_planning_service.py::test_procedrr_runs_real_planning_machine_through_compiled_artifacts",
+        "tests/test_planning_service.py::test_ready_question_frontier_runs_concurrently_and_checkpoints_serially",
+        "tests/test_planning_service.py::test_accepted_question_is_durable_and_not_called_again",
+        "tests/test_planning_compiler.py::test_compiler_round_trips_plan_and_emits_linked_artifacts"
+      ],
+      "stable_behavior": "The scripted source plan produces ready item item-0001 and three linked artifacts; provider question order and concurrency are asserted, and checkpoint resume does not call an accepted question again."
+    },
+    {
+      "flow": "autonomous_replanning",
+      "tests": [
+        "tests/test_plan_repair_service.py::test_shared_repair_service_compiles_real_reviewed_artifacts",
+        "tests/test_plan_repair_service.py::test_shared_repair_service_binds_cas_and_preserves_unrelated_item",
+        "tests/test_plan_repair_service.py::test_shared_repair_service_rejects_stale_bound_plan_reference",
+        "tests/test_github_issue_queue.py::test_plan_repair_reconciles_all_affected_issues_idempotently"
+      ],
+      "stable_behavior": "Typed repair compiles plan/workflow/Structrr artifacts, binds compare-and-swap digests locally, retains unrelated items, rejects stale revisions, and reconciles affected issue state idempotently."
+    },
+    {
+      "flow": "pr_implementation_and_verification",
+      "tests": [
+        "tests/test_implement_feature_e2e.py::test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker",
+        "tests/test_feature_endpoint.py::test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline",
+        "tests/test_coding_agent_end_to_end.py",
+        "tests/test_execute_pr_test_authoring.py"
+      ],
+      "stable_behavior": "The fixture repository gains the second greeting; pre-code probes fail on baseline and pass on candidate, tests and structural/behavior checks pass, artifacts are written, and the repository ends clean with the implementation commit recorded."
+    },
+    {
+      "flow": "review_feedback",
+      "tests": [
+        "tests/test_procedrr_chat.py::test_address_review_comments_flow_uses_structrr_and_thread_aware_gh_tools",
+        "tests/test_workflow_task_agent.py::test_coding_agent_exception_binds_and_reaches_parent_workflow_review",
+        "tests/test_github_issue_queue.py::test_continue_manual_prerequisite_retries_ci_then_resumes"
+      ],
+      "stable_behavior": "Review handling is bound to threads and Structrr context; unresolved/deferred threads stay unresolved; worker errors reach parent review; manual prerequisite continuation retries CI before resuming."
+    },
+    {
+      "flow": "artifact_state_and_bootstrap",
+      "tests": [
+        "tests/test_structrr_bootstrap.py::test_bootstrap_writes_validated_source_anchored_snapshot",
+        "tests/test_structrr_bootstrap.py::test_bootstrap_is_deterministic_and_does_not_stage_output",
+        "tests/test_cli.py::test_cli_bootstrap_structrr_json_reports_validated_summary"
+      ],
+      "stable_behavior": "Bootstrap output is validated, source anchored and deterministic; it does not stage generated artifacts, and the CLI returns the validated summary."
+    }
+  ]
+}

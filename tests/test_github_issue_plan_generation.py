@@ -1718,7 +1718,7 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     )
     monkeypatch.setattr(
         cli,
-        "GitHubCommentCheckpointStore",
+        "LocalCheckpointStore",
         lambda *_args, **_kwargs: store,
     )
     process_calls: list[dict[str, Any]] = []

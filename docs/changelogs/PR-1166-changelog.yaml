@@ -49,10 +49,58 @@ files:
   type: modified
   span:
     start_line: 2862
-    end_line: 2869
-  summary: Apply the configured concurrency limit and keep local llama inference single-threaded.
-  rationale: Bound remote request fan-out while avoiding concurrent use of the shared
-    local model.
+    end_line: 2870
+  summary: Use the local checkpoint journal and apply the configured concurrency
+    limit while keeping local llama inference single-threaded.
+  rationale: Avoid repeated issue comment reads and writes while bounding remote
+    request fan-out and avoiding concurrent use of the shared local model.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2851
+    end_line: 2858
+  summary: Migrate old planning comment journals locally once before resuming.
+  rationale: Existing sessions remain resumable without continuing per-checkpoint
+    GitHub traffic.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2922
+    end_line: 2937
+  summary: Write one GitHub issue update after planning reaches terminal failure.
+  rationale: Keep intermediate recovery state local and make terminal failures
+    visible on the tracking issue.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 717
+    end_line: 864
+  summary: Add a locked, atomic, private local planning journal with legacy comment
+    import.
+  rationale: Persist planning recovery state without a GitHub read and write for
+    every accepted answer.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 111
+    end_line: 147
+  summary: Verify local checkpoint recovery, permissions, and stale-parent checks.
+  rationale: Protect durable local resume behavior and serialized append semantics.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1719
+    end_line: 1724
+  summary: Run planning CLI coverage through the local checkpoint store.
+  rationale: Keep CLI publication behavior covered after moving checkpointing off
+    GitHub comments.
+- path: docs/plans/bounded-planning-and-plan-repair.md
+  type: modified
+  span:
+    start_line: 124
+    end_line: 124
+  summary: Update planning checkpoint ownership to describe the local journal.
+  rationale: Keep the planning architecture documentation accurate.
 - path: src/powdrr_lift/workrr/planning/driver.py
   type: modified
   span:

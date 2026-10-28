@@ -121,7 +121,7 @@ are updated in the same PR; do not maintain two orchestration implementations.
 | `assembly.py` | Requirement coverage, work-unit allocation, dependency graph, ready set |
 | `compiler.py` | Reviewed plan, Structrr proposal, workflows, repair manifest |
 | `repair.py` | Discoveries, impact sets, typed patch application and change validation |
-| `checkpoints.py` | Immutable accepted answers, GitHub checkpoints, local diagnostics |
+| `checkpoints.py` | Immutable accepted answers, local checkpoints, legacy GitHub migration, local diagnostics |
 | `service.py` | Initial planning, resume, repair, validation, publication coordination |
 
 Expose these Python operations with keyword-only arguments:

@@ -13,6 +13,7 @@ from powdrr_lift.workrr.planning.checkpoints import (
     GitHubCommentCheckpointStore,
     InMemoryCheckpointStore,
     JournalForkError,
+    LocalCheckpointStore,
     LocalDiagnosticCache,
     PlanningCheckpoint,
     PlanningJournalError,
@@ -105,6 +106,64 @@ def test_question_start_survives_crash_before_answer_and_resume_reuses_identity(
     assert resumed.pending_question == question
     assert resumed.accepted_answers == ()
     assert resumed.id_counters == {"anchor": 1, "requirement": 0}
+
+
+def test_local_checkpoint_store_recovers_events_with_private_atomic_journal(
+    tmp_path: Path,
+) -> None:
+    store = LocalCheckpointStore(tmp_path, session_id="planning-session-1")
+    checkpoint = _checkpoint(
+        event_id="event-start-1",
+        sequence=1,
+        parent=None,
+        event_type="question_started",
+        payload={"question": _question()},
+    )
+
+    updated = store.append(checkpoint, expected_parent_digest=None)
+    resumed = LocalCheckpointStore(tmp_path, session_id="planning-session-1").load()
+
+    assert updated.head == checkpoint
+    assert resumed.events == (checkpoint,)
+    assert resumed.pending_question == _question()
+    assert store.path.stat().st_mode & 0o777 == 0o600
+    assert store.directory.stat().st_mode & 0o777 == 0o700
+
+
+def test_local_checkpoint_store_rejects_stale_parent(tmp_path: Path) -> None:
+    store = LocalCheckpointStore(tmp_path, session_id="planning-session-1")
+    checkpoint = _checkpoint(
+        event_id="event-start-1",
+        sequence=1,
+        parent=None,
+        event_type="question_started",
+        payload={"question": _question()},
+    )
+    store.append(checkpoint, expected_parent_digest=None)
+
+    with pytest.raises(StaleCheckpointParent):
+        store.append(checkpoint, expected_parent_digest=None)
+
+
+def test_local_checkpoint_store_imports_legacy_issue_comments(tmp_path: Path) -> None:
+    api = _FakeIssueComments()
+    legacy_store = GitHubCommentCheckpointStore(
+        api, _issue(), session_id="planning-session-1"
+    )
+    checkpoint = _checkpoint(
+        event_id="event-start-1",
+        sequence=1,
+        parent=None,
+        event_type="question_started",
+        payload={"question": _question()},
+    )
+    legacy_store.append(checkpoint, expected_parent_digest=None)
+    local_store = LocalCheckpointStore(tmp_path, session_id="planning-session-1")
+
+    migrated = local_store.import_legacy_comments(api.comments)
+
+    assert migrated.events == (checkpoint,)
+    assert local_store.load().pending_question == _question()
 
 
 def test_accepted_answer_and_id_counters_resume_without_a_local_cache(

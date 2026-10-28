@@ -1,0 +1,224 @@
+usage: powdrr-lift [-h]
+                   {check-credentials,repository-state,repository_state,publish-plan-issues,plan,plan-resume,plan-repair,list-plan-issues,fulfill-plan-issue-without-pr,github-issue-worker,github-issue-worker-continue,pull-request-description,pull_request_description,pr-description,init,bootstrap-structrr,bootstrap_structrr,bootstrap,implement,verification-health,verification_health,verification-diff,verification_diff,rebase-structrr,rebase_structrr,init-from-plan-diff,init_from_plan_diff,evaluate-pr-against-changelog,evaluate_pr_against_changelog,validate-pr-files,validate_pr_files,validate-delivery-profile,validate_delivery_profile,edit-context,edit_context,entity-decisions,entity_decisions,entity-references,entity_references,entity-relationships,entity_relationships,invariants,invariants_report,current-decisions,current_decisions,codebase-state,codebase_state,artifact-state,artifact_state,synthesize-current-state,synthesize_current_state,architecture-specification,architecture_specification,implementation-specification,implementation_specification,system-specification,system_specification,project-structure,project_structure,validate-project-structure,validate_project_structure,system-map-specification,system_map_specification,feature-pr-specification,feature_pr_specification,design-interview-input,design_interview_input,start-planning-feature,start_planning_feature,plan-diff,plan_diff,pr-specification,pr_specification,search-proposed-prs,search_proposed_prs,show-proposed-pr,show_proposed_pr,evaluate,openai-proxy,openai_proxy,llm-diff,llm_diff,workflow-scenario,workflow_scenario,workflow-scenario-suite,agent-feature-e2e,workrr-feature,workrr_feature,harbor-feature,harbor_feature,evaluate-deepswe-design,evaluate-deepswe-probes,evaluate-deepswe-prompt,evaluate-prompt,compare-prompt-benchmark,replay-subject-bindings,extract-workflow-responses,validate-procedrr-processes,download-qwen-model,download_qwen_model,workflow-chat,workflow_chat,instantiate-workflow,instantiate_workflow,process-workflow-task,process_workflow_task,process-human-task,process_human_task,execution-exceptions,execution_exceptions,execution-checkpoints,execution_checkpoints,execution-compatibility,execution_compatibility,final-acceptance,final_acceptance,audit-capabilities,audit_capabilities,audit-intent-lineage,audit_intent_lineage,remember-intent,remember_intent,list-intent,list_intent,explain-effective-contract,explain_effective_contract,revoke-intent,revoke_intent,supersede-intent,supersede_intent,compile-execution-plan,compile_execution_plan,compile-implementation-request,compile_implementation_request,run-coding-agent,run_coding_agent,workflow-recovery,workflow_recovery,blame-ui,blame_ui}
+                   ...
+
+positional arguments:
+  {check-credentials,repository-state,repository_state,publish-plan-issues,plan,plan-resume,plan-repair,list-plan-issues,fulfill-plan-issue-without-pr,github-issue-worker,github-issue-worker-continue,pull-request-description,pull_request_description,pr-description,init,bootstrap-structrr,bootstrap_structrr,bootstrap,implement,verification-health,verification_health,verification-diff,verification_diff,rebase-structrr,rebase_structrr,init-from-plan-diff,init_from_plan_diff,evaluate-pr-against-changelog,evaluate_pr_against_changelog,validate-pr-files,validate_pr_files,validate-delivery-profile,validate_delivery_profile,edit-context,edit_context,entity-decisions,entity_decisions,entity-references,entity_references,entity-relationships,entity_relationships,invariants,invariants_report,current-decisions,current_decisions,codebase-state,codebase_state,artifact-state,artifact_state,synthesize-current-state,synthesize_current_state,architecture-specification,architecture_specification,implementation-specification,implementation_specification,system-specification,system_specification,project-structure,project_structure,validate-project-structure,validate_project_structure,system-map-specification,system_map_specification,feature-pr-specification,feature_pr_specification,design-interview-input,design_interview_input,start-planning-feature,start_planning_feature,plan-diff,plan_diff,pr-specification,pr_specification,search-proposed-prs,search_proposed_prs,show-proposed-pr,show_proposed_pr,evaluate,openai-proxy,openai_proxy,llm-diff,llm_diff,workflow-scenario,workflow_scenario,workflow-scenario-suite,agent-feature-e2e,workrr-feature,workrr_feature,harbor-feature,harbor_feature,evaluate-deepswe-design,evaluate-deepswe-probes,evaluate-deepswe-prompt,evaluate-prompt,compare-prompt-benchmark,replay-subject-bindings,extract-workflow-responses,validate-procedrr-processes,download-qwen-model,download_qwen_model,workflow-chat,workflow_chat,instantiate-workflow,instantiate_workflow,process-workflow-task,process_workflow_task,process-human-task,process_human_task,execution-exceptions,execution_exceptions,execution-checkpoints,execution_checkpoints,execution-compatibility,execution_compatibility,final-acceptance,final_acceptance,audit-capabilities,audit_capabilities,audit-intent-lineage,audit_intent_lineage,remember-intent,remember_intent,list-intent,list_intent,explain-effective-contract,explain_effective_contract,revoke-intent,revoke_intent,supersede-intent,supersede_intent,compile-execution-plan,compile_execution_plan,compile-implementation-request,compile_implementation_request,run-coding-agent,run_coding_agent,workflow-recovery,workflow_recovery,blame-ui,blame_ui}
+    check-credentials   Check configured planning and coding model access,
+                        plus GitHub repository write access, before a run.
+    repository-state (repository_state)
+                        Print structured Git branch and worktree state as
+                        JSON.
+    publish-plan-issues
+                        Publish one minimal GitHub issue per item in a merged
+                        plan revision.
+    plan                Analyze a Markdown plan against the current checkout,
+                        generate per-item PR workflows, and open a review pull
+                        request.
+    plan-resume         Resume a durable bounded planning session by its
+                        GitHub issue number.
+    plan-repair         Apply a typed repair to a reviewed plan and open an
+                        amendment PR.
+    list-plan-issues    Read the GitHub issue status for every item in a
+                        pinned plan revision.
+    fulfill-plan-issue-without-pr
+                        Mark a planned issue fulfilled by existing work
+                        without an implementation PR.
+    github-issue-worker
+                        Claim and execute one eligible GitHub issue work item.
+    github-issue-worker-continue
+                        Retry CI for a staged manual prerequisite PR and
+                        resume its issue workflow.
+    pull-request-description (pull_request_description, pr-description)
+                        Print the instructed pull-request description
+                        template.
+    init                Generate a ChangeLog template for the current branch.
+    bootstrap-structrr (bootstrap_structrr)
+                        Generate and validate a Structrr snapshot from
+                        repository evidence.
+    bootstrap           Create a validated project context snapshot in an
+                        agent worktree.
+    implement           Implement a feature headlessly in an isolated agent
+                        worktree.
+    verification-health (verification_health)
+                        Audit intent-linked verification coverage and evidence
+                        freshness.
+    verification-diff (verification_diff)
+                        Classify base/candidate evidence and identify verifier
+                        changes.
+    rebase-structrr (rebase_structrr)
+                        Compare Structrr snapshots and report proposal rebase
+                        impact.
+    init-from-plan-diff (init_from_plan_diff)
+                        Generate a ChangeLog template from a plan diff
+                        specification.
+    evaluate-pr-against-changelog (evaluate_pr_against_changelog)
+                        Validate a proposed ChangeLog against the branch diff.
+    validate-pr-files (validate_pr_files)
+                        Run repository format validators for every recognized
+                        changed file in a PR or the checked-out branch.
+    validate-delivery-profile (validate_delivery_profile)
+                        Validate a typed delivery profile.
+    edit-context (edit_context)
+                        Report changelog-backed context for a file and line
+                        ranges.
+    entity-decisions (entity_decisions)
+                        Report changelog decisions for PRs that mention an
+                        entity.
+    entity-references (entity_references)
+                        Report changelog-backed references for a named entity.
+    entity-relationships (entity_relationships)
+                        Report graph relationships for a named entity.
+    invariants (invariants_report)
+                        Report current invariants for the branch.
+    current-decisions (current_decisions)
+                        Report the current decisions for the branch.
+    codebase-state (codebase_state)
+                        Generate a changelog-derived snapshot of the current
+                        codebase.
+    artifact-state (artifact_state)
+                        Report Powdrr plans, workflows, entities, and
+                        changelogs at a commit.
+    synthesize-current-state (synthesize_current_state)
+                        Synthesize the current specification state from
+                        indexed files.
+    architecture-specification (architecture_specification)
+                        Generate an architecture specification template.
+    implementation-specification (implementation_specification)
+                        Generate an implementation specification template.
+    system-specification (system_specification)
+                        Generate a system specification template.
+    project-structure (project_structure)
+                        Create the project structure template.
+    validate-project-structure (validate_project_structure)
+                        Validate a project-structure specification-v1 YAML
+                        file.
+    system-map-specification (system_map_specification)
+                        Generate a system map specification template.
+    feature-pr-specification (feature_pr_specification)
+                        Generate a feature and PR specification template.
+    design-interview-input (design_interview_input)
+                        Create a JSON input document for the design interview.
+    start-planning-feature (start_planning_feature)
+                        Generate the instructions for starting feature
+                        planning.
+    plan-diff (plan_diff)
+                        Generate a plan diff specification from a feature plan
+                        and changelogs.
+    pr-specification (pr_specification)
+                        Generate a proposed PR specification v1 template.
+    search-proposed-prs (search_proposed_prs)
+                        Fuzzy-search proposed PR specifications.
+    show-proposed-pr (show_proposed_pr)
+                        Print a proposed PR specification by PR number.
+    evaluate            Validate one specification-v1 YAML file or a directory
+                        of them.
+    openai-proxy (openai_proxy)
+                        Start a local OpenAI reverse proxy that records
+                        exchanges.
+    llm-diff (llm_diff)
+                        Show the differences between two recorded llm-*.json
+                        exchanges.
+    workflow-scenario (workflow_scenario)
+                        Run a scripted Procedrr process or durable-task
+                        scenario in an isolated temporary Git repository.
+    workflow-scenario-suite
+                        Replay a checked-in manifest of deterministic workflow
+                        scenarios.
+    agent-feature-e2e   Prompt the live Powdrr agent to specify and implement
+                        a feature, run its generated workflows, and verify the
+                        resulting artifacts.
+    workrr-feature (workrr_feature)
+                        Plan a feature in Structrr, implement it with the
+                        selected code agent, validate and review the diff,
+                        then open a pull request.
+    harbor-feature (harbor_feature)
+                        Run implement-feature in benchmark mode in the current
+                        sandbox checkout and commit the result for Harbor to
+                        collect.
+    evaluate-deepswe-design
+                        Evaluate a design-only run against a DeepSWE reference
+                        solution and verifier tests.
+    evaluate-deepswe-probes
+                        Compare a frozen generated probe suite with DeepSWE
+                        verifier tests.
+    evaluate-deepswe-prompt
+                        Evaluate captured worker prompts against a DeepSWE
+                        reference solution and verifier tests.
+    evaluate-prompt     Evaluate captured worker prompts with a versioned
+                        prompt case and rubric.
+    compare-prompt-benchmark
+                        Compare a prompt evaluation with final benchmark
+                        validation results.
+    replay-subject-bindings
+                        Replay deterministic repository subject binding from a
+                        saved Procedrr event log without model calls.
+    extract-workflow-responses
+                        Convert a live workflow scenario report into a
+                        scripted response fixture.
+    validate-procedrr-processes
+                        Validate every Procedrr process in one or more process
+                        directories.
+    download-qwen-model (download_qwen_model)
+                        Download and cache the local Qwen model used by
+                        workflow-chat.
+    workflow-chat (workflow_chat)
+                        Start an interactive workflow chat agent in the
+                        terminal.
+    instantiate-workflow (instantiate_workflow)
+                        Instantiate a workflow template as durable task
+                        documents.
+    process-workflow-task (process_workflow_task)
+                        Process ready agent tasks from a durable workflow on
+                        its integration branch until human work or completion.
+    process-human-task (process_human_task)
+                        Find, present, and complete one ready human workflow
+                        task.
+    execution-exceptions (execution_exceptions)
+                        Inspect or decide pending capability exception
+                        requests.
+    execution-checkpoints (execution_checkpoints)
+                        Inspect or restore typed execution checkpoints.
+    execution-compatibility (execution_compatibility)
+                        Inspect persisted execution JSON for migration
+                        compatibility.
+    final-acceptance (final_acceptance)
+                        Run the deterministic typed execution acceptance
+                        scenario.
+    audit-capabilities (audit_capabilities)
+                        Audit the runtime capability registry for complete
+                        manifests.
+    audit-intent-lineage (audit_intent_lineage)
+                        Replay a fingerprinted history manifest and report
+                        intent drift.
+    remember-intent (remember_intent)
+                        Persist one explicit, scoped user instruction for
+                        future executions.
+    list-intent (list_intent)
+                        List remembered intent clauses.
+    explain-effective-contract (explain_effective_contract)
+                        Explain exactly which remembered intent applies to a
+                        context.
+    revoke-intent (revoke_intent)
+                        Revoke a remembered intent clause.
+    supersede-intent (supersede_intent)
+                        Install an explicit replacement for a remembered
+                        intent clause.
+    compile-execution-plan (compile_execution_plan)
+                        Compile a typed execution plan and delivery profile
+                        into a durable workflow task graph.
+    compile-implementation-request (compile_implementation_request)
+                        Compile one execution-plan unit into a coding-agent
+                        request artifact.
+    run-coding-agent (run_coding_agent)
+                        Run one bounded external coding-agent implementation
+                        attempt.
+    workflow-recovery (workflow_recovery)
+                        Inspect or clean up Git state for one durable workflow
+                        run.
+    blame-ui (blame_ui)
+                        Start a local GitHub-style blame viewer powered by the
+                        index.
+
+options:
+  -h, --help            show this help message and exit

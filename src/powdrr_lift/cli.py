@@ -12,6 +12,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
@@ -2775,25 +2776,9 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
                 "pinned source blob differs from the planning issue metadata"
             )
 
-        bootstrap_output = (
-            repo_root
-            / ".powdrr"
-            / "plan-structrr-bootstrap"
-            / f"{session.session_id}.yaml"
+        structrr_baseline = _bootstrap_planning_structrr_baseline(
+            repo_root, session.session_id
         )
-        bootstrap = bootstrap_structrr(
-            repo_root,
-            output_path=bootstrap_output,
-            taxonomy_path=_structrr_taxonomy_path(repo_root),
-        )
-        if not bootstrap.validation.successful:
-            details = "; ".join(
-                f"{issue.code}: {issue.message}"
-                for issue in bootstrap.validation.issues
-            )
-            raise PlanGenerationError(
-                f"Structrr bootstrap failed before planning: {details}"
-            )
 
         planning_provider = resolve_workflow_provider(args.planning_provider)
         planning_mapping = configured_model_mapping(
@@ -2831,7 +2816,7 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
                 repo_root, base_commit, pinned_source.text
             ),
             plan_id=plan_id,
-            structrr_baseline=bootstrap.document,
+            structrr_baseline=structrr_baseline,
             taxonomy_entity_types=taxonomy.entity_types,
         )
         assert github is not None
@@ -2933,6 +2918,26 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
         print(f"Opened plan review PR: {pull_request.pull_request_url}")
         print("No work-item issues were published and no work was executed.")
     return 0
+
+
+def _bootstrap_planning_structrr_baseline(
+    repo_root: Path, session_id: str
+) -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(prefix="powdrr-lift-plan-structrr-") as temp_dir:
+        bootstrap = bootstrap_structrr(
+            repo_root,
+            output_path=Path(temp_dir) / f"{session_id}.yaml",
+            taxonomy_path=_structrr_taxonomy_path(repo_root),
+        )
+        if not bootstrap.validation.successful:
+            details = "; ".join(
+                f"{issue.code}: {issue.message}"
+                for issue in bootstrap.validation.issues
+            )
+            raise PlanGenerationError(
+                f"Structrr bootstrap failed before planning: {details}"
+            )
+        return bootstrap.document
 
 
 def _discover_github_repository(repo_root: Path) -> str:

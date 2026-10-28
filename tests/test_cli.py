@@ -13,6 +13,7 @@ import yaml
 
 from powdrr_lift import parse_change_log, parse_validation_report
 from powdrr_lift.cli import (
+    _bootstrap_planning_structrr_baseline,
     _run_harbor_feature,
     _stage_generated_file,
     build_parser,
@@ -75,6 +76,42 @@ def test_plan_resume_cli_requires_repository_and_session_issue() -> None:
     assert args.func.__name__ == "_run_plan_resume"
     assert args.repository == "owner/repository"
     assert args.session_issue == 42
+
+
+def test_planning_structrr_baseline_uses_temporary_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import powdrr_lift.cli as cli
+
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    monkeypatch.setattr(cli.tempfile, "tempdir", str(tmp_path))
+    captured: dict[str, Path] = {}
+
+    def bootstrap(
+        repo_root: Path, *, output_path: Path, taxonomy_path: Path
+    ) -> SimpleNamespace:
+        assert repo_root == repository
+        captured["output"] = output_path
+        captured["taxonomy"] = taxonomy_path
+        output_path.write_text("baseline", encoding="utf-8")
+        output_path.with_suffix(".md").write_text("report", encoding="utf-8")
+        return SimpleNamespace(
+            validation=SimpleNamespace(successful=True, issues=()),
+            document={"entities": []},
+        )
+
+    monkeypatch.setattr(cli, "bootstrap_structrr", bootstrap)
+
+    result = _bootstrap_planning_structrr_baseline(repository, "session-123")
+
+    output_path = captured["output"]
+    assert result == {"entities": []}
+    assert output_path.name == "session-123.yaml"
+    assert repository not in output_path.parents
+    assert not output_path.exists()
+    assert not output_path.with_suffix(".md").exists()
+    assert not (repository / ".powdrr").exists()
 
 
 def test_plan_repair_cli_requires_reviewed_plan_and_typed_request() -> None:

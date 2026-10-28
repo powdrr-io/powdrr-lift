@@ -48,49 +48,84 @@ files:
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 2862
-    end_line: 2870
-  summary: Use the local checkpoint journal and apply the configured concurrency
-    limit while keeping local llama inference single-threaded.
-  rationale: Avoid repeated issue comment reads and writes while bounding remote
-    request fan-out and avoiding concurrent use of the shared local model.
+    start_line: 242
+    end_line: 242
+  summary: Switch planning from GitHub comments to the local checkpoint journal.
+  rationale: Keep intermediate recovery state local instead of writing every answer
+    to the tracking issue.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 2851
-    end_line: 2858
+    start_line: 2850
+    end_line: 2854
   summary: Migrate old planning comment journals locally once before resuming.
   rationale: Existing sessions remain resumable without continuing per-checkpoint
     GitHub traffic.
 - path: src/powdrr_lift/cli.py
   type: modified
   span:
-    start_line: 2922
-    end_line: 2937
-  summary: Write one GitHub issue update after planning reaches terminal failure.
-  rationale: Keep intermediate recovery state local and make terminal failures
-    visible on the tracking issue.
+    start_line: 2864
+    end_line: 2871
+  summary: Apply the configured concurrency limit and keep local llama inference single-threaded.
+  rationale: Bound remote request fan-out while avoiding concurrent use of the shared
+    local model.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2908
+    end_line: 2934
+  summary: Write one issue update after planning reaches a terminal outcome.
+  rationale: Keep intermediate recovery state local while reporting completion or
+    a terminal error to the tracking issue.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Describe the local journal and legacy GitHub migration in the module.
+  rationale: Clarify the source used for planning recovery checkpoints.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Add file locking for concurrent local journal access.
+  rationale: Serialize local planning checkpoint updates across processes.
 - path: src/powdrr_lift/workrr/planning/checkpoints.py
   type: modified
   span:
     start_line: 717
-    end_line: 864
+    end_line: 879
   summary: Add a locked, atomic, private local planning journal with legacy comment
     import.
   rationale: Persist planning recovery state without a GitHub read and write for
     every accepted answer.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 1123
+    end_line: 1123
+  summary: Export the local planning checkpoint store.
+  rationale: Make the local journal available to planning orchestration.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Add the local planning checkpoint store to the checkpoint test imports.
+  rationale: Exercise local checkpoint recovery and migration.
 - path: tests/test_planning_checkpoints.py
   type: modified
   span:
     start_line: 111
-    end_line: 147
+    end_line: 168
   summary: Verify local checkpoint recovery, permissions, and stale-parent checks.
   rationale: Protect durable local resume behavior and serialized append semantics.
 - path: tests/test_github_issue_plan_generation.py
   type: modified
   span:
-    start_line: 1719
-    end_line: 1724
+    start_line: 1721
+    end_line: 1721
   summary: Run planning CLI coverage through the local checkpoint store.
   rationale: Keep CLI publication behavior covered after moving checkpointing off
     GitHub comments.

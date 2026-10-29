@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1189
+change_id: 1191
 title: Move planning question ordering into the service package
 intent:
   problem: The deterministic source-ledger question machine and planning assembly still lived under the agent's legacy workrr package.

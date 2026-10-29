@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1182
+change_id: 1183
 title: Move local planning persistence behind adapters
 intent:
   problem: Planning checkpoint records and reducers were mixed with Git metadata writes, file locking,

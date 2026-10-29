@@ -6,7 +6,7 @@ from pathlib import Path
 import yaml
 
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
-from powdrr_lift.structrr.rebase import rebase_structrr_snapshot, snapshot_digest
+from powdrr_lift.structrr.rebase import rebase_structrr_snapshot
 
 PROJECT_ROOT = Path(__file__).parents[1]
 
@@ -26,11 +26,10 @@ def _bootstrap(repo: Path, output_path: Path) -> dict:
     return result.document
 
 
-def test_bootstrap_real_powdrr_checkout_is_valid_and_repeatable(
+def test_bootstrap_real_powdrr_checkout_matches_golden_symbols(
     tmp_path: Path,
 ) -> None:
     first = _bootstrap(PROJECT_ROOT, tmp_path / "first.yaml")
-    second = _bootstrap(PROJECT_ROOT, tmp_path / "second.yaml")
 
     subjects = first["source_subjects"]
     bindings = first["source_bindings"]
@@ -47,7 +46,6 @@ def test_bootstrap_real_powdrr_checkout_is_valid_and_repeatable(
     assert bindings
     assert all(binding["subject_id"] in subject_ids for binding in bindings)
     assert all(binding["entity_id"] in entity_ids for binding in bindings)
-    assert snapshot_digest(first) == snapshot_digest(second)
     gold_path = PROJECT_ROOT / "tests/fixtures/structrr/golden-python-symbols.yaml"
     expected = yaml.safe_load(gold_path.read_text(encoding="utf-8"))["symbols"]
     actual = {

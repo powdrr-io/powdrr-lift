@@ -294,6 +294,11 @@ files:
     rationale: Allow a structural subject to cite every relevant source anchor when more than eight anchors are available.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
+    span: {start_line: 480, end_line: 480}
+    summary: Include the exact projected subject index in the question digest.
+    rationale: Ensure context changes invalidate a pending question instead of reusing a stale answer.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
     span: {start_line: 1234, end_line: 1239}
     summary: Let reference validation use a caller-specific maximum.
     rationale: Keep the eight-record page limit separate from the number of valid source references.
@@ -324,37 +329,42 @@ files:
     rationale: Construct a valid source excerpt for bounded question tests.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 8, end_line: 9}
+    span: {start_line: 9, end_line: 10}
     summary: Import bounded question serialization and source construction helpers.
     rationale: Verify structural prompts respect the serialized input limit.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 16, end_line: 17}
+    span: {start_line: 17, end_line: 18}
     summary: Import structural question builders for regression coverage.
     rationale: Test enumeration and per-subject change requests against a large baseline.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 74, end_line: 74}
+    span: {start_line: 7, end_line: 7}
+    summary: Import the Structrr module to exercise its question digest.
+    rationale: Verify a changed supplied baseline index changes the pending question identity.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 75, end_line: 75}
     summary: Allow the structural page test helper to receive its valid source anchors.
     rationale: Exercise source-reference validation with realistic anchor sets.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 82, end_line: 82}
+    span: {start_line: 83, end_line: 83}
     summary: Pass the test-provided anchor set into the structural page parser.
     rationale: Verify that references remain bounded by known source evidence.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 89, end_line: 295}
+    span: {start_line: 90, end_line: 320}
     summary: Verify structural questions omit unrelated baseline records and expose projected file identities.
     rationale: Keep prompt context bounded while preventing existing projected files from being proposed as new subjects.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 322, end_line: 335}
+    span: {start_line: 347, end_line: 360}
     summary: Accept all nine supplied source anchors for one structural subject.
     rationale: Prevent a valid answer from failing because the record-count limit was incorrectly applied to source references.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 400, end_line: 421}
+    span: {start_line: 425, end_line: 446}
     summary: Accept a file path already present in the projected files baseline.
     rationale: Reproduce references to files introduced by earlier plan items and retain the path for change review.
 entities:

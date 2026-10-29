@@ -1201,7 +1201,7 @@ def _combine_excess_scope_entries(value: Any) -> Any:
     scope = list(value)
     while len(scope) > MAX_ITEM_SCOPE_ENTRIES:
         candidates: list[tuple[int, int, str]] = []
-        for index, (left, right) in enumerate(zip(scope, scope[1:])):
+        for index, (left, right) in enumerate(zip(scope, scope[1:], strict=False)):
             if not isinstance(left, Mapping) or not isinstance(right, Mapping):
                 return value
             if set(left) != {"description", "unit_ids"} or set(right) != {

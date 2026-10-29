@@ -49,6 +49,7 @@ _NEUTRAL_SUFFIXES = frozenset(
         ".ini",
         ".json",
         ".lock",
+        ".log",
         ".md",
         ".plist",
         ".properties",
@@ -859,6 +860,9 @@ def build_work_unit_proposal_request(
             "For each requirement ID in a unit, at least one planned write must "
             "cite one of that requirement's own source_refs from its requirement "
             "fact; do not cite only a neighboring requirement's anchors. "
+            "Set a planned write's runtime to null for non-executable artifacts "
+            "such as documentation, configuration, logs, and fixtures; use a "
+            "language runtime only for executable or source files. "
             "IDs must exactly match catalog ID values: put `validation-0001` in "
             "validation_ids, not the context reference `validation:validation-0001`. "
             "Use the valid example for field shape only; do not copy its "

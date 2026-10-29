@@ -212,6 +212,7 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
         "attestation/config/sandbox-profile.sb",
         "installer/launchd.plist",
         "config/install-paths.conf",
+        "test-results/section13-macos-github.log",
     ],
 )
 def test_platform_data_file_extensions_are_runtime_neutral(path: str) -> None:
@@ -366,6 +367,7 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
     request.validate()
     assert request.question.kind == "propose_work_units"
     assert "requirement's own source_refs" in request.exact_question
+    assert "runtime to null for non-executable artifacts" in request.exact_question
     assert "If every supplied requirement is covered" in request.exact_question
     assert (
         "requirements remain uncovered" in request.answer_field_definitions["has_more"]

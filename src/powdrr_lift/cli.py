@@ -2772,9 +2772,14 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
             session.base_commit if session is not None else _git_head(repo_root)
         )
         _require_clean_planning_checkout(repo_root, base_commit)
-        pinned_source = read_pinned_source(str(repo_root), base_commit, source_relative)
+        assert github is not None
+        pinned_source = read_pinned_source(
+            str(repo_root),
+            base_commit,
+            source_relative,
+            repository_id=github.repository,
+        )
         if session is None:
-            assert github is not None
             session = create_planning_session(
                 github,
                 plan_id=plan_id,

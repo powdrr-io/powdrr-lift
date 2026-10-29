@@ -21,6 +21,7 @@ from powdrr_service.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
 )
+from powdrr_service.planning.source import SegmentedSource
 
 from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.multipr_structrr import (
@@ -28,7 +29,6 @@ from powdrr_lift.workrr.multipr_structrr import (
     compile_multi_pr_proposal,
 )
 from powdrr_lift.workrr.planning.assembly import WorkUnit
-from powdrr_lift.workrr.planning.source import SegmentedSource
 
 _SECTIONS = frozenset({"entities", "entity_relationships", "files"})
 _ACTIONS = frozenset({"added", "changed", "deleted", "removed"})

@@ -264,7 +264,7 @@ files:
     rationale: Keep the example valid for planned paths already in the baseline.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 721, end_line: 877}
+    span: {start_line: 721, end_line: 878}
     summary: Build compact subject indexes and per-subject baseline context from planned paths and identities.
     rationale: Preserve relevant existing Structrr references without including unrelated repository data.
   - path: packages/service/src/powdrr_service/planning/structrr.py
@@ -294,7 +294,7 @@ files:
     rationale: Test enumeration and per-subject change requests against a large baseline.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 88, end_line: 268}
+    span: {start_line: 88, end_line: 277}
     summary: Verify structural questions omit unrelated baseline records and entity identity indexes.
     rationale: Catch oversized prompts before they block real planning sessions.
 entities:

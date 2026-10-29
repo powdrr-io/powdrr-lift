@@ -39,8 +39,6 @@ from powdrr_service.planning.service import (
     PlanningOptions,
     PlanningServiceError,
     PlanningSession,
-    create_planning_session,
-    load_planning_session,
     run_planning_procedrr,
 )
 
@@ -2817,6 +2815,52 @@ def _collect_plan_repair_operation_request(
     )
 
 
+def _planning_session_operation(
+    issue_store: GitHubPlanningIssueStore,
+    *,
+    action: str,
+    repository_id: str,
+    **parameters: Any,
+) -> PlanningSession:
+    request = OperationRequest(
+        request_id=f"planning-session-{uuid.uuid4().hex}",
+        operation_kind="plan",
+        inputs={
+            "action": action,
+            "repository_id": repository_id,
+            **parameters,
+        },
+    )
+    update = JsonServiceBridge(
+        LocalPowdrrService(planning_issue_store=issue_store)
+    ).start(request)
+    if update.status != "succeeded":
+        message = (
+            update.failure.message
+            if update.failure is not None
+            else "Service did not return a planning session."
+        )
+        raise PlanningServiceError(message)
+    session_artifact = next(
+        (
+            artifact
+            for artifact in update.output_artifacts
+            if artifact.artifact_id == "planning/session.json"
+            and artifact.media_type == "application/vnd.powdrr.planning-session+json"
+        ),
+        None,
+    )
+    if session_artifact is None:
+        raise PlanningServiceError("Service response omitted planning session data.")
+    try:
+        session_data = json.loads(session_artifact.data)
+    except json.JSONDecodeError as error:
+        raise PlanningServiceError(
+            "Service returned malformed planning session data."
+        ) from error
+    return PlanningSession.from_data(session_data)
+
+
 def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
     repo_root = resolve_repo_root(args.repo_root).resolve()
     github = GitHubIssueClient(args.repository) if resume else None
@@ -2824,13 +2868,12 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
     try:
         if resume:
             assert github is not None
-            session = load_planning_session(
-                GitHubPlanningIssueStore(github), args.session_issue
+            session = _planning_session_operation(
+                GitHubPlanningIssueStore(github),
+                action="load_session",
+                repository_id=args.repository,
+                issue_number=args.session_issue,
             )
-            if session.repository != args.repository:
-                raise PlanningServiceError(
-                    "planning session repository differs from --repository"
-                )
             plan_id = session.plan_id
             source_relative = session.source_path
             verification_command = session.verification_command
@@ -2872,8 +2915,10 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
             repository_id=github.repository,
         )
         if session is None:
-            session = create_planning_session(
+            session = _planning_session_operation(
                 GitHubPlanningIssueStore(github),
+                action="create_session",
+                repository_id=github.repository,
                 plan_id=plan_id,
                 base_commit=base_commit,
                 source_path=source_relative,

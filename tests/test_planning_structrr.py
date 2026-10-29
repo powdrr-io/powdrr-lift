@@ -140,6 +140,9 @@ def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
         source_refs=(source_ref,),
         projected_baseline=baseline,
     )
+    assert "new_identity_description is non-null, action must be added" in (
+        enumeration.exact_question
+    )
     enumeration_messages = build_question_messages(enumeration)
     enumeration_input = enumeration_messages[1]["content"]
 

@@ -487,7 +487,12 @@ def build_subject_enumeration_request(
             "identity. A new file subject must name one of the supplied planned "
             "write paths. Cite the requirements, units, and source anchors that "
             "justify each subject. Omit implementation details that do not change "
-            "Structrr. Return at most eight subjects. An empty final page means no "
+            "Structrr. "
+            "Use a supplied source_subjects stable_key to reference an existing "
+            "file subject; repository file metadata alone is not a subject_ref. "
+            "Whenever new_identity_description is non-null, action must be added. "
+            "Use changed, deleted, or removed only with a supplied subject_ref. "
+            "Return at most eight subjects. An empty final page means no "
             "structural change is needed for this item."
             " If another page is needed, set has_more true and copy the exact "
             "next_anchor_if_more value from accepted facts; otherwise set "
@@ -499,7 +504,10 @@ def build_subject_enumeration_request(
             "new_identity_description": (
                 "Concrete identity description, or null for an existing subject."
             ),
-            "action": "added, changed, deleted, or removed.",
+            "action": (
+                "added for a new_identity_description; changed, deleted, or removed "
+                "only for a supplied subject_ref."
+            ),
             "requirement_ids": (
                 "Supplied requirements affected by the structural change."
             ),
@@ -706,11 +714,6 @@ def _structural_subject_index(
         if record.get("source") in relevant_entity_ids
         or record.get("target") in relevant_entity_ids
     ]
-    files = [
-        record
-        for record in _mapping_records(snapshot.get("files"))
-        if record.get("path") in paths
-    ]
     return {
         "fingerprint": snapshot_digest(snapshot),
         "planned_paths": sorted(paths),
@@ -721,10 +724,6 @@ def _structural_subject_index(
         "entity_relationships": [
             _pick_fields(record, ("id", "source", "relationship", "target"))
             for record in relationships
-        ],
-        "files": [
-            _pick_fields(record, ("path", "summary", "rationale", "entities"))
-            for record in files
         ],
         "source_subjects": [
             _pick_fields(

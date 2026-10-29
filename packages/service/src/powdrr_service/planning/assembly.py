@@ -44,6 +44,7 @@ _NEUTRAL_SUFFIXES = frozenset(
     {
         ".cfg",
         ".csv",
+        ".conf",
         ".html",
         ".ini",
         ".json",

@@ -77,6 +77,13 @@ files:
     end_line: 790
   summary: Prompt for concise proposal pages within the 4,000-character answer limit.
   rationale: Reduce repeated retries for answers that cannot be durably checkpointed.
+- path: src/powdrr_lift/workrr/planning/assembly.py
+  type: modified
+  span:
+    start_line: 761
+    end_line: 761
+  summary: Include the complete requirement batch in each work-unit question ID.
+  rationale: Prevent old checkpoints from being reused when batch size changes.
 - path: src/powdrr_lift/workrr/planning/driver.py
   type: modified
   span:
@@ -116,9 +123,9 @@ files:
   type: modified
   span:
     start_line: 290
-    end_line: 309
-  summary: Assert proposal question and response limits are enforced.
-  rationale: Prevent future batches from exceeding the bounded answer contract.
+    end_line: 325
+  summary: Assert proposal request bounds and batch-specific question IDs.
+  rationale: Prevent oversized answers and stale checkpoint reuse when request shapes change.
 entities: []
 entity_relationships: []
 invariants: []

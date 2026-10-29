@@ -21,13 +21,14 @@ from typing import Any
 
 import yaml
 from powdrr_local.planning.checkpoints import LocalCheckpointStore
+from powdrr_local.planning.repair_publication import publish_repair_pull_request
 from powdrr_service.planning.assembly import PathFact
 from powdrr_service.planning.compiler import PlanningCompilationError
 from powdrr_service.planning.repair_service import (
     PlanRepairServiceError,
     apply_repair_request,
     load_repair_draft,
-    publish_repair_pull_request,
+    prepare_repair_publication,
 )
 from powdrr_service.planning.service import (
     PlanningOptions,
@@ -2702,13 +2703,15 @@ def _run_plan_repair(args: argparse.Namespace) -> int:
             **dict(request["discovery"]),
             "id": repaired.manifest["latest_repair"]["repair_id"],
         }
-        pull_request_url, changed_paths = publish_repair_pull_request(
-            repo_root=repo_root,
+        publication = prepare_repair_publication(
             draft=draft,
             repair=repaired,
             plan_path=plan_relative,
             source_plan_path=source_plan_path,
             discovery=bound_discovery,
+        )
+        pull_request_url, changed_paths = publish_repair_pull_request(
+            repo_root=repo_root, publication=publication
         )
     except (OSError, json.JSONDecodeError, PlanRepairServiceError) as error:
         raise PowdrrExecutionError(f"plan repair failed: {error}") from error

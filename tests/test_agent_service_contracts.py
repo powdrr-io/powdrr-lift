@@ -232,3 +232,11 @@ def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
     assert LegacyLocalCheckpointStore is LocalCheckpointStore
     assert LegacyLocalDiagnosticCache is LocalDiagnosticCache
     assert LegacyGitHubCheckpointStore is GitHubCommentCheckpointStore
+
+
+def test_plan_repair_publication_is_owned_by_local_adapter() -> None:
+    from powdrr_local.planning.repair_publication import publish_repair_pull_request
+    from powdrr_service.planning import repair_service
+
+    assert callable(publish_repair_pull_request)
+    assert not hasattr(repair_service, "publish_repair_pull_request")

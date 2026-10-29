@@ -4,47 +4,172 @@
     {
       "import": "powdrr_lift.artifact_state.build_artifact_state",
       "owner_pr": 8,
-      "rationale": "The legacy artifact-state projection remains available for areas not migrated through the boundary. Final package ownership cleanup removes this import."
+      "rationale": "The current artifact-state inspection slice still uses the legacy projection; relocate it during final ownership cleanup."
     },
     {
       "import": "powdrr_lift.core.instruction_ledger.InstructionLedger",
       "owner_pr": 8,
-      "rationale": "The source segmentation module uses the legacy instruction-ledger type until product semantic modules are relocated during package ownership cleanup."
+      "rationale": "Service source segmentation still shares established instruction-ledger semantics; move the product-semantic implementation and fixtures during final package cleanup."
     },
     {
       "import": "powdrr_lift.core.instruction_ledger.compile_instruction_ledger",
       "owner_pr": 8,
-      "rationale": "The service source segmenter uses the legacy instruction-ledger compiler until product semantic modules are relocated during package ownership cleanup."
+      "rationale": "Service source segmentation still shares established instruction-ledger semantics; move the product-semantic implementation and fixtures during final package cleanup."
     },
     {
       "import": "powdrr_lift.errors.PowdrrExecutionError",
       "owner_pr": 6,
-      "rationale": "Planning question execution translates the existing typed provider error; the service-owned error and inference contract replace this in PR 6."
+      "rationale": "Planning maps the existing provider execution error into its stable planning outcome; replace it with a service-owned error type during provider extraction."
     },
     {
       "import": "powdrr_lift.structrr.actual_diff.compile_actual_structrr_diff",
       "owner_pr": 8,
-      "rationale": "The service executes actual Structrr diff policy over exchanged snapshots, with code relocation to the service distribution scheduled for final package ownership cleanup."
+      "rationale": "The service still reuses the existing actual Structrr diff implementation; relocate it with the remaining Structrr product semantics."
     },
     {
       "import": "powdrr_lift.structrr.bootstrap.bootstrap_structrr",
       "owner_pr": 8,
-      "rationale": "The service reconstructs a service-owned snapshot and invokes the existing Structrr implementation. Moving the implementation into the service distribution is part of final package ownership cleanup."
+      "rationale": "Bootstrap still reuses the existing Structrr implementation over a service-owned snapshot; relocate it with the remaining Structrr product semantics."
+    },
+    {
+      "import": "powdrr_lift.structrr.rebase.snapshot_digest",
+      "owner_pr": 4,
+      "rationale": "Planning reuses Structrr canonical snapshot digests so proposed changes retain existing digest identity; this canonicalization helper still needs relocation to service-owned Structrr code."
     },
     {
       "import": "powdrr_lift.structrr.source_manifest.SourceManifest",
       "owner_pr": 8,
-      "rationale": "The service validates the source manifest format while compiling actual diffs; the private type moves with the Structrr service implementation during final package ownership cleanup."
+      "rationale": "Actual Structrr diff compilation still uses the existing source-manifest type; move the type with the service-owned Structrr implementation."
+    },
+    {
+      "import": "powdrr_lift.workrr.git.slugify_workflow_id",
+      "owner_pr": 4,
+      "rationale": "Planning uses the established workflow slug function for stable work-item IDs; moving that deterministic policy must preserve IDs stored in plans and issues."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_plan_generation.PLAN_WORKFLOW_PROCESS",
+      "owner_pr": 4,
+      "rationale": "Planning reuses the established workflow process/schema parser to preserve persisted plan artifact compatibility while the GitHub planning adapter is extracted."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_plan_generation.PLAN_WORKFLOW_SCHEMA",
+      "owner_pr": 4,
+      "rationale": "Planning reuses the established workflow process/schema parser to preserve persisted plan artifact compatibility while the GitHub planning adapter is extracted."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_plan_generation.PlanGenerationError",
+      "owner_pr": 4,
+      "rationale": "Planning reuses the established workflow process/schema parser to preserve persisted plan artifact compatibility while the GitHub planning adapter is extracted."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_plan_generation.parse_plan_workflow_instance_yaml",
+      "owner_pr": 4,
+      "rationale": "Planning reuses the established workflow process/schema parser to preserve persisted plan artifact compatibility while the GitHub planning adapter is extracted."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_queue.GitHubIssueClient",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_queue.GitHubIssueQueueError",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_queue.PlannedWorkItem",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_queue.QueueIssue",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_queue.ReviewedExecutionPlan",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_queue.parse_reviewed_plan_yaml",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_queue.render_plan_repair_metadata",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
+    },
+    {
+      "import": "powdrr_lift.workrr.github_issue_queue.serialize_reviewed_plan_yaml",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
     },
     {
       "import": "powdrr_lift.workrr.llm.complete_json_with_timeout_retry",
       "owner_pr": 6,
-      "rationale": "Planning uses the existing bounded provider retry helper until provider and inference ownership moves in PR 6."
+      "rationale": "The legacy bounded JSON completion helper owns provider retry behavior; planning will consume the service inference contract after provider extraction."
+    },
+    {
+      "import": "powdrr_lift.workrr.multipr_structrr.MultiPRStructrrProposal",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still call the existing multi-PR Structrr proposal compiler/loader; relocate these semantic helpers into the service package while preserving proposal formats."
+    },
+    {
+      "import": "powdrr_lift.workrr.multipr_structrr.compile_multi_pr_proposal",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still call the existing multi-PR Structrr proposal compiler/loader; relocate these semantic helpers into the service package while preserving proposal formats."
+    },
+    {
+      "import": "powdrr_lift.workrr.multipr_structrr.load_multi_pr_proposal",
+      "owner_pr": 4,
+      "rationale": "Planning and repair still call the existing multi-PR Structrr proposal compiler/loader; relocate these semantic helpers into the service package while preserving proposal formats."
+    },
+    {
+      "import": "powdrr_lift.workrr.plan_sizing.CANONICAL_RUNTIMES",
+      "owner_pr": 4,
+      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
+    },
+    {
+      "import": "powdrr_lift.workrr.plan_sizing.ExplicitWorkUnit",
+      "owner_pr": 4,
+      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
+    },
+    {
+      "import": "powdrr_lift.workrr.plan_sizing.MAX_PR_WORK_UNITS",
+      "owner_pr": 4,
+      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
+    },
+    {
+      "import": "powdrr_lift.workrr.plan_sizing.PATH_RUNTIME_SUFFIXES",
+      "owner_pr": 4,
+      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
+    },
+    {
+      "import": "powdrr_lift.workrr.plan_sizing.TARGET_PR_WORK_UNITS",
+      "owner_pr": 4,
+      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
+    },
+    {
+      "import": "powdrr_lift.workrr.plan_sizing.allocate_explicit_work_units",
+      "owner_pr": 4,
+      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
+    },
+    {
+      "import": "powdrr_lift.workrr.procedrr.WorkrrProcedrrClient",
+      "owner_pr": 6,
+      "rationale": "Planning uses the existing Procedrr client for bounded model-backed questions; provider and private process runtime ownership is scheduled for inference-boundary extraction."
+    },
+    {
+      "import": "powdrr_lift.workrr.procedrr_operations.WorkrrOperationExecutor",
+      "owner_pr": 6,
+      "rationale": "Planning executes private Procedrr operations through the legacy executor; move this provider/process runtime behind the service inference boundary."
     },
     {
       "import": "powdrr_lift.workrr.protocol.WorkflowLLMClient",
       "owner_pr": 6,
-      "rationale": "The planning question runner consumes the existing provider protocol until the service inference contract replaces it in PR 6."
+      "rationale": "Planning consumes the legacy workflow LLM protocol until its request/response path is replaced by the serializable service inference contract."
     }
   ]
 }

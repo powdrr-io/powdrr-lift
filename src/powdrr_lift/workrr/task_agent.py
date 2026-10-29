@@ -3329,7 +3329,7 @@ class _TaskWorkflowExecutionStrategy:
         workflow_id = str(task_context.get("proposed_pr_id", "")).strip()
         if not workflow_id:
             raise PowdrrExecutionError("plan amendment requires proposed_pr_id")
-        from powdrr_lift.workrr.planning.repair_service import (
+        from powdrr_service.planning.repair_service import (
             PlanRepairServiceError,
             apply_repair_request,
             load_repair_draft,

@@ -347,6 +347,48 @@
     },
     {
       "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.plan_sizing",
+        "powdrr_service.planning.contracts",
+        "powdrr_service.planning.evidence",
+        "powdrr_service.planning.questions",
+        "powdrr_service.planning.source"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/assembly.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_service.planning.contracts"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/checkpoints.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.github_issue_plan_generation",
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_service.planning.evidence"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/compiler.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "4",
       "internal_imports": [],
       "kind": "python_module",
       "owner": "service",
@@ -357,16 +399,83 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
+        "powdrr_service.planning.assembly",
+        "powdrr_service.planning.contracts",
+        "powdrr_service.planning.evidence",
+        "powdrr_service.planning.questions",
+        "powdrr_service.planning.source"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/dependencies.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/evidence.py",
+      "rationale": "Service-owned, portable evidence record validation used by planning policies.",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
         "powdrr_lift.errors",
         "powdrr_lift.workrr.llm",
-        "powdrr_service.planning.contracts",
-        "powdrr_lift.workrr.protocol"
+        "powdrr_lift.workrr.protocol",
+        "powdrr_service.planning.contracts"
       ],
       "kind": "python_module",
       "owner": "service",
       "path": "packages/service/src/powdrr_service/planning/questions.py",
       "rationale": "service-owned bounded planning prompts, question execution, and answer correction",
       "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.github_issue_queue"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/repair.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.git",
+        "powdrr_lift.workrr.github_issue_plan_generation",
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_service.planning.repair"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/repair_service.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_lift.workrr.procedrr",
+        "powdrr_lift.workrr.procedrr_operations",
+        "powdrr_lift.workrr.protocol",
+        "powdrr_service.planning.checkpoints",
+        "powdrr_service.planning.questions"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/service.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": true
     },
     {
       "extraction_pr": "4",
@@ -380,6 +489,22 @@
       "path": "packages/service/src/powdrr_service/planning/source.py",
       "rationale": "service-owned pinned-source segmentation, obligation extraction, and coverage accounting",
       "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_service.planning.assembly",
+        "powdrr_service.planning.contracts",
+        "powdrr_service.planning.questions",
+        "powdrr_service.planning.source"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/structrr.py",
+      "rationale": "bounded planning, question, dependency, or repair policy",
+      "reviewed": true
     },
     {
       "extraction_pr": "8",
@@ -2770,44 +2895,35 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.plan_sizing",
-        "powdrr_service.planning.contracts",
-        "powdrr_lift.workrr.planning.evidence",
-        "powdrr_service.planning.questions",
-        "powdrr_service.planning.source"
+        "powdrr_service.planning.assembly"
       ],
       "kind": "python_module",
-      "owner": "service",
+      "owner": "split",
       "path": "src/powdrr_lift/workrr/planning/assembly.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
-      "reviewed": false
+      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
+      "reviewed": true
     },
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.github_issue_queue",
-        "powdrr_service.planning.contracts"
+        "powdrr_service.planning.checkpoints"
       ],
       "kind": "python_module",
-      "owner": "service",
+      "owner": "split",
       "path": "src/powdrr_lift/workrr/planning/checkpoints.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
-      "reviewed": false
+      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
+      "reviewed": true
     },
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.git",
-        "powdrr_lift.workrr.github_issue_plan_generation",
-        "powdrr_lift.workrr.github_issue_queue",
-        "powdrr_lift.workrr.multipr_structrr",
-        "powdrr_lift.workrr.planning.evidence"
+        "powdrr_service.planning.compiler"
       ],
       "kind": "python_module",
-      "owner": "service",
+      "owner": "split",
       "path": "src/powdrr_lift/workrr/planning/compiler.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
-      "reviewed": false
+      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
+      "reviewed": true
     },
     {
       "extraction_pr": "4",
@@ -2823,17 +2939,13 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.planning.assembly",
-        "powdrr_service.planning.contracts",
-        "powdrr_lift.workrr.planning.evidence",
-        "powdrr_service.planning.questions",
-        "powdrr_service.planning.source"
+        "powdrr_service.planning.dependencies"
       ],
       "kind": "python_module",
-      "owner": "service",
+      "owner": "split",
       "path": "src/powdrr_lift/workrr/planning/dependencies.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
-      "reviewed": false
+      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
+      "reviewed": true
     },
     {
       "extraction_pr": "4",
@@ -2885,47 +2997,35 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.git",
-        "powdrr_lift.workrr.github_issue_queue"
+        "powdrr_service.planning.repair"
       ],
       "kind": "python_module",
-      "owner": "service",
+      "owner": "split",
       "path": "src/powdrr_lift/workrr/planning/repair.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
-      "reviewed": false
+      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
+      "reviewed": true
     },
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.git",
-        "powdrr_lift.workrr.github_issue_plan_generation",
-        "powdrr_lift.workrr.github_issue_queue",
-        "powdrr_lift.workrr.multipr_structrr",
-        "powdrr_lift.workrr.planning.repair"
+        "powdrr_service.planning.repair_service"
       ],
       "kind": "python_module",
-      "owner": "service",
+      "owner": "split",
       "path": "src/powdrr_lift/workrr/planning/repair_service.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
-      "reviewed": false
+      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
+      "reviewed": true
     },
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.github_issue_queue",
-        "powdrr_lift.workrr.planning.checkpoints",
-        "powdrr_service.planning.questions",
-        "powdrr_lift.workrr.procedrr",
-        "powdrr_lift.workrr.procedrr_operations",
-        "powdrr_lift.workrr.protocol",
-        "procedrr",
-        "procedrr_evaluator.runtime"
+        "powdrr_service.planning.service"
       ],
       "kind": "python_module",
-      "owner": "service",
+      "owner": "split",
       "path": "src/powdrr_lift/workrr/planning/service.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
-      "reviewed": false
+      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
+      "reviewed": true
     },
     {
       "extraction_pr": "4",
@@ -2942,18 +3042,13 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.structrr.rebase",
-        "powdrr_lift.workrr.multipr_structrr",
-        "powdrr_lift.workrr.planning.assembly",
-        "powdrr_service.planning.contracts",
-        "powdrr_service.planning.questions",
-        "powdrr_service.planning.source"
+        "powdrr_service.planning.structrr"
       ],
       "kind": "python_module",
-      "owner": "service",
+      "owner": "split",
       "path": "src/powdrr_lift/workrr/planning/structrr.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
-      "reviewed": false
+      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
+      "reviewed": true
     },
     {
       "extraction_pr": "7",

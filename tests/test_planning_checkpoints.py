@@ -7,9 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
-from powdrr_lift.workrr.github_issue_queue import QueueIssue
-from powdrr_lift.workrr.planning.checkpoints import (
+from powdrr_service.planning.checkpoints import (
     MAX_CHECKPOINT_COMMENT_CHARS,
     GitHubCommentCheckpointStore,
     InMemoryCheckpointStore,
@@ -22,6 +20,8 @@ from powdrr_lift.workrr.planning.checkpoints import (
     reduce_checkpoint_comments,
     render_checkpoint_comments,
 )
+
+from powdrr_lift.workrr.github_issue_queue import QueueIssue
 from powdrr_lift.workrr.planning.contracts import PlanningContractError, Question
 
 

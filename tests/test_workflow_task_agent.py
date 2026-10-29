@@ -1658,7 +1658,7 @@ def test_plan_amendment_recovers_reviewed_context_for_nested_failure(
         proposal_path.as_posix(),
         workflow_path.as_posix(),
     ]
-    from powdrr_lift.workrr.planning import repair_service
+    from powdrr_service.planning import repair_service
 
     draft = SimpleNamespace(
         plan=object(),

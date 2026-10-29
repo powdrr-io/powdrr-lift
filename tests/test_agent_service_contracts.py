@@ -195,3 +195,14 @@ def test_legacy_service_imports_are_explicitly_owned() -> None:
                         actual.add(f"{node.module}.{alias.name}")
     assert actual == expected
     assert all(entry["owner_pr"] > 0 for entry in allowlist["entries"])
+
+
+def test_legacy_planning_imports_reexport_service_owned_implementations() -> None:
+    from powdrr_service.planning.assembly import PlannedWrite
+    from powdrr_service.planning.compiler import compile_plan
+
+    from powdrr_lift.workrr.planning.assembly import PlannedWrite as LegacyPlannedWrite
+    from powdrr_lift.workrr.planning.compiler import compile_plan as legacy_compile_plan
+
+    assert LegacyPlannedWrite is PlannedWrite
+    assert legacy_compile_plan is compile_plan

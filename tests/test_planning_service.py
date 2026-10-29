@@ -7,22 +7,23 @@ from pathlib import Path
 from threading import Barrier, Lock
 from typing import Any
 
-from powdrr_lift.workrr.github_issue_queue import QueueIssue
-from powdrr_lift.workrr.planning.checkpoints import InMemoryCheckpointStore
-from powdrr_lift.workrr.planning.contracts import EnumerationAnswer, Question
-from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
-from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
-from powdrr_lift.workrr.planning.questions import (
-    QuestionRequest,
-    SourceExcerpt,
-)
-from powdrr_lift.workrr.planning.service import (
+from powdrr_service.planning.checkpoints import InMemoryCheckpointStore
+from powdrr_service.planning.service import (
     PlanningOptions,
     PlanningSession,
     advance_planning_session,
     create_planning_session,
     load_planning_session,
     run_planning_procedrr,
+)
+
+from powdrr_lift.workrr.github_issue_queue import QueueIssue
+from powdrr_lift.workrr.planning.contracts import EnumerationAnswer, Question
+from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
+from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
+from powdrr_lift.workrr.planning.questions import (
+    QuestionRequest,
+    SourceExcerpt,
 )
 from powdrr_lift.workrr.planning.source import (
     PinnedSourceDocument,

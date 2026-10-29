@@ -3,10 +3,8 @@ from __future__ import annotations
 import hashlib
 
 import pytest
-
-from powdrr_lift.workrr.planning.assembly import WorkUnit
-from powdrr_lift.workrr.planning.contracts import PlanningContractError
-from powdrr_lift.workrr.planning.dependencies import (
+from powdrr_service.planning.assembly import WorkUnit
+from powdrr_service.planning.dependencies import (
     DependencyCandidate,
     DependencyCycleError,
     DependencyError,
@@ -36,6 +34,8 @@ from powdrr_lift.workrr.planning.dependencies import (
     parse_validation_proposal,
     parse_validation_record,
 )
+
+from powdrr_lift.workrr.planning.contracts import PlanningContractError
 from powdrr_lift.workrr.planning.evidence import Evidence
 from powdrr_lift.workrr.planning.source import (
     PinnedSourceDocument,

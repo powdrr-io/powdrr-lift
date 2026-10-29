@@ -1655,7 +1655,7 @@ def test_legacy_issue_checkpoint_is_readable_for_rolling_upgrade() -> None:
 def test_plan_repair_reconciles_all_affected_issues_idempotently(
     tmp_path: Path,
 ) -> None:
-    from powdrr_lift.workrr.planning.repair import (
+    from powdrr_service.planning.repair import (
         item_content_digest,
         item_input_contract_digest,
     )

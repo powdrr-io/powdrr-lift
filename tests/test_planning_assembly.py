@@ -4,12 +4,7 @@ import hashlib
 from dataclasses import replace
 
 import pytest
-
-from powdrr_lift.workrr.plan_sizing import (
-    ExplicitWorkUnit,
-    allocate_explicit_work_units,
-)
-from powdrr_lift.workrr.planning.assembly import (
+from powdrr_service.planning.assembly import (
     AllocationGroup,
     AssemblyError,
     PathFact,
@@ -23,6 +18,11 @@ from powdrr_lift.workrr.planning.assembly import (
     build_work_unit_proposal_request,
     parse_item_description,
     parse_work_unit_proposal,
+)
+
+from powdrr_lift.workrr.plan_sizing import (
+    ExplicitWorkUnit,
+    allocate_explicit_work_units,
 )
 from powdrr_lift.workrr.planning.contracts import PlanningContractError
 from powdrr_lift.workrr.planning.source import (
@@ -312,7 +312,7 @@ def test_cohesion_split_can_allocate_one_requirement_to_multiple_units() -> None
         "replacements": [proposal.to_data(), proposal.to_data()],
     }
 
-    from powdrr_lift.workrr.planning.assembly import parse_cohesion_decision
+    from powdrr_service.planning.assembly import parse_cohesion_decision
 
     result = parse_cohesion_decision(split, original=proposal, context=context)
 

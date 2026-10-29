@@ -550,7 +550,7 @@ def serialize_reviewed_plan_yaml(plan: ReviewedExecutionPlan) -> str:
         items.append(record)
     data["items"] = items
     if plan.planning is not None:
-        from powdrr_lift.workrr.planning.compiler import PlanningManifest
+        from powdrr_service.planning.compiler import PlanningManifest
 
         data["planning"] = PlanningManifest.from_data(plan.planning).to_data()
     return yaml.safe_dump(
@@ -1669,7 +1669,7 @@ def _task_checkpoint_callback(
             output_state=output_state,
             plan_id=target_plan.plan_id,
         )
-        from powdrr_lift.workrr.planning.repair import item_input_contract_digest
+        from powdrr_service.planning.repair import item_input_contract_digest
 
         if repo_root is not None:
             _write_local_task_checkpoint(
@@ -2229,7 +2229,7 @@ def _reconcile_merged_plan_repair(
         if item is not None:
             new_digest = repair["new_input_contract_digests"].get(item_id)
             if not isinstance(new_digest, str):
-                from powdrr_lift.workrr.planning.repair import (
+                from powdrr_service.planning.repair import (
                     item_input_contract_digest,
                 )
 
@@ -2568,7 +2568,7 @@ def _parse_plan(text: str) -> ReviewedExecutionPlan:
         try:
             # Local import keeps the legacy queue parser independent at module
             # import time while validating new metadata when it is present.
-            from powdrr_lift.workrr.planning.compiler import PlanningManifest
+            from powdrr_service.planning.compiler import PlanningManifest
 
             PlanningManifest.from_data(planning)
         except (ValueError, TypeError) as error:

@@ -264,7 +264,7 @@ files:
     rationale: Keep the example valid for planned paths already in the baseline.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 733, end_line: 890}
+    span: {start_line: 733, end_line: 907}
     summary: Build compact subject indexes and per-subject baseline context from planned paths and identities.
     rationale: Preserve relevant existing Structrr references without including unrelated repository data.
   - path: packages/service/src/powdrr_service/planning/structrr.py
@@ -279,12 +279,12 @@ files:
     rationale: Align the answer contract with the structural-subject validator.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 950, end_line: 950}
+    span: {start_line: 967, end_line: 967}
     summary: Keep the entity change schema independent from the full taxonomy list.
     rationale: Avoid serializing taxonomy values both as context and schema enum values.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 956, end_line: 956}
+    span: {start_line: 973, end_line: 973}
     summary: Represent entity type as a string in the compact response schema.
     rationale: The supplied taxonomy context and parser enforce allowed entity types.
   - path: packages/service/src/powdrr_service/planning/structrr.py
@@ -294,12 +294,12 @@ files:
     rationale: Allow a structural subject to cite every relevant source anchor when more than eight anchors are available.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 1215, end_line: 1220}
+    span: {start_line: 1232, end_line: 1237}
     summary: Let reference validation use a caller-specific maximum.
     rationale: Keep the eight-record page limit separate from the number of valid source references.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 1222, end_line: 1222}
+    span: {start_line: 1239, end_line: 1239}
     summary: Apply the requested maximum when validating reference arrays.
     rationale: Keep the source-reference count aligned with supplied anchors.
   - path: packages/service/src/powdrr_service/planning/structrr.py
@@ -309,12 +309,12 @@ files:
     rationale: Supply the file path to subject-specific change review for files introduced by earlier plan items.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 1005, end_line: 1027}
+    span: {start_line: 1022, end_line: 1044}
     summary: Resolve file subjects from either source identities or projected file paths.
     rationale: Allow later plan items to refer to files already added in the projected Structrr baseline.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 1051, end_line: 1057}
+    span: {start_line: 1068, end_line: 1074}
     summary: Recognize projected file paths when checking whether a subject already exists.
     rationale: Prevent a repeated file path from being treated as a new identity.
   - path: tests/test_planning_structrr.py
@@ -344,17 +344,17 @@ files:
     rationale: Verify that references remain bounded by known source evidence.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 89, end_line: 285}
+    span: {start_line: 89, end_line: 292}
     summary: Verify structural questions omit unrelated baseline records and entity identity indexes.
     rationale: Catch oversized prompts before they block real planning sessions.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 312, end_line: 325}
+    span: {start_line: 319, end_line: 332}
     summary: Accept all nine supplied source anchors for one structural subject.
     rationale: Prevent a valid answer from failing because the record-count limit was incorrectly applied to source references.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 390, end_line: 411}
+    span: {start_line: 397, end_line: 418}
     summary: Accept a file path already present in the projected files baseline.
     rationale: Reproduce references to files introduced by earlier plan items and retain the path for change review.
 entities:

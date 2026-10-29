@@ -2,8 +2,8 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1182
 title: Make large plan generation scale and recover
 intent:
-  problem: CP-SAT plan partition searches can consume hours of CPU on large plans, and an item description with four one-unit scope entries repeatedly fails the three-entry contract.
-  goal: Preserve plan-sizing constraints with deterministic dynamic programming and combine valid adjacent scope entries when a model answer exceeds the contract's scope-entry limit.
+  problem: CP-SAT plan partition searches can consume hours of CPU on large plans, an item description with four one-unit scope entries repeatedly fails the three-entry contract, and dependency discovery can schedule a producer/consumer question for every pair of work units.
+  goal: Preserve plan-sizing constraints with deterministic dynamic programming, recover valid item descriptions that exceed the scope-entry limit, and bound dependency review to deterministic shared-file ordering plus evidence-based individual questions.
 human-decisions: []
 structured_files: []
 files:
@@ -112,6 +112,151 @@ files:
     span: {start_line: 359, end_line: 386}
     summary: Verify four valid scope records normalize to three without losing unit assignments.
     rationale: Prevent a repeated description-shape error from blocking planning.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Add token counting and pending output access for dependency candidate discovery.
+    rationale: Build deterministic dependency candidates from accepted work unit details.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 328, end_line: 420}
+    summary: Order shared-file writers and discover a bounded set of dependency questions.
+    rationale: Avoid all-pairs LLM review while retaining explicit output references and rare semantic matches.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Import the allocated work-unit result type for dependency discovery.
+    rationale: Return allocation and bounded dependency candidates together.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 34, end_line: 34}
+    summary: Import the dependency discovery result type.
+    rationale: Represent deterministic write ordering and bounded confirmation pairs.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 38, end_line: 38}
+    summary: Import single-pair dependency confirmation.
+    rationale: Keep LLM review questions focused on one candidate pair.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 40, end_line: 40}
+    summary: Import deterministic dependency candidate discovery.
+    rationale: Generate a bounded set of dependency questions before review.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 645, end_line: 659}
+    summary: Ask individual questions only for candidate dependencies.
+    rationale: Preserve small review questions while preventing a million-question expansion on large plans.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 664, end_line: 675}
+    summary: Prepare the candidate confirmation request and deterministic shared-file edges.
+    rationale: Preserve dependency edges without asking the model about overlapping file writes.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 679, end_line: 689}
+    summary: Add required candidate answers to the dependency graph.
+    rationale: Keep only confirmed producer-to-consumer dependencies.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 692, end_line: 701}
+    summary: Reconstruct allocation and dependency candidates from accepted proposals.
+    rationale: Use the same candidate set for issuing questions and assembling edges.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 919, end_line: 919}
+    summary: Keep structural subject enumeration requests separate.
+    rationale: Bound correction context and allow independent item questions to run concurrently.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 962, end_line: 962}
+    summary: Keep structural change requests separate.
+    rationale: Prevent large multi-subject corrections from exceeding the question input limit.
+  - path: tests/test_planning_dependencies.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Import dataclass replacement for dependency fixtures.
+    rationale: Construct candidate units with specific dependency evidence.
+  - path: tests/test_planning_dependencies.py
+    type: modified
+    span: {start_line: 7, end_line: 11}
+    summary: Import planned-write fixtures for dependency discovery tests.
+    rationale: Cover deterministic write ordering and output-path matches.
+  - path: tests/test_planning_dependencies.py
+    type: modified
+    span: {start_line: 35, end_line: 35}
+    summary: Import deterministic dependency candidate discovery.
+    rationale: Exercise candidate pruning directly in regression tests.
+  - path: tests/test_planning_dependencies.py
+    type: modified
+    span: {start_line: 226, end_line: 300}
+    summary: Cover shared-file ordering, unrelated pair pruning, semantic candidates, and explicit output-path references.
+    rationale: Verify dependency discovery remains bounded without losing concrete evidence.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 880, end_line: 882}
+    summary: Give the dependency fixture an explicit reference to the producer output path.
+    rationale: Keep the simulated dependency grounded in evidence accepted by candidate discovery.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 905, end_line: 905}
+    summary: Use the individual dependency confirmation question kind in the service fixture.
+    rationale: Align the fixture with focused dependency review prompts.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 907, end_line: 910}
+    summary: Answer the individual dependency confirmation contract in the planner fixture.
+    rationale: Keep the service test aligned with small per-pair dependency questions.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 913, end_line: 918}
+    summary: Assert structural subject questions remain individual requests.
+    rationale: Prevent batching from making correction context unbounded.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 421, end_line: 421}
+    summary: Send a path-relevant Structrr subject index during item enumeration.
+    rationale: Keep the full baseline available for validation while bounding question context.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 539, end_line: 539}
+    summary: Include only the current structural subject and directly related baseline records in change questions.
+    rationale: Avoid serializing the entire repository snapshot for one subject review.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 640, end_line: 641}
+    summary: Build the subject enumeration example from the path-relevant baseline index.
+    rationale: Keep example references consistent with the narrowed baseline facts.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 652, end_line: 662}
+    summary: Use an existing relevant file subject in the example when available.
+    rationale: Keep the example valid for planned paths already in the baseline.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 678, end_line: 837}
+    summary: Build compact subject indexes and per-subject baseline context from planned paths and identities.
+    rationale: Preserve relevant existing Structrr references without including unrelated repository data.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Import hashing support for a pinned planning source fixture.
+    rationale: Construct a valid source excerpt for bounded question tests.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 8, end_line: 9}
+    summary: Import bounded question serialization and source construction helpers.
+    rationale: Verify structural prompts respect the serialized input limit.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 16, end_line: 17}
+    summary: Import structural question builders for regression coverage.
+    rationale: Test enumeration and per-subject change requests against a large baseline.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 88, end_line: 174}
+    summary: Verify structural questions omit unrelated baseline records while retaining relevant identities.
+    rationale: Catch oversized prompts before they block real planning sessions.
 entities:
   - id: explicit-work-unit-allocation
     type: Function
@@ -128,6 +273,18 @@ entities:
   - id: excess-scope-entry-regression
     type: Regression test
     action: added
+  - id: bounded-dependency-candidate-discovery
+    type: Function
+    action: added
+  - id: dependency-discovery-regressions
+    type: Regression test
+    action: added
+  - id: bounded-structural-baseline-context
+    type: Function
+    action: added
+  - id: bounded-structural-context-regression
+    type: Regression test
+    action: added
 entity_relationships:
   - id: large-plan-test-verifies-explicit-allocation
     type: verifies
@@ -141,8 +298,20 @@ entity_relationships:
     target: item-description-scope-normalizer
     action: added
     description: The regression verifies adjacent scope entries merge while each work unit remains assigned once and in order.
+  - id: dependency-discovery-tests-verify-candidate-pruning
+    type: verifies
+    source: dependency-discovery-regressions
+    target: bounded-dependency-candidate-discovery
+    action: added
+    description: Regressions check deterministic ordering for shared writes, prune unrelated pairs, and retain evidence-based candidates.
+  - id: structural-context-test-verifies-bounded-baseline
+    type: verifies
+    source: bounded-structural-context-regression
+    target: bounded-structural-baseline-context
+    action: added
+    description: The regression serializes both structural subject enumeration and change questions against a large baseline and confirms unrelated records are excluded.
 invariants:
   - id: plan-sizing-completes-with-predictable-runtime
-    description: Plan sizing optimizes contiguous group assignments within configured constraints, and item-description recovery preserves every assigned work unit while enforcing the scope-entry limit.
+    description: Plan sizing optimizes contiguous group assignments within configured constraints, item-description recovery preserves every assigned work unit while enforcing the scope-entry limit, dependency discovery emits only bounded evidence-based questions while ordering shared-file writes deterministically, and Structrr questions include only baseline subjects relevant to the current item or change.
     action: altered
 guidance: []

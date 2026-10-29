@@ -418,10 +418,7 @@ def build_subject_enumeration_request(
     )
     baseline_fact = ContextRecord(
         f"projected-structrr:{item_id}:{snapshot_digest(projected_baseline)[:20]}",
-        {
-            "fingerprint": snapshot_digest(projected_baseline),
-            "snapshot": dict(projected_baseline),
-        },
+        _structural_subject_index(projected_baseline, units),
     )
     prior_facts = tuple(
         ContextRecord(
@@ -539,7 +536,7 @@ def build_structural_change_request(
         ),
         ContextRecord(
             f"projected-baseline:{subject.item_id}:{snapshot_digest(projected_baseline)[:20]}",
-            {"snapshot": dict(projected_baseline)},
+            _structural_change_baseline_context(projected_baseline, subject),
         ),
         ContextRecord("entity-taxonomy", {"entity_types": list(taxonomy_entity_types)}),
         ContextRecord("planned-paths", {"paths": sorted(planned_paths)}),
@@ -640,11 +637,23 @@ def _example_subject_page(
 ) -> Mapping[str, Any]:
     unit = units[0]
     paths = [write.path for candidate in units for write in candidate.planned_writes]
-    existing_entities = _record_ids(projected_baseline, "entities", "id")
+    subject_index = _structural_subject_index(projected_baseline, units)
+    existing_entities = _record_ids(subject_index, "entities", "id")
     if existing_entities:
         candidate = {
             "section": "entities",
             "subject_ref": sorted(existing_entities)[0],
+            "new_identity_description": None,
+            "action": "changed",
+            "requirement_ids": [unit.requirement_ids[0]],
+            "unit_ids": [unit.id],
+            "source_refs": [source_refs[0]],
+        }
+    elif subject_index["source_subjects"]:
+        existing_file = subject_index["source_subjects"][0]
+        candidate = {
+            "section": "files",
+            "subject_ref": existing_file["stable_key"],
             "new_identity_description": None,
             "action": "changed",
             "requirement_ids": [unit.requirement_ids[0]],
@@ -664,6 +673,166 @@ def _example_subject_page(
     else:
         return {"records": [], "has_more": False, "next_anchor": None}
     return {"records": [candidate], "has_more": False, "next_anchor": None}
+
+
+def _structural_subject_index(
+    snapshot: Mapping[str, Any], units: Sequence[WorkUnit]
+) -> dict[str, Any]:
+    """Give subject enumeration a compact baseline index for this item's paths."""
+    paths = {
+        write.path for unit in units for write in unit.planned_writes if write.path
+    }
+    entity_records = _mapping_records(snapshot.get("entities"))
+    relevant_entities = [
+        record
+        for record in entity_records
+        if record.get("path") in paths
+        or record.get("id") in {f"file:{path}" for path in paths}
+        or record.get("id") in paths
+    ]
+    relevant_entity_ids = {
+        str(record["id"])
+        for record in relevant_entities
+        if isinstance(record.get("id"), str)
+    }
+    source_subjects = [
+        record
+        for record in _mapping_records(snapshot.get("source_subjects"))
+        if record.get("path") in paths and isinstance(record.get("stable_key"), str)
+    ]
+    relationships = [
+        record
+        for record in _mapping_records(snapshot.get("entity_relationships"))
+        if record.get("source") in relevant_entity_ids
+        or record.get("target") in relevant_entity_ids
+    ]
+    files = [
+        record
+        for record in _mapping_records(snapshot.get("files"))
+        if record.get("path") in paths
+    ]
+    return {
+        "fingerprint": snapshot_digest(snapshot),
+        "planned_paths": sorted(paths),
+        "entities": [
+            _pick_fields(record, ("id", "type", "name", "path"))
+            for record in relevant_entities
+        ],
+        "entity_relationships": [
+            _pick_fields(record, ("id", "source", "relationship", "target"))
+            for record in relationships
+        ],
+        "files": [
+            _pick_fields(record, ("path", "summary", "rationale", "entities"))
+            for record in files
+        ],
+        "source_subjects": [
+            _pick_fields(
+                record,
+                (
+                    "stable_key",
+                    "path",
+                    "kind",
+                    "qualified_name",
+                    "language",
+                    "file_entity_id",
+                    "span",
+                ),
+            )
+            for record in source_subjects
+        ],
+    }
+
+
+def _structural_change_baseline_context(
+    snapshot: Mapping[str, Any], subject: BoundStructuralSubject
+) -> dict[str, Any]:
+    """Provide the one existing subject and its direct references to change review."""
+    subject_id = subject.subject_id
+    paths = {subject.planned_path} if subject.planned_path else set()
+    entities = _mapping_records(snapshot.get("entities"))
+    relationships = _mapping_records(snapshot.get("entity_relationships"))
+    source_subjects = _mapping_records(snapshot.get("source_subjects"))
+    files = _mapping_records(snapshot.get("files"))
+    target_relationship = next(
+        (record for record in relationships if record.get("id") == subject_id),
+        None,
+    )
+    related_entity_ids = {subject_id}
+    if target_relationship is not None:
+        related_entity_ids.update(
+            value
+            for value in (
+                target_relationship.get("source"),
+                target_relationship.get("target"),
+            )
+            if isinstance(value, str)
+        )
+    relevant_entities = [
+        record
+        for record in entities
+        if record.get("id") in related_entity_ids or record.get("path") in paths
+    ]
+    related_entity_ids.update(
+        str(record["id"])
+        for record in relevant_entities
+        if isinstance(record.get("id"), str)
+    )
+    relevant_relationships = [
+        record
+        for record in relationships
+        if record.get("id") == subject_id
+        or record.get("source") in related_entity_ids
+        or record.get("target") in related_entity_ids
+    ]
+    relevant_source_subjects = [
+        record
+        for record in source_subjects
+        if record.get("stable_key") == subject_id
+        or record.get("path") in paths
+        or record.get("file_entity_id") in related_entity_ids
+    ]
+    relevant_files = [record for record in files if record.get("path") in paths]
+    return {
+        "fingerprint": snapshot_digest(snapshot),
+        "entities": [
+            _pick_fields(record, ("id", "type", "name", "path"))
+            for record in relevant_entities
+        ],
+        "entity_relationships": [
+            _pick_fields(record, ("id", "source", "relationship", "target"))
+            for record in relevant_relationships
+        ],
+        "files": [
+            _pick_fields(record, ("path", "summary", "rationale", "entities"))
+            for record in relevant_files
+        ],
+        "source_subjects": [
+            _pick_fields(
+                record,
+                (
+                    "stable_key",
+                    "path",
+                    "kind",
+                    "qualified_name",
+                    "language",
+                    "file_entity_id",
+                    "span",
+                ),
+            )
+            for record in relevant_source_subjects
+        ],
+    }
+
+
+def _mapping_records(value: Any) -> list[Mapping[str, Any]]:
+    if not isinstance(value, list):
+        return []
+    return [record for record in value if isinstance(record, Mapping)]
+
+
+def _pick_fields(record: Mapping[str, Any], fields: Sequence[str]) -> dict[str, Any]:
+    return {field: record[field] for field in fields if field in record}
 
 
 def _validate_desired_content(

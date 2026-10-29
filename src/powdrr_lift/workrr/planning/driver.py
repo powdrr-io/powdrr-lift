@@ -10,6 +10,7 @@ from typing import Any
 from powdrr_service.planning.assembly import (
     MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
     MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
+    AllocatedWorkUnits,
     AllocationGroup,
     ItemDescription,
     PathFact,
@@ -30,11 +31,13 @@ from powdrr_service.planning.compiler import (
 )
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.dependencies import (
+    DependencyCandidateDiscovery,
     DependencyGraph,
     UnitDependencyEdge,
     Validation,
-    build_dependency_graph_review_requests,
+    build_dependency_confirmation_request,
     compile_dependency_graph,
+    discover_dependency_candidates,
 )
 from powdrr_service.planning.questions import (
     QuestionRequest,
@@ -639,26 +642,62 @@ class SourceLedgerQuestionMachine:
     def _dependency_requests(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[QuestionRequest[Any], ...]:
-        context, proposals = self._accepted_work_unit_proposals(accepted_answers)
-        allocation = allocate_work_units(proposals, context=context)
-        return build_dependency_graph_review_requests(
-            allocation.units, allocation.pending_outputs
-        )
+        allocation, discovery = self._dependency_discovery(accepted_answers)
+        units = {unit.id: unit for unit in allocation.units}
+        requests: list[QuestionRequest[Any]] = []
+        for pending_output, consumer in discovery.confirmation_pairs:
+            producer = units[pending_output.unit_id]
+            requests.append(
+                build_dependency_confirmation_request(
+                    producer,
+                    consumer,
+                    pending_output.description,
+                    allowed_requirement_ids=set(producer.requirement_ids)
+                    | set(consumer.requirement_ids),
+                )
+            )
+        return tuple(requests)
 
     def accepted_dependency_edges(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[UnitDependencyEdge, ...]:
-        context, proposals = self._accepted_work_unit_proposals(accepted_answers)
-        allocation = allocate_work_units(proposals, context=context)
-        edges: list[UnitDependencyEdge] = []
-        for request in build_dependency_graph_review_requests(
-            allocation.units, allocation.pending_outputs
-        ):
+        allocation, discovery = self._dependency_discovery(accepted_answers)
+        units = {unit.id: unit for unit in allocation.units}
+        edges = list(discovery.write_order_edges)
+        for pending_output, consumer in discovery.confirmation_pairs:
+            producer = units[pending_output.unit_id]
+            request = build_dependency_confirmation_request(
+                producer,
+                consumer,
+                pending_output.description,
+                allowed_requirement_ids=set(producer.requirement_ids)
+                | set(consumer.requirement_ids),
+            )
             answer = request.parse_answer(
                 accepted_answers[request.question.question_id]
             )
-            edges.extend(answer)
+            if answer.required:
+                assert answer.output is not None
+                edges.append(
+                    UnitDependencyEdge(
+                        producer.id,
+                        consumer.id,
+                        answer.output,
+                        answer.reason,
+                        answer.requirement_ids,
+                    )
+                )
         return tuple(edges)
+
+    def _dependency_discovery(
+        self, accepted_answers: Mapping[str, Mapping[str, Any]]
+    ) -> tuple[AllocatedWorkUnits, DependencyCandidateDiscovery]:
+        context, proposals = self._accepted_work_unit_proposals(accepted_answers)
+        allocation = allocate_work_units(proposals, context=context)
+        discovery = discover_dependency_candidates(
+            allocation.units, allocation.pending_outputs
+        )
+        return allocation, discovery
 
     def accepted_assembly(
         self,
@@ -877,7 +916,7 @@ class SourceLedgerQuestionMachine:
                         break
                     page_ordinal += 1
             if pending_enumerations:
-                return batch_question_requests(pending_enumerations)
+                return tuple(pending_enumerations)
 
             known_entity_ids = {
                 str(entity.get("id"))
@@ -920,7 +959,7 @@ class SourceLedgerQuestionMachine:
                     if operation is not None:
                         prior_operations.append(operation)
             if pending_changes:
-                return batch_question_requests(pending_changes)
+                return tuple(pending_changes)
             completed.update(ready_item_ids)
         return ()
 

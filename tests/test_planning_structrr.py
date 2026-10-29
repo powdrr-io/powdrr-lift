@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 import pytest
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
+from powdrr_service.planning.questions import build_question_messages
+from powdrr_service.planning.source import PinnedSourceDocument, segment_markdown_source
 from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
     StructrrPlanningError,
     StructuralSubjectPage,
     UnorderedStructrrConflict,
     bind_structural_operation,
+    build_structural_change_request,
+    build_subject_enumeration_request,
     compile_structrr_plan,
     complete_subject_enumeration,
     parse_structural_change,
@@ -78,6 +83,93 @@ def _parse_page(
         prior_subject_ids=prior or set(),
         page_ordinal=page_ordinal,
     )
+
+
+def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
+    unrelated_payload = "unrelated-baseline-detail-" + ("x" * 1_000)
+    baseline = {
+        "entities": [
+            {"id": f"file:src/unrelated-{index}.py", "description": unrelated_payload}
+            for index in range(80)
+        ]
+        + [{"id": "file:src/relevant.py", "type": "Source file"}],
+        "entity_relationships": [],
+        "files": [
+            {"path": f"src/unrelated-{index}.py", "summary": unrelated_payload}
+            for index in range(50)
+        ]
+        + [{"path": "src/relevant.py", "summary": "Relevant source file."}],
+        "source_subjects": [
+            {
+                "stable_key": f"python::unrelated_{index}",
+                "path": f"src/unrelated-{index}.py",
+                "qualified_name": unrelated_payload,
+            }
+            for index in range(80)
+        ]
+        + [
+            {
+                "stable_key": "python::relevant",
+                "path": "src/relevant.py",
+                "kind": "module",
+                "qualified_name": "relevant",
+            }
+        ],
+    }
+    unit = _unit(
+        writes=(PlannedWrite("src/relevant.py", "implementation", "python", (), ()),)
+    )
+    text = "# Plan\n\nUpdate the relevant module.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+
+    enumeration = build_subject_enumeration_request(
+        plan_id="plan",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline=baseline,
+    )
+    enumeration_messages = build_question_messages(enumeration)
+    enumeration_input = enumeration_messages[1]["content"]
+
+    subject = BoundStructuralSubject(
+        "python::relevant",
+        "files",
+        "item-0001",
+        "changed",
+        ("req-01",),
+        (unit.id,),
+        (source_ref,),
+        False,
+        "src/relevant.py",
+    )
+    change = build_structural_change_request(
+        subject,
+        projected_baseline=baseline,
+        taxonomy_entity_types=("Source file",),
+        planned_paths={"src/relevant.py"},
+        known_entity_ids={f"file:src/unrelated-{index}.py" for index in range(80)},
+        valid_example={"result": "unchanged", "reason": "Already satisfied."},
+    )
+    change_input = build_question_messages(change)[1]["content"]
+
+    assert "python::relevant" in enumeration_input
+    assert "python::unrelated_0" not in enumeration_input
+    assert unrelated_payload not in enumeration_input
+    assert "python::relevant" in change_input
+    assert "python::unrelated_0" not in change_input
+    assert unrelated_payload not in change_input
 
 
 def test_structural_subject_pages_cover_all_subjects_and_require_final_page() -> None:

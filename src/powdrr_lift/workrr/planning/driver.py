@@ -331,13 +331,14 @@ class SourceLedgerQuestionMachine:
                 offset : offset + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
             ]
             cursor: str | None = None
-            records: list[WorkUnitProposal] = []
+            remaining_requirement_ids = requirement_ids
             while True:
                 request = build_work_unit_proposal_request(
                     context,
-                    requirement_ids,
-                    valid_example=self._work_unit_example(context, requirement_ids),
-                    page_after=cursor,
+                    remaining_requirement_ids,
+                    valid_example=self._work_unit_example(
+                        context, remaining_requirement_ids
+                    ),
                 )
                 answer = accepted_answers.get(request.question.question_id)
                 if answer is None:
@@ -351,11 +352,15 @@ class SourceLedgerQuestionMachine:
                     )
                     requests.append(request)
                     break
-                records.extend(page.records)
                 if not page.has_more:
                     requests.append(None)
                     break
                 cursor = page.next_anchor
+                assert cursor is not None
+                cursor_index = remaining_requirement_ids.index(cursor)
+                remaining_requirement_ids = remaining_requirement_ids[
+                    cursor_index + 1 :
+                ]
         return tuple(requests)
 
     def _work_unit_context(

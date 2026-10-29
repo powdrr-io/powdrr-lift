@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 from powdrr_service.planning.assembly import (
@@ -27,6 +28,7 @@ from powdrr_lift.workrr.plan_sizing import (
     allocate_explicit_work_units,
 )
 from powdrr_lift.workrr.planning.contracts import PlanningContractError
+from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
 from powdrr_lift.workrr.planning.source import (
     PinnedSourceDocument,
     Requirement,
@@ -445,6 +447,57 @@ def test_work_unit_page_cursor_is_derived_and_cannot_skip_uncovered_requirements
         {"records": [final_proposal], "has_more": False, "next_anchor": None}
     )
     assert final_page.next_anchor is None
+
+
+def test_work_unit_continuation_only_includes_uncovered_requirements(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_context, anchor = _context()
+    requirement_ids = ("req-0013", "req-0014", "req-0015", "req-0016")
+    base_requirement = base_context.requirements["req-0001"]
+    requirements = {
+        requirement_id: replace(base_requirement, id=requirement_id)
+        for requirement_id in requirement_ids
+    }
+    context = replace(
+        base_context,
+        requirements=requirements,
+        unresolved_requirement_ids=requirement_ids,
+    )
+    machine = SourceLedgerQuestionMachine(context.source)
+    ledger = SimpleNamespace(requirements=tuple(requirements.values()))
+    coverage = tuple(
+        SimpleNamespace(
+            requirement_id=requirement_id,
+            answer=SimpleNamespace(status="missing"),
+        )
+        for requirement_id in requirement_ids
+    )
+    monkeypatch.setattr(machine, "_parse_source_ledger", lambda _answers: ledger)
+    monkeypatch.setattr(machine, "accepted_coverage", lambda _answers: coverage)
+    monkeypatch.setattr(
+        machine, "_work_unit_context", lambda _ledger, _unresolved: context
+    )
+
+    initial_request = machine._work_unit_requests({})[0]
+    assert initial_request is not None
+    proposals = []
+    for requirement_id in requirement_ids[:3]:
+        proposal = _proposal(context, anchor)
+        proposal["requirement_ids"] = [requirement_id]
+        proposals.append(proposal)
+    accepted = {
+        initial_request.question.question_id: {
+            "records": proposals,
+            "has_more": True,
+            "next_anchor": None,
+        }
+    }
+
+    continuation = machine._work_unit_requests(accepted)[0]
+
+    assert continuation is not None
+    assert continuation.question.subject_ids == ("req-0016",)
 
 
 def test_cohesion_question_example_passes_its_parser() -> None:

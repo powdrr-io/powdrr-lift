@@ -16,6 +16,11 @@ from powdrr_service.planning.contracts import (
     PlanningContractError,
     Question,
 )
+from powdrr_service.planning.questions import (
+    ContextRecord,
+    QuestionRequest,
+    SourceExcerpt,
+)
 
 from powdrr_lift.workrr.plan_sizing import (
     CANONICAL_RUNTIMES,
@@ -26,11 +31,6 @@ from powdrr_lift.workrr.plan_sizing import (
     allocate_explicit_work_units,
 )
 from powdrr_lift.workrr.planning.evidence import Evidence
-from powdrr_lift.workrr.planning.questions import (
-    ContextRecord,
-    QuestionRequest,
-    SourceExcerpt,
-)
 from powdrr_lift.workrr.planning.source import Requirement, SegmentedSource
 
 MAX_WORK_UNIT_CRITERIA = 2

@@ -19,6 +19,13 @@ from io import StringIO
 from pathlib import Path
 from typing import Any, Protocol
 
+from powdrr_service.planning.questions import (
+    AcceptedQuestionAnswer,
+    NeedsQuestionAnswer,
+    QuestionRequest,
+    run_question,
+)
+
 from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueClient,
     GitHubIssueQueueError,
@@ -28,12 +35,6 @@ from powdrr_lift.workrr.planning.checkpoints import (
     CheckpointStore,
     PlanningCheckpoint,
     PlanningJournalError,
-)
-from powdrr_lift.workrr.planning.questions import (
-    AcceptedQuestionAnswer,
-    NeedsQuestionAnswer,
-    QuestionRequest,
-    run_question,
 )
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor

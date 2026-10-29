@@ -186,7 +186,7 @@ def test_legacy_service_imports_are_explicitly_owned() -> None:
     expected = {entry["import"] for entry in allowlist["entries"]}
     actual: set[str] = set()
     package = repository / "packages/service/src/powdrr_service"
-    for source in package.glob("*.py"):
+    for source in package.rglob("*.py"):
         tree = ast.parse(source.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
             if isinstance(node, ast.ImportFrom) and node.module:

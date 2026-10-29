@@ -5,6 +5,12 @@ from collections import defaultdict, deque
 from typing import Any
 
 import pytest
+from powdrr_service.planning.questions import (
+    QuestionRequest as ServiceQuestionRequest,
+)
+from powdrr_service.planning.questions import (
+    run_question as service_run_question,
+)
 
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
@@ -42,6 +48,12 @@ def test_question_size_contract_constants_are_fixed() -> None:
     assert MAX_QUESTION_INPUT_CHARS == 24_000
     assert MAX_SOURCE_BLOCK_CHARS == 8_000
     assert MAX_QUESTION_ANSWER_CHARS == 4_000
+
+
+def test_legacy_question_imports_use_service_owned_implementation() -> None:
+    assert QuestionRequest is ServiceQuestionRequest
+    assert run_question is service_run_question
+    assert run_question.__module__ == "powdrr_service.planning.questions"
 
 
 def _question(

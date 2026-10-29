@@ -23,6 +23,7 @@ from powdrr_lift.workrr.git import slugify_workflow_id
 from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_lift.workrr.multipr_structrr import MultiPRStructrrProposal
 from powdrr_lift.workrr.planning.assembly import (
+    MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
     AllocationGroup,
     ItemDescription,
     PathFact,
@@ -315,8 +316,12 @@ class SourceLedgerQuestionMachine:
             return ()
         context = self._work_unit_context(ledger, unresolved)
         requests: list[QuestionRequest[Any] | None] = []
-        for offset in range(0, len(unresolved), 8):
-            requirement_ids = unresolved[offset : offset + 8]
+        for offset in range(
+            0, len(unresolved), MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+        ):
+            requirement_ids = unresolved[
+                offset : offset + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+            ]
             cursor: str | None = None
             records: list[WorkUnitProposal] = []
             while True:

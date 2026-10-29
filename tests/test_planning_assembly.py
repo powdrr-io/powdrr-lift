@@ -10,6 +10,8 @@ from powdrr_lift.workrr.plan_sizing import (
     allocate_explicit_work_units,
 )
 from powdrr_lift.workrr.planning.assembly import (
+    MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
+    MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
     AllocationGroup,
     AssemblyError,
     PathFact,
@@ -272,8 +274,9 @@ def test_item_description_question_example_passes_its_parser() -> None:
 
 def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> None:
     context, anchor = _context()
+    example_proposal = _proposal(context, anchor)
     example = {
-        "records": [_proposal(context, anchor)],
+        "records": [example_proposal],
         "has_more": False,
         "next_anchor": None,
     }
@@ -284,6 +287,26 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
+    assert (
+        request.answer_schema["properties"]["records"]["maxItems"]
+        == MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+    )
+    assert MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION == 4
+    with pytest.raises(PlanningContractError, match="must contain"):
+        request.parse_answer(
+            {
+                "records": [example_proposal] * 4,
+                "has_more": False,
+                "next_anchor": None,
+            }
+        )
+
+    with pytest.raises(ValueError, match="one to four requirements"):
+        build_work_unit_proposal_request(
+            context,
+            ["req-0001"] * 5,
+            valid_example=example,
+        )
 
     next_page = build_work_unit_proposal_request(
         context, ["req-0001"], valid_example=example, page_after=anchor

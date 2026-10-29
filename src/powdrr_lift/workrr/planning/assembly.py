@@ -36,6 +36,8 @@ from powdrr_lift.workrr.planning.evidence import Evidence
 MAX_WORK_UNIT_CRITERIA = 2
 MAX_ITEM_CRITERIA = 5
 MAX_ITEM_SCOPE_ENTRIES = 3
+MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION = 4
+MAX_WORK_UNIT_PROPOSALS_PER_PAGE = 3
 _ROLES = frozenset({"implementation", "test", "configuration", "documentation"})
 _RUNTIME_VALUES = frozenset({*CANONICAL_RUNTIMES, "neutral"})
 _NEUTRAL_SUFFIXES = frozenset(
@@ -70,7 +72,7 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
     "properties": {
         "records": {
             "type": "array",
-            "maxItems": MAX_ENUMERATION_RECORDS,
+            "maxItems": MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -533,7 +535,9 @@ def parse_work_unit_proposal_page(
     after_anchor: str | None = None,
 ) -> RequirementEnumerationPage:
     _exact_fields(value, {"records", "has_more", "next_anchor"}, "/")
-    raw_records = _array(value["records"], "/records", maximum=MAX_ENUMERATION_RECORDS)
+    raw_records = _array(
+        value["records"], "/records", maximum=MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+    )
     proposals = tuple(
         parse_work_unit_proposal(item, context=context)
         if isinstance(item, Mapping)
@@ -673,9 +677,9 @@ def build_work_unit_proposal_request(
     valid_example: Mapping[str, Any],
     page_after: str | None = None,
 ) -> QuestionRequest[RequirementEnumerationPage]:
-    """Build one bounded enumeration question for at most eight requirements."""
-    if not 1 <= len(requirement_ids) <= MAX_ENUMERATION_RECORDS:
-        raise ValueError("work-unit questions require one to eight requirements")
+    """Build one bounded enumeration question for a small requirement set."""
+    if not 1 <= len(requirement_ids) <= MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION:
+        raise ValueError("work-unit questions require one to four requirements")
     if len(set(requirement_ids)) != len(requirement_ids):
         raise ValueError("work-unit question requirement IDs must be unique")
     if not set(requirement_ids) <= set(context.unresolved_requirement_ids):
@@ -781,8 +785,9 @@ def build_work_unit_proposal_request(
             "step, at most two acceptance criteria, actual planned file writes, "
             "and required outputs that later work may consume. Do not invent "
             "requirement, component, validation, evidence, or source IDs. Split "
-            "different implementation runtimes into separate units. Return a "
-            "page of at most eight records."
+            "different implementation runtimes into separate units. Keep all "
+            "descriptions concise. Return at most three records per page, within "
+            "the 4,000-character answer limit; set has_more when more units remain."
         ),
         answer_field_definitions={
             "records": "WorkUnitProposal records with the exact fields in the schema.",

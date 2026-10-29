@@ -538,7 +538,7 @@ def build_structural_change_request(
     known_entity_ids: set[str],
     valid_example: Mapping[str, Any],
 ) -> QuestionRequest[StructuralChange]:
-    facts = (
+    facts = [
         ContextRecord(
             f"subject:{subject.section}:{subject.subject_id}", subject.to_data()
         ),
@@ -546,11 +546,21 @@ def build_structural_change_request(
             f"projected-baseline:{subject.item_id}:{snapshot_digest(projected_baseline)[:20]}",
             _structural_change_baseline_context(projected_baseline, subject),
         ),
-        ContextRecord("entity-taxonomy", {"entity_types": list(taxonomy_entity_types)}),
-        ContextRecord("planned-paths", {"paths": sorted(planned_paths)}),
-        ContextRecord("entity-identities", {"ids": sorted(known_entity_ids)}),
-    )
-    context_ids = tuple(item.ref_id for item in facts)
+    ]
+    if subject.section == "entities":
+        facts.append(
+            ContextRecord(
+                "entity-taxonomy", {"entity_types": list(taxonomy_entity_types)}
+            )
+        )
+    if subject.section == "files":
+        facts.append(ContextRecord("planned-paths", {"paths": sorted(planned_paths)}))
+    if subject.section == "entity_relationships":
+        facts.append(
+            ContextRecord("entity-identities", {"ids": sorted(known_entity_ids)})
+        )
+    accepted_facts = tuple(facts)
+    context_ids = tuple(item.ref_id for item in accepted_facts)
     desired_schema = _desired_content_schema(
         subject, taxonomy_entity_types=taxonomy_entity_types
     )
@@ -564,9 +574,19 @@ def build_structural_change_request(
                 {
                     "subject": subject.to_data(),
                     "baseline": snapshot_digest(projected_baseline),
-                    "taxonomy": list(taxonomy_entity_types),
-                    "paths": sorted(planned_paths),
-                    "entity_ids": sorted(known_entity_ids),
+                    "taxonomy": (
+                        list(taxonomy_entity_types)
+                        if subject.section == "entities"
+                        else []
+                    ),
+                    "paths": sorted(planned_paths)
+                    if subject.section == "files"
+                    else [],
+                    "entity_ids": (
+                        sorted(known_entity_ids)
+                        if subject.section == "entity_relationships"
+                        else []
+                    ),
                 }
             ),
             context_ids,
@@ -588,7 +608,7 @@ def build_structural_change_request(
         },
         source_excerpts=(),
         repository_evidence=(),
-        accepted_facts=facts,
+        accepted_facts=accepted_facts,
         valid_example=valid_example,
         empty_example={
             "result": "unchanged",

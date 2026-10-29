@@ -175,6 +175,33 @@ def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
     assert unrelated_payload not in change_input
 
 
+def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
+    subject = BoundStructuralSubject(
+        "attestation/scripts/verify-all.sh",
+        "files",
+        "item-0001",
+        "added",
+        ("req-01",),
+        ("unit-0001",),
+        ("anchor-01",),
+        False,
+        "attestation/scripts/verify-all.sh",
+    )
+    request = build_structural_change_request(
+        subject,
+        projected_baseline={"entities": [], "entity_relationships": [], "files": []},
+        taxonomy_entity_types=("Source file",),
+        planned_paths={"attestation/scripts/verify-all.sh"},
+        known_entity_ids={f"entity-{index:05d}" for index in range(4_000)},
+        valid_example={"result": "unchanged", "reason": "Already satisfied."},
+    )
+
+    serialized_input = build_question_messages(request)[1]["content"]
+
+    assert "entity-identities" not in serialized_input
+    assert len(serialized_input) < 24_000
+
+
 def test_structural_subject_pages_cover_all_subjects_and_require_final_page() -> None:
     baseline = {"entities": [{"id": f"entity-{index:02d}"} for index in range(12)]}
     first = _parse_page(

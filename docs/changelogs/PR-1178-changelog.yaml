@@ -2,8 +2,8 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1178
 title: Bound planning replay and work-unit proposals
 intent:
-  problem: Plan resume reread pinned evidence files repeatedly, and work-unit proposal pages could exceed the durable 4,000-character answer limit.
-  goal: Cache immutable source reads and bound each proposal request and response to a smaller page.
+  problem: Plan resume reread pinned evidence files repeatedly, work-unit proposal pages could exceed the durable 4,000-character answer limit, and generated work-unit proposals could fail on placeholder paths or replay with a different batch shape.
+  goal: Cache immutable source reads, bound proposal pages, and make generated proposal paths and checkpoint replay validate consistently.
 human-decisions: []
 structured_files: []
 files:
@@ -98,6 +98,13 @@ files:
     end_line: 324
   summary: Batch unresolved requirements in groups of four.
   rationale: Generate smaller proposal questions for large plans.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 407
+    end_line: 412
+  summary: Rebuild accepted work-unit proposals using the same four-requirement batches.
+  rationale: Ensure replay uses the same question identities and inputs as the original requests.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
@@ -126,6 +133,34 @@ files:
     end_line: 325
   summary: Assert proposal request bounds and batch-specific question IDs.
   rationale: Prevent oversized answers and stale checkpoint reuse when request shapes change.
+- path: src/powdrr_lift/workrr/planning/assembly.py
+  type: modified
+  span:
+    start_line: 193
+    end_line: 197
+  summary: Treat runtime classification failures as correctable planning contract errors.
+  rationale: Let bounded question correction repair ambiguous generated paths instead of aborting planning.
+- path: src/powdrr_lift/workrr/planning/assembly.py
+  type: modified
+  span:
+    start_line: 590
+    end_line: 600
+  summary: Classify Git placeholder files as runtime neutral.
+  rationale: Avoid requiring a programming-language runtime for `.gitkeep` marker files.
+- path: src/powdrr_lift/workrr/planning/assembly.py
+  type: modified
+  span:
+    start_line: 619
+    end_line: 636
+  summary: Allow a new planned file when its parent directory is explicitly cited in the source.
+  rationale: Support requirements that name a destination directory while leaving implementation filenames to the planner.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 187
+    end_line: 197
+  summary: Verify `.gitkeep` is accepted as a neutral write within a source-cited directory.
+  rationale: Cover the placeholder path that blocked the Gaterr planning run.
 entities: []
 entity_relationships: []
 invariants: []

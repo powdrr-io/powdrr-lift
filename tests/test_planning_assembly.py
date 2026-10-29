@@ -184,6 +184,29 @@ def test_unknown_extension_requires_runtime_classification() -> None:
         parse_work_unit_proposal(answer, context=context)
 
 
+def test_gitkeep_is_neutral_inside_a_source_named_directory() -> None:
+    directory = "attestation/github/workflows/"
+    path = f"{directory}.gitkeep"
+    context, anchor = _context(path=directory, runtime="neutral")
+    context = replace(context, repository_paths={})
+    path_anchor = next(
+        item.id
+        for item in context.source.anchors
+        if directory
+        in context.source.document.text[item.start_offset : item.end_offset]
+    )
+    requirement = replace(context.requirements["req-0001"], source_refs=(path_anchor,))
+    context = replace(context, requirements={requirement.id: requirement})
+    answer = _proposal(context, anchor, path=path, runtime="neutral")
+    answer["planned_writes"][0]["source_refs"] = [path_anchor]  # type: ignore[index]
+    answer["planned_writes"][0]["runtime"] = None  # type: ignore[index]
+
+    proposal = parse_work_unit_proposal(answer, context=context)
+
+    assert proposal.planned_writes[0].path == path
+    assert proposal.planned_writes[0].runtime is None
+
+
 def test_allocation_assigns_ids_and_requires_every_unresolved_requirement() -> None:
     context, anchor = _context()
     proposal = parse_work_unit_proposal(_proposal(context, anchor), context=context)

@@ -190,8 +190,11 @@ class AssemblyError(ValueError):
     """Invalid work-unit proposal, allocation, or item description."""
 
 
-class RuntimeClassificationRequired(AssemblyError):
+class RuntimeClassificationRequired(PlanningContractError):
     """A write path does not identify its language without repository evidence."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__("/planned_writes/path", message)
 
 
 @dataclass(frozen=True, slots=True)
@@ -591,6 +594,7 @@ def _write_runtime(write: PlannedWrite, context: WorkUnitContext) -> str | None:
             "Justfile",
             "Procfile",
             "LICENSE",
+            ".gitkeep",
         }
     ):
         derived = None
@@ -620,7 +624,12 @@ def _write_runtime(write: PlannedWrite, context: WorkUnitContext) -> str | None:
             ]
             for ref in write.source_refs
         )
-        if write.path not in additions:
+        named_directory = any(
+            f"{parent.as_posix().rstrip('/')}/" in additions
+            for parent in PurePosixPath(write.path).parents
+            if parent.as_posix() != "."
+        )
+        if write.path not in additions and not named_directory:
             raise PlanningContractError(
                 "/planned_writes/path",
                 "new paths must be named by a cited source anchor",

@@ -3,4 +3,5 @@
 from powdrr_service.planning import questions as _questions
 from powdrr_service.planning.questions import *  # noqa: F403
 
-__all__ = _questions.__all__
+batch_question_requests = _questions.batch_question_requests
+__all__ = tuple(dict.fromkeys((*_questions.__all__, "batch_question_requests")))

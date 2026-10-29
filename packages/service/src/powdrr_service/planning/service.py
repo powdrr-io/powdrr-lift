@@ -32,6 +32,7 @@ from powdrr_service.planning.checkpoints import (
     PlanningCheckpoint,
     PlanningJournalError,
 )
+from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.questions import (
     AcceptedQuestionAnswer,
     NeedsQuestionAnswer,
@@ -265,29 +266,35 @@ def advance_planning_session(
         requests = () if request is None else (request,)
     if not requests:
         return PlanningTransition("complete", session.session_id, session.issue.number)
-    question_ids = [request.question.question_id for request in requests]
+    question_ids = [
+        member.question.question_id
+        for request in requests
+        for member in (request.batch_members or (request,))
+    ]
     if len(question_ids) != len(set(question_ids)):
         raise PlanningServiceError("planning frontier contains duplicate question IDs")
     for request in requests:
         request.validate()
-        question = request.question
-        if question.question_id not in accepted:
-            continue
-        existing = next(
-            event
-            for event in reversed(journal.events)
-            if event.event_type == "answer_accepted"
-            and isinstance(event.payload.get("question"), Mapping)
-            and event.payload["question"].get("question_id") == question.question_id
-        )
-        if existing.payload.get("input_digest") != question.input_digest:
-            raise PlanningServiceError(
-                f"accepted question {question.question_id!r} changed its input digest"
+        for member in request.batch_members or (request,):
+            question = member.question
+            if question.question_id not in accepted:
+                continue
+            existing = next(
+                event
+                for event in reversed(journal.events)
+                if event.event_type == "answer_accepted"
+                and isinstance(event.payload.get("question"), Mapping)
+                and event.payload["question"].get("question_id") == question.question_id
             )
-        raise PlanningServiceError(
-            f"planning state machine did not advance past accepted question "
-            f"{question.question_id!r}"
-        )
+            if existing.payload.get("input_digest") != question.input_digest:
+                raise PlanningServiceError(
+                    f"accepted question {question.question_id!r} changed its input "
+                    "digest"
+                )
+            raise PlanningServiceError(
+                f"planning state machine did not advance past accepted question "
+                f"{question.question_id!r}"
+            )
 
     outcomes = _run_question_batch(
         requests,
@@ -300,11 +307,50 @@ def advance_planning_session(
     accepted_results: list[AcceptedQuestionAnswer[Any]] = []
     needs_answers: list[NeedsQuestionAnswer] = []
     errors: list[Exception] = []
-    for _request, result, error in outcomes:
+    for request, result, error in outcomes:
         if error is not None:
             errors.append(error)
         elif isinstance(result, AcceptedQuestionAnswer):
-            accepted_results.append(result)
+            if request.batch_members:
+                raw_answers = result.raw_answer.get("answers")
+                if not isinstance(raw_answers, Mapping):
+                    errors.append(
+                        PlanningServiceError("question batch returned no answer map")
+                    )
+                    continue
+                for member in request.batch_members:
+                    raw_answer = raw_answers.get(member.question.question_id)
+                    if not isinstance(raw_answer, Mapping):
+                        errors.append(
+                            PlanningServiceError(
+                                f"question batch omitted {member.question.question_id}"
+                            )
+                        )
+                        continue
+                    try:
+                        answer = member.parse_answer(raw_answer)
+                    except Exception as error:
+                        needs_answers.append(
+                            NeedsQuestionAnswer(
+                                member.question,
+                                result.attempts,
+                                error
+                                if isinstance(error, PlanningContractError)
+                                else PlanningContractError("/", str(error)),
+                                dict(raw_answer),
+                            )
+                        )
+                    else:
+                        accepted_results.append(
+                            AcceptedQuestionAnswer(
+                                member.question,
+                                result.attempts,
+                                answer,
+                                dict(raw_answer),
+                            )
+                        )
+            else:
+                accepted_results.append(result)
         elif isinstance(result, NeedsQuestionAnswer):
             needs_answers.append(result)
 

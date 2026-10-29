@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
-from powdrr_service.planning.assembly import WorkUnit
+from powdrr_service.planning.assembly import PendingUnitOutput, WorkUnit
 from powdrr_service.planning.contracts import (
     MAX_CONTRACT_TEXT_LENGTH,
     MAX_ENUMERATION_RECORDS,
@@ -1308,6 +1308,216 @@ def build_dependency_confirmation_request(
             value, allowed_requirement_ids=allowed_requirement_ids
         ),
     )
+
+
+def build_dependency_graph_review_requests(
+    units: Sequence[WorkUnit],
+    pending_outputs: Sequence[PendingUnitOutput],
+    *,
+    outputs_per_request: int = 4,
+    consumers_per_request: int = 8,
+) -> tuple[QuestionRequest[tuple[UnitDependencyEdge, ...]], ...]:
+    """Review output-to-unit dependencies in bounded graph batches."""
+    if outputs_per_request < 1:
+        raise ValueError("outputs_per_request must be positive")
+    if consumers_per_request < 1:
+        raise ValueError("consumers_per_request must be positive")
+    unit_by_id = {unit.id: unit for unit in units}
+    if len(unit_by_id) != len(units):
+        raise DependencyError("dependency graph review has duplicate work unit IDs")
+    requests: list[QuestionRequest[tuple[UnitDependencyEdge, ...]]] = []
+    for offset in range(0, len(pending_outputs), outputs_per_request):
+        output_page = tuple(pending_outputs[offset : offset + outputs_per_request])
+        for output in output_page:
+            if output.unit_id not in unit_by_id:
+                raise DependencyError("required output references an unknown unit")
+        for consumer_offset in range(0, len(units), consumers_per_request):
+            consumers = tuple(
+                units[consumer_offset : consumer_offset + consumers_per_request]
+            )
+            candidate_by_id = {
+                unit.id: unit
+                for unit in (
+                    *(unit_by_id[output.unit_id] for output in output_page),
+                    *consumers,
+                )
+            }
+            candidates = tuple(candidate_by_id.values())
+            facts = tuple(
+                ContextRecord(f"work-unit:{unit.id}", unit.to_data())
+                for unit in candidates
+            ) + tuple(
+                ContextRecord(
+                    f"required-output:{index:04d}:{output.unit_id}",
+                    {
+                        "producer_unit_id": output.unit_id,
+                        "description": output.description,
+                        "requirement_ids": list(output.requirement_ids),
+                    },
+                )
+                for index, output in enumerate(output_page, start=offset + 1)
+            )
+            outputs_by_producer: dict[str, set[str]] = defaultdict(set)
+            for output in output_page:
+                outputs_by_producer[output.unit_id].add(output.description)
+
+            def parse(
+                value: Mapping[str, Any],
+                candidate_by_id: Mapping[str, WorkUnit] = candidate_by_id,
+                outputs_by_producer: Mapping[str, set[str]] = outputs_by_producer,
+            ) -> tuple[UnitDependencyEdge, ...]:
+                _exact(value, {"edges"})
+                raw_edges = value["edges"]
+                if not isinstance(raw_edges, list) or len(raw_edges) > 32:
+                    raise PlanningContractError(
+                        "/edges", "must be an array of at most 32"
+                    )
+                edges: list[UnitDependencyEdge] = []
+                seen: set[tuple[str, str, str]] = set()
+                for index, raw in enumerate(raw_edges):
+                    pointer = f"/edges/{index}"
+                    if not isinstance(raw, Mapping):
+                        raise PlanningContractError(pointer, "must be an object")
+                    _exact(
+                        raw,
+                        {
+                            "before_unit_id",
+                            "after_unit_id",
+                            "output",
+                            "requirement_ids",
+                            "reason",
+                        },
+                    )
+                    producer_id = _text(
+                        raw["before_unit_id"], f"{pointer}/before_unit_id"
+                    )
+                    consumer_id = _text(
+                        raw["after_unit_id"], f"{pointer}/after_unit_id"
+                    )
+                    output_text = _text(raw["output"], f"{pointer}/output")
+                    producer = candidate_by_id.get(producer_id)
+                    consumer = candidate_by_id.get(consumer_id)
+                    if (
+                        producer is None
+                        or consumer is None
+                        or producer_id == consumer_id
+                    ):
+                        raise PlanningContractError(
+                            pointer, "references an invalid unit pair"
+                        )
+                    if output_text not in outputs_by_producer.get(producer_id, set()):
+                        raise PlanningContractError(
+                            f"{pointer}/output", "must match a supplied producer output"
+                        )
+                    endpoint_requirements = set(producer.requirement_ids) | set(
+                        consumer.requirement_ids
+                    )
+                    requirement_ids = _refs(
+                        raw["requirement_ids"],
+                        f"{pointer}/requirement_ids",
+                        endpoint_requirements,
+                        minimum=1,
+                    )
+                    reason = _text(raw["reason"], f"{pointer}/reason", max_length=1_000)
+                    identity = (producer_id, consumer_id, output_text)
+                    if identity in seen:
+                        raise PlanningContractError(
+                            pointer, "duplicates a dependency edge"
+                        )
+                    seen.add(identity)
+                    edges.append(
+                        UnitDependencyEdge(
+                            producer_id,
+                            consumer_id,
+                            output_text,
+                            reason,
+                            requirement_ids,
+                        )
+                    )
+                return tuple(edges)
+
+            digest = _digest(
+                {
+                    "units": [unit.to_data() for unit in candidates],
+                    "outputs": [
+                        {
+                            "unit_id": output.unit_id,
+                            "description": output.description,
+                            "requirement_ids": list(output.requirement_ids),
+                        }
+                        for output in output_page
+                    ],
+                    "consumer_offset": consumer_offset,
+                }
+            )
+            example: dict[str, Any] = {"edges": []}
+            request = QuestionRequest(
+                question=Question(
+                    f"dependency-graph-review-{digest[-20:]}",
+                    "review_dependency_graph",
+                    1,
+                    tuple(unit.id for unit in candidates),
+                    digest,
+                    tuple(fact.ref_id for fact in facts),
+                    "dependency-graph-review-v1",
+                    1,
+                ),
+                exact_question=(
+                    "Review the supplied required outputs against all candidate "
+                    "work units. Return only direct dependencies where a consumer "
+                    "needs the producer's named output before implementation or "
+                    "validation. Omit independent pairs. Use an exact supplied "
+                    "producer output and cite only requirements belonging to the "
+                    "two endpoint units."
+                ),
+                answer_field_definitions={
+                    "edges": (
+                        "Direct producer-to-consumer dependencies; empty means "
+                        "independent."
+                    )
+                },
+                source_excerpts=(),
+                repository_evidence=(),
+                accepted_facts=facts,
+                valid_example=example,
+                empty_example=example,
+                answer_schema={
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["edges"],
+                    "properties": {
+                        "edges": {
+                            "type": "array",
+                            "maxItems": 32,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "required": [
+                                    "before_unit_id",
+                                    "after_unit_id",
+                                    "output",
+                                    "requirement_ids",
+                                    "reason",
+                                ],
+                                "properties": {
+                                    "before_unit_id": {"type": "string"},
+                                    "after_unit_id": {"type": "string"},
+                                    "output": {"type": "string"},
+                                    "requirement_ids": {
+                                        "type": "array",
+                                        "minItems": 1,
+                                        "items": {"type": "string"},
+                                    },
+                                    "reason": {"type": "string", "minLength": 1},
+                                },
+                            },
+                        }
+                    },
+                },
+                parse_answer=parse,
+            )
+            requests.append(request)
+    return tuple(requests)
 
 
 def compile_dependency_graph(

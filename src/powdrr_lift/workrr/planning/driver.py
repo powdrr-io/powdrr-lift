@@ -30,10 +30,13 @@ from powdrr_service.planning.dependencies import (
     DependencyGraph,
     UnitDependencyEdge,
     Validation,
-    build_dependency_confirmation_request,
+    build_dependency_graph_review_requests,
     compile_dependency_graph,
 )
-from powdrr_service.planning.questions import QuestionRequest
+from powdrr_service.planning.questions import (
+    QuestionRequest,
+    batch_question_requests,
+)
 from powdrr_service.planning.source import (
     BlockDisposition,
     Requirement,
@@ -222,13 +225,26 @@ class SourceLedgerQuestionMachine:
             else:
                 fidelity_request.parse_answer(answer)
 
-        return tuple(pending_source_questions)
+        disposition_requests = tuple(
+            request
+            for request in pending_source_questions
+            if request.question.kind == "classify_source_block"
+        )
+        fidelity_requests = tuple(
+            request
+            for request in pending_source_questions
+            if request.question.kind != "classify_source_block"
+        )
+        return (*disposition_requests, *batch_question_requests(fidelity_requests))
 
     def next_question(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> QuestionRequest[Any] | None:
         requests = self.ready_questions(accepted_answers)
-        return requests[0] if requests else None
+        if not requests:
+            return None
+        first = requests[0]
+        return first.batch_members[0] if first.batch_members else first
 
     def ready_questions(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -255,7 +271,7 @@ class SourceLedgerQuestionMachine:
             if coverage_request.question.question_id not in accepted_answers:
                 coverage_requests.append(coverage_request)
         if coverage_requests:
-            return tuple(coverage_requests)
+            return batch_question_requests(coverage_requests)
 
         work_unit_requests = tuple(
             request
@@ -458,57 +474,23 @@ class SourceLedgerQuestionMachine:
     ) -> tuple[QuestionRequest[Any], ...]:
         context, proposals = self._accepted_work_unit_proposals(accepted_answers)
         allocation = allocate_work_units(proposals, context=context)
-        units = {unit.id: unit for unit in allocation.units}
-        requests: list[QuestionRequest[Any]] = []
-        for pending_output in allocation.pending_outputs:
-            producer = units[pending_output.unit_id]
-            for consumer in allocation.units:
-                if consumer.id == producer.id:
-                    continue
-                requests.append(
-                    build_dependency_confirmation_request(
-                        producer,
-                        consumer,
-                        pending_output.description,
-                        allowed_requirement_ids=set(producer.requirement_ids)
-                        | set(consumer.requirement_ids),
-                    )
-                )
-        return tuple(requests)
+        return build_dependency_graph_review_requests(
+            allocation.units, allocation.pending_outputs
+        )
 
     def accepted_dependency_edges(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[UnitDependencyEdge, ...]:
         context, proposals = self._accepted_work_unit_proposals(accepted_answers)
         allocation = allocate_work_units(proposals, context=context)
-        units = {unit.id: unit for unit in allocation.units}
         edges: list[UnitDependencyEdge] = []
-        for pending_output in allocation.pending_outputs:
-            producer = units[pending_output.unit_id]
-            for consumer in allocation.units:
-                if consumer.id == producer.id:
-                    continue
-                request = build_dependency_confirmation_request(
-                    producer,
-                    consumer,
-                    pending_output.description,
-                    allowed_requirement_ids=set(producer.requirement_ids)
-                    | set(consumer.requirement_ids),
-                )
-                answer = request.parse_answer(
-                    accepted_answers[request.question.question_id]
-                )
-                if answer.required:
-                    assert answer.output is not None
-                    edges.append(
-                        UnitDependencyEdge(
-                            producer.id,
-                            consumer.id,
-                            answer.output,
-                            answer.reason,
-                            answer.requirement_ids,
-                        )
-                    )
+        for request in build_dependency_graph_review_requests(
+            allocation.units, allocation.pending_outputs
+        ):
+            answer = request.parse_answer(
+                accepted_answers[request.question.question_id]
+            )
+            edges.extend(answer)
         return tuple(edges)
 
     def accepted_assembly(
@@ -649,95 +631,130 @@ class SourceLedgerQuestionMachine:
         assembly = self.accepted_assembly(accepted_answers, plan_id=self.plan_id)
         ledger = self.accepted_ledger(accepted_answers)
         requirement_by_id = {item.id: item for item in ledger.requirements}
+        record_by_id = {str(record["id"]): record for record in item_records}
+        order = assembly.dependency_graph.item_order
+        prerequisites: dict[str, set[str]] = {item_id: set() for item_id in order}
+        for edge in assembly.dependency_graph.item_edges:
+            prerequisites[edge.after_item_id].add(edge.before_item_id)
+        completed: set[str] = set()
         prior_operations: list[Mapping[str, Any]] = []
-        for item_index, record in enumerate(item_records):
-            item_id = str(record["id"])
-            if item_index:
-                prior_records = item_records[:item_index]
-                prior_ids = {str(item["id"]) for item in prior_records}
-                prior_plan_order = [
-                    item_id
-                    for item_id in assembly.dependency_graph.item_order
-                    if item_id in prior_ids
-                ]
-                projected = compile_structrr_plan(
+        while len(completed) < len(order):
+            ready_item_ids = tuple(
+                item_id
+                for item_id in order
+                if item_id not in completed and prerequisites[item_id] <= completed
+            )
+            if not ready_item_ids:
+                raise PlanningCompilationError(
+                    "Structrr planning item graph has no ready item"
+                )
+            prior_records = tuple(
+                record_by_id[item_id] for item_id in order if item_id in completed
+            )
+            projected = (
+                self.structrr_baseline
+                if not prior_records
+                else compile_structrr_plan(
                     plan_id=self.plan_id,
                     baseline_snapshot=self.structrr_baseline,
                     items=prior_records,
-                    item_order=prior_plan_order,
+                    item_order=tuple(
+                        item_id for item_id in order if item_id in completed
+                    ),
                     operations=prior_operations,
                     source_ref=self._structrr_source_ref(),
                 ).expected_final_snapshot
-            else:
-                projected = self.structrr_baseline
-            units = tuple(record["units"])
-            requirement_ids = tuple(
-                dict.fromkeys(
-                    requirement_id
-                    for unit in units
-                    for requirement_id in unit.requirement_ids
-                )
             )
-            source_refs = tuple(
-                dict.fromkeys(
-                    source_ref
-                    for requirement_id in requirement_ids
-                    for source_ref in requirement_by_id[requirement_id].source_refs
+            subjects_by_item: dict[str, tuple[BoundStructuralSubject, ...]] = {}
+            pending_enumerations: list[QuestionRequest[Any]] = []
+            for item_id in ready_item_ids:
+                record = record_by_id[item_id]
+                units = tuple(record["units"])
+                requirement_ids = tuple(
+                    dict.fromkeys(
+                        requirement_id
+                        for unit in units
+                        for requirement_id in unit.requirement_ids
+                    )
                 )
+                source_refs = tuple(
+                    dict.fromkeys(
+                        source_ref
+                        for requirement_id in requirement_ids
+                        for source_ref in requirement_by_id[requirement_id].source_refs
+                    )
+                )
+                page_ordinal = 1
+                item_subjects: list[BoundStructuralSubject] = []
+                while True:
+                    enumeration_request = build_subject_enumeration_request(
+                        plan_id=self.plan_id,
+                        item_id=item_id,
+                        units=units,
+                        source=self.source,
+                        source_refs=source_refs,
+                        projected_baseline=projected,
+                        prior_subjects=item_subjects,
+                        page_ordinal=page_ordinal,
+                    )
+                    answer = accepted_answers.get(
+                        enumeration_request.question.question_id
+                    )
+                    if answer is None:
+                        pending_enumerations.append(enumeration_request)
+                        break
+                    page = enumeration_request.parse_answer(answer)
+                    item_subjects.extend(page.records)
+                    if not page.has_more:
+                        subjects_by_item[item_id] = tuple(item_subjects)
+                        break
+                    page_ordinal += 1
+            if pending_enumerations:
+                return batch_question_requests(pending_enumerations)
+
+            known_entity_ids = {
+                str(entity.get("id"))
+                for entity in projected.get("entities", [])
+                if isinstance(entity, Mapping) and entity.get("id")
+            }
+            known_entity_ids.update(
+                subject.subject_id
+                for subjects in subjects_by_item.values()
+                for subject in subjects
+                if subject.section == "entities"
             )
-            page_ordinal = 1
-            prior_subjects: list[BoundStructuralSubject] = []
-            while True:
-                enumeration_request = build_subject_enumeration_request(
-                    plan_id=self.plan_id,
-                    item_id=item_id,
-                    units=units,
-                    source=self.source,
-                    source_refs=source_refs,
-                    projected_baseline=projected,
-                    prior_subjects=prior_subjects,
-                    page_ordinal=page_ordinal,
-                )
-                answer = accepted_answers.get(enumeration_request.question.question_id)
-                if answer is None:
-                    return (enumeration_request,)
-                page = enumeration_request.parse_answer(answer)
-                prior_subjects.extend(page.records)
-                if not page.has_more:
-                    break
-                page_ordinal += 1
             pending_changes: list[QuestionRequest[Any]] = []
-            for subject in prior_subjects:
-                change_request = build_structural_change_request(
-                    subject,
-                    projected_baseline=projected,
-                    taxonomy_entity_types=self.taxonomy_entity_types,
-                    planned_paths={
-                        write.path for unit in units for write in unit.planned_writes
-                    },
-                    known_entity_ids={
-                        str(entity.get("id"))
-                        for entity in projected.get("entities", [])
-                        if isinstance(entity, Mapping) and entity.get("id")
-                    },
-                    valid_example={
-                        "result": "unchanged",
-                        "reason": (
-                            "The projected state already satisfies this subject."
-                        ),
-                    },
-                )
-                if change_request.question.question_id not in accepted_answers:
-                    pending_changes.append(change_request)
-                    continue
-                change = change_request.parse_answer(
-                    accepted_answers[change_request.question.question_id]
-                )
-                operation = bind_structural_operation(change)
-                if operation is not None:
-                    prior_operations.append(operation)
+            for item_id in ready_item_ids:
+                record = record_by_id[item_id]
+                units = tuple(record["units"])
+                planned_paths = {
+                    write.path for unit in units for write in unit.planned_writes
+                }
+                for subject in subjects_by_item[item_id]:
+                    change_request = build_structural_change_request(
+                        subject,
+                        projected_baseline=projected,
+                        taxonomy_entity_types=self.taxonomy_entity_types,
+                        planned_paths=planned_paths,
+                        known_entity_ids=known_entity_ids,
+                        valid_example={
+                            "result": "unchanged",
+                            "reason": (
+                                "The projected state already satisfies this subject."
+                            ),
+                        },
+                    )
+                    answer = accepted_answers.get(change_request.question.question_id)
+                    if answer is None:
+                        pending_changes.append(change_request)
+                        continue
+                    change = change_request.parse_answer(answer)
+                    operation = bind_structural_operation(change)
+                    if operation is not None:
+                        prior_operations.append(operation)
             if pending_changes:
-                return tuple(pending_changes)
+                return batch_question_requests(pending_changes)
+            completed.update(ready_item_ids)
         return ()
 
     def _accepted_structural_subjects(

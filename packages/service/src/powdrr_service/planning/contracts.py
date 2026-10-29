@@ -22,6 +22,7 @@ QUESTION_KINDS = frozenset(
         "describe_item",
         "resolve_prerequisite_output",
         "confirm_dependency",
+        "review_dependency_graph",
         "check_validation_coverage",
         "requires_human_setup",
         "describe_human_setup",
@@ -29,6 +30,7 @@ QUESTION_KINDS = frozenset(
         "enumerate_structural_subjects",
         "describe_structural_change",
         "locate_repair_impact",
+        "planning_question_batch",
     }
 )
 

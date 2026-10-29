@@ -3004,15 +3004,7 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
                 f"Procedrr planning process ended {result.terminal_status.value}"
             )
         journal = store.load()
-        accepted_answers = {
-            str(event.payload["question"]["question_id"]): dict(
-                event.payload["accepted_answer"]
-            )
-            for event in journal.events
-            if event.event_type == "answer_accepted"
-            and isinstance(event.payload.get("question"), Mapping)
-            and isinstance(event.payload.get("accepted_answer"), Mapping)
-        }
+        accepted_answers = _accepted_planning_answers(journal.events)
         relative_output = output_path.relative_to(repo_root).as_posix()
         plan_slug = slugify_workflow_id(plan_id)
         proposal_relative = (
@@ -3095,6 +3087,25 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
         print(f"Opened plan review PR: {pull_request.pull_request_url}")
         print("No work-item issues were published and no work was executed.")
     return 0
+
+
+def _accepted_planning_answers(events: Sequence[Any]) -> dict[str, dict[str, Any]]:
+    """Replay accepted answers, removing any later-invalidated response."""
+    accepted: dict[str, dict[str, Any]] = {}
+    for event in events:
+        question = event.payload.get("question")
+        if not isinstance(question, Mapping):
+            continue
+        question_id = question.get("question_id")
+        if not isinstance(question_id, str):
+            continue
+        if event.event_type == "answer_accepted":
+            answer = event.payload.get("accepted_answer")
+            if isinstance(answer, Mapping):
+                accepted[question_id] = dict(answer)
+        elif event.event_type == "needs_answer":
+            accepted.pop(question_id, None)
+    return accepted
 
 
 def _bootstrap_planning_structrr_baseline(

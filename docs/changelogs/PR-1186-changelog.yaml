@@ -1,0 +1,175 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1186
+title: Move planning tracker GitHub access into the local adapter
+intent:
+  problem: The planning service imported GitHub client and issue types to create and load planning session trackers.
+  goal: Keep session validation and metadata policy in service code while routing tracker issue calls through a local adapter.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/local/src/powdrr_local/planning/sessions.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 32
+  summary: Add a local planning issue store that delegates label and issue calls to the existing GitHub client.
+  rationale: Keep external GitHub operations in the agent-owned local adapter package.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 26
+  summary: Remove the legacy GitHub client, error, and issue imports from the planning service.
+  rationale: Keep the service dependent on an adapter interface rather than the GitHub implementation.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 83
+  summary: Define planning issue data and issue-store protocols in the service.
+  rationale: Keep planning metadata policy typed without importing GitHub models.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 95
+    end_line: 95
+  summary: Type a planning session against the service-owned issue projection.
+  rationale: Preserve only the issue data used by planning.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 150
+  summary: Accept the issue-store protocol when creating a planning session.
+  rationale: Inject local persistence while retaining service validation.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 191
+    end_line: 194
+  summary: Delegate label and issue creation through the injected issue store.
+  rationale: Keep GitHub effects behind the local adapter.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 208
+    end_line: 208
+  summary: Accept the issue-store protocol when resuming a planning session.
+  rationale: Keep tracker lookup local while service validates session metadata.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Import the local GitHub planning issue adapter.
+  rationale: Compose the local GitHub client with service session policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2741
+    end_line: 2743
+  summary: Load resumed planning sessions through the local issue adapter.
+  rationale: Keep tracker lookup on the agent side.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2790
+    end_line: 2790
+  summary: Create new planning sessions through the local issue adapter.
+  rationale: Keep tracker creation on the agent side.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2906
+    end_line: 2907
+  summary: Add the completed planning status comment by issue number.
+  rationale: Avoid passing a GitHub issue object through the service-owned session.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2920
+    end_line: 2921
+  summary: Add the terminal planning status comment by issue number.
+  rationale: Keep the GitHub client interaction local.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 370
+    end_line: 381
+  summary: Record local ownership of planning session issue calls.
+  rationale: Keep ownership metadata aligned with the adapter.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 501
+    end_line: 501
+  summary: Remove the legacy GitHub issue client from planning service dependencies.
+  rationale: Reflect the new service-owned protocol boundary.
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 69
+    end_line: 73
+  summary: Remove the GitHub issue client import from the service legacy allowlist.
+  rationale: The service no longer imports this local integration.
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 83
+    end_line: 87
+  summary: Remove the GitHub issue record import from the service legacy allowlist.
+  rationale: The service now uses a service-owned issue projection protocol.
+- path: tests/test_agent_service_planning_adapters.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 58
+  summary: Exercise planning tracker creation and resume through the local adapter.
+  rationale: Verify the existing session metadata and explicit issue-number lookup work across the adapter.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 237
+    end_line: 252
+  summary: Assert the planning service no longer imports the legacy GitHub issue module.
+  rationale: Prevent a direct GitHub dependency from returning to service code.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 712
+    end_line: 712
+  summary: Remove an obsolete type suppression after the issue-store protocol was introduced.
+  rationale: Ensure the service fake conforms to its adapter interface.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 720
+    end_line: 720
+  summary: Remove the second obsolete type suppression from session resume coverage.
+  rationale: Keep planning session tests type checked.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1648
+    end_line: 1649
+  summary: Update the CLI planning fixture to accept GitHub comments by issue number.
+  rationale: Match the client method used after the session issue was projected into service-owned data.
+entities:
+- id: github-planning-issue-store
+  type: Class
+  action: added
+- id: planning-issue-store-protocol
+  type: Interface
+  action: added
+entity_relationships: []
+invariants:
+- id: planning-session-format-and-resume
+  description: Planning session issue labels, marker, metadata fields, explicit issue-number lookup, and stored issue body format remain unchanged.
+  action: altered
+- id: planning-github-effect-ownership
+  description: GitHub label creation and planning tracker issue creation and lookup are performed by powdrr_local.
+  action: added
+guidance:
+- id: public-plan-operation-routing
+  description: Routing full plan, resume, and re-plan CLI lifecycles through the public service operation interface remains the next planning extraction step.
+  action: added

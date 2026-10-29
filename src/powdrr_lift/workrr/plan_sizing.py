@@ -18,6 +18,7 @@ _RUNTIME = re.compile(
 )
 _COMPONENT = re.compile(r"\bcomponent\s*:\s*([a-z0-9._/-]+)", re.IGNORECASE)
 _PATH_RUNTIME_SUFFIXES = {
+    ".sh": "shell",
     ".py": "python",
     ".pyi": "python",
     ".swift": "swift",

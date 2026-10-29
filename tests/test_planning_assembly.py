@@ -130,6 +130,26 @@ def test_python_test_that_tests_swift_is_a_python_write() -> None:
     assert proposal.implementation_runtime == "python"
 
 
+def test_new_shell_script_runtime_is_derived_without_repository_evidence() -> None:
+    path = "attestation/scripts/verify-all.sh"
+    context, anchor = _context(path=path, runtime="shell")
+    context = replace(context, repository_paths={})
+    answer = _proposal(context, anchor, path=path, runtime="shell")
+    path_anchor = next(
+        item.id
+        for item in context.source.anchors
+        if path in context.source.document.text[item.start_offset : item.end_offset]
+    )
+    requirement = replace(context.requirements["req-0001"], source_refs=(path_anchor,))
+    context = replace(context, requirements={requirement.id: requirement})
+    answer["planned_writes"][0]["source_refs"] = [path_anchor]  # type: ignore[index]
+
+    proposal = parse_work_unit_proposal(answer, context=context)
+
+    assert proposal.planned_writes[0].runtime == "shell"
+    assert proposal.implementation_runtime == "shell"
+
+
 def test_actual_python_and_swift_writes_cannot_share_a_unit() -> None:
     context, anchor = _context()
     answer = _proposal(context, anchor)

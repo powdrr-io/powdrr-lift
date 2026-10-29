@@ -363,6 +363,7 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
+    assert "requirement's own source_refs" in request.exact_question
     assert (
         request.answer_schema["properties"]["records"]["maxItems"]
         == MAX_WORK_UNIT_PROPOSALS_PER_PAGE

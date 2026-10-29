@@ -5,8 +5,6 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-import shutil
-import subprocess
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -14,6 +12,13 @@ from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, Protocol
 
+from powdrr_agent.repository import (
+    LocalActionError,
+    execute_command,
+    find_workspace_symbols,
+    inspect_pinned_checkout,
+    read_pinned_file,
+)
 from powdrr_service.planning.contracts import (
     COVERAGE_ANSWER_JSON_SCHEMA,
     CompleteCoverage,
@@ -32,11 +37,10 @@ from powdrr_service.planning.source import (
     PlanningSourceError,
     Requirement,
     SegmentedSource,
+    pinned_source_document,
 )
 
-from powdrr_lift.basedpyright_tools import find_workspace_symbols
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.planning.source import read_pinned_source
 
 MAX_SYMBOL_QUERIES = 8
 MAX_SYMBOL_QUERY_CHARS = 120
@@ -340,9 +344,6 @@ def search_requirements_evidence(
             # Python language server is unavailable or cannot index this repo.
             basedpyright_available = False
 
-    rg_binary = shutil.which("rg")
-    if rg_binary is None:
-        raise EvidenceError("rg is required for local repository coverage search")
     all_terms = tuple(
         dict.fromkeys(
             term for values in terms_by_requirement.values() for term in values
@@ -351,7 +352,7 @@ def search_requirements_evidence(
     rg_rows: list[tuple[str, int, str]] = []
     for offset in range(0, len(all_terms), MAX_RG_COVERAGE_TERMS_PER_PASS):
         command = [
-            rg_binary,
+            "rg",
             "--line-number",
             "--no-heading",
             "--color",
@@ -376,22 +377,21 @@ def search_requirements_evidence(
             command.extend(("--glob", glob))
         command.append(".")
         try:
-            result = subprocess.run(
-                command,
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
+            receipt, stdout, stderr = execute_command(
+                root, tuple(command), timeout_seconds=300
             )
         except OSError as error:
             raise EvidenceError(
                 f"could not run rg in pinned repository: {error}"
             ) from error
-        if result.returncode not in {0, 1}:
-            details = result.stderr.strip() or f"rg exited {result.returncode}"
+        if receipt.status == "timed_out":
+            raise EvidenceError("pinned repository rg search timed out")
+        if receipt.exit_code not in {0, 1}:
+            details = stderr.data.decode("utf-8", errors="replace").strip() or (
+                f"rg exited with status {receipt.exit_code}"
+            )
             raise EvidenceError(f"pinned repository rg search failed: {details}")
-        for raw_line in result.stdout.splitlines():
+        for raw_line in stdout.data.decode("utf-8", errors="replace").splitlines():
             parts = raw_line.split(":", 2)
             if len(parts) != 3 or not parts[1].isdigit():
                 continue
@@ -549,7 +549,20 @@ def _read_pinned_code_file_cached(
     repository_root: str, base_commit: str, path: str
 ) -> tuple[str, str]:
     try:
-        document = read_pinned_source(repository_root, base_commit, path)
+        artifact = read_pinned_file(repository_root, base_commit, path)
+    except LocalActionError as error:
+        raise EvidenceError(str(error)) from error
+    blob_sha = artifact.attributes.get("git_blob_sha")
+    if not isinstance(blob_sha, str):
+        raise EvidenceError("agent did not return the pinned Git blob ID")
+    try:
+        document = pinned_source_document(
+            str(Path(repository_root).resolve()),
+            base_commit,
+            artifact.artifact_id,
+            blob_sha,
+            artifact.data,
+        )
     except PlanningSourceError as error:
         raise EvidenceError(str(error)) from error
     return document.path, document.text
@@ -934,30 +947,12 @@ def create_requirement_coverage(
 
 def _require_clean_pinned_checkout(root: Path, base_commit: str) -> None:
     try:
-        head = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--verify", "HEAD^{commit}"],
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        status = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(root),
-                "status",
-                "--porcelain=v1",
-                "-z",
-                "--untracked-files=all",
-            ],
-            check=True,
-            capture_output=True,
-        ).stdout
-    except subprocess.CalledProcessError as error:
+        head, clean = inspect_pinned_checkout(root)
+    except LocalActionError as error:
         raise EvidenceError("could not verify pinned analysis checkout") from error
     if head != base_commit:
         raise EvidenceError("symbol lookup checkout does not match pinned base commit")
-    if status:
+    if not clean:
         raise EvidenceError("symbol lookup requires a clean pinned checkout")
 
 

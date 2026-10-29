@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -289,6 +290,34 @@ def test_requirement_search_with_no_matches_allows_missing_coverage(
         ).status
         == "missing"
     )
+
+
+def test_requirement_search_reports_agent_command_timeout(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repository, commit = _repository(tmp_path)
+    requirement, _ = _requirement(commit)
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.planning.evidence.find_workspace_symbols",
+        lambda queries, **kwargs: {},
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.planning.evidence.execute_command",
+        lambda *_args, **_kwargs: (
+            SimpleNamespace(status="timed_out", exit_code=None),
+            SimpleNamespace(data=b""),
+            SimpleNamespace(data=b""),
+        ),
+    )
+
+    with pytest.raises(EvidenceError, match="rg search timed out"):
+        search_requirement_evidence(
+            repository,
+            commit,
+            requirement,
+            first_ordinal=1,
+        )
 
 
 def test_requirement_search_uses_rg_for_non_python_when_basedpyright_fails(

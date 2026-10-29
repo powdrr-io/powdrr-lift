@@ -542,6 +542,20 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
 
     initial_request = machine._work_unit_requests({})[0]
     assert initial_request is not None
+    initial_request.validate()
+    example_records = initial_request.valid_example["records"]
+    assert len(example_records) == 1
+    assert set(example_records[0]) == {
+        "requirement_ids",
+        "deliverable",
+        "component",
+        "implementation_runtime",
+        "planned_writes",
+        "implementation_step",
+        "acceptance_criteria",
+        "validation_ids",
+        "required_outputs",
+    }
     proposals = []
     for requirement_id in requirement_ids[:3]:
         proposal = _proposal(context, anchor)

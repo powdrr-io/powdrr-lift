@@ -425,8 +425,32 @@ class SourceLedgerQuestionMachine:
     def _work_unit_example(
         self, context: WorkUnitContext, requirement_ids: tuple[str, ...]
     ) -> Mapping[str, Any]:
+        requirement_id = requirement_ids[0]
+        requirement = context.requirements[requirement_id]
+        component_id = sorted(context.component_ids)[0]
+        validation_id = sorted(context.validation_catalog)[0]
         return {
-            "records": [],
+            "records": [
+                {
+                    "requirement_ids": [requirement_id],
+                    "deliverable": "Concise example deliverable",
+                    "component": component_id,
+                    "implementation_runtime": "neutral",
+                    "planned_writes": [
+                        {
+                            "path": "example-output.txt",
+                            "role": "documentation",
+                            "runtime": None,
+                            "source_refs": [requirement.source_refs[0]],
+                            "evidence_ids": [],
+                        }
+                    ],
+                    "implementation_step": "Describe one concrete implementation step.",
+                    "acceptance_criteria": ["State one observable result."],
+                    "validation_ids": [validation_id],
+                    "required_outputs": [],
+                }
+            ],
             "has_more": False,
             "next_anchor": None,
         }

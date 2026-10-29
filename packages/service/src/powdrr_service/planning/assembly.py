@@ -856,6 +856,8 @@ def build_work_unit_proposal_request(
             "different implementation runtimes into separate units. Reference "
             "IDs must exactly match catalog ID values: put `validation-0001` in "
             "validation_ids, not the context reference `validation:validation-0001`. "
+            "Use the valid example for field shape only; do not copy its "
+            "placeholder path or example wording. "
             f"Keep descriptions concise. Return at most {maximum_proposals} records "
             "in this response, within "
             "the 4,000-character answer limit; set has_more when more units remain."

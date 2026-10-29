@@ -1,0 +1,126 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1188
+title: Route planning session setup through the plan operation
+intent:
+  problem: Initial plan creation and plan resume called session creation and loading policy directly from the CLI.
+  goal: Carry planning session creation and explicit issue-number resume lookup through a JSON-validated plan operation.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 30
+  summary: Configure the local service with a planning issue adapter and route plan requests to session handling.
+  rationale: Keep planning session policy behind the operation interface while injecting repository effects at local composition.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 33
+  summary: Continue dispatching existing operation families after adding plan handling.
+  rationale: Preserve existing service operation behavior.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 158
+  summary: Create or load planning sessions and return the serialized session as an operation artifact.
+  rationale: Keep session validation and issue effects behind the public plan operation boundary.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 69
+    end_line: 80
+  summary: Define the serializable issue projection used by planning session responses.
+  rationale: Return only service-owned planning session data across the operation boundary.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 184
+  summary: Serialize and validate planning session records for operation responses.
+  rationale: Reconstruct planning sessions from JSON without passing repository issue objects across the bridge.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 43
+  summary: Remove direct imports of planning session create and load policy.
+  rationale: Make the CLI use the public operation boundary for session setup.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2818
+    end_line: 2863
+  summary: Build a plan operation request and decode its session artifact response.
+  rationale: Serialize planning session setup and resume lookup through the JSON bridge.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2830
+    end_line: 2833
+  summary: Add operation parameters to the serialized plan request.
+  rationale: Keep operation-specific session inputs within the JSON contract.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2871
+    end_line: 2875
+  summary: Load resumed planning sessions through the plan operation.
+  rationale: Keep explicit repository validation within service policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2918
+    end_line: 2918
+  summary: Create initial planning sessions through the plan operation.
+  rationale: Ensure the same operation boundary governs initial and resumed sessions.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2920
+    end_line: 2921
+  summary: Send session creation parameters through the plan operation.
+  rationale: Keep session identity and pinned input metadata in the operation request.
+- path: tests/test_agent_service_planning_adapters.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 6
+  summary: Import JSON bridge and operation types for planning session boundary tests.
+  rationale: Exercise the serialized operation contract.
+- path: tests/test_agent_service_planning_adapters.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Import the planning session decoder used after operation responses.
+  rationale: Verify the operation response reconstructs the same session data.
+- path: tests/test_agent_service_planning_adapters.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 141
+  summary: Exercise session creation and resume lookup across the JSON bridge, including repository mismatch failure.
+  rationale: Verify issue effects, serialized session records, and repository binding end to end.
+entities:
+- id: planning-session-plan-operation
+  type: Function
+  action: added
+- id: planning-issue-record
+  type: Class
+  action: added
+entity_relationships: []
+invariants:
+- id: planning-session-operation-serialization
+  description: The public plan operation returns a JSON-compatible planning session record; repository issue objects do not cross the bridge.
+  action: added
+- id: planning-session-issue-effects
+  description: Session creation and explicit issue-number lookup retain existing labels, metadata, repository binding, and stored issue format.
+  action: altered
+guidance:
+- id: planning-execution-operation-routing
+  description: Route the long-running question generation, checkpoint, compilation, and publication lifecycle through public operations.
+  action: added

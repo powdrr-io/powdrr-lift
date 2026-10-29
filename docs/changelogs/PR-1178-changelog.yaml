@@ -1,9 +1,9 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1178
-title: Cache pinned evidence reads during planning replay
+title: Bound planning replay and work-unit proposals
 intent:
-  problem: Rebuilding accepted coverage requests reread pinned evidence files for every excerpt, spawning repeated Git subprocesses during plan resume.
-  goal: Reuse file contents for repeated evidence reads at the same repository commit.
+  problem: Plan resume reread pinned evidence files repeatedly, and work-unit proposal pages could exceed the durable 4,000-character answer limit.
+  goal: Cache immutable source reads and bound each proposal request and response to a smaller page.
 human-decisions: []
 structured_files: []
 files:
@@ -42,6 +42,83 @@ files:
     end_line: 149
   summary: Verify repeat reads of one pinned source file perform one source lookup.
   rationale: Prevent planning replay from spawning redundant Git subprocesses for repeated evidence paths.
+- path: src/powdrr_lift/workrr/planning/assembly.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 40
+  summary: Set work-unit questions to four requirements and three proposals per page.
+  rationale: Keep request scope and serialized answers within the planning contract's limits.
+- path: src/powdrr_lift/workrr/planning/assembly.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 75
+  summary: Apply the proposal page limit to its JSON schema.
+  rationale: Tell the model the maximum response record count before generation.
+- path: src/powdrr_lift/workrr/planning/assembly.py
+  type: modified
+  span:
+    start_line: 538
+    end_line: 540
+  summary: Enforce the proposal page limit while parsing answers.
+  rationale: Reject overlarge proposal pages before checkpointing them.
+- path: src/powdrr_lift/workrr/planning/assembly.py
+  type: modified
+  span:
+    start_line: 680
+    end_line: 682
+  summary: Enforce the four-requirement limit when building proposal questions.
+  rationale: Keep each question focused on a small requirement set.
+- path: src/powdrr_lift/workrr/planning/assembly.py
+  type: modified
+  span:
+    start_line: 788
+    end_line: 790
+  summary: Prompt for concise proposal pages within the 4,000-character answer limit.
+  rationale: Reduce repeated retries for answers that cannot be durably checkpointed.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Import the proposal question requirement limit.
+  rationale: Use one limit for both request validation and question batching.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 319
+    end_line: 324
+  summary: Batch unresolved requirements in groups of four.
+  rationale: Generate smaller proposal questions for large plans.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 14
+  summary: Import the work-unit question limits for contract tests.
+  rationale: Assert configured request and response bounds.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 277
+    end_line: 277
+  summary: Create one proposal example for work-unit question coverage.
+  rationale: Reuse the valid proposal when checking response limits.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 279
+    end_line: 279
+  summary: Use the shared proposal example in the work-unit request.
+  rationale: Keep the example consistent with the subsequent parser assertions.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 290
+    end_line: 309
+  summary: Assert proposal question and response limits are enforced.
+  rationale: Prevent future batches from exceeding the bounded answer contract.
 entities: []
 entity_relationships: []
 invariants: []

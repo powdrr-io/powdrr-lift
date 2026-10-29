@@ -31,6 +31,7 @@ from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
 from powdrr_lift.workrr.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
+    batch_question_requests,
 )
 from powdrr_lift.workrr.planning.source import (
     PinnedSourceDocument,
@@ -72,8 +73,20 @@ class _PlanningScriptClient:
         del response_schema
         packet = json.loads(messages[-1]["content"])
         question = packet["exact_question"]
+        self.calls.append(question["kind"])
+        if question["kind"] == "planning_question_batch":
+            return {
+                "answers": {
+                    child["exact_question"]["question_id"]: self._answer(child)
+                    for item in packet["accepted_facts"]
+                    for child in (item["value"],)
+                }
+            }
+        return self._answer(packet)
+
+    def _answer(self, packet: Mapping[str, Any]) -> dict[str, Any]:
+        question = packet["exact_question"]
         kind = question["kind"]
-        self.calls.append(kind)
         excerpts = packet["source_excerpts"]
         source_ref = excerpts[0]["ref_id"] if excerpts else ""
         anchor_ref = next(
@@ -152,6 +165,8 @@ class _PlanningScriptClient:
             }
         if kind == "enumerate_structural_subjects":
             return {"records": [], "has_more": False, "next_anchor": None}
+        if kind == "review_dependency_graph":
+            return {"edges": []}
         raise AssertionError(f"unexpected planning question: {kind}")
 
 
@@ -271,6 +286,84 @@ def test_accepted_question_is_durable_and_not_called_again() -> None:
     assert [event.event_type for event in store.load().events] == [
         "answer_accepted",
     ]
+
+
+def test_batched_question_answer_is_checkpointed_as_each_original_question() -> None:
+    session_id = "session-question-batch"
+    store = InMemoryCheckpointStore(session_id=session_id)
+    session = PlanningSession(
+        session_id=session_id,
+        plan_id="bounded-plan",
+        repository="powdrr-io/example",
+        base_commit="a" * 40,
+        source_path="docs/plan.md",
+        source_blob_sha="b" * 40,
+        verification_command="make test",
+        issue=QueueIssue(
+            44, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
+        ),
+    )
+    members = (_request("extract-block-01"), _request("extract-block-02"))
+    (batch,) = batch_question_requests(members)
+
+    class BatchMachine:
+        def next_question(
+            self, accepted_answers: Mapping[str, Mapping[str, Any]]
+        ) -> QuestionRequest[Any] | None:
+            if all(
+                member.question.question_id in accepted_answers for member in members
+            ):
+                return None
+            return batch
+
+        def ready_questions(
+            self, accepted_answers: Mapping[str, Mapping[str, Any]]
+        ) -> tuple[QuestionRequest[Any], ...]:
+            if all(
+                member.question.question_id in accepted_answers for member in members
+            ):
+                return ()
+            return (batch,)
+
+    class BatchClient:
+        calls = 0
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            del messages, response_schema
+            self.calls += 1
+            return {
+                "answers": {
+                    member.question.question_id: dict(member.valid_example)
+                    for member in members
+                }
+            }
+
+    client = BatchClient()
+    transition = advance_planning_session(
+        session=session,
+        state_machine=BatchMachine(),
+        checkpoint_store=store,
+        client=client,
+        options=PlanningOptions(model="test-model"),
+        stderr=None,
+    )
+
+    accepted_events = [
+        event for event in store.load().events if event.event_type == "answer_accepted"
+    ]
+    assert transition.status == "question_accepted"
+    assert set(transition.question_ids) == {
+        member.question.question_id for member in members
+    }
+    assert {event.payload["question"]["question_id"] for event in accepted_events} == {
+        member.question.question_id for member in members
+    }
+    assert client.calls == 1
 
 
 def test_invalid_accepted_answer_is_reasked_under_the_current_contract() -> None:
@@ -807,12 +900,19 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
             }
         elif question.kind == "describe_item":
             answer = dict(request.valid_example)
-        elif question.kind == "confirm_dependency":
+        elif question.kind == "review_dependency_graph":
             answer = {
-                "result": "required",
-                "output": "The behavior contract.",
-                "requirement_ids": ["req-0001"],
-                "reason": "The focused test consumes the implementation contract.",
+                "edges": [
+                    {
+                        "before_unit_id": "unit-0001",
+                        "after_unit_id": "unit-0002",
+                        "output": "The behavior contract.",
+                        "requirement_ids": ["req-0001"],
+                        "reason": (
+                            "The focused test consumes the implementation contract."
+                        ),
+                    }
+                ]
             }
         elif question.kind == "enumerate_structural_subjects":
             answer = {"records": [], "has_more": False, "next_anchor": None}

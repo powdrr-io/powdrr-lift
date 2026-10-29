@@ -3,7 +3,8 @@ from __future__ import annotations
 import hashlib
 
 import pytest
-from powdrr_service.planning.assembly import WorkUnit
+from powdrr_service.planning.assembly import PendingUnitOutput, WorkUnit
+from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.dependencies import (
     DependencyCandidate,
     DependencyCycleError,
@@ -17,6 +18,7 @@ from powdrr_service.planning.dependencies import (
     bind_unit_prerequisites,
     bind_validation,
     build_dependency_confirmation_request,
+    build_dependency_graph_review_requests,
     build_human_setup_description_request,
     build_output_resolution_request,
     build_requires_human_setup_request,
@@ -35,7 +37,6 @@ from powdrr_service.planning.dependencies import (
     parse_validation_record,
 )
 
-from powdrr_lift.workrr.planning.contracts import PlanningContractError
 from powdrr_lift.workrr.planning.evidence import Evidence
 from powdrr_lift.workrr.planning.source import (
     PinnedSourceDocument,
@@ -565,6 +566,40 @@ def test_validation_description_and_dependency_questions_are_parser_bound() -> N
         dependency_request.question.question_id
         != another_output_request.question.question_id
     )
+
+
+def test_dependency_graph_review_batches_outputs_instead_of_unit_pairs() -> None:
+    producer = _unit("unit-0001", "req-0001")
+    consumers = [
+        _unit(f"unit-{index:04d}", f"req-{index:04d}") for index in range(2, 10)
+    ]
+    outputs = [
+        PendingUnitOutput("unit-0001", f"Output {index}", ("req-0001",))
+        for index in range(3)
+    ]
+
+    requests = build_dependency_graph_review_requests([producer, *consumers], outputs)
+    request = requests[0]
+    request.validate()
+    parsed = request.parse_answer(
+        {
+            "edges": [
+                {
+                    "before_unit_id": "unit-0001",
+                    "after_unit_id": "unit-0002",
+                    "output": "Output 1",
+                    "requirement_ids": ["req-0001", "req-0002"],
+                    "reason": "The consumer reads this generated output.",
+                }
+            ]
+        }
+    )
+
+    assert request.question.kind == "review_dependency_graph"
+    assert len(requests) == 2
+    assert len(parsed) == 1
+    assert parsed[0].before_unit_id == producer.id
+    assert parsed[0].after_unit_id == "unit-0002"
 
 
 def test_output_and_setup_equivalence_questions_are_singular_and_valid() -> None:

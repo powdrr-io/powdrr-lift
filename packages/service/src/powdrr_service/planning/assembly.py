@@ -807,7 +807,7 @@ def build_work_unit_proposal_request(
         "components": sorted(context.component_ids),
         "page_after": page_after,
     }
-    question_identity = {
+    question_identity: dict[str, Any] = {
         "requirement_ids": list(requirement_ids),
         "page_after": page_after,
     }

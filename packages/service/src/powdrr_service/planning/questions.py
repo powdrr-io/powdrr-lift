@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -34,6 +35,7 @@ __all__ = [
     "QuestionResult",
     "split_source_excerpt",
     "build_question_messages",
+    "batch_question_requests",
     "run_question",
     "run_questions",
 ]
@@ -103,8 +105,12 @@ class QuestionRequest[AnswerT]:
     empty_example: Mapping[str, Any]
     answer_schema: Mapping[str, Any]
     parse_answer: Callable[[Mapping[str, Any]], AnswerT]
+    batch_members: tuple[QuestionRequest[Any], ...] = ()
+    max_answer_chars: int = MAX_QUESTION_ANSWER_CHARS
 
     def validate(self) -> None:
+        if self.max_answer_chars < 1:
+            raise ValueError("max_answer_chars must be positive")
         if not self.exact_question.strip():
             raise ValueError("exact_question must not be empty")
         if not self.answer_field_definitions:
@@ -139,6 +145,159 @@ class QuestionRequest[AnswerT]:
                 raise ValueError(
                     f"{name} does not pass its answer parser: {error}"
                 ) from error
+
+
+def batch_question_requests(
+    requests: Sequence[QuestionRequest[Any]], *, max_batch_size: int = 4
+) -> tuple[QuestionRequest[Any], ...]:
+    """Pack compatible questions into bounded model calls without losing identity."""
+    if max_batch_size < 1:
+        raise ValueError("max_batch_size must be positive")
+    batches: list[QuestionRequest[Any]] = []
+    pending: list[QuestionRequest[Any]] = []
+
+    def flush() -> None:
+        if not pending:
+            return
+        batches.append(
+            pending[0] if len(pending) == 1 else _build_question_batch(tuple(pending))
+        )
+        pending.clear()
+
+    for request in requests:
+        request.validate()
+        if pending and (
+            len(pending) >= max_batch_size
+            or request.question.kind != pending[0].question.kind
+        ):
+            flush()
+        candidate = (*pending, request)
+        if len(candidate) == 1:
+            pending.append(request)
+            continue
+        try:
+            _build_question_batch(candidate)
+        except QuestionInputTooLarge:
+            flush()
+            pending.append(request)
+        else:
+            pending.append(request)
+    flush()
+    return tuple(batches)
+
+
+def _build_question_batch(
+    requests: tuple[QuestionRequest[Any], ...],
+) -> QuestionRequest[Mapping[str, Mapping[str, Any]]]:
+    if len(requests) < 2:
+        raise ValueError("question batches require at least two requests")
+    kinds = {request.question.kind for request in requests}
+    if len(kinds) != 1:
+        raise ValueError("question batches require one question kind")
+    identifiers = [request.question.question_id for request in requests]
+    if len(set(identifiers)) != len(identifiers):
+        raise ValueError("question batch contains duplicate question IDs")
+    members = {request.question.question_id: request for request in requests}
+    batch_context: list[ContextRecord] = []
+    for request in requests:
+        messages = build_question_messages(request)
+        packet = json.loads(messages[1]["content"])
+        batch_context.append(
+            ContextRecord(f"question:{request.question.question_id}", packet)
+        )
+    properties = {
+        request.question.question_id: dict(request.answer_schema)
+        for request in requests
+    }
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["answers"],
+        "properties": {
+            "answers": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": identifiers,
+                "properties": properties,
+            }
+        },
+    }
+
+    def parse(value: Mapping[str, Any]) -> Mapping[str, Mapping[str, Any]]:
+        if set(value) != {"answers"} or not isinstance(value.get("answers"), Mapping):
+            raise PlanningContractError("/", "must contain one answers object")
+        answers = value["answers"]
+        if set(answers) != set(identifiers):
+            raise PlanningContractError(
+                "/answers", "must answer every supplied question exactly once"
+            )
+        parsed: dict[str, Mapping[str, Any]] = {}
+        for question_id in identifiers:
+            answer = answers[question_id]
+            if not isinstance(answer, Mapping):
+                raise PlanningContractError(
+                    f"/answers/{question_id}", "must be an object"
+                )
+            member = members[question_id]
+            try:
+                member.parse_answer(answer)
+            except PlanningContractError as error:
+                raise PlanningContractError(
+                    f"/answers/{question_id}{error.json_pointer}", error.message
+                ) from error
+            parsed[question_id] = dict(answer)
+        return parsed
+
+    digest = hashlib.sha256(
+        json.dumps(
+            [request.question.input_digest for request in requests],
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    example = {
+        "answers": {
+            request.question.question_id: dict(request.valid_example)
+            for request in requests
+        }
+    }
+    batch = QuestionRequest(
+        question=Question(
+            question_id=f"batch-{digest[:24]}",
+            kind="planning_question_batch",
+            contract_version=1,
+            subject_ids=tuple(
+                dict.fromkeys(
+                    subject
+                    for request in requests
+                    for subject in request.question.subject_ids
+                )
+            ),
+            input_digest=f"sha256:{digest}",
+            context_ref_ids=tuple(record.ref_id for record in batch_context),
+            expected_answer_schema="planning-question-batch-v1",
+            attempt=1,
+        ),
+        exact_question=(
+            "Answer every planning request in the accepted facts. Treat each "
+            "request as independent, follow its own question and schema, and put "
+            "exactly one answer under its supplied question ID. Do not omit or "
+            "combine answers."
+        ),
+        answer_field_definitions={
+            "answers": "An answer object for every supplied question ID."
+        },
+        source_excerpts=(),
+        repository_evidence=(),
+        accepted_facts=tuple(batch_context),
+        valid_example=example,
+        empty_example=example,
+        answer_schema=schema,
+        parse_answer=parse,
+        batch_members=tuple(members.values()),
+        max_answer_chars=sum(request.max_answer_chars for request in requests),
+    )
+    build_question_messages(batch)
+    return batch
 
 
 @dataclass(frozen=True, slots=True)
@@ -357,7 +516,7 @@ def run_question[AnswerT](
             last_error = PlanningContractError(
                 "/", "previous response was not valid JSON; return one JSON object"
             )
-            if raw_size > _answer_size_limit(request):
+            if raw_size > max(request.max_answer_chars, _answer_size_limit(request)):
                 return NeedsQuestionAnswer(
                     question=replace(request.question, attempt=attempt),
                     attempts=attempt,
@@ -373,7 +532,7 @@ def run_question[AnswerT](
             raw_size = len(
                 json.dumps(previous_answer, ensure_ascii=False, separators=(",", ":"))
             )
-            if raw_size > _answer_size_limit(request):
+            if raw_size > max(request.max_answer_chars, _answer_size_limit(request)):
                 return NeedsQuestionAnswer(
                     question=replace(request.question, attempt=attempt),
                     attempts=attempt,
@@ -385,7 +544,7 @@ def run_question[AnswerT](
         answer_size = len(
             json.dumps(previous_answer, ensure_ascii=False, separators=(",", ":"))
         )
-        answer_limit = _answer_size_limit(request)
+        answer_limit = max(request.max_answer_chars, _answer_size_limit(request))
         if answer_size > answer_limit:
             last_error = PlanningContractError(
                 "/",

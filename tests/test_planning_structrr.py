@@ -207,7 +207,7 @@ def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
     assert len(serialized_input) < 24_000
 
 
-def test_entity_structural_change_omits_sibling_source_subjects() -> None:
+def test_entity_structural_change_omits_sibling_baseline_records() -> None:
     subject = BoundStructuralSubject(
         "python::module",
         "entities",
@@ -222,7 +222,16 @@ def test_entity_structural_change_omits_sibling_source_subjects() -> None:
     sibling_payload = "unrelated-sibling-description-" + ("x" * 300)
     baseline = {
         "entities": [
-            {"id": "python::module", "type": "Module", "path": "src/module.py"}
+            {"id": "python::module", "type": "Module", "path": "src/module.py"},
+            *[
+                {
+                    "id": f"python::module.sibling_{index}",
+                    "type": "Function",
+                    "name": sibling_payload,
+                    "path": "src/module.py",
+                }
+                for index in range(100)
+            ],
         ],
         "entity_relationships": [],
         "files": [

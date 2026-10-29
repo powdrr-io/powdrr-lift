@@ -805,7 +805,8 @@ def _structural_change_baseline_context(
     relevant_entities = [
         record
         for record in entities
-        if record.get("id") in related_entity_ids or record.get("path") in paths
+        if record.get("id") in related_entity_ids
+        or (subject.section == "files" and record.get("path") in paths)
     ]
     related_entity_ids.update(
         str(record["id"])

@@ -758,7 +758,7 @@ def build_work_unit_proposal_request(
     question = Question(
         question_id=(
             f"propose-units-{requirement_ids[0]}-"
-            f"{_digest({'page_after': page_after})[-12:]}"
+            f"{_digest({'requirement_ids': list(requirement_ids), 'page_after': page_after})[-12:]}"
         ),
         kind="propose_work_units",
         contract_version=1,

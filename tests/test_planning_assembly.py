@@ -308,6 +308,22 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
             valid_example=example,
         )
 
+    second_requirement = replace(context.requirements["req-0001"], id="req-0002")
+    two_requirement_context = replace(
+        context,
+        requirements={
+            **context.requirements,
+            second_requirement.id: second_requirement,
+        },
+        unresolved_requirement_ids=("req-0001", "req-0002"),
+    )
+    larger_batch = build_work_unit_proposal_request(
+        two_requirement_context,
+        ["req-0001", "req-0002"],
+        valid_example=example,
+    )
+    assert larger_batch.question.question_id != request.question.question_id
+
     next_page = build_work_unit_proposal_request(
         context, ["req-0001"], valid_example=example, page_after=anchor
     )

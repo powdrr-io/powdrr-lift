@@ -21,6 +21,7 @@ from powdrr_service.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
 )
+from powdrr_service.planning.source import Requirement, SegmentedSource
 
 from powdrr_lift.workrr.plan_sizing import (
     CANONICAL_RUNTIMES,
@@ -31,7 +32,6 @@ from powdrr_lift.workrr.plan_sizing import (
     allocate_explicit_work_units,
 )
 from powdrr_lift.workrr.planning.evidence import Evidence
-from powdrr_lift.workrr.planning.source import Requirement, SegmentedSource
 
 MAX_WORK_UNIT_CRITERIA = 2
 MAX_ITEM_CRITERIA = 5

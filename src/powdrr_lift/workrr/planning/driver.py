@@ -8,6 +8,15 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_service.planning.questions import QuestionRequest
+from powdrr_service.planning.source import (
+    BlockDisposition,
+    Requirement,
+    SegmentedSource,
+    allocate_requirements,
+    build_block_disposition_request,
+    build_extract_requirements_request,
+    build_fidelity_request,
+)
 
 from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.git import slugify_workflow_id
@@ -45,15 +54,6 @@ from powdrr_lift.workrr.planning.evidence import (
     RequirementEvidenceSearch,
     build_requirement_coverage_request,
     create_requirement_coverage,
-)
-from powdrr_lift.workrr.planning.source import (
-    BlockDisposition,
-    Requirement,
-    SegmentedSource,
-    allocate_requirements,
-    build_block_disposition_request,
-    build_extract_requirements_request,
-    build_fidelity_request,
 )
 from powdrr_lift.workrr.planning.structrr import (
     BoundStructuralSubject,

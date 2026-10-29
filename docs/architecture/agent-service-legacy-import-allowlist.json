@@ -7,6 +7,16 @@
       "rationale": "The legacy artifact-state projection remains available for areas not migrated through the boundary. Final package ownership cleanup removes this import."
     },
     {
+      "import": "powdrr_lift.core.instruction_ledger.InstructionLedger",
+      "owner_pr": 8,
+      "rationale": "The source segmentation module uses the legacy instruction-ledger type until product semantic modules are relocated during package ownership cleanup."
+    },
+    {
+      "import": "powdrr_lift.core.instruction_ledger.compile_instruction_ledger",
+      "owner_pr": 8,
+      "rationale": "The service source segmenter uses the legacy instruction-ledger compiler until product semantic modules are relocated during package ownership cleanup."
+    },
+    {
       "import": "powdrr_lift.errors.PowdrrExecutionError",
       "owner_pr": 6,
       "rationale": "Planning question execution translates the existing typed provider error; the service-owned error and inference contract replace this in PR 6."

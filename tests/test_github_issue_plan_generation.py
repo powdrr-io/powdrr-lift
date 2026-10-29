@@ -1682,7 +1682,7 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     monkeypatch.setattr(
         cli,
         "read_pinned_source",
-        lambda *_args: PinnedSourceDocument(
+        lambda *_args, **_kwargs: PinnedSourceDocument(
             repository="example/repo",
             commit_sha=base_commit,
             path="proposal.md",

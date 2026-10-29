@@ -21,10 +21,10 @@ from powdrr_service.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
 )
+from powdrr_service.planning.source import Requirement, SegmentedSource
 
 from powdrr_lift.workrr.planning.assembly import WorkUnit
 from powdrr_lift.workrr.planning.evidence import Evidence
-from powdrr_lift.workrr.planning.source import Requirement, SegmentedSource
 
 _VALIDATION_KINDS = frozenset({"local_command", "ci_check", "manual_observation"})
 _SETUP_TRIGGER: Literal["after_implementation_before_validation"] = (

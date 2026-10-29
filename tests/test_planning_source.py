@@ -5,6 +5,9 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from powdrr_service.planning.source import (
+    pinned_source_document as service_pinned_source_document,
+)
 
 from powdrr_lift.workrr.planning.source import (
     EquivalenceDecision,
@@ -69,6 +72,7 @@ def _document(
 def test_reads_exact_tracked_source_from_pinned_commit(tmp_path: Path) -> None:
     repository, commit = _committed_repository(tmp_path, "# Plan\n\nKeep this exact.\n")
 
+    (repository / "plan.md").write_text("uncommitted change\n", encoding="utf-8")
     source = read_pinned_source(str(repository), commit, "plan.md")
 
     assert source.commit_sha == commit
@@ -78,6 +82,23 @@ def test_reads_exact_tracked_source_from_pinned_commit(tmp_path: Path) -> None:
         read_pinned_source(str(repository), commit, "../plan.md")
     with pytest.raises(PlanningSourceError, match="tracked file"):
         read_pinned_source(str(repository), commit, "missing.md")
+
+
+def test_service_source_document_validates_git_blob_identity(tmp_path: Path) -> None:
+    repository, commit = _committed_repository(tmp_path, "# Plan\n\nPinned.\n")
+    blob_sha = _git(repository, "rev-parse", f"{commit}:plan.md")
+    content = (repository / "plan.md").read_bytes()
+
+    source = service_pinned_source_document(
+        "powdrr-io/example", commit, "plan.md", blob_sha, content
+    )
+
+    assert source.repository == "powdrr-io/example"
+    assert source.text == "# Plan\n\nPinned.\n"
+    with pytest.raises(PlanningSourceError, match="do not match"):
+        service_pinned_source_document(
+            "powdrr-io/example", commit, "plan.md", "0" * len(blob_sha), content
+        )
 
 
 def test_segments_markdown_with_headings_late_setup_and_cross_references() -> None:

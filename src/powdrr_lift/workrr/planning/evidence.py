@@ -27,15 +27,15 @@ from powdrr_service.planning.questions import (
     ContextRecord,
     QuestionRequest,
 )
-
-from powdrr_lift.basedpyright_tools import find_workspace_symbols
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.planning.source import (
+from powdrr_service.planning.source import (
     PlanningSourceError,
     Requirement,
     SegmentedSource,
-    read_pinned_source,
 )
+
+from powdrr_lift.basedpyright_tools import find_workspace_symbols
+from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.planning.source import read_pinned_source
 
 MAX_SYMBOL_QUERIES = 8
 MAX_SYMBOL_QUERY_CHARS = 120

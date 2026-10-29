@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import stat
 import subprocess
 import tempfile
@@ -20,6 +21,7 @@ from powdrr_contracts.models import (
 
 SOURCE_FILE = "application/vnd.powdrr.source-file"
 _FORBIDDEN_ROOTS = {".git", ".worktrees", ".venv", "venv", "node_modules"}
+_GIT_OBJECT_ID = re.compile(r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
 
 
 class LocalActionError(ValueError):
@@ -127,6 +129,67 @@ def collect_tracked_worktree(
             {"name": "file.materialize", "version": "1"},
             {"name": "command.execute", "version": "1"},
         ),
+    )
+
+
+def read_pinned_file(
+    repo_root: str | Path, commit_sha: str, relative_path: str
+) -> Artifact:
+    """Capture one regular file from the exact Git tree named by commit_sha."""
+    if not _GIT_OBJECT_ID.fullmatch(commit_sha):
+        raise LocalActionError(
+            "invalid_revision", "Commit SHA must be a full Git object ID."
+        )
+    root = Path(repo_root).resolve()
+    _authorized_path(root, relative_path, require_parent=False)
+    resolved_commit = _git(
+        root, "rev-parse", "--verify", f"{commit_sha}^{{commit}}"
+    ).strip()
+    if resolved_commit != commit_sha:
+        raise LocalActionError(
+            "invalid_revision", "Commit SHA must identify the full commit object."
+        )
+    listing = _git_bytes(
+        root,
+        "ls-tree",
+        "-z",
+        commit_sha,
+        "--",
+        f":(literal){relative_path}",
+    )
+    entries = [entry for entry in listing.split(b"\0") if entry]
+    if len(entries) != 1:
+        raise LocalActionError(
+            "forbidden_path", "Source path is not a tracked file at the pinned SHA."
+        )
+    metadata, separator, entry_path = entries[0].partition(b"\t")
+    fields = metadata.split()
+    if not separator or entry_path.decode("utf-8", errors="strict") != relative_path:
+        raise LocalActionError(
+            "forbidden_path", "Git did not resolve the exact pinned source path."
+        )
+    if (
+        len(fields) != 3
+        or fields[0] not in {b"100644", b"100755"}
+        or fields[1] != b"blob"
+    ):
+        raise LocalActionError(
+            "forbidden_path", "Pinned source must be a regular tracked blob."
+        )
+    blob_sha = fields[2].decode("ascii")
+    if len(blob_sha) != len(commit_sha):
+        raise LocalActionError("repository_error", "Git object format is inconsistent.")
+    content = _git_bytes(root, "cat-file", "blob", blob_sha)
+    return Artifact(
+        artifact_id=relative_path,
+        media_type=SOURCE_FILE,
+        data=content,
+        scope="repository_snapshot",
+        attributes={
+            "git_blob_sha": blob_sha,
+            "git_mode": fields[0].decode("ascii"),
+            "source_revision": commit_sha,
+        },
     )
 
 

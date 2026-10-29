@@ -214,89 +214,94 @@ files:
     rationale: Prevent batching from making correction context unbounded.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 421, end_line: 421}
+    span: {start_line: 425, end_line: 425}
     summary: Send a path-relevant Structrr subject index during item enumeration.
     rationale: Keep the full baseline available for validation while bounding question context.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 541, end_line: 541}
+    span: {start_line: 545, end_line: 545}
     summary: Build structural change context from subject-specific facts.
     rationale: Keep unrelated repository identifiers out of the model input.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 547, end_line: 547}
+    span: {start_line: 551, end_line: 551}
     summary: Keep structural change baseline context scoped to the bound subject.
     rationale: Omit unrelated baseline records from the question payload.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 549, end_line: 575}
+    span: {start_line: 553, end_line: 579}
     summary: Include taxonomy, planned paths, and entity identities only for the subject sections that need them.
     rationale: Prevent large unrelated entity indexes from exceeding the question input limit.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 586, end_line: 598}
+    span: {start_line: 590, end_line: 602}
     summary: Digest only the section-specific facts sent with a structural change question.
     rationale: Keep question identity aligned with its bounded model context.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 619, end_line: 624}
+    span: {start_line: 623, end_line: 628}
     summary: Clarify that entity types must come from the supplied taxonomy.
     rationale: Keep taxonomy validation in the parser without duplicating its full list in the schema.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 630, end_line: 631}
+    span: {start_line: 634, end_line: 635}
     summary: Pass the filtered context and subject-appropriate example to structural change review.
     rationale: Ensure the prompt receives bounded facts and an example matching the answer contract.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 607, end_line: 613}
+    span: {start_line: 611, end_line: 617}
     summary: Explain baseline comparison and require concise structural change reasons.
     rationale: Prevent unchanged answers for absent subjects and avoid reasoning text in the bounded reason field.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 687, end_line: 688}
+    span: {start_line: 691, end_line: 692}
     summary: Build the subject enumeration example from the path-relevant baseline index.
     rationale: Keep example references consistent with the narrowed baseline facts.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 699, end_line: 709}
+    span: {start_line: 703, end_line: 713}
     summary: Use an existing relevant file subject in the example when available.
     rationale: Keep the example valid for planned paths already in the baseline.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 725, end_line: 882}
+    span: {start_line: 729, end_line: 886}
     summary: Build compact subject indexes and per-subject baseline context from planned paths and identities.
     rationale: Preserve relevant existing Structrr references without including unrelated repository data.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 490, end_line: 495}
+    span: {start_line: 494, end_line: 499}
     summary: State the identity and action rules directly in structural enumeration questions.
     rationale: Prevent new file subjects from being mislabeled as changes to existing subjects.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 507, end_line: 510}
+    span: {start_line: 511, end_line: 514}
     summary: Define which actions are valid for new and existing structural subjects.
     rationale: Align the answer contract with the structural-subject validator.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 942, end_line: 942}
+    span: {start_line: 946, end_line: 946}
     summary: Keep the entity change schema independent from the full taxonomy list.
     rationale: Avoid serializing taxonomy values both as context and schema enum values.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 948, end_line: 948}
+    span: {start_line: 952, end_line: 952}
     summary: Represent entity type as a string in the compact response schema.
     rationale: The supplied taxonomy context and parser enforce allowed entity types.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 184, end_line: 190}
+    span: {start_line: 185, end_line: 189}
     summary: Bound accepted source references by the supplied anchor set.
     rationale: Allow a structural subject to cite every relevant source anchor when more than eight anchors are available.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 1180, end_line: 1188}
+    span: {start_line: 1181, end_line: 1186}
     summary: Let reference validation use a caller-specific maximum.
     rationale: Keep the eight-record page limit separate from the number of valid source references.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1188, end_line: 1188}
+    summary: Apply the requested maximum when validating reference arrays.
+    rationale: Keep the source-reference count aligned with supplied anchors.
   - path: tests/test_planning_structrr.py
     type: modified
     span: {start_line: 3, end_line: 3}
@@ -314,12 +319,22 @@ files:
     rationale: Test enumeration and per-subject change requests against a large baseline.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 88, end_line: 284}
+    span: {start_line: 74, end_line: 74}
+    summary: Allow the structural page test helper to receive its valid source anchors.
+    rationale: Exercise source-reference validation with realistic anchor sets.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 82, end_line: 82}
+    summary: Pass the test-provided anchor set into the structural page parser.
+    rationale: Verify that references remain bounded by known source evidence.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 89, end_line: 285}
     summary: Verify structural questions omit unrelated baseline records and entity identity indexes.
     rationale: Catch oversized prompts before they block real planning sessions.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 312, end_line: 323}
+    span: {start_line: 312, end_line: 325}
     summary: Accept all nine supplied source anchors for one structural subject.
     rationale: Prevent a valid answer from failing because the record-count limit was incorrectly applied to source references.
 entities:

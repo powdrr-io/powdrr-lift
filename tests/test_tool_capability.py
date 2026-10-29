@@ -45,9 +45,14 @@ def context(
     return ToolContext(root, root, actions, frozenset({ToolEffect.WORKSPACE_READ}))
 
 
-def test_manifest_fingerprint_is_stable() -> None:
+def test_manifest_fingerprint_is_stable_across_equivalent_instances() -> None:
     manifest = FakeTool.manifest
-    assert manifest.fingerprint() == manifest.fingerprint()
+    equivalent = ToolManifest(
+        tool_name="read-file",
+        semantic_actions=("inspect",),
+        effects=(ToolEffect.WORKSPACE_READ,),
+    )
+    assert manifest.fingerprint() == equivalent.fingerprint()
     assert manifest.to_data()["schema_version"] == "tool-manifest-v1"
 
 

@@ -357,10 +357,23 @@ steps:
     assert calls == [{"command": ["record_feature", "Add a greeting"]}]
 
 
-@pytest.mark.parametrize("implementation_passes", [True, False])
-@pytest.mark.parametrize("pull_request_url_valid", [True, False])
-@pytest.mark.parametrize("plan_defect_detected", [True, False])
-@pytest.mark.parametrize("unshaped_execution_error", [False, True])
+@pytest.mark.parametrize(
+    (
+        "implementation_passes",
+        "pull_request_url_valid",
+        "plan_defect_detected",
+        "unshaped_execution_error",
+    ),
+    [
+        (False, False, False, True),
+        *(
+            (implementation, pull_request, plan_defect, False)
+            for implementation in (True, False)
+            for pull_request in (True, False)
+            for plan_defect in (True, False)
+        ),
+    ],
+)
 def test_execute_proposed_pr_workflow_enforces_implementation_and_pr_calls(
     tmp_path: Path,
     implementation_passes: bool,

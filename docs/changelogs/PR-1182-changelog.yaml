@@ -224,6 +224,11 @@ files:
     rationale: Keep unrelated repository identifiers out of the model input.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
+    span: {start_line: 547, end_line: 547}
+    summary: Keep structural change baseline context scoped to the bound subject.
+    rationale: Omit unrelated baseline records from the question payload.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
     span: {start_line: 549, end_line: 563}
     summary: Include taxonomy, planned paths, and entity identities only for the subject sections that need them.
     rationale: Prevent large unrelated entity indexes from exceeding the question input limit.

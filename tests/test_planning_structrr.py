@@ -176,6 +176,9 @@ def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
 
     assert "python::relevant" in enumeration_input
     assert "path::src/projected.py" in enumeration_input
+    assert "Never describe an existing file subject as new" in (
+        enumeration.exact_question
+    )
     assert "python::unrelated_0" not in enumeration_input
     assert unrelated_payload not in enumeration_input
     assert "python::relevant" in change_input

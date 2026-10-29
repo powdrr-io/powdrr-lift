@@ -26,6 +26,8 @@ class LocalPowdrrService:
     """Reconstruct public artifact state from data supplied by the agent."""
 
     def start(self, request: OperationRequest) -> OperationUpdate:
+        if request.operation_kind == "replan":
+            return self._prepare_plan_repair(request)
         if request.operation_kind == "bootstrap":
             return self._bootstrap_structrr(request)
         if request.operation_kind == "compile_structrr_diff":
@@ -63,6 +65,101 @@ class LocalPowdrrService:
                 Artifact(
                     artifact_id="artifact-state/workflows.json",
                     media_type="application/vnd.powdrr.artifact-state+json",
+                    data=payload,
+                ),
+            ),
+        )
+
+    def _prepare_plan_repair(self, request: OperationRequest) -> OperationUpdate:
+        repository = request.repository
+        if repository is None:
+            return _failed(
+                request.request_id,
+                "invalid_request",
+                "Repository snapshot is required.",
+            )
+        try:
+            plan_path = _safe_relative_path(request.inputs.get("plan_path"))
+            base_commit = _required_string(
+                request.inputs.get("base_commit", repository.head_sha),
+                "base_commit",
+            )
+            request_artifact_id = _required_string(
+                request.inputs.get("repair_request_artifact"),
+                "repair_request_artifact",
+            )
+            request_artifact = next(
+                (
+                    artifact
+                    for artifact in request.artifacts
+                    if artifact.artifact_id == request_artifact_id
+                    and artifact.media_type
+                    == "application/vnd.powdrr.plan-repair-request+json"
+                ),
+                None,
+            )
+            if request_artifact is None:
+                raise ValueError("plan repair request artifact is missing")
+            repair_request = json.loads(request_artifact.data)
+            if not isinstance(repair_request, dict):
+                raise ValueError("plan repair request must be a JSON object")
+            with tempfile.TemporaryDirectory(
+                prefix="powdrr-service-plan-repair-"
+            ) as temp:
+                root = Path(temp).resolve()
+                _write_snapshot(root, request)
+                _initialize_snapshot_git(root)
+                from powdrr_service.planning.repair_service import (
+                    apply_repair_request,
+                    load_repair_draft,
+                    prepare_repair_publication,
+                )
+
+                draft = load_repair_draft(root, root / plan_path)
+                repaired = apply_repair_request(
+                    draft,
+                    repair_request,
+                    base_commit=base_commit,
+                )
+                source_plan_path = draft.plan.source_document
+                if not source_plan_path:
+                    raise ValueError(
+                        "reviewed plan does not reference its source document"
+                    )
+                latest_repair = repaired.manifest.get("latest_repair")
+                if not isinstance(latest_repair, dict):
+                    raise ValueError("repaired plan has no latest repair manifest")
+                discovery_value = repair_request.get("discovery")
+                if not isinstance(discovery_value, dict):
+                    raise ValueError("repair discovery must be an object")
+                bound_discovery = {
+                    **discovery_value,
+                    "id": latest_repair.get("repair_id"),
+                }
+                publication = prepare_repair_publication(
+                    draft=draft,
+                    repair=repaired,
+                    plan_path=plan_path,
+                    source_plan_path=source_plan_path,
+                    discovery=bound_discovery,
+                )
+                publication["affected_item_ids"] = list(
+                    latest_repair.get("affected_item_ids", [])
+                )
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            return _failed(request.request_id, "plan_repair_failed", str(exc))
+        payload = json.dumps(publication, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+        return OperationUpdate(
+            operation_id=request.request_id,
+            revision=1,
+            status="succeeded",
+            progress=({"phase": "plan_repair_validated"},),
+            output_artifacts=(
+                Artifact(
+                    artifact_id="plan-repair/prepared-publication.json",
+                    media_type="application/vnd.powdrr.plan-repair-publication+json",
                     data=payload,
                 ),
             ),

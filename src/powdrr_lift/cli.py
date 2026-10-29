@@ -20,17 +20,21 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_contracts.models import (
+    Artifact,
+    OperationRequest,
+    RepositorySnapshot,
+    artifact_manifest_digest,
+)
+from powdrr_local import JsonServiceBridge, LocalPowdrrService
 from powdrr_local.planning.checkpoints import LocalCheckpointStore
-from powdrr_local.planning.repair_publication import publish_repair_pull_request
+from powdrr_local.planning.repair_publication import (
+    RepairPublicationError,
+    publish_repair_pull_request,
+)
 from powdrr_local.planning.sessions import GitHubPlanningIssueStore
 from powdrr_service.planning.assembly import PathFact
 from powdrr_service.planning.compiler import PlanningCompilationError
-from powdrr_service.planning.repair_service import (
-    PlanRepairServiceError,
-    apply_repair_request,
-    load_repair_draft,
-    prepare_repair_publication,
-)
 from powdrr_service.planning.service import (
     PlanningOptions,
     PlanningServiceError,
@@ -2689,39 +2693,51 @@ def _run_plan_repair(args: argparse.Namespace) -> int:
     try:
         request = json.loads(request_path.read_text(encoding="utf-8"))
         if not isinstance(request, Mapping):
-            raise PlanRepairServiceError("repair request root must be an object")
-        draft = load_repair_draft(repo_root, plan_path)
-        repaired = apply_repair_request(
-            draft,
-            request,
-            base_commit=_git_head(repo_root),
-        )
+            raise ValueError("repair request root must be an object")
         plan_relative = plan_path.relative_to(repo_root).as_posix()
-        source_plan_path = draft.plan.source_document
-        if not source_plan_path:
-            raise PlanRepairServiceError("reviewed plan does not reference its source")
-        bound_discovery = {
-            **dict(request["discovery"]),
-            "id": repaired.manifest["latest_repair"]["repair_id"],
-        }
-        publication = prepare_repair_publication(
-            draft=draft,
-            repair=repaired,
-            plan_path=plan_relative,
-            source_plan_path=source_plan_path,
-            discovery=bound_discovery,
+        operation_request = _collect_plan_repair_operation_request(
+            repo_root=repo_root,
+            plan_path=plan_path,
+            plan_relative=plan_relative,
+            repair_request=request,
         )
+        update = JsonServiceBridge(LocalPowdrrService()).start(operation_request)
+        if update.status != "succeeded":
+            message = (
+                update.failure.message
+                if update.failure is not None
+                else "Service did not prepare the plan repair."
+            )
+            raise ValueError(message)
+        prepared_artifact = next(
+            (
+                artifact
+                for artifact in update.output_artifacts
+                if artifact.artifact_id == "plan-repair/prepared-publication.json"
+            ),
+            None,
+        )
+        if prepared_artifact is None:
+            raise ValueError("Service response omitted prepared plan repair data.")
+        publication = json.loads(prepared_artifact.data)
+        if not isinstance(publication, Mapping):
+            raise ValueError("Service returned malformed plan repair data.")
         pull_request_url, changed_paths = publish_repair_pull_request(
             repo_root=repo_root, publication=publication
         )
-    except (OSError, json.JSONDecodeError, PlanRepairServiceError) as error:
+    except (
+        OSError,
+        json.JSONDecodeError,
+        ValueError,
+        RepairPublicationError,
+    ) as error:
         raise PowdrrExecutionError(f"plan repair failed: {error}") from error
     result = {
-        "plan_id": repaired.plan.plan_id,
-        "repair_id": bound_discovery["id"],
+        "plan_id": publication["plan_id"],
+        "repair_id": publication["repair_id"],
         "pull_request_url": pull_request_url,
         "changed_paths": list(changed_paths),
-        "affected_item_ids": repaired.manifest["latest_repair"]["affected_item_ids"],
+        "affected_item_ids": publication["affected_item_ids"],
     }
     if args.json:
         sys.stdout.write(json.dumps(result, indent=2, sort_keys=True) + "\n")
@@ -2729,6 +2745,76 @@ def _run_plan_repair(args: argparse.Namespace) -> int:
         print(f"Plan repair PR: {pull_request_url}")
         print("Changed artifacts: " + ", ".join(changed_paths))
     return 0
+
+
+def _collect_plan_repair_operation_request(
+    *,
+    repo_root: Path,
+    plan_path: Path,
+    plan_relative: str,
+    repair_request: Mapping[str, Any],
+) -> OperationRequest:
+    plan_document = yaml.safe_load(plan_path.read_text(encoding="utf-8"))
+    if not isinstance(plan_document, Mapping):
+        raise ValueError("Reviewed plan must contain a YAML object.")
+    planning = plan_document.get("planning")
+    structrr = planning.get("structrr") if isinstance(planning, Mapping) else None
+    proposal_path = (
+        structrr.get("proposal_path") if isinstance(structrr, Mapping) else None
+    )
+    items = plan_document.get("items")
+    if not isinstance(proposal_path, str) or not isinstance(items, list):
+        raise ValueError("Reviewed plan is missing its proposal or item catalog.")
+    relative_paths = [plan_relative, proposal_path]
+    for item in items:
+        if not isinstance(item, Mapping) or not isinstance(
+            item.get("workflow_file"), str
+        ):
+            raise ValueError("Reviewed plan contains an invalid workflow reference.")
+        relative_paths.append(item["workflow_file"])
+    if len(set(relative_paths)) != len(relative_paths):
+        relative_paths = list(dict.fromkeys(relative_paths))
+    source_artifacts = tuple(
+        Artifact(
+            artifact_id=relative,
+            media_type="application/vnd.powdrr.source-file",
+            data=_repository_file_path(
+                Path(relative), repo_root, "Plan artifact"
+            ).read_bytes(),
+        )
+        for relative in relative_paths
+    )
+    request_artifact_id = "plan-repair/request.json"
+    request_artifact = Artifact(
+        artifact_id=request_artifact_id,
+        media_type="application/vnd.powdrr.plan-repair-request+json",
+        data=json.dumps(repair_request, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        ),
+    )
+    manifest_digest = artifact_manifest_digest(source_artifacts)
+    head_sha = _git_head(repo_root)
+    repository = RepositorySnapshot(
+        repository_id=_discover_github_repository(repo_root),
+        branch=_current_branch(repo_root),
+        base_sha=None,
+        head_sha=head_sha,
+        manifest_digest=manifest_digest,
+        worktree_digest=manifest_digest,
+        source_artifact_refs=tuple(item.artifact_id for item in source_artifacts),
+    )
+    return OperationRequest(
+        request_id=f"plan-repair-{uuid.uuid4().hex}",
+        operation_kind="replan",
+        inputs={
+            "plan_path": plan_relative,
+            "base_commit": head_sha,
+            "repair_request_artifact": request_artifact_id,
+        },
+        repository=repository,
+        artifacts=(*source_artifacts, request_artifact),
+        capabilities=({"name": "repository.pinned_file_snapshot", "version": "1"},),
+    )
 
 
 def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:

@@ -1,0 +1,147 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1187
+title: Route plan repair through the service operation API
+intent:
+  problem: The plan-repair CLI performed plan mutation and artifact compilation directly in the agent process.
+  goal: Send a pinned plan artifact snapshot and repair request through the public replan operation, leaving the agent to publish the prepared result.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 30
+  summary: Route replan operations to the service-owned repair handler.
+  rationale: Keep plan-repair policy and transformation behind the service operation boundary.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 73
+    end_line: 167
+  summary: Validate and prepare a plan-repair publication from supplied artifacts.
+  rationale: Keep plan-repair policy and transformation behind the service operation boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 29
+  summary: Import operation contracts and the local service bridge.
+  rationale: Compose the agent and service through the versioned operation interface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 34
+  summary: Import the typed local publisher error with the publisher function.
+  rationale: Preserve existing local publication error handling.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 33
+  summary: Bind local publisher imports to the CLI module.
+  rationale: Keep publication and its error handling in the agent package.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2696
+    end_line: 2696
+  summary: Reject a repair request whose root is not an object.
+  rationale: Validate the request envelope before it crosses the service boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2698
+    end_line: 2718
+  summary: Submit plan repair through the replan operation and locate its prepared publication artifact.
+  rationale: Move plan repair execution behind the service boundary while keeping repository publication on the agent side.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2720
+    end_line: 2724
+  summary: Validate and decode the prepared service output.
+  rationale: Reject incomplete or malformed service responses before publication.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2728
+    end_line: 2733
+  summary: Translate operation and publisher errors into the existing CLI error.
+  rationale: Preserve plan-repair error reporting through the new boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2736
+    end_line: 2737
+  summary: Read the plan and repair identifiers from service-prepared publication data.
+  rationale: Keep CLI output based on the service result.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2740
+    end_line: 2740
+  summary: Read affected item identifiers from service-prepared publication data.
+  rationale: Keep CLI output based on the service result.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2750
+    end_line: 2819
+  summary: Collect the pinned plan artifact snapshot and typed repair request for the operation.
+  rationale: Move plan repair execution behind the service boundary while keeping repository publication on the agent side.
+- path: tests/test_plan_repair_service.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 5
+  summary: Import helpers for the operation and CLI boundary test.
+  rationale: Exercise repair through the JSON operation API.
+- path: tests/test_plan_repair_service.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 18
+  summary: Import public operation contracts and the local JSON bridge.
+  rationale: Exercise the public operation API with real compiled artifacts.
+- path: tests/test_plan_repair_service.py
+  type: modified
+  span:
+    start_line: 162
+    end_line: 162
+  summary: Add CLI test fixtures to the real compiled-artifact repair test.
+  rationale: Verify the end-to-end agent/service composition.
+- path: tests/test_plan_repair_service.py
+  type: modified
+  span:
+    start_line: 167
+    end_line: 168
+  summary: Load the CLI entry module in the integration test.
+  rationale: Exercise the same operation path the CLI uses.
+- path: tests/test_plan_repair_service.py
+  type: modified
+  span:
+    start_line: 210
+    end_line: 315
+  summary: Exercise real compiled plan artifacts through the JSON service bridge and plan-repair CLI handoff.
+  rationale: Verify service output and agent publication composition using an actual temporary Git repository.
+entities:
+- id: local-powdrr-service-replan-handler
+  type: Method
+  action: added
+- id: plan-repair-cli-operation-routing
+  type: Command
+  action: added
+entity_relationships: []
+invariants:
+- id: plan-repair-operation-boundary
+  description: The agent supplies reviewed plan, proposal, workflow, and repair-request artifacts to the replan operation; the service returns prepared publication data and the agent performs GitHub publication.
+  action: added
+- id: plan-repair-snapshot-binding
+  description: The replan operation applies repair against the supplied repository snapshot and reports validation failures as failed operation updates.
+  action: added
+guidance:
+- id: remaining-plan-operation-routing
+  description: Route full plan creation and resume lifecycles through public service operations; plan-repair execution is now routed through replan.
+  action: added

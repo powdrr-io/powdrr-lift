@@ -562,18 +562,19 @@ def parse_work_unit_proposal_page(
             for proposal in proposals
             for requirement_id in proposal.requirement_ids
         }
-        if raw_anchor is None:
-            covered_after_cursor = [
-                requirement_id
-                for requirement_id in requirement_order[after_index + 1 :]
-                if requirement_id in covered_ids
-            ]
-            if not covered_after_cursor:
+        contiguous_covered: list[str] = []
+        for requirement_id in requirement_order[after_index + 1 :]:
+            if requirement_id not in covered_ids:
+                break
+            contiguous_covered.append(requirement_id)
+        if not contiguous_covered:
+            if raw_anchor is None:
                 raise PlanningContractError(
                     "/next_anchor",
                     "cannot infer a page cursor without a proposed requirement",
                 )
-            anchor = covered_after_cursor[-1]
+        if raw_anchor is None:
+            anchor = contiguous_covered[-1]
         else:
             anchor = _text(raw_anchor, "/next_anchor", max_length=120)
         if anchor not in requirement_order:
@@ -581,6 +582,17 @@ def parse_work_unit_proposal_page(
                 "/next_anchor", "must be in the supplied requirement range"
             )
         anchor_index = requirement_order.index(anchor)
+        first_uncovered_index = after_index + len(contiguous_covered) + 1
+        if (
+            contiguous_covered
+            and anchor_index == first_uncovered_index
+            and first_uncovered_index < len(requirement_order)
+        ):
+            # Older answers treated next_anchor as the first requirement for the
+            # next page. Normalize that to this journal's cursor meaning: the
+            # last requirement completed on the current page.
+            anchor = contiguous_covered[-1]
+            anchor_index = requirement_order.index(anchor)
         if anchor_index <= after_index:
             raise PlanningContractError(
                 "/next_anchor", "must advance beyond the page cursor"

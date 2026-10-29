@@ -415,6 +415,10 @@ def test_work_unit_page_cursor_is_derived_and_cannot_skip_uncovered_requirements
         {"records": proposals, "has_more": True, "next_anchor": None}
     )
     assert page.next_anchor == "req-0015"
+    page_with_first_uncovered_cursor = request.parse_answer(
+        {"records": proposals, "has_more": True, "next_anchor": "req-0016"}
+    )
+    assert page_with_first_uncovered_cursor.next_anchor == "req-0015"
 
     with pytest.raises(PlanningContractError, match="must not skip requirements"):
         request.parse_answer(

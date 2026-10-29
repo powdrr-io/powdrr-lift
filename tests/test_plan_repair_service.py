@@ -6,15 +6,15 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
-from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
-from powdrr_lift.workrr.planning.repair import RepairDraft, item_content_digest
-from powdrr_lift.workrr.planning.repair_service import (
+from powdrr_service.planning.repair import RepairDraft, item_content_digest
+from powdrr_service.planning.repair_service import (
     PlanRepairServiceError,
     apply_repair_request,
     load_repair_draft,
     publish_repair_pull_request,
 )
+
+from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 
 
 def _item(item_id: str, title: str | None = None) -> PlannedWorkItem:
@@ -147,9 +147,8 @@ def test_shared_repair_service_rejects_stale_bound_plan_reference() -> None:
 def test_shared_repair_service_compiles_real_reviewed_artifacts(
     tmp_path: Path,
 ) -> None:
+    from powdrr_service.planning.compiler import compile_plan
     from test_planning_compiler import _fixture
-
-    from powdrr_lift.workrr.planning.compiler import compile_plan
 
     plan, manifest, proposal = _fixture()
     plan = replace(plan, planning=manifest.to_data())

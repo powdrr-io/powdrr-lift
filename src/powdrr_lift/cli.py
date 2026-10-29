@@ -20,6 +20,23 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.planning.assembly import PathFact
+from powdrr_service.planning.checkpoints import LocalCheckpointStore
+from powdrr_service.planning.compiler import PlanningCompilationError
+from powdrr_service.planning.repair_service import (
+    PlanRepairServiceError,
+    apply_repair_request,
+    load_repair_draft,
+    publish_repair_pull_request,
+)
+from powdrr_service.planning.service import (
+    PlanningOptions,
+    PlanningServiceError,
+    PlanningSession,
+    create_planning_session,
+    load_planning_session,
+    run_planning_procedrr,
+)
 
 from powdrr_lift.agent_bootstrap import (
     BootstrapTaskConfig,
@@ -239,25 +256,8 @@ from powdrr_lift.workrr.human_task import (
 )
 from powdrr_lift.workrr.local_model import download_local_qwen_model
 from powdrr_lift.workrr.plan_sizing import PATH_RUNTIME_SUFFIXES
-from powdrr_lift.workrr.planning.assembly import PathFact
-from powdrr_lift.workrr.planning.checkpoints import LocalCheckpointStore
-from powdrr_lift.workrr.planning.compiler import PlanningCompilationError
 from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
 from powdrr_lift.workrr.planning.evidence import search_requirements_evidence
-from powdrr_lift.workrr.planning.repair_service import (
-    PlanRepairServiceError,
-    apply_repair_request,
-    load_repair_draft,
-    publish_repair_pull_request,
-)
-from powdrr_lift.workrr.planning.service import (
-    PlanningOptions,
-    PlanningServiceError,
-    PlanningSession,
-    create_planning_session,
-    load_planning_session,
-    run_planning_procedrr,
-)
 from powdrr_lift.workrr.planning.source import (
     read_pinned_source,
     segment_markdown_source,

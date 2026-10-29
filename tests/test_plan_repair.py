@@ -7,9 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
-from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
-from powdrr_lift.workrr.planning.repair import (
+from powdrr_service.planning.repair import (
     PlanDiscovery,
     PlanRepairError,
     PlanRepairPatch,
@@ -24,6 +22,8 @@ from powdrr_lift.workrr.planning.repair import (
     item_input_contract_digest,
     plan_revision_digest,
 )
+
+from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 from procedrr import ProcessCatalog
 
 

@@ -72,16 +72,6 @@
       "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
     },
     {
-      "import": "powdrr_lift.workrr.github_issue_queue.PlannedWorkItem",
-      "owner_pr": 4,
-      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
-    },
-    {
-      "import": "powdrr_lift.workrr.github_issue_queue.ReviewedExecutionPlan",
-      "owner_pr": 4,
-      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
-    },
-    {
       "import": "powdrr_lift.workrr.github_issue_queue.parse_reviewed_plan_yaml",
       "owner_pr": 4,
       "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."

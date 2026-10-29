@@ -205,17 +205,17 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
     assert proposal.planned_writes[0].runtime is None
 
 
-def test_swift_package_resolved_file_is_runtime_neutral() -> None:
-    context, anchor = _context(
-        path="attestation/macos/Package.resolved", runtime="neutral"
-    )
+@pytest.mark.parametrize(
+    "path",
+    [
+        "attestation/macos/Package.resolved",
+        "attestation/config/sandbox-profile.sb",
+    ],
+)
+def test_platform_data_file_extensions_are_runtime_neutral(path: str) -> None:
+    context, anchor = _context(path=path, runtime="neutral")
     context = replace(context, repository_paths={})
-    answer = _proposal(
-        context,
-        anchor,
-        path="attestation/macos/Package.resolved",
-        runtime="neutral",
-    )
+    answer = _proposal(context, anchor, path=path, runtime="neutral")
     planned_writes = answer["planned_writes"]
     assert isinstance(planned_writes, list)
     planned_writes[0]["runtime"] = None

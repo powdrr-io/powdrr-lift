@@ -1,0 +1,133 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1181
+title: Move planning coverage policy into service
+intent:
+  problem: Requirement coverage judgments and their generated question contract still lived in the agent-side
+    planning evidence module, leaving private planning policy coupled to local repository access.
+  goal: Move coverage policy, validation, residual creation, and question construction into the service
+    package while the agent supplies verified excerpts from the pinned repository.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/coverage.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 333
+  summary: Add service-owned requirement coverage policy and question construction.
+  rationale: Keep coverage decisions and prompt content behind the service boundary while accepting only
+    pinned excerpts and typed evidence records.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Remove duplicate imports for coverage policy.
+  rationale: Keep only repository capture dependencies in the agent-side module.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 23
+  summary: Import service-owned coverage records and validators.
+  rationale: Preserve legacy import paths while making the service the implementation owner.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 30
+  summary: Re-export coverage policy and residual types from the service package.
+  rationale: Retain compatibility for callers during staged migration.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 33
+  summary: Remove the service question context import from the agent adapter.
+  rationale: Question construction now belongs to service code.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 139
+    end_line: 169
+  summary: Remove local definitions of residual requirements and coverage results.
+  rationale: Use service-owned planning types.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 587
+    end_line: 634
+  summary: Remove agent-side coverage answer and requirement policy.
+  rationale: Keep evidence interpretation and question policy in service.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 564
+    end_line: 566
+  summary: Capture pinned excerpts in the agent adapter.
+  rationale: The agent retains repository access and prepares digest-bound excerpts.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 568
+    end_line: 573
+  summary: Pass pinned excerpts to service question construction.
+  rationale: Delegate coverage policy without exposing a repository path or callback.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 842
+    end_line: 842
+  summary: Remove the duplicate local residual coverage return.
+  rationale: Avoid maintaining a second implementation of service-owned behavior.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 399
+    end_line: 412
+  summary: Assign the coverage policy module to the service.
+  rationale: Track the new module and its service dependencies in the ownership inventory.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2997
+    end_line: 2997
+  summary: Clarify that the agent module now only captures repository evidence.
+  rationale: Record that coverage policy is service-owned while retaining a compatibility adapter.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 12
+  summary: Import the service coverage question builder for boundary coverage.
+  rationale: Exercise question construction directly through the service package.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 185
+    end_line: 198
+  summary: Build a coverage question directly from service code and pinned excerpts.
+  rationale: Prove the service path emits the same question data as the compatibility adapter.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 200
+    end_line: 220
+  summary: Verify equivalent service output and reject excerpts with a mismatched digest.
+  rationale: Guard the agent-to-service evidence boundary against unverified content.
+entities:
+- id: planning-coverage-policy
+  type: Module
+  action: added
+entity_relationships: []
+invariants:
+- id: planning-coverage-boundary
+  description: Coverage policy and question construction run in service code; the agent reads only pinned
+    repository excerpts and verifies evidence against its recorded digest before submitting them.
+  action: altered
+guidance:
+- id: next-planning-boundary-slice
+  description: Planning operations are not yet routed through the public service API; the next increment
+    must extract checkpoint and tracker effects behind adapters and route plan, resume, and re-plan operations
+    through that boundary.
+  action: added

@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal
@@ -323,6 +323,99 @@ class ItemDependencyEdge:
             "reason": self.reason,
             "requirement_ids": list(self.requirement_ids),
         }
+
+
+@dataclass(frozen=True, slots=True)
+class DependencyCandidateDiscovery:
+    """Deterministic same-file edges and bounded semantic confirmation pairs."""
+
+    write_order_edges: tuple[UnitDependencyEdge, ...]
+    confirmation_pairs: tuple[tuple[PendingUnitOutput, WorkUnit], ...]
+
+
+def discover_dependency_candidates(
+    units: Sequence[WorkUnit],
+    pending_outputs: Sequence[PendingUnitOutput],
+) -> DependencyCandidateDiscovery:
+    """Avoid all-pairs dependency questions by pruning to concrete evidence."""
+    by_id = {unit.id: unit for unit in units}
+    writers_by_path: dict[str, list[WorkUnit]] = defaultdict(list)
+    paths_by_unit: dict[str, set[str]] = {unit.id: set() for unit in units}
+    for unit in units:
+        for write in unit.planned_writes:
+            if write.path in paths_by_unit[unit.id]:
+                continue
+            writers_by_path[write.path].append(unit)
+            paths_by_unit[unit.id].add(write.path)
+
+    write_order_edges = tuple(
+        UnitDependencyEdge(
+            before.id,
+            after.id,
+            path,
+            (
+                f"Both work units write {path}; apply their changes in plan order "
+                "to avoid concurrent edits."
+            ),
+            before.requirement_ids,
+        )
+        for path, writers in sorted(writers_by_path.items())
+        for before, after in zip(writers, writers[1:], strict=False)
+    )
+
+    unit_text = {unit.id: _dependency_unit_text(unit) for unit in units}
+    unit_tokens = {
+        unit_id: _dependency_tokens(text) for unit_id, text in unit_text.items()
+    }
+    document_frequency: Counter[str] = Counter(
+        token for tokens in unit_tokens.values() for token in tokens
+    )
+    rare_token_limit = max(3, len(units) // 200)
+    pairs: list[tuple[PendingUnitOutput, WorkUnit]] = []
+    for pending in pending_outputs:
+        producer = by_id.get(pending.unit_id)
+        if producer is None:
+            continue
+        producer_text = f"{_dependency_unit_text(producer)} {pending.description}"
+        candidate_tokens = {
+            token
+            for token in _dependency_tokens(producer_text)
+            if document_frequency[token] < rare_token_limit
+        }
+        for consumer in units:
+            if consumer.id == producer.id:
+                continue
+            if paths_by_unit[producer.id] & paths_by_unit[consumer.id]:
+                # Same-file work is ordered deterministically above.
+                continue
+            consumer_title = consumer.deliverable.casefold()
+            explicit_path_reference = any(
+                path.casefold() in consumer_title
+                for path in paths_by_unit[producer.id]
+                if path
+            )
+            shared_rare_tokens = candidate_tokens & unit_tokens[consumer.id]
+            if explicit_path_reference or len(shared_rare_tokens) >= 3:
+                pairs.append((pending, consumer))
+    return DependencyCandidateDiscovery(write_order_edges, tuple(pairs))
+
+
+def _dependency_unit_text(unit: WorkUnit) -> str:
+    return " ".join(
+        (
+            unit.deliverable,
+            unit.implementation_step,
+            *unit.acceptance_criteria,
+        )
+    )
+
+
+def _dependency_tokens(text: str) -> set[str]:
+    return {
+        token.casefold()
+        for token in re.findall(r"[A-Za-z0-9]+", text)
+        if len(token) >= 5
+    }
 
 
 @dataclass(frozen=True, slots=True)

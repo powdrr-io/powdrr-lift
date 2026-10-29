@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 
 import pytest
-from powdrr_service.planning.assembly import PendingUnitOutput, WorkUnit
+from powdrr_service.planning.assembly import (
+    PendingUnitOutput,
+    PlannedWrite,
+    WorkUnit,
+)
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.dependencies import (
     DependencyCandidate,
@@ -27,6 +32,7 @@ from powdrr_service.planning.dependencies import (
     build_validation_description_request,
     compile_dependency_graph,
     compile_manual_setup_ownership,
+    discover_dependency_candidates,
     parse_dependency_confirmation,
     parse_human_setup_need,
     parse_manual_setup_proposal,
@@ -215,6 +221,81 @@ def test_external_output_must_cite_supplied_evidence() -> None:
             candidate_unit_ids=set(),
             evidence_ids={"evidence-0001"},
         )
+
+
+def test_dependency_discovery_orders_shared_paths_and_skips_unrelated_pairs() -> None:
+    shared_write = PlannedWrite("src/shared.py", "implementation", "python", (), ())
+    units = [
+        replace(_unit("unit-0001"), planned_writes=(shared_write, shared_write)),
+        replace(_unit("unit-0002", "req-0002"), planned_writes=(shared_write,)),
+        replace(
+            _unit("unit-0003", "req-0003"),
+            planned_writes=(
+                PlannedWrite("docs/independent.md", "documentation", None, (), ()),
+            ),
+        ),
+    ]
+    outputs = [
+        PendingUnitOutput(unit.id, "A generic output artifact.", unit.requirement_ids)
+        for unit in units
+    ]
+
+    discovery = discover_dependency_candidates(units, outputs)
+
+    assert [
+        (edge.before_unit_id, edge.after_unit_id)
+        for edge in discovery.write_order_edges
+    ] == [("unit-0001", "unit-0002")]
+    assert discovery.confirmation_pairs == ()
+
+
+def test_dependency_discovery_keeps_specific_cross_path_candidates() -> None:
+    producer = replace(
+        _unit("unit-0001"),
+        deliverable="Create the signed verifier manifest.",
+        implementation_step="Create a canonical signed verifier manifest.",
+        planned_writes=(
+            PlannedWrite("src/manifest.py", "implementation", "python", (), ()),
+        ),
+    )
+    consumer = replace(
+        _unit("unit-0002", "req-0002"),
+        deliverable="Consume the verifier manifest.",
+        implementation_step="Consume the canonical signed verifier manifest.",
+        planned_writes=(
+            PlannedWrite("src/consumer.py", "implementation", "python", (), ()),
+        ),
+    )
+    output = PendingUnitOutput(
+        producer.id,
+        "The canonical signed verifier manifest.",
+        producer.requirement_ids,
+    )
+
+    discovery = discover_dependency_candidates([producer, consumer], [output])
+
+    assert discovery.write_order_edges == ()
+    assert discovery.confirmation_pairs == ((output, consumer),)
+
+
+def test_dependency_discovery_keeps_named_output_path_in_deliverable() -> None:
+    producer = replace(
+        _unit("unit-0001"),
+        planned_writes=(
+            PlannedWrite("attestation/scripts/verify-all.sh", "test", "shell", (), ()),
+        ),
+    )
+    consumer = replace(
+        _unit("unit-0002", "req-0002"),
+        deliverable="Document use of attestation/scripts/verify-all.sh.",
+    )
+    output = PendingUnitOutput(
+        producer.id, "The verifier script.", producer.requirement_ids
+    )
+
+    discovery = discover_dependency_candidates([producer, consumer], [output])
+
+    assert discovery.confirmation_pairs == ((output, consumer),)
 
 
 def test_dependency_confirmation_has_exact_required_and_independent_variants() -> None:

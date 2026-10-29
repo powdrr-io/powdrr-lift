@@ -10,18 +10,19 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Literal
 
+from powdrr_service.planning.contracts import (
+    MAX_CONTRACT_TEXT_LENGTH,
+    MAX_ENUMERATION_RECORDS,
+    PlanningContractError,
+    Question,
+)
+
 from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.multipr_structrr import (
     MultiPRStructrrProposal,
     compile_multi_pr_proposal,
 )
 from powdrr_lift.workrr.planning.assembly import WorkUnit
-from powdrr_lift.workrr.planning.contracts import (
-    MAX_CONTRACT_TEXT_LENGTH,
-    MAX_ENUMERATION_RECORDS,
-    PlanningContractError,
-    Question,
-)
 from powdrr_lift.workrr.planning.questions import (
     ContextRecord,
     QuestionRequest,

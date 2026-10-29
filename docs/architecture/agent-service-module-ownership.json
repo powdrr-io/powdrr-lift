@@ -335,6 +335,15 @@
       "reviewed": false
     },
     {
+      "extraction_pr": "4",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/contracts.py",
+      "rationale": "service-owned strict bounded-planning contracts",
+      "reviewed": false
+    },
+    {
       "extraction_pr": "8",
       "internal_imports": [],
       "kind": "python_module",
@@ -2724,7 +2733,7 @@
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_lift.workrr.plan_sizing",
-        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_service.planning.contracts",
         "powdrr_lift.workrr.planning.evidence",
         "powdrr_lift.workrr.planning.questions",
         "powdrr_lift.workrr.planning.source"
@@ -2739,7 +2748,7 @@
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_lift.workrr.github_issue_queue",
-        "powdrr_lift.workrr.planning.contracts"
+        "powdrr_service.planning.contracts"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -2764,18 +2773,20 @@
     },
     {
       "extraction_pr": "4",
-      "internal_imports": [],
+      "internal_imports": [
+        "powdrr_service.planning.contracts"
+      ],
       "kind": "python_module",
       "owner": "service",
       "path": "src/powdrr_lift/workrr/planning/contracts.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
+      "rationale": "temporary compatibility shim for existing application imports; implementation is service-owned",
       "reviewed": false
     },
     {
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_lift.workrr.planning.assembly",
-        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_service.planning.contracts",
         "powdrr_lift.workrr.planning.evidence",
         "powdrr_lift.workrr.planning.questions",
         "powdrr_lift.workrr.planning.source"
@@ -2812,7 +2823,7 @@
       "internal_imports": [
         "powdrr_lift.basedpyright_tools",
         "powdrr_lift.errors",
-        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_service.planning.contracts",
         "powdrr_lift.workrr.planning.questions",
         "powdrr_lift.workrr.planning.source"
       ],
@@ -2827,7 +2838,7 @@
       "internal_imports": [
         "powdrr_lift.errors",
         "powdrr_lift.workrr.llm",
-        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_service.planning.contracts",
         "powdrr_lift.workrr.protocol"
       ],
       "kind": "python_module",
@@ -2885,7 +2896,7 @@
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_lift.core.instruction_ledger",
-        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_service.planning.contracts",
         "powdrr_lift.workrr.planning.questions"
       ],
       "kind": "python_module",
@@ -2900,7 +2911,7 @@
         "powdrr_lift.structrr.rebase",
         "powdrr_lift.workrr.multipr_structrr",
         "powdrr_lift.workrr.planning.assembly",
-        "powdrr_lift.workrr.planning.contracts",
+        "powdrr_service.planning.contracts",
         "powdrr_lift.workrr.planning.questions",
         "powdrr_lift.workrr.planning.source"
       ],

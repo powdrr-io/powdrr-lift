@@ -189,10 +189,9 @@ def test_legacy_service_imports_are_explicitly_owned() -> None:
     for source in package.glob("*.py"):
         tree = ast.parse(source.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
-            if (
-                isinstance(node, ast.ImportFrom)
-                and node.module == "powdrr_lift.artifact_state"
-            ):
-                actual.add(f"{node.module}.build_artifact_state")
+            if isinstance(node, ast.ImportFrom) and node.module:
+                for alias in node.names:
+                    if node.module.startswith("powdrr_lift"):
+                        actual.add(f"{node.module}.{alias.name}")
     assert actual == expected
     assert all(entry["owner_pr"] > 0 for entry in allowlist["entries"])

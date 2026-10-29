@@ -13,6 +13,7 @@ OPERATION_KINDS = frozenset(
         "review_feedback",
         "bootstrap",
         "inspect_artifacts",
+        "compile_structrr_diff",
         "verification_health",
         "verification_diff",
         "evaluate_pr_against_changelog",

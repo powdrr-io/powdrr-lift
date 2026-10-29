@@ -129,6 +129,7 @@ def bootstrap_structrr(
     include_untracked: bool = False,
     artifact_exclusions: Sequence[str] = (),
     submission_base: str | None = None,
+    source_revision: str | None = None,
     repository_name: str | None = None,
 ) -> BootstrapResult:
     """Build and validate a Structrr snapshot from tracked repository evidence.
@@ -171,9 +172,10 @@ def bootstrap_structrr(
         text=True,
         check=False,
     )
-    source_revision = source_revision_result.stdout.strip()
-    if source_revision_result.returncode != 0 or not source_revision:
-        source_revision = "unavailable"
+    observed_source_revision = source_revision_result.stdout.strip()
+    if source_revision_result.returncode != 0 or not observed_source_revision:
+        observed_source_revision = "unavailable"
+    source_revision = source_revision or observed_source_revision
     # GitHub workflows are intentionally excluded from the semantic Structrr
     # inventory, but candidate comparison still needs file-level provenance
     # when a plan explicitly adds or changes CI configuration.

@@ -147,6 +147,7 @@ class Artifact:
     data: bytes
     scope: str = "operation"
     encoding: str = "base64"
+    attributes: JsonObject = field(default_factory=dict)
 
     @property
     def sha256(self) -> str:
@@ -165,6 +166,7 @@ class Artifact:
             "data": base64.b64encode(self.data).decode("ascii"),
             "sha256": self.sha256,
             "scope": self.scope,
+            "attributes": self.attributes,
         }
 
     @classmethod
@@ -187,6 +189,7 @@ class Artifact:
             media_type=_string(obj.get("media_type"), "artifact.media_type"),
             data=raw,
             scope=_string(obj.get("scope", "operation"), "artifact.scope"),
+            attributes=_object(obj.get("attributes", {}), "artifact.attributes"),
         )
 
 
@@ -661,3 +664,13 @@ def json_round_trip(value: JsonObject) -> JsonObject:
         return json.loads(json.dumps(value, separators=(",", ":")))
     except (TypeError, ValueError) as exc:
         raise ContractError("payload is not JSON serializable") from exc
+
+
+def artifact_manifest_digest(artifacts: tuple[Artifact, ...]) -> str:
+    """Hash artifact identity, bytes, and metadata in a stable path order."""
+    manifest = [
+        (item.artifact_id, item.sha256, item.attributes)
+        for item in sorted(artifacts, key=lambda artifact: artifact.artifact_id)
+    ]
+    payload = json.dumps(manifest, separators=(",", ":"), sort_keys=True).encode()
+    return hashlib.sha256(payload).hexdigest()

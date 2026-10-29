@@ -25,7 +25,12 @@ from powdrr_contracts.models import (
 class LocalPowdrrService:
     """Reconstruct public artifact state from data supplied by the agent."""
 
+    def __init__(self, *, planning_issue_store: Any | None = None) -> None:
+        self._planning_issue_store = planning_issue_store
+
     def start(self, request: OperationRequest) -> OperationUpdate:
+        if request.operation_kind == "plan":
+            return self._planning_session(request)
         if request.operation_kind == "replan":
             return self._prepare_plan_repair(request)
         if request.operation_kind == "bootstrap":
@@ -65,6 +70,87 @@ class LocalPowdrrService:
                 Artifact(
                     artifact_id="artifact-state/workflows.json",
                     media_type="application/vnd.powdrr.artifact-state+json",
+                    data=payload,
+                ),
+            ),
+        )
+
+    def _planning_session(self, request: OperationRequest) -> OperationUpdate:
+        store = self._planning_issue_store
+        if store is None:
+            return _failed(
+                request.request_id,
+                "adapter_unavailable",
+                "Planning issue adapter is not configured.",
+            )
+        try:
+            from powdrr_service.planning.service import (
+                PlanningServiceError,
+                create_planning_session,
+                load_planning_session,
+            )
+
+            action = request.inputs.get("action")
+            repository = _required_string(
+                request.inputs.get("repository_id"), "repository_id"
+            )
+            if repository != store.repository:
+                raise PlanningServiceError(
+                    "planning issue adapter repository differs from request"
+                )
+            if action == "create_session":
+                session = create_planning_session(
+                    store,
+                    plan_id=_required_string(request.inputs.get("plan_id"), "plan_id"),
+                    base_commit=_required_string(
+                        request.inputs.get("base_commit"), "base_commit"
+                    ),
+                    source_path=_required_string(
+                        request.inputs.get("source_path"), "source_path"
+                    ),
+                    source_blob_sha=_required_string(
+                        request.inputs.get("source_blob_sha"), "source_blob_sha"
+                    ),
+                    verification_command=_required_string(
+                        request.inputs.get("verification_command"),
+                        "verification_command",
+                    ),
+                )
+            elif action == "load_session":
+                issue_number = request.inputs.get("issue_number")
+                if not isinstance(issue_number, int) or isinstance(issue_number, bool):
+                    raise ValueError("issue_number must be an integer")
+                session = load_planning_session(
+                    store,
+                    issue_number,
+                    expected_repository=repository,
+                )
+            else:
+                raise ValueError("plan operation action must create or load a session")
+        except (
+            OSError,
+            ValueError,
+            subprocess.SubprocessError,
+            PlanningServiceError,
+        ) as exc:
+            return _failed(request.request_id, "planning_session_failed", str(exc))
+        payload = json.dumps(
+            session.to_data(), sort_keys=True, separators=(",", ":")
+        ).encode()
+        phase = (
+            "planning_session_created"
+            if action == "create_session"
+            else "planning_session_loaded"
+        )
+        return OperationUpdate(
+            operation_id=request.request_id,
+            revision=1,
+            status="succeeded",
+            progress=({"phase": phase},),
+            output_artifacts=(
+                Artifact(
+                    artifact_id="planning/session.json",
+                    media_type="application/vnd.powdrr.planning-session+json",
                     data=payload,
                 ),
             ),

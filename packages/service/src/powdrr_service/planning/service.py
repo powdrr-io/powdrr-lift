@@ -66,6 +66,18 @@ class PlanningIssue(Protocol):
     def url(self) -> str: ...
 
 
+@dataclass(frozen=True, slots=True)
+class PlanningIssueRecord:
+    """Public issue fields needed to resume a planning session."""
+
+    number: int
+    title: str
+    body: str
+    state: str
+    labels: tuple[str, ...]
+    url: str
+
+
 class PlanningIssueStore(Protocol):
     """Issue operations supplied by a local persistence adapter."""
 
@@ -93,6 +105,82 @@ class PlanningSession:
     source_blob_sha: str
     verification_command: str
     issue: PlanningIssue
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "schema": "planning-session-record-v1",
+            "session_id": self.session_id,
+            "plan_id": self.plan_id,
+            "repository": self.repository,
+            "base_commit": self.base_commit,
+            "source_path": self.source_path,
+            "source_blob_sha": self.source_blob_sha,
+            "verification_command": self.verification_command,
+            "issue": {
+                "number": self.issue.number,
+                "title": self.issue.title,
+                "body": self.issue.body,
+                "state": self.issue.state,
+                "labels": list(self.issue.labels),
+                "url": self.issue.url,
+            },
+        }
+
+    @classmethod
+    def from_data(cls, value: object) -> PlanningSession:
+        if (
+            not isinstance(value, Mapping)
+            or value.get("schema") != "planning-session-record-v1"
+        ):
+            raise PlanningServiceError(
+                "planning session operation returned malformed data"
+            )
+        issue = value.get("issue")
+        string_fields = (
+            "session_id",
+            "plan_id",
+            "repository",
+            "base_commit",
+            "source_path",
+            "source_blob_sha",
+            "verification_command",
+        )
+        if any(not isinstance(value.get(field), str) for field in string_fields):
+            raise PlanningServiceError(
+                "planning session operation returned malformed data"
+            )
+        if (
+            not isinstance(issue, Mapping)
+            or not isinstance(issue.get("number"), int)
+            or isinstance(issue.get("number"), bool)
+            or not all(
+                isinstance(issue.get(field), str)
+                for field in ("title", "body", "state", "url")
+            )
+            or not isinstance(issue.get("labels"), list)
+            or not all(isinstance(label, str) for label in issue["labels"])
+        ):
+            raise PlanningServiceError(
+                "planning session operation returned malformed data"
+            )
+        record = PlanningIssueRecord(
+            number=issue["number"],
+            title=issue["title"],
+            body=issue["body"],
+            state=issue["state"],
+            labels=tuple(issue["labels"]),
+            url=issue["url"],
+        )
+        return cls(
+            session_id=value["session_id"],
+            plan_id=value["plan_id"],
+            repository=value["repository"],
+            base_commit=value["base_commit"],
+            source_path=value["source_path"],
+            source_blob_sha=value["source_blob_sha"],
+            verification_command=value["verification_command"],
+            issue=record,
+        )
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
+import powdrr_service.planning.structrr as structrr_module
 import pytest
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
+from powdrr_service.planning.questions import build_question_messages
+from powdrr_service.planning.source import PinnedSourceDocument, segment_markdown_source
 from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
     StructrrPlanningError,
     StructuralSubjectPage,
     UnorderedStructrrConflict,
     bind_structural_operation,
+    build_structural_change_request,
+    build_subject_enumeration_request,
     compile_structrr_plan,
     complete_subject_enumeration,
     parse_structural_change,
@@ -66,6 +72,7 @@ def _parse_page(
     requirements: set[str] | None = None,
     baseline: dict[str, Any] | None = None,
     prior: set[tuple[str, str]] | None = None,
+    source_ids: set[str] | None = None,
 ) -> StructuralSubjectPage:
     return parse_structural_subject_page(
         value,
@@ -73,11 +80,242 @@ def _parse_page(
         item_id="item-01",
         requirement_ids=requirements or {"req-01"},
         units=units or (_unit(),),
-        source_ids={"anchor-01"},
+        source_ids=source_ids or {"anchor-01"},
         projected_baseline=baseline or {"entities": []},
         prior_subject_ids=prior or set(),
         page_ordinal=page_ordinal,
     )
+
+
+def test_structural_questions_send_only_relevant_baseline_subjects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    unrelated_payload = "unrelated-baseline-detail-" + ("x" * 1_000)
+    baseline = {
+        "entities": [
+            {"id": f"file:src/unrelated-{index}.py", "description": unrelated_payload}
+            for index in range(80)
+        ]
+        + [{"id": "file:src/relevant.py", "type": "Source file"}],
+        "entity_relationships": [],
+        "files": [
+            {"path": f"src/unrelated-{index}.py", "summary": unrelated_payload}
+            for index in range(50)
+        ]
+        + [
+            {"path": "src/relevant.py", "summary": "Relevant source file."},
+            {"path": "src/projected.py", "summary": unrelated_payload},
+        ],
+        "source_subjects": [
+            {
+                "stable_key": f"python::unrelated_{index}",
+                "path": f"src/unrelated-{index}.py",
+                "qualified_name": unrelated_payload,
+            }
+            for index in range(80)
+        ]
+        + [
+            {
+                "stable_key": "python::relevant",
+                "path": "src/relevant.py",
+                "kind": "module",
+                "qualified_name": "relevant",
+            }
+        ],
+    }
+    unit = _unit(
+        writes=(
+            PlannedWrite("src/relevant.py", "implementation", "python", (), ()),
+            PlannedWrite("src/projected.py", "implementation", "python", (), ()),
+        )
+    )
+    text = "# Plan\n\nUpdate the relevant module.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    monkeypatch.setattr(
+        structrr_module, "snapshot_digest", lambda _snapshot: "sha256:constant"
+    )
+
+    enumeration = build_subject_enumeration_request(
+        plan_id="plan",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline=baseline,
+    )
+    assert "new_identity_description is non-null, action must be added" in (
+        enumeration.exact_question
+    )
+    enumeration_messages = build_question_messages(enumeration)
+    enumeration_input = enumeration_messages[1]["content"]
+    without_projected_file = build_subject_enumeration_request(
+        plan_id="plan",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline={
+            **baseline,
+            "files": [
+                record
+                for record in baseline["files"]
+                if record["path"] != "src/projected.py"
+            ],
+        },
+    )
+
+    subject = BoundStructuralSubject(
+        "python::relevant",
+        "files",
+        "item-0001",
+        "changed",
+        ("req-01",),
+        (unit.id,),
+        (source_ref,),
+        False,
+        "src/relevant.py",
+    )
+    change = build_structural_change_request(
+        subject,
+        projected_baseline=baseline,
+        taxonomy_entity_types=("Source file",),
+        planned_paths={"src/relevant.py"},
+        known_entity_ids={f"file:src/unrelated-{index}.py" for index in range(80)},
+        valid_example={"result": "unchanged", "reason": "Already satisfied."},
+    )
+    change_input = build_question_messages(change)[1]["content"]
+
+    assert "python::relevant" in enumeration_input
+    assert "path::src/projected.py" in enumeration_input
+    assert (
+        enumeration.question.input_digest
+        != without_projected_file.question.input_digest
+    )
+    assert "Never describe an existing file subject as new" in (
+        enumeration.exact_question
+    )
+    assert "python::unrelated_0" not in enumeration_input
+    assert unrelated_payload not in enumeration_input
+    assert "python::relevant" in change_input
+    assert "python::unrelated_0" not in change_input
+    assert unrelated_payload not in change_input
+
+
+def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
+    subject = BoundStructuralSubject(
+        "attestation/scripts/verify-all.sh",
+        "files",
+        "item-0001",
+        "added",
+        ("req-01",),
+        ("unit-0001",),
+        ("anchor-01",),
+        False,
+        "attestation/scripts/verify-all.sh",
+    )
+    request = build_structural_change_request(
+        subject,
+        projected_baseline={"entities": [], "entity_relationships": [], "files": []},
+        taxonomy_entity_types=("Source file",),
+        planned_paths={"attestation/scripts/verify-all.sh"},
+        known_entity_ids={f"entity-{index:05d}" for index in range(4_000)},
+        valid_example={"result": "unchanged", "reason": "Already satisfied."},
+    )
+
+    serialized_input = build_question_messages(request)[1]["content"]
+
+    assert request.valid_example["result"] == "change"
+    assert request.valid_example["desired_content"] == {
+        "path": "attestation/scripts/verify-all.sh"
+    }
+    assert "one concise reason of at most 200 characters" in request.exact_question
+    assert "entity-identities" not in serialized_input
+    assert len(serialized_input) < 24_000
+
+
+def test_entity_structural_change_omits_sibling_baseline_records() -> None:
+    subject = BoundStructuralSubject(
+        "python::module",
+        "entities",
+        "item-0001",
+        "changed",
+        ("req-01",),
+        ("unit-0001",),
+        ("anchor-01",),
+        False,
+        "src/module.py",
+    )
+    sibling_payload = "unrelated-sibling-description-" + ("x" * 300)
+    baseline = {
+        "entities": [
+            {"id": "python::module", "type": "Module", "path": "src/module.py"},
+            *[
+                {
+                    "id": f"python::module.sibling_{index}",
+                    "type": "Function",
+                    "name": sibling_payload,
+                    "path": "src/module.py",
+                }
+                for index in range(100)
+            ],
+        ],
+        "entity_relationships": [],
+        "files": [
+            {
+                "path": "src/module.py",
+                "summary": "large file summary marker " + ("s" * 2_000),
+            }
+        ],
+        "source_subjects": [
+            {
+                "stable_key": "python::module",
+                "path": "src/module.py",
+                "qualified_name": "module",
+            },
+            *[
+                {
+                    "stable_key": f"python::module.sibling_{index}",
+                    "path": "src/module.py",
+                    "file_entity_id": "python::module",
+                    "qualified_name": sibling_payload,
+                }
+                for index in range(100)
+            ],
+        ],
+    }
+    request = build_structural_change_request(
+        subject,
+        projected_baseline=baseline,
+        taxonomy_entity_types=("Module",)
+        + tuple(f"EntityType{index:04d}" for index in range(600)),
+        planned_paths={"src/module.py"},
+        known_entity_ids={"python::module"},
+        valid_example={"result": "unchanged", "reason": "Already satisfied."},
+    )
+
+    serialized_input = build_question_messages(request)[1]["content"]
+
+    assert "python::module" in serialized_input
+    assert "python::module.sibling_0" not in serialized_input
+    assert sibling_payload not in serialized_input
+    assert "large file summary marker" not in serialized_input
+    assert "EntityType0000" in serialized_input
+    assert serialized_input.count("EntityType0000") == 1
+    assert (
+        "one of the supplied entity-taxonomy entity_types"
+        in (request.answer_field_definitions["desired_content"])
+    )
+    assert len(serialized_input) < 24_000
 
 
 def test_structural_subject_pages_cover_all_subjects_and_require_final_page() -> None:
@@ -104,6 +342,20 @@ def test_structural_subject_pages_cover_all_subjects_and_require_final_page() ->
     assert len(complete_subject_enumeration((first, second))) == 12
     with pytest.raises(StructrrPlanningError, match="incomplete"):
         complete_subject_enumeration((first,))
+
+
+def test_subject_page_accepts_all_known_source_references() -> None:
+    source_ids = {f"anchor-{index:02d}" for index in range(9)}
+    row = _record("entity-01")
+    row["source_refs"] = sorted(source_ids)
+
+    page = _parse_page(
+        _candidate_page([row], has_more=False, next_anchor=None),
+        baseline={"entities": [{"id": "entity-01"}]},
+        source_ids=source_ids,
+    )
+
+    assert page.records[0].source_refs == tuple(sorted(source_ids))
 
 
 def test_subject_page_rejects_wrong_cursor_and_duplicate_subject() -> None:
@@ -168,6 +420,28 @@ def test_new_file_subject_is_bound_to_a_planned_path() -> None:
     assert operation["subject_id"] == "path::src/new.py"
     assert operation["content"]["stable_key"] == "path::src/new.py"
     assert operation["content"]["id"] == "file:src/new.py"
+
+
+def test_existing_projected_file_path_is_a_valid_structural_subject() -> None:
+    path = "src/yaml_strict.py"
+    baseline = {"files": [{"path": path}], "source_subjects": []}
+    candidate = {
+        "section": "files",
+        "subject_ref": f"path::{path}",
+        "new_identity_description": None,
+        "action": "changed",
+        "requirement_ids": ["req-01"],
+        "unit_ids": ["unit-01"],
+        "source_refs": ["anchor-01"],
+    }
+
+    page = _parse_page(
+        _candidate_page([candidate], has_more=False, next_anchor=None),
+        baseline=baseline,
+    )
+
+    assert page.records[0].subject_id == f"path::{path}"
+    assert page.records[0].planned_path == path
 
 
 def test_change_response_rejects_model_assigned_identity_fields() -> None:

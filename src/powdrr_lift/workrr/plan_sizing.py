@@ -7,8 +7,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from ortools.sat.python import cp_model
-
 MAX_PR_WORK_UNITS = 4
 TARGET_PR_WORK_UNITS = 3
 _RUNTIME = re.compile(
@@ -109,84 +107,68 @@ def allocate_explicit_work_units(
         raise PlanSizingError("work-unit sizing facts are invalid")
 
     count = len(units)
-    model = cp_model.CpModel()
-    boundaries = [model.new_bool_var(f"boundary_{i}") for i in range(count + 1)]
-    model.add(boundaries[0] == 1)
-    model.add(boundaries[count] == 1)
-    group_count = model.new_int_var(1, count, "group_count")
-    model.add(group_count == sum(boundaries[1:count]) + 1)
-    segments: dict[tuple[int, int], Any] = {}
-    cohesion_costs: list[Any] = []
+    # This is a bounded contiguous partition problem. Dynamic programming gives
+    # the exact same minimum as the former CP-SAT model with predictable runtime.
+    segments: list[list[tuple[int, int]]] = [[] for _ in range(count)]
     for start in range(count):
+        components: set[str] = set()
+        runtimes: set[str] = set()
+        criteria_count = 0
+        has_standalone = False
         for end in range(start + 1, min(count, start + max_units) + 1):
-            chunk = units[start:end]
-            if any(unit.id in standalone_unit_ids for unit in chunk) and len(chunk) > 1:
-                continue
-            if sum(unit.acceptance_criteria_count for unit in chunk) > max_criteria:
-                continue
-            components = {unit.component for unit in chunk}
-            if len(components) > max_components:
-                continue
-            runtimes = {
-                unit.implementation_runtime
-                for unit in chunk
-                if unit.implementation_runtime != "neutral"
-            }
-            if len(runtimes) > 1:
-                continue
-            selected = model.new_bool_var(f"segment_{start}_{end}")
-            segments[(start, end)] = selected
-            model.add(selected <= boundaries[start])
-            for inner in range(start + 1, end):
-                model.add(selected + boundaries[inner] <= 1)
-            cohesion_costs.append(selected * (len(components) - 1))
-    for index in range(count):
-        model.add(
-            sum(
-                variable
-                for (start, end), variable in segments.items()
-                if start <= index < end
-            )
-            == 1
-        )
-    for boundary in range(count):
-        model.add(
-            boundaries[boundary]
-            == sum(
-                variable
-                for (start, _end), variable in segments.items()
-                if start == boundary
-            )
-        )
-    distance = model.new_int_var(0, count * target_units + count, "target_distance")
-    model.add_abs_equality(distance, group_count * target_units - count)
-    tie_break = sum((index + 1) * boundaries[index] for index in range(1, count))
-    model.minimize(distance * 1_000_000 + sum(cohesion_costs) * 1_000 + tie_break)
-    solver = cp_model.CpSolver()
-    solver.parameters.num_search_workers = 1
-    solver.parameters.random_seed = 0
-    status = solver.solve(model)
-    if status not in (cp_model.OPTIMAL, cp_model.FEASIBLE):
-        raise PlanSizingError(
-            "CP-SAT cannot allocate work units within hard constraints"
-        )
-    selected_segments = sorted(
-        (start, end)
-        for (start, end), variable in segments.items()
-        if solver.value(variable)
+            unit = units[end - 1]
+            has_standalone = has_standalone or unit.id in standalone_unit_ids
+            components.add(unit.component)
+            if unit.implementation_runtime != "neutral":
+                runtimes.add(unit.implementation_runtime)
+            criteria_count += unit.acceptance_criteria_count
+            if (
+                (has_standalone and end - start > 1)
+                or criteria_count > max_criteria
+                or len(components) > max_components
+                or len(runtimes) > 1
+            ):
+                break
+            segments[start].append((end, len(components) - 1))
+
+    # For each (prefix length, group count), retain the cheapest cohesion and
+    # boundary score, plus one predecessor for reconstruction.
+    costs: list[dict[int, int]] = [dict() for _ in range(count + 1)]
+    previous: list[dict[int, tuple[int, int]]] = [dict() for _ in range(count + 1)]
+    costs[0][0] = 0
+    for start in range(count):
+        for end, cohesion_cost in segments[start]:
+            boundary_cost = 0 if start == 0 else start + 1
+            for prior_groups, prior_cost in costs[start].items():
+                group_count = prior_groups + 1
+                candidate = prior_cost + cohesion_cost * 1_000 + boundary_cost
+                if candidate < costs[end].get(group_count, 2**63):
+                    costs[end][group_count] = candidate
+                    previous[end][group_count] = (start, prior_groups)
+
+    if not costs[count]:
+        raise PlanSizingError("no work-unit allocation satisfies the hard constraints")
+    best_group_count = min(
+        costs[count],
+        key=lambda groups: (
+            abs(groups * target_units - count) * 1_000_000 + costs[count][groups]
+        ),
     )
-    if (
-        not selected_segments
-        or selected_segments[0][0] != 0
-        or selected_segments[-1][1] != count
-    ):
-        raise PlanSizingError("CP-SAT returned incomplete work-unit coverage")
-    for prior, current in zip(selected_segments, selected_segments[1:], strict=False):
-        if prior[1] != current[0]:
-            raise PlanSizingError("CP-SAT returned overlapping work-unit groups")
+    objective_value = (
+        abs(best_group_count * target_units - count) * 1_000_000
+        + costs[count][best_group_count]
+    )
+    selected_segments_reversed: list[tuple[int, int]] = []
+    end = count
+    group_count = best_group_count
+    while end:
+        start, prior_groups = previous[end][group_count]
+        selected_segments_reversed.append((start, end))
+        end, group_count = start, prior_groups
+    selected_segments = list(reversed(selected_segments_reversed))
     return ExplicitAllocation(
         tuple(tuple(unit_ids[start:end]) for start, end in selected_segments),
-        int(solver.objective_value),
+        objective_value,
     )
 
 
@@ -196,7 +178,7 @@ def size_plan_items(
     target_work_units: int = TARGET_PR_WORK_UNITS,
     max_work_units: int = MAX_PR_WORK_UNITS,
 ) -> list[dict[str, Any]]:
-    """Group compatible adjacent items near the target size using CP-SAT.
+    """Group compatible adjacent items near the target size with dynamic programming.
 
     One concrete implementation step is one work unit. The optimizer only joins
     adjacent items when their paths/components are cohesive, runtimes are
@@ -226,8 +208,7 @@ def size_plan_items(
         item_ids.append(item_id)
         item_units.append(len(set(steps)))
 
-    model = cp_model.CpModel()
-    candidates: list[tuple[int, int, int, Any]] = []
+    candidates: list[list[tuple[int, int]]] = [[] for _ in range(len(normalized))]
     for start in range(len(normalized)):
         unit_count = 0
         group = []
@@ -237,34 +218,38 @@ def size_plan_items(
             if unit_count > max_work_units:
                 break
             if _merge_is_valid(group):
-                decision = model.new_bool_var(f"group_{start}_{end}")
                 cost = abs(unit_count - target_work_units) * 10_000
-                candidates.append((start, end, cost, decision))
+                candidates[start].append((end + 1, cost))
 
-    for index in range(len(normalized)):
-        covering = [
-            decision
-            for start, end, _cost, decision in candidates
-            if start <= index <= end
-        ]
-        model.add_exactly_one(covering)
-    model.minimize(sum(cost * decision for _start, _end, cost, decision in candidates))
-
-    solver = cp_model.CpSolver()
-    solver.parameters.num_search_workers = 1
-    solver.parameters.random_seed = 0
-    status = solver.solve(model)
-    if status != cp_model.OPTIMAL:
+    # Group choices cover adjacent intervals, so a shortest path over item
+    # positions finds the global minimum in linear time for the bounded group
+    # size. Keeping the first equal-cost path makes ties reproducible.
+    best_cost: list[int | None] = [None] * (len(normalized) + 1)
+    previous_position: list[int | None] = [None] * (len(normalized) + 1)
+    best_cost[0] = 0
+    for start, options in enumerate(candidates):
+        prefix_cost = best_cost[start]
+        if prefix_cost is None:
+            continue
+        for end, cost in options:
+            candidate_cost = prefix_cost + cost
+            current_cost = best_cost[end]
+            if current_cost is None or candidate_cost < current_cost:
+                best_cost[end] = candidate_cost
+                previous_position[end] = start
+    if best_cost[-1] is None:
         raise PlanSizingError(
-            "the deterministic PR sizing model did not find a proven optimum "
-            f"(solver status: {solver.status_name(status)})"
+            "the deterministic PR sizing model found no valid partition"
         )
-
-    selected = sorted(
-        (start, end)
-        for start, end, _cost, decision in candidates
-        if solver.value(decision)
-    )
+    selected_reversed: list[tuple[int, int]] = []
+    end = len(normalized)
+    while end:
+        previous_index = previous_position[end]
+        if previous_index is None:
+            raise PlanSizingError("the PR sizing solver returned incomplete coverage")
+        selected_reversed.append((previous_index, end - 1))
+        end = previous_index
+    selected = list(reversed(selected_reversed))
     if not selected or selected[0][0] != 0 or selected[-1][1] != len(normalized) - 1:
         raise PlanSizingError("the PR sizing solver returned incomplete coverage")
     for prior, current in zip(selected, selected[1:], strict=False):

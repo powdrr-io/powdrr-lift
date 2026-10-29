@@ -877,7 +877,9 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                     },
                     {
                         "requirement_ids": ["req-0001"],
-                        "deliverable": "Test the requested behavior.",
+                        "deliverable": (
+                            "Test the requested behavior in src/behavior.txt."
+                        ),
                         "component": "repository",
                         "implementation_runtime": "neutral",
                         "planned_writes": [
@@ -900,21 +902,20 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
             }
         elif question.kind == "describe_item":
             answer = dict(request.valid_example)
-        elif question.kind == "review_dependency_graph":
+        elif question.kind == "confirm_dependency":
             answer = {
-                "edges": [
-                    {
-                        "before_unit_id": "unit-0001",
-                        "after_unit_id": "unit-0002",
-                        "output": "The behavior contract.",
-                        "requirement_ids": ["req-0001"],
-                        "reason": (
-                            "The focused test consumes the implementation contract."
-                        ),
-                    }
-                ]
+                "result": "required",
+                "output": "The behavior contract.",
+                "requirement_ids": ["req-0001"],
+                "reason": "The focused test consumes the implementation contract.",
             }
         elif question.kind == "enumerate_structural_subjects":
+            structural_requests = machine._structrr_requests(answers)
+            assert len(structural_requests) == 1
+            assert structural_requests[0].question.kind == (
+                "enumerate_structural_subjects"
+            )
+            assert not structural_requests[0].batch_members
             answer = {"records": [], "has_more": False, "next_anchor": None}
         else:
             answer = {"decision": "accept", "reason": "Faithful to the source."}

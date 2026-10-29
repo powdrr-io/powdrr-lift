@@ -8,6 +8,7 @@ import re
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, Protocol
 
@@ -445,6 +446,14 @@ def read_pinned_code_file(
     repository_root: str | Path, base_commit: str, path: str
 ) -> tuple[str, str]:
     """Read the exact UTF-8 blob and return normalized path plus text."""
+    root = str(Path(repository_root).resolve())
+    return _read_pinned_code_file_cached(root, base_commit, path)
+
+
+@lru_cache(maxsize=256)
+def _read_pinned_code_file_cached(
+    repository_root: str, base_commit: str, path: str
+) -> tuple[str, str]:
     try:
         artifact = read_pinned_file(repository_root, base_commit, path)
     except LocalActionError as error:

@@ -19,6 +19,7 @@ from powdrr_service.planning.contracts import (
 MAX_QUESTION_INPUT_CHARS = 24_000
 MAX_SOURCE_BLOCK_CHARS = 8_000
 MAX_QUESTION_ANSWER_CHARS = 4_000
+MAX_WORK_UNIT_ANSWER_CHARS = MAX_QUESTION_ANSWER_CHARS + 128
 MAX_SEMANTIC_CORRECTIONS = 2
 __all__ = [
     "MAX_QUESTION_INPUT_CHARS",
@@ -463,6 +464,7 @@ def run_question[AnswerT](
     stderr: Any,
     max_transport_retries: int,
     transport_backoff_seconds: float,
+    use_provider_schema: bool = True,
 ) -> QuestionResult[AnswerT]:
     """Run one bounded question with transport retry and two semantic corrections."""
     request.validate()
@@ -499,7 +501,9 @@ def run_question[AnswerT](
                 stderr=stderr,
                 max_timeout_retries=max_transport_retries,
                 timeout_backoff_seconds=transport_backoff_seconds,
-                response_schema=request.answer_schema,
+                response_schema=(
+                    request.answer_schema if use_provider_schema else None
+                ),
             )
         except PowdrrExecutionError as error:
             if error.error_code != "invalid_json_response":
@@ -512,7 +516,7 @@ def run_question[AnswerT](
             last_error = PlanningContractError(
                 "/", "previous response was not valid JSON; return one JSON object"
             )
-            if raw_size > request.max_answer_chars:
+            if raw_size > max(request.max_answer_chars, _answer_size_limit(request)):
                 return NeedsQuestionAnswer(
                     question=replace(request.question, attempt=attempt),
                     attempts=attempt,
@@ -528,7 +532,7 @@ def run_question[AnswerT](
             raw_size = len(
                 json.dumps(previous_answer, ensure_ascii=False, separators=(",", ":"))
             )
-            if raw_size > request.max_answer_chars:
+            if raw_size > max(request.max_answer_chars, _answer_size_limit(request)):
                 return NeedsQuestionAnswer(
                     question=replace(request.question, attempt=attempt),
                     attempts=attempt,
@@ -540,11 +544,12 @@ def run_question[AnswerT](
         answer_size = len(
             json.dumps(previous_answer, ensure_ascii=False, separators=(",", ":"))
         )
-        if answer_size > request.max_answer_chars:
+        answer_limit = max(request.max_answer_chars, _answer_size_limit(request))
+        if answer_size > answer_limit:
             last_error = PlanningContractError(
                 "/",
                 f"serialized answer is {answer_size} characters; limit is "
-                f"{request.max_answer_chars}",
+                f"{answer_limit}",
             )
             # Retry with the complete answer. If that makes the input too large,
             # the next iteration returns NeedsQuestionAnswer without truncating it.
@@ -568,6 +573,12 @@ def run_question[AnswerT](
         error=last_error,
         previous_answer=previous_answer,
     )
+
+
+def _answer_size_limit(request: QuestionRequest[Any]) -> int:
+    if request.question.kind == "propose_work_units":
+        return MAX_WORK_UNIT_ANSWER_CHARS
+    return MAX_QUESTION_ANSWER_CHARS
 
 
 def run_questions[AnswerT](

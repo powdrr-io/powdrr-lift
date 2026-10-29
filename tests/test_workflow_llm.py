@@ -545,6 +545,31 @@ def test_timeout_retry_preserves_optional_response_schema(
     assert client.calls == [schema, schema]
 
 
+def test_timeout_retry_retries_empty_provider_content(monkeypatch: Any) -> None:
+    class _EmptyThenSuccessClient:
+        calls = 0
+
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            _ = messages
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("OpenAI response message content was empty.")
+            return {"answer": "ok"}
+
+    monkeypatch.setattr("powdrr_lift.workrr.llm.time.sleep", lambda _: None)
+    client = _EmptyThenSuccessClient()
+
+    assert complete_json_with_timeout_retry(
+        client,
+        [],
+        model="test",
+        stderr=None,
+        max_timeout_retries=1,
+        timeout_backoff_seconds=0,
+    ) == {"answer": "ok"}
+    assert client.calls == 2
+
+
 class _ExecutionStrategy(WorkflowExecutionStrategy):
     def __init__(self) -> None:
         self.client = _Client([{"kind": "next_step"}, {"kind": "complete"}])

@@ -6,9 +6,11 @@ from urllib.request import Request
 
 import pytest
 
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.protocol import SchemaAwareWorkflowLLMClient
 from powdrr_lift.workrr.providers import (
     OpenAIChatClient,
+    _read_openai_response,
     _remove_schema_keywords,
     build_provider_client,
 )
@@ -98,3 +100,69 @@ def test_deepinfra_request_omits_unique_items_keyword(
     assert isinstance(transmitted_schema, dict)
     assert "uniqueItems" not in transmitted_schema["properties"]["evidence_ids"]
     assert schema["properties"]["evidence_ids"]["uniqueItems"] is True
+
+
+def test_empty_provider_response_reports_finish_reason(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class _Response:
+        headers = {"Content-Type": "application/json"}
+
+        def __enter__(self) -> _Response:
+            return self
+
+        def __exit__(self, *_: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {"content": "  "},
+                            "finish_reason": "length",
+                        }
+                    ]
+                }
+            ).encode()
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.providers.urlopen",
+        lambda *_args, **_kwargs: _Response(),
+    )
+    client = OpenAIChatClient(
+        model="test-model",
+        api_key="test-token",
+        base_url="https://api.deepinfra.com/v1/openai",
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="finish_reason='length'"):
+        client.complete_json([{"role": "user", "content": "return json"}])
+
+
+def test_stream_parser_preserves_finish_reason() -> None:
+    class _SSEStream:
+        headers = {"Content-Type": "text/event-stream"}
+
+        def __init__(self) -> None:
+            events = (
+                {"choices": [{"delta": {"role": "assistant"}}]},
+                {"choices": [{"delta": {"content": " "}}]},
+                {"choices": [{"delta": {}, "finish_reason": "length"}]},
+            )
+            lines = [
+                line
+                for event in events
+                for line in (
+                    f"data: {json.dumps(event)}\n".encode(),
+                    b"\n",
+                )
+            ]
+            self._lines = iter([*lines, b"data: [DONE]\n", b"\n"])
+
+        def readline(self) -> bytes:
+            return next(self._lines, b"")
+
+    response = json.loads(_read_openai_response(_SSEStream(), progress_stream=None))
+
+    assert response["choices"][0]["finish_reason"] == "length"

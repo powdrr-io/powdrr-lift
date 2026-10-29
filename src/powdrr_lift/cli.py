@@ -2858,6 +2858,7 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
                     if planning_mapping.provider == "local"
                     else args.planning_concurrency
                 ),
+                use_provider_schema=planning_mapping.provider != "deepinfra-cheap",
             ),
             stderr=sys.stderr,
         )

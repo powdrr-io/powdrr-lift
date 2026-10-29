@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_service.planning.assembly import (
+    MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
+    MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
     AllocationGroup,
     ItemDescription,
     PathFact,
@@ -26,6 +28,7 @@ from powdrr_service.planning.compiler import (
     compile_plan,
     validate_compiled_plan,
 )
+from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.dependencies import (
     DependencyGraph,
     UnitDependencyEdge,
@@ -119,6 +122,24 @@ class SourceLedgerQuestionMachine:
             None if structrr_baseline is None else dict(structrr_baseline)
         )
         self.taxonomy_entity_types = taxonomy_entity_types
+        self._invalid_accepted_question_ids: set[str] = set()
+        self._oversized_work_unit_groups: set[tuple[str, ...]] = set()
+        self._single_proposal_requirements: set[str] = set()
+        self._supplemental_work_unit_requirements: set[str] = set()
+
+    @property
+    def invalid_accepted_question_ids(self) -> frozenset[str]:
+        """Accepted answers that no longer satisfy the current parser contract."""
+        return frozenset(self._invalid_accepted_question_ids)
+
+    def set_oversized_work_unit_groups(self, groups: Sequence[Sequence[str]]) -> None:
+        """Split only requirement groups whose previous response exceeded the cap."""
+        self._oversized_work_unit_groups = {
+            tuple(group) for group in groups if len(group) > 1
+        }
+        self._single_proposal_requirements = {
+            group[0] for group in groups if len(group) == 1
+        }
 
     def _next_source_question(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -250,6 +271,7 @@ class SourceLedgerQuestionMachine:
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[QuestionRequest[Any], ...]:
         """Return all independent questions ready from this accepted snapshot."""
+        self._invalid_accepted_question_ids.clear()
         source_requests = self._next_source_questions(accepted_answers)
         if source_requests:
             return source_requests
@@ -322,6 +344,7 @@ class SourceLedgerQuestionMachine:
     def _work_unit_requests(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[QuestionRequest[Any] | None, ...]:
+        self._supplemental_work_unit_requirements.clear()
         ledger = self._parse_source_ledger(accepted_answers)
         coverage = self.accepted_coverage(accepted_answers)
         unresolved = tuple(
@@ -331,28 +354,122 @@ class SourceLedgerQuestionMachine:
             return ()
         context = self._work_unit_context(ledger, unresolved)
         requests: list[QuestionRequest[Any] | None] = []
-        for offset in range(0, len(unresolved), 8):
-            requirement_ids = unresolved[offset : offset + 8]
+        for requirement_ids in self._work_unit_requirement_groups(unresolved):
             cursor: str | None = None
-            records: list[WorkUnitProposal] = []
+            remaining_requirement_ids = requirement_ids
+            covered_requirement_ids: set[str] = set()
+            group_complete = True
+            last_request: QuestionRequest[Any] | None = None
             while True:
                 request = build_work_unit_proposal_request(
                     context,
-                    requirement_ids,
-                    valid_example=self._work_unit_example(context, requirement_ids),
-                    page_after=cursor,
+                    remaining_requirement_ids,
+                    valid_example=self._work_unit_example(
+                        context, remaining_requirement_ids
+                    ),
+                    maximum_proposals=(
+                        1
+                        if any(
+                            item in self._single_proposal_requirements
+                            for item in remaining_requirement_ids
+                        )
+                        else MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+                    ),
+                )
+                last_request = request
+                answer = accepted_answers.get(request.question.question_id)
+                if answer is None:
+                    requests.append(request)
+                    group_complete = False
+                    break
+                try:
+                    page = request.parse_answer(answer)
+                except PlanningContractError:
+                    self._invalid_accepted_question_ids.add(
+                        request.question.question_id
+                    )
+                    requests.append(request)
+                    group_complete = False
+                    break
+                covered_requirement_ids.update(
+                    requirement_id
+                    for proposal in page.records
+                    for requirement_id in proposal.requirement_ids
+                )
+                if not page.has_more:
+                    break
+                cursor = page.next_anchor
+                assert cursor is not None
+                cursor_index = remaining_requirement_ids.index(cursor)
+                remaining_requirement_ids = remaining_requirement_ids[
+                    cursor_index + 1 :
+                ]
+            if not group_complete:
+                continue
+            missing_requirement_ids = set(requirement_ids) - covered_requirement_ids
+            if not missing_requirement_ids:
+                requests.append(None)
+                continue
+            if len(requirement_ids) == 1:
+                assert last_request is not None
+                self._invalid_accepted_question_ids.add(
+                    last_request.question.question_id
+                )
+                requests.append(last_request)
+                continue
+            for requirement_id in sorted(missing_requirement_ids):
+                self._supplemental_work_unit_requirements.add(requirement_id)
+                single_ids = (requirement_id,)
+                request = build_work_unit_proposal_request(
+                    context,
+                    single_ids,
+                    valid_example=self._work_unit_example(context, single_ids),
+                    maximum_proposals=(
+                        1
+                        if requirement_id in self._single_proposal_requirements
+                        else MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+                    ),
                 )
                 answer = accepted_answers.get(request.question.question_id)
                 if answer is None:
                     requests.append(request)
-                    break
-                page = request.parse_answer(answer)
-                records.extend(page.records)
-                if not page.has_more:
-                    requests.append(None)
-                    break
-                cursor = page.next_anchor
+                    continue
+                try:
+                    page = request.parse_answer(answer)
+                except PlanningContractError:
+                    self._invalid_accepted_question_ids.add(
+                        request.question.question_id
+                    )
+                    requests.append(request)
+                    continue
+                if requirement_id not in {
+                    item
+                    for proposal in page.records
+                    for item in proposal.requirement_ids
+                }:
+                    self._invalid_accepted_question_ids.add(
+                        request.question.question_id
+                    )
+                    requests.append(request)
+                    continue
+                requests.append(None)
         return tuple(requests)
+
+    def _work_unit_requirement_groups(
+        self, unresolved: tuple[str, ...]
+    ) -> tuple[tuple[str, ...], ...]:
+        groups: list[tuple[str, ...]] = []
+        for offset in range(
+            0, len(unresolved), MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+        ):
+            group = unresolved[
+                offset : offset + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+            ]
+            if group in self._oversized_work_unit_groups:
+                groups.extend((requirement_id,) for requirement_id in group)
+            else:
+                groups.append(group)
+        return tuple(groups)
 
     def _work_unit_context(
         self, ledger: SourceLedger, unresolved: tuple[str, ...]
@@ -385,8 +502,32 @@ class SourceLedgerQuestionMachine:
     def _work_unit_example(
         self, context: WorkUnitContext, requirement_ids: tuple[str, ...]
     ) -> Mapping[str, Any]:
+        requirement_id = requirement_ids[0]
+        requirement = context.requirements[requirement_id]
+        component_id = sorted(context.component_ids)[0]
+        validation_id = sorted(context.validation_catalog)[0]
         return {
-            "records": [],
+            "records": [
+                {
+                    "requirement_ids": [requirement_id],
+                    "deliverable": "Concise example deliverable",
+                    "component": component_id,
+                    "implementation_runtime": "neutral",
+                    "planned_writes": [
+                        {
+                            "path": "example-output.txt",
+                            "role": "documentation",
+                            "runtime": None,
+                            "source_refs": [requirement.source_refs[0]],
+                            "evidence_ids": [],
+                        }
+                    ],
+                    "implementation_step": "Describe one concrete implementation step.",
+                    "acceptance_criteria": ["State one observable result."],
+                    "validation_ids": [validation_id],
+                    "required_outputs": [],
+                }
+            ],
             "has_more": False,
             "next_anchor": None,
         }
@@ -415,15 +556,23 @@ class SourceLedgerQuestionMachine:
             return self._work_unit_context(ledger, ()), ()
         context = self._work_unit_context(ledger, unresolved)
         proposals: list[WorkUnitProposal] = []
-        for offset in range(0, len(unresolved), 8):
-            requirement_ids = unresolved[offset : offset + 8]
-            cursor: str | None = None
+        for requirement_ids in self._work_unit_requirement_groups(unresolved):
+            remaining_requirement_ids = requirement_ids
             while True:
                 request = build_work_unit_proposal_request(
                     context,
-                    requirement_ids,
-                    valid_example=self._work_unit_example(context, requirement_ids),
-                    page_after=cursor,
+                    remaining_requirement_ids,
+                    valid_example=self._work_unit_example(
+                        context, remaining_requirement_ids
+                    ),
+                    maximum_proposals=(
+                        1
+                        if any(
+                            item in self._single_proposal_requirements
+                            for item in remaining_requirement_ids
+                        )
+                        else MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+                    ),
                 )
                 page = request.parse_answer(
                     accepted_answers[request.question.question_id]
@@ -431,7 +580,25 @@ class SourceLedgerQuestionMachine:
                 proposals.extend(page.records)
                 if not page.has_more:
                     break
-                cursor = page.next_anchor
+                assert page.next_anchor is not None
+                cursor_index = remaining_requirement_ids.index(page.next_anchor)
+                remaining_requirement_ids = remaining_requirement_ids[
+                    cursor_index + 1 :
+                ]
+        for requirement_id in sorted(self._supplemental_work_unit_requirements):
+            single_ids = (requirement_id,)
+            request = build_work_unit_proposal_request(
+                context,
+                single_ids,
+                valid_example=self._work_unit_example(context, single_ids),
+                maximum_proposals=(
+                    1
+                    if requirement_id in self._single_proposal_requirements
+                    else MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+                ),
+            )
+            page = request.parse_answer(accepted_answers[request.question.question_id])
+            proposals.extend(page.records)
         return context, tuple(proposals)
 
     def _item_groups(

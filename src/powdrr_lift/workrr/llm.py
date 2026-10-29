@@ -751,6 +751,7 @@ def is_retryable_provider_error(error: RuntimeError) -> bool:
                 "getaddrinfo failed",
                 "streaming response did not include any events",
                 "streaming response content was empty",
+                "response message content was empty",
             )
         )
     )

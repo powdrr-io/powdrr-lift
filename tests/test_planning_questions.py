@@ -62,10 +62,12 @@ def _question(
     question_id: str,
     subject_id: str,
     context_ref_ids: tuple[str, ...] = (),
+    *,
+    kind: str = "extract_requirements",
 ) -> Question:
     return Question(
         question_id=question_id,
-        kind="extract_requirements",
+        kind=kind,
         contract_version=1,
         subject_ids=(subject_id,),
         input_digest="sha256:" + "a" * 64,
@@ -459,6 +461,32 @@ def test_input_and_output_limits_reject_without_truncation() -> None:
     assert len(correction["correction"]["previous_answer"]["extra"]) == (
         MAX_QUESTION_ANSWER_CHARS + 1
     )
+
+
+def test_work_unit_answers_allow_a_small_serialization_margin() -> None:
+    request = _request(_question("q-000003", "block-01", kind="propose_work_units"))
+    answer = {
+        "records": [{"statement": "x" * 3_950}],
+        "has_more": False,
+        "next_anchor": None,
+    }
+    serialized_size = len(json.dumps(answer, separators=(",", ":")))
+    assert (
+        MAX_QUESTION_ANSWER_CHARS < serialized_size <= (MAX_QUESTION_ANSWER_CHARS + 128)
+    )
+    client = _ScriptedClient({("propose_work_units", "block-01"): [answer]})
+
+    result = run_question(
+        client,
+        request,
+        model="deepinfra-cheap",
+        stderr=None,
+        max_transport_retries=0,
+        transport_backoff_seconds=0,
+    )
+
+    assert not isinstance(result, NeedsQuestionAnswer)
+    assert result.attempts == 1
 
 
 def test_huge_answer_is_never_truncated_to_fit_a_correction() -> None:

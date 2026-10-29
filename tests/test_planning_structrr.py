@@ -3,10 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-
-from powdrr_lift.workrr.planning.assembly import PlannedWrite, WorkUnit
-from powdrr_lift.workrr.planning.contracts import PlanningContractError
-from powdrr_lift.workrr.planning.structrr import (
+from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
+from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
     StructrrPlanningError,
     StructuralSubjectPage,
@@ -17,6 +15,8 @@ from powdrr_lift.workrr.planning.structrr import (
     parse_structural_change,
     parse_structural_subject_page,
 )
+
+from powdrr_lift.workrr.planning.contracts import PlanningContractError
 
 
 def _unit(

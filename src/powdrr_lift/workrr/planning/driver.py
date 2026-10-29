@@ -7,22 +7,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from powdrr_service.planning.questions import QuestionRequest
-from powdrr_service.planning.source import (
-    BlockDisposition,
-    Requirement,
-    SegmentedSource,
-    allocate_requirements,
-    build_block_disposition_request,
-    build_extract_requirements_request,
-    build_fidelity_request,
-)
-
-from powdrr_lift.structrr.rebase import snapshot_digest
-from powdrr_lift.workrr.git import slugify_workflow_id
-from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
-from powdrr_lift.workrr.multipr_structrr import MultiPRStructrrProposal
-from powdrr_lift.workrr.planning.assembly import (
+from powdrr_service.planning.assembly import (
     MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
     AllocationGroup,
     ItemDescription,
@@ -35,33 +20,48 @@ from powdrr_lift.workrr.planning.assembly import (
     build_item_description_request,
     build_work_unit_proposal_request,
 )
-from powdrr_lift.workrr.planning.compiler import (
+from powdrr_service.planning.compiler import (
     CompiledPlan,
     PlanningCompilationError,
     PlanningManifest,
     compile_plan,
     validate_compiled_plan,
 )
-from powdrr_lift.workrr.planning.dependencies import (
+from powdrr_service.planning.dependencies import (
     DependencyGraph,
     UnitDependencyEdge,
     Validation,
     build_dependency_confirmation_request,
     compile_dependency_graph,
 )
+from powdrr_service.planning.questions import QuestionRequest
+from powdrr_service.planning.source import (
+    BlockDisposition,
+    Requirement,
+    SegmentedSource,
+    allocate_requirements,
+    build_block_disposition_request,
+    build_extract_requirements_request,
+    build_fidelity_request,
+)
+from powdrr_service.planning.structrr import (
+    BoundStructuralSubject,
+    bind_structural_operation,
+    build_structural_change_request,
+    build_subject_enumeration_request,
+    compile_structrr_plan,
+)
+
+from powdrr_lift.structrr.rebase import snapshot_digest
+from powdrr_lift.workrr.git import slugify_workflow_id
+from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_lift.workrr.multipr_structrr import MultiPRStructrrProposal
 from powdrr_lift.workrr.planning.evidence import (
     Evidence,
     RequirementCoverage,
     RequirementEvidenceSearch,
     build_requirement_coverage_request,
     create_requirement_coverage,
-)
-from powdrr_lift.workrr.planning.structrr import (
-    BoundStructuralSubject,
-    bind_structural_operation,
-    build_structural_change_request,
-    build_subject_enumeration_request,
-    compile_structrr_plan,
 )
 
 
@@ -404,12 +404,8 @@ class SourceLedgerQuestionMachine:
             return self._work_unit_context(ledger, ()), ()
         context = self._work_unit_context(ledger, unresolved)
         proposals: list[WorkUnitProposal] = []
-        for offset in range(
-            0, len(unresolved), MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
-        ):
-            requirement_ids = unresolved[
-                offset : offset + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
-            ]
+        for offset in range(0, len(unresolved), 8):
+            requirement_ids = unresolved[offset : offset + 8]
             cursor: str | None = None
             while True:
                 request = build_work_unit_proposal_request(

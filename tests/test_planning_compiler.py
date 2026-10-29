@@ -6,6 +6,15 @@ from dataclasses import replace
 from typing import Any
 
 import pytest
+from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
+from powdrr_service.planning.compiler import (
+    PLANNING_MANIFEST_SCHEMA,
+    PlanningCompilationError,
+    PlanningManifest,
+    compile_plan,
+    serialize_reviewed_plan_yaml,
+    validate_compiled_plan,
+)
 
 from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.github_issue_queue import (
@@ -15,15 +24,6 @@ from powdrr_lift.workrr.github_issue_queue import (
     parse_reviewed_plan_yaml,
 )
 from powdrr_lift.workrr.multipr_structrr import compile_multi_pr_proposal
-from powdrr_lift.workrr.planning.assembly import PlannedWrite, WorkUnit
-from powdrr_lift.workrr.planning.compiler import (
-    PLANNING_MANIFEST_SCHEMA,
-    PlanningCompilationError,
-    PlanningManifest,
-    compile_plan,
-    serialize_reviewed_plan_yaml,
-    validate_compiled_plan,
-)
 
 
 def _source_digest(value: str) -> str:

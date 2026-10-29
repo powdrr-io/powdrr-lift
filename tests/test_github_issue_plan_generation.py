@@ -1619,7 +1619,8 @@ def test_generate_execution_plan_yaml_rejects_empty_and_oversized_sources() -> N
 def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     tmp_path: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from powdrr_lift.workrr.planning.checkpoints import InMemoryCheckpointStore
+    from powdrr_service.planning.checkpoints import InMemoryCheckpointStore
+
     from powdrr_lift.workrr.planning.source import PinnedSourceDocument
 
     source = tmp_path / "proposal.md"

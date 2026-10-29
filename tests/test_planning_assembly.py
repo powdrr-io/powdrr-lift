@@ -4,12 +4,7 @@ import hashlib
 from dataclasses import replace
 
 import pytest
-
-from powdrr_lift.workrr.plan_sizing import (
-    ExplicitWorkUnit,
-    allocate_explicit_work_units,
-)
-from powdrr_lift.workrr.planning.assembly import (
+from powdrr_service.planning.assembly import (
     MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
     MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
     AllocationGroup,
@@ -25,6 +20,11 @@ from powdrr_lift.workrr.planning.assembly import (
     build_work_unit_proposal_request,
     parse_item_description,
     parse_work_unit_proposal,
+)
+
+from powdrr_lift.workrr.plan_sizing import (
+    ExplicitWorkUnit,
+    allocate_explicit_work_units,
 )
 from powdrr_lift.workrr.planning.contracts import PlanningContractError
 from powdrr_lift.workrr.planning.source import (
@@ -207,6 +207,21 @@ def test_gitkeep_is_neutral_inside_a_source_named_directory() -> None:
     assert proposal.planned_writes[0].runtime is None
 
 
+def test_new_path_is_allowed_in_a_repository_evidenced_directory() -> None:
+    existing_path = "attestation/scripts/verify-all.sh"
+    new_path = "attestation/scripts/validate.sh"
+    context, anchor = _context(path="legacy/verify-all.sh", runtime="shell")
+    context = replace(
+        context,
+        repository_paths={existing_path: PathFact(existing_path, "shell")},
+    )
+    answer = _proposal(context, anchor, path=new_path, runtime="shell")
+
+    proposal = parse_work_unit_proposal(answer, context=context)
+
+    assert proposal.planned_writes[0].path == new_path
+
+
 def test_allocation_assigns_ids_and_requires_every_unresolved_requirement() -> None:
     context, anchor = _context()
     proposal = parse_work_unit_proposal(_proposal(context, anchor), context=context)
@@ -374,7 +389,7 @@ def test_cohesion_split_can_allocate_one_requirement_to_multiple_units() -> None
         "replacements": [proposal.to_data(), proposal.to_data()],
     }
 
-    from powdrr_lift.workrr.planning.assembly import parse_cohesion_decision
+    from powdrr_service.planning.assembly import parse_cohesion_decision
 
     result = parse_cohesion_decision(split, original=proposal, context=context)
 

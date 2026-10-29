@@ -29,6 +29,7 @@ from powdrr_service.planning.contracts import (
     Question,
     parse_coverage_answer,
 )
+from powdrr_service.planning.evidence import Evidence, EvidenceError
 from powdrr_service.planning.questions import (
     ContextRecord,
     QuestionRequest,
@@ -118,13 +119,6 @@ _COVERAGE_SEARCH_PATHS = (
     "makefile",
     "Dockerfile",
 )
-_EVIDENCE_KINDS = frozenset(
-    {"implementation", "test", "configuration", "execution_receipt"}
-)
-
-
-class EvidenceError(ValueError):
-    """Invalid pinned evidence, symbol lookup, or coverage binding."""
 
 
 class SymbolFinder(Protocol):
@@ -135,94 +129,6 @@ class SymbolFinder(Protocol):
         worktree_root: Path,
         limit: int = 50,
     ) -> dict[str, list[dict[str, Any]]]: ...
-
-
-@dataclass(frozen=True, slots=True)
-class Evidence:
-    id: str
-    base_commit: str
-    path: str
-    start_line: int
-    end_line: int
-    content_sha256: str
-    kind: Literal["implementation", "test", "configuration", "execution_receipt"]
-    symbol: str | None = None
-
-    @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]) -> Evidence:
-        expected = {
-            "id",
-            "base_commit",
-            "path",
-            "start_line",
-            "end_line",
-            "content_sha256",
-            "kind",
-            "symbol",
-        }
-        if set(value) != expected:
-            raise EvidenceError("evidence record fields are invalid")
-        evidence_id = value["id"]
-        commit = value["base_commit"]
-        path = value["path"]
-        start = value["start_line"]
-        end = value["end_line"]
-        digest = value["content_sha256"]
-        kind = value["kind"]
-        symbol = value["symbol"]
-        if not isinstance(evidence_id, str) or not re.fullmatch(
-            r"evidence-[0-9]{4,}", evidence_id
-        ):
-            raise EvidenceError("evidence ID is invalid")
-        if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40,64}", commit):
-            raise EvidenceError("evidence base commit is invalid")
-        if not isinstance(path, str):
-            raise EvidenceError("evidence path is invalid")
-        _validate_repository_path(path)
-        if (
-            isinstance(start, bool)
-            or not isinstance(start, int)
-            or isinstance(end, bool)
-            or not isinstance(end, int)
-            or start < 1
-            or end < start
-        ):
-            raise EvidenceError("evidence line range is invalid")
-        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
-            raise EvidenceError("evidence content digest is invalid")
-        evidence_kind = _kind(kind) if isinstance(kind, str) else None
-        if evidence_kind is None:
-            raise EvidenceError("evidence kind is invalid")
-        if symbol is not None and (not isinstance(symbol, str) or not symbol.strip()):
-            raise EvidenceError("evidence symbol must be a name or null")
-        if (
-            evidence_kind in {"configuration", "execution_receipt"}
-            and symbol is not None
-        ):
-            raise EvidenceError("file evidence cannot carry a symbol name")
-        _validate_test_kind(path, evidence_kind)
-        return cls(
-            evidence_id,
-            commit,
-            path,
-            start,
-            end,
-            digest,
-            evidence_kind,
-            symbol,
-        )
-
-    def to_data(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "base_commit": self.base_commit,
-            "path": self.path,
-            "start_line": self.start_line,
-            "end_line": self.end_line,
-            "content_sha256": self.content_sha256,
-            "kind": self.kind,
-            "symbol": self.symbol,
-        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -1029,7 +935,7 @@ def _validate_test_kind(path: str, kind: str) -> None:
 def _kind(
     value: str,
 ) -> Literal["implementation", "test", "configuration", "execution_receipt"]:
-    if value not in _EVIDENCE_KINDS:
+    if value not in {"implementation", "test", "configuration", "execution_receipt"}:
         raise EvidenceError(f"unknown evidence kind: {value}")
     return value  # type: ignore[return-value]
 
@@ -1038,17 +944,6 @@ def _evidence_id(ordinal: int) -> str:
     if ordinal < 1:
         raise EvidenceError("evidence ordinal must be positive")
     return f"evidence-{ordinal:04d}"
-
-
-def _validate_repository_path(path: str) -> None:
-    normalized = PurePosixPath(path)
-    if (
-        not path
-        or normalized.is_absolute()
-        or normalized.as_posix() != path
-        or any(part in {"", ".", ".."} for part in path.split("/"))
-    ):
-        raise EvidenceError("evidence path must be a normalized repository path")
 
 
 __all__ = [

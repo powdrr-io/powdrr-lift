@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+import argparse
+import json
+import subprocess
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from powdrr_contracts.models import (
+    Artifact,
+    OperationRequest,
+    RepositorySnapshot,
+    artifact_manifest_digest,
+)
+from powdrr_local import JsonServiceBridge, LocalPowdrrService
 from powdrr_local.planning.repair_publication import (
     RepairPublicationError,
     publish_repair_pull_request,
@@ -149,10 +159,12 @@ def test_shared_repair_service_rejects_stale_bound_plan_reference() -> None:
 
 
 def test_shared_repair_service_compiles_real_reviewed_artifacts(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     from powdrr_service.planning.compiler import compile_plan
     from test_planning_compiler import _fixture
+
+    from powdrr_lift import cli
 
     plan, manifest, proposal = _fixture()
     plan = replace(plan, planning=manifest.to_data())
@@ -194,6 +206,112 @@ def test_shared_repair_service_compiles_real_reviewed_artifacts(
     assert repaired.artifacts[compiled.plan_path] != compiled.files[compiled.plan_path]
     workflow = repaired.artifacts["docs/workflows/bounded-plan/item-01.yaml"]
     assert "Implement the corrected requirement" in workflow
+
+    source_artifacts = tuple(
+        Artifact(path, "application/vnd.powdrr.source-file", content.encode("utf-8"))
+        for path, content in compiled.files.items()
+    )
+    request_artifact = Artifact(
+        "plan-repair/request.json",
+        "application/vnd.powdrr.plan-repair-request+json",
+        json.dumps(request).encode("utf-8"),
+    )
+    manifest_digest = artifact_manifest_digest(source_artifacts)
+    operation = OperationRequest(
+        request_id="replan-e2e",
+        operation_kind="replan",
+        inputs={
+            "plan_path": compiled.plan_path,
+            "base_commit": "c" * 40,
+            "repair_request_artifact": request_artifact.artifact_id,
+        },
+        repository=RepositorySnapshot(
+            repository_id="owner/repo",
+            branch="main",
+            base_sha=None,
+            head_sha="c" * 40,
+            manifest_digest=manifest_digest,
+            worktree_digest=manifest_digest,
+            source_artifact_refs=tuple(
+                artifact.artifact_id for artifact in source_artifacts
+            ),
+        ),
+        artifacts=(*source_artifacts, request_artifact),
+    )
+
+    update = JsonServiceBridge(LocalPowdrrService()).start(operation)
+
+    assert update.status == "succeeded"
+    assert update.operation_id == "replan-e2e"
+    assert update.progress == ({"phase": "plan_repair_validated"},)
+    assert len(update.output_artifacts) == 1
+    publication = json.loads(update.output_artifacts[0].data)
+    assert publication["plan_id"] == "bounded-plan"
+    assert publication["affected_item_ids"] == ["item-01"]
+    assert publication["changed"] == [
+        "docs/plans/bounded-plan-execution-plan.yaml",
+        "docs/workflows/bounded-plan/item-01.yaml",
+    ]
+
+    request_path = tmp_path / "repair-request.json"
+    request_path.write_text(json.dumps(request), encoding="utf-8")
+    subprocess.run(["git", "init", "-b", "main", str(tmp_path)], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "add",
+            ".",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "fixture",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    published: dict[str, Any] = {}
+
+    def publish(*, repo_root: Path, publication: Any) -> tuple[str, tuple[str, ...]]:
+        published["repo_root"] = repo_root
+        published["publication"] = publication
+        return "https://github.com/owner/repo/pull/1", tuple(publication["changed"])
+
+    monkeypatch.setattr(cli, "_discover_github_repository", lambda _root: "owner/repo")
+    monkeypatch.setattr(cli, "publish_repair_pull_request", publish)
+    result = cli._run_plan_repair(
+        argparse.Namespace(
+            repo_root=tmp_path,
+            plan=Path(compiled.plan_path),
+            request=request_path,
+            json=True,
+        )
+    )
+
+    cli_output = json.loads(capsys.readouterr().out)
+    assert result == 0
+    assert cli_output["plan_id"] == "bounded-plan"
+    assert cli_output["affected_item_ids"] == ["item-01"]
+    assert cli_output["pull_request_url"] == "https://github.com/owner/repo/pull/1"
+    assert published["repo_root"] == tmp_path
+    assert published["publication"]["changed"] == publication["changed"]
 
 
 def test_repair_publisher_branches_from_fresh_main_and_limits_commit_paths(

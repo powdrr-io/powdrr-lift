@@ -9,12 +9,9 @@ import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import Any, Protocol
 
 from powdrr_service.planning.contracts import PlanningContractError, Question
-
-if TYPE_CHECKING:
-    from powdrr_lift.workrr.github_issue_queue import QueueIssue
 
 MAX_CHECKPOINT_COMMENT_CHARS = 48 * 1024
 _CHUNK_RAW_BYTES = 24 * 1024
@@ -380,12 +377,6 @@ class QuestionDiagnostic:
         }
 
 
-class IssueCommentAPI(Protocol):
-    def list_comments(self, issue_number: int) -> tuple[Mapping[str, Any], ...]: ...
-
-    def add_comment(self, issue: QueueIssue, body: str) -> None: ...
-
-
 class CheckpointStore(Protocol):
     def load(
         self, *, selected_checkpoint_digest: str | None = None
@@ -663,53 +654,6 @@ def reduce_checkpoint_events(
     )
 
 
-class GitHubCommentCheckpointStore:
-    """Append-only store for one active coordinator per planning session.
-
-    Parent validation detects stale state and the reducer detects forks. A
-    read-then-append comment sequence is not a distributed compare-and-swap.
-    """
-
-    def __init__(
-        self,
-        client: IssueCommentAPI,
-        issue: QueueIssue,
-        *,
-        session_id: str,
-    ) -> None:
-        validate_session_id(session_id)
-        self.client = client
-        self.issue = issue
-        self.session_id = session_id
-
-    def load(self, *, selected_checkpoint_digest: str | None = None) -> JournalState:
-        return reduce_checkpoint_comments(
-            self.client.list_comments(self.issue.number),
-            session_id=self.session_id,
-            selected_checkpoint_digest=selected_checkpoint_digest,
-        )
-
-    def append(
-        self,
-        checkpoint: PlanningCheckpoint,
-        *,
-        expected_parent_digest: str | None,
-        selected_checkpoint_digest: str | None = None,
-    ) -> JournalState:
-        return _append_to_store(
-            self,
-            checkpoint,
-            expected_parent_digest=expected_parent_digest,
-            selected_checkpoint_digest=selected_checkpoint_digest,
-        )
-
-    def _comments(self) -> tuple[Mapping[str, Any], ...]:
-        return self.client.list_comments(self.issue.number)
-
-    def _add(self, body: str) -> None:
-        self.client.add_comment(self.issue, body)
-
-
 class InMemoryCheckpointStore:
     """Append-only fake with the same parent and reducer semantics as GitHub."""
 
@@ -732,12 +676,25 @@ class InMemoryCheckpointStore:
         expected_parent_digest: str | None,
         selected_checkpoint_digest: str | None = None,
     ) -> JournalState:
-        return _append_to_store(
-            self,
+        current = self.load(selected_checkpoint_digest=selected_checkpoint_digest)
+        comments = prepare_checkpoint_append(
             checkpoint,
+            current,
+            session_id=self.session_id,
             expected_parent_digest=expected_parent_digest,
-            selected_checkpoint_digest=selected_checkpoint_digest,
         )
+        for body in comments:
+            self._add(body)
+        updated = self.load(
+            selected_checkpoint_digest=(
+                checkpoint.digest if selected_checkpoint_digest is not None else None
+            )
+        )
+        if updated.head is None or updated.head.digest != checkpoint.digest:
+            raise JournalForkError(
+                "checkpoint append did not produce a unique canonical head"
+            )
+        return updated
 
     def _comments(self) -> tuple[Mapping[str, Any], ...]:
         return tuple(self.comments)
@@ -750,16 +707,16 @@ class InMemoryCheckpointStore:
         self.comments.append(dict(self.comments[index]))
 
 
-def _append_to_store(
-    store: GitHubCommentCheckpointStore | InMemoryCheckpointStore,
+def prepare_checkpoint_append(
     checkpoint: PlanningCheckpoint,
+    current: JournalState,
     *,
+    session_id: str,
     expected_parent_digest: str | None,
-    selected_checkpoint_digest: str | None,
-) -> JournalState:
-    if checkpoint.session_id != store.session_id:
+) -> tuple[str, ...]:
+    """Validate an append against service-owned journal policy and render it."""
+    if checkpoint.session_id != session_id:
         raise PlanningJournalError("checkpoint belongs to another planning session")
-    current = store.load(selected_checkpoint_digest=selected_checkpoint_digest)
     if current.status == "conflicted" or current.head is None and current.events:
         raise JournalForkError(
             "planning journal is conflicted; select a checkpoint to resume"
@@ -777,18 +734,7 @@ def _append_to_store(
         raise StaleCheckpointParent(
             "new checkpoint sequence does not follow its parent"
         )
-    for comment in render_checkpoint_comments(checkpoint):
-        store._add(comment)
-    updated = store.load(
-        selected_checkpoint_digest=(
-            checkpoint.digest if selected_checkpoint_digest is not None else None
-        )
-    )
-    if updated.head is None or updated.head.digest != checkpoint.digest:
-        raise JournalForkError(
-            "checkpoint append did not produce a unique canonical head"
-        )
-    return updated
+    return render_checkpoint_comments(checkpoint)
 
 
 def sanitize_diagnostic(
@@ -882,9 +828,7 @@ def _exact_fields(value: Mapping[str, Any], expected: set[str], name: str) -> No
 __all__ = [
     "MAX_CHECKPOINT_COMMENT_CHARS",
     "CheckpointStore",
-    "GitHubCommentCheckpointStore",
     "InMemoryCheckpointStore",
-    "IssueCommentAPI",
     "JournalForkError",
     "JournalState",
     "PlanningCheckpoint",
@@ -892,6 +836,7 @@ __all__ = [
     "QuestionDiagnostic",
     "StaleCheckpointParent",
     "canonical_json",
+    "prepare_checkpoint_append",
     "reduce_checkpoint_comments",
     "reduce_checkpoint_events",
     "render_checkpoint_comment",

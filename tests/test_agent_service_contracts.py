@@ -210,11 +210,15 @@ def test_legacy_planning_imports_reexport_service_owned_implementations() -> Non
 
 def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
     from powdrr_local.planning.checkpoints import (
+        GitHubCommentCheckpointStore,
         LocalCheckpointStore,
         LocalDiagnosticCache,
     )
     from powdrr_service.planning import checkpoints as service_checkpoints
 
+    from powdrr_lift.workrr.planning.checkpoints import (
+        GitHubCommentCheckpointStore as LegacyGitHubCheckpointStore,
+    )
     from powdrr_lift.workrr.planning.checkpoints import (
         LocalCheckpointStore as LegacyLocalCheckpointStore,
     )
@@ -224,5 +228,7 @@ def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
 
     assert not hasattr(service_checkpoints, "LocalCheckpointStore")
     assert not hasattr(service_checkpoints, "LocalDiagnosticCache")
+    assert not hasattr(service_checkpoints, "GitHubCommentCheckpointStore")
     assert LegacyLocalCheckpointStore is LocalCheckpointStore
     assert LegacyLocalDiagnosticCache is LocalDiagnosticCache
+    assert LegacyGitHubCheckpointStore is GitHubCommentCheckpointStore

@@ -346,10 +346,13 @@ class GitHubIssueClient:
         self._api(*arguments)
 
     def add_comment(self, issue: QueueIssue, body: str) -> None:
+        self.add_issue_comment(issue.number, body)
+
+    def add_issue_comment(self, issue_number: int, body: str) -> None:
         arguments = [
             "api",
             "--include",
-            f"repos/{self.repository}/issues/{issue.number}/comments",
+            f"repos/{self.repository}/issues/{issue_number}/comments",
             "--method",
             "POST",
             "-f",
@@ -357,7 +360,7 @@ class GitHubIssueClient:
         ]
         self._invoke_comment_api(
             arguments,
-            operation=(f"POST repos/{self.repository}/issues/{issue.number}/comments"),
+            operation=(f"POST repos/{self.repository}/issues/{issue_number}/comments"),
         )
 
     def list_comments(self, issue_number: int) -> tuple[Mapping[str, Any], ...]:

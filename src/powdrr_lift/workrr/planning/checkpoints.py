@@ -1,6 +1,8 @@
 """Compatibility imports for planning policies and local persistence adapters."""
 
 from powdrr_local.planning.checkpoints import (
+    GitHubCommentCheckpointStore,
+    IssueCommentAPI,
     LocalCheckpointStore,
     LocalDiagnosticCache,
 )
@@ -11,4 +13,6 @@ __all__ = [
     *_service_checkpoints.__all__,
     "LocalCheckpointStore",
     "LocalDiagnosticCache",
+    "GitHubCommentCheckpointStore",
+    "IssueCommentAPI",
 ]

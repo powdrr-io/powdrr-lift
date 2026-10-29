@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.planning import evidence as evidence_module
 from powdrr_lift.workrr.planning.contracts import PlanningContractError
 from powdrr_lift.workrr.planning.evidence import (
     Evidence,
@@ -123,6 +124,27 @@ def test_pinned_file_evidence_reads_exact_commit_and_rejects_invented_paths(
         read_pinned_code_file(
             repository, _git(repository, "rev-parse", "HEAD"), "src/link.py"
         )
+
+
+def test_pinned_code_file_reads_each_repository_blob_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, commit = _repository(tmp_path)
+    original = evidence_module.read_pinned_source
+    reads = 0
+
+    def count_reads(root: str, sha: str, path: str) -> Any:
+        nonlocal reads
+        reads += 1
+        return original(root, sha, path)
+
+    monkeypatch.setattr(evidence_module, "read_pinned_source", count_reads)
+
+    first = read_pinned_code_file(repository, commit, "src/schema.py")
+    second = read_pinned_code_file(str(repository), commit, "src/schema.py")
+
+    assert first == second
+    assert reads == 1
 
 
 def test_requirement_search_supplies_pinned_implementation_and_test_evidence(

@@ -1,0 +1,27 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1176
+title: Classify planned shell scripts without repository evidence
+intent:
+  problem: Planning could not classify a new .sh path because it is absent from the pinned repository and shell was not a known path runtime.
+  goal: Derive the runtime of new shell-script writes from their file extension.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/plan_sizing.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Map .sh files to the shell runtime.
+  rationale: Classify planned new shell scripts deterministically without requiring existing repository evidence.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 133
+    end_line: 152
+  summary: Cover runtime derivation for a new shell script absent from repository evidence.
+  rationale: Ensure planning can propose a new verifier script such as attestation/scripts/verify-all.sh.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

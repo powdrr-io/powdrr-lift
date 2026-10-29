@@ -1,0 +1,77 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1190
+title: Audit test runtime and remove duplicate Structrr work
+intent:
+  problem: The test-suite audit had limited runtime evidence, and its real-repository Structrr check repeated a costly bootstrap already covered by a focused determinism test.
+  goal: Record measured runtime and coverage findings, remove the redundant full-repository bootstrap, and guide further test reduction by behavior evidence.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/test-suite-rationalization-audit.md
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Rename the audit section to include runtime findings.
+    rationale: Make the measured test-duration analysis visible in the document structure.
+  - path: docs/plans/test-suite-rationalization-audit.md
+    type: modified
+    span: {start_line: 5, end_line: 43}
+    summary: Record collection counts, full-suite timings, slow tests, and assessment.
+    rationale: Separate expensive distinct integration coverage from repeated work before proposing removals.
+  - path: docs/plans/test-suite-rationalization-audit.md
+    type: modified
+    span: {start_line: 63, end_line: 66}
+    summary: Update the current case count and note the removed repeated scan.
+    rationale: Keep the audit baseline aligned with the collection and runtime measurements.
+  - path: docs/plans/test-suite-rationalization-audit.md
+    type: modified
+    span: {start_line: 71, end_line: 73}
+    summary: Clarify which low-value work the audit has confirmed.
+    rationale: Avoid treating the requested case-reduction target as evidence that safe deletions exist.
+  - path: docs/plans/test-suite-rationalization-audit.md
+    type: modified
+    span: {start_line: 83, end_line: 87}
+    summary: Add a targeted review item for the weak non-required-sentence test.
+    rationale: Require the test contract to assert the behavior its setup names.
+  - path: docs/plans/test-suite-rationalization-audit.md
+    type: modified
+    span: {start_line: 90, end_line: 90}
+    summary: Renumber the remaining audit step.
+    rationale: Keep the reduction plan ordered after adding the assertion review.
+  - path: docs/plans/test-suite-rationalization-audit.md
+    type: modified
+    span: {start_line: 94, end_line: 95}
+    summary: Reflow the closing audit guidance.
+    rationale: Preserve the guidance against using file size alone as deletion evidence.
+  - path: tests/test_structrr_real_repositories.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Remove the unused snapshot digest import.
+    rationale: The real-checkout test no longer compares two redundant full scans.
+  - path: tests/test_structrr_real_repositories.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Rename the real-checkout test to describe its golden-symbol assertion.
+    rationale: The test no longer checks repeatability, which is covered on a focused fixture.
+  - path: tests/test_structrr_real_repositories.py
+    type: modified
+    span: {start_line: 33, end_line: 33}
+    summary: Remove the second bootstrap of the full checkout.
+    rationale: Preserve real-repository smoke coverage without repeating the expensive operation.
+  - path: tests/test_structrr_real_repositories.py
+    type: modified
+    span: {start_line: 50, end_line: 50}
+    summary: Remove the repeatability assertion from the real-checkout test.
+    rationale: Determinism remains covered by the focused bootstrap test.
+entities:
+  - id: test-suite-rationalization-audit
+    type: Design doc
+    action: added
+  - id: real-checkout-structrr-bootstrap-test
+    type: Regression test
+    action: added
+entity_relationships: []
+invariants:
+  - id: test-case-removal-requires-behavior-evidence
+    description: Remove test cases only when retained coverage proves the same input class and observable outcome, or when the case checks an implementation detail already protected by a public contract.
+    action: added
+guidance: []

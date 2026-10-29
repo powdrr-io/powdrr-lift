@@ -1,0 +1,397 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1180
+title: Reduce planning model call count
+intent:
+  problem: Planning asks independent questions individually and confirms dependencies through pairwise
+    prompts, increasing model calls and serial latency.
+  goal: Batch compatible planning questions, review candidate dependencies as a graph, and process independent
+    Structrr items in parallel while preserving per-question validation and checkpoints.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/contracts.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Register the batched planning question kind.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/contracts.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 33
+  summary: Register the batched planning question kind.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Build bounded dependency graph review requests and validate returned edges.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 1313
+    end_line: 1522
+  summary: Build bounded dependency graph review requests and validate returned edges.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Batch compatible planning questions while retaining each child schema.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Batch compatible planning questions while retaining each child schema.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 107
+    end_line: 108
+  summary: Batch compatible planning questions while retaining each child schema.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 111
+    end_line: 112
+  summary: Batch compatible planning questions while retaining each child schema.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 149
+    end_line: 301
+  summary: Batch compatible planning questions while retaining each child schema.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 515
+    end_line: 515
+  summary: Batch compatible planning questions while retaining each child schema.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 531
+    end_line: 531
+  summary: Batch compatible planning questions while retaining each child schema.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 543
+    end_line: 543
+  summary: Batch compatible planning questions while retaining each child schema.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 547
+    end_line: 547
+  summary: Batch compatible planning questions while retaining each child schema.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 35
+  summary: Expand batched answers into individual validated checkpoints.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 269
+    end_line: 273
+  summary: Expand batched answers into individual validated checkpoints.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 293
+  summary: Expand batched answers into individual validated checkpoints.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 295
+    end_line: 296
+  summary: Expand batched answers into individual validated checkpoints.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 287
+    end_line: 290
+  summary: Expand batched answers into individual validated checkpoints.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 310
+    end_line: 310
+  summary: Expand batched answers into individual validated checkpoints.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 314
+    end_line: 353
+  summary: Expand batched answers into individual validated checkpoints.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 33
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 39
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 228
+    end_line: 238
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 244
+    end_line: 247
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 274
+    end_line: 274
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 477
+    end_line: 479
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 484
+    end_line: 484
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 487
+    end_line: 493
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 634
+    end_line: 639
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 641
+    end_line: 657
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 661
+    end_line: 663
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 671
+    end_line: 679
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 668
+    end_line: 678
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 680
+    end_line: 685
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 687
+    end_line: 725
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 727
+    end_line: 754
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: modified
+  span:
+    start_line: 756
+    end_line: 757
+  summary: Batch planning frontiers and process Structrr items by ready dependency wave.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: src/powdrr_lift/workrr/planning/questions.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 7
+  summary: Export the batch helper through the legacy import path.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 7
+  summary: Test dependency graph review batching and validation.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Test dependency graph review batching and validation.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Test dependency graph review batching and validation.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 571
+    end_line: 604
+  summary: Test dependency graph review batching and validation.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Test batched request identity and answer schemas.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 35
+  summary: Test batched request identity and answer schemas.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 191
+  summary: Test batched request identity and answer schemas.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Test individual checkpoints for batched child answers.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 71
+    end_line: 83
+  summary: Test individual checkpoints for batched child answers.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 100
+  summary: Test individual checkpoints for batched child answers.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 160
+    end_line: 161
+  summary: Test individual checkpoints for batched child answers.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 283
+    end_line: 360
+  summary: Test individual checkpoints for batched child answers.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 631
+    end_line: 631
+  summary: Test individual checkpoints for batched child answers.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 633
+    end_line: 643
+  summary: Test individual checkpoints for batched child answers.
+  rationale: Document the exact changed source span and its role in reducing planning calls.
+entities:
+- id: planning-question-batcher
+  type: Function
+  action: added
+- id: dependency-graph-review-builder
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: planning-answer-identity-preserved
+  description: Batched answers are parsed against each original question and checkpointed under that original
+    question ID.
+  action: added
+- id: planning-dependency-order-preserved
+  description: Structrr work is parallel only within dependency-ready waves; later waves wait for prerequisite
+    items.
+  action: added
+guidance:
+- id: planning-batch-bounds
+  description: Keep question batches and dependency graph review chunks bounded so prompt and answer sizes
+    remain manageable.
+  action: added

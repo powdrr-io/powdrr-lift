@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 from powdrr_service.planning.assembly import (
+    MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
+    MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
     AllocationGroup,
     AssemblyError,
     PathFact,
@@ -25,6 +28,7 @@ from powdrr_lift.workrr.plan_sizing import (
     allocate_explicit_work_units,
 )
 from powdrr_lift.workrr.planning.contracts import PlanningContractError
+from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
 from powdrr_lift.workrr.planning.source import (
     PinnedSourceDocument,
     Requirement,
@@ -182,6 +186,83 @@ def test_unknown_extension_requires_runtime_classification() -> None:
         parse_work_unit_proposal(answer, context=context)
 
 
+def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None:
+    context, anchor = _context()
+    context = replace(context, repository_paths={})
+    answer = _proposal(
+        context,
+        anchor,
+        path="attestation/keys/authorized-keys",
+        runtime="neutral",
+    )
+    planned_writes = answer["planned_writes"]
+    assert isinstance(planned_writes, list)
+    planned_writes[0]["runtime"] = None
+
+    proposal = parse_work_unit_proposal(answer, context=context)
+
+    assert proposal.implementation_runtime == "neutral"
+    assert proposal.planned_writes[0].runtime is None
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "attestation/macos/Package.resolved",
+        "attestation/config/sandbox-profile.sb",
+        "installer/launchd.plist",
+        "config/install-paths.conf",
+        "test-results/section13-macos-github.log",
+    ],
+)
+def test_platform_data_file_extensions_are_runtime_neutral(path: str) -> None:
+    context, anchor = _context(path=path, runtime="neutral")
+    context = replace(context, repository_paths={})
+    answer = _proposal(context, anchor, path=path, runtime="neutral")
+    planned_writes = answer["planned_writes"]
+    assert isinstance(planned_writes, list)
+    planned_writes[0]["runtime"] = None
+
+    proposal = parse_work_unit_proposal(answer, context=context)
+
+    assert proposal.implementation_runtime == "neutral"
+    assert proposal.planned_writes[0].runtime is None
+
+
+def test_gitkeep_is_neutral_inside_a_source_named_directory() -> None:
+    directory = "attestation/github/workflows/"
+    path = f"{directory}.gitkeep"
+    context, anchor = _context(path=directory, runtime="neutral")
+    context = replace(context, repository_paths={})
+    path_anchor = next(
+        item.id
+        for item in context.source.anchors
+        if directory
+        in context.source.document.text[item.start_offset : item.end_offset]
+    )
+    requirement = replace(context.requirements["req-0001"], source_refs=(path_anchor,))
+    context = replace(context, requirements={requirement.id: requirement})
+    answer = _proposal(context, anchor, path=path, runtime="neutral")
+    answer["planned_writes"][0]["source_refs"] = [path_anchor]  # type: ignore[index]
+    answer["planned_writes"][0]["runtime"] = None  # type: ignore[index]
+
+    proposal = parse_work_unit_proposal(answer, context=context)
+
+    assert proposal.planned_writes[0].path == path
+    assert proposal.planned_writes[0].runtime is None
+
+
+def test_new_path_is_allowed_in_a_new_directory() -> None:
+    new_path = "attestation/providers/local/run.sh"
+    context, anchor = _context(path="legacy/verify-all.sh", runtime="shell")
+    context = replace(context, repository_paths={})
+    answer = _proposal(context, anchor, path=new_path, runtime="shell")
+
+    proposal = parse_work_unit_proposal(answer, context=context)
+
+    assert proposal.planned_writes[0].path == new_path
+
+
 def test_allocation_assigns_ids_and_requires_every_unresolved_requirement() -> None:
     context, anchor = _context()
     proposal = parse_work_unit_proposal(_proposal(context, anchor), context=context)
@@ -272,8 +353,9 @@ def test_item_description_question_example_passes_its_parser() -> None:
 
 def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> None:
     context, anchor = _context()
+    example_proposal = _proposal(context, anchor)
     example = {
-        "records": [_proposal(context, anchor)],
+        "records": [example_proposal],
         "has_more": False,
         "next_anchor": None,
     }
@@ -284,11 +366,320 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
-
-    next_page = build_work_unit_proposal_request(
-        context, ["req-0001"], valid_example=example, page_after=anchor
+    assert "requirement's own source_refs" in request.exact_question
+    assert "runtime to null for non-executable artifacts" in request.exact_question
+    assert "If every supplied requirement is covered" in request.exact_question
+    assert (
+        "requirements remain uncovered" in request.answer_field_definitions["has_more"]
     )
-    assert next_page.question.question_id != request.question.question_id
+    assert (
+        request.answer_schema["properties"]["records"]["maxItems"]
+        == MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+    )
+    record_schema = request.answer_schema["properties"]["records"]["items"]
+    assert record_schema["properties"]["validation_ids"]["items"]["enum"] == [
+        "validation-0001"
+    ]
+    assert MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION == 4
+    with pytest.raises(PlanningContractError, match="must contain"):
+        request.parse_answer(
+            {
+                "records": [example_proposal] * 4,
+                "has_more": False,
+                "next_anchor": None,
+            }
+        )
+
+    with pytest.raises(ValueError, match="one to four requirements"):
+        build_work_unit_proposal_request(
+            context,
+            ["req-0001"] * 5,
+            valid_example=example,
+        )
+
+    prefixed_validation = dict(example_proposal)
+    prefixed_validation["validation_ids"] = ["validation:validation-0001"]
+    with pytest.raises(PlanningContractError, match="unknown references"):
+        request.parse_answer(
+            {"records": [prefixed_validation], "has_more": False, "next_anchor": None}
+        )
+
+    second_requirement = replace(context.requirements["req-0001"], id="req-0002")
+    two_requirement_context = replace(
+        context,
+        requirements={
+            **context.requirements,
+            second_requirement.id: second_requirement,
+        },
+        unresolved_requirement_ids=("req-0001", "req-0002"),
+    )
+    larger_batch = build_work_unit_proposal_request(
+        two_requirement_context,
+        ["req-0001", "req-0002"],
+        valid_example=example,
+    )
+    assert larger_batch.question.question_id != request.question.question_id
+    next_page = build_work_unit_proposal_request(
+        two_requirement_context,
+        ["req-0001", "req-0002"],
+        valid_example=example,
+        page_after="req-0001",
+    )
+    assert next_page.question.question_id != larger_batch.question.question_id
+    one_proposal = build_work_unit_proposal_request(
+        two_requirement_context,
+        ["req-0001"],
+        valid_example=example,
+        maximum_proposals=1,
+    )
+    default_single = build_work_unit_proposal_request(
+        two_requirement_context,
+        ["req-0001"],
+        valid_example=example,
+    )
+    assert one_proposal.answer_schema["properties"]["records"]["maxItems"] == 1
+    assert one_proposal.question.question_id != default_single.question.question_id
+    with pytest.raises(PlanningContractError, match="between 0 and 1 entries"):
+        one_proposal.parse_answer(
+            {
+                "records": [example_proposal, example_proposal],
+                "has_more": False,
+                "next_anchor": None,
+            }
+        )
+
+
+def test_work_unit_page_cursor_is_derived_and_cannot_skip_uncovered_requirements() -> (
+    None
+):
+    base_context, anchor = _context()
+    requirement_ids = ("req-0013", "req-0014", "req-0015", "req-0016")
+    base_requirement = base_context.requirements["req-0001"]
+    requirements = {
+        requirement_id: replace(base_requirement, id=requirement_id)
+        for requirement_id in requirement_ids
+    }
+    context = replace(
+        base_context,
+        requirements=requirements,
+        unresolved_requirement_ids=requirement_ids,
+    )
+    proposals = []
+    for requirement_id in requirement_ids[:3]:
+        proposal = _proposal(context, anchor)
+        proposal["requirement_ids"] = [requirement_id]
+        proposals.append(proposal)
+    request = build_work_unit_proposal_request(
+        context,
+        requirement_ids,
+        valid_example={
+            "records": [proposals[0]],
+            "has_more": False,
+            "next_anchor": None,
+        },
+    )
+
+    assert request.answer_schema["properties"]["next_anchor"]["enum"] == [
+        *requirement_ids[:-1],
+        None,
+    ]
+    page = request.parse_answer(
+        {"records": proposals, "has_more": True, "next_anchor": None}
+    )
+    assert page.next_anchor == "req-0015"
+    page_with_first_uncovered_cursor = request.parse_answer(
+        {"records": proposals, "has_more": True, "next_anchor": "req-0016"}
+    )
+    assert page_with_first_uncovered_cursor.next_anchor == "req-0015"
+
+    with pytest.raises(PlanningContractError, match="must not skip requirements"):
+        request.parse_answer(
+            {
+                "records": [proposals[0], proposals[2]],
+                "has_more": True,
+                "next_anchor": "req-0015",
+            }
+        )
+
+    final_proposal = _proposal(context, anchor)
+    final_proposal["requirement_ids"] = ["req-0016"]
+    next_request = build_work_unit_proposal_request(
+        context,
+        requirement_ids,
+        valid_example={
+            "records": [final_proposal],
+            "has_more": False,
+            "next_anchor": None,
+        },
+        page_after=page.next_anchor,
+    )
+    final_page = next_request.parse_answer(
+        {"records": [final_proposal], "has_more": False, "next_anchor": None}
+    )
+    assert final_page.next_anchor is None
+
+
+def test_work_unit_continuation_only_includes_uncovered_requirements(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_context, anchor = _context()
+    requirement_ids = ("req-0013", "req-0014", "req-0015", "req-0016")
+    base_requirement = base_context.requirements["req-0001"]
+    requirements = {
+        requirement_id: replace(base_requirement, id=requirement_id)
+        for requirement_id in requirement_ids
+    }
+    context = replace(
+        base_context,
+        requirements=requirements,
+        unresolved_requirement_ids=requirement_ids,
+    )
+    machine = SourceLedgerQuestionMachine(context.source)
+    ledger = SimpleNamespace(requirements=tuple(requirements.values()))
+    coverage = tuple(
+        SimpleNamespace(
+            requirement_id=requirement_id,
+            answer=SimpleNamespace(status="missing"),
+        )
+        for requirement_id in requirement_ids
+    )
+    monkeypatch.setattr(machine, "_parse_source_ledger", lambda _answers: ledger)
+    monkeypatch.setattr(machine, "accepted_coverage", lambda _answers: coverage)
+    monkeypatch.setattr(
+        machine, "_work_unit_context", lambda _ledger, _unresolved: context
+    )
+
+    initial_request = machine._work_unit_requests({})[0]
+    assert initial_request is not None
+    initial_request.validate()
+    example_records = initial_request.valid_example["records"]
+    assert len(example_records) == 1
+    assert set(example_records[0]) == {
+        "requirement_ids",
+        "deliverable",
+        "component",
+        "implementation_runtime",
+        "planned_writes",
+        "implementation_step",
+        "acceptance_criteria",
+        "validation_ids",
+        "required_outputs",
+    }
+    proposals = []
+    for requirement_id in requirement_ids[:3]:
+        proposal = _proposal(context, anchor)
+        proposal["requirement_ids"] = [requirement_id]
+        proposals.append(proposal)
+    accepted = {
+        initial_request.question.question_id: {
+            "records": proposals,
+            "has_more": True,
+            "next_anchor": None,
+        }
+    }
+
+    continuation = machine._work_unit_requests(accepted)[0]
+
+    assert continuation is not None
+    assert continuation.question.subject_ids == ("req-0016",)
+    final_proposal = _proposal(context, anchor)
+    final_proposal["requirement_ids"] = ["req-0016"]
+    accepted[continuation.question.question_id] = {
+        "records": [final_proposal],
+        "has_more": False,
+        "next_anchor": None,
+    }
+    monkeypatch.setattr(machine, "accepted_ledger", lambda _answers: ledger)
+    _, reconstructed_proposals = machine._accepted_work_unit_proposals(accepted)
+    assert {
+        requirement_id
+        for proposal in reconstructed_proposals
+        for requirement_id in proposal.requirement_ids
+    } == set(requirement_ids)
+
+    machine.set_oversized_work_unit_groups((requirement_ids,))
+    split_requests = machine._work_unit_requests({})
+    assert tuple(
+        request.question.subject_ids
+        for request in split_requests
+        if request is not None
+    ) == tuple((requirement_id,) for requirement_id in requirement_ids)
+    machine.set_oversized_work_unit_groups((requirement_ids, ("req-0016",)))
+    single_request = next(
+        request
+        for request in machine._work_unit_requests({})
+        if request is not None and request.question.subject_ids == ("req-0016",)
+    )
+    assert single_request.answer_schema["properties"]["records"]["maxItems"] == 1
+
+
+def test_missing_grouped_requirement_gets_a_supplemental_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_context, anchor = _context()
+    requirement_ids = ("req-0021", "req-0022", "req-0023", "req-0024")
+    base_requirement = base_context.requirements["req-0001"]
+    requirements = {
+        requirement_id: replace(base_requirement, id=requirement_id)
+        for requirement_id in requirement_ids
+    }
+    context = replace(
+        base_context,
+        requirements=requirements,
+        unresolved_requirement_ids=requirement_ids,
+    )
+    machine = SourceLedgerQuestionMachine(context.source)
+    ledger = SimpleNamespace(requirements=tuple(requirements.values()))
+    coverage = tuple(
+        SimpleNamespace(
+            requirement_id=requirement_id,
+            answer=SimpleNamespace(status="missing"),
+        )
+        for requirement_id in requirement_ids
+    )
+    monkeypatch.setattr(machine, "_parse_source_ledger", lambda _answers: ledger)
+    monkeypatch.setattr(machine, "accepted_ledger", lambda _answers: ledger)
+    monkeypatch.setattr(machine, "accepted_coverage", lambda _answers: coverage)
+    monkeypatch.setattr(
+        machine, "_work_unit_context", lambda _ledger, _unresolved: context
+    )
+
+    grouped_request = machine._work_unit_requests({})[0]
+    assert grouped_request is not None
+    grouped_records = []
+    for requirement_id in requirement_ids[1:]:
+        proposal = _proposal(context, anchor)
+        proposal["requirement_ids"] = [requirement_id]
+        grouped_records.append(proposal)
+    accepted: dict[str, dict[str, object]] = {
+        grouped_request.question.question_id: {
+            "records": grouped_records,
+            "has_more": False,
+            "next_anchor": None,
+        }
+    }
+
+    supplemental_request = next(
+        request
+        for request in machine._work_unit_requests(accepted)
+        if request is not None
+    )
+    assert supplemental_request.question.subject_ids == ("req-0021",)
+    supplemental_proposal = _proposal(context, anchor)
+    supplemental_proposal["requirement_ids"] = ["req-0021"]
+    accepted[supplemental_request.question.question_id] = {
+        "records": [supplemental_proposal],
+        "has_more": False,
+        "next_anchor": None,
+    }
+
+    _, proposals = machine._accepted_work_unit_proposals(accepted)
+
+    assert {
+        requirement_id
+        for proposal in proposals
+        for requirement_id in proposal.requirement_ids
+    } == set(requirement_ids)
 
 
 def test_cohesion_question_example_passes_its_parser() -> None:

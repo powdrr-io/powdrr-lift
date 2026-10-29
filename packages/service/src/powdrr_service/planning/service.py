@@ -106,6 +106,7 @@ class PlanningOptions:
     max_transport_retries: int = 5
     transport_backoff_seconds: float = 1.0
     max_concurrent_questions: int = 4
+    use_provider_schema: bool = True
 
     def __post_init__(self) -> None:
         if self.max_concurrent_questions < 1:
@@ -247,15 +248,37 @@ def advance_planning_session(
             "before continuing"
         )
     accepted: dict[str, Mapping[str, Any]] = {}
+    oversized_work_unit_groups: list[tuple[str, ...]] = []
     for event in journal.events:
-        if event.event_type != "answer_accepted":
-            continue
         question = event.payload.get("question")
-        answer = event.payload.get("accepted_answer")
-        if isinstance(question, Mapping) and isinstance(answer, Mapping):
-            question_id = question.get("question_id")
-            if isinstance(question_id, str):
+        if not isinstance(question, Mapping):
+            continue
+        question_id = question.get("question_id")
+        if not isinstance(question_id, str):
+            continue
+        if event.event_type == "answer_accepted":
+            answer = event.payload.get("accepted_answer")
+            if isinstance(answer, Mapping):
                 accepted[question_id] = dict(answer)
+        elif event.event_type == "needs_answer":
+            accepted.pop(question_id, None)
+            validation_result = event.payload.get("validation_result")
+            subject_ids = question.get("subject_ids")
+            if (
+                question.get("kind") == "propose_work_units"
+                and isinstance(validation_result, Mapping)
+                and isinstance(validation_result.get("message"), str)
+                and validation_result["message"].startswith("serialized answer is ")
+                and isinstance(subject_ids, list)
+                and all(isinstance(item, str) for item in subject_ids)
+            ):
+                oversized_work_unit_groups.append(tuple(subject_ids))
+
+    set_oversized_groups = getattr(
+        state_machine, "set_oversized_work_unit_groups", None
+    )
+    if callable(set_oversized_groups):
+        set_oversized_groups(oversized_work_unit_groups)
 
     ready_questions = getattr(state_machine, "ready_questions", None)
     if callable(ready_questions):
@@ -265,6 +288,15 @@ def advance_planning_session(
         requests = () if request is None else (request,)
     if not requests:
         return PlanningTransition("complete", session.session_id, session.issue.number)
+    invalid_accepted_ids = getattr(
+        state_machine, "invalid_accepted_question_ids", frozenset()
+    )
+    for question_id in invalid_accepted_ids:
+        accepted.pop(question_id, None)
+    # Bound each durable transition even when many independent questions are
+    # ready. The next Procedrr iteration can checkpoint this window and
+    # recompute the remaining frontier before asking more questions.
+    requests = requests[: options.max_concurrent_questions]
     question_ids = [request.question.question_id for request in requests]
     if len(question_ids) != len(set(question_ids)):
         raise PlanningServiceError("planning frontier contains duplicate question IDs")
@@ -386,6 +418,7 @@ def _run_question_batch(
                 stderr=output,
                 max_transport_retries=options.max_transport_retries,
                 transport_backoff_seconds=options.transport_backoff_seconds,
+                use_provider_schema=options.use_provider_schema,
             )
             return request, result, None, output.getvalue()
         except Exception as error:

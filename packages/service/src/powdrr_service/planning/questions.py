@@ -18,6 +18,7 @@ from powdrr_service.planning.contracts import (
 MAX_QUESTION_INPUT_CHARS = 24_000
 MAX_SOURCE_BLOCK_CHARS = 8_000
 MAX_QUESTION_ANSWER_CHARS = 4_000
+MAX_WORK_UNIT_ANSWER_CHARS = MAX_QUESTION_ANSWER_CHARS + 128
 MAX_SEMANTIC_CORRECTIONS = 2
 __all__ = [
     "MAX_QUESTION_INPUT_CHARS",
@@ -356,7 +357,7 @@ def run_question[AnswerT](
             last_error = PlanningContractError(
                 "/", "previous response was not valid JSON; return one JSON object"
             )
-            if raw_size > MAX_QUESTION_ANSWER_CHARS:
+            if raw_size > _answer_size_limit(request):
                 return NeedsQuestionAnswer(
                     question=replace(request.question, attempt=attempt),
                     attempts=attempt,
@@ -372,7 +373,7 @@ def run_question[AnswerT](
             raw_size = len(
                 json.dumps(previous_answer, ensure_ascii=False, separators=(",", ":"))
             )
-            if raw_size > MAX_QUESTION_ANSWER_CHARS:
+            if raw_size > _answer_size_limit(request):
                 return NeedsQuestionAnswer(
                     question=replace(request.question, attempt=attempt),
                     attempts=attempt,
@@ -384,11 +385,12 @@ def run_question[AnswerT](
         answer_size = len(
             json.dumps(previous_answer, ensure_ascii=False, separators=(",", ":"))
         )
-        if answer_size > MAX_QUESTION_ANSWER_CHARS:
+        answer_limit = _answer_size_limit(request)
+        if answer_size > answer_limit:
             last_error = PlanningContractError(
                 "/",
                 f"serialized answer is {answer_size} characters; limit is "
-                f"{MAX_QUESTION_ANSWER_CHARS}",
+                f"{answer_limit}",
             )
             # Retry with the complete answer. If that makes the input too large,
             # the next iteration returns NeedsQuestionAnswer without truncating it.
@@ -412,6 +414,12 @@ def run_question[AnswerT](
         error=last_error,
         previous_answer=previous_answer,
     )
+
+
+def _answer_size_limit(request: QuestionRequest[Any]) -> int:
+    if request.question.kind == "propose_work_units":
+        return MAX_WORK_UNIT_ANSWER_CHARS
+    return MAX_QUESTION_ANSWER_CHARS
 
 
 def run_questions[AnswerT](

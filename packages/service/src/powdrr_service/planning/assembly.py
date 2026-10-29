@@ -862,8 +862,12 @@ def build_work_unit_proposal_request(
             "Use the valid example for field shape only; do not copy its "
             "placeholder path or example wording. "
             f"Keep descriptions concise. Return at most {maximum_proposals} records "
-            "in this response, within "
-            "the 4,000-character answer limit; set has_more when more units remain."
+            "in this response, within the 4,000-character answer limit. Set "
+            "has_more only when at least one supplied requirement remains uncovered "
+            "for another page. If every supplied requirement is covered, set "
+            "has_more=false and next_anchor=null. When has_more=true, next_anchor "
+            "must be the last requirement covered on this page and must leave a "
+            "later supplied requirement for the next page."
         ),
         answer_field_definitions={
             "records": "WorkUnitProposal records with the exact fields in the schema.",
@@ -879,7 +883,9 @@ def build_work_unit_proposal_request(
                 "Concrete outputs needed by later work, with references only to "
                 "requirements this unit addresses."
             ),
-            "has_more": "Whether another page is needed.",
+            "has_more": (
+                "Whether any supplied requirements remain uncovered for another page."
+            ),
             "next_anchor": (
                 "When has_more is true, the last requirement represented by this "
                 "page, leaving at least one supplied requirement for the next page. "

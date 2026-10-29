@@ -404,8 +404,12 @@ class SourceLedgerQuestionMachine:
             return self._work_unit_context(ledger, ()), ()
         context = self._work_unit_context(ledger, unresolved)
         proposals: list[WorkUnitProposal] = []
-        for offset in range(0, len(unresolved), 8):
-            requirement_ids = unresolved[offset : offset + 8]
+        for offset in range(
+            0, len(unresolved), MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+        ):
+            requirement_ids = unresolved[
+                offset : offset + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+            ]
             cursor: str | None = None
             while True:
                 request = build_work_unit_proposal_request(

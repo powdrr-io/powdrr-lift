@@ -2,23 +2,19 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1178
 title: Bound planning replay and work-unit proposals
 intent:
-  problem: Plan resume reread pinned evidence files repeatedly, work-unit proposal pages could exceed the durable 4,000-character answer limit, and generated work-unit proposals could fail on placeholder paths or replay with a different batch shape.
-  goal: Cache immutable source reads, bound proposal pages, and make generated proposal paths and checkpoint replay validate consistently.
+  problem: Plan resume reread pinned evidence files repeatedly, work-unit proposal pages could exceed
+    the durable 4,000-character answer limit, and generated work-unit proposals could fail on placeholder
+    paths or replay with a different batch shape.
+  goal: Cache immutable source reads, bound proposal pages, and make generated proposal paths and checkpoint
+    replay validate consistently.
 human-decisions: []
 structured_files: []
 files:
 - path: src/powdrr_lift/workrr/planning/evidence.py
   type: modified
   span:
-    start_line: 11
-    end_line: 11
-  summary: Import an LRU cache for pinned source reads.
-  rationale: Bound retained source file content while avoiding repeated Git reads during a planning session.
-- path: src/powdrr_lift/workrr/planning/evidence.py
-  type: modified
-  span:
-    start_line: 543
-    end_line: 550
+    start_line: 449
+    end_line: 456
   summary: Cache pinned code file content by repository root, commit, and path.
   rationale: Reuse each immutable source blob when multiple coverage answers cite its excerpts.
 - path: tests/test_planning_evidence.py
@@ -35,62 +31,77 @@ files:
     end_line: 150
   summary: Verify repeat reads of one pinned source file perform one source lookup.
   rationale: Prevent planning replay from spawning redundant Git subprocesses for repeated evidence paths.
-- path: src/powdrr_lift/workrr/planning/assembly.py
+- path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 39
-    end_line: 40
+    start_line: 36
+    end_line: 37
   summary: Set work-unit questions to four requirements and three proposals per page.
-  rationale: Keep request scope and serialized answers within the planning contract's limits.
-- path: src/powdrr_lift/workrr/planning/assembly.py
+  rationale: Keep request scope and serialized answers within the planning contract limits.
+- path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 75
-    end_line: 75
+    start_line: 74
+    end_line: 74
   summary: Apply the proposal page limit to its JSON schema.
   rationale: Tell the model the maximum response record count before generation.
-- path: src/powdrr_lift/workrr/planning/assembly.py
+- path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 541
-    end_line: 543
+    start_line: 540
+    end_line: 542
   summary: Enforce the proposal page limit while parsing answers.
   rationale: Reject overlarge proposal pages before checkpointing them.
-- path: src/powdrr_lift/workrr/planning/assembly.py
+- path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 689
-    end_line: 691
+    start_line: 596
+    end_line: 596
+  summary: Classify Git placeholder files as runtime neutral.
+  rationale: Avoid requiring a programming-language runtime for .gitkeep marker files.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 626
+    end_line: 640
+  summary: Allow a new planned file when its parent directory is source-cited or present in pinned repository
+    evidence.
+  rationale: Ground generated filenames in source or existing repository structure.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 643
+    end_line: 643
+  summary: Explain the source-citation and repository-directory requirements for new paths.
+  rationale: Give planning corrections an actionable path validation error.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 697
+    end_line: 699
   summary: Enforce the four-requirement limit when building proposal questions.
   rationale: Keep each question focused on a small requirement set.
-- path: src/powdrr_lift/workrr/planning/assembly.py
+- path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 797
-    end_line: 799
-  summary: Prompt for concise proposal pages within the 4,000-character answer limit.
-  rationale: Reduce repeated retries for answers that cannot be durably checkpointed.
-- path: src/powdrr_lift/workrr/planning/assembly.py
-  type: modified
-  span:
-    start_line: 767
-    end_line: 769
+    start_line: 778
+    end_line: 778
   summary: Include the complete requirement batch in each work-unit question ID.
   rationale: Prevent old checkpoints from being reused when batch size changes.
-- path: src/powdrr_lift/workrr/planning/assembly.py
+- path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 771
-    end_line: 771
-  summary: Use the complete batch key in each work-unit question ID.
-  rationale: Prevent old checkpoints from being reused when batch size changes.
+    start_line: 805
+    end_line: 807
+  summary: Prompt for concise proposal pages within the 4,000-character answer limit.
+  rationale: Reduce retries for answers that cannot be durably checkpointed.
 - path: src/powdrr_lift/workrr/planning/driver.py
   type: modified
   span:
-    start_line: 26
-    end_line: 26
+    start_line: 11
+    end_line: 11
   summary: Import the proposal question requirement limit.
-  rationale: Use one limit for both request validation and question batching.
+  rationale: Use one limit for request validation and question batching.
 - path: src/powdrr_lift/workrr/planning/driver.py
   type: modified
   span:
@@ -108,80 +119,59 @@ files:
 - path: tests/test_planning_assembly.py
   type: modified
   span:
-    start_line: 13
-    end_line: 14
+    start_line: 8
+    end_line: 9
   summary: Import the work-unit question limits for contract tests.
   rationale: Assert configured request and response bounds.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
-    start_line: 300
-    end_line: 300
+    start_line: 187
+    end_line: 224
+  summary: Cover neutral placeholder writes and new filenames grounded in repository directories.
+  rationale: Prevent the Gaterr planning run from rejecting valid workflow script paths.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 328
+    end_line: 363
+  summary: Assert proposal request bounds and batch-specific question IDs.
+  rationale: Prevent oversized answers and stale checkpoint reuse when request shapes change.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 192
+    end_line: 192
+  summary: Treat runtime classification failures as correctable planning contract errors.
+  rationale: Let bounded question correction repair ambiguous generated paths instead of aborting planning.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 195
+    end_line: 197
+  summary: Give runtime classification failures a work-unit path correction pointer.
+  rationale: Let bounded question correction repair ambiguous generated paths instead of aborting planning.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 315
+    end_line: 315
   summary: Create one proposal example for work-unit question coverage.
   rationale: Reuse the valid proposal when checking response limits.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
-    start_line: 302
-    end_line: 302
+    start_line: 317
+    end_line: 317
   summary: Use the shared proposal example in the work-unit request.
-  rationale: Keep the example consistent with the subsequent parser assertions.
-- path: tests/test_planning_assembly.py
+  rationale: Keep the example consistent with subsequent parser assertions.
+- path: src/powdrr_lift/workrr/planning/evidence.py
   type: modified
   span:
-    start_line: 313
-    end_line: 348
-  summary: Assert proposal request bounds and batch-specific question IDs.
-  rationale: Prevent oversized answers and stale checkpoint reuse when request shapes change.
-- path: src/powdrr_lift/workrr/planning/assembly.py
-  type: modified
-  span:
-    start_line: 193
-    end_line: 193
-  summary: Treat runtime classification failures as correctable planning contract errors.
-  rationale: Let bounded question correction repair ambiguous generated paths instead of aborting planning.
-- path: src/powdrr_lift/workrr/planning/assembly.py
-  type: modified
-  span:
-    start_line: 196
-    end_line: 198
-  summary: Give runtime classification failures a work-unit path correction pointer.
-  rationale: Let bounded question correction repair ambiguous generated paths instead of aborting planning.
-- path: src/powdrr_lift/workrr/planning/assembly.py
-  type: modified
-  span:
-    start_line: 597
-    end_line: 597
-  summary: Classify Git placeholder files as runtime neutral.
-  rationale: Avoid requiring a programming-language runtime for `.gitkeep` marker files.
-- path: src/powdrr_lift/workrr/planning/assembly.py
-  type: modified
-  span:
-    start_line: 627
-    end_line: 641
-  summary: Allow a new planned file when its parent directory is source-cited or present in pinned repository evidence.
-  rationale: Support requirements that name a destination directory while grounding generated filenames in source or existing repository structure.
-- path: src/powdrr_lift/workrr/planning/assembly.py
-  type: modified
-  span:
-    start_line: 644
-    end_line: 644
-  summary: Explain the source-citation and repository-directory requirements for new paths.
-  rationale: Give planning corrections an actionable path validation error.
-- path: tests/test_planning_assembly.py
-  type: modified
-  span:
-    start_line: 187
-    end_line: 209
-  summary: Verify `.gitkeep` is accepted as a neutral write within a source-cited directory.
-  rationale: Cover the placeholder path that blocked the Gaterr planning run.
-- path: tests/test_planning_assembly.py
-  type: modified
-  span:
-    start_line: 210
-    end_line: 222
-  summary: Verify a new filename can use a repository-evidenced directory.
-  rationale: Cover the work-unit path pattern that blocked the Gaterr planning run.
+    start_line: 11
+    end_line: 11
+  summary: Import an LRU cache for pinned source reads.
+  rationale: Bound retained source content while avoiding repeated Git reads.
 entities: []
 entity_relationships: []
 invariants: []

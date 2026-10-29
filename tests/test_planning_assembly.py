@@ -518,6 +518,14 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     assert continuation is not None
     assert continuation.question.subject_ids == ("req-0016",)
 
+    machine.set_oversized_work_unit_groups((requirement_ids,))
+    split_requests = machine._work_unit_requests({})
+    assert tuple(
+        request.question.subject_ids
+        for request in split_requests
+        if request is not None
+    ) == tuple((requirement_id,) for requirement_id in requirement_ids)
+
 
 def test_cohesion_question_example_passes_its_parser() -> None:
     context, anchor = _context()

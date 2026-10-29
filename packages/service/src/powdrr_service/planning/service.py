@@ -248,6 +248,7 @@ def advance_planning_session(
             "before continuing"
         )
     accepted: dict[str, Mapping[str, Any]] = {}
+    oversized_work_unit_groups: list[tuple[str, ...]] = []
     for event in journal.events:
         question = event.payload.get("question")
         if not isinstance(question, Mapping):
@@ -261,6 +262,23 @@ def advance_planning_session(
                 accepted[question_id] = dict(answer)
         elif event.event_type == "needs_answer":
             accepted.pop(question_id, None)
+            validation_result = event.payload.get("validation_result")
+            subject_ids = question.get("subject_ids")
+            if (
+                question.get("kind") == "propose_work_units"
+                and isinstance(validation_result, Mapping)
+                and isinstance(validation_result.get("message"), str)
+                and validation_result["message"].startswith("serialized answer is ")
+                and isinstance(subject_ids, list)
+                and all(isinstance(item, str) for item in subject_ids)
+            ):
+                oversized_work_unit_groups.append(tuple(subject_ids))
+
+    set_oversized_groups = getattr(
+        state_machine, "set_oversized_work_unit_groups", None
+    )
+    if callable(set_oversized_groups):
+        set_oversized_groups(oversized_work_unit_groups)
 
     ready_questions = getattr(state_machine, "ready_questions", None)
     if callable(ready_questions):

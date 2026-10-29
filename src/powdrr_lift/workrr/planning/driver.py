@@ -119,11 +119,18 @@ class SourceLedgerQuestionMachine:
         )
         self.taxonomy_entity_types = taxonomy_entity_types
         self._invalid_accepted_question_ids: set[str] = set()
+        self._oversized_work_unit_groups: set[tuple[str, ...]] = set()
 
     @property
     def invalid_accepted_question_ids(self) -> frozenset[str]:
         """Accepted answers that no longer satisfy the current parser contract."""
         return frozenset(self._invalid_accepted_question_ids)
+
+    def set_oversized_work_unit_groups(self, groups: Sequence[Sequence[str]]) -> None:
+        """Split only requirement groups whose previous response exceeded the cap."""
+        self._oversized_work_unit_groups = {
+            tuple(group) for group in groups if len(group) > 1
+        }
 
     def _next_source_question(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -324,12 +331,7 @@ class SourceLedgerQuestionMachine:
             return ()
         context = self._work_unit_context(ledger, unresolved)
         requests: list[QuestionRequest[Any] | None] = []
-        for offset in range(
-            0, len(unresolved), MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
-        ):
-            requirement_ids = unresolved[
-                offset : offset + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
-            ]
+        for requirement_ids in self._work_unit_requirement_groups(unresolved):
             cursor: str | None = None
             remaining_requirement_ids = requirement_ids
             while True:
@@ -362,6 +364,22 @@ class SourceLedgerQuestionMachine:
                     cursor_index + 1 :
                 ]
         return tuple(requests)
+
+    def _work_unit_requirement_groups(
+        self, unresolved: tuple[str, ...]
+    ) -> tuple[tuple[str, ...], ...]:
+        groups: list[tuple[str, ...]] = []
+        for offset in range(
+            0, len(unresolved), MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+        ):
+            group = unresolved[
+                offset : offset + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+            ]
+            if group in self._oversized_work_unit_groups:
+                groups.extend((requirement_id,) for requirement_id in group)
+            else:
+                groups.append(group)
+        return tuple(groups)
 
     def _work_unit_context(
         self, ledger: SourceLedger, unresolved: tuple[str, ...]
@@ -424,12 +442,7 @@ class SourceLedgerQuestionMachine:
             return self._work_unit_context(ledger, ()), ()
         context = self._work_unit_context(ledger, unresolved)
         proposals: list[WorkUnitProposal] = []
-        for offset in range(
-            0, len(unresolved), MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
-        ):
-            requirement_ids = unresolved[
-                offset : offset + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
-            ]
+        for requirement_ids in self._work_unit_requirement_groups(unresolved):
             cursor: str | None = None
             while True:
                 request = build_work_unit_proposal_request(

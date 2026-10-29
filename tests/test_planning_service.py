@@ -391,6 +391,69 @@ def test_needs_answer_event_supersedes_an_older_accepted_answer() -> None:
     assert len(store.load().events) == 3
 
 
+def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> None:
+    session_id = "session-oversized-work-units"
+    store = InMemoryCheckpointStore(session_id=session_id)
+    session = PlanningSession(
+        session_id=session_id,
+        plan_id="bounded-plan",
+        repository="powdrr-io/example",
+        base_commit="a" * 40,
+        source_path="docs/plan.md",
+        source_blob_sha="b" * 40,
+        verification_command="make test",
+        issue=QueueIssue(
+            47, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
+        ),
+    )
+    question = Question(
+        question_id="propose-units-req-0057-example",
+        kind="propose_work_units",
+        contract_version=1,
+        subject_ids=("req-0057", "req-0058", "req-0059", "req-0060"),
+        input_digest="sha256:" + "0" * 64,
+        context_ref_ids=(),
+        expected_answer_schema="work-unit-proposals-v1",
+        attempt=1,
+    )
+    event = PlanningCheckpoint.needs_answer(
+        session_id=session_id,
+        event_id="needs-answer-000001",
+        sequence=1,
+        parent_digest=None,
+        question=question,
+        error=PlanningContractError(
+            "/", "serialized answer is 6304 characters; limit is 4000"
+        ),
+        previous_answer={"records": []},
+        id_counters={},
+    )
+    store.append(event, expected_parent_digest=None)
+
+    class _SplitCaptureMachine(_Machine):
+        oversized_groups: tuple[tuple[str, ...], ...] = ()
+
+        def set_oversized_work_unit_groups(
+            self, groups: tuple[tuple[str, ...], ...]
+        ) -> None:
+            self.oversized_groups = tuple(groups)
+
+    machine = _SplitCaptureMachine()
+    transition = advance_planning_session(
+        session=session,
+        state_machine=machine,
+        checkpoint_store=store,
+        client=_Client(),
+        options=PlanningOptions(model="test-model"),
+        stderr=None,
+    )
+
+    assert transition.status == "question_accepted"
+    assert machine.oversized_groups == (
+        ("req-0057", "req-0058", "req-0059", "req-0060"),
+    )
+
+
 def test_question_uses_json_object_mode_and_validates_schema_locally() -> None:
     session_id = "session-json-object"
     store = InMemoryCheckpointStore(session_id=session_id)

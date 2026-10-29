@@ -3,8 +3,8 @@ from __future__ import annotations
 import hashlib
 from typing import Any
 
-import pytest
 import powdrr_service.planning.structrr as structrr_module
+import pytest
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
 from powdrr_service.planning.questions import build_question_messages
 from powdrr_service.planning.source import PinnedSourceDocument, segment_markdown_source

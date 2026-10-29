@@ -219,44 +219,34 @@ files:
     rationale: Keep the full baseline available for validation while bounding question context.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 539, end_line: 539}
+    span: {start_line: 547, end_line: 547}
     summary: Include only the current structural subject and directly related baseline records in change questions.
     rationale: Avoid serializing the entire repository snapshot for one subject review.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 640, end_line: 641}
+    span: {start_line: 648, end_line: 649}
     summary: Build the subject enumeration example from the path-relevant baseline index.
     rationale: Keep example references consistent with the narrowed baseline facts.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 652, end_line: 662}
+    span: {start_line: 660, end_line: 670}
     summary: Use an existing relevant file subject in the example when available.
     rationale: Keep the example valid for planned paths already in the baseline.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 678, end_line: 837}
+    span: {start_line: 686, end_line: 836}
     summary: Build compact subject indexes and per-subject baseline context from planned paths and identities.
     rationale: Preserve relevant existing Structrr references without including unrelated repository data.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 491, end_line: 494}
+    span: {start_line: 490, end_line: 495}
     summary: State the identity and action rules directly in structural enumeration questions.
     rationale: Prevent new file subjects from being mislabeled as changes to existing subjects.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 507, end_line: 509}
+    span: {start_line: 507, end_line: 510}
     summary: Define which actions are valid for new and existing structural subjects.
     rationale: Align the answer contract with the structural-subject validator.
-  - path: packages/service/src/powdrr_service/planning/structrr.py
-    type: modified
-    span: {start_line: 706, end_line: 716}
-    summary: Exclude repository file metadata from existing structural subject references.
-    rationale: Require explicit stable subject identities for changes to existing files.
-  - path: tests/test_planning_structrr.py
-    type: modified
-    span: {start_line: 143, end_line: 145}
-    summary: Assert structural enumeration explains the required action for new identities.
-    rationale: Catch prompt and validator contract drift before a planning session.
   - path: tests/test_planning_structrr.py
     type: modified
     span: {start_line: 3, end_line: 3}
@@ -274,7 +264,7 @@ files:
     rationale: Test enumeration and per-subject change requests against a large baseline.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 88, end_line: 174}
+    span: {start_line: 88, end_line: 177}
     summary: Verify structural questions omit unrelated baseline records while retaining relevant identities.
     rationale: Catch oversized prompts before they block real planning sessions.
 entities:

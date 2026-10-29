@@ -7,6 +7,9 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from powdrr_service.planning.coverage import (
+    build_requirement_coverage_request as build_service_coverage_request,
+)
 
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.planning.contracts import PlanningContractError
@@ -179,7 +182,42 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
         repository_root=repository,
         repository_search=search.to_data(),
     )
+    service_request = build_service_coverage_request(
+        requirement,
+        source=source,
+        evidence=search.evidence,
+        evidence_excerpts={
+            item.id: "".join(
+                read_pinned_code_file(repository, commit, item.path)[1].splitlines(
+                    keepends=True
+                )[item.start_line - 1 : item.end_line]
+            )
+            for item in search.evidence
+        },
+        repository_search=search.to_data(),
+    )
     request.validate()
+    service_request.validate()
+    assert service_request.question == request.question
+    assert service_request.exact_question == request.exact_question
+    assert service_request.repository_evidence == request.repository_evidence
+    assert service_request.accepted_facts == request.accepted_facts
+    with pytest.raises(EvidenceError, match="content digest"):
+        build_service_coverage_request(
+            requirement,
+            source=source,
+            evidence=search.evidence,
+            evidence_excerpts={
+                item.id: "!"
+                + "".join(
+                    read_pinned_code_file(repository, commit, item.path)[1].splitlines(
+                        keepends=True
+                    )[item.start_line - 1 : item.end_line]
+                )[1:]
+                for item in search.evidence
+            },
+            repository_search=search.to_data(),
+        )
     messages = build_question_messages(request)
 
     assert search.terms

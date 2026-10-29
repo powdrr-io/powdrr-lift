@@ -1,0 +1,24 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1192
+title: Discard invalidated planning answers before compilation
+intent:
+  problem: The plan CLI included every historical accepted answer when compiling a resumed plan, even when a later retry had invalidated that answer.
+  goal: Replay planning answer events in order so a later needs-answer checkpoint removes the superseded accepted answer.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3007, end_line: 3007}
+    summary: Rebuild compile inputs from replayed planning answers.
+    rationale: Avoid compiling a stale response that a later checkpoint reopened for correction.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3092, end_line: 3108}
+    summary: Replay accepted and invalidated answers in checkpoint order.
+    rationale: Keep the latest answer state consistent with the durable planning journal.
+  - path: tests/test_cli.py
+    type: modified
+    span: {start_line: 27, end_line: 46}
+    summary: Cover invalidation of an accepted answer and replacement by a revised answer.
+    rationale: Prevent stale historical responses from reappearing during plan compilation.

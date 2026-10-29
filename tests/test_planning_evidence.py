@@ -131,15 +131,15 @@ def test_pinned_code_file_reads_each_repository_blob_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repository, commit = _repository(tmp_path)
-    original = evidence_module.read_pinned_source
+    original = evidence_module.read_pinned_file
     reads = 0
 
-    def count_reads(root: str, sha: str, path: str) -> Any:
+    def count_reads(root: str | Path, sha: str, path: str) -> Any:
         nonlocal reads
         reads += 1
         return original(root, sha, path)
 
-    monkeypatch.setattr(evidence_module, "read_pinned_source", count_reads)
+    monkeypatch.setattr(evidence_module, "read_pinned_file", count_reads)
 
     first = read_pinned_code_file(repository, commit, "src/schema.py")
     second = read_pinned_code_file(str(repository), commit, "src/schema.py")

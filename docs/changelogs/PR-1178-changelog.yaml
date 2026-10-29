@@ -71,28 +71,28 @@ files:
   type: modified
   span:
     start_line: 643
-    end_line: 643
+    end_line: 644
   summary: Explain the source-citation and repository-directory requirements for new paths.
   rationale: Give planning corrections an actionable path validation error.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 697
-    end_line: 699
+    start_line: 698
+    end_line: 700
   summary: Enforce the four-requirement limit when building proposal questions.
   rationale: Keep each question focused on a small requirement set.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 778
+    start_line: 776
     end_line: 778
   summary: Include the complete requirement batch in each work-unit question ID.
   rationale: Prevent old checkpoints from being reused when batch size changes.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 805
-    end_line: 807
+    start_line: 806
+    end_line: 808
   summary: Prompt for concise proposal pages within the 4,000-character answer limit.
   rationale: Reduce retries for answers that cannot be durably checkpointed.
 - path: src/powdrr_lift/workrr/planning/driver.py
@@ -172,6 +172,13 @@ files:
     end_line: 11
   summary: Import an LRU cache for pinned source reads.
   rationale: Bound retained source content while avoiding repeated Git reads.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 780
+    end_line: 780
+  summary: Assign a batch-specific identifier to each proposal question.
+  rationale: Prevent replay from reusing an answer for a differently shaped question.
 entities: []
 entity_relationships: []
 invariants: []

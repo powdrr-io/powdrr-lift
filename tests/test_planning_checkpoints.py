@@ -7,13 +7,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from powdrr_local.planning.checkpoints import (
+    LocalCheckpointStore,
+    LocalDiagnosticCache,
+)
 from powdrr_service.planning.checkpoints import (
     MAX_CHECKPOINT_COMMENT_CHARS,
     GitHubCommentCheckpointStore,
     InMemoryCheckpointStore,
     JournalForkError,
-    LocalCheckpointStore,
-    LocalDiagnosticCache,
     PlanningCheckpoint,
     PlanningJournalError,
     StaleCheckpointParent,

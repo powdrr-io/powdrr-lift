@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_local.planning.checkpoints import LocalCheckpointStore
 from powdrr_service.planning.assembly import PathFact
-from powdrr_service.planning.checkpoints import LocalCheckpointStore
 from powdrr_service.planning.compiler import PlanningCompilationError
 from powdrr_service.planning.repair_service import (
     PlanRepairServiceError,

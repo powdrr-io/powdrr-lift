@@ -34,52 +34,53 @@ files:
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 36
-    end_line: 37
+    start_line: 37
+    end_line: 38
   summary: Set work-unit questions to four requirements and three proposals per page.
   rationale: Keep request scope and serialized answers within the planning contract limits.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 74
-    end_line: 74
+    start_line: 75
+    end_line: 75
   summary: Apply the proposal page limit to its JSON schema.
   rationale: Tell the model the maximum response record count before generation.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 540
-    end_line: 542
+    start_line: 541
+    end_line: 543
   summary: Enforce the proposal page limit while parsing answers.
   rationale: Reject overlarge proposal pages before checkpointing them.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 596
-    end_line: 596
+    start_line: 597
+    end_line: 597
   summary: Classify Git placeholder files as runtime neutral.
   rationale: Avoid requiring a programming-language runtime for .gitkeep marker files.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 670
-    end_line: 672
+    start_line: 671
+    end_line: 673
   summary: Enforce the four-requirement limit when building proposal questions.
   rationale: Keep each question focused on a small requirement set.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 748
-    end_line: 750
+    start_line: 749
+    end_line: 751
   summary: Include the complete requirement batch in each work-unit question ID.
   rationale: Prevent old checkpoints from being reused when batch size changes.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 778
-    end_line: 780
-  summary: Prompt for concise proposal pages within the 4,000-character answer limit.
-  rationale: Reduce retries for answers that cannot be durably checkpointed.
+    start_line: 800
+    end_line: 804
+  summary: Prompt for concise proposal pages and bare catalog identifiers within the 4,000-character answer
+    limit.
+  rationale: Reduce answer size and prevent malformed values such as validation:validation-0001.
 - path: src/powdrr_lift/workrr/planning/driver.py
   type: modified
   span:
@@ -119,21 +120,21 @@ files:
   type: modified
   span:
     start_line: 324
-    end_line: 359
+    end_line: 370
   summary: Assert proposal request bounds and batch-specific question IDs.
   rationale: Prevent oversized answers and stale checkpoint reuse when request shapes change.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 192
-    end_line: 192
+    start_line: 193
+    end_line: 193
   summary: Treat runtime classification failures as correctable planning contract errors.
   rationale: Let bounded question correction repair ambiguous generated paths instead of aborting planning.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 195
-    end_line: 197
+    start_line: 196
+    end_line: 198
   summary: Give runtime classification failures a work-unit path correction pointer.
   rationale: Let bounded question correction repair ambiguous generated paths instead of aborting planning.
 - path: tests/test_planning_assembly.py
@@ -160,8 +161,8 @@ files:
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 752
-    end_line: 752
+    start_line: 753
+    end_line: 753
   summary: Assign a batch-specific identifier to each proposal question.
   rationale: Prevent replay from reusing an answer for a differently shaped question.
 - path: packages/service/src/powdrr_service/planning/assembly.py
@@ -172,6 +173,44 @@ files:
   summary: Allow proposal paths to introduce directories absent from source and repository evidence.
   rationale: Implementation requirements may call for new modules whose filenames and directories were
     not specified in the plan.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Import deep-copy support for per-question answer schemas.
+  rationale: Restrict model references to the IDs valid for each question without mutating the shared
+    schema.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 771
+    end_line: 791
+  summary: Build a per-question schema enumerating only valid requirement, component, source, evidence,
+    validation, and pagination IDs.
+  rationale: Prevent the model from inventing identifiers or copying namespaced context references into
+    answer fields.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 812
+    end_line: 815
+  summary: Define validation_ids as bare IDs from the supplied catalog.
+  rationale: Clarify the required identifier format where the answer field is specified.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 831
+    end_line: 831
+  summary: Pass the per-question schema to the response parser and model.
+  rationale: Apply catalog ID constraints to each generated answer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 373
+    end_line: 373
+  summary: Use a valid requirement ID as the pagination cursor in request identity coverage.
+  rationale: Exercise pagination with the cursor type required by the planning contract.
 entities: []
 entity_relationships: []
 invariants: []

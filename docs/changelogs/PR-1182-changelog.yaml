@@ -229,42 +229,42 @@ files:
     rationale: Omit unrelated baseline records from the question payload.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 549, end_line: 563}
+    span: {start_line: 549, end_line: 575}
     summary: Include taxonomy, planned paths, and entity identities only for the subject sections that need them.
     rationale: Prevent large unrelated entity indexes from exceeding the question input limit.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 588, end_line: 600}
+    span: {start_line: 586, end_line: 598}
     summary: Digest only the section-specific facts sent with a structural change question.
     rationale: Keep question identity aligned with its bounded model context.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 626, end_line: 627}
+    span: {start_line: 619, end_line: 624}
+    summary: Clarify that entity types must come from the supplied taxonomy.
+    rationale: Keep taxonomy validation in the parser without duplicating its full list in the schema.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 630, end_line: 631}
     summary: Pass the filtered context and subject-appropriate example to structural change review.
     rationale: Ensure the prompt receives bounded facts and an example matching the answer contract.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 567, end_line: 577}
-    summary: Provide a change-shaped example for newly added file subjects.
-    rationale: Show the model how to report an absent planned file as a required change.
-  - path: packages/service/src/powdrr_service/planning/structrr.py
-    type: modified
-    span: {start_line: 609, end_line: 615}
+    span: {start_line: 607, end_line: 613}
     summary: Explain baseline comparison and require concise structural change reasons.
     rationale: Prevent unchanged answers for absent subjects and avoid reasoning text in the bounded reason field.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 683, end_line: 684}
+    span: {start_line: 687, end_line: 688}
     summary: Build the subject enumeration example from the path-relevant baseline index.
     rationale: Keep example references consistent with the narrowed baseline facts.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 695, end_line: 705}
+    span: {start_line: 699, end_line: 709}
     summary: Use an existing relevant file subject in the example when available.
     rationale: Keep the example valid for planned paths already in the baseline.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 721, end_line: 878}
+    span: {start_line: 725, end_line: 882}
     summary: Build compact subject indexes and per-subject baseline context from planned paths and identities.
     rationale: Preserve relevant existing Structrr references without including unrelated repository data.
   - path: packages/service/src/powdrr_service/planning/structrr.py
@@ -277,6 +277,16 @@ files:
     span: {start_line: 507, end_line: 510}
     summary: Define which actions are valid for new and existing structural subjects.
     rationale: Align the answer contract with the structural-subject validator.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 942, end_line: 942}
+    summary: Keep the entity change schema independent from the full taxonomy list.
+    rationale: Avoid serializing taxonomy values both as context and schema enum values.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 948, end_line: 948}
+    summary: Represent entity type as a string in the compact response schema.
+    rationale: The supplied taxonomy context and parser enforce allowed entity types.
   - path: tests/test_planning_structrr.py
     type: modified
     span: {start_line: 3, end_line: 3}
@@ -294,7 +304,7 @@ files:
     rationale: Test enumeration and per-subject change requests against a large baseline.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 88, end_line: 277}
+    span: {start_line: 88, end_line: 284}
     summary: Verify structural questions omit unrelated baseline records and entity identity indexes.
     rationale: Catch oversized prompts before they block real planning sessions.
 entities:

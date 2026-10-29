@@ -46,7 +46,7 @@ files:
   type: added
   span:
     start_line: 1
-    end_line: 1388
+    end_line: 1427
   summary: Move deterministic source-ledger question ordering and planning assembly into the service package.
   rationale: Put proprietary planning policy in the service-owned package while retaining the existing planning behavior.
 - path: packages/service/src/powdrr_service/planning/coverage.py
@@ -129,8 +129,8 @@ files:
 - path: src/powdrr_lift/workrr/planning/driver.py
   type: modified
   span:
-    start_line: 77
-    end_line: 78
+    start_line: 80
+    end_line: 81
   summary: Remove the duplicate legacy source ledger record.
   rationale: Use the service-owned planning record.
 - path: src/powdrr_lift/workrr/planning/driver.py
@@ -248,15 +248,15 @@ files:
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 960
-    end_line: 960
+    start_line: 961
+    end_line: 961
   summary: Adjust the planning machine test after removing its legacy import.
   rationale: Keep the service planning test focused on behavior.
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 978
-    end_line: 978
+    start_line: 979
+    end_line: 979
   summary: Remove an unused repository fixture from the service machine integration test.
   rationale: Verify the service question machine runs without a repository path.
 entities:

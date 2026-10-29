@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from powdrr_service.planning.checkpoints import (
     JournalForkError,
@@ -18,6 +18,7 @@ from powdrr_service.planning.checkpoints import (
     PlanningJournalError,
     QuestionDiagnostic,
     StaleCheckpointParent,
+    prepare_checkpoint_append,
     reduce_checkpoint_comments,
     reduce_checkpoint_events,
     sanitize_diagnostic,
@@ -271,3 +272,61 @@ class LocalDiagnosticCache:
             return None
         value = json.loads(path.read_text(encoding="utf-8"))
         return value if isinstance(value, Mapping) else None
+
+
+class IssueCommentAPI(Protocol):
+    def list_comments(self, issue_number: int) -> tuple[Mapping[str, Any], ...]: ...
+
+    def add_issue_comment(self, issue_number: int, body: str) -> None: ...
+
+
+class GitHubCommentCheckpointStore:
+    """Local adapter persisting service-rendered checkpoints in GitHub comments."""
+
+    def __init__(
+        self, client: IssueCommentAPI, issue_number: int, *, session_id: str
+    ) -> None:
+        validate_session_id(session_id)
+        if (
+            isinstance(issue_number, bool)
+            or not isinstance(issue_number, int)
+            or issue_number < 1
+        ):
+            raise PlanningJournalError("issue number must be a positive integer")
+        self.client = client
+        self.issue_number = issue_number
+        self.session_id = session_id
+
+    def load(self, *, selected_checkpoint_digest: str | None = None) -> JournalState:
+        return reduce_checkpoint_comments(
+            self.client.list_comments(self.issue_number),
+            session_id=self.session_id,
+            selected_checkpoint_digest=selected_checkpoint_digest,
+        )
+
+    def append(
+        self,
+        checkpoint: PlanningCheckpoint,
+        *,
+        expected_parent_digest: str | None,
+        selected_checkpoint_digest: str | None = None,
+    ) -> JournalState:
+        current = self.load(selected_checkpoint_digest=selected_checkpoint_digest)
+        comments = prepare_checkpoint_append(
+            checkpoint,
+            current,
+            session_id=self.session_id,
+            expected_parent_digest=expected_parent_digest,
+        )
+        for body in comments:
+            self.client.add_issue_comment(self.issue_number, body)
+        updated = self.load(
+            selected_checkpoint_digest=(
+                checkpoint.digest if selected_checkpoint_digest is not None else None
+            )
+        )
+        if updated.head is None or updated.head.digest != checkpoint.digest:
+            raise JournalForkError(
+                "checkpoint append did not produce a unique canonical head"
+            )
+        return updated

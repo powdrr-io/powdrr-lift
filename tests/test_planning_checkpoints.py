@@ -8,12 +8,12 @@ from typing import Any
 
 import pytest
 from powdrr_local.planning.checkpoints import (
+    GitHubCommentCheckpointStore,
     LocalCheckpointStore,
     LocalDiagnosticCache,
 )
 from powdrr_service.planning.checkpoints import (
     MAX_CHECKPOINT_COMMENT_CHARS,
-    GitHubCommentCheckpointStore,
     InMemoryCheckpointStore,
     JournalForkError,
     PlanningCheckpoint,
@@ -23,7 +23,6 @@ from powdrr_service.planning.checkpoints import (
     render_checkpoint_comments,
 )
 
-from powdrr_lift.workrr.github_issue_queue import QueueIssue
 from powdrr_lift.workrr.planning.contracts import PlanningContractError, Question
 
 
@@ -69,20 +68,9 @@ class _FakeIssueComments:
         assert issue_number == 44
         return tuple(self.comments)
 
-    def add_comment(self, issue: QueueIssue, body: str) -> None:
-        assert issue.number == 44
+    def add_issue_comment(self, issue_number: int, body: str) -> None:
+        assert issue_number == 44
         self.comments.append({"id": len(self.comments) + 1, "body": body})
-
-
-def _issue() -> QueueIssue:
-    return QueueIssue(
-        number=44,
-        title="Planning session",
-        body="Session journal",
-        state="open",
-        labels=("powdrr:planning",),
-        url="https://github.com/powdrr-io/example/issues/44",
-    )
 
 
 def _initialize_git_repository(path: Path) -> Path:
@@ -94,7 +82,7 @@ def test_question_start_survives_crash_before_answer_and_resume_reuses_identity(
     None
 ):
     api = _FakeIssueComments()
-    store = GitHubCommentCheckpointStore(api, _issue(), session_id="planning-session-1")
+    store = GitHubCommentCheckpointStore(api, 44, session_id="planning-session-1")
     question = _question()
     started = PlanningCheckpoint.question_started(
         session_id="planning-session-1",
@@ -108,7 +96,7 @@ def test_question_start_survives_crash_before_answer_and_resume_reuses_identity(
     store.append(started, expected_parent_digest=None)
     # Simulate process exit before an accepted-answer checkpoint is appended.
     resumed = GitHubCommentCheckpointStore(
-        api, _issue(), session_id="planning-session-1"
+        api, 44, session_id="planning-session-1"
     ).load()
 
     assert resumed.pending_question == question
@@ -159,7 +147,7 @@ def test_local_checkpoint_store_imports_legacy_issue_comments(tmp_path: Path) ->
     _initialize_git_repository(tmp_path)
     api = _FakeIssueComments()
     legacy_store = GitHubCommentCheckpointStore(
-        api, _issue(), session_id="planning-session-1"
+        api, 44, session_id="planning-session-1"
     )
     checkpoint = _checkpoint(
         event_id="event-start-1",
@@ -226,7 +214,7 @@ def test_accepted_answer_and_id_counters_resume_without_a_local_cache(
 ) -> None:
     _initialize_git_repository(tmp_path)
     api = _FakeIssueComments()
-    store = GitHubCommentCheckpointStore(api, _issue(), session_id="planning-session-1")
+    store = GitHubCommentCheckpointStore(api, 44, session_id="planning-session-1")
     question = _question()
     question_contract = Question.from_mapping(question)
     started = PlanningCheckpoint.question_started(
@@ -257,9 +245,7 @@ def test_accepted_answer_and_id_counters_resume_without_a_local_cache(
 
     # A new machine shares only GitHub comments; its local diagnostics directory
     # starts empty and has no role in reconstructing journal state.
-    new_machine = GitHubCommentCheckpointStore(
-        api, _issue(), session_id="planning-session-1"
-    )
+    new_machine = GitHubCommentCheckpointStore(api, 44, session_id="planning-session-1")
     first_cache = LocalDiagnosticCache(
         tmp_path / "machine-a" / ".git", session_id="planning-session-1"
     )

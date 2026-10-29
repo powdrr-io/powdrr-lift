@@ -38,10 +38,42 @@ SCHEMA = {
     [
         "Temporary failure in name resolution",
         "OpenAI streaming response content was empty.",
+        "OpenAI response message content was empty.",
     ],
 )
 def test_procedrr_recognizes_transient_provider_errors(message: str) -> None:
     assert _is_retryable_provider_failure(RuntimeError(message))
+
+
+def test_procedrr_retries_empty_provider_content(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class EmptyContentThenSuccess:
+        calls = 0
+
+        def complete_json(
+            self, _messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls == 1:
+                raise PowdrrExecutionError("OpenAI response message content was empty.")
+            return {"complete": True}
+
+    provider = EmptyContentThenSuccess()
+    client = WorkrrProcedrrClient(
+        cast(Any, provider),
+        process_directory=tmp_path,
+        provider_retry_delay_seconds=2.0,
+    )
+    delays: list[float] = []
+    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", delays.append)
+
+    assert client.complete_json(
+        [{"role": "user", "content": "judge this"}],
+        response_schema=SCHEMA,
+    ) == {"complete": True}
+    assert provider.calls == 2
+    assert delays == [2.0]
 
 
 def test_procedrr_retries_http_429(

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from powdrr_service.planning.contracts import Question as ServiceQuestion
 
 from powdrr_lift.workrr.planning.contracts import (
     COVERAGE_ANSWER_JSON_SCHEMA,
@@ -34,6 +35,10 @@ FAILURE_EXAMPLES = (
 
 def _fixture(case: str) -> dict[str, Any]:
     return json.loads((FIXTURES / f"{case}.json").read_text())
+
+
+def test_legacy_contract_import_is_service_owned_type() -> None:
+    assert Question is ServiceQuestion
 
 
 def test_failure_fixtures_preserve_captured_responses_and_provenance() -> None:

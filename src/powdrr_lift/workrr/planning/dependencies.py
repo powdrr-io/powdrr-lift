@@ -10,13 +10,14 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
-from powdrr_lift.workrr.planning.assembly import WorkUnit
-from powdrr_lift.workrr.planning.contracts import (
+from powdrr_service.planning.contracts import (
     MAX_CONTRACT_TEXT_LENGTH,
     MAX_ENUMERATION_RECORDS,
     PlanningContractError,
     Question,
 )
+
+from powdrr_lift.workrr.planning.assembly import WorkUnit
 from powdrr_lift.workrr.planning.evidence import Evidence
 from powdrr_lift.workrr.planning.questions import (
     ContextRecord,

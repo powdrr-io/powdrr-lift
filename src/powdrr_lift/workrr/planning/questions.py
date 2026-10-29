@@ -7,12 +7,13 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.llm import complete_json_with_timeout_retry
-from powdrr_lift.workrr.planning.contracts import (
+from powdrr_service.planning.contracts import (
     PlanningContractError,
     Question,
 )
+
+from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.llm import complete_json_with_timeout_retry
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
 MAX_QUESTION_INPUT_CHARS = 24_000

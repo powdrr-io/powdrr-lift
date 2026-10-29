@@ -11,11 +11,12 @@ from dataclasses import dataclass, replace
 from pathlib import PurePosixPath
 from typing import Any, Literal
 
+from powdrr_service.planning.contracts import PlanningContractError, Question
+
 from powdrr_lift.core.instruction_ledger import (
     InstructionLedger,
     compile_instruction_ledger,
 )
-from powdrr_lift.workrr.planning.contracts import PlanningContractError, Question
 from powdrr_lift.workrr.planning.questions import (
     ContextRecord,
     QuestionRequest,

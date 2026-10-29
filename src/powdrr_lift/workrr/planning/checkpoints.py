@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
-from powdrr_lift.workrr.planning.contracts import PlanningContractError, Question
+from powdrr_service.planning.contracts import PlanningContractError, Question
 
 if TYPE_CHECKING:
     from powdrr_lift.workrr.github_issue_queue import QueueIssue

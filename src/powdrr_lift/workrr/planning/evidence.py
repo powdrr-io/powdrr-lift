@@ -13,9 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, Protocol
 
-from powdrr_lift.basedpyright_tools import find_workspace_symbols
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.planning.contracts import (
+from powdrr_service.planning.contracts import (
     COVERAGE_ANSWER_JSON_SCHEMA,
     CompleteCoverage,
     CoverageAnswer,
@@ -25,6 +23,9 @@ from powdrr_lift.workrr.planning.contracts import (
     Question,
     parse_coverage_answer,
 )
+
+from powdrr_lift.basedpyright_tools import find_workspace_symbols
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.planning.questions import (
     ContextRecord,
     QuestionRequest,

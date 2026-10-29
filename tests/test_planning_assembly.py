@@ -325,6 +325,10 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         request.answer_schema["properties"]["records"]["maxItems"]
         == MAX_WORK_UNIT_PROPOSALS_PER_PAGE
     )
+    record_schema = request.answer_schema["properties"]["records"]["items"]
+    assert record_schema["properties"]["validation_ids"]["items"]["enum"] == [
+        "validation-0001"
+    ]
     assert MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION == 4
     with pytest.raises(PlanningContractError, match="must contain"):
         request.parse_answer(
@@ -340,6 +344,13 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
             context,
             ["req-0001"] * 5,
             valid_example=example,
+        )
+
+    prefixed_validation = dict(example_proposal)
+    prefixed_validation["validation_ids"] = ["validation:validation-0001"]
+    with pytest.raises(PlanningContractError, match="unknown references"):
+        request.parse_answer(
+            {"records": [prefixed_validation], "has_more": False, "next_anchor": None}
         )
 
     second_requirement = replace(context.requirements["req-0001"], id="req-0002")
@@ -359,7 +370,7 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
     assert larger_batch.question.question_id != request.question.question_id
 
     next_page = build_work_unit_proposal_request(
-        context, ["req-0001"], valid_example=example, page_after=anchor
+        context, ["req-0001"], valid_example=example, page_after="req-0001"
     )
     assert next_page.question.question_id != request.question.question_id
 

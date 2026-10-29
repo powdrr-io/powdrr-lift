@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Literal, cast
@@ -767,6 +768,27 @@ def build_work_unit_proposal_request(
             after_anchor=page_after,
         )
 
+    answer_schema = deepcopy(WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA)
+    record_properties = answer_schema["properties"]["records"]["items"]["properties"]
+    record_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
+    record_properties["component"]["enum"] = sorted(context.component_ids)
+    record_properties["validation_ids"]["items"]["enum"] = sorted(
+        context.validation_catalog
+    )
+    write_properties = record_properties["planned_writes"]["items"]["properties"]
+    write_properties["source_refs"]["items"]["enum"] = list(source_refs)
+    write_properties["evidence_ids"]["items"]["enum"] = sorted(context.evidence)
+    output_properties = record_properties["required_outputs"]["items"]["properties"]
+    output_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
+    next_anchors = list(requirement_ids)
+    if page_after is not None:
+        cursor = requirement_ids.index(page_after)
+        next_anchors = list(requirement_ids[cursor + 1 :])
+    answer_schema["properties"]["next_anchor"] = {
+        "type": ["string", "null"],
+        "enum": [*next_anchors, None],
+    }
+
     return QuestionRequest(
         question=question,
         exact_question=(
@@ -775,8 +797,10 @@ def build_work_unit_proposal_request(
             "step, at most two acceptance criteria, actual planned file writes, "
             "and required outputs that later work may consume. Do not invent "
             "requirement, component, validation, evidence, or source IDs. Split "
-            "different implementation runtimes into separate units. Keep all "
-            "descriptions concise. Return at most three records per page, within "
+            "different implementation runtimes into separate units. Reference "
+            "IDs must exactly match catalog ID values: put `validation-0001` in "
+            "validation_ids, not the context reference `validation:validation-0001`. "
+            "Keep descriptions concise. Return at most three records per page, within "
             "the 4,000-character answer limit; set has_more when more units remain."
         ),
         answer_field_definitions={
@@ -784,6 +808,10 @@ def build_work_unit_proposal_request(
             "implementation_runtime": (
                 "Canonical runtime derived from the actual planned writes, or "
                 "neutral when all writes are non-executable."
+            ),
+            "validation_ids": (
+                "Exact bare IDs from the supplied validation catalog, such as "
+                "validation-0001; do not add the context prefix `validation:`."
             ),
             "required_outputs": (
                 "Concrete outputs needed by later work, with references only to "
@@ -800,7 +828,7 @@ def build_work_unit_proposal_request(
         accepted_facts=accepted,
         valid_example=valid_example,
         empty_example={"records": [], "has_more": False, "next_anchor": None},
-        answer_schema=WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA,
+        answer_schema=answer_schema,
         parse_answer=parse,
     )
 

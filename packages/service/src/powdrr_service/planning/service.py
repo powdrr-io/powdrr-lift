@@ -249,14 +249,18 @@ def advance_planning_session(
         )
     accepted: dict[str, Mapping[str, Any]] = {}
     for event in journal.events:
-        if event.event_type != "answer_accepted":
-            continue
         question = event.payload.get("question")
-        answer = event.payload.get("accepted_answer")
-        if isinstance(question, Mapping) and isinstance(answer, Mapping):
-            question_id = question.get("question_id")
-            if isinstance(question_id, str):
+        if not isinstance(question, Mapping):
+            continue
+        question_id = question.get("question_id")
+        if not isinstance(question_id, str):
+            continue
+        if event.event_type == "answer_accepted":
+            answer = event.payload.get("accepted_answer")
+            if isinstance(answer, Mapping):
                 accepted[question_id] = dict(answer)
+        elif event.event_type == "needs_answer":
+            accepted.pop(question_id, None)
 
     ready_questions = getattr(state_machine, "ready_questions", None)
     if callable(ready_questions):
@@ -266,6 +270,11 @@ def advance_planning_session(
         requests = () if request is None else (request,)
     if not requests:
         return PlanningTransition("complete", session.session_id, session.issue.number)
+    invalid_accepted_ids = getattr(
+        state_machine, "invalid_accepted_question_ids", frozenset()
+    )
+    for question_id in invalid_accepted_ids:
+        accepted.pop(question_id, None)
     # Bound each durable transition even when many independent questions are
     # ready. The next Procedrr iteration can checkpoint this window and
     # recompute the remaining frontier before asking more questions.

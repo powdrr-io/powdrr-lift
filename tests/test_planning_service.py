@@ -7,7 +7,10 @@ from pathlib import Path
 from threading import Barrier, Lock
 from typing import Any
 
-from powdrr_service.planning.checkpoints import InMemoryCheckpointStore
+from powdrr_service.planning.checkpoints import (
+    InMemoryCheckpointStore,
+    PlanningCheckpoint,
+)
 from powdrr_service.planning.service import (
     PlanningOptions,
     PlanningSession,
@@ -18,7 +21,11 @@ from powdrr_service.planning.service import (
 )
 
 from powdrr_lift.workrr.github_issue_queue import QueueIssue
-from powdrr_lift.workrr.planning.contracts import EnumerationAnswer, Question
+from powdrr_lift.workrr.planning.contracts import (
+    EnumerationAnswer,
+    PlanningContractError,
+    Question,
+)
 from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
 from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
 from powdrr_lift.workrr.planning.questions import (
@@ -264,6 +271,124 @@ def test_accepted_question_is_durable_and_not_called_again() -> None:
     assert [event.event_type for event in store.load().events] == [
         "answer_accepted",
     ]
+
+
+def test_invalid_accepted_answer_is_reasked_under_the_current_contract() -> None:
+    session_id = "session-invalid-replay"
+    store = InMemoryCheckpointStore(session_id=session_id)
+    session = PlanningSession(
+        session_id=session_id,
+        plan_id="bounded-plan",
+        repository="powdrr-io/example",
+        base_commit="a" * 40,
+        source_path="docs/plan.md",
+        source_blob_sha="b" * 40,
+        verification_command="make test",
+        issue=QueueIssue(
+            45, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
+        ),
+    )
+    machine = _Machine()
+    stale_answer = {"records": [{"statement": "Old accepted result."}]}
+    checkpoint = PlanningCheckpoint.answer_accepted(
+        session_id=session_id,
+        event_id="answer-accepted-000001",
+        sequence=1,
+        parent_digest=None,
+        question=machine.request.question,
+        accepted_answer=stale_answer,
+        validation_result={"accepted": True, "attempts": 1},
+        id_counters={},
+    )
+    store.append(checkpoint, expected_parent_digest=None)
+
+    class _ReplayRepairMachine:
+        invalid_accepted_question_ids: frozenset[str] = frozenset()
+
+        def ready_questions(
+            self, accepted: Mapping[str, Mapping[str, Any]]
+        ) -> tuple[QuestionRequest[EnumerationAnswer], ...]:
+            question_id = machine.request.question.question_id
+            if question_id in accepted:
+                self.invalid_accepted_question_ids = frozenset({question_id})
+            return (machine.request,)
+
+        def next_question(
+            self, accepted: Mapping[str, Mapping[str, Any]]
+        ) -> QuestionRequest[EnumerationAnswer] | None:
+            return self.ready_questions(accepted)[0]
+
+    client = _Client()
+    transition = advance_planning_session(
+        session=session,
+        state_machine=_ReplayRepairMachine(),
+        checkpoint_store=store,
+        client=client,
+        options=PlanningOptions(model="test-model"),
+        stderr=None,
+    )
+
+    assert transition.status == "question_accepted"
+    assert client.calls == 1
+    assert len(store.load().events) == 2
+    assert (
+        store.load().events[-1].payload["accepted_answer"]["records"][0]["statement"]
+        == "The issue state is durable."
+    )
+
+
+def test_needs_answer_event_supersedes_an_older_accepted_answer() -> None:
+    session_id = "session-reopened-answer"
+    store = InMemoryCheckpointStore(session_id=session_id)
+    session = PlanningSession(
+        session_id=session_id,
+        plan_id="bounded-plan",
+        repository="powdrr-io/example",
+        base_commit="a" * 40,
+        source_path="docs/plan.md",
+        source_blob_sha="b" * 40,
+        verification_command="make test",
+        issue=QueueIssue(
+            46, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
+        ),
+    )
+    machine = _Machine()
+    accepted = PlanningCheckpoint.answer_accepted(
+        session_id=session_id,
+        event_id="answer-accepted-000001",
+        sequence=1,
+        parent_digest=None,
+        question=machine.request.question,
+        accepted_answer={"records": [{"statement": "Old answer."}]},
+        validation_result={"accepted": True, "attempts": 1},
+        id_counters={},
+    )
+    store.append(accepted, expected_parent_digest=None)
+    reopened = PlanningCheckpoint.needs_answer(
+        session_id=session_id,
+        event_id="needs-answer-000002",
+        sequence=2,
+        parent_digest=accepted.digest,
+        question=machine.request.question,
+        error=PlanningContractError("/records", "needs correction"),
+        previous_answer={"records": [{"statement": "Old answer."}]},
+        id_counters={},
+    )
+    store.append(reopened, expected_parent_digest=accepted.digest)
+
+    client = _Client()
+    transition = advance_planning_session(
+        session=session,
+        state_machine=machine,
+        checkpoint_store=store,
+        client=client,
+        options=PlanningOptions(model="test-model"),
+        stderr=None,
+    )
+
+    assert transition.status == "question_accepted"
+    assert client.calls == 1
+    assert len(store.load().events) == 3
 
 
 def test_question_uses_json_object_mode_and_validates_schema_locally() -> None:

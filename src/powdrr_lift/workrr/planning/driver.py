@@ -27,6 +27,7 @@ from powdrr_service.planning.compiler import (
     compile_plan,
     validate_compiled_plan,
 )
+from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.dependencies import (
     DependencyGraph,
     UnitDependencyEdge,
@@ -117,6 +118,12 @@ class SourceLedgerQuestionMachine:
             None if structrr_baseline is None else dict(structrr_baseline)
         )
         self.taxonomy_entity_types = taxonomy_entity_types
+        self._invalid_accepted_question_ids: set[str] = set()
+
+    @property
+    def invalid_accepted_question_ids(self) -> frozenset[str]:
+        """Accepted answers that no longer satisfy the current parser contract."""
+        return frozenset(self._invalid_accepted_question_ids)
 
     def _next_source_question(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -235,6 +242,7 @@ class SourceLedgerQuestionMachine:
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[QuestionRequest[Any], ...]:
         """Return all independent questions ready from this accepted snapshot."""
+        self._invalid_accepted_question_ids.clear()
         source_requests = self._next_source_questions(accepted_answers)
         if source_requests:
             return source_requests
@@ -335,7 +343,14 @@ class SourceLedgerQuestionMachine:
                 if answer is None:
                     requests.append(request)
                     break
-                page = request.parse_answer(answer)
+                try:
+                    page = request.parse_answer(answer)
+                except PlanningContractError:
+                    self._invalid_accepted_question_ids.add(
+                        request.question.question_id
+                    )
+                    requests.append(request)
+                    break
                 records.extend(page.records)
                 if not page.has_more:
                     requests.append(None)

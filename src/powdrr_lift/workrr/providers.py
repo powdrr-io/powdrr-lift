@@ -510,8 +510,12 @@ class OpenAIChatClient:
                 if metadata
                 else ""
             )
+            finish_reason = first_choice.get("finish_reason")
+            if finish_reason not in (None, ""):
+                detail += f"; finish_reason={finish_reason!r}"
             raise PowdrrExecutionError(
-                f"OpenAI response message content was empty{detail}."
+                f"OpenAI-compatible provider response message content was empty"
+                f"{detail}."
             )
 
         return _parse_json_object(content, "OpenAI response content")
@@ -546,6 +550,7 @@ def _read_openai_response(
             capture.write(f"\n---STREAM-BEGIN id={capture_id}---\n")
             capture.flush()
     response_metadata: dict[str, Any] | None = None
+    finish_reason: Any = None
     event_data: list[str] = []
     chunk_count = 0
     stream_complete = False
@@ -585,6 +590,7 @@ def _read_openai_response(
             continue
         if first_choice.get("finish_reason") is not None:
             stream_complete = True
+            finish_reason = first_choice["finish_reason"]
         delta = first_choice.get("delta")
         if not isinstance(delta, dict):
             continue
@@ -639,7 +645,12 @@ def _read_openai_response(
             f"received {chunk_count} content chunks; "
             f"partial content: {_stream_excerpt(content_parts)!r}"
         )
-    response_metadata["choices"] = [{"message": {"content": "".join(content_parts)}}]
+    response_metadata["choices"] = [
+        {
+            "message": {"content": "".join(content_parts)},
+            "finish_reason": finish_reason,
+        }
+    ]
     if capture_path:
         with Path(capture_path).open("a", encoding="utf-8") as capture:
             capture.write(f"\n---STREAM-END id={capture_id}---\n")

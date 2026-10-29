@@ -266,6 +266,54 @@ def test_accepted_question_is_durable_and_not_called_again() -> None:
     ]
 
 
+def test_question_uses_json_object_mode_and_validates_schema_locally() -> None:
+    session_id = "session-json-object"
+    store = InMemoryCheckpointStore(session_id=session_id)
+    session = PlanningSession(
+        session_id=session_id,
+        plan_id="bounded-plan",
+        repository="powdrr-io/example",
+        base_commit="a" * 40,
+        source_path="docs/plan.md",
+        source_blob_sha="b" * 40,
+        verification_command="make test",
+        issue=QueueIssue(
+            44, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
+        ),
+    )
+
+    class _JsonObjectClient:
+        def __init__(self) -> None:
+            self.response_schemas: list[Mapping[str, Any] | None] = []
+
+        def complete_json(
+            self,
+            _messages: list[dict[str, str]],
+            *,
+            response_schema: Mapping[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            self.response_schemas.append(response_schema)
+            return {
+                "records": [{"statement": "The issue state is durable."}],
+                "has_more": False,
+                "next_anchor": None,
+            }
+
+    client = _JsonObjectClient()
+    transition = advance_planning_session(
+        session=session,
+        state_machine=_Machine(),
+        checkpoint_store=store,
+        client=client,
+        options=PlanningOptions(model="test-model", use_provider_schema=False),
+        stderr=None,
+    )
+
+    assert transition.status == "question_accepted"
+    assert client.response_schemas == [None]
+    assert store.load().events[0].event_type == "answer_accepted"
+
+
 def test_ready_question_frontier_runs_concurrently_and_checkpoints_serially() -> None:
     session_id = "session-batch"
     store = InMemoryCheckpointStore(session_id=session_id)

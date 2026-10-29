@@ -304,6 +304,7 @@ def run_question[AnswerT](
     stderr: Any,
     max_transport_retries: int,
     transport_backoff_seconds: float,
+    use_provider_schema: bool = True,
 ) -> QuestionResult[AnswerT]:
     """Run one bounded question with transport retry and two semantic corrections."""
     request.validate()
@@ -340,7 +341,9 @@ def run_question[AnswerT](
                 stderr=stderr,
                 max_timeout_retries=max_transport_retries,
                 timeout_backoff_seconds=transport_backoff_seconds,
-                response_schema=request.answer_schema,
+                response_schema=(
+                    request.answer_schema if use_provider_schema else None
+                ),
             )
         except PowdrrExecutionError as error:
             if error.error_code != "invalid_json_response":

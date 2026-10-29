@@ -106,6 +106,7 @@ class PlanningOptions:
     max_transport_retries: int = 5
     transport_backoff_seconds: float = 1.0
     max_concurrent_questions: int = 4
+    use_provider_schema: bool = True
 
     def __post_init__(self) -> None:
         if self.max_concurrent_questions < 1:
@@ -390,6 +391,7 @@ def _run_question_batch(
                 stderr=output,
                 max_transport_retries=options.max_transport_retries,
                 transport_backoff_seconds=options.transport_backoff_seconds,
+                use_provider_schema=options.use_provider_schema,
             )
             return request, result, None, output.getvalue()
         except Exception as error:

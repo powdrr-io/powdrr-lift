@@ -234,6 +234,22 @@ def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
     assert LegacyGitHubCheckpointStore is GitHubCommentCheckpointStore
 
 
+def test_planning_service_uses_issue_store_protocol_not_github_client() -> None:
+    source = (
+        Path(__file__).parents[1]
+        / "packages/service/src/powdrr_service/planning/service.py"
+    ).read_text(encoding="utf-8")
+    tree = ast.parse(source)
+
+    assert all(
+        not (
+            isinstance(node, ast.ImportFrom)
+            and node.module == "powdrr_lift.workrr.github_issue_queue"
+        )
+        for node in ast.walk(tree)
+    )
+
+
 def test_plan_repair_publication_is_owned_by_local_adapter() -> None:
     from powdrr_local.planning.repair_publication import publish_repair_pull_request
     from powdrr_service.planning import repair_service

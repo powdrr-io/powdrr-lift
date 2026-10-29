@@ -207,14 +207,10 @@ def test_gitkeep_is_neutral_inside_a_source_named_directory() -> None:
     assert proposal.planned_writes[0].runtime is None
 
 
-def test_new_path_is_allowed_in_a_repository_evidenced_directory() -> None:
-    existing_path = "attestation/scripts/verify-all.sh"
-    new_path = "attestation/scripts/validate.sh"
+def test_new_path_is_allowed_in_a_new_directory() -> None:
+    new_path = "attestation/providers/local/run.sh"
     context, anchor = _context(path="legacy/verify-all.sh", runtime="shell")
-    context = replace(
-        context,
-        repository_paths={existing_path: PathFact(existing_path, "shell")},
-    )
+    context = replace(context, repository_paths={})
     answer = _proposal(context, anchor, path=new_path, runtime="shell")
 
     proposal = parse_work_unit_proposal(answer, context=context)

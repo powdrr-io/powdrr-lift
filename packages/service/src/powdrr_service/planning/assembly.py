@@ -615,34 +615,6 @@ def _write_runtime(write: PlannedWrite, context: WorkUnitContext) -> str | None:
             f"runtime for {write.path} must be {derived!r} based on the path "
             "and repository facts",
         )
-    if fact is None:
-        anchors = {item.id: item for item in context.source.anchors}
-        additions = "\n".join(
-            context.source.document.text[
-                anchors[ref].start_offset : anchors[ref].end_offset
-            ]
-            for ref in write.source_refs
-        )
-        write_parent = PurePosixPath(write.path).parent
-        named_directory = any(
-            f"{parent.as_posix().rstrip('/')}/" in additions
-            for parent in PurePosixPath(write.path).parents
-            if parent.as_posix() != "."
-        )
-        repository_backed_directory = any(
-            PurePosixPath(path).parent == write_parent
-            for path in context.repository_paths
-        )
-        if (
-            write.path not in additions
-            and not named_directory
-            and not repository_backed_directory
-        ):
-            raise PlanningContractError(
-                "/planned_writes/path",
-                "new paths must be source-cited or use a "
-                "repository-evidenced directory",
-            )
     return derived
 
 

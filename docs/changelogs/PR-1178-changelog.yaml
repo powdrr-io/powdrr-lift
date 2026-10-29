@@ -62,21 +62,6 @@ files:
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 626
-    end_line: 640
-  summary: Allow a new planned file when its parent directory is source-cited or present in pinned repository
-    evidence.
-  rationale: Ground generated filenames in source or existing repository structure.
-- path: packages/service/src/powdrr_service/planning/assembly.py
-  type: modified
-  span:
-    start_line: 643
-    end_line: 644
-  summary: Explain the source-citation and repository-directory requirements for new paths.
-  rationale: Give planning corrections an actionable path validation error.
-- path: packages/service/src/powdrr_service/planning/assembly.py
-  type: modified
-  span:
     start_line: 698
     end_line: 700
   summary: Enforce the four-requirement limit when building proposal questions.
@@ -128,8 +113,8 @@ files:
   span:
     start_line: 187
     end_line: 224
-  summary: Cover neutral placeholder writes and new filenames grounded in repository directories.
-  rationale: Prevent the Gaterr planning run from rejecting valid workflow script paths.
+  summary: Cover neutral placeholder writes and a new provider directory.
+  rationale: Ensure valid implementation paths can introduce directories absent from the repository.
 - path: tests/test_planning_assembly.py
   type: modified
   span:

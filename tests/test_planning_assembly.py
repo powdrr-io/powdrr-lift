@@ -613,6 +613,75 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     assert single_request.answer_schema["properties"]["records"]["maxItems"] == 1
 
 
+def test_missing_grouped_requirement_gets_a_supplemental_question(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    base_context, anchor = _context()
+    requirement_ids = ("req-0021", "req-0022", "req-0023", "req-0024")
+    base_requirement = base_context.requirements["req-0001"]
+    requirements = {
+        requirement_id: replace(base_requirement, id=requirement_id)
+        for requirement_id in requirement_ids
+    }
+    context = replace(
+        base_context,
+        requirements=requirements,
+        unresolved_requirement_ids=requirement_ids,
+    )
+    machine = SourceLedgerQuestionMachine(context.source)
+    ledger = SimpleNamespace(requirements=tuple(requirements.values()))
+    coverage = tuple(
+        SimpleNamespace(
+            requirement_id=requirement_id,
+            answer=SimpleNamespace(status="missing"),
+        )
+        for requirement_id in requirement_ids
+    )
+    monkeypatch.setattr(machine, "_parse_source_ledger", lambda _answers: ledger)
+    monkeypatch.setattr(machine, "accepted_ledger", lambda _answers: ledger)
+    monkeypatch.setattr(machine, "accepted_coverage", lambda _answers: coverage)
+    monkeypatch.setattr(
+        machine, "_work_unit_context", lambda _ledger, _unresolved: context
+    )
+
+    grouped_request = machine._work_unit_requests({})[0]
+    assert grouped_request is not None
+    grouped_records = []
+    for requirement_id in requirement_ids[1:]:
+        proposal = _proposal(context, anchor)
+        proposal["requirement_ids"] = [requirement_id]
+        grouped_records.append(proposal)
+    accepted: dict[str, dict[str, object]] = {
+        grouped_request.question.question_id: {
+            "records": grouped_records,
+            "has_more": False,
+            "next_anchor": None,
+        }
+    }
+
+    supplemental_request = next(
+        request
+        for request in machine._work_unit_requests(accepted)
+        if request is not None
+    )
+    assert supplemental_request.question.subject_ids == ("req-0021",)
+    supplemental_proposal = _proposal(context, anchor)
+    supplemental_proposal["requirement_ids"] = ["req-0021"]
+    accepted[supplemental_request.question.question_id] = {
+        "records": [supplemental_proposal],
+        "has_more": False,
+        "next_anchor": None,
+    }
+
+    _, proposals = machine._accepted_work_unit_proposals(accepted)
+
+    assert {
+        requirement_id
+        for proposal in proposals
+        for requirement_id in proposal.requirement_ids
+    } == set(requirement_ids)
+
+
 def test_cohesion_question_example_passes_its_parser() -> None:
     context, anchor = _context()
     proposal = parse_work_unit_proposal(_proposal(context, anchor), context=context)

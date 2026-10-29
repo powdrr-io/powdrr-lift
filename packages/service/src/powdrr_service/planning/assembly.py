@@ -551,6 +551,15 @@ def parse_work_unit_proposal_page(
         else _invalid_record(f"/records/{index}")
         for index, item in enumerate(raw_records)
     )
+    allowed_requirement_ids = set(requirement_order)
+    if any(
+        not set(proposal.requirement_ids) <= allowed_requirement_ids
+        for proposal in proposals
+    ):
+        raise PlanningContractError(
+            "/records/requirement_ids",
+            "must reference only requirements supplied to this page",
+        )
     has_more = _bool(value["has_more"], "/has_more")
     raw_anchor = value["next_anchor"]
     if has_more:

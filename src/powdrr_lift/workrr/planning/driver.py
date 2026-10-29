@@ -122,6 +122,7 @@ class SourceLedgerQuestionMachine:
         self._invalid_accepted_question_ids: set[str] = set()
         self._oversized_work_unit_groups: set[tuple[str, ...]] = set()
         self._single_proposal_requirements: set[str] = set()
+        self._supplemental_work_unit_requirements: set[str] = set()
 
     @property
     def invalid_accepted_question_ids(self) -> frozenset[str]:
@@ -327,6 +328,7 @@ class SourceLedgerQuestionMachine:
     def _work_unit_requests(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[QuestionRequest[Any] | None, ...]:
+        self._supplemental_work_unit_requirements.clear()
         ledger = self._parse_source_ledger(accepted_answers)
         coverage = self.accepted_coverage(accepted_answers)
         unresolved = tuple(
@@ -339,6 +341,9 @@ class SourceLedgerQuestionMachine:
         for requirement_ids in self._work_unit_requirement_groups(unresolved):
             cursor: str | None = None
             remaining_requirement_ids = requirement_ids
+            covered_requirement_ids: set[str] = set()
+            group_complete = True
+            last_request: QuestionRequest[Any] | None = None
             while True:
                 request = build_work_unit_proposal_request(
                     context,
@@ -355,9 +360,11 @@ class SourceLedgerQuestionMachine:
                         else MAX_WORK_UNIT_PROPOSALS_PER_PAGE
                     ),
                 )
+                last_request = request
                 answer = accepted_answers.get(request.question.question_id)
                 if answer is None:
                     requests.append(request)
+                    group_complete = False
                     break
                 try:
                     page = request.parse_answer(answer)
@@ -366,9 +373,14 @@ class SourceLedgerQuestionMachine:
                         request.question.question_id
                     )
                     requests.append(request)
+                    group_complete = False
                     break
+                covered_requirement_ids.update(
+                    requirement_id
+                    for proposal in page.records
+                    for requirement_id in proposal.requirement_ids
+                )
                 if not page.has_more:
-                    requests.append(None)
                     break
                 cursor = page.next_anchor
                 assert cursor is not None
@@ -376,6 +388,55 @@ class SourceLedgerQuestionMachine:
                 remaining_requirement_ids = remaining_requirement_ids[
                     cursor_index + 1 :
                 ]
+            if not group_complete:
+                continue
+            missing_requirement_ids = set(requirement_ids) - covered_requirement_ids
+            if not missing_requirement_ids:
+                requests.append(None)
+                continue
+            if len(requirement_ids) == 1:
+                assert last_request is not None
+                self._invalid_accepted_question_ids.add(
+                    last_request.question.question_id
+                )
+                requests.append(last_request)
+                continue
+            for requirement_id in sorted(missing_requirement_ids):
+                self._supplemental_work_unit_requirements.add(requirement_id)
+                single_ids = (requirement_id,)
+                request = build_work_unit_proposal_request(
+                    context,
+                    single_ids,
+                    valid_example=self._work_unit_example(context, single_ids),
+                    maximum_proposals=(
+                        1
+                        if requirement_id in self._single_proposal_requirements
+                        else MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+                    ),
+                )
+                answer = accepted_answers.get(request.question.question_id)
+                if answer is None:
+                    requests.append(request)
+                    continue
+                try:
+                    page = request.parse_answer(answer)
+                except PlanningContractError:
+                    self._invalid_accepted_question_ids.add(
+                        request.question.question_id
+                    )
+                    requests.append(request)
+                    continue
+                if requirement_id not in {
+                    item
+                    for proposal in page.records
+                    for item in proposal.requirement_ids
+                }:
+                    self._invalid_accepted_question_ids.add(
+                        request.question.question_id
+                    )
+                    requests.append(request)
+                    continue
+                requests.append(None)
         return tuple(requests)
 
     def _work_unit_requirement_groups(
@@ -508,6 +569,20 @@ class SourceLedgerQuestionMachine:
                 remaining_requirement_ids = remaining_requirement_ids[
                     cursor_index + 1 :
                 ]
+        for requirement_id in sorted(self._supplemental_work_unit_requirements):
+            single_ids = (requirement_id,)
+            request = build_work_unit_proposal_request(
+                context,
+                single_ids,
+                valid_example=self._work_unit_example(context, single_ids),
+                maximum_proposals=(
+                    1
+                    if requirement_id in self._single_proposal_requirements
+                    else MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+                ),
+            )
+            page = request.parse_answer(accepted_answers[request.question.question_id])
+            proposals.extend(page.records)
         return context, tuple(proposals)
 
     def _item_groups(

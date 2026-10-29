@@ -276,7 +276,7 @@ def test_allocation_assigns_ids_and_requires_every_unresolved_requirement() -> N
         allocate_work_units([proposal], context=missing)
 
 
-def test_cp_sat_targets_three_units_and_never_exceeds_four() -> None:
+def test_sizing_targets_three_units_and_never_exceeds_four() -> None:
     allocation = allocate_work_unit_groups([_unit(index) for index in range(1, 8)])
 
     assert [len(group.unit_ids) for group in allocation.groups] == [3, 4]
@@ -286,7 +286,7 @@ def test_cp_sat_targets_three_units_and_never_exceeds_four() -> None:
     }
 
 
-def test_cp_sat_splits_actual_mixed_runtime_writes() -> None:
+def test_sizing_splits_actual_mixed_runtime_writes() -> None:
     allocation = allocate_work_unit_groups(
         [_unit(1, runtime="swift"), _unit(2, runtime="python")]
     )
@@ -298,7 +298,7 @@ def test_cp_sat_splits_actual_mixed_runtime_writes() -> None:
     }
 
 
-def test_explicit_cp_sat_does_not_infer_runtime_from_unit_prose() -> None:
+def test_explicit_sizing_does_not_infer_runtime_from_unit_prose() -> None:
     result = allocate_explicit_work_units(
         [
             ExplicitWorkUnit("unit-0001", "tests", "swift", 1),
@@ -307,6 +307,20 @@ def test_explicit_cp_sat_does_not_infer_runtime_from_unit_prose() -> None:
     )
 
     assert result.groups == (("unit-0001", "unit-0002"),)
+
+
+def test_explicit_sizing_handles_large_plan_deterministically() -> None:
+    units = [
+        ExplicitWorkUnit(f"unit-{index:04d}", "core", "neutral", 1)
+        for index in range(1, 1001)
+    ]
+
+    result = allocate_explicit_work_units(units)
+
+    flattened = [unit_id for group in result.groups for unit_id in group]
+    assert flattened == [unit.id for unit in units]
+    assert all(1 <= len(group) <= 4 for group in result.groups)
+    assert len(result.groups) == 333
 
 
 def test_standalone_units_are_not_grouped_with_product_work() -> None:

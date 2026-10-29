@@ -368,11 +368,79 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         valid_example=example,
     )
     assert larger_batch.question.question_id != request.question.question_id
-
     next_page = build_work_unit_proposal_request(
-        context, ["req-0001"], valid_example=example, page_after="req-0001"
+        two_requirement_context,
+        ["req-0001", "req-0002"],
+        valid_example=example,
+        page_after="req-0001",
     )
-    assert next_page.question.question_id != request.question.question_id
+    assert next_page.question.question_id != larger_batch.question.question_id
+
+
+def test_work_unit_page_cursor_is_derived_and_cannot_skip_uncovered_requirements() -> (
+    None
+):
+    base_context, anchor = _context()
+    requirement_ids = ("req-0013", "req-0014", "req-0015", "req-0016")
+    base_requirement = base_context.requirements["req-0001"]
+    requirements = {
+        requirement_id: replace(base_requirement, id=requirement_id)
+        for requirement_id in requirement_ids
+    }
+    context = replace(
+        base_context,
+        requirements=requirements,
+        unresolved_requirement_ids=requirement_ids,
+    )
+    proposals = []
+    for requirement_id in requirement_ids[:3]:
+        proposal = _proposal(context, anchor)
+        proposal["requirement_ids"] = [requirement_id]
+        proposals.append(proposal)
+    request = build_work_unit_proposal_request(
+        context,
+        requirement_ids,
+        valid_example={
+            "records": [proposals[0]],
+            "has_more": False,
+            "next_anchor": None,
+        },
+    )
+
+    assert request.answer_schema["properties"]["next_anchor"]["enum"] == [
+        *requirement_ids[:-1],
+        None,
+    ]
+    page = request.parse_answer(
+        {"records": proposals, "has_more": True, "next_anchor": None}
+    )
+    assert page.next_anchor == "req-0015"
+
+    with pytest.raises(PlanningContractError, match="must not skip requirements"):
+        request.parse_answer(
+            {
+                "records": [proposals[0], proposals[2]],
+                "has_more": True,
+                "next_anchor": "req-0015",
+            }
+        )
+
+    final_proposal = _proposal(context, anchor)
+    final_proposal["requirement_ids"] = ["req-0016"]
+    next_request = build_work_unit_proposal_request(
+        context,
+        requirement_ids,
+        valid_example={
+            "records": [final_proposal],
+            "has_more": False,
+            "next_anchor": None,
+        },
+        page_after=page.next_anchor,
+    )
+    final_page = next_request.parse_answer(
+        {"records": [final_proposal], "has_more": False, "next_anchor": None}
+    )
+    assert final_page.next_anchor is None
 
 
 def test_cohesion_question_example_passes_its_parser() -> None:

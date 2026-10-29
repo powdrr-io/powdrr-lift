@@ -550,21 +550,49 @@ def parse_work_unit_proposal_page(
     has_more = _bool(value["has_more"], "/has_more")
     raw_anchor = value["next_anchor"]
     if has_more:
-        anchor = _text(raw_anchor, "/next_anchor", max_length=120)
-        if anchor not in requirement_order:
-            raise PlanningContractError(
-                "/next_anchor", "must be in the supplied requirement range"
-            )
         if after_anchor is not None and after_anchor not in requirement_order:
             raise PlanningContractError(
                 "/next_anchor", "supplied cursor is not in the requirement range"
             )
-        cursor = (
+        after_index = (
             requirement_order.index(after_anchor) if after_anchor is not None else -1
         )
-        if requirement_order.index(anchor) <= cursor:
+        covered_ids = {
+            requirement_id
+            for proposal in proposals
+            for requirement_id in proposal.requirement_ids
+        }
+        if raw_anchor is None:
+            covered_after_cursor = [
+                requirement_id
+                for requirement_id in requirement_order[after_index + 1 :]
+                if requirement_id in covered_ids
+            ]
+            if not covered_after_cursor:
+                raise PlanningContractError(
+                    "/next_anchor",
+                    "cannot infer a page cursor without a proposed requirement",
+                )
+            anchor = covered_after_cursor[-1]
+        else:
+            anchor = _text(raw_anchor, "/next_anchor", max_length=120)
+        if anchor not in requirement_order:
+            raise PlanningContractError(
+                "/next_anchor", "must be in the supplied requirement range"
+            )
+        anchor_index = requirement_order.index(anchor)
+        if anchor_index <= after_index:
             raise PlanningContractError(
                 "/next_anchor", "must advance beyond the page cursor"
+            )
+        page_requirement_ids = requirement_order[after_index + 1 : anchor_index + 1]
+        if any(item not in covered_ids for item in page_requirement_ids):
+            raise PlanningContractError(
+                "/next_anchor", "must not skip requirements without a proposal"
+            )
+        if anchor_index == len(requirement_order) - 1:
+            raise PlanningContractError(
+                "/next_anchor", "must leave a requirement for the next page"
             )
     else:
         if raw_anchor is not None:
@@ -780,10 +808,10 @@ def build_work_unit_proposal_request(
     write_properties["evidence_ids"]["items"]["enum"] = sorted(context.evidence)
     output_properties = record_properties["required_outputs"]["items"]["properties"]
     output_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
-    next_anchors = list(requirement_ids)
+    next_anchors = list(requirement_ids[:-1])
     if page_after is not None:
         cursor = requirement_ids.index(page_after)
-        next_anchors = list(requirement_ids[cursor + 1 :])
+        next_anchors = list(requirement_ids[cursor + 1 : -1])
     answer_schema["properties"]["next_anchor"] = {
         "type": ["string", "null"],
         "enum": [*next_anchors, None],
@@ -819,8 +847,9 @@ def build_work_unit_proposal_request(
             ),
             "has_more": "Whether another page is needed.",
             "next_anchor": (
-                "A requirement ID from the supplied order, strictly after the "
-                "previous page cursor, or null on the final page."
+                "When has_more is true, the last requirement represented by this "
+                "page, leaving at least one supplied requirement for the next page. "
+                "Return null on the final page."
             ),
         },
         source_excerpts=excerpts,

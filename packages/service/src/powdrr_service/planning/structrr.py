@@ -561,9 +561,7 @@ def build_structural_change_request(
         )
     accepted_facts = tuple(facts)
     context_ids = tuple(item.ref_id for item in accepted_facts)
-    desired_schema = _desired_content_schema(
-        subject, taxonomy_entity_types=taxonomy_entity_types
-    )
+    desired_schema = _desired_content_schema(subject)
     question_example = valid_example
     if (
         subject.section == "files"
@@ -618,6 +616,12 @@ def build_structural_change_request(
             "result": "unchanged or change.",
             "desired_content": (
                 "Section-specific desired fields; omitted for unchanged."
+                + (
+                    " For entity subjects, type must match one of the supplied "
+                    "entity-taxonomy entity_types."
+                    if subject.section == "entities"
+                    else ""
+                )
             ),
             "reason": "Why this subject should remain unchanged or receive the change.",
         },
@@ -935,13 +939,13 @@ def _validate_desired_content(
 
 
 def _desired_content_schema(
-    subject: BoundStructuralSubject, *, taxonomy_entity_types: Sequence[str]
+    subject: BoundStructuralSubject,
 ) -> dict[str, Any]:
     if subject.action in {"deleted", "removed"}:
         return {"type": "object", "additionalProperties": False, "maxProperties": 0}
     if subject.section == "entities":
         properties: dict[str, Any] = {
-            "type": {"type": "string", "enum": list(taxonomy_entity_types)},
+            "type": {"type": "string"},
             "description": {"type": "string"},
             "summary": {"type": "string"},
             "rationale": {"type": "string"},

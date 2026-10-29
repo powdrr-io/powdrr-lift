@@ -260,7 +260,8 @@ def test_entity_structural_change_omits_sibling_baseline_records() -> None:
     request = build_structural_change_request(
         subject,
         projected_baseline=baseline,
-        taxonomy_entity_types=("Module",),
+        taxonomy_entity_types=("Module",)
+        + tuple(f"EntityType{index:04d}" for index in range(600)),
         planned_paths={"src/module.py"},
         known_entity_ids={"python::module"},
         valid_example={"result": "unchanged", "reason": "Already satisfied."},
@@ -272,6 +273,12 @@ def test_entity_structural_change_omits_sibling_baseline_records() -> None:
     assert "python::module.sibling_0" not in serialized_input
     assert sibling_payload not in serialized_input
     assert "large file summary marker" not in serialized_input
+    assert "EntityType0000" in serialized_input
+    assert serialized_input.count("EntityType0000") == 1
+    assert (
+        "one of the supplied entity-taxonomy entity_types"
+        in (request.answer_field_definitions["desired_content"])
+    )
     assert len(serialized_input) < 24_000
 
 

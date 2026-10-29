@@ -536,11 +536,10 @@ def parse_work_unit_proposal_page(
     context: WorkUnitContext,
     requirement_order: Sequence[str],
     after_anchor: str | None = None,
+    maximum_proposals: int = MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
 ) -> RequirementEnumerationPage:
     _exact_fields(value, {"records", "has_more", "next_anchor"}, "/")
-    raw_records = _array(
-        value["records"], "/records", maximum=MAX_WORK_UNIT_PROPOSALS_PER_PAGE
-    )
+    raw_records = _array(value["records"], "/records", maximum=maximum_proposals)
     proposals = tuple(
         parse_work_unit_proposal(item, context=context)
         if isinstance(item, Mapping)
@@ -712,12 +711,15 @@ def build_work_unit_proposal_request(
     *,
     valid_example: Mapping[str, Any],
     page_after: str | None = None,
+    maximum_proposals: int = MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
 ) -> QuestionRequest[RequirementEnumerationPage]:
     """Build one bounded enumeration question for a small requirement set."""
     if not 1 <= len(requirement_ids) <= MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION:
         raise ValueError("work-unit questions require one to four requirements")
     if len(set(requirement_ids)) != len(requirement_ids):
         raise ValueError("work-unit question requirement IDs must be unique")
+    if not 1 <= maximum_proposals <= MAX_WORK_UNIT_PROPOSALS_PER_PAGE:
+        raise ValueError("work-unit proposal limit must be one to three")
     if not set(requirement_ids) <= set(context.unresolved_requirement_ids):
         raise ValueError("work-unit question includes a non-unresolved requirement")
     anchor_by_id = {item.id: item for item in context.source.anchors}
@@ -791,9 +793,14 @@ def build_work_unit_proposal_request(
         "components": sorted(context.component_ids),
         "page_after": page_after,
     }
-    question_key = _digest(
-        {"requirement_ids": list(requirement_ids), "page_after": page_after}
-    )[-12:]
+    question_identity = {
+        "requirement_ids": list(requirement_ids),
+        "page_after": page_after,
+    }
+    if maximum_proposals != MAX_WORK_UNIT_PROPOSALS_PER_PAGE:
+        input_facts["maximum_proposals"] = maximum_proposals
+        question_identity["maximum_proposals"] = maximum_proposals
+    question_key = _digest(question_identity)[-12:]
     question = Question(
         question_id=f"propose-units-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
@@ -811,9 +818,11 @@ def build_work_unit_proposal_request(
             context=context,
             requirement_order=requirement_ids,
             after_anchor=page_after,
+            maximum_proposals=maximum_proposals,
         )
 
     answer_schema = deepcopy(WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA)
+    answer_schema["properties"]["records"]["maxItems"] = maximum_proposals
     record_properties = answer_schema["properties"]["records"]["items"]["properties"]
     record_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
     record_properties["component"]["enum"] = sorted(context.component_ids)
@@ -845,7 +854,8 @@ def build_work_unit_proposal_request(
             "different implementation runtimes into separate units. Reference "
             "IDs must exactly match catalog ID values: put `validation-0001` in "
             "validation_ids, not the context reference `validation:validation-0001`. "
-            "Keep descriptions concise. Return at most three records per page, within "
+            f"Keep descriptions concise. Return at most {maximum_proposals} records "
+            "in this response, within "
             "the 4,000-character answer limit; set has_more when more units remain."
         ),
         answer_field_definitions={

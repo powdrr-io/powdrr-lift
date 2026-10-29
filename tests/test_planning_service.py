@@ -429,6 +429,29 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         id_counters={},
     )
     store.append(event, expected_parent_digest=None)
+    single_question = Question(
+        question_id="propose-units-req-0058-single",
+        kind="propose_work_units",
+        contract_version=1,
+        subject_ids=("req-0058",),
+        input_digest="sha256:" + "1" * 64,
+        context_ref_ids=(),
+        expected_answer_schema="work-unit-proposals-v1",
+        attempt=1,
+    )
+    single_event = PlanningCheckpoint.needs_answer(
+        session_id=session_id,
+        event_id="needs-answer-000002",
+        sequence=2,
+        parent_digest=event.digest,
+        question=single_question,
+        error=PlanningContractError(
+            "/", "serialized answer is 4249 characters; limit is 4000"
+        ),
+        previous_answer={"records": []},
+        id_counters={},
+    )
+    store.append(single_event, expected_parent_digest=event.digest)
 
     class _SplitCaptureMachine(_Machine):
         oversized_groups: tuple[tuple[str, ...], ...] = ()
@@ -451,6 +474,7 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
     assert transition.status == "question_accepted"
     assert machine.oversized_groups == (
         ("req-0057", "req-0058", "req-0059", "req-0060"),
+        ("req-0058",),
     )
 
 

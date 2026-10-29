@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_service.planning.assembly import (
+    MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
     MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
     AllocationGroup,
     ItemDescription,
@@ -120,6 +121,7 @@ class SourceLedgerQuestionMachine:
         self.taxonomy_entity_types = taxonomy_entity_types
         self._invalid_accepted_question_ids: set[str] = set()
         self._oversized_work_unit_groups: set[tuple[str, ...]] = set()
+        self._single_proposal_requirements: set[str] = set()
 
     @property
     def invalid_accepted_question_ids(self) -> frozenset[str]:
@@ -130,6 +132,9 @@ class SourceLedgerQuestionMachine:
         """Split only requirement groups whose previous response exceeded the cap."""
         self._oversized_work_unit_groups = {
             tuple(group) for group in groups if len(group) > 1
+        }
+        self._single_proposal_requirements = {
+            group[0] for group in groups if len(group) == 1
         }
 
     def _next_source_question(
@@ -341,6 +346,14 @@ class SourceLedgerQuestionMachine:
                     valid_example=self._work_unit_example(
                         context, remaining_requirement_ids
                     ),
+                    maximum_proposals=(
+                        1
+                        if any(
+                            item in self._single_proposal_requirements
+                            for item in remaining_requirement_ids
+                        )
+                        else MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+                    ),
                 )
                 answer = accepted_answers.get(request.question.question_id)
                 if answer is None:
@@ -449,6 +462,14 @@ class SourceLedgerQuestionMachine:
                     context,
                     requirement_ids,
                     valid_example=self._work_unit_example(context, requirement_ids),
+                    maximum_proposals=(
+                        1
+                        if any(
+                            item in self._single_proposal_requirements
+                            for item in requirement_ids
+                        )
+                        else MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+                    ),
                     page_after=cursor,
                 )
                 page = request.parse_answer(

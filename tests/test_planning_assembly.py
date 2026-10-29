@@ -396,6 +396,27 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         page_after="req-0001",
     )
     assert next_page.question.question_id != larger_batch.question.question_id
+    one_proposal = build_work_unit_proposal_request(
+        two_requirement_context,
+        ["req-0001"],
+        valid_example=example,
+        maximum_proposals=1,
+    )
+    default_single = build_work_unit_proposal_request(
+        two_requirement_context,
+        ["req-0001"],
+        valid_example=example,
+    )
+    assert one_proposal.answer_schema["properties"]["records"]["maxItems"] == 1
+    assert one_proposal.question.question_id != default_single.question.question_id
+    with pytest.raises(PlanningContractError, match="between 0 and 1 entries"):
+        one_proposal.parse_answer(
+            {
+                "records": [example_proposal, example_proposal],
+                "has_more": False,
+                "next_anchor": None,
+            }
+        )
 
 
 def test_work_unit_page_cursor_is_derived_and_cannot_skip_uncovered_requirements() -> (
@@ -525,6 +546,13 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
         for request in split_requests
         if request is not None
     ) == tuple((requirement_id,) for requirement_id in requirement_ids)
+    machine.set_oversized_work_unit_groups((requirement_ids, ("req-0016",)))
+    single_request = next(
+        request
+        for request in machine._work_unit_requests({})
+        if request is not None and request.question.subject_ids == ("req-0016",)
+    )
+    assert single_request.answer_schema["properties"]["records"]["maxItems"] == 1
 
 
 def test_cohesion_question_example_passes_its_parser() -> None:

@@ -6,12 +6,16 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from powdrr_local.planning.repair_publication import (
+    RepairPublicationError,
+    publish_repair_pull_request,
+)
 from powdrr_service.planning.repair import RepairDraft, item_content_digest
 from powdrr_service.planning.repair_service import (
     PlanRepairServiceError,
     apply_repair_request,
     load_repair_draft,
-    publish_repair_pull_request,
+    prepare_repair_publication,
 )
 
 from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
@@ -210,8 +214,7 @@ def test_repair_publisher_branches_from_fresh_main_and_limits_commit_paths(
             stdout = ""
         return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
 
-    url, changed = publish_repair_pull_request(
-        repo_root=tmp_path,
+    publication = prepare_repair_publication(
         draft=draft,
         repair=repaired,
         plan_path="docs/plans/plan-execution-plan.yaml",
@@ -220,7 +223,9 @@ def test_repair_publisher_branches_from_fresh_main_and_limits_commit_paths(
             "id": repaired.manifest["latest_repair"]["repair_id"],
             "summary": "Correct the reviewed item title.",
         },
-        runner=runner,
+    )
+    url, changed = publish_repair_pull_request(
+        repo_root=tmp_path, publication=publication, runner=runner
     )
 
     assert url == "https://github.com/example/repo/pull/123"
@@ -236,3 +241,58 @@ def test_repair_publisher_branches_from_fresh_main_and_limits_commit_paths(
     body = create[create.index("--body") + 1]
     assert "<!-- powdrr-plan-repair:v1 -->" in body
     assert '"repair_id":' in body
+
+
+def test_repair_publisher_rejects_paths_before_running_git(tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def runner(arguments: list[str], **_kwargs: Any) -> SimpleNamespace:
+        calls.append(arguments)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    with pytest.raises(RepairPublicationError, match="path is invalid"):
+        publish_repair_pull_request(
+            repo_root=tmp_path,
+            publication={
+                "plan_id": "plan",
+                "repair_id": "repair",
+                "summary": "Fix plan",
+                "body": "body",
+                "changed": ["../outside.txt"],
+                "artifacts": {"../outside.txt": "content"},
+            },
+            runner=runner,
+        )
+
+    assert calls == []
+
+
+def test_repair_publisher_rejects_symlink_escape_before_running_git(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    outside.mkdir()
+    (root / "docs").symlink_to(outside, target_is_directory=True)
+    calls: list[list[str]] = []
+
+    def runner(arguments: list[str], **_kwargs: Any) -> SimpleNamespace:
+        calls.append(arguments)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    with pytest.raises(RepairPublicationError, match="escapes repository"):
+        publish_repair_pull_request(
+            repo_root=root,
+            publication={
+                "plan_id": "plan",
+                "repair_id": "repair",
+                "summary": "Fix plan",
+                "body": "body",
+                "changed": ["docs/outside.txt"],
+                "artifacts": {"docs/outside.txt": "content"},
+            },
+            runner=runner,
+        )
+
+    assert calls == []

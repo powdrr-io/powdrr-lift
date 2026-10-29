@@ -1,10 +1,9 @@
-"""Shared preparation, compilation, and publication for reviewed plan repairs."""
+"""Shared preparation and compilation for reviewed plan repairs."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 import uuid
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -12,7 +11,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.workrr.git import slugify_workflow_id
 from powdrr_lift.workrr.github_issue_plan_generation import (
     parse_plan_workflow_instance_yaml,
 )
@@ -245,29 +243,15 @@ def apply_repair_request(
         raise PlanRepairServiceError(str(error)) from error
 
 
-def publish_repair_pull_request(
+def prepare_repair_publication(
     *,
-    repo_root: Path,
     draft: RepairDraft,
     repair: RepairDraft,
     plan_path: str,
     source_plan_path: str,
     discovery: Mapping[str, Any],
-    runner: Any = subprocess.run,
-) -> tuple[str, tuple[str, ...]]:
-    """Publish a validated repair from a fresh remote main branch."""
-    root = repo_root.resolve()
-    _run(runner, root, ["git", "fetch", "origin", "main"])
-    if _run(runner, root, ["git", "status", "--porcelain"]):
-        raise PlanRepairServiceError(
-            "plan repair publication requires a clean checkout"
-        )
-    head = _run(runner, root, ["git", "rev-parse", "HEAD"])
-    base = _run(runner, root, ["git", "rev-parse", "origin/main"])
-    if head != base:
-        raise PlanRepairServiceError(
-            "plan repair publication requires HEAD to match fresh origin/main"
-        )
+) -> dict[str, Any]:
+    """Prepare validated repair data for a later agent-side GitHub effect."""
     changed = tuple(
         path
         for path, content in repair.artifacts.items()
@@ -275,77 +259,27 @@ def publish_repair_pull_request(
     )
     if not changed:
         raise PlanRepairServiceError("repair does not change any plan artifacts")
-    plan = repair.plan
-    repair_id = str(discovery.get("id", "repair"))
-    branch = (
-        f"powdrr/{slugify_workflow_id(plan.plan_id)}-repair-"
-        f"{slugify_workflow_id(repair_id)}-{uuid.uuid4().hex[:8]}"
-    )
-    _run(runner, root, ["git", "switch", "--detach", "origin/main"])
-    _run(runner, root, ["git", "switch", "-c", branch])
-    for path in changed:
-        destination = (root / path).resolve()
-        try:
-            destination.relative_to(root)
-        except ValueError as error:
-            raise PlanRepairServiceError(
-                f"repair artifact escapes repository: {path}"
-            ) from error
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(repair.artifacts[path], encoding="utf-8")
-    _run(runner, root, ["git", "add", "--", *changed])
-    _run(
-        runner,
-        root,
-        [
-            "git",
-            "-c",
-            "user.name=Powdrr Automation",
-            "-c",
-            "user.email=powdrr-automation@users.noreply.github.com",
-            "commit",
-            "--only",
-            "-m",
-            f"Repair reviewed plan {plan.plan_id}",
-            "--",
-            *changed,
-        ],
-    )
-    _run(runner, root, ["git", "push", "--set-upstream", "origin", branch])
-    summary = str(discovery.get("summary", "Correct the reviewed implementation plan."))
-    title_summary = " ".join(summary.split())[:65]
-    body = _repair_pr_body(
-        plan_id=plan.plan_id,
-        source_plan_path=source_plan_path,
-        plan_path=plan_path,
-        discovery=discovery,
-        changed=changed,
-        draft=draft,
-        repaired=repair,
-    )
-    url = _run(
-        runner,
-        root,
-        [
-            "gh",
-            "pr",
-            "create",
-            "--base",
-            "main",
-            "--head",
-            branch,
-            "--title",
-            f"Correct plan: {title_summary}",
-            "--body",
-            body,
-        ],
-    )
-    url = next(
-        (line.strip() for line in reversed(url.splitlines()) if "/pull/" in line), ""
-    )
-    if not url:
-        raise PlanRepairServiceError("gh pr create did not return a pull request URL")
-    return url, changed
+    return {
+        "plan_id": repair.plan.plan_id,
+        "repair_id": str(discovery.get("id", "repair")),
+        "summary": str(
+            discovery.get("summary", "Correct the reviewed implementation plan.")
+        ),
+        "plan_path": plan_path,
+        "source_plan_path": source_plan_path,
+        "discovery": dict(discovery),
+        "changed": list(changed),
+        "artifacts": {path: repair.artifacts[path] for path in changed},
+        "body": _repair_pr_body(
+            plan_id=repair.plan.plan_id,
+            source_plan_path=source_plan_path,
+            plan_path=plan_path,
+            discovery=discovery,
+            changed=changed,
+            draft=draft,
+            repaired=repair,
+        ),
+    }
 
 
 def _compile_artifacts(
@@ -618,20 +552,11 @@ def _repair_pr_body(
     )
 
 
-def _run(runner: Any, root: Path, arguments: list[str]) -> str:
-    result = runner(arguments, cwd=root, text=True, capture_output=True, check=False)
-    if result.returncode:
-        raise PlanRepairServiceError(
-            f"command failed ({' '.join(arguments)}): {result.stderr.strip()}"
-        )
-    return result.stdout.strip()
-
-
 __all__ = [
     "PlanRepairServiceError",
     "apply_repair_request",
     "load_repair_draft",
-    "publish_repair_pull_request",
+    "prepare_repair_publication",
     "write_repaired_artifacts",
 ]
 

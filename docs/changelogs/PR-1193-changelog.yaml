@@ -1,0 +1,93 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1193
+title: Move deterministic plan sizing into the service package
+intent:
+  problem: The service-owned planning assembler imported its bounded work-unit sizing policy from the legacy agent package.
+  goal: Make plan sizing service-owned while retaining the old import path as a compatibility re-export.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 385, end_line: 385}
+    summary: Assign deterministic plan sizing to the service package and classify the legacy module as a compatibility re-export.
+    rationale: Keep the ownership inventory aligned with the planner's actual code location and imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 548, end_line: 556}
+    summary: Register the service-owned plan sizing module.
+    rationale: Track the module that now owns work-unit allocation policy.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2952, end_line: 2955}
+    summary: Reclassify the legacy plan sizing module as an agent compatibility re-export.
+    rationale: Keep the ownership inventory accurate while legacy imports remain supported.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2957, end_line: 2957}
+    summary: Point the legacy sizing shim to the service-owned implementation.
+    rationale: Record the compatibility import direction.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2959, end_line: 2960}
+    summary: Mark the legacy plan sizing module as reviewed.
+    rationale: Track completion of this ownership extraction step.
+  - path: docs/architecture/agent-service-legacy-import-allowlist.json
+    type: modified
+    span: {start_line: 119, end_line: 148}
+    summary: Remove service allowlist entries for legacy plan sizing imports.
+    rationale: The service planning assembler now imports the service-owned implementation directly.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 14, end_line: 21}
+    summary: Import work-unit allocation policy from the service-owned plan sizing module.
+    rationale: Remove the planner's dependency on the legacy agent module.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 21, end_line: 28}
+    summary: Complete the service-owned sizing import block.
+    rationale: Keep planning policy imports within the service package.
+  - path: packages/service/src/powdrr_service/planning/plan_sizing.py
+    type: added
+    span: {start_line: 1, end_line: 617}
+    summary: Own deterministic work-unit allocation, plan slicing, and runtime grouping in the service package.
+    rationale: Keep plan decomposition policy within service-owned code.
+  - path: src/powdrr_lift/workrr/plan_sizing.py
+    type: modified
+    span: {start_line: 1, end_line: 1}
+    summary: Preserve legacy plan sizing imports through explicit service re-exports.
+    rationale: Maintain compatibility for existing callers during the staged package migration.
+  - path: src/powdrr_lift/workrr/plan_sizing.py
+    type: modified
+    span: {start_line: 5, end_line: 15}
+    summary: Forward public plan sizing constants and types to the service module.
+    rationale: Preserve existing imports without retaining a second implementation.
+  - path: src/powdrr_lift/workrr/plan_sizing.py
+    type: modified
+    span: {start_line: 54, end_line: 591}
+    summary: Remove the legacy plan sizing algorithms after moving them to service.
+    rationale: Keep a single implementation of plan decomposition policy.
+  - path: src/powdrr_lift/workrr/plan_sizing.py
+    type: modified
+    span: {start_line: 18, end_line: 29}
+    summary: Retain the supported compatibility export list.
+    rationale: Keep the old module's import surface explicit and stable.
+  - path: tests/test_agent_service_contracts.py
+    type: modified
+    span: {start_line: 223, end_line: 232}
+    summary: Verify every legacy plan sizing export is the service-owned object.
+    rationale: Prevent policy duplication from returning under the old import path.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 26, end_line: 26}
+    summary: Exercise work-unit sizing through the service-owned module.
+    rationale: Keep planning allocation tests attached to the module that owns the policy.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 30, end_line: 30}
+    summary: Import allocation helpers from service-owned plan sizing.
+    rationale: Exercise the ownership boundary in planning tests.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

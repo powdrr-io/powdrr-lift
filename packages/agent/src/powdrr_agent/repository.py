@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 import uuid
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 from powdrr_contracts.models import (
     ActionReceipt,
@@ -191,6 +192,25 @@ def read_pinned_file(
             "source_revision": commit_sha,
         },
     )
+
+
+def inspect_pinned_checkout(repo_root: str | Path) -> tuple[str, bool]:
+    """Return the current commit and whether the checkout has no changes."""
+    root = Path(repo_root).resolve()
+    head = _git(root, "rev-parse", "--verify", "HEAD^{commit}").strip()
+    status = _git_bytes(root, "status", "--porcelain=v1", "-z", "--untracked-files=all")
+    return head, not status
+
+
+def find_workspace_symbols(
+    queries: list[str], *, worktree_root: Path, limit: int = 50
+) -> dict[str, list[dict[str, Any]]]:
+    """Run the local basedpyright symbol tool for a bounded set of queries."""
+    # The tool implementation is a legacy application module already classified
+    # as an agent capability; PR 8 moves it into this package.
+    from powdrr_lift.basedpyright_tools import find_workspace_symbols as find
+
+    return find(queries, worktree_root=worktree_root, limit=limit)
 
 
 def digest_at_path(repo_root: str | Path, relative_path: str) -> str | None:

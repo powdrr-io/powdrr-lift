@@ -335,6 +335,17 @@
       "reviewed": false
     },
     {
+      "extraction_pr": "3/8",
+      "internal_imports": [
+        "powdrr_lift.basedpyright_tools"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/repository.py",
+      "rationale": "local repository and command capabilities; basedpyright adapter moves fully into the agent package during final package ownership cleanup",
+      "reviewed": false
+    },
+    {
       "extraction_pr": "4",
       "internal_imports": [],
       "kind": "python_module",
@@ -2848,7 +2859,7 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.basedpyright_tools",
+        "powdrr_agent.repository",
         "powdrr_lift.errors",
         "powdrr_service.planning.contracts",
         "powdrr_service.planning.questions",

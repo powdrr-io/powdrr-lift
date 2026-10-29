@@ -4,6 +4,7 @@ import hashlib
 from typing import Any
 
 import pytest
+import powdrr_service.planning.structrr as structrr_module
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
 from powdrr_service.planning.questions import build_question_messages
 from powdrr_service.planning.source import PinnedSourceDocument, segment_markdown_source
@@ -86,7 +87,9 @@ def _parse_page(
     )
 
 
-def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
+def test_structural_questions_send_only_relevant_baseline_subjects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     unrelated_payload = "unrelated-baseline-detail-" + ("x" * 1_000)
     baseline = {
         "entities": [
@@ -138,6 +141,9 @@ def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
         )
     )
     source_ref = source.anchors[0].id
+    monkeypatch.setattr(
+        structrr_module, "snapshot_digest", lambda _snapshot: "sha256:constant"
+    )
 
     enumeration = build_subject_enumeration_request(
         plan_id="plan",
@@ -152,6 +158,21 @@ def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
     )
     enumeration_messages = build_question_messages(enumeration)
     enumeration_input = enumeration_messages[1]["content"]
+    without_projected_file = build_subject_enumeration_request(
+        plan_id="plan",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline={
+            **baseline,
+            "files": [
+                record
+                for record in baseline["files"]
+                if record["path"] != "src/projected.py"
+            ],
+        },
+    )
 
     subject = BoundStructuralSubject(
         "python::relevant",
@@ -176,6 +197,10 @@ def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
 
     assert "python::relevant" in enumeration_input
     assert "path::src/projected.py" in enumeration_input
+    assert (
+        enumeration.question.input_digest
+        != without_projected_file.question.input_digest
+    )
     assert "Never describe an existing file subject as new" in (
         enumeration.exact_question
     )

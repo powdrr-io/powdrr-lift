@@ -477,7 +477,7 @@ def build_subject_enumeration_request(
             (item_id, *sorted(unit_ids)),
             _digest(
                 {
-                    "baseline": snapshot_digest(projected_baseline),
+                    "baseline_index": baseline_fact.value,
                     "units": [unit.to_data() for unit in units],
                     "source": [(item.ref_id, item.text) for item in excerpt_map],
                     "prior": [item.to_data() for item in prior_subjects],

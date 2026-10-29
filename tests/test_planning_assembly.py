@@ -210,6 +210,7 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
     [
         "attestation/macos/Package.resolved",
         "attestation/config/sandbox-profile.sb",
+        "installer/launchd.plist",
     ],
 )
 def test_platform_data_file_extensions_are_runtime_neutral(path: str) -> None:

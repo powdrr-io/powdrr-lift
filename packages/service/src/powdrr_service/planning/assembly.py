@@ -49,6 +49,7 @@ _NEUTRAL_SUFFIXES = frozenset(
         ".json",
         ".lock",
         ".md",
+        ".plist",
         ".properties",
         ".resolved",
         ".rst",

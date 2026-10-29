@@ -480,21 +480,22 @@ class SourceLedgerQuestionMachine:
         context = self._work_unit_context(ledger, unresolved)
         proposals: list[WorkUnitProposal] = []
         for requirement_ids in self._work_unit_requirement_groups(unresolved):
-            cursor: str | None = None
+            remaining_requirement_ids = requirement_ids
             while True:
                 request = build_work_unit_proposal_request(
                     context,
-                    requirement_ids,
-                    valid_example=self._work_unit_example(context, requirement_ids),
+                    remaining_requirement_ids,
+                    valid_example=self._work_unit_example(
+                        context, remaining_requirement_ids
+                    ),
                     maximum_proposals=(
                         1
                         if any(
                             item in self._single_proposal_requirements
-                            for item in requirement_ids
+                            for item in remaining_requirement_ids
                         )
                         else MAX_WORK_UNIT_PROPOSALS_PER_PAGE
                     ),
-                    page_after=cursor,
                 )
                 page = request.parse_answer(
                     accepted_answers[request.question.question_id]
@@ -502,7 +503,11 @@ class SourceLedgerQuestionMachine:
                 proposals.extend(page.records)
                 if not page.has_more:
                     break
-                cursor = page.next_anchor
+                assert page.next_anchor is not None
+                cursor_index = remaining_requirement_ids.index(page.next_anchor)
+                remaining_requirement_ids = remaining_requirement_ids[
+                    cursor_index + 1 :
+                ]
         return context, tuple(proposals)
 
     def _item_groups(

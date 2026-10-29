@@ -582,6 +582,20 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
 
     assert continuation is not None
     assert continuation.question.subject_ids == ("req-0016",)
+    final_proposal = _proposal(context, anchor)
+    final_proposal["requirement_ids"] = ["req-0016"]
+    accepted[continuation.question.question_id] = {
+        "records": [final_proposal],
+        "has_more": False,
+        "next_anchor": None,
+    }
+    monkeypatch.setattr(machine, "accepted_ledger", lambda _answers: ledger)
+    _, reconstructed_proposals = machine._accepted_work_unit_proposals(accepted)
+    assert {
+        requirement_id
+        for proposal in reconstructed_proposals
+        for requirement_id in proposal.requirement_ids
+    } == set(requirement_ids)
 
     machine.set_oversized_work_unit_groups((requirement_ids,))
     split_requests = machine._work_unit_requests({})

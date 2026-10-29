@@ -117,36 +117,6 @@
       "rationale": "Planning and repair still call the existing multi-PR Structrr proposal compiler/loader; relocate these semantic helpers into the service package while preserving proposal formats."
     },
     {
-      "import": "powdrr_lift.workrr.plan_sizing.CANONICAL_RUNTIMES",
-      "owner_pr": 4,
-      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
-    },
-    {
-      "import": "powdrr_lift.workrr.plan_sizing.ExplicitWorkUnit",
-      "owner_pr": 4,
-      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
-    },
-    {
-      "import": "powdrr_lift.workrr.plan_sizing.MAX_PR_WORK_UNITS",
-      "owner_pr": 4,
-      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
-    },
-    {
-      "import": "powdrr_lift.workrr.plan_sizing.PATH_RUNTIME_SUFFIXES",
-      "owner_pr": 4,
-      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
-    },
-    {
-      "import": "powdrr_lift.workrr.plan_sizing.TARGET_PR_WORK_UNITS",
-      "owner_pr": 4,
-      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
-    },
-    {
-      "import": "powdrr_lift.workrr.plan_sizing.allocate_explicit_work_units",
-      "owner_pr": 4,
-      "rationale": "Planning still shares runtime classification, path suffixes, and work-unit sizing with legacy workflow code; extract this policy without changing work-unit boundaries."
-    },
-    {
       "import": "powdrr_lift.workrr.procedrr.WorkrrProcedrrClient",
       "owner_pr": 6,
       "rationale": "Planning uses the existing Procedrr client for bounded model-backed questions; provider and private process runtime ownership is scheduled for inference-boundary extraction."

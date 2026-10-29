@@ -11,14 +11,6 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Literal, cast
 
-from powdrr_lift.workrr.plan_sizing import (
-    CANONICAL_RUNTIMES,
-    MAX_PR_WORK_UNITS,
-    PATH_RUNTIME_SUFFIXES,
-    TARGET_PR_WORK_UNITS,
-    ExplicitWorkUnit,
-    allocate_explicit_work_units,
-)
 from powdrr_service.planning.contracts import (
     MAX_CONTRACT_TEXT_LENGTH,
     MAX_ENUMERATION_RECORDS,
@@ -26,6 +18,14 @@ from powdrr_service.planning.contracts import (
     Question,
 )
 from powdrr_service.planning.evidence import Evidence
+from powdrr_service.planning.plan_sizing import (
+    CANONICAL_RUNTIMES,
+    MAX_PR_WORK_UNITS,
+    PATH_RUNTIME_SUFFIXES,
+    TARGET_PR_WORK_UNITS,
+    ExplicitWorkUnit,
+    allocate_explicit_work_units,
+)
 from powdrr_service.planning.questions import (
     ContextRecord,
     QuestionRequest,

@@ -220,6 +220,16 @@ def test_legacy_planning_driver_adapts_the_service_owned_machine() -> None:
     assert issubclass(LegacyQuestionMachine, ServiceQuestionMachine)
 
 
+def test_legacy_plan_sizing_reexports_service_owned_policy() -> None:
+    from powdrr_service.planning import plan_sizing as service_plan_sizing
+
+    from powdrr_lift.workrr import plan_sizing as legacy_plan_sizing
+
+    assert legacy_plan_sizing.__all__ == service_plan_sizing.__all__
+    for name in service_plan_sizing.__all__:
+        assert getattr(legacy_plan_sizing, name) is getattr(service_plan_sizing, name)
+
+
 def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
     from powdrr_local.planning.checkpoints import (
         GitHubCommentCheckpointStore,

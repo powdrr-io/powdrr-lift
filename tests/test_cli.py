@@ -13,6 +13,7 @@ import yaml
 
 from powdrr_lift import parse_change_log, parse_validation_report
 from powdrr_lift.cli import (
+    _accepted_planning_answers,
     _bootstrap_planning_structrr_baseline,
     _run_harbor_feature,
     _stage_generated_file,
@@ -21,6 +22,28 @@ from powdrr_lift.cli import (
 )
 from powdrr_lift.workrr.human_task import HumanTaskRunnerConfig
 from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig
+
+
+def test_planning_answer_replay_discards_answers_invalidated_by_retry() -> None:
+    def event(
+        event_type: str, question_id: str, answer: dict[str, str] | None = None
+    ) -> SimpleNamespace:
+        payload = {"question": {"question_id": question_id}}
+        if answer is not None:
+            payload["accepted_answer"] = answer
+        return SimpleNamespace(event_type=event_type, payload=payload)
+
+    accepted = _accepted_planning_answers(
+        (
+            event("answer_accepted", "q-1", {"value": "stale"}),
+            event("needs_answer", "q-1"),
+            event("answer_accepted", "q-1", {"value": "revised"}),
+            event("answer_accepted", "q-2", {"value": "stale"}),
+            event("needs_answer", "q-2"),
+        )
+    )
+
+    assert accepted == {"q-1": {"value": "revised"}}
 
 
 def test_prompt_evaluation_cli_preserves_deepswe_and_adds_generic_case() -> None:

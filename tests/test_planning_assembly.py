@@ -205,6 +205,27 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
     assert proposal.planned_writes[0].runtime is None
 
 
+def test_swift_package_resolved_file_is_runtime_neutral() -> None:
+    context, anchor = _context(
+        path="attestation/macos/Package.resolved", runtime="neutral"
+    )
+    context = replace(context, repository_paths={})
+    answer = _proposal(
+        context,
+        anchor,
+        path="attestation/macos/Package.resolved",
+        runtime="neutral",
+    )
+    planned_writes = answer["planned_writes"]
+    assert isinstance(planned_writes, list)
+    planned_writes[0]["runtime"] = None
+
+    proposal = parse_work_unit_proposal(answer, context=context)
+
+    assert proposal.implementation_runtime == "neutral"
+    assert proposal.planned_writes[0].runtime is None
+
+
 def test_gitkeep_is_neutral_inside_a_source_named_directory() -> None:
     directory = "attestation/github/workflows/"
     path = f"{directory}.gitkeep"

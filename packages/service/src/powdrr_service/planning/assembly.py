@@ -50,6 +50,7 @@ _NEUTRAL_SUFFIXES = frozenset(
         ".lock",
         ".md",
         ".properties",
+        ".resolved",
         ".rst",
         ".svg",
         ".toml",

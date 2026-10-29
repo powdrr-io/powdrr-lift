@@ -370,6 +370,18 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_service.planning.service"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "packages/local/src/powdrr_local/planning/sessions.py",
+      "rationale": "Local GitHub issue calls for planning session trackers, using the service-owned session contract.",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
         "powdrr_lift.workrr.plan_sizing",
         "powdrr_service.planning.contracts",
         "powdrr_service.planning.evidence",
@@ -498,7 +510,6 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.github_issue_queue",
         "powdrr_lift.workrr.procedrr",
         "powdrr_lift.workrr.procedrr_operations",
         "powdrr_lift.workrr.protocol",

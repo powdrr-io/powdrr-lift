@@ -22,6 +22,7 @@ from typing import Any
 import yaml
 from powdrr_local.planning.checkpoints import LocalCheckpointStore
 from powdrr_local.planning.repair_publication import publish_repair_pull_request
+from powdrr_local.planning.sessions import GitHubPlanningIssueStore
 from powdrr_service.planning.assembly import PathFact
 from powdrr_service.planning.compiler import PlanningCompilationError
 from powdrr_service.planning.repair_service import (
@@ -2737,7 +2738,9 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
     try:
         if resume:
             assert github is not None
-            session = load_planning_session(github, args.session_issue)
+            session = load_planning_session(
+                GitHubPlanningIssueStore(github), args.session_issue
+            )
             if session.repository != args.repository:
                 raise PlanningServiceError(
                     "planning session repository differs from --repository"
@@ -2784,7 +2787,7 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
         )
         if session is None:
             session = create_planning_session(
-                github,
+                GitHubPlanningIssueStore(github),
                 plan_id=plan_id,
                 base_commit=base_commit,
                 source_path=source_relative,
@@ -2900,8 +2903,8 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
             source_plan_path=source_relative,
         )
         try:
-            github.add_comment(
-                session.issue,
+            github.add_issue_comment(
+                session.issue.number,
                 "Planning completed and the review PR is open: "
                 f"{pull_request.pull_request_url}",
             )
@@ -2914,8 +2917,8 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
     except Exception as error:
         if session is not None and github is not None:
             try:
-                github.add_comment(
-                    session.issue,
+                github.add_issue_comment(
+                    session.issue.number,
                     "Planning stopped after a terminal error. "
                     f"Resume with `powdrr plan-resume --session-issue "
                     f"{session.issue.number}`. Error: {error}",

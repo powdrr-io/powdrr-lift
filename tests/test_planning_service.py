@@ -709,7 +709,7 @@ def test_session_issue_is_created_as_a_non_queue_tracker_and_resumes_by_number()
 ):
     client = _IssueClient()
     session = create_planning_session(
-        client,  # type: ignore[arg-type]
+        client,
         plan_id="bounded-plan",
         base_commit="a" * 40,
         source_path="docs/plan.md",
@@ -717,7 +717,7 @@ def test_session_issue_is_created_as_a_non_queue_tracker_and_resumes_by_number()
         verification_command="make test",
     )
 
-    resumed = load_planning_session(client, 42)  # type: ignore[arg-type]
+    resumed = load_planning_session(client, 42)
 
     assert client.ensured_labels == ["powdrr:planning"]
     assert client.created_labels == ("powdrr:planning",)

@@ -1645,7 +1645,8 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
             created_issues.append(issue)
             return issue
 
-        def add_comment(self, _issue: QueueIssue, body: str) -> None:
+        def add_issue_comment(self, issue_number: int, body: str) -> None:
+            assert issue_number == 42
             comments.append(body)
 
     issue_client = FakeIssueClient()

@@ -19,11 +19,6 @@ from io import StringIO
 from pathlib import Path
 from typing import Any, Protocol
 
-from powdrr_lift.workrr.github_issue_queue import (
-    GitHubIssueClient,
-    GitHubIssueQueueError,
-    QueueIssue,
-)
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
@@ -49,6 +44,43 @@ class PlanningServiceError(RuntimeError):
     """A planning session cannot safely start, advance, or resume."""
 
 
+class PlanningIssue(Protocol):
+    """Repository issue data needed by the planning coordinator."""
+
+    @property
+    def number(self) -> int: ...
+
+    @property
+    def title(self) -> str: ...
+
+    @property
+    def body(self) -> str: ...
+
+    @property
+    def state(self) -> str: ...
+
+    @property
+    def labels(self) -> tuple[str, ...]: ...
+
+    @property
+    def url(self) -> str: ...
+
+
+class PlanningIssueStore(Protocol):
+    """Issue operations supplied by a local persistence adapter."""
+
+    @property
+    def repository(self) -> str: ...
+
+    def ensure_planning_label(self) -> None: ...
+
+    def create_issue(
+        self, *, body: str, labels: tuple[str, ...], title: str
+    ) -> PlanningIssue: ...
+
+    def get_issue(self, issue_number: int) -> PlanningIssue: ...
+
+
 @dataclass(frozen=True, slots=True)
 class PlanningSession:
     """Pinned identity and immutable inputs for an initial planning session."""
@@ -60,7 +92,7 @@ class PlanningSession:
     source_path: str
     source_blob_sha: str
     verification_command: str
-    issue: QueueIssue
+    issue: PlanningIssue
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,7 +147,7 @@ class PlanningOptions:
 
 
 def create_planning_session(
-    client: GitHubIssueClient,
+    client: PlanningIssueStore,
     *,
     plan_id: str,
     base_commit: str,
@@ -156,13 +188,10 @@ def create_planning_session(
             "```",
         )
     )
-    try:
-        client.ensure_planning_label()
-        issue = client.create_issue(
-            title=f"Planning: {plan_id}", body=body, labels=[PLANNING_LABEL]
-        )
-    except GitHubIssueQueueError:
-        raise
+    client.ensure_planning_label()
+    issue = client.create_issue(
+        title=f"Planning: {plan_id}", body=body, labels=(PLANNING_LABEL,)
+    )
     return PlanningSession(
         session_id,
         plan_id,
@@ -176,7 +205,7 @@ def create_planning_session(
 
 
 def load_planning_session(
-    client: GitHubIssueClient,
+    client: PlanningIssueStore,
     issue_number: int,
     *,
     expected_repository: str | None = None,

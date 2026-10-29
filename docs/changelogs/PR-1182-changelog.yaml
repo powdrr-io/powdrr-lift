@@ -302,6 +302,21 @@ files:
     span: {start_line: 1188, end_line: 1188}
     summary: Apply the requested maximum when validating reference arrays.
     rationale: Keep the source-reference count aligned with supplied anchors.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 197, end_line: 201}
+    summary: Retain the path for an existing projected file subject.
+    rationale: Supply the file path to subject-specific change review for files introduced by earlier plan items.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1005, end_line: 1027}
+    summary: Resolve file subjects from either source identities or projected file paths.
+    rationale: Allow later plan items to refer to files already added in the projected Structrr baseline.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1051, end_line: 1057}
+    summary: Recognize projected file paths when checking whether a subject already exists.
+    rationale: Prevent a repeated file path from being treated as a new identity.
   - path: tests/test_planning_structrr.py
     type: modified
     span: {start_line: 3, end_line: 3}
@@ -337,6 +352,11 @@ files:
     span: {start_line: 312, end_line: 325}
     summary: Accept all nine supplied source anchors for one structural subject.
     rationale: Prevent a valid answer from failing because the record-count limit was incorrectly applied to source references.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 390, end_line: 411}
+    summary: Accept a file path already present in the projected files baseline.
+    rationale: Reproduce references to files introduced by earlier plan items and retain the path for change review.
 entities:
   - id: explicit-work-unit-allocation
     type: Function

@@ -387,6 +387,28 @@ def test_new_file_subject_is_bound_to_a_planned_path() -> None:
     assert operation["content"]["id"] == "file:src/new.py"
 
 
+def test_existing_projected_file_path_is_a_valid_structural_subject() -> None:
+    path = "src/yaml_strict.py"
+    baseline = {"files": [{"path": path}], "source_subjects": []}
+    candidate = {
+        "section": "files",
+        "subject_ref": f"path::{path}",
+        "new_identity_description": None,
+        "action": "changed",
+        "requirement_ids": ["req-01"],
+        "unit_ids": ["unit-01"],
+        "source_refs": ["anchor-01"],
+    }
+
+    page = _parse_page(
+        _candidate_page([candidate], has_more=False, next_anchor=None),
+        baseline=baseline,
+    )
+
+    assert page.records[0].subject_id == f"path::{path}"
+    assert page.records[0].planned_path == path
+
+
 def test_change_response_rejects_model_assigned_identity_fields() -> None:
     subject = BoundStructuralSubject(
         "entity-01",

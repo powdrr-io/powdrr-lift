@@ -194,7 +194,11 @@ def parse_structural_subject_page(
                 raise PlanningContractError(
                     f"{pointer}/action", "an existing subject cannot be added"
                 )
-            planned_path = None
+            planned_path = (
+                subject_id.removeprefix("path::")
+                if section == "files" and subject_id.startswith("path::")
+                else None
+            )
             is_new = False
         else:
             if action != "added":
@@ -998,6 +1002,29 @@ def _desired_content_schema(
 def _existing_subject_id(
     section: str, subject_ref: str, snapshot: Mapping[str, Any]
 ) -> str:
+    if section == "files":
+        source_subjects = snapshot.get("source_subjects", [])
+        if isinstance(source_subjects, list):
+            for record in source_subjects:
+                if isinstance(record, Mapping):
+                    if record.get("stable_key") == subject_ref:
+                        return subject_ref
+                    if record.get("id") == subject_ref:
+                        stable_key = record.get("stable_key")
+                        if isinstance(stable_key, str) and stable_key:
+                            return stable_key
+        files = snapshot.get("files", [])
+        if isinstance(files, list):
+            for record in files:
+                if not isinstance(record, Mapping):
+                    continue
+                path = record.get("path")
+                if isinstance(path, str) and f"path::{path}" == subject_ref:
+                    return subject_ref
+        raise PlanningContractError(
+            "/subject_ref", "subject reference is absent from the projected baseline"
+        )
+
     collection, identity = _collection_identity(section)
     records = snapshot.get(collection, [])
     if not isinstance(records, list):
@@ -1021,6 +1048,13 @@ def _existing_subject_id(
 
 
 def _subject_exists(section: str, subject_id: str, snapshot: Mapping[str, Any]) -> bool:
+    if section == "files" and subject_id.startswith("path::"):
+        path = subject_id.removeprefix("path::")
+        files = snapshot.get("files", [])
+        if isinstance(files, list) and any(
+            isinstance(item, Mapping) and item.get("path") == path for item in files
+        ):
+            return True
     collection, identity = _collection_identity(section)
     records = snapshot.get(collection, [])
     return isinstance(records, list) and any(

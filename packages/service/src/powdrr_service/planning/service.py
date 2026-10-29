@@ -265,6 +265,10 @@ def advance_planning_session(
         requests = () if request is None else (request,)
     if not requests:
         return PlanningTransition("complete", session.session_id, session.issue.number)
+    # Bound each durable transition even when many independent questions are
+    # ready. The next Procedrr iteration can checkpoint this window and
+    # recompute the remaining frontier before asking more questions.
+    requests = requests[: options.max_concurrent_questions]
     question_ids = [request.question.question_id for request in requests]
     if len(question_ids) != len(set(question_ids)):
         raise PlanningServiceError("planning frontier contains duplicate question IDs")

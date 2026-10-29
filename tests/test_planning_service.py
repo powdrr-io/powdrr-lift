@@ -281,7 +281,7 @@ def test_ready_question_frontier_runs_concurrently_and_checkpoints_serially() ->
             43, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
         ),
     )
-    requests = (_request("extract-block-01"), _request("extract-block-02"))
+    requests = tuple(_request(f"extract-block-{index:02d}") for index in range(1, 6))
 
     class BatchMachine:
         def ready_questions(
@@ -330,14 +330,25 @@ def test_ready_question_frontier_runs_concurrently_and_checkpoints_serially() ->
         options=PlanningOptions(model="test-model", max_concurrent_questions=2),
         stderr=None,
     )
+    next_transition = advance_planning_session(
+        session=session,
+        state_machine=BatchMachine(),
+        checkpoint_store=store,
+        client=client,
+        options=PlanningOptions(model="test-model", max_concurrent_questions=2),
+        stderr=None,
+    )
 
     assert transition.status == "question_accepted"
     assert transition.question_ids == tuple(
-        request.question.question_id for request in requests
+        request.question.question_id for request in requests[:2]
     )
     assert len(transition.accepted_answers) == 2
-    assert client.calls == 2
-    assert [event.sequence for event in store.load().events] == [1, 2]
+    assert next_transition.question_ids == tuple(
+        request.question.question_id for request in requests[2:4]
+    )
+    assert client.calls == 4
+    assert [event.sequence for event in store.load().events] == [1, 2, 3, 4]
 
 
 def test_session_issue_is_created_as_a_non_queue_tracker_and_resumes_by_number() -> (

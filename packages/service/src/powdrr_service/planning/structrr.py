@@ -564,6 +564,17 @@ def build_structural_change_request(
     desired_schema = _desired_content_schema(
         subject, taxonomy_entity_types=taxonomy_entity_types
     )
+    question_example = valid_example
+    if (
+        subject.section == "files"
+        and subject.action == "added"
+        and subject.planned_path is not None
+    ):
+        question_example = {
+            "result": "change",
+            "desired_content": {"path": subject.planned_path},
+            "reason": "The projected baseline does not yet contain this planned file.",
+        }
     return QuestionRequest(
         question=Question(
             f"describe-structural-change-{subject.item_id}-{subject.subject_id}",
@@ -595,9 +606,13 @@ def build_structural_change_request(
         ),
         exact_question=(
             "For this one bound Structrr subject, determine whether the projected "
-            "baseline already has the desired state. Return unchanged with a reason, "
-            "or change with only the desired section-specific fields. Do not return "
-            "IDs, action, item assignment, operation ID, or another subject."
+            "baseline already has the desired state. If the baseline lacks the "
+            "desired state, return change with only the desired section-specific "
+            "fields; an added subject needs change unless the baseline already "
+            "contains that desired subject. Return unchanged only when the baseline "
+            "already satisfies it. Give one concise reason of at most 200 characters; "
+            "do not include deliberation. Do not return IDs, action, item assignment, "
+            "operation ID, or another subject."
         ),
         answer_field_definitions={
             "result": "unchanged or change.",
@@ -609,7 +624,7 @@ def build_structural_change_request(
         source_excerpts=(),
         repository_evidence=(),
         accepted_facts=accepted_facts,
-        valid_example=valid_example,
+        valid_example=question_example,
         empty_example={
             "result": "unchanged",
             "reason": "The projected baseline already has the required state.",

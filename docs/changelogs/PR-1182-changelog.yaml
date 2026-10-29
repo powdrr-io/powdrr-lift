@@ -244,6 +244,21 @@ files:
     rationale: Ensure compact context reaches serialization and validation.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
+    span: {start_line: 567, end_line: 577}
+    summary: Provide a change-shaped example for newly added file subjects.
+    rationale: Show the model how to report an absent planned file as a required change.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 609, end_line: 615}
+    summary: Explain baseline comparison and require concise structural change reasons.
+    rationale: Prevent unchanged answers for absent subjects and avoid reasoning text in the bounded reason field.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 627, end_line: 627}
+    summary: Use the subject-appropriate example in structural change questions.
+    rationale: Keep the example aligned with the supplied subject and projected state.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
     span: {start_line: 668, end_line: 669}
     summary: Build the subject enumeration example from the path-relevant baseline index.
     rationale: Keep example references consistent with the narrowed baseline facts.
@@ -284,7 +299,7 @@ files:
     rationale: Test enumeration and per-subject change requests against a large baseline.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 88, end_line: 204}
+    span: {start_line: 88, end_line: 207}
     summary: Verify structural questions omit unrelated baseline records and entity identity indexes.
     rationale: Catch oversized prompts before they block real planning sessions.
 entities:

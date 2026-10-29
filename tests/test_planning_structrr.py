@@ -198,6 +198,11 @@ def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
 
     serialized_input = build_question_messages(request)[1]["content"]
 
+    assert request.valid_example["result"] == "change"
+    assert request.valid_example["desired_content"] == {
+        "path": "attestation/scripts/verify-all.sh"
+    }
+    assert "one concise reason of at most 200 characters" in request.exact_question
     assert "entity-identities" not in serialized_input
     assert len(serialized_input) < 24_000
 

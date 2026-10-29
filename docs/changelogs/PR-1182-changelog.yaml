@@ -219,22 +219,37 @@ files:
     rationale: Keep the full baseline available for validation while bounding question context.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 547, end_line: 547}
-    summary: Include only the current structural subject and directly related baseline records in change questions.
-    rationale: Avoid serializing the entire repository snapshot for one subject review.
+    span: {start_line: 541, end_line: 541}
+    summary: Build structural change context from subject-specific facts.
+    rationale: Keep unrelated repository identifiers out of the model input.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 648, end_line: 649}
+    span: {start_line: 549, end_line: 563}
+    summary: Include taxonomy, planned paths, and entity identities only for the subject sections that need them.
+    rationale: Prevent large unrelated entity indexes from exceeding the question input limit.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 577, end_line: 589}
+    summary: Digest only the section-specific facts sent with a structural change question.
+    rationale: Keep question identity aligned with its bounded model context.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 611, end_line: 611}
+    summary: Pass the filtered subject-specific facts to structural change review.
+    rationale: Ensure compact context reaches serialization and validation.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 668, end_line: 669}
     summary: Build the subject enumeration example from the path-relevant baseline index.
     rationale: Keep example references consistent with the narrowed baseline facts.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 660, end_line: 670}
+    span: {start_line: 680, end_line: 690}
     summary: Use an existing relevant file subject in the example when available.
     rationale: Keep the example valid for planned paths already in the baseline.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 686, end_line: 836}
+    span: {start_line: 706, end_line: 856}
     summary: Build compact subject indexes and per-subject baseline context from planned paths and identities.
     rationale: Preserve relevant existing Structrr references without including unrelated repository data.
   - path: packages/service/src/powdrr_service/planning/structrr.py
@@ -264,8 +279,8 @@ files:
     rationale: Test enumeration and per-subject change requests against a large baseline.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 88, end_line: 177}
-    summary: Verify structural questions omit unrelated baseline records while retaining relevant identities.
+    span: {start_line: 88, end_line: 204}
+    summary: Verify structural questions omit unrelated baseline records and entity identity indexes.
     rationale: Catch oversized prompts before they block real planning sessions.
 entities:
   - id: explicit-work-unit-allocation

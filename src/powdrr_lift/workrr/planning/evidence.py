@@ -23,6 +23,7 @@ from powdrr_service.planning.contracts import (
 )
 from powdrr_service.planning.coverage import (
     RequirementCoverage,
+    RequirementEvidenceSearch,
     ResidualRequirement,
     bind_coverage_answer,
     create_requirement_coverage,
@@ -135,36 +136,6 @@ class SymbolFinder(Protocol):
 class SymbolLookupResult:
     evidence: tuple[Evidence, ...]
     unresolved_queries: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class RequirementEvidenceSearch:
-    """Bounded symbol and text search results tied to one pinned commit."""
-
-    evidence: tuple[Evidence, ...]
-    terms: tuple[str, ...]
-    matching_line_count: int
-    matching_path_count: int
-    base_commit: str
-    basedpyright_query_count: int = 0
-    basedpyright_match_count: int = 0
-    rg_match_count: int = 0
-    basedpyright_available: bool = True
-
-    def to_data(self) -> dict[str, Any]:
-        return {
-            "method": "basedpyright-symbols-and-rg-v1",
-            "base_commit": self.base_commit,
-            "terms": list(self.terms),
-            "matching_line_count": self.matching_line_count,
-            "matching_path_count": self.matching_path_count,
-            "evidence_count": len(self.evidence),
-            "basedpyright_query_count": self.basedpyright_query_count,
-            "basedpyright_match_count": self.basedpyright_match_count,
-            "rg_match_count": self.rg_match_count,
-            "basedpyright_available": self.basedpyright_available,
-            "scope": "tracked source, test, and configuration files",
-        }
 
 
 def search_requirement_evidence(
@@ -609,6 +580,11 @@ def _read_evidence_excerpt(repository_root: str | Path, evidence: Evidence) -> s
     if hashlib.sha256(excerpt.encode("utf-8")).hexdigest() != evidence.content_sha256:
         raise EvidenceError("evidence content digest does not match its pinned range")
     return excerpt
+
+
+def read_evidence_excerpt(repository_root: str | Path, evidence: Evidence) -> str:
+    """Read and verify the lines for an evidence record from a pinned commit."""
+    return _read_evidence_excerpt(repository_root, evidence)
 
 
 def _validate_symbol_queries(queries: Sequence[str]) -> list[str]:

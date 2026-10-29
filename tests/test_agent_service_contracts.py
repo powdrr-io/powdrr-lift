@@ -208,6 +208,18 @@ def test_legacy_planning_imports_reexport_service_owned_implementations() -> Non
     assert legacy_compile_plan is compile_plan
 
 
+def test_legacy_planning_driver_adapts_the_service_owned_machine() -> None:
+    from powdrr_service.planning.driver import (
+        SourceLedgerQuestionMachine as ServiceQuestionMachine,
+    )
+
+    from powdrr_lift.workrr.planning.driver import (
+        SourceLedgerQuestionMachine as LegacyQuestionMachine,
+    )
+
+    assert issubclass(LegacyQuestionMachine, ServiceQuestionMachine)
+
+
 def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
     from powdrr_local.planning.checkpoints import (
         GitHubCommentCheckpointStore,

@@ -35,6 +35,7 @@ from powdrr_local.planning.repair_publication import (
 from powdrr_local.planning.sessions import GitHubPlanningIssueStore
 from powdrr_service.planning.assembly import PathFact
 from powdrr_service.planning.compiler import PlanningCompilationError
+from powdrr_service.planning.driver import SourceLedgerQuestionMachine
 from powdrr_service.planning.service import (
     PlanningOptions,
     PlanningServiceError,
@@ -260,8 +261,10 @@ from powdrr_lift.workrr.human_task import (
 )
 from powdrr_lift.workrr.local_model import download_local_qwen_model
 from powdrr_lift.workrr.plan_sizing import PATH_RUNTIME_SUFFIXES
-from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
-from powdrr_lift.workrr.planning.evidence import search_requirements_evidence
+from powdrr_lift.workrr.planning.evidence import (
+    read_evidence_excerpt,
+    search_requirements_evidence,
+)
 from powdrr_lift.workrr.planning.source import (
     read_pinned_source,
     segment_markdown_source,
@@ -2959,11 +2962,13 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
         taxonomy = load_entity_taxonomy(repo_root, _structrr_taxonomy_path(repo_root))
         machine = SourceLedgerQuestionMachine(
             source,
-            repository_root=repo_root,
             evidence_search=lambda requirements: search_requirements_evidence(
                 repo_root,
                 base_commit,
                 requirements,
+            ),
+            evidence_excerpt_reader=lambda evidence: read_evidence_excerpt(
+                repo_root, evidence
             ),
             verification_command=verification_command,
             repository_paths=_planning_repository_paths(

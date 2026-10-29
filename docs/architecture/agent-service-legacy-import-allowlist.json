@@ -7,9 +7,9 @@
       "rationale": "The legacy artifact-state projection remains available for areas not migrated through the boundary. Final package ownership cleanup removes this import."
     },
     {
-      "import": "powdrr_lift.structrr.bootstrap.bootstrap_structrr",
-      "owner_pr": 8,
-      "rationale": "The service reconstructs a service-owned snapshot and invokes the existing Structrr implementation. Moving the implementation into the service distribution is part of final package ownership cleanup."
+      "import": "powdrr_lift.errors.PowdrrExecutionError",
+      "owner_pr": 6,
+      "rationale": "Planning question execution translates the existing typed provider error; the service-owned error and inference contract replace this in PR 6."
     },
     {
       "import": "powdrr_lift.structrr.actual_diff.compile_actual_structrr_diff",
@@ -17,9 +17,24 @@
       "rationale": "The service executes actual Structrr diff policy over exchanged snapshots, with code relocation to the service distribution scheduled for final package ownership cleanup."
     },
     {
+      "import": "powdrr_lift.structrr.bootstrap.bootstrap_structrr",
+      "owner_pr": 8,
+      "rationale": "The service reconstructs a service-owned snapshot and invokes the existing Structrr implementation. Moving the implementation into the service distribution is part of final package ownership cleanup."
+    },
+    {
       "import": "powdrr_lift.structrr.source_manifest.SourceManifest",
       "owner_pr": 8,
       "rationale": "The service validates the source manifest format while compiling actual diffs; the private type moves with the Structrr service implementation during final package ownership cleanup."
+    },
+    {
+      "import": "powdrr_lift.workrr.llm.complete_json_with_timeout_retry",
+      "owner_pr": 6,
+      "rationale": "Planning uses the existing bounded provider retry helper until provider and inference ownership moves in PR 6."
+    },
+    {
+      "import": "powdrr_lift.workrr.protocol.WorkflowLLMClient",
+      "owner_pr": 6,
+      "rationale": "The planning question runner consumes the existing provider protocol until the service inference contract replaces it in PR 6."
     }
   ]
 }

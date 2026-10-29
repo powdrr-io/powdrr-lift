@@ -344,6 +344,20 @@
       "reviewed": false
     },
     {
+      "extraction_pr": "4",
+      "internal_imports": [
+        "powdrr_lift.errors",
+        "powdrr_lift.workrr.llm",
+        "powdrr_service.planning.contracts",
+        "powdrr_lift.workrr.protocol"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/questions.py",
+      "rationale": "service-owned bounded planning prompts, question execution, and answer correction",
+      "reviewed": false
+    },
+    {
       "extraction_pr": "8",
       "internal_imports": [],
       "kind": "python_module",
@@ -2735,7 +2749,7 @@
         "powdrr_lift.workrr.plan_sizing",
         "powdrr_service.planning.contracts",
         "powdrr_lift.workrr.planning.evidence",
-        "powdrr_lift.workrr.planning.questions",
+        "powdrr_service.planning.questions",
         "powdrr_lift.workrr.planning.source"
       ],
       "kind": "python_module",
@@ -2788,7 +2802,7 @@
         "powdrr_lift.workrr.planning.assembly",
         "powdrr_service.planning.contracts",
         "powdrr_lift.workrr.planning.evidence",
-        "powdrr_lift.workrr.planning.questions",
+        "powdrr_service.planning.questions",
         "powdrr_lift.workrr.planning.source"
       ],
       "kind": "python_module",
@@ -2808,7 +2822,7 @@
         "powdrr_lift.workrr.planning.compiler",
         "powdrr_lift.workrr.planning.dependencies",
         "powdrr_lift.workrr.planning.evidence",
-        "powdrr_lift.workrr.planning.questions",
+        "powdrr_service.planning.questions",
         "powdrr_lift.workrr.planning.source",
         "powdrr_lift.workrr.planning.structrr"
       ],
@@ -2824,7 +2838,7 @@
         "powdrr_lift.basedpyright_tools",
         "powdrr_lift.errors",
         "powdrr_service.planning.contracts",
-        "powdrr_lift.workrr.planning.questions",
+        "powdrr_service.planning.questions",
         "powdrr_lift.workrr.planning.source"
       ],
       "kind": "python_module",
@@ -2836,15 +2850,12 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.errors",
-        "powdrr_lift.workrr.llm",
-        "powdrr_service.planning.contracts",
-        "powdrr_lift.workrr.protocol"
+        "powdrr_service.planning.questions"
       ],
       "kind": "python_module",
       "owner": "service",
       "path": "src/powdrr_lift/workrr/planning/questions.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
+      "rationale": "temporary compatibility shim for existing application imports; implementation is service-owned",
       "reviewed": false
     },
     {
@@ -2879,7 +2890,7 @@
       "internal_imports": [
         "powdrr_lift.workrr.github_issue_queue",
         "powdrr_lift.workrr.planning.checkpoints",
-        "powdrr_lift.workrr.planning.questions",
+        "powdrr_service.planning.questions",
         "powdrr_lift.workrr.procedrr",
         "powdrr_lift.workrr.procedrr_operations",
         "powdrr_lift.workrr.protocol",
@@ -2897,7 +2908,7 @@
       "internal_imports": [
         "powdrr_lift.core.instruction_ledger",
         "powdrr_service.planning.contracts",
-        "powdrr_lift.workrr.planning.questions"
+        "powdrr_service.planning.questions"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2912,7 +2923,7 @@
         "powdrr_lift.workrr.multipr_structrr",
         "powdrr_lift.workrr.planning.assembly",
         "powdrr_service.planning.contracts",
-        "powdrr_lift.workrr.planning.questions",
+        "powdrr_service.planning.questions",
         "powdrr_lift.workrr.planning.source"
       ],
       "kind": "python_module",

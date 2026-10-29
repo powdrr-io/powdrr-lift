@@ -16,14 +16,14 @@ from powdrr_service.planning.contracts import (
     PlanningContractError,
     Question,
 )
-
-from powdrr_lift.workrr.planning.assembly import WorkUnit
-from powdrr_lift.workrr.planning.evidence import Evidence
-from powdrr_lift.workrr.planning.questions import (
+from powdrr_service.planning.questions import (
     ContextRecord,
     QuestionRequest,
     SourceExcerpt,
 )
+
+from powdrr_lift.workrr.planning.assembly import WorkUnit
+from powdrr_lift.workrr.planning.evidence import Evidence
 from powdrr_lift.workrr.planning.source import Requirement, SegmentedSource
 
 _VALIDATION_KINDS = frozenset({"local_command", "ci_check", "manual_observation"})

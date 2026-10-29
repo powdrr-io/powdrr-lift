@@ -12,15 +12,15 @@ from pathlib import PurePosixPath
 from typing import Any, Literal
 
 from powdrr_service.planning.contracts import PlanningContractError, Question
+from powdrr_service.planning.questions import (
+    ContextRecord,
+    QuestionRequest,
+    SourceExcerpt,
+)
 
 from powdrr_lift.core.instruction_ledger import (
     InstructionLedger,
     compile_instruction_ledger,
-)
-from powdrr_lift.workrr.planning.questions import (
-    ContextRecord,
-    QuestionRequest,
-    SourceExcerpt,
 )
 
 MAX_SOURCE_BLOCK_CHARS = 8_000

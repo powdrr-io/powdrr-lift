@@ -7,6 +7,8 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from powdrr_service.planning.questions import QuestionRequest
+
 from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.git import slugify_workflow_id
 from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
@@ -44,7 +46,6 @@ from powdrr_lift.workrr.planning.evidence import (
     build_requirement_coverage_request,
     create_requirement_coverage,
 )
-from powdrr_lift.workrr.planning.questions import QuestionRequest
 from powdrr_lift.workrr.planning.source import (
     BlockDisposition,
     Requirement,

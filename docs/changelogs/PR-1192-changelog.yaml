@@ -14,11 +14,16 @@ files:
     rationale: Avoid compiling a stale response that a later checkpoint reopened for correction.
   - path: src/powdrr_lift/cli.py
     type: modified
-    span: {start_line: 3092, end_line: 3108}
+    span: {start_line: 3092, end_line: 3110}
     summary: Replay accepted and invalidated answers in checkpoint order.
     rationale: Keep the latest answer state consistent with the durable planning journal.
   - path: tests/test_cli.py
     type: modified
-    span: {start_line: 27, end_line: 46}
+    span: {start_line: 16, end_line: 16}
+    summary: Import the planning answer replay helper for regression coverage.
+    rationale: Test the same replay function that plan compilation uses.
+  - path: tests/test_cli.py
+    type: modified
+    span: {start_line: 27, end_line: 48}
     summary: Cover invalidation of an accepted answer and replacement by a revised answer.
     rationale: Prevent stale historical responses from reappearing during plan compilation.

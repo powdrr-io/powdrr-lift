@@ -287,6 +287,16 @@ files:
     span: {start_line: 948, end_line: 948}
     summary: Represent entity type as a string in the compact response schema.
     rationale: The supplied taxonomy context and parser enforce allowed entity types.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 184, end_line: 190}
+    summary: Bound accepted source references by the supplied anchor set.
+    rationale: Allow a structural subject to cite every relevant source anchor when more than eight anchors are available.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1180, end_line: 1188}
+    summary: Let reference validation use a caller-specific maximum.
+    rationale: Keep the eight-record page limit separate from the number of valid source references.
   - path: tests/test_planning_structrr.py
     type: modified
     span: {start_line: 3, end_line: 3}
@@ -307,6 +317,11 @@ files:
     span: {start_line: 88, end_line: 284}
     summary: Verify structural questions omit unrelated baseline records and entity identity indexes.
     rationale: Catch oversized prompts before they block real planning sessions.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 312, end_line: 323}
+    summary: Accept all nine supplied source anchors for one structural subject.
+    rationale: Prevent a valid answer from failing because the record-count limit was incorrectly applied to source references.
 entities:
   - id: explicit-work-unit-allocation
     type: Function

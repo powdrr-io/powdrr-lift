@@ -182,7 +182,11 @@ def parse_structural_subject_page(
                 "cited requirements must belong to the cited units",
             )
         refs = _refs(
-            raw["source_refs"], f"{pointer}/source_refs", source_ids, minimum=1
+            raw["source_refs"],
+            f"{pointer}/source_refs",
+            source_ids,
+            minimum=1,
+            maximum=len(source_ids),
         )
         if subject_ref is not None:
             subject_id = _existing_subject_id(section, subject_ref, projected_baseline)
@@ -1174,9 +1178,14 @@ def _nullable_text(value: Any, pointer: str) -> str | None:
 
 
 def _refs(
-    value: Any, pointer: str, known: set[str], *, minimum: int
+    value: Any,
+    pointer: str,
+    known: set[str],
+    *,
+    minimum: int,
+    maximum: int = MAX_ENUMERATION_RECORDS,
 ) -> tuple[str, ...]:
-    values = _array(value, pointer, minimum=minimum, maximum=MAX_ENUMERATION_RECORDS)
+    values = _array(value, pointer, minimum=minimum, maximum=maximum)
     refs = tuple(
         _text(item, f"{pointer}/{index}", max_length=120)
         for index, item in enumerate(values)

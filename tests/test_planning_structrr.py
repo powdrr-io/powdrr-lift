@@ -71,6 +71,7 @@ def _parse_page(
     requirements: set[str] | None = None,
     baseline: dict[str, Any] | None = None,
     prior: set[tuple[str, str]] | None = None,
+    source_ids: set[str] | None = None,
 ) -> StructuralSubjectPage:
     return parse_structural_subject_page(
         value,
@@ -78,7 +79,7 @@ def _parse_page(
         item_id="item-01",
         requirement_ids=requirements or {"req-01"},
         units=units or (_unit(),),
-        source_ids={"anchor-01"},
+        source_ids=source_ids or {"anchor-01"},
         projected_baseline=baseline or {"entities": []},
         prior_subject_ids=prior or set(),
         page_ordinal=page_ordinal,
@@ -306,6 +307,20 @@ def test_structural_subject_pages_cover_all_subjects_and_require_final_page() ->
     assert len(complete_subject_enumeration((first, second))) == 12
     with pytest.raises(StructrrPlanningError, match="incomplete"):
         complete_subject_enumeration((first,))
+
+
+def test_subject_page_accepts_all_known_source_references() -> None:
+    source_ids = {f"anchor-{index:02d}" for index in range(9)}
+    row = _record("entity-01")
+    row["source_refs"] = sorted(source_ids)
+
+    page = _parse_page(
+        _candidate_page([row], has_more=False, next_anchor=None),
+        baseline={"entities": [{"id": "entity-01"}]},
+        source_ids=source_ids,
+    )
+
+    assert page.records[0].source_refs == tuple(sorted(source_ids))
 
 
 def test_subject_page_rejects_wrong_cursor_and_duplicate_subject() -> None:

@@ -1,0 +1,48 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1178
+title: Cache pinned evidence reads during planning replay
+intent:
+  problem: Rebuilding accepted coverage requests reread pinned evidence files for every excerpt, spawning repeated Git subprocesses during plan resume.
+  goal: Reuse file contents for repeated evidence reads at the same repository commit.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Import an LRU cache for pinned source reads.
+  rationale: Bound retained source file content while avoiding repeated Git reads during a planning session.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 543
+    end_line: 550
+  summary: Cache pinned code file content by repository root, commit, and path.
+  rationale: Reuse each immutable source blob when multiple coverage answers cite its excerpts.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 552
+    end_line: 552
+  summary: Read pinned source files through the normalized repository-root cache key.
+  rationale: Keep repeated reads attached to the same immutable source blob.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Import the evidence module for lookup-count regression coverage.
+  rationale: Instrument the pinned source reader in the test.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 129
+    end_line: 149
+  summary: Verify repeat reads of one pinned source file perform one source lookup.
+  rationale: Prevent planning replay from spawning redundant Git subprocesses for repeated evidence paths.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

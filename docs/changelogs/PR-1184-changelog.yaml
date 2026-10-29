@@ -1,0 +1,333 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1184
+title: Move GitHub checkpoint persistence behind local adapters
+intent:
+  problem: The service checkpoint module included GitHub issue-comment reads and writes alongside checkpoint
+    serialization and append validation.
+  goal: Keep checkpoint formats, reduction, and append policy in service code while moving GitHub comment
+    persistence into powdrr_local.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Import the protocol type used for issue comment persistence.
+  rationale: Keep the integration interface on the local side.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Import service append validation and rendering policy.
+  rationale: Reuse service validation while keeping the API side effect local.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 275
+    end_line: 332
+  summary: Add a GitHub comment checkpoint store and its issue-number capability.
+  rationale: Perform comment reads and writes locally after service code validates and renders each checkpoint.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 349
+    end_line: 351
+  summary: Route the existing issue comment method through the number-based adapter method.
+  rationale: Allow the local checkpoint adapter to post comments without depending on the legacy QueueIssue
+    data type.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 355
+    end_line: 355
+  summary: Add a number-based issue comment method for the local checkpoint adapter.
+  rationale: Allow the local checkpoint adapter to post comments without depending on the legacy QueueIssue
+    data type.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 363
+    end_line: 363
+  summary: Keep GitHub comment posting on the existing retrying API path.
+  rationale: Allow the local checkpoint adapter to post comments without depending on the legacy QueueIssue
+    data type.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 5
+  summary: Re-export the GitHub comment checkpoint adapter from powdrr_local.
+  rationale: Preserve the old module import while the implementation ownership changes.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 17
+  summary: Expose local GitHub comment persistence names on the compatibility module.
+  rationale: Preserve downstream imports during migration.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 213
+    end_line: 213
+  summary: Import the local GitHub checkpoint adapter for package ownership assertions.
+  rationale: Verify the adapter is not exported from the service module.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 219
+    end_line: 221
+  summary: Import the legacy GitHub store alias.
+  rationale: Verify compatibility imports resolve to the local implementation.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 231
+    end_line: 231
+  summary: Assert the service does not own GitHub checkpoint persistence.
+  rationale: Keep local API effects outside the service package.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 234
+    end_line: 234
+  summary: Assert the legacy GitHub store name resolves to powdrr_local.
+  rationale: Prevent reintroducing the implementation under service ownership.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 356
+    end_line: 356
+  summary: Assign GitHub comment persistence to the local adapter package.
+  rationale: Keep checkpoint formats and reducer policy assigned to the service.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 377
+    end_line: 377
+  summary: Remove the legacy issue type from the service checkpoint module inventory.
+  rationale: The local adapter now exchanges issue numbers through its narrow capability interface.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 382
+    end_line: 382
+  summary: Update service checkpoint module ownership.
+  rationale: Record that external comment writes live in powdrr_local.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2939
+    end_line: 2939
+  summary: Update the legacy checkpoint module import ownership.
+  rationale: Keep compatibility re-exports pointed at service policy and local adapters.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Remove the GitHub queue type from service imports.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 18
+  summary: Remove the issue-comment protocol from service code.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 383
+    end_line: 388
+  summary: Remove the issue-comment protocol from service checkpoint contracts.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 666
+    end_line: 712
+  summary: Move GitHub checkpoint comment reads and writes to the local package.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 679
+    end_line: 680
+  summary: Retain the service checkpoint protocol without its concrete external adapter.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 682
+    end_line: 683
+  summary: Validate in-memory journal appends with shared append policy.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 739
+    end_line: 739
+  summary: Use the service-owned append preparation helper for in-memory storage.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 714
+    end_line: 714
+  summary: Centralize checkpoint parent and sequence validation.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 762
+    end_line: 762
+  summary: Render append comments using service-owned policy.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 737
+    end_line: 737
+  summary: Verify append state after writing in-memory comments.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 885
+    end_line: 885
+  summary: Remove the GitHub adapter from service exports.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 887
+    end_line: 887
+  summary: Remove the GitHub comment protocol from service exports.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 839
+    end_line: 839
+  summary: Export pure append preparation for local adapters.
+  rationale: Keep checkpoint schemas and append policy in service while GitHub side effects live in powdrr_local.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Import the GitHub checkpoint store from powdrr_local.
+  rationale: Keep adapter tests on the new local ownership boundary while preserving journal behavior.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Remove its implementation import from the service module.
+  rationale: Keep adapter tests on the new local ownership boundary while preserving journal behavior.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Remove the legacy GitHub issue model from checkpoint tests.
+  rationale: Keep adapter tests on the new local ownership boundary while preserving journal behavior.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 87
+  summary: Use issue-number-based comments and construct the local checkpoint store by issue number.
+  rationale: Keep adapter tests on the new local ownership boundary while preserving journal behavior.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 686
+    end_line: 697
+  summary: Centralize checkpoint parent digest and sequence checks before rendering.
+  rationale: Preserve service-owned journal invariants independently from storage effects.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 710
+    end_line: 710
+  summary: Retain post-write verification for in-memory comment persistence.
+  rationale: Preserve service-owned journal invariants independently from storage effects.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 712
+    end_line: 712
+  summary: Keep the updated reducer state as the append result.
+  rationale: Preserve service-owned journal invariants independently from storage effects.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 716
+    end_line: 718
+  summary: Remove the store-specific append helper now that stores share validation.
+  rationale: Preserve service-owned journal invariants independently from storage effects.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 71
+    end_line: 72
+  summary: Update the fake comment client to accept an issue number.
+  rationale: Exercise the existing persistence and resume behavior through the local adapter.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 85
+  summary: Construct the GitHub store with the issue number.
+  rationale: Exercise the existing persistence and resume behavior through the local adapter.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 99
+  summary: Resume the journal through its local adapter.
+  rationale: Exercise the existing persistence and resume behavior through the local adapter.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 150
+  summary: Migrate legacy issue comments through the local adapter.
+  rationale: Exercise the existing persistence and resume behavior through the local adapter.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 217
+    end_line: 217
+  summary: Persist accepted answers through the local adapter.
+  rationale: Exercise the existing persistence and resume behavior through the local adapter.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 248
+    end_line: 248
+  summary: Resume accepted answers from GitHub comments on a new adapter instance.
+  rationale: Exercise the existing persistence and resume behavior through the local adapter.
+entities:
+- id: github-comment-checkpoint-adapter
+  type: Class
+  action: added
+- id: github-issue-comment-capability
+  type: Method
+  action: added
+entity_relationships: []
+invariants:
+- id: checkpoint-append-ordering
+  description: Checkpoint session identity, parent digest, sequence validation, chunk format, resume reduction,
+    and append verification remain unchanged across the local persistence adapter.
+  action: altered
+guidance:
+- id: remaining-planning-service-boundary
+  description: Planning issue creation, resume, and re-plan CLI operations still need to route through
+    the public service operation interface.
+  action: added

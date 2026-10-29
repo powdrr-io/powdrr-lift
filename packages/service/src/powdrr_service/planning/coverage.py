@@ -54,6 +54,36 @@ class RequirementCoverage:
     residual: ResidualRequirement | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class RequirementEvidenceSearch:
+    """Bounded repository evidence results supplied to planning policy."""
+
+    evidence: tuple[Evidence, ...]
+    terms: tuple[str, ...]
+    matching_line_count: int
+    matching_path_count: int
+    base_commit: str
+    basedpyright_query_count: int = 0
+    basedpyright_match_count: int = 0
+    rg_match_count: int = 0
+    basedpyright_available: bool = True
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "method": "basedpyright-symbols-and-rg-v1",
+            "base_commit": self.base_commit,
+            "terms": list(self.terms),
+            "matching_line_count": self.matching_line_count,
+            "matching_path_count": self.matching_path_count,
+            "evidence_count": len(self.evidence),
+            "basedpyright_query_count": self.basedpyright_query_count,
+            "basedpyright_match_count": self.basedpyright_match_count,
+            "rg_match_count": self.rg_match_count,
+            "basedpyright_available": self.basedpyright_available,
+            "scope": "tracked source, test, and configuration files",
+        }
+
+
 def _validated_evidence_excerpt(evidence: Evidence, excerpt: str | None) -> str:
     if not isinstance(excerpt, str):
         raise EvidenceError(f"missing pinned excerpt for evidence {evidence.id}")
@@ -68,6 +98,7 @@ def _validated_evidence_excerpt(evidence: Evidence, excerpt: str | None) -> str:
 
 __all__ = [
     "RequirementCoverage",
+    "RequirementEvidenceSearch",
     "ResidualRequirement",
     "bind_coverage_answer",
     "build_requirement_coverage_request",

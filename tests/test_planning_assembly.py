@@ -22,13 +22,13 @@ from powdrr_service.planning.assembly import (
     parse_item_description,
     parse_work_unit_proposal,
 )
+from powdrr_service.planning.driver import SourceLedgerQuestionMachine
 
 from powdrr_lift.workrr.plan_sizing import (
     ExplicitWorkUnit,
     allocate_explicit_work_units,
 )
 from powdrr_lift.workrr.planning.contracts import PlanningContractError
-from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
 from powdrr_lift.workrr.planning.source import (
     PinnedSourceDocument,
     Requirement,

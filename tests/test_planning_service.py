@@ -11,6 +11,7 @@ from powdrr_service.planning.checkpoints import (
     InMemoryCheckpointStore,
     PlanningCheckpoint,
 )
+from powdrr_service.planning.driver import SourceLedgerQuestionMachine
 from powdrr_service.planning.service import (
     PlanningOptions,
     PlanningSession,
@@ -26,7 +27,6 @@ from powdrr_lift.workrr.planning.contracts import (
     PlanningContractError,
     Question,
 )
-from powdrr_lift.workrr.planning.driver import SourceLedgerQuestionMachine
 from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
 from powdrr_lift.workrr.planning.questions import (
     QuestionRequest,
@@ -958,9 +958,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     assert searched_requirements == ["req-0001"]
 
 
-def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
-    tmp_path: Path,
-) -> None:
+def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> None:
     text = (
         "# Plan\n\nImplement the requested behavior in src/behavior.txt.\n\n"
         "Background only.\n"
@@ -976,7 +974,6 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
     source = segment_markdown_source(source_document)
     machine = SourceLedgerQuestionMachine(
         source,
-        repository_root=tmp_path,
         verification_command="make test",
         plan_id="bounded-plan",
         structrr_baseline={

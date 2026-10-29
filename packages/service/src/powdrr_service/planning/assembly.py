@@ -638,6 +638,11 @@ def _write_runtime(write: PlannedWrite, context: WorkUnitContext) -> str | None:
         }
     ):
         derived = None
+    elif derived is None and fact is None and not suffix and write.runtime is None:
+        # New extensionless files explicitly marked without a runtime are data
+        # artifacts. Source files should use a recognized extension or cite a
+        # repository fact that identifies their runtime.
+        derived = None
     elif derived is None:
         derived = (
             fact.runtime if fact is not None else None

@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import subprocess
 from pathlib import Path
 
-from powdrr_contracts.models import Artifact, OperationRequest, RepositorySnapshot
+from powdrr_contracts.models import (
+    Artifact,
+    OperationRequest,
+    RepositorySnapshot,
+    artifact_manifest_digest,
+)
 
 
 class RepositorySnapshotError(ValueError):
@@ -51,10 +55,7 @@ def collect_workflow_snapshot(
         )
         for path in paths
     )
-    manifest = json.dumps(
-        [(item.artifact_id, item.sha256) for item in artifacts], separators=(",", ":")
-    ).encode()
-    manifest_digest = hashlib.sha256(manifest).hexdigest()
+    manifest_digest = artifact_manifest_digest(artifacts)
     tree_id = _git(root, "rev-parse", f"{commit}^{{tree}}").strip()
     worktree_digest = hashlib.sha256(tree_id.encode()).hexdigest()
     snapshot = RepositorySnapshot(

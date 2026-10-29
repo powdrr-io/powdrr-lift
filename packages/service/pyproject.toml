@@ -3,7 +3,7 @@ name = "powdrr-service"
 version = "0.1.0"
 description = "Powdrr-owned service-side operation policies and reconstruction."
 requires-python = ">=3.12"
-dependencies = ["powdrr-contracts"]
+dependencies = ["powdrr-contracts", "PyYAML>=6.0.2"]
 
 [build-system]
 requires = ["uv_build>=0.11.3,<0.12.0"]

@@ -4306,6 +4306,128 @@ def _run_init_from_plan_diff(args: argparse.Namespace) -> int:
 
 def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
+    requested_output = _repository_relative_option(repo_root, args.output, None)
+    requested_taxonomy = _repository_relative_option(
+        repo_root, args.taxonomy, "software_development_entity_taxonomy.md"
+    )
+    if (args.output is not None and requested_output is None) or (
+        requested_taxonomy is None
+    ):
+        return _run_legacy_bootstrap_structrr(args, repo_root)
+    from powdrr_agent.repository import (
+        LocalActionError,
+        collect_tracked_worktree,
+        digest_at_path,
+        materialize_artifact,
+    )
+    from powdrr_local import JsonServiceBridge, LocalPowdrrService
+
+    try:
+        output_path = _repository_relative_option(
+            repo_root, args.output, default_name=None
+        )
+        if output_path is None:
+            short_sha = subprocess.run(
+                ["git", "-C", str(repo_root), "rev-parse", "--short", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+            output_path = f"docs/structrr/current/baseline-{short_sha}.yaml"
+        taxonomy_path = _repository_relative_option(
+            repo_root,
+            args.taxonomy,
+            default_name="software_development_entity_taxonomy.md",
+        )
+        if taxonomy_path is None:
+            raise LocalActionError(
+                "forbidden_path",
+                "The taxonomy must be inside the repository for service analysis.",
+            )
+        report_path = str(Path(output_path).with_suffix(".md").as_posix())
+        expected = {
+            output_path: digest_at_path(repo_root, output_path),
+            report_path: digest_at_path(repo_root, report_path),
+        }
+        request = collect_tracked_worktree(
+            repo_root,
+            request_id=str(uuid.uuid4()),
+            operation_kind="bootstrap",
+            inputs={
+                "output_path": output_path,
+                "taxonomy_path": taxonomy_path,
+                "change_id": args.change_id,
+                "title": args.title,
+                "repository_name": repo_root.name,
+            },
+        )
+        update = JsonServiceBridge(LocalPowdrrService()).start(request)
+        if update.status != "succeeded":
+            message = (
+                update.failure.message
+                if update.failure
+                else "service returned an incomplete Structrr bootstrap"
+            )
+            print(f"Structrr bootstrap validation failed: {message}", file=sys.stderr)
+            return 1
+        outputs = {item.artifact_id: item for item in update.output_artifacts}
+        if set(outputs) != set(expected):
+            raise LocalActionError(
+                "invalid_service_output",
+                "Service returned unexpected Structrr artifact paths.",
+            )
+        for relative_path, prior_digest in expected.items():
+            if digest_at_path(repo_root, relative_path) != prior_digest:
+                raise LocalActionError(
+                    "stale_precondition",
+                    f"{relative_path} changed while Structrr was being analyzed.",
+                )
+        for relative_path, prior_digest in expected.items():
+            materialize_artifact(
+                repo_root, outputs[relative_path], expected_digest=prior_digest
+            )
+    except (OSError, ValueError, subprocess.SubprocessError) as error:
+        print(f"Could not build Structrr bootstrap: {error}", file=sys.stderr)
+        return 1
+    document = yaml.safe_load(outputs[output_path].data)
+    summary = {
+        "output_path": str(repo_root / output_path),
+        "report_path": str(repo_root / report_path),
+        "baseline_status": "not_run",
+        "entity_count": len(document.get("entities", [])),
+        "relationship_count": len(document.get("entity_relationships", [])),
+        "source_anchor_count": len(document.get("files", [])),
+        "source_subject_count": len(document.get("source_subjects", [])),
+        "source_binding_count": len(document.get("source_bindings", [])),
+    }
+    if args.json:
+        print(json.dumps(summary, sort_keys=True))
+    else:
+        print(repo_root / output_path)
+        print(repo_root / report_path)
+        print(
+            f"Validated {summary['entity_count']} entities, "
+            f"{summary['relationship_count']} relationships, and "
+            f"{summary['source_anchor_count']} source anchors.",
+        )
+        print("Repository validation commands were discovered but not run.")
+    return 0
+
+
+def _repository_relative_option(
+    repo_root: Path, value: Path | None, default_name: str | None
+) -> str | None:
+    if value is None:
+        return default_name
+    target = value if value.is_absolute() else repo_root / value
+    try:
+        return target.resolve(strict=False).relative_to(repo_root).as_posix()
+    except ValueError:
+        return None
+
+
+def _run_legacy_bootstrap_structrr(args: argparse.Namespace, repo_root: Path) -> int:
+    """Preserve explicit out-of-repository output and taxonomy paths."""
     result = bootstrap_structrr(
         repo_root,
         output_path=args.output,
@@ -4338,7 +4460,7 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
         print(
             f"Validated {summary['entity_count']} entities, "
             f"{summary['relationship_count']} relationships, and "
-            f"{summary['source_anchor_count']} source anchors.",
+            f"{summary['source_anchor_count']} source anchors."
         )
         print("Repository validation commands were discovered but not run.")
     return 0

@@ -62,22 +62,22 @@ files:
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 698
-    end_line: 700
+    start_line: 670
+    end_line: 672
   summary: Enforce the four-requirement limit when building proposal questions.
   rationale: Keep each question focused on a small requirement set.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 776
-    end_line: 778
+    start_line: 748
+    end_line: 750
   summary: Include the complete requirement batch in each work-unit question ID.
   rationale: Prevent old checkpoints from being reused when batch size changes.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 806
-    end_line: 808
+    start_line: 778
+    end_line: 780
   summary: Prompt for concise proposal pages within the 4,000-character answer limit.
   rationale: Reduce retries for answers that cannot be durably checkpointed.
 - path: src/powdrr_lift/workrr/planning/driver.py
@@ -112,14 +112,14 @@ files:
   type: modified
   span:
     start_line: 187
-    end_line: 224
+    end_line: 220
   summary: Cover neutral placeholder writes and a new provider directory.
   rationale: Ensure valid implementation paths can introduce directories absent from the repository.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
-    start_line: 328
-    end_line: 363
+    start_line: 324
+    end_line: 359
   summary: Assert proposal request bounds and batch-specific question IDs.
   rationale: Prevent oversized answers and stale checkpoint reuse when request shapes change.
 - path: packages/service/src/powdrr_service/planning/assembly.py
@@ -139,15 +139,15 @@ files:
 - path: tests/test_planning_assembly.py
   type: modified
   span:
-    start_line: 315
-    end_line: 315
+    start_line: 311
+    end_line: 311
   summary: Create one proposal example for work-unit question coverage.
   rationale: Reuse the valid proposal when checking response limits.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
-    start_line: 317
-    end_line: 317
+    start_line: 313
+    end_line: 313
   summary: Use the shared proposal example in the work-unit request.
   rationale: Keep the example consistent with subsequent parser assertions.
 - path: src/powdrr_lift/workrr/planning/evidence.py
@@ -160,10 +160,18 @@ files:
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
-    start_line: 780
-    end_line: 780
+    start_line: 752
+    end_line: 752
   summary: Assign a batch-specific identifier to each proposal question.
   rationale: Prevent replay from reusing an answer for a differently shaped question.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 610
+    end_line: 622
+  summary: Allow proposal paths to introduce directories absent from source and repository evidence.
+  rationale: Implementation requirements may call for new modules whose filenames and directories were
+    not specified in the plan.
 entities: []
 entity_relationships: []
 invariants: []

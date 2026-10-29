@@ -356,6 +356,34 @@ def test_scope_description_must_assign_each_unit_once() -> None:
         parse_item_description(invalid, group=group)
 
 
+def test_item_description_combines_excess_scope_entries_without_losing_units() -> None:
+    group = AllocationGroup(
+        "allocation-0001",
+        ("unit-0001", "unit-0002", "unit-0003", "unit-0004"),
+        (),
+        (),
+        "neutral",
+        4,
+    )
+    answer = {
+        "title": "Implement the verification script",
+        "objective": "Validate all configured attestation steps.",
+        "scope": [
+            {"description": f"Implement part {index}.", "unit_ids": [unit_id]}
+            for index, unit_id in enumerate(group.unit_ids, start=1)
+        ],
+    }
+
+    parsed = parse_item_description(answer, group=group)
+
+    assert len(parsed.scope) == 3
+    assert (
+        tuple(unit_id for scope in parsed.scope for unit_id in scope.unit_ids)
+        == group.unit_ids
+    )
+    assert "Implement part 1.; Implement part 2." == parsed.scope[0].description
+
+
 def test_item_description_question_example_passes_its_parser() -> None:
     group = AllocationGroup(
         "allocation-0001", ("unit-0001",), ("req-0001",), ("core",), "neutral", 1

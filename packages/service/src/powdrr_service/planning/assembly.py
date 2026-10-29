@@ -1164,7 +1164,10 @@ def parse_item_description(
     title = _text(value["title"], "/title", max_length=160)
     objective = _text(value["objective"], "/objective", max_length=1_000)
     raw_scope = _array(
-        value["scope"], "/scope", minimum=1, maximum=MAX_ITEM_SCOPE_ENTRIES
+        _combine_excess_scope_entries(value["scope"]),
+        "/scope",
+        minimum=1,
+        maximum=MAX_ITEM_SCOPE_ENTRIES,
     )
     scope: list[ItemScope] = []
     mentioned: list[str] = []
@@ -1189,6 +1192,51 @@ def parse_item_description(
             "/scope", "must cover each allocated unit exactly once"
         )
     return ItemDescription(title, objective, tuple(scope))
+
+
+def _combine_excess_scope_entries(value: Any) -> Any:
+    """Combine adjacent scope records when they exceed the contract limit."""
+    if not isinstance(value, list) or len(value) <= MAX_ITEM_SCOPE_ENTRIES:
+        return value
+    scope = list(value)
+    while len(scope) > MAX_ITEM_SCOPE_ENTRIES:
+        candidates: list[tuple[int, int, str]] = []
+        for index, (left, right) in enumerate(zip(scope, scope[1:])):
+            if not isinstance(left, Mapping) or not isinstance(right, Mapping):
+                return value
+            if set(left) != {"description", "unit_ids"} or set(right) != {
+                "description",
+                "unit_ids",
+            }:
+                return value
+            left_description = left["description"]
+            right_description = right["description"]
+            left_unit_ids = left["unit_ids"]
+            right_unit_ids = right["unit_ids"]
+            if (
+                not isinstance(left_description, str)
+                or not isinstance(right_description, str)
+                or not isinstance(left_unit_ids, list)
+                or not isinstance(right_unit_ids, list)
+                or not all(isinstance(unit_id, str) for unit_id in left_unit_ids)
+                or not all(isinstance(unit_id, str) for unit_id in right_unit_ids)
+            ):
+                return value
+            description = f"{left_description}; {right_description}"
+            if len(description) <= 500:
+                candidates.append((len(description), index, description))
+        if not candidates:
+            return value
+        _combined_length, index, description = min(candidates)
+        left = scope[index]
+        right = scope[index + 1]
+        scope[index : index + 2] = [
+            {
+                "description": description,
+                "unit_ids": [*left["unit_ids"], *right["unit_ids"]],
+            }
+        ]
+    return scope
 
 
 def build_item_description_request(
@@ -1227,9 +1275,11 @@ def build_item_description_request(
     return QuestionRequest(
         question=question,
         exact_question=(
-            "Describe this frozen CP-SAT group as a reviewable implementation item. "
-            "Do not add, remove, or reorder work units. Return concise title, "
-            "objective, and scope."
+            "Describe this frozen work-unit group as a reviewable implementation "
+            "item. Do not add, remove, or reorder work units. Return a concise "
+            "title, objective, and at most three scope entries. For four supplied "
+            "units, combine related units in one entry rather than returning four "
+            "one-unit entries."
         ),
         answer_field_definitions={
             "title": "Specific, outcome-oriented PR title.",

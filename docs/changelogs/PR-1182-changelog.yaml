@@ -1,9 +1,9 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1182
-title: Make plan sizing scale to large proposals
+title: Make large plan generation scale and recover
 intent:
-  problem: The CP-SAT plan partition searches can consume hours of CPU on large generated plans, preventing planning from reaching compilation.
-  goal: Preserve the existing plan sizing constraints and objective with deterministic dynamic programming whose runtime scales predictably with plan size.
+  problem: CP-SAT plan partition searches can consume hours of CPU on large plans, and an item description with four one-unit scope entries repeatedly fails the three-entry contract.
+  goal: Preserve plan-sizing constraints with deterministic dynamic programming and combine valid adjacent scope entries when a model answer exceeds the contract's scope-entry limit.
 human-decisions: []
 structured_files: []
 files:
@@ -92,6 +92,26 @@ files:
     span: {start_line: 312, end_line: 325}
     summary: Cover a 1,000-work-unit allocation.
     rationale: Verify deterministic sizing preserves ordered coverage and the maximum group size at planning scale.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1167, end_line: 1170}
+    summary: Normalize excess scope entries before validating the item description.
+    rationale: Recover valid work-unit coverage when the model returns one scope record per unit.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1197, end_line: 1241}
+    summary: Merge the shortest adjacent scope records while retaining their descriptions and unit IDs.
+    rationale: Reduce scope to the contract limit deterministically without dropping or reordering assigned work.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1278, end_line: 1282}
+    summary: Explain how to describe four supplied units with at most three scope records.
+    rationale: Give the model an explicit instruction that matches the parser contract.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 359, end_line: 386}
+    summary: Verify four valid scope records normalize to three without losing unit assignments.
+    rationale: Prevent a repeated description-shape error from blocking planning.
 entities:
   - id: explicit-work-unit-allocation
     type: Function
@@ -102,6 +122,12 @@ entities:
   - id: large-plan-sizing-regression
     type: Regression test
     action: added
+  - id: item-description-scope-normalizer
+    type: Function
+    action: added
+  - id: excess-scope-entry-regression
+    type: Regression test
+    action: added
 entity_relationships:
   - id: large-plan-test-verifies-explicit-allocation
     type: verifies
@@ -109,8 +135,14 @@ entity_relationships:
     target: explicit-work-unit-allocation
     action: added
     description: The regression allocates 1,000 work units and checks ordered full coverage and the maximum group size.
+  - id: excess-scope-test-verifies-scope-normalizer
+    type: verifies
+    source: excess-scope-entry-regression
+    target: item-description-scope-normalizer
+    action: added
+    description: The regression verifies adjacent scope entries merge while each work unit remains assigned once and in order.
 invariants:
   - id: plan-sizing-completes-with-predictable-runtime
-    description: Plan sizing optimizes contiguous group assignments while respecting the configured hard constraints and does not rely on an unbounded generic solver search.
+    description: Plan sizing optimizes contiguous group assignments within configured constraints, and item-description recovery preserves every assigned work unit while enforcing the scope-entry limit.
     action: altered
 guidance: []

@@ -207,6 +207,65 @@ def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
     assert len(serialized_input) < 24_000
 
 
+def test_entity_structural_change_omits_sibling_source_subjects() -> None:
+    subject = BoundStructuralSubject(
+        "python::module",
+        "entities",
+        "item-0001",
+        "changed",
+        ("req-01",),
+        ("unit-0001",),
+        ("anchor-01",),
+        False,
+        "src/module.py",
+    )
+    sibling_payload = "unrelated-sibling-description-" + ("x" * 300)
+    baseline = {
+        "entities": [
+            {"id": "python::module", "type": "Module", "path": "src/module.py"}
+        ],
+        "entity_relationships": [],
+        "files": [
+            {
+                "path": "src/module.py",
+                "summary": "large file summary marker " + ("s" * 2_000),
+            }
+        ],
+        "source_subjects": [
+            {
+                "stable_key": "python::module",
+                "path": "src/module.py",
+                "qualified_name": "module",
+            },
+            *[
+                {
+                    "stable_key": f"python::module.sibling_{index}",
+                    "path": "src/module.py",
+                    "file_entity_id": "python::module",
+                    "qualified_name": sibling_payload,
+                }
+                for index in range(100)
+            ],
+        ],
+    }
+    request = build_structural_change_request(
+        subject,
+        projected_baseline=baseline,
+        taxonomy_entity_types=("Module",),
+        planned_paths={"src/module.py"},
+        known_entity_ids={"python::module"},
+        valid_example={"result": "unchanged", "reason": "Already satisfied."},
+    )
+
+    serialized_input = build_question_messages(request)[1]["content"]
+
+    assert "python::module" in serialized_input
+    assert "python::module.sibling_0" not in serialized_input
+    assert sibling_payload not in serialized_input
+    assert "large file summary marker" not in serialized_input
+    assert len(serialized_input) < 24_000
+
+
 def test_structural_subject_pages_cover_all_subjects_and_require_final_page() -> None:
     baseline = {"entities": [{"id": f"entity-{index:02d}"} for index in range(12)]}
     first = _parse_page(

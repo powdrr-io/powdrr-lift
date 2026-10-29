@@ -819,13 +819,22 @@ def _structural_change_baseline_context(
         or record.get("source") in related_entity_ids
         or record.get("target") in related_entity_ids
     ]
-    relevant_source_subjects = [
-        record
-        for record in source_subjects
-        if record.get("stable_key") == subject_id
-        or record.get("path") in paths
-        or record.get("file_entity_id") in related_entity_ids
-    ]
+    if subject.section == "files":
+        relevant_source_subjects = [
+            record
+            for record in source_subjects
+            if record.get("stable_key") == subject_id
+            or record.get("path") in paths
+            or record.get("file_entity_id") in related_entity_ids
+        ]
+    elif subject.section == "entities":
+        relevant_source_subjects = [
+            record
+            for record in source_subjects
+            if record.get("stable_key") == subject_id
+        ]
+    else:
+        relevant_source_subjects = []
     relevant_files = [record for record in files if record.get("path") in paths]
     return {
         "fingerprint": snapshot_digest(snapshot),
@@ -837,10 +846,7 @@ def _structural_change_baseline_context(
             _pick_fields(record, ("id", "source", "relationship", "target"))
             for record in relevant_relationships
         ],
-        "files": [
-            _pick_fields(record, ("path", "summary", "rationale", "entities"))
-            for record in relevant_files
-        ],
+        "files": [_pick_fields(record, ("path",)) for record in relevant_files],
         "source_subjects": [
             _pick_fields(
                 record,

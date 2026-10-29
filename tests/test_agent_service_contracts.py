@@ -206,3 +206,23 @@ def test_legacy_planning_imports_reexport_service_owned_implementations() -> Non
 
     assert LegacyPlannedWrite is PlannedWrite
     assert legacy_compile_plan is compile_plan
+
+
+def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
+    from powdrr_local.planning.checkpoints import (
+        LocalCheckpointStore,
+        LocalDiagnosticCache,
+    )
+    from powdrr_service.planning import checkpoints as service_checkpoints
+
+    from powdrr_lift.workrr.planning.checkpoints import (
+        LocalCheckpointStore as LegacyLocalCheckpointStore,
+    )
+    from powdrr_lift.workrr.planning.checkpoints import (
+        LocalDiagnosticCache as LegacyLocalDiagnosticCache,
+    )
+
+    assert not hasattr(service_checkpoints, "LocalCheckpointStore")
+    assert not hasattr(service_checkpoints, "LocalDiagnosticCache")
+    assert LegacyLocalCheckpointStore is LocalCheckpointStore
+    assert LegacyLocalDiagnosticCache is LocalDiagnosticCache

@@ -1,0 +1,268 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1183
+title: Move local planning persistence behind adapters
+intent:
+  problem: Planning checkpoint records and reducers were mixed with Git metadata writes, file locking,
+    diagnostic files, and other local filesystem effects in the service package.
+  goal: Keep checkpoint formats and reduction in service code while moving local journal and diagnostic
+    persistence to the local adapter package without changing stored formats.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/local/src/powdrr_local/planning/__init__.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Add the local planning adapter namespace.
+  rationale: Group local persistence adapters under the local package.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 273
+  summary: Add Git-local checkpoint and diagnostic persistence adapters.
+  rationale: Keep Git metadata access, locks, atomic file writes, and filesystem permissions on the local
+    side while using service-owned checkpoint records and reducers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 348
+    end_line: 358
+  summary: Add local checkpoint adapter ownership metadata.
+  rationale: Keep the agent/service ownership inventory aligned with the new package boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 383
+    end_line: 383
+  summary: Clarify that service checkpoint modules retain policies and schemas.
+  rationale: Keep the agent/service ownership inventory aligned with the new package boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2934
+    end_line: 2935
+  summary: Record both service and local adapter imports for the compatibility shim.
+  rationale: Keep the agent/service ownership inventory aligned with the new package boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2940
+    end_line: 2940
+  summary: Clarify ownership of the compatibility module.
+  rationale: Keep the agent/service ownership inventory aligned with the new package boundary.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 209
+    end_line: 228
+  summary: Verify local persistence is absent from service exports and legacy names resolve to local adapters.
+  rationale: Guard package ownership while keeping compatibility imports stable.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Remove filesystem lock support from the service journal module.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Remove operating-system filesystem calls from service policy.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Remove subprocess and temporary-file dependencies from service policy.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Remove local filesystem path types from service code.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 718
+    end_line: 900
+  summary: Move local checkpoint journal file reads, locking, and atomic writes to powdrr_local.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 982
+    end_line: 1046
+  summary: Move local diagnostic cache reads and writes to powdrr_local.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 1143
+    end_line: 1144
+  summary: Remove local persistence adapter names from service exports.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 896
+    end_line: 896
+  summary: Expose the pure checkpoint event reducer for local stores.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 900
+    end_line: 900
+  summary: Expose session ID validation for local path construction.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 23
+  summary: Import local checkpoint persistence from powdrr_local.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Remove the LocalCheckpointStore import from the service module.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Update the compatibility module description.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 7
+  summary: Re-export local checkpoint persistence adapters.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 14
+  summary: Expose local adapter names through the legacy import path.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 13
+  summary: Keep service journal policy imports in service tests.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 16
+  summary: Import local persistence implementations from powdrr_local.
+  rationale: Record that local persistence is owned by the local adapter while service policy remains
+    unchanged.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 178
+    end_line: 178
+  summary: Use exported session ID validation in checkpoint construction.
+  rationale: Share path-safe ID validation and event reduction without moving filesystem effects back
+    into service code.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 338
+  summary: Use exported question ID validation in diagnostic parsing.
+  rationale: Share path-safe ID validation and event reduction without moving filesystem effects back
+    into service code.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 482
+    end_line: 482
+  summary: Use exported session ID validation during comment reduction.
+  rationale: Share path-safe ID validation and event reduction without moving filesystem effects back
+    into service code.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 578
+    end_line: 578
+  summary: Call the public pure event reducer from comment reduction.
+  rationale: Share path-safe ID validation and event reduction without moving filesystem effects back
+    into service code.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 585
+    end_line: 585
+  summary: Expose pure event reduction for the local checkpoint adapter.
+  rationale: Share path-safe ID validation and event reduction without moving filesystem effects back
+    into service code.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 680
+    end_line: 680
+  summary: Use exported session ID validation in the GitHub journal adapter.
+  rationale: Share path-safe ID validation and event reduction without moving filesystem effects back
+    into service code.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 717
+    end_line: 717
+  summary: Retain in-memory checkpoint storage in the service module.
+  rationale: Share path-safe ID validation and event reduction without moving filesystem effects back
+    into service code.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 857
+    end_line: 857
+  summary: Expose the shared session ID validator.
+  rationale: Share path-safe ID validation and event reduction without moving filesystem effects back
+    into service code.
+entities:
+- id: local-planning-persistence-adapter
+  type: Module
+  action: added
+entity_relationships: []
+invariants:
+- id: planning-checkpoint-format
+  description: The local checkpoint journal schema, Git common-dir location, permissions, append ordering,
+    and diagnostic redaction behavior remain unchanged.
+  action: altered
+guidance:
+- id: remaining-planning-adapter-work
+  description: GitHub tracker operations and plan, resume, and re-plan public operation routing remain
+    for later PR 4 increments.
+  action: added

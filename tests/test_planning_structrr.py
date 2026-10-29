@@ -99,7 +99,10 @@ def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
             {"path": f"src/unrelated-{index}.py", "summary": unrelated_payload}
             for index in range(50)
         ]
-        + [{"path": "src/relevant.py", "summary": "Relevant source file."}],
+        + [
+            {"path": "src/relevant.py", "summary": "Relevant source file."},
+            {"path": "src/projected.py", "summary": unrelated_payload},
+        ],
         "source_subjects": [
             {
                 "stable_key": f"python::unrelated_{index}",
@@ -118,7 +121,10 @@ def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
         ],
     }
     unit = _unit(
-        writes=(PlannedWrite("src/relevant.py", "implementation", "python", (), ()),)
+        writes=(
+            PlannedWrite("src/relevant.py", "implementation", "python", (), ()),
+            PlannedWrite("src/projected.py", "implementation", "python", (), ()),
+        )
     )
     text = "# Plan\n\nUpdate the relevant module.\n"
     source = segment_markdown_source(
@@ -169,6 +175,7 @@ def test_structural_questions_send_only_relevant_baseline_subjects() -> None:
     change_input = build_question_messages(change)[1]["content"]
 
     assert "python::relevant" in enumeration_input
+    assert "path::src/projected.py" in enumeration_input
     assert "python::unrelated_0" not in enumeration_input
     assert unrelated_payload not in enumeration_input
     assert "python::relevant" in change_input

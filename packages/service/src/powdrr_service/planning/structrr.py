@@ -755,6 +755,23 @@ def _structural_subject_index(
         for record in _mapping_records(snapshot.get("source_subjects"))
         if record.get("path") in paths and isinstance(record.get("stable_key"), str)
     ]
+    indexed_paths = {
+        str(record["path"])
+        for record in source_subjects
+        if isinstance(record.get("path"), str)
+    }
+    source_subjects.extend(
+        {
+            "stable_key": f"path::{path}",
+            "path": path,
+            "kind": "file",
+            "qualified_name": path,
+        }
+        for record in _mapping_records(snapshot.get("files"))
+        if isinstance((path := record.get("path")), str)
+        and path in paths
+        and path not in indexed_paths
+    )
     relationships = [
         record
         for record in _mapping_records(snapshot.get("entity_relationships"))

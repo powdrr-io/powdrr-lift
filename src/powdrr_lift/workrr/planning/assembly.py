@@ -755,11 +755,11 @@ def build_work_unit_proposal_request(
         "components": sorted(context.component_ids),
         "page_after": page_after,
     }
+    question_key = _digest(
+        {"requirement_ids": list(requirement_ids), "page_after": page_after}
+    )[-12:]
     question = Question(
-        question_id=(
-            f"propose-units-{requirement_ids[0]}-"
-            f"{_digest({'requirement_ids': list(requirement_ids), 'page_after': page_after})[-12:]}"
-        ),
+        question_id=(f"propose-units-{requirement_ids[0]}-{question_key}"),
         kind="propose_work_units",
         contract_version=1,
         subject_ids=tuple(requirement_ids),

@@ -1,0 +1,93 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1194
+title: Move reviewed plan records into service package
+intent:
+  problem: Service planning policy imported its core reviewed-plan data records from the legacy GitHub issue queue module.
+  goal: Make reviewed plan records service-owned while preserving the legacy import names for existing callers.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/architecture/agent-service-legacy-import-allowlist.json
+    type: modified
+    span: {start_line: 73, end_line: 82}
+    summary: Remove allowlist entries for service imports of legacy plan record types.
+    rationale: Planning modules now import the service-owned model definitions.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 486, end_line: 486}
+    summary: Remove the plan queue import from service repair policy ownership metadata.
+    rationale: Service repair now imports its records from the service package.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 530, end_line: 530}
+    summary: Remove the plan queue import from the service planning driver inventory.
+    rationale: The driver now uses service-owned plan records.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 555, end_line: 563}
+    summary: Register the service-owned plan model module.
+    rationale: Keep the module ownership inventory complete after extraction.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2822, end_line: 2823}
+    summary: Record the legacy queue module's re-export dependency on service models.
+    rationale: Document compatibility imports during the staged migration.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 24, end_line: 25}
+    summary: Stop importing reviewed plan records from the legacy issue queue.
+    rationale: Keep plan compilation independent of agent queue data definitions.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Import reviewed plan records from the service-owned model module.
+    rationale: Use the service-owned planning records during compilation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Remove the legacy queue import for plan records.
+    rationale: Keep service planning policy independent of the agent queue module.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 52, end_line: 52}
+    summary: Import plan records from the service-owned model module.
+    rationale: Use service-owned types when assembling reviewed plans.
+  - path: packages/service/src/powdrr_service/planning/plan_models.py
+    type: added
+    span: {start_line: 1, end_line: 36}
+    summary: Define the service-owned reviewed plan and work item records.
+    rationale: Keep the planning data model with the private planning policy that consumes it.
+  - path: packages/service/src/powdrr_service/planning/repair.py
+    type: modified
+    span: {start_line: 14, end_line: 14}
+    summary: Use service-owned plan records in repair logic.
+    rationale: Remove the repair algorithm's dependency on the GitHub issue queue module.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 18, end_line: 19}
+    summary: Remove plan record imports from the legacy queue import block.
+    rationale: Keep repair preparation bound to service-owned planning models.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 23, end_line: 23}
+    summary: Import plan records from the service model module.
+    rationale: Preserve the same records through repair draft compilation.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 26, end_line: 26}
+    summary: Re-export service-owned plan records from the legacy queue module.
+    rationale: Preserve existing imports while relocating the model definitions.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 65, end_line: 90}
+    summary: Remove the duplicate plan record definitions from the queue module.
+    rationale: Keep one canonical definition of reviewed plans and their work items.
+  - path: tests/test_agent_service_contracts.py
+    type: modified
+    span: {start_line: 233, end_line: 249}
+    summary: Verify legacy plan record names are identical to service-owned models.
+    rationale: Prevent the compatibility layer from growing a second record definition.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

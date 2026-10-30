@@ -9,7 +9,6 @@ from typing import Any
 
 from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.git import slugify_workflow_id
-from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_lift.workrr.multipr_structrr import MultiPRStructrrProposal
 from powdrr_service.planning.assembly import (
     MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
@@ -50,6 +49,7 @@ from powdrr_service.planning.dependencies import (
     discover_dependency_candidates,
 )
 from powdrr_service.planning.evidence import Evidence
+from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_service.planning.questions import (
     QuestionRequest,
     batch_question_requests,

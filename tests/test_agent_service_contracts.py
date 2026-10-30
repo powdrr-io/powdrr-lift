@@ -230,6 +230,23 @@ def test_legacy_plan_sizing_reexports_service_owned_policy() -> None:
         assert getattr(legacy_plan_sizing, name) is getattr(service_plan_sizing, name)
 
 
+def test_legacy_plan_record_names_reexport_service_owned_models() -> None:
+    from powdrr_service.planning.plan_models import (
+        PlannedWorkItem,
+        ReviewedExecutionPlan,
+    )
+
+    from powdrr_lift.workrr.github_issue_queue import (
+        PlannedWorkItem as LegacyPlannedWorkItem,
+    )
+    from powdrr_lift.workrr.github_issue_queue import (
+        ReviewedExecutionPlan as LegacyReviewedExecutionPlan,
+    )
+
+    assert LegacyPlannedWorkItem is PlannedWorkItem
+    assert LegacyReviewedExecutionPlan is ReviewedExecutionPlan
+
+
 def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
     from powdrr_local.planning.checkpoints import (
         GitHubCommentCheckpointStore,

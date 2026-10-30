@@ -11,7 +11,7 @@ from dataclasses import dataclass, replace
 from typing import Any
 
 from powdrr_lift.workrr.git import slugify_workflow_id
-from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 
 _REPAIR_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")

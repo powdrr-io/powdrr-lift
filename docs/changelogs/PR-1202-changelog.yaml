@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1201
+change_id: 1202
 title: Avoid duplicate subjects in structural page examples
 intent:
   problem: Building a later structural enumeration question could fail because its generated valid example repeated an entity already accepted on an earlier page.

@@ -1,0 +1,31 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1204
+title: Classify absent planned files as additions
+intent:
+  problem: Structural planning could reject a valid planned file when the model referenced it as existing even though it was absent from the projected baseline.
+  goal: Resolve planned file references against the projected baseline and deterministically classify an absent planned path as a new file subject.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 165, end_line: 188}
+    summary: Reclassify an unresolved reference to a planned, absent file as a new addition.
+    rationale: Allow structural planning to represent implementation files that the current repository baseline does not contain.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1180, end_line: 1187}
+    summary: Recognize the supported path and file reference prefixes.
+    rationale: Safely extract candidate paths before checking whether a planned file reference resolves.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 641, end_line: 692}
+    summary: Cover absent planned references and reject absent unplanned paths.
+    rationale: Verify both supported reference forms normalize to additions while references outside the write set remain invalid.
+entities: []
+entity_relationships: []
+invariants:
+  - id: absent-planned-files-are-added
+    description: A file reference absent from the projected baseline may be treated as a new subject only when its path is an allocated planned write.
+    action: added
+guidance: []

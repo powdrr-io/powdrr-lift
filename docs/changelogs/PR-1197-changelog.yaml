@@ -1,0 +1,370 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1197
+title: Remove dead helpers and duplicate test executions
+intent:
+  problem: The suite repeated a checked-in workflow scenario, contained an uncollected
+    live test body, and retained private helpers with no call sites.
+  goal: Remove proven duplicate or unreachable code and document the evidence and
+    remaining audit candidates.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/test-suite-rationalization-audit.md
+  type: modified
+  span:
+    start_line: 68
+    end_line: 105
+  summary: Record the duplicate-test and dead-code audit findings.
+  rationale: Make test reduction decisions traceable to runtime, references, and assertions.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 921
+    end_line: 924
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 1057
+    end_line: 1075
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1944
+    end_line: 2014
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 2244
+    end_line: 2257
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1180
+    end_line: 1265
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/core/project_structure.py
+  type: modified
+  span:
+    start_line: 214
+    end_line: 229
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/structrr/validation.py
+  type: modified
+  span:
+    start_line: 2232
+    end_line: 2238
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/chat_io.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/chat_io.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/chat_io.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 50
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/chat_tui.py
+  type: modified
+  span:
+    start_line: 645
+    end_line: 647
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 177
+    end_line: 187
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 586
+    end_line: 650
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 935
+    end_line: 950
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/execution_loop.py
+  type: modified
+  span:
+    start_line: 1002
+    end_line: 1005
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/execution_state.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/execution_state.py
+  type: modified
+  span:
+    start_line: 61
+    end_line: 73
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/execution_state.py
+  type: modified
+  span:
+    start_line: 102
+    end_line: 102
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/execution_state.py
+  type: modified
+  span:
+    start_line: 147
+    end_line: 300
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span:
+    start_line: 951
+    end_line: 955
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/scenario.py
+  type: modified
+  span:
+    start_line: 784
+    end_line: 789
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 319
+    end_line: 326
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2449
+    end_line: 2458
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 6089
+    end_line: 6107
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 6136
+    end_line: 6196
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 6354
+    end_line: 6374
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 6557
+    end_line: 6576
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 431
+    end_line: 445
+  summary: Remove a private helper with no call sites; keep the active replacement
+    or dynamic handler.
+  rationale: The deleted helper was unreachable from source, tests, and checked-in
+    workflows.
+- path: tests/test_workflow_scenario.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Remove the duplicate run of the checked-in task-all scenario.
+  rationale: The scenario suite already runs the same workflow fixture with the same
+    scripted provider and expectations.
+- path: tests/test_workflow_scenario.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 143
+  summary: Remove the duplicate run of the checked-in task-all scenario.
+  rationale: The scenario suite already runs the same workflow fixture with the same
+    scripted provider and expectations.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 3386
+    end_line: 3386
+  summary: Assert the timeout worktree remains on disk for recovery.
+  rationale: Check the observable recovery property directly instead of patching an
+    unreachable deletion helper.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 3388
+    end_line: 3392
+  summary: Assert the timeout worktree remains on disk for recovery.
+  rationale: Check the observable recovery property directly instead of patching an
+    unreachable deletion helper.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 3389
+    end_line: 3389
+  summary: Assert the timeout worktree remains on disk for recovery.
+  rationale: Check the observable recovery property directly instead of patching an
+    unreachable deletion helper.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 3400
+    end_line: 3400
+  summary: Assert the timeout worktree remains on disk for recovery.
+  rationale: Check the observable recovery property directly instead of patching an
+    unreachable deletion helper.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 6
+  summary: Remove an uncollected live test body and its unused imports.
+  rationale: The underscore-prefixed function was never collected by pytest and had
+    no callers.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 14
+  summary: Remove an uncollected live test body and its unused imports.
+  rationale: The underscore-prefixed function was never collected by pytest and had
+    no callers.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Remove an uncollected live test body and its unused imports.
+  rationale: The underscore-prefixed function was never collected by pytest and had
+    no callers.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 279
+  summary: Remove an uncollected live test body and its unused imports.
+  rationale: The underscore-prefixed function was never collected by pytest and had
+    no callers.
+entities:
+- id: test-suite-rationalization-audit
+  type: Design doc
+  action: modified
+entity_relationships: []
+invariants:
+- id: retain-only-reachable-private-helpers
+  description: Private helpers must have a source, test, or declarative workflow call
+    site; dynamic handlers are retained when registered indirectly.
+  action: added
+guidance: []

@@ -1,0 +1,56 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1207
+title: Move instruction context policy into service
+intent:
+  problem: Instruction classification context selection and retry policy remained in an agent core module after the instruction ledger had moved to service.
+  goal: Make bounded source context and retry decisions service-owned and remove the old agent module.
+human-decisions: []
+structured_files: []
+files:
+  - path: science/classifications/root_disposition/build_dataset.py
+    type: modified
+    span: {start_line: 23, end_line: 26}
+    summary: Import instruction context helpers from service planning.
+    rationale: Keep the classification dataset harness on the canonical module.
+  - path: science/classifications/root_disposition/build_dataset.py
+    type: modified
+    span: {start_line: 28, end_line: 31}
+    summary: Remove the import from the deleted agent module.
+    rationale: Remove the stale dependency on agent core.
+  - path: tests/test_instruction_context.py
+    type: modified
+    span: {start_line: 3, end_line: 6}
+    summary: Import context helpers from the service package.
+    rationale: Exercise the canonical service implementation directly.
+  - path: tests/test_instruction_context.py
+    type: modified
+    span: {start_line: 9, end_line: 12}
+    summary: Remove the import from the deleted agent module.
+    rationale: Keep tests aligned with the direct service import path.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 615, end_line: 623}
+    summary: Register the instruction context module as service-owned.
+    rationale: Keep the ownership inventory aligned with package contents.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 1296, end_line: 1304}
+    summary: Remove the old split-owned agent module record.
+    rationale: Keep the ownership inventory aligned with the source tree.
+  - path: docs/plans/routing-classifier-jev-and-dedicated-model-handoff.md
+    type: modified
+    span: {start_line: 80, end_line: 80}
+    summary: Point the context helper reference at the service module.
+    rationale: Keep the handoff plan aligned with current ownership.
+  - path: docs/plans/routing-classifier-jev-and-dedicated-model-handoff.md
+    type: modified
+    span: {start_line: 266, end_line: 266}
+    summary: Use the canonical service module name in the implementation notes.
+    rationale: Keep the handoff plan aligned with current ownership.
+entities: []
+entity_relationships: []
+invariants:
+  - id: instruction-context-policy-owned-by-service
+    description: Instruction context selection and retry classification are implemented in the service package, with consumers importing the service module directly.
+    action: added
+guidance: []

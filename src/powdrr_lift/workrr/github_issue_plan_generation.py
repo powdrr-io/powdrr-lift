@@ -14,6 +14,16 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.planning.multipr_structrr import (
+    MultiPRStructrrProposal,
+    compile_multi_pr_proposal,
+    write_multi_pr_proposal,
+)
+from powdrr_service.planning.plan_sizing import (
+    PlanSizingError,
+    size_plan_items,
+    split_mixed_runtime_items,
+)
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.planning.workflow_instance import (
     PLAN_WORKFLOW_PROCESS,
@@ -37,16 +47,6 @@ from powdrr_lift.workrr.github_issue_queue import (
     parse_reviewed_plan_yaml,
 )
 from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
-from powdrr_lift.workrr.multipr_structrr import (
-    MultiPRStructrrProposal,
-    compile_multi_pr_proposal,
-    write_multi_pr_proposal,
-)
-from powdrr_lift.workrr.plan_sizing import (
-    PlanSizingError,
-    size_plan_items,
-    split_mixed_runtime_items,
-)
 
 MAX_SOURCE_PLAN_CHARS = 500_000
 MAX_PLAN_ITEMS = 100

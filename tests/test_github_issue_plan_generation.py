@@ -8,6 +8,8 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from powdrr_service.planning.multipr_structrr import compile_multi_pr_proposal
+from powdrr_service.planning.plan_sizing import PlanSizingError, size_plan_items
 
 from powdrr_lift import cli
 from powdrr_lift.workrr import jev_classifier
@@ -34,8 +36,6 @@ from powdrr_lift.workrr.github_issue_queue import (
     QueueIssue,
     ReviewedExecutionPlan,
 )
-from powdrr_lift.workrr.multipr_structrr import compile_multi_pr_proposal
-from powdrr_lift.workrr.plan_sizing import PlanSizingError, size_plan_items
 
 
 @pytest.fixture(autouse=True)

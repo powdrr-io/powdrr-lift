@@ -7,6 +7,7 @@ from typing import Any
 import powdrr_service.planning.structrr as structrr_module
 import pytest
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
+from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.dependencies import Validation
 from powdrr_service.planning.questions import build_question_messages
 from powdrr_service.planning.source import (
@@ -28,7 +29,6 @@ from powdrr_service.planning.structrr import (
     parse_structural_subject_page,
 )
 
-from powdrr_lift.workrr.planning.contracts import PlanningContractError
 from powdrr_lift.workrr.planning.driver import (
     SourceLedger,
     SourceLedgerQuestionMachine,

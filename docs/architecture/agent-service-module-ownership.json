@@ -977,14 +977,14 @@
         "powdrr_lift.workrr.github_issue_queue",
         "powdrr_lift.workrr.human_task",
         "powdrr_lift.workrr.local_model",
-        "powdrr_lift.workrr.plan_sizing",
-        "powdrr_lift.workrr.planning.assembly",
+        "powdrr_service.planning.plan_sizing",
+        "powdrr_service.planning.assembly",
         "powdrr_lift.workrr.planning.checkpoints",
-        "powdrr_lift.workrr.planning.compiler",
+        "powdrr_service.planning.compiler",
         "powdrr_lift.workrr.planning.evidence",
         "powdrr_service.planning.driver",
-        "powdrr_lift.workrr.planning.repair_service",
-        "powdrr_lift.workrr.planning.service",
+        "powdrr_service.planning.repair_service",
+        "powdrr_service.planning.service",
         "powdrr_service.planning.source",
         "powdrr_lift.workrr.procedrr_chat",
         "powdrr_lift.workrr.prompt_benchmark_comparison",
@@ -2847,8 +2847,8 @@
         "powdrr_lift.structrr.rebase",
         "powdrr_lift.workrr.github_issue_queue",
         "powdrr_lift.workrr.llm",
-        "powdrr_lift.workrr.multipr_structrr",
-        "powdrr_lift.workrr.plan_sizing",
+        "powdrr_service.planning.multipr_structrr",
+        "powdrr_service.planning.plan_sizing",
         "powdrr_service.planning.workflow_instance",
         "powdrr_service.planning.workflow_ids"
       ],
@@ -2862,8 +2862,8 @@
       "extraction_pr": "4/7",
       "internal_imports": [
         "powdrr_lift.workrr.github_issue_plan_generation",
-        "powdrr_lift.workrr.planning.compiler",
-        "powdrr_lift.workrr.planning.repair",
+        "powdrr_service.planning.compiler",
+        "powdrr_service.planning.repair",
         "powdrr_service.planning.plan_document",
         "powdrr_service.planning.plan_models"
       ],
@@ -2950,17 +2950,6 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_service.planning.multipr_structrr"
-      ],
-      "kind": "python_module",
-      "owner": "agent",
-      "path": "src/powdrr_lift/workrr/multipr_structrr.py",
-      "rationale": "Compatibility re-export of service-owned multi-PR Structrr policy",
-      "reviewed": true
-    },
-    {
       "extraction_pr": "5/7",
       "internal_imports": [
         "powdrr_lift.repository_state",
@@ -2999,37 +2988,12 @@
     },
     {
       "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_service.planning.plan_sizing"
-      ],
+      "internal_imports": [],
       "kind": "python_module",
       "owner": "agent",
-      "path": "src/powdrr_lift/workrr/plan_sizing.py",
-      "rationale": "Compatibility re-export of service-owned plan sizing policy",
-      "reviewed": true
-    },
-    {
-      "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_lift.workrr.planning.driver",
-        "powdrr_lift.workrr.planning.service"
-      ],
-      "kind": "python_module",
-      "owner": "service",
       "path": "src/powdrr_lift/workrr/planning/__init__.py",
-      "rationale": "bounded planning, question, dependency, or repair policy",
+      "rationale": "Namespace for agent-side pinned repository evidence helpers.",
       "reviewed": false
-    },
-    {
-      "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_service.planning.assembly"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/planning/assembly.py",
-      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
-      "reviewed": true
     },
     {
       "extraction_pr": "4",
@@ -3041,39 +3005,6 @@
       "owner": "split",
       "path": "src/powdrr_lift/workrr/planning/checkpoints.py",
       "rationale": "Compatibility re-exports for service journal policy and local persistence adapters.",
-      "reviewed": true
-    },
-    {
-      "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_service.planning.compiler"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/planning/compiler.py",
-      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
-      "reviewed": true
-    },
-    {
-      "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_service.planning.contracts"
-      ],
-      "kind": "python_module",
-      "owner": "service",
-      "path": "src/powdrr_lift/workrr/planning/contracts.py",
-      "rationale": "temporary compatibility shim for existing application imports; implementation is service-owned",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_service.planning.dependencies"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/planning/dependencies.py",
-      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
       "reviewed": true
     },
     {
@@ -3106,50 +3037,6 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_service.planning.questions"
-      ],
-      "kind": "python_module",
-      "owner": "service",
-      "path": "src/powdrr_lift/workrr/planning/questions.py",
-      "rationale": "temporary compatibility shim for existing application imports; implementation is service-owned",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_service.planning.repair"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/planning/repair.py",
-      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
-      "reviewed": true
-    },
-    {
-      "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_service.planning.repair_service"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/planning/repair_service.py",
-      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
-      "reviewed": true
-    },
-    {
-      "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_service.planning.service"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/planning/service.py",
-      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
-      "reviewed": true
-    },
-    {
-      "extraction_pr": "4",
-      "internal_imports": [
         "powdrr_agent.repository.read_pinned_file",
         "powdrr_service.planning.source"
       ],
@@ -3158,17 +3045,6 @@
       "path": "src/powdrr_lift/workrr/planning/source.py",
       "rationale": "temporary compatibility adapter captures pinned Git bytes through agent capability, then constructs the service source type",
       "reviewed": false
-    },
-    {
-      "extraction_pr": "4",
-      "internal_imports": [
-        "powdrr_service.planning.structrr"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/planning/structrr.py",
-      "rationale": "Temporary compatibility re-export for the combined legacy CLI and downstream imports.",
-      "reviewed": true
     },
     {
       "extraction_pr": "7",
@@ -3450,11 +3326,11 @@
         "powdrr_lift.workrr.github_issue_queue",
         "powdrr_lift.workrr.jev_classifier",
         "powdrr_lift.workrr.llm",
-        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_service.planning.multipr_structrr",
         "powdrr_lift.workrr.observer",
         "powdrr_lift.workrr.operation_validation",
         "powdrr_lift.workrr.paths",
-        "powdrr_lift.workrr.planning.repair_service",
+        "powdrr_service.planning.repair_service",
         "powdrr_lift.workrr.procedrr",
         "powdrr_lift.workrr.procedrr_chat",
         "powdrr_lift.workrr.procedrr_operations",

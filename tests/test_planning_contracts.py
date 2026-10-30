@@ -5,9 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from powdrr_service.planning.contracts import Question as ServiceQuestion
-
-from powdrr_lift.workrr.planning.contracts import (
+from powdrr_service.planning.contracts import (
     COVERAGE_ANSWER_JSON_SCHEMA,
     ENUMERATION_ANSWER_JSON_SCHEMA,
     HUMAN_SETUP_DESCRIPTION_JSON_SCHEMA,
@@ -23,6 +21,7 @@ from powdrr_lift.workrr.planning.contracts import (
     Question,
     parse_coverage_answer,
 )
+from powdrr_service.planning.contracts import Question as ServiceQuestion
 
 FIXTURES = Path(__file__).parent / "fixtures" / "planning"
 FAILURE_EXAMPLES = (

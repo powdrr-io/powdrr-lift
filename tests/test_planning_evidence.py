@@ -7,13 +7,17 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.coverage import (
     build_requirement_coverage_request as build_service_coverage_request,
+)
+from powdrr_service.planning.questions import (
+    MAX_QUESTION_INPUT_CHARS,
+    build_question_messages,
 )
 
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.planning import evidence as evidence_module
-from powdrr_lift.workrr.planning.contracts import PlanningContractError
 from powdrr_lift.workrr.planning.evidence import (
     Evidence,
     EvidenceError,
@@ -24,10 +28,6 @@ from powdrr_lift.workrr.planning.evidence import (
     read_pinned_code_file,
     record_file_evidence,
     search_requirement_evidence,
-)
-from powdrr_lift.workrr.planning.questions import (
-    MAX_QUESTION_INPUT_CHARS,
-    build_question_messages,
 )
 from powdrr_lift.workrr.planning.source import (
     PinnedSourceDocument,

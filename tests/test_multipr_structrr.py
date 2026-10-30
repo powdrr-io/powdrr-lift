@@ -4,8 +4,7 @@ import copy
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.structrr.rebase import snapshot_digest
-from powdrr_lift.workrr.multipr_structrr import (
+from powdrr_service.planning.multipr_structrr import (
     MultiPRStructrrProposal,
     active_decision_drift_findings,
     compile_multi_pr_proposal,
@@ -14,6 +13,8 @@ from powdrr_lift.workrr.multipr_structrr import (
     rebase_item_proposal,
     write_multi_pr_proposal,
 )
+
+from powdrr_lift.structrr.rebase import snapshot_digest
 
 
 def _plan_item(item_id: str) -> dict[str, object]:

@@ -36,6 +36,7 @@ from powdrr_local.planning.sessions import GitHubPlanningIssueStore
 from powdrr_service.planning.assembly import PathFact
 from powdrr_service.planning.compiler import PlanningCompilationError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
+from powdrr_service.planning.plan_sizing import PATH_RUNTIME_SUFFIXES
 from powdrr_service.planning.service import (
     PlanningOptions,
     PlanningServiceError,
@@ -260,7 +261,6 @@ from powdrr_lift.workrr.human_task import (
     run_human_task,
 )
 from powdrr_lift.workrr.local_model import download_local_qwen_model
-from powdrr_lift.workrr.plan_sizing import PATH_RUNTIME_SUFFIXES
 from powdrr_lift.workrr.planning.evidence import (
     read_evidence_excerpt,
     search_requirements_evidence,

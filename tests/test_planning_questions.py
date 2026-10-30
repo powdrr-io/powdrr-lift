@@ -6,16 +6,7 @@ from dataclasses import replace
 from typing import Any
 
 import pytest
-from powdrr_service.planning.questions import (
-    QuestionRequest as ServiceQuestionRequest,
-)
-from powdrr_service.planning.questions import (
-    run_question as service_run_question,
-)
-
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
-from powdrr_lift.workrr.planning.contracts import (
+from powdrr_service.planning.contracts import (
     COVERAGE_ANSWER_JSON_SCHEMA,
     ENUMERATION_ANSWER_JSON_SCHEMA,
     CoverageAnswer,
@@ -24,7 +15,7 @@ from powdrr_lift.workrr.planning.contracts import (
     Question,
     parse_coverage_answer,
 )
-from powdrr_lift.workrr.planning.questions import (
+from powdrr_service.planning.questions import (
     MAX_QUESTION_ANSWER_CHARS,
     MAX_QUESTION_INPUT_CHARS,
     MAX_SOURCE_BLOCK_CHARS,
@@ -39,6 +30,15 @@ from powdrr_lift.workrr.planning.questions import (
     run_questions,
     split_source_excerpt,
 )
+from powdrr_service.planning.questions import (
+    QuestionRequest as ServiceQuestionRequest,
+)
+from powdrr_service.planning.questions import (
+    run_question as service_run_question,
+)
+
+from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
 
 _VALID_PAGE = {
     "records": [{"statement": "One requirement."}],

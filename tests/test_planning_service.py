@@ -11,7 +11,17 @@ from powdrr_service.planning.checkpoints import (
     InMemoryCheckpointStore,
     PlanningCheckpoint,
 )
+from powdrr_service.planning.contracts import (
+    EnumerationAnswer,
+    PlanningContractError,
+    Question,
+)
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
+from powdrr_service.planning.questions import (
+    QuestionRequest,
+    SourceExcerpt,
+    batch_question_requests,
+)
 from powdrr_service.planning.service import (
     PlanningOptions,
     PlanningSession,
@@ -22,17 +32,7 @@ from powdrr_service.planning.service import (
 )
 
 from powdrr_lift.workrr.github_issue_queue import QueueIssue
-from powdrr_lift.workrr.planning.contracts import (
-    EnumerationAnswer,
-    PlanningContractError,
-    Question,
-)
 from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
-from powdrr_lift.workrr.planning.questions import (
-    QuestionRequest,
-    SourceExcerpt,
-    batch_question_requests,
-)
 from powdrr_lift.workrr.planning.source import (
     PinnedSourceDocument,
     segment_markdown_source,

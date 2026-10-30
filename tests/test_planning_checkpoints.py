@@ -22,8 +22,7 @@ from powdrr_service.planning.checkpoints import (
     reduce_checkpoint_comments,
     render_checkpoint_comments,
 )
-
-from powdrr_lift.workrr.planning.contracts import PlanningContractError, Question
+from powdrr_service.planning.contracts import PlanningContractError, Question
 
 
 def _question(question_id: str = "q-000001") -> dict[str, Any]:

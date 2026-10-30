@@ -15,6 +15,7 @@ from powdrr_service.planning.compiler import (
     serialize_reviewed_plan_yaml,
     validate_compiled_plan,
 )
+from powdrr_service.planning.multipr_structrr import compile_multi_pr_proposal
 from powdrr_service.planning.plan_document import (
     PlanDocumentError,
     parse_reviewed_plan_yaml,
@@ -25,7 +26,6 @@ from powdrr_lift.workrr.github_issue_queue import (
     PlannedWorkItem,
     ReviewedExecutionPlan,
 )
-from powdrr_lift.workrr.multipr_structrr import compile_multi_pr_proposal
 
 
 def _source_digest(value: str) -> str:

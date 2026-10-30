@@ -1,0 +1,178 @@
+{
+  "schema": "https://powdrr.io/schema/changelog-v2",
+  "change_id": 1219,
+  "title": "Add local repository registry for workspace",
+  "intent": {
+    "problem": "Browser workspace operations need a stable repository selector but must not accept arbitrary filesystem paths on normal job and conversation routes.",
+    "goal": "Explicitly register validated Git working trees, assign opaque IDs, and resolve those IDs to canonical roots inside the backend."
+  },
+  "human-decisions": [],
+  "structured_files": [],
+  "files": [
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 56,
+        "end_line": 56
+      },
+      "summary": "Define the repository registry record and path-safe public projection.",
+      "rationale": "Represent registered repositories with a stable opaque ID while keeping canonical local paths out of browser-facing data."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 354,
+        "end_line": 392
+      },
+      "summary": "Define the repository registry record and path-safe public projection.",
+      "rationale": "Represent registered repositories with a stable opaque ID while keeping canonical local paths out of browser-facing data."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 12,
+        "end_line": 12
+      },
+      "summary": "Validate, persist, and resolve explicitly registered Git repository roots.",
+      "rationale": "Allow future workspace routes to resolve opaque repository IDs without accepting arbitrary paths for normal operations."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 29,
+        "end_line": 29
+      },
+      "summary": "Validate, persist, and resolve explicitly registered Git repository roots.",
+      "rationale": "Allow future workspace routes to resolve opaque repository IDs without accepting arbitrary paths for normal operations."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 95,
+        "end_line": 99
+      },
+      "summary": "Validate, persist, and resolve explicitly registered Git repository roots.",
+      "rationale": "Allow future workspace routes to resolve opaque repository IDs without accepting arbitrary paths for normal operations."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 102,
+        "end_line": 107
+      },
+      "summary": "Validate, persist, and resolve explicitly registered Git repository roots.",
+      "rationale": "Allow future workspace routes to resolve opaque repository IDs without accepting arbitrary paths for normal operations."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 156,
+        "end_line": 157
+      },
+      "summary": "Validate, persist, and resolve explicitly registered Git repository roots.",
+      "rationale": "Allow future workspace routes to resolve opaque repository IDs without accepting arbitrary paths for normal operations."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 168,
+        "end_line": 175
+      },
+      "summary": "Validate, persist, and resolve explicitly registered Git repository roots.",
+      "rationale": "Allow future workspace routes to resolve opaque repository IDs without accepting arbitrary paths for normal operations."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 189,
+        "end_line": 333
+      },
+      "summary": "Validate, persist, and resolve explicitly registered Git repository roots.",
+      "rationale": "Allow future workspace routes to resolve opaque repository IDs without accepting arbitrary paths for normal operations."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 2,
+        "end_line": 2
+      },
+      "summary": "Verify Git-root canonicalization, idempotent registration, and schema migration.",
+      "rationale": "Protect repository registration and path resolution behavior across storage upgrades."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 17,
+        "end_line": 17
+      },
+      "summary": "Verify Git-root canonicalization, idempotent registration, and schema migration.",
+      "rationale": "Protect repository registration and path resolution behavior across storage upgrades."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 253,
+        "end_line": 253
+      },
+      "summary": "Verify Git-root canonicalization, idempotent registration, and schema migration.",
+      "rationale": "Protect repository registration and path resolution behavior across storage upgrades."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 399,
+        "end_line": 452
+      },
+      "summary": "Verify Git-root canonicalization, idempotent registration, and schema migration.",
+      "rationale": "Protect repository registration and path resolution behavior across storage upgrades."
+    }
+  ],
+  "entities": [
+    {
+      "id": "ui-workspace-records",
+      "type": "Module",
+      "action": "modified"
+    },
+    {
+      "id": "workspace-repository-record",
+      "type": "Class",
+      "action": "added"
+    },
+    {
+      "id": "local-ui-workspace-store",
+      "type": "Class",
+      "action": "modified"
+    },
+    {
+      "id": "workspace-repository-table",
+      "type": "Table",
+      "action": "added"
+    },
+    {
+      "id": "workspace-schema-v4-migration",
+      "type": "Migration",
+      "action": "added"
+    },
+    {
+      "id": "workspace-event-type",
+      "type": "Enum",
+      "action": "modified"
+    }
+  ],
+  "entity_relationships": [],
+  "invariants": [],
+  "guidance": []
+}

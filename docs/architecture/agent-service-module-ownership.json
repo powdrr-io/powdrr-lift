@@ -631,6 +631,38 @@
       "reviewed": true
     },
     {
+      "extraction_pr": "1209",
+      "internal_imports": [
+        "powdrr_service.planning.instruction_ledger",
+        "powdrr_service.planning.semantic_contract"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/feature_obligation.py",
+      "rationale": "Service-owned canonical design projections, obligations, and required test contracts.",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "1209",
+      "internal_imports": [
+        "powdrr_service.planning.semantic_decision"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/semantic_contract.py",
+      "rationale": "Service-owned source extraction records and validated partial semantic contracts.",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "1209",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/semantic_decision.py",
+      "rationale": "Service-owned semantic decision schemas, exact source spans, and validation.",
+      "reviewed": true
+    },
+    {
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_lift.structrr.rebase",
@@ -1056,7 +1088,7 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.core.semantic_decision"
+        "powdrr_service.planning.semantic_decision"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -1237,18 +1269,6 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_service.planning.instruction_ledger",
-        "powdrr_lift.core.semantic_contract"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/feature_obligation.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "3/8",
-      "internal_imports": [
         "powdrr_lift.change_log_template",
         "powdrr_lift.core.codebase_state",
         "powdrr_lift.core.spec_paths",
@@ -1416,28 +1436,8 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.core.semantic_decision"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/semantic_contract.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "3/8",
-      "internal_imports": [],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/semantic_decision.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "3/8",
-      "internal_imports": [
-        "powdrr_lift.core.semantic_contract",
-        "powdrr_lift.core.semantic_decision"
+        "powdrr_service.planning.semantic_contract",
+        "powdrr_service.planning.semantic_decision"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2564,11 +2564,11 @@
       "internal_imports": [
         "powdrr_lift.core.behavior_contract",
         "powdrr_lift.core.decision_obligation",
-        "powdrr_lift.core.feature_obligation",
+        "powdrr_service.planning.feature_obligation",
         "powdrr_service.planning.instruction_ledger",
         "powdrr_lift.core.repository_inventory",
-        "powdrr_lift.core.semantic_contract",
-        "powdrr_lift.core.semantic_decision",
+        "powdrr_service.planning.semantic_contract",
+        "powdrr_service.planning.semantic_decision",
         "powdrr_lift.core.semantic_faithfulness",
         "powdrr_lift.errors",
         "powdrr_lift.structrr.obligation_evidence",
@@ -3182,7 +3182,7 @@
       "internal_imports": [
         "powdrr_lift.core.behavior_contract",
         "powdrr_lift.core.decision_obligation",
-        "powdrr_lift.core.semantic_contract",
+        "powdrr_service.planning.semantic_contract",
         "powdrr_lift.core.semantic_faithfulness",
         "powdrr_lift.workrr.llm",
         "powdrr_lift.workrr.protocol"
@@ -3325,8 +3325,8 @@
       "extraction_pr": "5/7",
       "internal_imports": [
         "powdrr_lift.core.repository_inventory",
-        "powdrr_lift.core.semantic_contract",
-        "powdrr_lift.core.semantic_decision"
+        "powdrr_service.planning.semantic_contract",
+        "powdrr_service.planning.semantic_decision"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3381,8 +3381,8 @@
       "extraction_pr": "5/7",
       "internal_imports": [
         "powdrr_lift.core.classifier_input",
-        "powdrr_lift.core.semantic_contract",
-        "powdrr_lift.core.semantic_decision",
+        "powdrr_service.planning.semantic_contract",
+        "powdrr_service.planning.semantic_decision",
         "powdrr_lift.core.semantic_faithfulness",
         "powdrr_lift.workrr.semantic_classifier"
       ],

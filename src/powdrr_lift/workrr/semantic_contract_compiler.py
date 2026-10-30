@@ -8,21 +8,22 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from powdrr_lift.core.classifier_input import format_classifier_input
-from powdrr_lift.core.semantic_contract import (
+from powdrr_service.planning.semantic_contract import (
     BoundSourceExtraction,
     PartialSemanticContract,
     SemanticContractError,
     SourceExtractionSpec,
     compile_partial_semantic_contract,
 )
-from powdrr_lift.core.semantic_decision import (
+from powdrr_service.planning.semantic_decision import (
     DECISION_VALUES,
     SEMANTIC_DIMENSION_DECISION_KINDS,
     SemanticDecision,
     SemanticDecisionProvider,
     SemanticDecisionSpec,
 )
+
+from powdrr_lift.core.classifier_input import format_classifier_input
 from powdrr_lift.core.semantic_faithfulness import (
     FieldEntailmentReview,
 )

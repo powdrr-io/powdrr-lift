@@ -961,8 +961,8 @@ Implementation:
 Expected touchpoints:
 
 - `src/powdrr_lift/core/semantic_boundary.py`;
-- `src/powdrr_lift/core/semantic_decision.py`;
-- `src/powdrr_lift/core/semantic_contract.py`;
+- `packages/service/src/powdrr_service/planning/semantic_decision.py`;
+- `packages/service/src/powdrr_service/planning/semantic_contract.py`;
 - `src/powdrr_lift/workrr/semantic_boundary_compiler.py`;
 - `src/powdrr_lift/workrr/semantic_contract_compiler.py`;
 - `src/powdrr_lift/workrr/verification_case_compiler.py`;

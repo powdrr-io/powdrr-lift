@@ -65,8 +65,8 @@ base; line numbers and function placement will change.
 | `src/powdrr_lift/workrr/command_catalog.py` | Prepares/binds atomicity, source decisions, extracted contracts, and scenario artifacts. | Carry new bounded context and decisions through workflow command boundaries. |
 | `src/powdrr_lift/workrr/semantic_contract_compiler.py` | Routing and dependent classifiers; exact subject/behavior/modifier extraction; partial-contract compilation. | Improve inputs and targeted semantic questions without replacing the compiler. |
 | `src/powdrr_lift/core/classifier_input.py` | Serializes optional containing/neighboring source context. | Reuse for bounded context; currently available helper does not prove context is wired into each decision. |
-| `src/powdrr_lift/core/semantic_decision.py` | Allowed labels, unresolved reasons, decisions, exact spans, fingerprints. | Version any changed decision contracts; preserve provider independence. |
-| `src/powdrr_lift/core/semantic_contract.py` | Partial semantic contract model. | Carry scope/modifiers and conditional dimensions as needed. |
+| `packages/service/src/powdrr_service/planning/semantic_decision.py` | Allowed labels, unresolved reasons, decisions, exact spans, fingerprints. | Version any changed decision contracts; preserve provider independence. |
+| `packages/service/src/powdrr_service/planning/semantic_contract.py` | Partial semantic contract model. | Carry scope/modifiers and conditional dimensions as needed. |
 | `src/powdrr_lift/core/semantic_faithfulness.py` | Source entailment reviews for existing semantic fields. | Extend existing checking to added scenario claims and relationships. |
 | `src/powdrr_lift/core/behavior_contract.py` | Validates and renders scenarios, capabilities, relations, assumptions. | Render accepted decisions accurately and retain explicit assumption status. |
 | `src/powdrr_lift/core/implementation_packet.py` and `src/powdrr_lift/workrr/coding_agent.py` | Compile implementation content and the actual worker prompt. | Ensure classifier decisions constrain every relevant worker-facing section. |

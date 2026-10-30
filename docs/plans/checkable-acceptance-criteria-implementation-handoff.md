@@ -105,9 +105,9 @@ label its revision; do not reconstruct the old prompt from memory.
 | --- | --- |
 | `core/instruction_ledger.py` | Preserve source ancestry; extend split relations and qualifier attachment. |
 | `core/classifier_input.py` | Assemble bounded containing/neighboring context for semantic questions. |
-| `core/semantic_decision.py` | Define and version new bounded decisions; retain provider independence. |
+| `packages/service/src/powdrr_service/planning/semantic_decision.py` | Define and version new bounded decisions; retain provider independence. |
 | `workrr/semantic_contract_compiler.py` | Attach semantic interpretation to deterministic source spans; avoid treating unknown family as unknown meaning. |
-| `core/semantic_contract.py` | Version and validate the additional interpretation fields. |
+| `packages/service/src/powdrr_service/planning/semantic_contract.py` | Version and validate the additional interpretation fields. |
 | `core/behavior_contract.py` | Introduce criterion quality and typed acceptance structures; change rendering. |
 | `core/semantic_faithfulness.py` | Review assertion-level additions; distinguish illustrative setup from required behavior; repair overflow locally. |
 | `workrr/command_catalog.py` | Register, prepare, bind, persist, and connect new stages; replace false resolved fallbacks. |

@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
-from powdrr_lift.core.semantic_decision import (
+from powdrr_service.planning.semantic_decision import (
     DECISION_VALUES,
     SEMANTIC_DIMENSION_DECISION_KINDS,
 )

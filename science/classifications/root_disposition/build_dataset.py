@@ -28,8 +28,8 @@ from powdrr_service.planning.instruction_ledger import (
     apply_atomicity_decisions,
     compile_instruction_ledger,
 )
+from powdrr_service.planning.semantic_decision import DECISION_VALUES
 
-from powdrr_lift.core.semantic_decision import DECISION_VALUES
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.provider_config import default_llm_mappings
 from powdrr_lift.workrr.providers import (

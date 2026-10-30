@@ -726,7 +726,7 @@ Create focused modules rather than expanding `feature_endpoint.py` indefinitely:
 
 ```text
 packages/service/src/powdrr_service/planning/instruction_ledger.py
-src/powdrr_lift/core/feature_obligation.py
+packages/service/src/powdrr_service/planning/feature_obligation.py
 src/powdrr_lift/core/implementation_packet.py
 src/powdrr_lift/core/obligation_review.py
 src/powdrr_lift/workrr/instruction_compiler.py
@@ -738,7 +738,7 @@ Suggested responsibilities:
 
 - `core/instruction_ledger.py`: immutable source, clause, disposition, and
   ledger contracts; IDs; fingerprints; reference validation.
-- `core/feature_obligation.py`: design projection, obligation, and contract
+- `packages/service/src/powdrr_service/planning/feature_obligation.py`: design projection, obligation, and contract
   records.
 - `core/implementation_packet.py`: worker and repair packets.
 - `core/obligation_review.py`: semantic review result and aggregate status.

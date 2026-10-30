@@ -9,11 +9,11 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Literal
 
-from powdrr_lift.core.instruction_ledger import (
+from powdrr_service.planning.contracts import PlanningContractError, Question
+from powdrr_service.planning.instruction_ledger import (
     InstructionLedger,
     compile_instruction_ledger,
 )
-from powdrr_service.planning.contracts import PlanningContractError, Question
 from powdrr_service.planning.questions import (
     ContextRecord,
     QuestionRequest,

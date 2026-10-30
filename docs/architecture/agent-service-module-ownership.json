@@ -602,7 +602,7 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.core.instruction_ledger",
+        "powdrr_service.planning.instruction_ledger",
         "powdrr_service.planning.contracts",
         "powdrr_service.planning.questions"
       ],
@@ -611,6 +611,15 @@
       "path": "packages/service/src/powdrr_service/planning/source.py",
       "rationale": "service-owned pinned-source segmentation, obligation extraction, and coverage accounting",
       "reviewed": false
+    },
+    {
+      "extraction_pr": "1203",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/instruction_ledger.py",
+      "rationale": "Service-owned deterministic instruction segmentation, source identity, and clause validation.",
+      "reviewed": true
     },
     {
       "extraction_pr": "4",
@@ -1294,13 +1303,15 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
-      "internal_imports": [],
+      "extraction_pr": "1203",
+      "internal_imports": [
+        "powdrr_service.planning.instruction_ledger"
+      ],
       "kind": "python_module",
-      "owner": "split",
+      "owner": "agent",
       "path": "src/powdrr_lift/core/instruction_ledger.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
-      "reviewed": false
+      "rationale": "Compatibility re-exports for the service-owned deterministic instruction ledger.",
+      "reviewed": true
     },
     {
       "extraction_pr": "3/8",

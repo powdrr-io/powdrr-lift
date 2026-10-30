@@ -7,16 +7,6 @@
       "rationale": "The current artifact-state inspection slice still uses the legacy projection; relocate it during final ownership cleanup."
     },
     {
-      "import": "powdrr_lift.core.instruction_ledger.InstructionLedger",
-      "owner_pr": 8,
-      "rationale": "Service source segmentation still shares established instruction-ledger semantics; move the product-semantic implementation and fixtures during final package cleanup."
-    },
-    {
-      "import": "powdrr_lift.core.instruction_ledger.compile_instruction_ledger",
-      "owner_pr": 8,
-      "rationale": "Service source segmentation still shares established instruction-ledger semantics; move the product-semantic implementation and fixtures during final package cleanup."
-    },
-    {
       "import": "powdrr_lift.errors.PowdrrExecutionError",
       "owner_pr": 6,
       "rationale": "Planning maps the existing provider execution error into its stable planning outcome; replace it with a service-owned error type during provider extraction."

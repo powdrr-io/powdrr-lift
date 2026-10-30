@@ -1,0 +1,83 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1203
+title: Move instruction ledger semantics into service
+intent:
+  problem: Service source analysis imported deterministic instruction identity, segmentation, and validation from an agent-owned core module.
+  goal: Make instruction ledger semantics service-owned while preserving the legacy module path for existing callers.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/instruction_ledger.py
+    type: added
+    span: {start_line: 1, end_line: 697}
+    summary: Own instruction source records, deterministic clause segmentation, validation, and atomicity split handling.
+    rationale: Keep source interpretation and instruction semantics with the planning service.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 12, end_line: 13}
+    summary: Import the instruction ledger from the service planning package.
+    rationale: Remove the source analyzer's dependency on agent core code.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 16, end_line: 16}
+    summary: Remove the old instruction ledger import.
+    rationale: Keep service source segmentation within the service package.
+  - path: src/powdrr_lift/core/instruction_ledger.py
+    type: modified
+    span: {start_line: 1, end_line: 13}
+    summary: Replace the implementation with legacy re-exports of service-owned ledger symbols.
+    rationale: Preserve imports for existing agent callers while maintaining a single implementation.
+  - path: docs/architecture/agent-service-legacy-import-allowlist.json
+    type: modified
+    span: {start_line: 9, end_line: 18}
+    summary: Remove service imports of the legacy instruction ledger.
+    rationale: Keep the service boundary allowlist aligned with source imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 605, end_line: 605}
+    summary: Point source analysis at service-owned instruction ledger code.
+    rationale: Keep ownership metadata aligned with service imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 615, end_line: 623}
+    summary: Register the service-owned instruction ledger module.
+    rationale: Track the canonical owner of instruction identity and segmentation.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 1306, end_line: 1309}
+    summary: Register the legacy core module's dependency on the service ledger.
+    rationale: Record the compatibility shim's canonical implementation source.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 1311, end_line: 1311}
+    summary: Mark the legacy instruction ledger module as agent-owned compatibility code.
+    rationale: Preserve old imports while documenting the temporary package boundary.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 1313, end_line: 1314}
+    summary: Describe the legacy module's compatibility role and reviewed status.
+    rationale: Keep ownership metadata aligned with the new re-export shim.
+  - path: tests/test_agent_service_contracts.py
+    type: modified
+    span: {start_line: 295, end_line: 304}
+    summary: Assert legacy ledger exports are identical to service-owned symbols.
+    rationale: Prevent policy duplication or API drift across the compatibility shim.
+entities:
+  - id: service-instruction-ledger-policy
+    type: Module
+    action: added
+  - id: legacy-instruction-ledger-compatibility-module
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: service-source-analysis-uses-service-ledger
+    description: Service planning source segmentation uses the canonical service-owned instruction ledger.
+    action: added
+  - id: legacy-ledger-symbol-identity-is-preserved
+    description: Legacy instruction ledger imports resolve to the exact service-owned symbols.
+    action: altered
+guidance:
+  - id: use-service-instruction-ledger
+    description: New service planning code should import instruction ledger types and helpers from powdrr_service.planning.instruction_ledger.
+    action: added

@@ -2229,13 +2229,6 @@ def _profile_markers(profile: DiscoveredValidationProfile) -> tuple[str, ...]:
     return command[:1]
 
 
-def _split_shell_arguments(command: str) -> tuple[str, ...]:
-    try:
-        return tuple(shlex.split(command, posix=True))
-    except ValueError:
-        return tuple(command.split())
-
-
 def _find_command(
     commands: tuple[tuple[str, ...], ...], marker: tuple[str, ...]
 ) -> tuple[str, ...] | None:

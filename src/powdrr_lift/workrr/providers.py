@@ -948,11 +948,6 @@ def _remove_schema_keywords(
     return convert(schema)
 
 
-def _serialize_prompt_json(value: object) -> str:
-    """Serialize structured prompt context without formatting-only whitespace."""
-    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
-
-
 def _serialize_openai_payload(
     payload: Mapping[str, Any],
     *,

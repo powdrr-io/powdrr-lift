@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import shutil
 import subprocess
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -59,19 +58,6 @@ class _ValidationGateState:
 
 
 @dataclass(slots=True)
-class _WorkflowStepCheckpoint:
-    identity: tuple[str, int]
-    transcript: list[dict[str, str]]
-    execution_events: list[dict[str, Any]]
-    execution_context: list[str]
-    handoff_records: dict[str, dict[str, Any]]
-    durable_facts: dict[str, dict[str, Any]]
-    current_file_path: Path | None
-    validation_gates: dict[str, _ValidationGateState]
-    worktree_files: dict[str, tuple[bool, bytes | None, int | None]]
-
-
-@dataclass(slots=True)
 class _WorkflowExecutionState:
     """Mutable execution state shared by the workflow runtime and adapters.
 
@@ -99,7 +85,6 @@ class _WorkflowExecutionState:
         default_factory=dict
     )
     validation_gates: dict[str, _ValidationGateState] = field(default_factory=dict)
-    step_checkpoint: _WorkflowStepCheckpoint | None = None
     stalled_step_context: list[dict[str, Any]] = field(default_factory=list)
     file_added_callback: Callable[[tuple[str, ...]], None] | None = None
     runtime: ExecutionRuntime | None = None
@@ -142,160 +127,6 @@ def _git_changed_paths(worktree_root: Path) -> set[str]:
             if path
         )
     return paths
-
-
-def _is_git_tracked(worktree_root: Path, relative_path: str) -> bool:
-    result = subprocess.run(
-        ["git", "ls-files", "--error-unmatch", "--", relative_path],
-        cwd=worktree_root,
-        capture_output=True,
-        check=False,
-    )
-    return result.returncode == 0
-
-
-def _snapshot_worktree_files(
-    worktree_root: Path,
-) -> dict[str, tuple[bool, bytes | None, int | None]]:
-    snapshot: dict[str, tuple[bool, bytes | None, int | None]] = {}
-    for relative_path in _git_changed_paths(worktree_root):
-        path = worktree_root / relative_path
-        if path.is_file():
-            stat = path.stat()
-            snapshot[relative_path] = (
-                _is_git_tracked(worktree_root, relative_path),
-                path.read_bytes(),
-                stat.st_mode & 0o777,
-            )
-        else:
-            snapshot[relative_path] = (
-                _is_git_tracked(worktree_root, relative_path),
-                None,
-                None,
-            )
-    return snapshot
-
-
-def _remove_worktree_path(path: Path) -> None:
-    if path.is_dir() and not path.is_symlink():
-        shutil.rmtree(path)
-    elif path.exists() or path.is_symlink():
-        path.unlink()
-
-
-def _restore_step_worktree(
-    worktree_root: Path,
-    baseline: Mapping[str, tuple[bool, bytes | None, int | None]],
-) -> None:
-    current_paths = _git_changed_paths(worktree_root)
-    for relative_path in sorted(current_paths | set(baseline)):
-        path = worktree_root / relative_path
-        snapshot = baseline.get(relative_path)
-        if snapshot is None:
-            if _is_git_tracked(worktree_root, relative_path):
-                subprocess.run(
-                    [
-                        "git",
-                        "restore",
-                        "--source=HEAD",
-                        "--staged",
-                        "--worktree",
-                        "--",
-                        relative_path,
-                    ],
-                    cwd=worktree_root,
-                    check=False,
-                )
-            else:
-                _remove_worktree_path(path)
-            continue
-
-        tracked, content, mode = snapshot
-        if tracked:
-            subprocess.run(
-                [
-                    "git",
-                    "restore",
-                    "--source=HEAD",
-                    "--staged",
-                    "--worktree",
-                    "--",
-                    relative_path,
-                ],
-                cwd=worktree_root,
-                check=False,
-            )
-        if content is None:
-            _remove_worktree_path(path)
-            continue
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_bytes(content)
-        if mode is not None:
-            path.chmod(mode)
-
-
-def _begin_step_checkpoint(
-    state: _WorkflowExecutionState,
-    *,
-    process: ProcessExecutionReference,
-    step_index: int,
-) -> None:
-    state.step_checkpoint = _WorkflowStepCheckpoint(
-        identity=(str(process.path), step_index),
-        transcript=list(state.transcript),
-        execution_events=list(state.execution_events),
-        execution_context=list(state.execution_context),
-        handoff_records={
-            name: dict(record) for name, record in state.handoff_records.items()
-        },
-        durable_facts={
-            name: dict(record) for name, record in state.durable_facts.items()
-        },
-        current_file_path=state.current_file_path,
-        validation_gates={
-            gate_id: _ValidationGateState(
-                step_index=gate_state.step_index,
-                discovered=gate_state.discovered,
-                epoch=gate_state.epoch,
-                obligations={
-                    obligation_id: _ValidationObligation(
-                        obligation_id=obligation.obligation_id,
-                        expected_action=dict(obligation.expected_action),
-                        source=dict(obligation.source),
-                        status=obligation.status,
-                        epoch=obligation.epoch,
-                        attempts=obligation.attempts,
-                        last_result=obligation.last_result,
-                    )
-                    for obligation_id, obligation in gate_state.obligations.items()
-                },
-                correction_required=gate_state.correction_required,
-                discovery_action=gate_state.discovery_action,
-            )
-            for gate_id, gate_state in state.validation_gates.items()
-        },
-        worktree_files=_snapshot_worktree_files(state.worktree_root),
-    )
-
-
-def _restore_step_checkpoint(state: _WorkflowExecutionState) -> None:
-    checkpoint = state.step_checkpoint
-    if checkpoint is None:
-        return
-    _restore_step_worktree(state.worktree_root, checkpoint.worktree_files)
-    state.transcript = list(checkpoint.transcript)
-    state.execution_events = list(checkpoint.execution_events)
-    state.execution_context = list(checkpoint.execution_context)
-    state.handoff_records = {
-        name: dict(record) for name, record in checkpoint.handoff_records.items()
-    }
-    state.durable_facts = {
-        name: dict(record) for name, record in checkpoint.durable_facts.items()
-    }
-    state.current_file_path = checkpoint.current_file_path
-    state.validation_gates = checkpoint.validation_gates
-    state.current_file_context_cache.clear()
-    state.fuzzy_match_cache.clear()
 
 
 def _record_durable_fact(

@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import select
 import sys
 from collections.abc import Callable
-from pathlib import Path
 from typing import TextIO
 
 try:
@@ -22,30 +20,6 @@ except ImportError:  # pragma: no cover - only used on non-POSIX platforms
 def _verbose_print(stderr: TextIO, verbose: bool, message: str) -> None:
     if verbose:
         print(f"[verbose] {message}", file=stderr)
-
-
-def _write_agent_error(repo_root: Path, message: str) -> None:
-    """Persist the latest failure context without hiding the original error."""
-    try:
-        (repo_root / "agent_error.txt").write_text(
-            message.rstrip() + "\n", encoding="utf-8"
-        )
-    except OSError:
-        return
-
-
-def _verbose_json(
-    stderr: TextIO,
-    verbose: bool,
-    label: str,
-    value: object,
-) -> None:
-    if not verbose:
-        return
-    serialized = json.dumps(value, indent=2, ensure_ascii=False, sort_keys=True)
-    for line_number, line in enumerate(serialized.splitlines()):
-        prefix = f"{label}: " if line_number == 0 else "  "
-        _verbose_print(stderr, verbose, f"{prefix}{line}")
 
 
 def _prompt_user(

@@ -428,21 +428,6 @@ def _replace_pre_step_result(value: Any, result: Any) -> Any:
     return value
 
 
-def _response_correction(messages: Sequence[Mapping[str, str]]) -> str:
-    """Extract the latest repair guidance from a task-agent request."""
-    for message in reversed(messages):
-        if message.get("role") != "user":
-            continue
-        try:
-            payload = json.loads(message["content"])
-        except (KeyError, TypeError, json.JSONDecodeError):
-            continue
-        step_context = payload.get("step_context")
-        if isinstance(step_context, list) and step_context:
-            return str(step_context[-1])
-    return "No repair guidance was included in the task-agent request."
-
-
 def _analyze_live_run(
     exchanges: Sequence[Mapping[str, Any]], stdout: str, stderr: str
 ) -> dict[str, Any]:

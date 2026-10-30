@@ -168,15 +168,16 @@ def test_run_opencode_resets_inactivity_timeout_on_progress_events(
         "-c",
         (
             "import sys, time; "
+            "time.sleep(1.0); "
             'print(\'{"type":"session.started"}\', flush=True); '
-            "time.sleep(0.05); "
+            "time.sleep(2.1); "
             'print(\'{"type":"session.completed"}\', flush=True)'
         ),
     ]
     result = run_opencode(
         command,
         log_path=tmp_path / "events.ndjson",
-        inactivity_timeout=0.1,
+        inactivity_timeout=3.0,
     )
 
     assert result.returncode == 0

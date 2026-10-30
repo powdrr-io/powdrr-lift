@@ -27,9 +27,34 @@
       "rationale": "The service still reuses the existing actual Structrr diff implementation; relocate it with the remaining Structrr product semantics."
     },
     {
+      "import": "powdrr_lift.structrr.actual_diff.StructrrActualDiff",
+      "owner_pr": 8,
+      "rationale": "The service-owned multi-PR proposal still consumes the existing Structrr diff record; relocate it with Structrr policy."
+    },
+    {
       "import": "powdrr_lift.structrr.bootstrap.bootstrap_structrr",
       "owner_pr": 8,
       "rationale": "Bootstrap still reuses the existing Structrr implementation over a service-owned snapshot; relocate it with the remaining Structrr product semantics."
+    },
+    {
+      "import": "powdrr_lift.structrr.candidate_comparison.compare_candidate_snapshot",
+      "owner_pr": 8,
+      "rationale": "The service-owned proposal reconciliation still uses the existing Structrr candidate comparison; relocate it with Structrr policy."
+    },
+    {
+      "import": "powdrr_lift.structrr.proposal.ProposalRevision",
+      "owner_pr": 8,
+      "rationale": "The service-owned multi-PR proposal still uses the established Structrr proposal record; relocate it with Structrr policy."
+    },
+    {
+      "import": "powdrr_lift.structrr.proposal.compile_proposal_revision",
+      "owner_pr": 8,
+      "rationale": "The service-owned multi-PR proposal still uses the established Structrr compiler; relocate it with Structrr policy."
+    },
+    {
+      "import": "powdrr_lift.structrr.rebase.rebase_structrr_snapshot",
+      "owner_pr": 8,
+      "rationale": "The service-owned multi-PR proposal still uses the existing Structrr rebase algorithm; relocate it with Structrr policy."
     },
     {
       "import": "powdrr_lift.structrr.rebase.snapshot_digest",
@@ -90,21 +115,6 @@
       "import": "powdrr_lift.workrr.llm.complete_json_with_timeout_retry",
       "owner_pr": 6,
       "rationale": "The legacy bounded JSON completion helper owns provider retry behavior; planning will consume the service inference contract after provider extraction."
-    },
-    {
-      "import": "powdrr_lift.workrr.multipr_structrr.MultiPRStructrrProposal",
-      "owner_pr": 4,
-      "rationale": "Planning and repair still call the existing multi-PR Structrr proposal compiler/loader; relocate these semantic helpers into the service package while preserving proposal formats."
-    },
-    {
-      "import": "powdrr_lift.workrr.multipr_structrr.compile_multi_pr_proposal",
-      "owner_pr": 4,
-      "rationale": "Planning and repair still call the existing multi-PR Structrr proposal compiler/loader; relocate these semantic helpers into the service package while preserving proposal formats."
-    },
-    {
-      "import": "powdrr_lift.workrr.multipr_structrr.load_multi_pr_proposal",
-      "owner_pr": 4,
-      "rationale": "Planning and repair still call the existing multi-PR Structrr proposal compiler/loader; relocate these semantic helpers into the service package while preserving proposal formats."
     },
     {
       "import": "powdrr_lift.workrr.procedrr.WorkrrProcedrrClient",

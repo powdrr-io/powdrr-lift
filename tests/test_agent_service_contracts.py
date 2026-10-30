@@ -247,6 +247,16 @@ def test_legacy_plan_record_names_reexport_service_owned_models() -> None:
     assert LegacyReviewedExecutionPlan is ReviewedExecutionPlan
 
 
+def test_legacy_multipr_structrr_reexports_service_owned_policy() -> None:
+    from powdrr_service.planning import multipr_structrr as service_multipr
+
+    from powdrr_lift.workrr import multipr_structrr as legacy_multipr
+
+    assert legacy_multipr.__all__ == service_multipr.__all__
+    for name in service_multipr.__all__:
+        assert getattr(legacy_multipr, name) is getattr(service_multipr, name)
+
+
 def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
     from powdrr_local.planning.checkpoints import (
         GitHubCommentCheckpointStore,

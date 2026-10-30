@@ -11,16 +11,16 @@ from pathlib import PurePosixPath
 from typing import Any, Literal
 
 from powdrr_lift.structrr.rebase import snapshot_digest
-from powdrr_lift.workrr.multipr_structrr import (
-    MultiPRStructrrProposal,
-    compile_multi_pr_proposal,
-)
 from powdrr_service.planning.assembly import WorkUnit
 from powdrr_service.planning.contracts import (
     MAX_CONTRACT_TEXT_LENGTH,
     MAX_ENUMERATION_RECORDS,
     PlanningContractError,
     Question,
+)
+from powdrr_service.planning.multipr_structrr import (
+    MultiPRStructrrProposal,
+    compile_multi_pr_proposal,
 )
 from powdrr_service.planning.questions import (
     ContextRecord,

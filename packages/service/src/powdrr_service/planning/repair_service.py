@@ -19,7 +19,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     render_plan_repair_metadata,
     serialize_reviewed_plan_yaml,
 )
-from powdrr_lift.workrr.multipr_structrr import load_multi_pr_proposal
+from powdrr_service.planning.multipr_structrr import load_multi_pr_proposal
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_service.planning.repair import (
     PlanDiscovery,

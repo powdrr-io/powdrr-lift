@@ -410,8 +410,8 @@
       "internal_imports": [
         "powdrr_lift.workrr.github_issue_plan_generation",
         "powdrr_lift.workrr.github_issue_queue",
-        "powdrr_lift.workrr.multipr_structrr",
-        "powdrr_service.planning.evidence"
+        "powdrr_service.planning.evidence",
+        "powdrr_service.planning.multipr_structrr"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -497,7 +497,7 @@
         "powdrr_lift.workrr.git",
         "powdrr_lift.workrr.github_issue_plan_generation",
         "powdrr_lift.workrr.github_issue_queue",
-        "powdrr_lift.workrr.multipr_structrr",
+        "powdrr_service.planning.multipr_structrr",
         "powdrr_service.planning.repair"
       ],
       "kind": "python_module",
@@ -526,13 +526,13 @@
       "internal_imports": [
         "powdrr_lift.structrr.rebase",
         "powdrr_lift.workrr.git",
-        "powdrr_lift.workrr.multipr_structrr",
         "powdrr_service.planning.assembly",
         "powdrr_service.planning.compiler",
         "powdrr_service.planning.contracts",
         "powdrr_service.planning.coverage",
         "powdrr_service.planning.dependencies",
         "powdrr_service.planning.evidence",
+        "powdrr_service.planning.multipr_structrr",
         "powdrr_service.planning.questions",
         "powdrr_service.planning.source",
         "powdrr_service.planning.structrr"
@@ -564,6 +564,21 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
+        "powdrr_lift.structrr.actual_diff",
+        "powdrr_lift.structrr.candidate_comparison",
+        "powdrr_lift.structrr.proposal",
+        "powdrr_lift.structrr.rebase",
+        "powdrr_lift.structrr.source_manifest"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/multipr_structrr.py",
+      "rationale": "Service-owned plan-wide Structrr proposal partitioning and reconciliation policy.",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "4",
+      "internal_imports": [
         "powdrr_lift.core.instruction_ledger",
         "powdrr_service.planning.contracts",
         "powdrr_service.planning.questions"
@@ -578,9 +593,9 @@
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_lift.structrr.rebase",
-        "powdrr_lift.workrr.multipr_structrr",
         "powdrr_service.planning.assembly",
         "powdrr_service.planning.contracts",
+        "powdrr_service.planning.multipr_structrr",
         "powdrr_service.planning.questions",
         "powdrr_service.planning.source"
       ],
@@ -2905,19 +2920,15 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "4/7",
+      "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.structrr.actual_diff",
-        "powdrr_lift.structrr.candidate_comparison",
-        "powdrr_lift.structrr.proposal",
-        "powdrr_lift.structrr.rebase",
-        "powdrr_lift.structrr.source_manifest"
+        "powdrr_service.planning.multipr_structrr"
       ],
       "kind": "python_module",
-      "owner": "split",
+      "owner": "agent",
       "path": "src/powdrr_lift/workrr/multipr_structrr.py",
-      "rationale": "service planning and GitHub policy; agent local Git effects",
-      "reviewed": false
+      "rationale": "Compatibility re-export of service-owned multi-PR Structrr policy",
+      "reviewed": true
     },
     {
       "extraction_pr": "5/7",

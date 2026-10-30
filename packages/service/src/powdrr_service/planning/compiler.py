@@ -24,8 +24,8 @@ from powdrr_lift.workrr.github_issue_queue import (
     parse_reviewed_plan_yaml,
     serialize_reviewed_plan_yaml,
 )
-from powdrr_lift.workrr.multipr_structrr import MultiPRStructrrProposal
 from powdrr_service.planning.evidence import Evidence, EvidenceError
+from powdrr_service.planning.multipr_structrr import MultiPRStructrrProposal
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 
 PLANNING_MANIFEST_SCHEMA = "https://powdrr.io/schemas/planning-manifest-v1"

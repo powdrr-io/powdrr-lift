@@ -648,6 +648,54 @@ def test_new_file_subject_is_bound_to_a_planned_path() -> None:
     assert operation["content"]["id"] == "file:src/new.py"
 
 
+@pytest.mark.parametrize("description_prefix", ["path::", "file:"])
+def test_prefixed_new_file_description_resolves_to_planned_path(
+    description_prefix: str,
+) -> None:
+    path = "src/new.py"
+    unit = _unit(
+        writes=(PlannedWrite(path, "implementation", "python", ("anchor-01",), ()),)
+    )
+    candidate = {
+        "section": "files",
+        "subject_ref": None,
+        "new_identity_description": f"{description_prefix}{path}",
+        "action": "added",
+        "requirement_ids": ["req-01"],
+        "unit_ids": [unit.id],
+        "source_refs": ["anchor-01"],
+    }
+
+    page = _parse_page(
+        _candidate_page([candidate], has_more=False, next_anchor=None),
+        units=(unit,),
+        baseline={"files": [], "source_subjects": []},
+    )
+
+    subject = page.records[0]
+    assert subject.subject_id == f"path::{path}"
+    assert subject.planned_path == path
+    assert subject.action == "added"
+
+
+def test_prefixed_new_file_description_must_still_match_a_planned_path() -> None:
+    candidate = {
+        "section": "files",
+        "subject_ref": None,
+        "new_identity_description": "path::src/unplanned.py",
+        "action": "added",
+        "requirement_ids": ["req-01"],
+        "unit_ids": ["unit-01"],
+        "source_refs": ["anchor-01"],
+    }
+
+    with pytest.raises(PlanningContractError, match="planned write path"):
+        _parse_page(
+            _candidate_page([candidate], has_more=False, next_anchor=None),
+            baseline={"files": [], "source_subjects": []},
+        )
+
+
 def test_existing_projected_file_path_is_a_valid_structural_subject() -> None:
     path = "src/yaml_strict.py"
     baseline = {"files": [{"path": path}], "source_subjects": []}

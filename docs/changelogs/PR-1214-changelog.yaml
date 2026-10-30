@@ -1,0 +1,31 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1214
+title: Normalize prefixed planned file descriptions
+intent:
+  problem: "Structural planning rejected a planned file when the model supplied its path with a path:: or file: identity prefix in new_identity_description."
+  goal: "Strip a supported identity prefix only when the resulting path exactly matches an allocated planned write, and continue rejecting all unplanned paths."
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 256, end_line: 256}
+    summary: Validate new file descriptions with the planned-path prefix resolver.
+    rationale: Accept prefixed identity syntax while preserving planned-write membership checks.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1230, end_line: 1239}
+    summary: Strip supported identity prefixes only when the remaining path is planned.
+    rationale: Normalize model output without accepting a path outside the unit write set.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 651, end_line: 698}
+    summary: "Cover path:: and file: prefixes and preserve rejection of unplanned paths."
+    rationale: Reproduce the item-83 failure while checking the resolver's boundary.
+entities: []
+entity_relationships: []
+invariants:
+  - id: new-file-descriptions-resolve-only-to-planned-writes
+    description: A supported file identity prefix may be removed from a new file description only when the remaining path is an allocated planned write.
+    action: altered
+guidance: []

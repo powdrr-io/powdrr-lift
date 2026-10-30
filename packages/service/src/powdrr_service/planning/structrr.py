@@ -253,7 +253,7 @@ def parse_structural_subject_page(
                 )
             assert new_description is not None
             if section == "files":
-                planned_path = _validate_planned_path(
+                planned_path = _validate_planned_file_description(
                     new_description,
                     planned_paths,
                     f"{pointer}/new_identity_description",
@@ -1225,6 +1225,16 @@ def _validate_planned_path(value: str, paths: set[str], pointer: str) -> str:
             pointer, "new file subject must name a planned write path"
         )
     return value
+
+
+def _validate_planned_file_description(
+    value: str, paths: set[str], pointer: str
+) -> str:
+    if value not in paths:
+        referenced_path = _file_reference_path(value)
+        if referenced_path is not None and referenced_path in paths:
+            value = referenced_path
+    return _validate_planned_path(value, paths, pointer)
 
 
 def _path(value: str, pointer: str) -> None:

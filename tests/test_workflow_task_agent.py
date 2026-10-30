@@ -922,9 +922,9 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     current, rebased_proposal, current_manifest, report = result
     assert current["entities"] == fresh_baseline["entities"]
     assert current["guidance"] == committed_bootstrap["guidance"]
-    assert rebased_proposal.structrr_baseline_fingerprint == task_agent.snapshot_digest(
-        current
-    )
+    from powdrr_service.structrr.snapshot import snapshot_digest
+
+    assert rebased_proposal.structrr_baseline_fingerprint == snapshot_digest(current)
     assert current_manifest == manifest
     assert len(bootstrap_calls) == 1
     bootstrap_root, bootstrap_options = bootstrap_calls[0]

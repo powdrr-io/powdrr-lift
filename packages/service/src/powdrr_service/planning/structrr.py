@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Literal
 
-from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_service.planning.assembly import WorkUnit
 from powdrr_service.planning.contracts import (
     MAX_CONTRACT_TEXT_LENGTH,
@@ -28,6 +27,7 @@ from powdrr_service.planning.questions import (
     SourceExcerpt,
 )
 from powdrr_service.planning.source import SegmentedSource
+from powdrr_service.structrr.snapshot import snapshot_digest
 
 _SECTIONS = frozenset({"entities", "entity_relationships", "files"})
 _ACTIONS = frozenset({"added", "changed", "deleted", "removed"})

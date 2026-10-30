@@ -6,13 +6,14 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from powdrr_service.structrr.snapshot import snapshot_digest
+
 from powdrr_lift.cli import main
 from powdrr_lift.structrr.intent_lineage import (
     INTENT_LINEAGE_HISTORY_SCHEMA,
     audit_intent_lineage,
 )
 from powdrr_lift.structrr.proposal import compile_proposal_revision
-from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.actualization import reconcile_actualization
 
 

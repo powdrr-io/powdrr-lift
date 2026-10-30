@@ -20,8 +20,8 @@ from powdrr_service.planning.plan_document import (
     PlanDocumentError,
     parse_reviewed_plan_yaml,
 )
+from powdrr_service.structrr.snapshot import snapshot_digest
 
-from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.github_issue_queue import (
     PlannedWorkItem,
     ReviewedExecutionPlan,

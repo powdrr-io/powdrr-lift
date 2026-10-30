@@ -13,8 +13,7 @@ from powdrr_service.planning.multipr_structrr import (
     rebase_item_proposal,
     write_multi_pr_proposal,
 )
-
-from powdrr_lift.structrr.rebase import snapshot_digest
+from powdrr_service.structrr.snapshot import snapshot_digest
 
 
 def _plan_item(item_id: str) -> dict[str, object]:

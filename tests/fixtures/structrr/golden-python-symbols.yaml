@@ -25,8 +25,8 @@ symbols:
     qualified_name: src.powdrr_lift.structrr.rebase.rebase_structrr_snapshot
     stable_key: python::src.powdrr_lift.structrr.rebase.rebase_structrr_snapshot
     span:
-      start_line: 132
-      end_line: 184
+      start_line: 119
+      end_line: 171
   - path: src/powdrr_lift/structrr/rebase.py
     kind: method
     qualified_name: src.powdrr_lift.structrr.rebase.StructrrRebaseReport.to_data

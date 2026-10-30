@@ -452,6 +452,7 @@ def build_subject_enumeration_request(
         units=units,
         source_refs=source_refs,
         projected_baseline=projected_baseline,
+        prior_subjects=prior_subjects,
         page_ordinal=page_ordinal,
     )
 
@@ -693,12 +694,20 @@ def _example_subject_page(
     units: Sequence[WorkUnit],
     source_refs: Sequence[str],
     projected_baseline: Mapping[str, Any],
+    prior_subjects: Sequence[BoundStructuralSubject],
     page_ordinal: int,
 ) -> Mapping[str, Any]:
     unit = units[0]
     paths = [write.path for candidate in units for write in candidate.planned_writes]
+    prior_subject_ids = {
+        (subject.section, subject.subject_id) for subject in prior_subjects
+    }
     subject_index = _structural_subject_index(projected_baseline, units)
-    existing_entities = _record_ids(subject_index, "entities", "id")
+    existing_entities = {
+        subject_id
+        for subject_id in _record_ids(subject_index, "entities", "id")
+        if ("entities", subject_id) not in prior_subject_ids
+    }
     if existing_entities:
         candidate = {
             "section": "entities",
@@ -709,8 +718,12 @@ def _example_subject_page(
             "unit_ids": [unit.id],
             "source_refs": [source_refs[0]],
         }
-    elif subject_index["source_subjects"]:
-        existing_file = subject_index["source_subjects"][0]
+    elif existing_files := [
+        record
+        for record in subject_index["source_subjects"]
+        if ("files", str(record["stable_key"])) not in prior_subject_ids
+    ]:
+        existing_file = existing_files[0]
         candidate = {
             "section": "files",
             "subject_ref": existing_file["stable_key"],
@@ -720,11 +733,16 @@ def _example_subject_page(
             "unit_ids": [unit.id],
             "source_refs": [source_refs[0]],
         }
-    elif paths:
+    elif new_paths := [
+        path
+        for path in paths
+        if ("files", f"path::{path}") not in prior_subject_ids
+        and not _subject_exists("files", f"path::{path}", projected_baseline)
+    ]:
         candidate = {
             "section": "files",
             "subject_ref": None,
-            "new_identity_description": paths[0],
+            "new_identity_description": new_paths[0],
             "action": "added",
             "requirement_ids": [unit.requirement_ids[0]],
             "unit_ids": [unit.id],

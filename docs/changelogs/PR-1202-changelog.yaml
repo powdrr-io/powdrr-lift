@@ -1,0 +1,56 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1202
+title: Avoid duplicate subjects in structural page examples
+intent:
+  problem: Building a later structural enumeration question could fail because its generated valid example repeated an entity already accepted on an earlier page.
+  goal: Exclude previously enumerated and baseline-existing subjects when choosing an example, and use an empty valid page when no unique example remains.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 455, end_line: 455}
+    summary: Pass prior structural subjects into the valid-example builder.
+    rationale: Make example validation account for earlier pages of the same enumeration.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 697, end_line: 697}
+    summary: Accept prior subjects in the example builder.
+    rationale: Give the helper the page history needed to avoid repeats.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 702, end_line: 704}
+    summary: Build the set of previously enumerated subject identities.
+    rationale: Filter example candidates using the parser's duplicate identity rule.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 706, end_line: 710}
+    summary: Select an existing entity example that has not appeared on a prior page.
+    rationale: Keep generated examples valid when an item has multiple subject pages.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 721, end_line: 726}
+    summary: Select an existing file example that has not already been enumerated.
+    rationale: Prevent duplicate file references in later-page examples.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 736, end_line: 741}
+    summary: Select a new planned path only when it is absent from prior pages and the baseline.
+    rationale: Avoid examples that the parser rejects as existing or repeated subjects.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 745, end_line: 745}
+    summary: Use the filtered path when constructing a new-file example.
+    rationale: Ensure the example matches the candidate validated above.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 473, end_line: 521}
+    summary: Cover valid page examples when the baseline entity was already enumerated.
+    rationale: Prevent Procedrr from blocking while building a later structural question.
+entities: []
+entity_relationships: []
+invariants:
+  - id: structural-page-examples-avoid-repeats
+    description: A generated structural subject example must not repeat a subject already enumerated for the item or describe a planned path that already exists in the baseline.
+    action: altered
+guidance: []

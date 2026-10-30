@@ -470,6 +470,55 @@ def test_structural_subject_pages_cover_all_subjects_and_require_final_page() ->
         complete_subject_enumeration((first,))
 
 
+def test_structural_page_example_does_not_repeat_prior_subjects() -> None:
+    text = "# Plan\n\nUpdate the module.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    unit = _unit(
+        writes=(PlannedWrite("src/module.py", "implementation", "python", (), ()),)
+    )
+    baseline = {
+        "entities": [{"id": "python::module", "path": "src/module.py"}],
+        "entity_relationships": [],
+        "files": [{"path": "src/module.py"}],
+        "source_subjects": [],
+    }
+    prior_subject = BoundStructuralSubject(
+        "python::module",
+        "entities",
+        "item-0001",
+        "changed",
+        ("req-01",),
+        (unit.id,),
+        (source_ref,),
+        False,
+        "src/module.py",
+    )
+
+    request = build_subject_enumeration_request(
+        plan_id="plan-01",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline=baseline,
+        prior_subjects=(prior_subject,),
+        page_ordinal=2,
+    )
+
+    assert request.valid_example["records"][0]["section"] == "files"
+    request.parse_answer(request.valid_example)
+
+
 def test_file_subject_can_reference_projected_file_entity_id() -> None:
     baseline = {
         "entities": [],

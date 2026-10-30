@@ -1,0 +1,498 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1214
+title: Remove planning compatibility re-exports
+intent:
+  problem: Agent modules and tests still depended on service-owned planning through legacy powdrr_lift
+    re-export modules, leaving duplicate public paths after the service extraction.
+  goal: Import planning policy directly from powdrr_service, delete the obsolete re-export modules, and
+    keep the ownership inventory aligned with the resulting package boundary.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 980
+    end_line: 981
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 983
+    end_line: 983
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 986
+    end_line: 987
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2850
+    end_line: 2851
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2865
+    end_line: 2866
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2952
+    end_line: 2962
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2991
+    end_line: 2991
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3007
+    end_line: 3018
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2995
+    end_line: 2995
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3023
+    end_line: 3033
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3046
+    end_line: 3078
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3106
+    end_line: 3149
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3162
+    end_line: 3172
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3329
+    end_line: 3329
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3333
+    end_line: 3333
+  summary: Remove deleted planning shims and record direct service imports in the ownership inventory.
+  rationale: Keep the architecture inventory synchronized with the actual package paths after shim removal.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 39
+  summary: Import planning sizing and policy directly from the service package.
+  rationale: The CLI must not route service-owned planning policy through agent re-exports.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 263
+    end_line: 263
+  summary: Import planning sizing and policy directly from the service package.
+  rationale: The CLI must not route service-owned planning policy through agent re-exports.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 26
+  summary: Use service-owned planning policy imports directly.
+  rationale: Production callers should depend on the owning service package without a legacy alias.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 49
+  summary: Use service-owned planning policy imports directly.
+  rationale: Production callers should depend on the owning service package without a legacy alias.
+- path: src/powdrr_lift/workrr/multipr_structrr.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 31
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/plan_sizing.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 29
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/planning/__init__.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Keep the legacy planning namespace limited to agent-side evidence helpers.
+  rationale: Do not re-export service planning operations from the agent package.
+- path: src/powdrr_lift/workrr/planning/assembly.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/planning/compiler.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/planning/contracts.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 10
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/planning/dependencies.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/planning/questions.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 7
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/planning/repair.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/planning/repair_service.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/planning/service.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/planning/structrr.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Delete the obsolete agent-side planning compatibility re-export.
+  rationale: Service-owned planning policy is imported directly from powdrr_service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 27
+  summary: Use service-owned planning policy imports directly.
+  rationale: Production callers should depend on the owning service package without a legacy alias.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 158
+  summary: Use service-owned planning policy imports directly.
+  rationale: Production callers should depend on the owning service package without a legacy alias.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 200
+    end_line: 210
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 212
+    end_line: 226
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 228
+    end_line: 230
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 295
+    end_line: 304
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_decision_continuity.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_decision_continuity.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Use service-owned planning policy imports directly.
+  rationale: Production callers should depend on the owning service package without a legacy alias.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 38
+  summary: Use service-owned planning policy imports directly.
+  rationale: Production callers should depend on the owning service package without a legacy alias.
+- path: tests/test_multipr_structrr.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_multipr_structrr.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 18
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_contracts.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_contracts.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 17
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 31
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 41
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 18
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 24
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 29
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 35
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Update planning tests to import service-owned policy directly and assert removed shims stay
+    absent.
+  rationale: Tests should exercise the owning package path and prevent compatibility modules from returning.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 18
+  summary: Use service-owned planning policy imports directly.
+  rationale: Production callers should depend on the owning service package without a legacy alias.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 50
+  summary: Use service-owned planning policy imports directly.
+  rationale: Production callers should depend on the owning service package without a legacy alias.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

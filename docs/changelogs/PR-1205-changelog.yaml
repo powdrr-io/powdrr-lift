@@ -1,0 +1,141 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1205
+title: Remove instruction ledger compatibility shim
+intent:
+  problem: The instruction ledger implementation had moved to the service, but callers still imported it through the old agent module.
+  goal: Make all callers import the service-owned ledger directly and remove the obsolete agent module.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/core/instruction_ledger.py
+    type: deleted
+    span: {start_line: 1, end_line: 25}
+    summary: Delete the legacy instruction ledger re-export module.
+    rationale: Keep the agent package free of service-owned planning policy and avoid retaining a compatibility shim.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 14, end_line: 20}
+    summary: Import instruction ledger symbols from the service planning package.
+    rationale: Ensure runtime workflow commands use the canonical service module.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 26, end_line: 31}
+    summary: Remove the import from the deleted agent module.
+    rationale: Ensure runtime callers have no dependency on the legacy import path.
+  - path: src/powdrr_lift/core/feature_obligation.py
+    type: modified
+    span: {start_line: 18, end_line: 19}
+    summary: Import the instruction ledger record from the service package.
+    rationale: Keep feature obligation compilation on the service-owned contract.
+  - path: science/classifications/root_disposition/build_dataset.py
+    type: modified
+    span: {start_line: 23, end_line: 27}
+    summary: Import instruction ledger helpers from the service package.
+    rationale: Keep dataset generation aligned with the canonical module.
+  - path: science/classifications/root_disposition/build_dataset.py
+    type: modified
+    span: {start_line: 27, end_line: 30}
+    summary: Remove the import from the deleted agent module.
+    rationale: Keep science tooling free of the legacy import path.
+  - path: science/classifications/routing/build_dataset.py
+    type: modified
+    span: {start_line: 16, end_line: 16}
+    summary: Import the instruction ledger helper from the service package.
+    rationale: Keep routing dataset generation aligned with the canonical module.
+  - path: science/deepswe/acceptance_templates/production_analysis.py
+    type: modified
+    span: {start_line: 16, end_line: 16}
+    summary: Import production analysis ledger helpers from the service package.
+    rationale: Keep acceptance template analysis aligned with the canonical module.
+  - path: science/deepswe/acceptance_templates/production_analysis.py
+    type: modified
+    span: {start_line: 21, end_line: 21}
+    summary: Adjust spacing after changing the ledger import.
+    rationale: Keep the import block correctly formatted.
+  - path: science/deepswe/test_case_prediction/predictor.py
+    type: modified
+    span: {start_line: 12, end_line: 13}
+    summary: Import instruction clause compilation from the service package.
+    rationale: Keep DeepSWE prediction aligned with the canonical module.
+  - path: tests/test_agent_service_contracts.py
+    type: modified
+    span: {start_line: 295, end_line: 304}
+    summary: Remove the assertion that required the deleted compatibility shim.
+    rationale: Keep service boundary tests aligned with the direct-import architecture.
+  - path: tests/test_feature_obligation.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Import the instruction ledger helper from the service package.
+    rationale: Test the service-owned ledger contract directly.
+  - path: tests/test_feature_obligation.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Remove the import from the deleted agent module.
+    rationale: Keep tests free of the legacy import path.
+  - path: tests/test_instruction_context.py
+    type: modified
+    span: {start_line: 3, end_line: 7}
+    summary: Import instruction ledger helpers from the service package.
+    rationale: Test instruction context behavior against the canonical module.
+  - path: tests/test_instruction_context.py
+    type: modified
+    span: {start_line: 8, end_line: 11}
+    summary: Remove the import from the deleted agent module.
+    rationale: Keep tests free of the legacy import path.
+  - path: tests/test_instruction_ledger.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Import ledger implementation and types from the service package.
+    rationale: Test the service-owned implementation directly.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 1231, end_line: 1231}
+    summary: Point feature obligation imports to the service ledger.
+    rationale: Keep module ownership metadata aligned with source imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 1305, end_line: 1315}
+    summary: Remove the ownership record for the deleted compatibility module.
+    rationale: Keep the ownership inventory consistent with the source tree.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2568, end_line: 2568}
+    summary: Point command catalog imports to the service ledger.
+    rationale: Keep module ownership metadata aligned with source imports.
+  - path: docs/plans/bounded-llm-instruction-compiler.md
+    type: modified
+    span: {start_line: 476, end_line: 476}
+    summary: Update the instruction ledger path to the service package.
+    rationale: Keep the design plan aligned with the implemented ownership.
+  - path: docs/plans/bounded-llm-instruction-compiler.md
+    type: modified
+    span: {start_line: 728, end_line: 728}
+    summary: Update the implementation module path to the service package.
+    rationale: Keep the design plan aligned with the implemented ownership.
+  - path: docs/plans/classifier-semantic-quality-handoff.md
+    type: modified
+    span: {start_line: 64, end_line: 64}
+    summary: Update the instruction ledger reference to the service package.
+    rationale: Keep the handoff documentation aligned with the implemented ownership.
+  - path: docs/plans/deepswe-test-case-predictor.md
+    type: modified
+    span: {start_line: 27, end_line: 27}
+    summary: Update the instruction ledger reference to the service package.
+    rationale: Keep the predictor plan aligned with the implemented ownership.
+  - path: docs/plans/routing-classifier-jev-and-dedicated-model-handoff.md
+    type: modified
+    span: {start_line: 81, end_line: 81}
+    summary: Update the instruction ledger reference to the service package.
+    rationale: Keep the classifier handoff aligned with the implemented ownership.
+  - path: docs/plans/structrr-diff-and-invariant-repair-loop.md
+    type: modified
+    span: {start_line: 25, end_line: 25}
+    summary: Update the instruction ledger reference to the service package.
+    rationale: Keep the structural diff plan aligned with the implemented ownership.
+entities: []
+entity_relationships: []
+invariants:
+  - id: instruction-ledger-callers-use-service-module
+    description: Production, tests, and science tooling import the instruction ledger from its service-owned module without a legacy agent import path.
+    action: added
+guidance: []

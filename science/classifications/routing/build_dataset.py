@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.core.instruction_ledger import compile_instruction_ledger
+from powdrr_service.planning.instruction_ledger import compile_instruction_ledger
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_SILVER = (

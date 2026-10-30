@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+from powdrr_service.planning.instruction_ledger import (
+    apply_atomicity_decisions,
+    compile_instruction_ledger,
+)
+
 from powdrr_lift.core.classifier_input import format_classifier_input
 from powdrr_lift.core.instruction_context import (
     context_retry_reason,
     local_instruction_context,
-)
-from powdrr_lift.core.instruction_ledger import (
-    apply_atomicity_decisions,
-    compile_instruction_ledger,
 )
 
 

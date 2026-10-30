@@ -78,7 +78,7 @@ useful diagnostics; their weights are not production artifacts.
 | `src/powdrr_lift/core/semantic_decision.py` | Routing labels, result envelopes, provider metadata, input fingerprints, revision validation. |
 | `src/powdrr_lift/core/classifier_input.py` | Stable target/context serialization. |
 | `src/powdrr_lift/core/instruction_context.py` | Existing helper for containing and adjacent source context. |
-| `src/powdrr_lift/core/instruction_ledger.py` | Original spans and atomic clause derivation. |
+| `packages/service/src/powdrr_service/planning/instruction_ledger.py` | Original spans and atomic clause derivation. |
 | `src/powdrr_lift/workrr/command_catalog.py` | Runtime root request preparation, source-text plumbing, and context retention. |
 | `docs/procedrr/processes/design-interview.yaml` | Jev-backed root decision invocation and dependent branches. |
 | `tests/test_jev_classifier.py`, `tests/test_semantic_contract_compiler.py`, `tests/test_semantic_decision.py`, `tests/test_root_disposition_context_retry.py` | Existing adapter, branching, revision, and source-context tests. |

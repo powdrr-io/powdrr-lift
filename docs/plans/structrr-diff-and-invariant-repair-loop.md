@@ -22,7 +22,7 @@ any definition or generated/documented copy.
 
 | Component | Existing implementation | Required extension |
 | --- | --- | --- |
-| Instruction capture | `src/powdrr_lift/core/instruction_ledger.py` | Classify each obligation's evidence requirements without losing its source span or exact wording. |
+| Instruction capture | `packages/service/src/powdrr_service/planning/instruction_ledger.py` | Classify each obligation's evidence requirements without losing its source span or exact wording. |
 | Instruction-to-design conversion | `src/powdrr_lift/workrr/feature_endpoint.py`, including `_apply_sentence_design_trace` and `_task_structrr_changes` | Preserve the evidence classification through proposal operations, prompts, and review. |
 | Snapshot collection | `src/powdrr_lift/structrr/bootstrap.py` | Collect comparable original and candidate snapshots, separating observations from declared intent. |
 | Proposal and retained intent | `src/powdrr_lift/structrr/proposal.py`, `intent.py`, `active_intent.py`, `verification_obligations.py` | Bind obligations and invariants to the accepted proposal and retained baseline intent. |

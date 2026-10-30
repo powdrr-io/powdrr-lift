@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import pytest
-
-from powdrr_lift.core.instruction_ledger import (
+from powdrr_service.planning.instruction_ledger import (
     InstructionClause,
     InstructionLedger,
     InstructionLedgerError,

@@ -33,7 +33,7 @@ def test_build_plan_diff_report_detects_missing_feature_ids(tmp_path: Path) -> N
     )
 
     assert report.feature_plan_path == (
-        "docs/specs/powdrr-lift/feature-pr-specification.yaml"
+        "docs/proposals/powdrr-lift/feature-pr-specification.yaml"
     )
     assert report.changelog_paths == ["docs/changelogs/PR-1-changelog.yaml"]
     assert [difference.kind for difference in report.differences] == [
@@ -92,7 +92,11 @@ def _write_feature_plan_specification(
     features: list[str],
 ) -> Path:
     feature_plan_specification = (
-        repo_root / "docs" / "specs" / work_item_name / "feature-pr-specification.yaml"
+        repo_root
+        / "docs"
+        / "proposals"
+        / work_item_name
+        / "feature-pr-specification.yaml"
     )
     feature_plan_specification.parent.mkdir(parents=True, exist_ok=True)
     feature_plan_specification.write_text(

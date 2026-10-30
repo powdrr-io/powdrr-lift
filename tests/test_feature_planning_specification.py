@@ -468,9 +468,9 @@ def _create_repo_with_structured_specs_and_changelogs(tmp_path: Path) -> Path:
 
     (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
     (repo_root / "docs").mkdir()
-    (repo_root / "docs" / "specs").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "current").mkdir(parents=True, exist_ok=True)
     _write_structured_specs(repo_root)
-    _git(repo_root, "add", "README.md", "docs/specs")
+    _git(repo_root, "add", "README.md", "docs/current")
     _git(repo_root, "commit", "-m", "Add structured specs")
 
     _git(repo_root, "checkout", "-b", "feature/current-state")
@@ -518,9 +518,9 @@ def _create_repo_with_structured_specs_and_changelogs(tmp_path: Path) -> Path:
 
 
 def _write_structured_specs(repo_root: Path) -> None:
-    (repo_root / "docs" / "specs" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "current" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
     (
-        repo_root / "docs" / "specs" / "powdrr-lift" / "system-specification.yaml"
+        repo_root / "docs" / "current" / "powdrr-lift" / "system-specification.yaml"
     ).write_text(
         """
         schema: https://powdrr.io/schemas/specification-v1
@@ -538,7 +538,11 @@ def _write_structured_specs(repo_root: Path) -> None:
         encoding="utf-8",
     )
     (
-        repo_root / "docs" / "specs" / "powdrr-lift" / "architecture-specification.yaml"
+        repo_root
+        / "docs"
+        / "current"
+        / "powdrr-lift"
+        / "architecture-specification.yaml"
     ).write_text(
         """
         schema: https://powdrr.io/schemas/specification-v1
@@ -594,7 +598,7 @@ def _write_structured_specs(repo_root: Path) -> None:
     (
         repo_root
         / "docs"
-        / "specs"
+        / "current"
         / "powdrr-lift"
         / "implementation-specification.yaml"
     ).write_text(

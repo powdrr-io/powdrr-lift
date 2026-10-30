@@ -155,7 +155,7 @@ class _StructuredDeliveryAdapter:
         stage = arguments.get("stage")
         implementation_path = (
             self.artifact_root
-            / "docs/specs/powdrr-lift/implementation-specification.yaml"
+            / "docs/current/powdrr-lift/implementation-specification.yaml"
         )
         proposal_path = (
             self.artifact_root
@@ -209,7 +209,7 @@ def run_final_acceptance(
             ExecutionUnit(
                 "architecture",
                 "Architect validates the structured delivery specification",
-                ("docs/specs/powdrr-lift/implementation-specification.yaml",),
+                ("docs/current/powdrr-lift/implementation-specification.yaml",),
                 validation_profiles=("repository-validation",),
                 acceptance_criteria=("the structured specification is valid",),
             ),
@@ -928,7 +928,7 @@ def _run_structured_artifact_chain(workflow_directory: Path) -> bool:
     implementation_path = (
         artifact_root
         / "docs"
-        / "specs"
+        / "current"
         / "powdrr-lift"
         / "implementation-specification.yaml"
     )
@@ -1062,6 +1062,17 @@ pre_step:
         encoding="utf-8",
     )
     scenario_path = scenario_root / "scenario.yaml"
+    scripted_step = json.dumps(
+        {
+            "operation": {
+                "tool": "task_complete",
+                "parameters": {
+                    "output_state": "$deterministic_pre_step",
+                    "terminate_workflow": False,
+                },
+            }
+        }
+    )
     scenario_path.write_text(
         f"""\
 schema_version: 1
@@ -1074,8 +1085,7 @@ fixture: {fixture_path}
 provider:
   mode: scripted
   responses:
-  - action: next_step
-    output_state: $deterministic_pre_step
+  - step_json: '{scripted_step}'
 expect:
   output_state: $deterministic_pre_step
 """,

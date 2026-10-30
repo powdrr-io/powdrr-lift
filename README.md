@@ -130,8 +130,9 @@ It moves instruction interpretation, design compilation, prompt assembly, and
 acceptance policy into a service while keeping repository access and
 mini-SWE-agent execution local.
 
-The current specification documents live under `docs/specs/<work-item-name>/`
-and share the `https://powdrr.io/schemas/specification-v1` schema.
+Proposed specifications live under `docs/proposals/<work-item-name>/`; accepted
+current-state specifications live under `docs/current/<work-item-name>`. Both
+use the `https://powdrr.io/schemas/specification-v1` schema.
 
 ## How It Works
 

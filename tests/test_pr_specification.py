@@ -102,7 +102,7 @@ def _write_implementation_specification(repo_root: Path) -> Path:
     implementation_specification_path = (
         repo_root
         / "docs"
-        / "specs"
+        / "proposals"
         / "powdrr-lift"
         / "implementation-specification.yaml"
     )
@@ -128,7 +128,7 @@ def _write_implementation_specification(repo_root: Path) -> Path:
 
 def _write_existing_pr_specification(repo_root: Path) -> Path:
     pr_specification_path = (
-        repo_root / "docs" / "specs" / "PR-123" / "proposed-pr-specification.yaml"
+        repo_root / "docs" / "proposals" / "PR-123" / "proposed-pr-specification.yaml"
     )
     pr_specification_path.parent.mkdir(parents=True, exist_ok=True)
     pr_specification_path.write_text(
@@ -1088,7 +1088,7 @@ def test_validate_pr_specification_rejects_template_boilerplate(
     #   `description`.
     #
     # Current feature ids:
-    # - feature-a (feature, docs/specs/powdrr-lift/implementation-specification.yaml)
+    # - feature-a (feature, docs/current/powdrr-lift/implementation-specification.yaml)
     id: pr-789
     feature_ids:
       - feature-a
@@ -1197,7 +1197,7 @@ def test_validate_pr_specification_rejects_missing_detail_description(
 def test_cli_validate_pr_specification_reports_yaml(tmp_path: Path) -> None:
     _write_implementation_specification(tmp_path)
     spec_path = (
-        tmp_path / "docs" / "specs" / "PR-456" / "proposed-pr-specification.yaml"
+        tmp_path / "docs" / "proposals" / "PR-456" / "proposed-pr-specification.yaml"
     )
     spec_path.parent.mkdir(parents=True, exist_ok=True)
     spec_path.write_text(

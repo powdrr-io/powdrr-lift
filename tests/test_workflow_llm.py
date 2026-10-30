@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
+import pytest
+
+from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.workrr.execution import ProgressDecision
 from powdrr_lift.workrr.llm import (
     ProgrammerInvariantError,
@@ -37,6 +41,15 @@ from powdrr_lift.workrr.llm import (
     workflow_action_signature,
     workflow_action_target_signature,
 )
+
+
+def _execution_runtime(tmp_path: Path, execution_id: str) -> ExecutionRuntime:
+    return ExecutionRuntime(
+        execution_id,
+        profile_id="default",
+        workflow_directory=tmp_path / execution_id,
+        repo_root=tmp_path,
+    )
 
 
 def test_provider_5xx_errors_are_retryable() -> None:
@@ -782,11 +795,16 @@ def test_action_engine_reports_stalls_through_the_runner_strategy() -> None:
     assert strategy.observations == [observation]
 
 
-def test_execution_driver_owns_roundtrips_and_terminal_action_outcomes() -> None:
+def test_execution_driver_owns_roundtrips_and_terminal_action_outcomes(
+    tmp_path: Path,
+) -> None:
     strategy = _ExecutionStrategy()
+    with pytest.raises(ProgrammerInvariantError) as missing_runtime:
+        WorkflowStepRunner(max_stalled_roundtrips=1)
+    assert missing_runtime.value.error_code == "execution_runtime_required"
 
     exit_code = WorkflowStepRunner(
-        max_stalled_roundtrips=1, legacy_compatibility=True
+        max_stalled_roundtrips=1, runtime=_execution_runtime(tmp_path, "roundtrips")
     ).run(
         strategy,
         max_roundtrips=3,
@@ -801,7 +819,9 @@ def test_execution_driver_owns_roundtrips_and_terminal_action_outcomes() -> None
     ]
 
 
-def test_execution_driver_honors_adapter_terminal_repair_exit_code() -> None:
+def test_execution_driver_honors_adapter_terminal_repair_exit_code(
+    tmp_path: Path,
+) -> None:
     class _TerminalStrategy(_ExecutionStrategy):
         terminalized = True
         terminal_exit_code: int | None = 17
@@ -812,7 +832,10 @@ def test_execution_driver_honors_adapter_terminal_repair_exit_code() -> None:
     strategy = _TerminalStrategy()
 
     assert (
-        WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True).run(
+        WorkflowStepRunner(
+            max_stalled_roundtrips=1,
+            runtime=_execution_runtime(tmp_path, "terminal-repair"),
+        ).run(
             strategy,
             max_roundtrips=3,
             signature=workflow_action_signature,
@@ -821,7 +844,7 @@ def test_execution_driver_honors_adapter_terminal_repair_exit_code() -> None:
     )
 
 
-def test_execution_driver_bounds_coding_loop_iterations() -> None:
+def test_execution_driver_bounds_coding_loop_iterations(tmp_path: Path) -> None:
     class _CodingLoopStrategy(_ExecutionStrategy):
         current_step_index = 0
 
@@ -846,16 +869,19 @@ def test_execution_driver_bounds_coding_loop_iterations() -> None:
 
     strategy = _CodingLoopStrategy()
     assert (
-        WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True).run(
-            strategy, max_roundtrips=None, signature=workflow_action_signature
-        )
+        WorkflowStepRunner(
+            max_stalled_roundtrips=1,
+            runtime=_execution_runtime(tmp_path, "coding-loop"),
+        ).run(strategy, max_roundtrips=None, signature=workflow_action_signature)
         == 9
     )
     assert strategy.exhausted_limit == 2
     assert strategy.executed == ["next_step", "next_step"]
 
 
-def test_execution_driver_can_stop_a_strategy_after_no_progress_threshold() -> None:
+def test_execution_driver_can_stop_a_strategy_after_no_progress_threshold(
+    tmp_path: Path,
+) -> None:
     class _StalledStrategy(_ExecutionStrategy):
         def __init__(self) -> None:
             super().__init__()
@@ -876,7 +902,10 @@ def test_execution_driver_can_stop_a_strategy_after_no_progress_threshold() -> N
             return 7
 
     strategy = _StalledStrategy()
-    driver = WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True)
+    driver = WorkflowStepRunner(
+        max_stalled_roundtrips=1,
+        runtime=_execution_runtime(tmp_path, "no-progress"),
+    )
     assert (
         driver.run(
             strategy,
@@ -889,7 +918,7 @@ def test_execution_driver_can_stop_a_strategy_after_no_progress_threshold() -> N
     assert driver.last_repair_directive.stage is RepairStage.CLEAN_ROOM
 
 
-def test_execution_driver_never_crashes_when_observer_fails() -> None:
+def test_execution_driver_never_crashes_when_observer_fails(tmp_path: Path) -> None:
     class _FailingObserver:
         def response_failed(self, error: Exception) -> None:
             raise RuntimeError("observer failed") from error
@@ -913,7 +942,7 @@ def test_execution_driver_never_crashes_when_observer_fails() -> None:
     driver = WorkflowStepRunner(
         max_stalled_roundtrips=1,
         observer=_FailingObserver(),
-        legacy_compatibility=True,
+        runtime=_execution_runtime(tmp_path, "observer-failure"),
     )
 
     assert (
@@ -926,7 +955,9 @@ def test_execution_driver_never_crashes_when_observer_fails() -> None:
     )
 
 
-def test_execution_driver_supports_a_shared_model_fallback_request() -> None:
+def test_execution_driver_supports_a_shared_model_fallback_request(
+    tmp_path: Path,
+) -> None:
     strategy = _ExecutionStrategy()
     action = _Action(kind="complete")
     original_next_request = strategy.next_request
@@ -948,7 +979,8 @@ def test_execution_driver_supports_a_shared_model_fallback_request() -> None:
     strategy.next_request = next_request  # type: ignore[method-assign]
 
     exit_code = WorkflowStepRunner(
-        max_stalled_roundtrips=1, legacy_compatibility=True
+        max_stalled_roundtrips=1,
+        runtime=_execution_runtime(tmp_path, "shared-model-fallback"),
     ).run(
         strategy,
         max_roundtrips=1,

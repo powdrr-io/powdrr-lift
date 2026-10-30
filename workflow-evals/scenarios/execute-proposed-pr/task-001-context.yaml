@@ -7,7 +7,6 @@ fixture: fixtures/task-001
 provider:
   mode: scripted
   responses:
-    - action: complete
-      output_state: $deterministic_pre_step
+    - step_json: '{"operation":{"tool":"task_complete","parameters":{"output_state":"$deterministic_pre_step","terminate_workflow":false}}}'
 expect:
   output_state: $deterministic_pre_step

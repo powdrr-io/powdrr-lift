@@ -1241,7 +1241,7 @@ def _is_changelog_artifact_path(path: str) -> bool:
 def _is_structured_document_path(path: str) -> bool:
     normalized_path = path.strip().replace("\\", "/")
     return normalized_path.startswith(
-        ("docs/proposals/", "docs/current/", "docs/specs/")
+        ("docs/proposals/", "docs/current/")
     ) and normalized_path.endswith(".yaml")
 
 

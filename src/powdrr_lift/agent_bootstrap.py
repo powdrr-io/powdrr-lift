@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 import signal
 import subprocess
@@ -157,13 +156,9 @@ def run_bootstrap_task(
         )
         snapshot_path = task.worktree / "docs/structrr/current/baseline-bootstrap.yaml"
         legacy_manifest_path = snapshot_path.with_suffix(".manifest.json")
+        legacy_manifest_was_present = legacy_manifest_path.is_file()
         previous_snapshot = (
             snapshot_path.read_bytes() if snapshot_path.is_file() else None
-        )
-        previous_legacy_manifest = (
-            legacy_manifest_path.read_bytes()
-            if legacy_manifest_path.is_file()
-            else None
         )
         previous_manifest_data: Any = None
         if previous_snapshot is not None:
@@ -172,11 +167,6 @@ def run_bootstrap_task(
                 if isinstance(prior_document, dict):
                     previous_manifest_data = prior_document.get("source_manifest")
             except yaml.YAMLError:
-                previous_manifest_data = None
-        if previous_manifest_data is None and previous_legacy_manifest is not None:
-            try:
-                previous_manifest_data = json.loads(previous_legacy_manifest)
-            except json.JSONDecodeError:
                 previous_manifest_data = None
         _emit_bootstrap_progress(
             progress, "Scanning repository sources and drafting the baseline snapshot."
@@ -269,7 +259,9 @@ def run_bootstrap_task(
                         encoding="utf-8",
                     )
         candidate_paths = [bootstrap.output_path]
-        if previous_legacy_manifest is not None:
+        # The bootstrap writer removes obsolete sidecars. Stage that removal
+        # when an older repository still tracks one, but never read its data.
+        if legacy_manifest_was_present:
             tracked_legacy = runner(
                 [
                     "git",

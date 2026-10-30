@@ -7,11 +7,8 @@ fixture: fixtures/scope-repair
 provider:
   mode: scripted
   responses:
-  - action: file_management
-    operation: delete
-    file_path: agent_error.txt
-  - action: complete
-    output_state: {scope-repair-state: {removed: [agent_error.txt]}}
+  - step_json: '{"operation":{"tool":"file_management","parameters":{"operation":"delete","file_path":"agent_error.txt"}}}'
+  - step_json: '{"operation":{"tool":"task_complete","parameters":{"output_state":{"scope-repair-state":{"removed":["agent_error.txt"]}},"terminate_workflow":false}}}'
 expect:
   output_state: {scope-repair-state: {removed: [agent_error.txt]}}
   max_roundtrips: 2

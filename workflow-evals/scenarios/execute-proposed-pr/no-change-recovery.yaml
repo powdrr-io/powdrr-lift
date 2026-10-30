@@ -6,11 +6,8 @@ task_id: execute-proposed-pr-failure-task-001
 provider:
   mode: scripted
   responses:
-  - action: invoke_tool
-    tool: shell
-    parameters: {command: ["true"]}
-  - action: complete
-    output_state: {no-change-state: {recovered: true}}
+  - step_json: '{"operation":{"tool":"invoke_tool","parameters":{"tool":"shell","parameters":{"command":["true"]}}}}'
+  - step_json: '{"operation":{"tool":"task_complete","parameters":{"output_state":{"no-change-state":{"recovered":true}},"terminate_workflow":false}}}'
 expect:
   output_state: {no-change-state: {recovered: true}}
   max_roundtrips: 2

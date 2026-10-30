@@ -3581,7 +3581,7 @@ def test_process_workflow_task_supports_gather_context_action(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workflow = _workflow(tmp_path)
-    specs = tmp_path / "docs" / "specs" / "example"
+    specs = tmp_path / "docs" / "proposals" / "example"
     specs.mkdir(parents=True)
     (specs / "proposed-pr-specification.yaml").write_text(
         "proposed_prs:\n- id: example-pr\n  state: proposed\n",

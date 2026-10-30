@@ -27,82 +27,6 @@ class WorkflowTaskScenarioError(ValueError):
     """Raised for malformed isolated workflow-task scenario inputs."""
 
 
-def _adapt_legacy_task_response(response: Mapping[str, Any]) -> dict[str, Any]:
-    """Translate old scripted task fixtures to one Procedrr fragment step."""
-    action = response.get("action")
-    if (
-        action in {"complete", "next_step", "task_complete"}
-        and "output_state" in response
-    ):
-        return {
-            "step_json": json.dumps(
-                {
-                    "operation": {
-                        "tool": "task_complete",
-                        "parameters": {
-                            "output_state": response["output_state"],
-                            "terminate_workflow": response.get(
-                                "terminate_workflow", False
-                            ),
-                        },
-                    }
-                }
-            )
-        }
-    if action in {"complete", "next_step"}:
-        return {
-            "step_json": json.dumps(
-                {
-                    "operation": {
-                        "tool": "respond",
-                        "parameters": {"text": response.get("text", "")},
-                    }
-                }
-            )
-        }
-    tool = {
-        "edit": "edit",
-        "yaml_edit": "yaml_edit",
-        "file_management": "file_management",
-        "read_document": "read_document",
-        "list_files": "list_files",
-        "gather_context": "gather_context",
-        "invoke_tool": "invoke_tool",
-        "task_run_process": "task_run_process",
-        "get-human-input": "task_handoff",
-        "task_handoff": "task_handoff",
-        "prompt_user": "task_handoff",
-    }.get(str(action))
-    if tool is None:
-        return dict(response)
-    if tool == "invoke_tool":
-        parameters = {
-            "tool": response.get("tool"),
-            "parameters": response.get("parameters", {}),
-        }
-    elif tool == "task_run_process":
-        parameters = {
-            "process_id": response.get("process_id"),
-            "bindings": response.get("bindings", {}),
-        }
-    elif tool == "task_handoff":
-        parameters = {
-            "human_input": response.get("human_input"),
-            "question": response.get("text", "Please provide the required input."),
-            "continuation_instructions": "Use the human response to continue.",
-        }
-    elif tool == "edit":
-        parameters = {
-            "file_path": response.get("file_path"),
-            "edits": response.get("edits", []),
-        }
-    else:
-        parameters = {key: value for key, value in response.items() if key != "action"}
-    return {
-        "step_json": json.dumps({"operation": {"tool": tool, "parameters": parameters}})
-    }
-
-
 class LiveWorkflowTaskExchangeRecorder:
     """Capture complete exchanges while delegating to a real LLM client."""
 
@@ -131,13 +55,12 @@ class LiveWorkflowTaskExchangeRecorder:
             record["error"] = {"type": type(exc).__name__, "message": str(exc)}
             self.exchanges.append(record)
             raise
-        adapted_response = _adapt_legacy_task_response(response)
-        record["output"] = adapted_response
+        record["output"] = response
         usage = getattr(self._client, "last_usage", None)
         if isinstance(usage, Mapping):
             record["usage"] = dict(usage)
         self.exchanges.append(record)
-        return adapted_response
+        return response
 
 
 class _TeeTextIO:
@@ -173,12 +96,14 @@ class _ScriptedWorkflowTaskClient:
         try:
             response = next(self._responses)
             self.responses_served.append(response)
-            adapted = _adapt_legacy_task_response(response)
-            if response.get("action") in {"complete", "next_step"} and (
-                "output_state" in response
+            step = json.loads(str(response.get("step_json", "{}")))
+            operation = step.get("operation", {})
+            if (
+                isinstance(operation, Mapping)
+                and operation.get("tool") == "task_complete"
             ):
                 self._terminal_pending = True
-            return adapted
+            return response
         except StopIteration:
             return {"step_json": json.dumps({"terminal": "succeeded"})}
 
@@ -420,9 +345,14 @@ def _replace_pre_step_result(value: Any, result: Any) -> Any:
     if value == "$deterministic_pre_step":
         return result
     if isinstance(value, Mapping):
-        return {
+        replaced = {
             key: _replace_pre_step_result(item, result) for key, item in value.items()
         }
+        encoded_step = value.get("step_json")
+        if isinstance(encoded_step, str) and "$deterministic_pre_step" in encoded_step:
+            step = json.loads(encoded_step)
+            replaced["step_json"] = json.dumps(_replace_pre_step_result(step, result))
+        return replaced
     if isinstance(value, list):
         return [_replace_pre_step_result(item, result) for item in value]
     return value

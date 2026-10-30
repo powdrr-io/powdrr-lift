@@ -7,6 +7,7 @@ import pytest
 from powdrr_contracts.workspace import (
     Conversation,
     EventType,
+    Job,
     JobState,
     Message,
     MessageRole,
@@ -247,7 +248,7 @@ def test_version_one_database_migrates_without_changing_existing_records(
     with sqlite3.connect(path) as db:
         version = db.execute("PRAGMA user_version").fetchone()[0]
         sequence = db.execute("SELECT sequence FROM events").fetchone()[0]
-    assert version == 2
+    assert version == 3
     assert sequence == 7
     assert conversation.revision == 1
     assert conversation.specification_refs == ("docs/old.yaml",)
@@ -292,3 +293,104 @@ def test_workspace_contracts_reject_unknown_versions_invalid_ids_and_nan() -> No
     )
     with pytest.raises(WorkspaceContractError, match="finite JSON"):
         WorkspaceEvent.from_dict(event.to_dict())
+
+
+def test_mutation_requests_replay_the_original_result_and_reject_reuse(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    chat = store.create_conversation("repo", "Feature", request_id="create-chat")
+    assert (
+        store.create_conversation("repo", "Feature", request_id="create-chat") == chat
+    )
+    with pytest.raises(WorkspaceConflict, match="different content"):
+        store.create_conversation("repo", "Other", request_id="create-chat")
+
+    message = store.append_message(
+        chat.conversation_id,
+        message_id="message-1",
+        role="user",
+        content="Build it",
+        request_id="send-message",
+    )
+    assert (
+        store.append_message(
+            chat.conversation_id,
+            message_id="message-1",
+            role="user",
+            content="Build it",
+            request_id="send-message",
+        )
+        == message
+    )
+    with pytest.raises(WorkspaceConflict, match="different content"):
+        store.append_message(
+            chat.conversation_id,
+            message_id="message-1",
+            role="user",
+            content="Different text",
+            request_id="send-message",
+        )
+    assert len(store.read_events("repo")) == 2
+
+
+def test_update_and_transition_retries_return_the_first_result(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    chat = store.create_conversation("repo", "Feature")
+    updated = store.update_conversation(
+        chat.conversation_id,
+        title="Renamed",
+        expected_revision=chat.revision,
+        request_id="rename-chat",
+    )
+    assert (
+        store.update_conversation(
+            chat.conversation_id,
+            title="Renamed",
+            expected_revision=chat.revision,
+            request_id="rename-chat",
+        )
+        == updated
+    )
+
+    job = store.create_job("repo", kind="planning", title="Plan")
+    running = store.transition_job(
+        job.job_id,
+        expected_revision=job.revision,
+        state=JobState.RUNNING,
+        request_id="start-job",
+    )
+    succeeded = store.transition_job(
+        job.job_id,
+        expected_revision=running.revision,
+        state=JobState.SUCCEEDED,
+    )
+    replayed = store.transition_job(
+        job.job_id,
+        expected_revision=job.revision,
+        state=JobState.RUNNING,
+        request_id="start-job",
+    )
+    assert replayed == running
+    assert store.get_job(job.job_id) == succeeded
+
+
+def test_concurrent_identical_create_requests_produce_one_job(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace.db"
+    WorkspaceStore(path)
+
+    def create(_: int) -> Job:
+        return WorkspaceStore(path).create_job(
+            "repo", kind="planning", title="Plan", request_id="create-plan"
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        jobs = tuple(workers.map(create, range(2)))
+    assert jobs[0] == jobs[1]
+    store = WorkspaceStore(path)
+    assert store.list_jobs("repo") == (jobs[0],)
+    assert len(store.read_events("repo")) == 1

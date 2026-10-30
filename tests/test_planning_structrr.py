@@ -537,6 +537,27 @@ def test_file_subject_can_reference_projected_file_entity_id() -> None:
     assert page.records[0].subject_id == "path::src/existing.py"
 
 
+@pytest.mark.parametrize("reference_prefix", ["path::", "file:"])
+def test_file_reference_in_entity_section_is_resolved_as_file(
+    reference_prefix: str,
+) -> None:
+    path = "attestation/scripts/verify-all.sh"
+    candidate = _record(f"{reference_prefix}{path}")
+    baseline = {
+        "entities": [],
+        "files": [{"path": path}],
+        "source_subjects": [],
+    }
+
+    page = _parse_page(
+        _candidate_page([candidate], has_more=False, next_anchor=None),
+        baseline=baseline,
+    )
+
+    assert page.records[0].section == "files"
+    assert page.records[0].subject_id == f"path::{path}"
+
+
 def test_subject_page_accepts_all_known_source_references() -> None:
     source_ids = {f"anchor-{index:02d}" for index in range(9)}
     row = _record("entity-01")

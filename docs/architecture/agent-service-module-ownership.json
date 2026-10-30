@@ -562,7 +562,7 @@
       "reviewed": true
     },
     {
-      "extraction_pr": "1198",
+      "extraction_pr": "1199",
       "internal_imports": [
         "powdrr_service.planning.compiler",
         "powdrr_service.planning.plan_models"

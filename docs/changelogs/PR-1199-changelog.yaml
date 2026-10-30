@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1198
+change_id: 1199
 title: Move reviewed plan document codec into service package
 intent:
   problem: Service compilation and repair still imported reviewed-plan parsing, serialization, and repair metadata rendering from the legacy GitHub issue queue module.

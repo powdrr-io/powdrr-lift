@@ -16,8 +16,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from powdrr_service.planning.instruction_ledger import InstructionLedger
-
-from powdrr_lift.core.semantic_contract import PartialSemanticContract
+from powdrr_service.planning.semantic_contract import PartialSemanticContract
 
 
 class FeatureObligationError(ValueError):

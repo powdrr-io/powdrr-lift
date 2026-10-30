@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import pytest
-from powdrr_service.planning.instruction_ledger import compile_instruction_ledger
-
-from powdrr_lift.core.feature_obligation import (
+from powdrr_service.planning.feature_obligation import (
     FeatureObligationError,
     compile_feature_design,
 )
-from powdrr_lift.core.semantic_contract import (
+from powdrr_service.planning.instruction_ledger import compile_instruction_ledger
+from powdrr_service.planning.semantic_contract import (
     BoundSourceExtraction,
     PartialSemanticContract,
     UnresolvedSemanticField,
 )
-from powdrr_lift.core.semantic_decision import (
+from powdrr_service.planning.semantic_decision import (
     ExactSourceSpan,
     SemanticDecisionProvider,
 )

@@ -16,7 +16,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 
-from powdrr_lift.core.semantic_decision import SemanticDecisionSpec  # noqa: E402
+from powdrr_service.planning.semantic_decision import SemanticDecisionSpec  # noqa: E402
+
 from powdrr_lift.workrr import jev_classifier  # noqa: E402
 from powdrr_lift.workrr.semantic_contract_compiler import (  # noqa: E402
     CLASSIFIER_DEFINITIONS,

@@ -2146,8 +2146,8 @@ operation with no model discretion.
 ## Suggested module boundaries
 
 ```text
-src/powdrr_lift/core/semantic_decision.py
-src/powdrr_lift/core/semantic_contract.py
+packages/service/src/powdrr_service/planning/semantic_decision.py
+packages/service/src/powdrr_service/planning/semantic_contract.py
 src/powdrr_lift/core/semantic_ontology.py
 src/powdrr_lift/core/semantic_boundary.py
 src/powdrr_lift/core/repository_inventory.py

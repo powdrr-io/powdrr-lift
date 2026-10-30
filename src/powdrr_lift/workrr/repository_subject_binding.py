@@ -10,6 +10,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from powdrr_service.planning.semantic_contract import PartialSemanticContract
+from powdrr_service.planning.semantic_decision import (
+    SemanticDecision,
+    SemanticDecisionProvider,
+    SemanticDecisionSpec,
+)
+
 from powdrr_lift.core.repository_inventory import (
     CandidateSet,
     InventoryError,
@@ -18,12 +25,6 @@ from powdrr_lift.core.repository_inventory import (
     StructrrLookupContext,
     aggregate_candidate_relations,
     retrieve_candidates,
-)
-from powdrr_lift.core.semantic_contract import PartialSemanticContract
-from powdrr_lift.core.semantic_decision import (
-    SemanticDecision,
-    SemanticDecisionProvider,
-    SemanticDecisionSpec,
 )
 
 CANDIDATE_RELATION_REVISION = "candidate-relation-v1"

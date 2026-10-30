@@ -11,11 +11,26 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_service.planning.feature_obligation import (
+    SEMANTIC_KINDS,
+    FeatureObligationError,
+    compile_feature_design,
+)
 from powdrr_service.planning.instruction_ledger import (
     InstructionLedger,
     InstructionLedgerError,
     apply_atomicity_decisions,
     compile_instruction_ledger,
+)
+from powdrr_service.planning.semantic_contract import (
+    BoundSourceExtraction,
+    PartialSemanticContract,
+    SemanticContractError,
+)
+from powdrr_service.planning.semantic_decision import (
+    SEMANTIC_DIMENSION_DECISION_KINDS,
+    SemanticDecision,
+    SemanticDecisionError,
 )
 
 from powdrr_lift.core.behavior_contract import (
@@ -25,11 +40,6 @@ from powdrr_lift.core.behavior_contract import (
     validate_normative_assumptions,
 )
 from powdrr_lift.core.decision_obligation import content_fingerprint
-from powdrr_lift.core.feature_obligation import (
-    SEMANTIC_KINDS,
-    FeatureObligationError,
-    compile_feature_design,
-)
 from powdrr_lift.core.repository_inventory import (
     CandidateSet,
     InventoryError,
@@ -40,16 +50,6 @@ from powdrr_lift.core.repository_inventory import (
     build_python_lookup_context,
     enumerate_population,
     inventory_from_source_subjects,
-)
-from powdrr_lift.core.semantic_contract import (
-    BoundSourceExtraction,
-    PartialSemanticContract,
-    SemanticContractError,
-)
-from powdrr_lift.core.semantic_decision import (
-    SEMANTIC_DIMENSION_DECISION_KINDS,
-    SemanticDecision,
-    SemanticDecisionError,
 )
 from powdrr_lift.core.semantic_faithfulness import (
     FaithfulnessError,

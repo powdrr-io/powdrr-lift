@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from powdrr_lift.core.semantic_decision import (
+from powdrr_service.planning.semantic_decision import (
     SEMANTIC_DIMENSION_DECISION_KINDS,
     ExactSourceSpan,
     SemanticDecision,

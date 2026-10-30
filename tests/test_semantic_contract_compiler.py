@@ -7,17 +7,17 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
-from powdrr_lift.core.semantic_contract import (
+from powdrr_service.planning.semantic_contract import (
     BoundSourceExtraction,
     PartialSemanticContract,
     SemanticContractError,
 )
-from powdrr_lift.core.semantic_decision import (
+from powdrr_service.planning.semantic_decision import (
     DECISION_VALUES,
     SEMANTIC_DIMENSION_DECISION_KINDS,
     SemanticDecision,
 )
+
 from powdrr_lift.core.semantic_faithfulness import (
     FaithfulnessError,
     bind_field_entailment_reviews,

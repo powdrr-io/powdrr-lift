@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
-from powdrr_lift.core.semantic_contract import PartialSemanticContract
-from powdrr_lift.core.semantic_decision import (
+from powdrr_service.planning.semantic_contract import PartialSemanticContract
+from powdrr_service.planning.semantic_decision import (
     DECISION_VALUES,
     SemanticDecision,
     SemanticDecisionProvider,

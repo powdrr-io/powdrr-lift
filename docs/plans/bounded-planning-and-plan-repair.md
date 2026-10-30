@@ -72,7 +72,7 @@ Reuse these existing primitives instead of writing parallel implementations:
 
 - `core/instruction_ledger.py`: `InstructionSource`, `InstructionClause`, source
   offsets/fingerprints, `compile_instruction_ledger`, and atomic split validation.
-- `core/semantic_contract.py`: source-bound extraction and exact-key validation
+- `packages/service/src/powdrr_service/planning/semantic_contract.py`: source-bound extraction and exact-key validation
   patterns; preserve conditional, ordered, alternative, and grouped obligations.
 - `workrr/semantic_contract_compiler.py`: existing bounded source-context and
   extraction preparation/binding helpers where their contracts fit. Reuse pure

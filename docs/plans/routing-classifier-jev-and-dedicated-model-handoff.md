@@ -75,7 +75,7 @@ useful diagnostics; their weights are not production artifacts.
 | --- | --- |
 | `src/powdrr_lift/workrr/semantic_contract_compiler.py` | `ClassifierDefinition`, routing definitions, root request preparation, `_classifier_request`, context extraction, decision binding and benchmark defaults. |
 | `src/powdrr_lift/workrr/jev_classifier.py` | `_classifier_request`, `_call_jev`, `_format_classifier_result`, `complete_json`, and fallback behavior. |
-| `src/powdrr_lift/core/semantic_decision.py` | Routing labels, result envelopes, provider metadata, input fingerprints, revision validation. |
+| `packages/service/src/powdrr_service/planning/semantic_decision.py` | Routing labels, result envelopes, provider metadata, input fingerprints, revision validation. |
 | `src/powdrr_lift/core/classifier_input.py` | Stable target/context serialization. |
 | `packages/service/src/powdrr_service/planning/instruction_context.py` | Service-owned helper for containing and adjacent source context. |
 | `packages/service/src/powdrr_service/planning/instruction_ledger.py` | Original spans and atomic clause derivation. |

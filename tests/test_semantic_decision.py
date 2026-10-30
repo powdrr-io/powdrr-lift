@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import pytest
-
-from powdrr_lift.core.semantic_decision import (
+from powdrr_service.planning.semantic_decision import (
     DECISION_VALUES,
     ExactSourceSpan,
     SemanticDecision,
@@ -11,6 +10,7 @@ from powdrr_lift.core.semantic_decision import (
     SemanticDecisionSpec,
     resolve_exact_source_span,
 )
+
 from powdrr_lift.workrr.semantic_classifier import (
     resolve_deterministic_source_decision,
 )

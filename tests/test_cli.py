@@ -928,7 +928,7 @@ def test_cli_init_from_plan_diff_writes_template(tmp_path: Path) -> None:
     plan_diff_path.write_text(
         """
         schema: https://powdrr.io/schema/plan-diff-v1
-        feature_plan_path: docs/specs/feature/feature-pr-specification.yaml
+        feature_plan_path: docs/proposals/feature/feature-pr-specification.yaml
         changelog_paths:
           - docs/changelogs/PR-1-changelog.yaml
         differences: []

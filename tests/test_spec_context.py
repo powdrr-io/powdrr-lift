@@ -23,15 +23,27 @@ def test_proposed_pr_id_exists_uses_gather_context_discovery(
         "id: demo-pr\nfeature_ids: []\n",
         encoding="utf-8",
     )
+    legacy_proposal_path = (
+        tmp_path
+        / "docs"
+        / "specs"
+        / "legacy-feature"
+        / "proposed-pr-specification.yaml"
+    )
+    legacy_proposal_path.parent.mkdir(parents=True)
+    legacy_proposal_path.write_text(
+        "id: legacy-pr\nfeature_ids: []\n", encoding="utf-8"
+    )
 
     assert proposed_pr_id_exists(tmp_path, "demo-pr") is True
     assert proposed_pr_id_exists(tmp_path, "missing-pr") is False
+    assert proposed_pr_id_exists(tmp_path, "legacy-pr") is False
 
 
 def test_gather_context_filters_tools_by_entity_type_and_labels(
     tmp_path: Path,
 ) -> None:
-    spec_path = tmp_path / "docs" / "specs" / "demo"
+    spec_path = tmp_path / "docs" / "current" / "demo"
     spec_path.mkdir(parents=True)
     (spec_path / "architecture-specification.yaml").write_text(
         """

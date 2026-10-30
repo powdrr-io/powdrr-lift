@@ -6,8 +6,6 @@ SPECIFICATION_SCHEMA_URL = "https://powdrr.io/schemas/specification-v1"
 PLAN_DIFF_SCHEMA_URL = "https://powdrr.io/schema/plan-diff-v1"
 PROPOSALS_ROOT = Path("docs") / "proposals"
 CURRENT_ROOT = Path("docs") / "current"
-# Kept for reading repositories created before proposal/current separation.
-LEGACY_SPECIFICATIONS_ROOT = Path("docs") / "specs"
 PLAN_DIFFS_ROOT = Path("docs") / "plan-diffs"
 
 ARCHITECTURE_SPECIFICATION_FILENAME = "architecture-specification.yaml"
@@ -113,13 +111,10 @@ def existing_specification_path(
     work_item_name: str,
     filename: str,
 ) -> Path:
-    """Find a checked-in spec across the new roots and the legacy root."""
+    """Find a checked-in spec across the proposal and current roots."""
     roots = (
         work_item_proposal_root(repo_root, work_item_name),
         work_item_current_root(repo_root, work_item_name),
-        Path(repo_root)
-        / LEGACY_SPECIFICATIONS_ROOT
-        / normalize_work_item_name(work_item_name),
     )
     for root in roots:
         candidate = root / filename
@@ -145,14 +140,13 @@ def is_specification_path(path: str) -> bool:
     return (
         normalized_path.startswith("docs/proposals/")
         or normalized_path.startswith("docs/current/")
-        or normalized_path.startswith("docs/specs/")
     ) and normalized_path.endswith(".yaml")
 
 
 def is_current_specification_path(path: str | Path) -> bool:
     parts = Path(path).parts
     return Path(path).suffix == ".yaml" and any(
-        parts[index : index + 2] in (("docs", "current"), ("docs", "specs"))
+        parts[index : index + 2] == ("docs", "current")
         for index in range(max(0, len(parts) - 1))
     )
 
@@ -160,6 +154,6 @@ def is_current_specification_path(path: str | Path) -> bool:
 def is_proposal_specification_path(path: str | Path) -> bool:
     parts = Path(path).parts
     return Path(path).suffix == ".yaml" and any(
-        parts[index : index + 2] in (("docs", "proposals"), ("docs", "specs"))
+        parts[index : index + 2] == ("docs", "proposals")
         for index in range(max(0, len(parts) - 1))
     )

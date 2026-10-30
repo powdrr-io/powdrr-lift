@@ -201,7 +201,7 @@ def test_create_change_log_template_from_plan_diff_prefills_related_sections(
     plan_diff_path.write_text(
         """
         schema: https://powdrr.io/schema/plan-diff-v1
-        feature_plan_path: docs/specs/feature/feature-pr-specification.yaml
+        feature_plan_path: docs/proposals/feature/feature-pr-specification.yaml
         changelog_paths:
           - docs/changelogs/PR-1-changelog.yaml
         differences:

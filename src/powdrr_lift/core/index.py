@@ -341,7 +341,6 @@ def load_specification_documents(repo_root: Path) -> list[SpecificationDocument]
         "--",
         "docs/current",
         "docs/proposals",
-        "docs/specs",
     )
     specification_documents: list[SpecificationDocument] = []
     for path_text in sorted(output.splitlines()):

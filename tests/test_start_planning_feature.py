@@ -56,7 +56,7 @@ description: Start planning a feature.
 
 # Plan And Implement Feature
 
-# - Use the work item folder `docs/specs/<work-item-name>`.
+# - Use the work item folder `docs/proposals/<work-item-name>`.
 
 1. Build the system map.
 2. Build the feature and PR template.

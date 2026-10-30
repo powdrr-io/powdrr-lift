@@ -24,7 +24,6 @@ from powdrr_lift.errors import (
     ProgrammerInvariantError,
     ProviderExecutionError,
 )
-from powdrr_lift.execution.kernel import ActionKernel
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.workrr.actions import (
     WorkflowAction,  # noqa: F401 - compatibility export
@@ -861,7 +860,6 @@ class WorkflowStepRunner:
         observer: WorkflowExecutionObserver | None = None,
         shadow_recorder: WorkflowShadowRecorder | None = None,
         runtime: ExecutionRuntime | None = None,
-        legacy_compatibility: bool = False,
         phase_type: str = "build",
         actor_id: str = "workflow-agent",
         repair_policy: RepairPolicy | None = None,
@@ -877,16 +875,13 @@ class WorkflowStepRunner:
         self.repair_coordinator = WorkflowRepairCoordinator(repair_policy)
         self.last_repair_directive: RepairDirective | None = None
         self._last_repair_failure: RepairFailure | None = None
-        if runtime is None and not legacy_compatibility:
+        if runtime is None:
             raise ProgrammerInvariantError(
                 "WorkflowStepRunner requires an ExecutionRuntime for normal execution.",
                 error_code="execution_runtime_required",
-                remediation=(
-                    "Create an ExecutionRuntime, or explicitly opt into the "
-                    "legacy compatibility runner."
-                ),
+                remediation="Create an ExecutionRuntime before running workflow steps.",
             )
-        self.kernel = runtime.kernel if runtime is not None else ActionKernel()
+        self.kernel = runtime.kernel
 
     def run(
         self,

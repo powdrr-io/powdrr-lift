@@ -148,9 +148,9 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     )
     _git(repo_root, "add", "docs/design/agent-platform-expansion.md")
     _git(repo_root, "commit", "-m", "Add structured design doc")
-    (repo_root / "docs" / "specs" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "current" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
     system_spec_path = (
-        repo_root / "docs" / "specs" / "powdrr-lift" / "system-specification.yaml"
+        repo_root / "docs" / "current" / "powdrr-lift" / "system-specification.yaml"
     )
     system_spec_path.write_text(
         """
@@ -162,10 +162,14 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         """,
         encoding="utf-8",
     )
-    _git(repo_root, "add", "docs/specs/powdrr-lift/system-specification.yaml")
+    _git(repo_root, "add", "docs/current/powdrr-lift/system-specification.yaml")
     _git(repo_root, "commit", "-m", "Add structured system spec")
     architecture_spec_path = (
-        repo_root / "docs" / "specs" / "powdrr-lift" / "architecture-specification.yaml"
+        repo_root
+        / "docs"
+        / "current"
+        / "powdrr-lift"
+        / "architecture-specification.yaml"
     )
     architecture_spec_path.write_text(
         """
@@ -175,12 +179,12 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         """,
         encoding="utf-8",
     )
-    _git(repo_root, "add", "docs/specs/powdrr-lift/architecture-specification.yaml")
+    _git(repo_root, "add", "docs/current/powdrr-lift/architecture-specification.yaml")
     _git(repo_root, "commit", "-m", "Add structured architecture spec")
     implementation_spec_path = (
         repo_root
         / "docs"
-        / "specs"
+        / "current"
         / "powdrr-lift"
         / "implementation-specification.yaml"
     )
@@ -202,7 +206,7 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         """,
         encoding="utf-8",
     )
-    _git(repo_root, "add", "docs/specs/powdrr-lift/implementation-specification.yaml")
+    _git(repo_root, "add", "docs/current/powdrr-lift/implementation-specification.yaml")
     _git(repo_root, "commit", "-m", "Add structured implementation spec")
     (repo_root / "README.md").write_text(
         "Updated for the structured file validation test.\n",
@@ -224,9 +228,9 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
         summary: Introduce version 2 of the changelog schema.
 
     structured_files:
-      - docs/specs/powdrr-lift/system-specification.yaml
-      - docs/specs/powdrr-lift/architecture-specification.yaml
-      - docs/specs/powdrr-lift/implementation-specification.yaml
+      - docs/current/powdrr-lift/system-specification.yaml
+      - docs/current/powdrr-lift/architecture-specification.yaml
+      - docs/current/powdrr-lift/implementation-specification.yaml
 
     files:
       - path: README.md
@@ -331,18 +335,18 @@ def test_validate_change_log_yaml_reports_success_for_version_two_changes(
     assert set(report.expected_change_files) == {
         "README.md",
         "docs/design/agent-platform-expansion.md",
-        "docs/specs/powdrr-lift/architecture-specification.yaml",
-        "docs/specs/powdrr-lift/implementation-specification.yaml",
-        "docs/specs/powdrr-lift/system-specification.yaml",
+        "docs/current/powdrr-lift/architecture-specification.yaml",
+        "docs/current/powdrr-lift/implementation-specification.yaml",
+        "docs/current/powdrr-lift/system-specification.yaml",
         "src/app.py",
         "tests/test_app.py",
     }
     assert set(report.proposed_change_files) == {
         "README.md",
         "docs/design/agent-platform-expansion.md",
-        "docs/specs/powdrr-lift/architecture-specification.yaml",
-        "docs/specs/powdrr-lift/implementation-specification.yaml",
-        "docs/specs/powdrr-lift/system-specification.yaml",
+        "docs/current/powdrr-lift/architecture-specification.yaml",
+        "docs/current/powdrr-lift/implementation-specification.yaml",
+        "docs/current/powdrr-lift/system-specification.yaml",
         "src/app.py",
         "tests/test_app.py",
     }
@@ -785,9 +789,9 @@ def test_validate_change_log_yaml_accepts_proposal_detail_related_ids(
     tmp_path: Path,
 ) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
-    (repo_root / "docs" / "specs" / "PR-1").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "proposals" / "PR-1").mkdir(parents=True, exist_ok=True)
     proposal_path = (
-        repo_root / "docs" / "specs" / "PR-1" / "proposed-pr-specification.yaml"
+        repo_root / "docs" / "proposals" / "PR-1" / "proposed-pr-specification.yaml"
     )
     proposal_path.write_text(
         """
@@ -885,9 +889,9 @@ def test_validate_change_log_yaml_rejects_related_proposed_prs_objects(
     tmp_path: Path,
 ) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
-    (repo_root / "docs" / "specs" / "PR-1").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "proposals" / "PR-1").mkdir(parents=True, exist_ok=True)
     proposal_path = (
-        repo_root / "docs" / "specs" / "PR-1" / "proposed-pr-specification.yaml"
+        repo_root / "docs" / "proposals" / "PR-1" / "proposed-pr-specification.yaml"
     )
     proposal_path.write_text(
         """
@@ -972,9 +976,9 @@ def test_validate_change_log_yaml_rejects_top_level_proposed_pr_state_invalid(
     tmp_path: Path,
 ) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
-    (repo_root / "docs" / "specs" / "PR-1").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "proposals" / "PR-1").mkdir(parents=True, exist_ok=True)
     proposal_path = (
-        repo_root / "docs" / "specs" / "PR-1" / "proposed-pr-specification.yaml"
+        repo_root / "docs" / "proposals" / "PR-1" / "proposed-pr-specification.yaml"
     )
     proposal_path.write_text(
         """
@@ -1102,11 +1106,11 @@ def test_validate_change_log_yaml_rejects_version_two_structured_file_in_files(
     tmp_path: Path,
 ) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
-    (repo_root / "docs" / "specs" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "current" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
     implementation_spec_path = (
         repo_root
         / "docs"
-        / "specs"
+        / "current"
         / "powdrr-lift"
         / "implementation-specification.yaml"
     )
@@ -1123,7 +1127,7 @@ def test_validate_change_log_yaml_rejects_version_two_structured_file_in_files(
         """,
         encoding="utf-8",
     )
-    _git(repo_root, "add", "docs/specs/powdrr-lift/implementation-specification.yaml")
+    _git(repo_root, "add", "docs/current/powdrr-lift/implementation-specification.yaml")
     _git(repo_root, "commit", "-m", "Add structured implementation spec")
     proposed_yaml = """
     version: 2
@@ -1137,7 +1141,7 @@ def test_validate_change_log_yaml_rejects_version_two_structured_file_in_files(
     structured_files: []
 
     files:
-      - path: docs/specs/powdrr-lift/implementation-specification.yaml
+      - path: docs/current/powdrr-lift/implementation-specification.yaml
         type: modified
         span:
           start_line: 1
@@ -1225,11 +1229,11 @@ def test_validate_change_log_yaml_rejects_structured_file_with_invalid_schema(
     tmp_path: Path,
 ) -> None:
     repo_root = _create_repo_with_feature_branch(tmp_path)
-    (repo_root / "docs" / "specs" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "current" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
     implementation_spec_path = (
         repo_root
         / "docs"
-        / "specs"
+        / "current"
         / "powdrr-lift"
         / "implementation-specification.yaml"
     )
@@ -1246,7 +1250,7 @@ def test_validate_change_log_yaml_rejects_structured_file_with_invalid_schema(
         """,
         encoding="utf-8",
     )
-    _git(repo_root, "add", "docs/specs/powdrr-lift/implementation-specification.yaml")
+    _git(repo_root, "add", "docs/current/powdrr-lift/implementation-specification.yaml")
     _git(repo_root, "commit", "-m", "Add structured implementation spec")
     proposed_yaml = """
     version: 2
@@ -1258,7 +1262,7 @@ def test_validate_change_log_yaml_rejects_structured_file_with_invalid_schema(
       goal: Capture files, entities, invariants, and guidance per hunk.
 
     structured_files:
-      - docs/specs/powdrr-lift/implementation-specification.yaml
+      - docs/current/powdrr-lift/implementation-specification.yaml
 
     files:
       - path: src/app.py
@@ -1307,9 +1311,9 @@ def test_validate_change_log_yaml_rejects_invalid_structured_specification_conte
     _git(repo_root, "commit", "-m", "Initial commit")
 
     _git(repo_root, "checkout", "-b", "feature/change-log")
-    (repo_root / "docs" / "specs" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "current" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
     system_spec_path = (
-        repo_root / "docs" / "specs" / "powdrr-lift" / "system-specification.yaml"
+        repo_root / "docs" / "current" / "powdrr-lift" / "system-specification.yaml"
     )
     system_spec_path.write_text(
         """
@@ -1320,7 +1324,7 @@ def test_validate_change_log_yaml_rejects_invalid_structured_specification_conte
         """,
         encoding="utf-8",
     )
-    _git(repo_root, "add", "docs/specs/powdrr-lift/system-specification.yaml")
+    _git(repo_root, "add", "docs/current/powdrr-lift/system-specification.yaml")
     _git(repo_root, "commit", "-m", "Add invalid system spec")
 
     proposed_yaml = """
@@ -1333,7 +1337,7 @@ def test_validate_change_log_yaml_rejects_invalid_structured_specification_conte
       goal: Capture files, entities, invariants, and guidance per hunk.
 
     structured_files:
-      - docs/specs/powdrr-lift/system-specification.yaml
+      - docs/current/powdrr-lift/system-specification.yaml
 
     files: []
     entities: []
@@ -1366,11 +1370,11 @@ def test_validate_change_log_yaml_rejects_unmodified_structured_file_entry(
     _git(repo_root, "config", "user.name", "Test User")
     _git(repo_root, "config", "user.email", "test@example.com")
     (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
-    (repo_root / "docs" / "specs" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "current" / "powdrr-lift").mkdir(parents=True, exist_ok=True)
     implementation_spec_path = (
         repo_root
         / "docs"
-        / "specs"
+        / "current"
         / "powdrr-lift"
         / "implementation-specification.yaml"
     )
@@ -1387,7 +1391,7 @@ def test_validate_change_log_yaml_rejects_unmodified_structured_file_entry(
         """,
         encoding="utf-8",
     )
-    _git(repo_root, "add", "docs/specs/powdrr-lift/implementation-specification.yaml")
+    _git(repo_root, "add", "docs/current/powdrr-lift/implementation-specification.yaml")
     _git(repo_root, "add", "README.md")
     _git(repo_root, "commit", "-m", "Initial commit")
     _git(repo_root, "checkout", "-b", "feature/change-log")
@@ -1405,7 +1409,7 @@ def test_validate_change_log_yaml_rejects_unmodified_structured_file_entry(
       goal: Capture files, entities, invariants, and guidance per hunk.
 
     structured_files:
-      - docs/specs/powdrr-lift/implementation-specification.yaml
+      - docs/current/powdrr-lift/implementation-specification.yaml
 
     files:
       - path: src/app.py
@@ -2190,9 +2194,9 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
     _git(repo_root, "commit", "-m", "Initial commit")
     _write_taxonomy_file(repo_root)
 
-    (repo_root / "docs" / "specs" / "PR-1").mkdir(parents=True, exist_ok=True)
+    (repo_root / "docs" / "proposals" / "PR-1").mkdir(parents=True, exist_ok=True)
     (
-        repo_root / "docs" / "specs" / "PR-1" / "proposed-pr-specification.yaml"
+        repo_root / "docs" / "proposals" / "PR-1" / "proposed-pr-specification.yaml"
     ).write_text(
         """
         schema: https://powdrr.io/schemas/specification-v1
@@ -2226,7 +2230,7 @@ def _create_repo_with_feature_branch(tmp_path: Path) -> Path:
         """,
         encoding="utf-8",
     )
-    _git(repo_root, "add", "docs/specs/PR-1/proposed-pr-specification.yaml")
+    _git(repo_root, "add", "docs/proposals/PR-1/proposed-pr-specification.yaml")
     _git(repo_root, "commit", "-m", "Seed proposed PR spec catalog")
 
     _git(repo_root, "checkout", "-b", "feature/change-log")

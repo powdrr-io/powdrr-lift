@@ -368,7 +368,7 @@ def test_cli_validate_system_specification_reports_yaml(
     tmp_path: Path,
 ) -> None:
     spec_path = (
-        tmp_path / "docs" / "specs" / "powdrr-lift" / "system-specification.yaml"
+        tmp_path / "docs" / "current" / "powdrr-lift" / "system-specification.yaml"
     )
     spec_path.parent.mkdir(parents=True, exist_ok=True)
     spec_path.write_text(

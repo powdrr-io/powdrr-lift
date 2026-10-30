@@ -261,8 +261,7 @@ def _iter_context_specification_paths(
     Context discovery is intentionally path-scoped.  The current tree is the
     default source of truth; proposal documents are supplemental and are only
     included when the caller supplies a work-item directory.  Select one
-    proposal root so a repository containing both the canonical and legacy
-    layouts cannot silently merge two different proposals.
+    proposal root so separate proposals cannot silently merge into one context.
     """
 
     def yaml_files(root: Path) -> list[Path]:
@@ -275,10 +274,7 @@ def _iter_context_specification_paths(
         ]
 
     paths: list[Path] = []
-    for docs_root in (
-        repo_root / "docs" / "current",
-        repo_root / "docs" / "specs",
-    ):
+    for docs_root in (repo_root / "docs" / "current",):
         paths.extend(yaml_files(docs_root))
 
     if feature_id is not None:
@@ -342,7 +338,7 @@ def _describe_specification_path(
     if (
         len(path_parts) >= 3
         and path_parts[0] == "docs"
-        and path_parts[1] in {"current", "proposed", "proposals", "specs"}
+        and path_parts[1] in {"current", "proposed", "proposals"}
     ):
         work_item_name = path_parts[2]
         specification_type = (

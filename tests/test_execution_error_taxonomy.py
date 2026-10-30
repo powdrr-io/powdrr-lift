@@ -58,7 +58,7 @@ def test_runtime_surfaces_corrupt_state_as_non_correctable_error(
         runtime.verify()
 
 
-def test_provider_failure_bypasses_model_correction_path() -> None:
+def test_provider_failure_bypasses_model_correction_path(tmp_path: Path) -> None:
     class Strategy:
         def next_request(self) -> WorkflowActionRequest:
             def fail() -> None:
@@ -79,7 +79,15 @@ def test_provider_failure_bypasses_model_correction_path() -> None:
             raise AssertionError("provider failures must not enter correction")
 
     with pytest.raises(ProviderExecutionError):
-        WorkflowStepRunner(max_stalled_roundtrips=1, legacy_compatibility=True).run(
+        WorkflowStepRunner(
+            max_stalled_roundtrips=1,
+            runtime=ExecutionRuntime(
+                "provider-failure",
+                profile_id="default",
+                workflow_directory=tmp_path / "workflow",
+                repo_root=tmp_path,
+            ),
+        ).run(
             cast(WorkflowExecutionStrategy, Strategy()),
             max_roundtrips=1,
             signature=lambda _: "failure",

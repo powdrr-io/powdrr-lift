@@ -287,7 +287,7 @@ def _validate_repository_target(
         WorkflowRelationshipValidationIssue(
             "missing_workflow_target",
             f"Workflow relationship target proposed_pr {target_id!r} does not "
-            "resolve to a proposed PR specification in docs/proposals or docs/specs.",
+            "resolve to a proposed PR specification in docs/proposals.",
             f"{path}:relationships[{index}].target_id",
         )
     )

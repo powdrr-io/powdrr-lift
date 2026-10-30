@@ -7,19 +7,7 @@ fixture: fixtures/task-002
 provider:
   mode: scripted
   responses:
-  - action: complete
-    output_state:
-      detailed-execution-plan-state:
-        execution_plan:
-          criteria_to_tests:
-          - Verify the proposed PR context is handed to the implementation plan.
-          implementation_files:
-          - src/example.py
-          test_commands:
-          - uv run pytest -q
-          validation_commands:
-          - uv run ruff check .
-          risks: []
+  - step_json: '{"operation":{"tool":"task_complete","parameters":{"output_state":{"detailed-execution-plan-state":{"execution_plan":{"criteria_to_tests":["Verify the proposed PR context is handed to the implementation plan."],"implementation_files":["src/example.py"],"test_commands":["uv run pytest -q"],"validation_commands":["uv run ruff check ."],"risks":[]}}},"terminate_workflow":false}}}'
 expect:
   output_state:
     detailed-execution-plan-state:

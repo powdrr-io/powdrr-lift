@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,12 @@ from powdrr_lift.workrr.scenario import (
     run_workflow_scenario,
 )
 from powdrr_lift.workrr.task_scenario import run_workflow_task_scenario
+
+
+def _response(tool: str, parameters: dict[str, object]) -> dict[str, object]:
+    return {
+        "step_json": json.dumps({"operation": {"tool": tool, "parameters": parameters}})
+    }
 
 
 def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
@@ -40,7 +47,7 @@ def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
         workflow_source=workflow.directory,
         task_id="execute-proposed-pr-task-001",
         responses=[
-            {"action": "complete", "output_state": {"plan-state": {"ok": True}}}
+            _response("task_complete", {"output_state": {"plan-state": {"ok": True}}})
         ],
         expected_output_state={"plan-state": {"ok": True}},
     )
@@ -72,15 +79,14 @@ def test_task_scenario_repairs_a_failed_procedrr_operation(tmp_path: Path) -> No
         workflow_source=workflow.directory,
         task_id="repair-task",
         responses=[
-            {
-                "action": "edit",
-                "file_path": "missing.txt",
-                "edits": [{"kind": "replace", "start_line": 1, "text": "x"}],
-            },
-            {
-                "action": "task_complete",
-                "output_state": {"result": {"ok": True}},
-            },
+            _response(
+                "edit",
+                {
+                    "file_path": "missing.txt",
+                    "edits": [{"kind": "replace", "start_line": 1, "text": "x"}],
+                },
+            ),
+            _response("task_complete", {"output_state": {"result": {"ok": True}}}),
         ],
         expected_output_state={"result": {"ok": True}},
     )
@@ -115,7 +121,9 @@ def test_workflow_scenario_dispatches_to_task_adapter(tmp_path: Path) -> None:
         "provider": {
             "mode": "scripted",
             "responses": [
-                {"action": "complete", "output_state": {"plan-state": {"ok": True}}}
+                _response(
+                    "task_complete", {"output_state": {"plan-state": {"ok": True}}}
+                )
             ],
         },
         "expect": {"output_state": {"plan-state": {"ok": True}}},
@@ -150,7 +158,9 @@ def test_live_workflow_scenario_records_real_client_exchanges(
     class FakeLiveClient:
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, object]:
             assert messages
-            return {"action": "complete", "output_state": {"plan-state": {"ok": True}}}
+            return _response(
+                "task_complete", {"output_state": {"plan-state": {"ok": True}}}
+            )
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.task_scenario._build_workflow_client",

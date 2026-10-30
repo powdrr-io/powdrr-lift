@@ -28,7 +28,6 @@ _DEFAULT_OUTPUT_PATH = PROPOSALS_ROOT
 _IMPLEMENTATION_SPECIFICATION_DIRS = (
     CURRENT_ROOT,
     PROPOSALS_ROOT,
-    Path("docs") / "specs",
 )
 _EFFECT_SECTIONS = (
     "entities",
@@ -723,15 +722,7 @@ def proposed_pr_specification_path(
         / f"PR-{pr_number}"
         / "proposed-pr-specification.yaml"
     )
-    if proposal_path.exists():
-        return proposal_path
-    return (
-        repo_root_path
-        / "docs"
-        / "specs"
-        / f"PR-{pr_number}"
-        / "proposed-pr-specification.yaml"
-    )
+    return proposal_path
 
 
 def show_proposed_pr_specification(
@@ -1786,10 +1777,7 @@ def _load_proposed_pr_documents(repo_root: Path) -> list[_ProposedPRDocument]:
 def _iter_proposed_pr_specification_paths(repo_root: Path) -> list[Path]:
     specification_paths = [
         specification_path
-        for proposal_root in (
-            repo_root / PROPOSALS_ROOT,
-            repo_root / "docs" / "specs",
-        )
+        for proposal_root in (repo_root / PROPOSALS_ROOT,)
         if proposal_root.exists()
         for specification_path in proposal_root.rglob("*.yaml")
         if specification_path.is_file()

@@ -1775,10 +1775,7 @@ def _load_specification_ids(repo_root: Path, specification_kind: str) -> set[str
 
 
 def _iter_specification_paths(repo_root: Path, specification_kind: str) -> list[Path]:
-    spec_root = repo_root / "docs" / "specs"
-    if not spec_root.exists():
-        return []
-
+    spec_root = repo_root / "docs" / "current"
     filename_by_kind = {
         "architecture": "architecture-specification.yaml",
         "feature_pr": "feature-pr-specification.yaml",
@@ -1790,20 +1787,22 @@ def _iter_specification_paths(repo_root: Path, specification_kind: str) -> list[
     if filename is None:
         return []
 
-    specification_paths = [
-        specification_path
-        for specification_path in spec_root.rglob(filename)
-        if specification_path.is_file()
-    ]
+    specification_paths = (
+        [
+            specification_path
+            for specification_path in spec_root.rglob(filename)
+            if specification_path.is_file()
+        ]
+        if spec_root.is_dir()
+        else []
+    )
 
     if specification_kind == "proposed_pr":
         proposal_root = repo_root / "docs" / "proposals"
         if proposal_root.exists():
             specification_paths.extend(
                 specification_path
-                for specification_path in proposal_root.glob(
-                    "PR-*-proposed-pr-specification.yaml"
-                )
+                for specification_path in proposal_root.rglob(filename)
                 if specification_path.is_file()
             )
 
@@ -1852,7 +1851,6 @@ def _load_merged_structured_file_paths(
                 default_branch_name,
                 "docs/proposals",
                 "docs/current",
-                "docs/specs",
             ],
             check=True,
             capture_output=True,

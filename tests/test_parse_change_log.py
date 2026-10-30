@@ -75,7 +75,7 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
             summary: Keep version 1 support while introducing version 2.
 
         structured_files:
-          - docs/specs/powdrr-lift/system-specification.yaml
+          - docs/current/powdrr-lift/system-specification.yaml
 
         files:
             - path: src/review/workflow.py
@@ -162,7 +162,7 @@ def test_parse_change_log_maps_version_two_yaml_into_nested_dataclasses() -> Non
     assert change_log.title == "Expand review workflow metadata"
     assert (change_log.decisions or [])[0].id == "ADR-200"
     assert change_log.structured_files == [
-        "docs/specs/powdrr-lift/system-specification.yaml"
+        "docs/current/powdrr-lift/system-specification.yaml"
     ]
     assert [entity.id for entity in (change_log.entity_changes or [])] == [
         "ReviewSkill",

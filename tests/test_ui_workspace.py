@@ -12,9 +12,13 @@ from powdrr_contracts.workspace import (
     JobState,
     Message,
     MessageRole,
+    QuestionState,
+    TurnState,
     WorkspaceContractError,
     WorkspaceEvent,
+    WorkspaceQuestion,
     WorkspaceRepository,
+    WorkspaceTurn,
 )
 from powdrr_local.workspace import WorkspaceConflict, WorkspaceStore
 
@@ -250,7 +254,7 @@ def test_version_one_database_migrates_without_changing_existing_records(
     with sqlite3.connect(path) as db:
         version = db.execute("PRAGMA user_version").fetchone()[0]
         sequence = db.execute("SELECT sequence FROM events").fetchone()[0]
-    assert version == 4
+    assert version == 5
     assert sequence == 7
     assert conversation.revision == 1
     assert conversation.specification_refs == ("docs/old.yaml",)
@@ -437,7 +441,7 @@ def test_repository_registry_rejects_non_git_paths_and_unknown_ids(
         store.resolve_repository_root("unknown-repository")
 
 
-def test_schema_v3_migrates_to_repository_registry(tmp_path: Path) -> None:
+def test_schema_v3_migrates_to_durable_turns(tmp_path: Path) -> None:
     path = tmp_path / "workspace-v3.db"
     with sqlite3.connect(path) as db:
         db.execute("PRAGMA user_version = 3")
@@ -448,5 +452,158 @@ def test_schema_v3_migrates_to_repository_registry(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 4
+    assert version == 5
     assert "repositories" in tables
+    assert "turns" in tables
+    assert "questions" in tables
+
+
+def test_turn_creation_is_atomic_and_only_one_active_turn_is_allowed(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    first_chat = store.create_conversation("repo", "First")
+    second_chat = store.create_conversation("repo", "Second")
+    turn = store.create_turn(
+        first_chat.conversation_id,
+        turn_id="turn-1",
+        message_id="turn-message-1",
+        content="Add search",
+        request_id="start-turn-1",
+    )
+    assert (
+        store.create_turn(
+            first_chat.conversation_id,
+            turn_id="turn-1",
+            message_id="turn-message-1",
+            content="Add search",
+            request_id="start-turn-1",
+        )
+        == turn
+    )
+    assert WorkspaceTurn.from_dict(turn.to_dict()) == turn
+    assert store.list_messages(first_chat.conversation_id)[0].content == "Add search"
+    with pytest.raises(WorkspaceConflict, match="active turn"):
+        store.create_turn(
+            first_chat.conversation_id,
+            turn_id="turn-2",
+            message_id="turn-message-2",
+            content="Another request",
+        )
+    second_turn = store.create_turn(
+        second_chat.conversation_id,
+        turn_id="turn-3",
+        message_id="turn-message-3",
+        content="Independent chat",
+    )
+    assert second_turn.state == TurnState.ACCEPTED
+    assert len(store.read_events("repo")) == 6
+
+
+def test_question_answers_validate_and_recover_until_delivered(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace.db"
+    store = WorkspaceStore(path)
+    chat = store.create_conversation("repo", "Design")
+    turn = store.create_turn(
+        chat.conversation_id,
+        turn_id="turn-1",
+        message_id="user-message-1",
+        content="Design search",
+    )
+    running = store.transition_turn(
+        turn.turn_id,
+        expected_revision=turn.revision,
+        state=TurnState.RUNNING,
+        run_id="run-1",
+        attempt_id="attempt-1",
+    )
+    response_schema = {
+        "type": "object",
+        "properties": {"scope": {"type": "string"}},
+        "required": ["scope"],
+        "additionalProperties": False,
+    }
+    question = store.create_question(
+        turn.turn_id,
+        question_id="question-1",
+        prompt="What should search include?",
+        response_schema=response_schema,
+        run_id="run-1",
+        attempt_id="attempt-1",
+        expected_turn_revision=running.revision,
+        request_id="ask-scope",
+    )
+    assert WorkspaceQuestion.from_dict(question.to_dict()) == question
+    assert store.get_turn(turn.turn_id).state == TurnState.WAITING_FOR_INPUT
+    with pytest.raises(ValueError, match="does not match"):
+        store.answer_question(
+            question.question_id,
+            answer={"scope": 42},
+            expected_revision=question.revision,
+        )
+
+    answered = store.answer_question(
+        question.question_id,
+        answer={"scope": "product names"},
+        expected_revision=question.revision,
+        request_id="answer-scope",
+    )
+    reopened = WorkspaceStore(path)
+    assert reopened.list_undelivered_question_answers("repo") == (answered,)
+    with pytest.raises(WorkspaceConflict, match="different run or attempt"):
+        reopened.mark_question_answer_delivered(
+            question.question_id,
+            expected_revision=answered.revision,
+            run_id="run-1",
+            attempt_id="attempt-other",
+            delivery_receipt_id="receipt-wrong",
+        )
+    delivered = reopened.mark_question_answer_delivered(
+        question.question_id,
+        expected_revision=answered.revision,
+        run_id="run-1",
+        attempt_id="attempt-1",
+        delivery_receipt_id="receipt-1",
+        request_id="deliver-scope",
+    )
+    assert delivered.state == QuestionState.DELIVERED
+    assert delivered.delivery_receipt_id == "receipt-1"
+    assert reopened.list_undelivered_question_answers("repo") == ()
+    assert reopened.get_turn(turn.turn_id).state == TurnState.RUNNING
+    assert (
+        reopened.answer_question(
+            question.question_id,
+            answer={"scope": "product names"},
+            expected_revision=question.revision,
+            request_id="answer-scope",
+        )
+        == answered
+    )
+    assert (
+        reopened.mark_question_answer_delivered(
+            question.question_id,
+            expected_revision=answered.revision,
+            run_id="run-1",
+            attempt_id="attempt-1",
+            delivery_receipt_id="receipt-1",
+            request_id="deliver-scope",
+        )
+        == delivered
+    )
+
+    assistant_message = reopened.append_message(
+        chat.conversation_id,
+        message_id="assistant-message-1",
+        role="assistant",
+        content="I will search product names.",
+    )
+    finished = reopened.transition_turn(
+        turn.turn_id,
+        expected_revision=reopened.get_turn(turn.turn_id).revision,
+        state=TurnState.SUCCEEDED,
+        final_message_id=assistant_message.message_id,
+    )
+    assert finished.state == TurnState.SUCCEEDED
+    assert finished.final_message_id == assistant_message.message_id

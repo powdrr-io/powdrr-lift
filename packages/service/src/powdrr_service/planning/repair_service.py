@@ -14,12 +14,12 @@ import yaml
 from powdrr_lift.workrr.github_issue_plan_generation import (
     parse_plan_workflow_instance_yaml,
 )
-from powdrr_lift.workrr.github_issue_queue import (
+from powdrr_service.planning.multipr_structrr import load_multi_pr_proposal
+from powdrr_service.planning.plan_document import (
     parse_reviewed_plan_yaml,
     render_plan_repair_metadata,
     serialize_reviewed_plan_yaml,
 )
-from powdrr_service.planning.multipr_structrr import load_multi_pr_proposal
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_service.planning.repair import (
     PlanDiscovery,

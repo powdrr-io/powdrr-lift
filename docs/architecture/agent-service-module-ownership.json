@@ -409,9 +409,9 @@
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_lift.workrr.github_issue_plan_generation",
-        "powdrr_lift.workrr.github_issue_queue",
         "powdrr_service.planning.evidence",
-        "powdrr_service.planning.multipr_structrr"
+        "powdrr_service.planning.multipr_structrr",
+        "powdrr_service.planning.plan_document"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -496,8 +496,8 @@
       "internal_imports": [
         "powdrr_lift.workrr.git",
         "powdrr_lift.workrr.github_issue_plan_generation",
-        "powdrr_lift.workrr.github_issue_queue",
         "powdrr_service.planning.multipr_structrr",
+        "powdrr_service.planning.plan_document",
         "powdrr_service.planning.repair"
       ],
       "kind": "python_module",
@@ -559,6 +559,18 @@
       "owner": "service",
       "path": "packages/service/src/powdrr_service/planning/plan_models.py",
       "rationale": "Service-owned reviewed execution plan records.",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "1199",
+      "internal_imports": [
+        "powdrr_service.planning.compiler",
+        "powdrr_service.planning.plan_models"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/plan_document.py",
+      "rationale": "Service-owned reviewed plan validation, serialization, and repair metadata format.",
       "reviewed": true
     },
     {
@@ -2835,6 +2847,7 @@
         "powdrr_lift.workrr.github_issue_plan_generation",
         "powdrr_lift.workrr.planning.compiler",
         "powdrr_lift.workrr.planning.repair",
+        "powdrr_service.planning.plan_document",
         "powdrr_service.planning.plan_models"
       ],
       "kind": "python_module",

@@ -19,13 +19,13 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanGenerationError,
     parse_plan_workflow_instance_yaml,
 )
-from powdrr_lift.workrr.github_issue_queue import (
-    GitHubIssueQueueError,
+from powdrr_service.planning.evidence import Evidence, EvidenceError
+from powdrr_service.planning.multipr_structrr import MultiPRStructrrProposal
+from powdrr_service.planning.plan_document import (
+    PlanDocumentError,
     parse_reviewed_plan_yaml,
     serialize_reviewed_plan_yaml,
 )
-from powdrr_service.planning.evidence import Evidence, EvidenceError
-from powdrr_service.planning.multipr_structrr import MultiPRStructrrProposal
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 
 PLANNING_MANIFEST_SCHEMA = "https://powdrr.io/schemas/planning-manifest-v1"
@@ -335,7 +335,7 @@ def validate_compiled_plan(
             ):
                 errors.append(f"workflow {item.workflow_id!r} lost plan context")
     except (
-        GitHubIssueQueueError,
+        PlanDocumentError,
         KeyError,
         TypeError,
         ValueError,

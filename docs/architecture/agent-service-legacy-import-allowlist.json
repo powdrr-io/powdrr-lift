@@ -92,26 +92,6 @@
       "rationale": "Planning reuses the established workflow process/schema parser to preserve persisted plan artifact compatibility while the GitHub planning adapter is extracted."
     },
     {
-      "import": "powdrr_lift.workrr.github_issue_queue.GitHubIssueQueueError",
-      "owner_pr": 4,
-      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
-    },
-    {
-      "import": "powdrr_lift.workrr.github_issue_queue.parse_reviewed_plan_yaml",
-      "owner_pr": 4,
-      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
-    },
-    {
-      "import": "powdrr_lift.workrr.github_issue_queue.render_plan_repair_metadata",
-      "owner_pr": 4,
-      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
-    },
-    {
-      "import": "powdrr_lift.workrr.github_issue_queue.serialize_reviewed_plan_yaml",
-      "owner_pr": 4,
-      "rationale": "Planning and repair still use the legacy GitHub issue client and serialized plan records; move these operations behind service-owned integration and persistence adapters."
-    },
-    {
       "import": "powdrr_lift.workrr.llm.complete_json_with_timeout_retry",
       "owner_pr": 6,
       "rationale": "The legacy bounded JSON completion helper owns provider retry behavior; planning will consume the service inference contract after provider extraction."

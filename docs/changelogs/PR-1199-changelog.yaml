@@ -1,0 +1,163 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1199
+title: Move reviewed plan document codec into service package
+intent:
+  problem: Service compilation and repair still imported reviewed-plan parsing, serialization, and repair metadata rendering from the legacy GitHub issue queue module.
+  goal: Make reviewed plan document validation and serialization service-owned while retaining the queue module's compatibility API and RuntimeError behavior.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/plan_document.py
+    type: added
+    span: {start_line: 1, end_line: 332}
+    summary: Own reviewed execution plan validation, deterministic YAML serialization, and repair metadata rendering.
+    rationale: Keep planning artifact semantics inside the service package.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 22, end_line: 25}
+    summary: Use service-owned plan document helpers and validation errors during compilation.
+    rationale: Remove the compiler's legacy GitHub queue dependency.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 27, end_line: 28}
+    summary: Replace queue exception handling with the service-owned plan document error.
+    rationale: Keep compiler validation errors independent of GitHub issue integration.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 338, end_line: 338}
+    summary: Catch the service plan document error during compiled-plan validation.
+    rationale: Preserve validation reporting after moving the codec.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 17, end_line: 18}
+    summary: Use service-owned plan document helpers during repair preparation and serialization.
+    rationale: Keep service repair artifact handling within the service package.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 22, end_line: 22}
+    summary: Keep proposal loading grouped with service-owned planning imports.
+    rationale: Preserve repair service imports after removing the queue codec dependency.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 25, end_line: 44}
+    summary: Retain legacy queue helper names as compatibility adapters to the service codec.
+    rationale: Preserve existing callers while removing duplicate plan document logic.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 28, end_line: 28}
+    summary: Remove the duplicate queue schema constant.
+    rationale: Use the service-owned schema value for both callers.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 39, end_line: 39}
+    summary: Remove the duplicate manual prerequisite trigger constant.
+    rationale: Keep plan document constants in the service codec.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 43, end_line: 43}
+    summary: Remove the duplicate plan repair marker constant.
+    rationale: Keep repair metadata formatting constants with the service codec.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 517, end_line: 520}
+    summary: Translate service plan document errors into the legacy queue exception.
+    rationale: Preserve the prior queue-facing exception contract.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 523, end_line: 530}
+    summary: Keep manual prerequisite parsing as a queue compatibility adapter.
+    rationale: Preserve legacy error behavior while using service validation rules.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 558, end_line: 558}
+    summary: Load pinned plan revisions through the compatibility parser.
+    rationale: Translate parser failures to the established queue error type.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1599, end_line: 1616}
+    summary: Remove the duplicate plan repair metadata renderer.
+    rationale: Keep serialization policy in service-owned planning code.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 2420, end_line: 2666}
+    summary: Remove plan YAML validation and helper implementations from the issue queue module.
+    rationale: Ensure service and queue consumers share one reviewed-plan codec.
+  - path: docs/architecture/agent-service-legacy-import-allowlist.json
+    type: modified
+    span: {start_line: 94, end_line: 113}
+    summary: Remove service compiler and repair imports of the legacy plan document helpers.
+    rationale: Keep the migration allowlist aligned with current service imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 412, end_line: 412}
+    summary: Register the new plan document module and update compiler, repair, and queue ownership metadata.
+    rationale: Keep the package ownership inventory aligned with the code split.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 413, end_line: 414}
+    summary: Point the compiler ownership record at the service-owned plan document codec.
+    rationale: Reflect the compiler's updated internal imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 499, end_line: 499}
+    summary: Remove the repair service's legacy queue import from its ownership record.
+    rationale: Keep inventory imports aligned with service source.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 500, end_line: 500}
+    summary: Record the repair service's service-owned plan document dependency.
+    rationale: Keep inventory imports aligned with service source.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 564, end_line: 575}
+    summary: Register the new service-owned plan document module.
+    rationale: Track the canonical reviewed-plan validation and serialization owner.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2850, end_line: 2850}
+    summary: Record the compatibility queue's dependency on the service codec.
+    rationale: Track the preserved agent-facing import adapter.
+  - path: tests/test_agent_service_contracts.py
+    type: modified
+    span: {start_line: 250, end_line: 271}
+    summary: Assert compatibility helper exports resolve to the service-owned codec.
+    rationale: Prevent legacy plan document behavior from drifting from the canonical implementation.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 18, end_line: 21}
+    summary: Assert codec validation errors use the service-owned plan document error type.
+    rationale: Verify service callers depend on service errors rather than queue integration errors.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 21, end_line: 21}
+    summary: Remove the queue-specific error import from service codec tests.
+    rationale: Test service-owned validation through its public API.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 24, end_line: 24}
+    summary: Remove the legacy parser import from service codec tests.
+    rationale: Keep compiler tests on the service-owned parser.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 309, end_line: 309}
+    summary: Expect the service plan document error for forged planning metadata.
+    rationale: Verify service-owned semantic digest validation.
+entities:
+  - id: reviewed-plan-document-codec
+    type: Module
+    action: added
+  - id: legacy-plan-document-compatibility-adapter
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: service-owns-reviewed-plan-document-codec
+    description: Reviewed plan parsing, serialization, and repair metadata rendering have one canonical implementation in the service package.
+    action: added
+  - id: legacy-queue-api-remains-compatible
+    description: Existing GitHub issue queue callers retain their plan helper API and GitHubIssueQueueError type.
+    action: altered
+guidance:
+  - id: use-service-plan-document-codec
+    description: Keep future planning and repair callers on powdrr_service.planning.plan_document; the queue module only preserves legacy imports and translates plan document errors for compatibility.
+    action: added

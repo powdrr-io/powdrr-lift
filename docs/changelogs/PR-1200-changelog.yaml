@@ -1,0 +1,1005 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1200
+title: Remove migrated legacy compatibility paths
+intent:
+  problem: The execution, specification, and scenario layers still accepted superseded formats after their
+    current replacements were established.
+  goal: Remove obsolete compatibility paths so workflow execution, scenarios, and repository specifications
+    use one current contract and directory layout.
+human-decisions: []
+structured_files: []
+files:
+- path: README.md
+  type: modified
+  span:
+    start_line: 133
+    end_line: 135
+  summary: Document the canonical proposal and current-state specification locations.
+  rationale: Align repository documentation with the supported docs/proposals and docs/current layouts.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Stop importing data from the obsolete Structrr manifest sidecar while retaining tracked-file
+    cleanup.
+  rationale: Bootstrap now reads its manifest from the canonical snapshot and only stages obsolete sidecar
+    removal.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 159
+    end_line: 159
+  summary: Stop importing data from the obsolete Structrr manifest sidecar while retaining tracked-file
+    cleanup.
+  rationale: Bootstrap now reads its manifest from the canonical snapshot and only stages obsolete sidecar
+    removal.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 167
+  summary: Stop importing data from the obsolete Structrr manifest sidecar while retaining tracked-file
+    cleanup.
+  rationale: Bootstrap now reads its manifest from the canonical snapshot and only stages obsolete sidecar
+    removal.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 176
+    end_line: 180
+  summary: Stop importing data from the obsolete Structrr manifest sidecar while retaining tracked-file
+    cleanup.
+  rationale: Bootstrap now reads its manifest from the canonical snapshot and only stages obsolete sidecar
+    removal.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 262
+    end_line: 264
+  summary: Stop importing data from the obsolete Structrr manifest sidecar while retaining tracked-file
+    cleanup.
+  rationale: Bootstrap now reads its manifest from the canonical snapshot and only stages obsolete sidecar
+    removal.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 1244
+    end_line: 1244
+  summary: Recognize structured specifications only in canonical roots.
+  rationale: Generated changelog guidance no longer treats docs/specs as a supported structured-document
+    location.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1778
+    end_line: 1778
+  summary: Discover current specifications and proposal details from their canonical roots.
+  rationale: Validation no longer scans docs/specs and supports nested proposal files under docs/proposals.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1790
+    end_line: 1798
+  summary: Discover current specifications and proposal details from their canonical roots.
+  rationale: Validation no longer scans docs/specs and supports nested proposal files under docs/proposals.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1805
+    end_line: 1805
+  summary: Discover current specifications and proposal details from their canonical roots.
+  rationale: Validation no longer scans docs/specs and supports nested proposal files under docs/proposals.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1855
+    end_line: 1855
+  summary: Discover current specifications and proposal details from their canonical roots.
+  rationale: Validation no longer scans docs/specs and supports nested proposal files under docs/proposals.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 344
+    end_line: 344
+  summary: Limit specification indexing to current and proposal documents.
+  rationale: The repository index no longer discovers obsolete docs/specs files.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Remove docs/specs fallback from proposed-PR discovery and implementation-specification lookup.
+  rationale: Proposed PRs now resolve exclusively from docs/proposals and current specifications from
+    canonical roots.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 725
+    end_line: 725
+  summary: Remove docs/specs fallback from proposed-PR discovery and implementation-specification lookup.
+  rationale: Proposed PRs now resolve exclusively from docs/proposals and current specifications from
+    canonical roots.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1780
+    end_line: 1780
+  summary: Remove docs/specs fallback from proposed-PR discovery and implementation-specification lookup.
+  rationale: Proposed PRs now resolve exclusively from docs/proposals and current specifications from
+    canonical roots.
+- path: src/powdrr_lift/core/spec_context.py
+  type: modified
+  span:
+    start_line: 264
+    end_line: 264
+  summary: Restrict gathered specification context to current documents and the selected proposal.
+  rationale: Context collection no longer merges obsolete docs/specs content into planning or feature
+    work.
+- path: src/powdrr_lift/core/spec_context.py
+  type: modified
+  span:
+    start_line: 277
+    end_line: 277
+  summary: Restrict gathered specification context to current documents and the selected proposal.
+  rationale: Context collection no longer merges obsolete docs/specs content into planning or feature
+    work.
+- path: src/powdrr_lift/core/spec_context.py
+  type: modified
+  span:
+    start_line: 341
+    end_line: 341
+  summary: Restrict gathered specification context to current documents and the selected proposal.
+  rationale: Context collection no longer merges obsolete docs/specs content into planning or feature
+    work.
+- path: src/powdrr_lift/core/spec_paths.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Remove legacy docs/specs classification and lookup.
+  rationale: Specification paths now resolve only under docs/proposals and docs/current.
+- path: src/powdrr_lift/core/spec_paths.py
+  type: modified
+  span:
+    start_line: 114
+    end_line: 114
+  summary: Remove legacy docs/specs classification and lookup.
+  rationale: Specification paths now resolve only under docs/proposals and docs/current.
+- path: src/powdrr_lift/core/spec_paths.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 122
+  summary: Remove legacy docs/specs classification and lookup.
+  rationale: Specification paths now resolve only under docs/proposals and docs/current.
+- path: src/powdrr_lift/core/spec_paths.py
+  type: modified
+  span:
+    start_line: 148
+    end_line: 148
+  summary: Remove legacy docs/specs classification and lookup.
+  rationale: Specification paths now resolve only under docs/proposals and docs/current.
+- path: src/powdrr_lift/core/spec_paths.py
+  type: modified
+  span:
+    start_line: 149
+    end_line: 149
+  summary: Remove legacy docs/specs classification and lookup.
+  rationale: Specification paths now resolve only under docs/proposals and docs/current.
+- path: src/powdrr_lift/core/spec_paths.py
+  type: modified
+  span:
+    start_line: 157
+    end_line: 157
+  summary: Remove legacy docs/specs classification and lookup.
+  rationale: Specification paths now resolve only under docs/proposals and docs/current.
+- path: src/powdrr_lift/core/workflow_relationships.py
+  type: modified
+  span:
+    start_line: 290
+    end_line: 290
+  summary: Report the supported proposed-PR specification location.
+  rationale: Workflow target validation now names docs/proposals as the canonical proposed-PR root.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 158
+    end_line: 158
+  summary: Use canonical specification paths and Procedrr step_json in acceptance scenarios.
+  rationale: Acceptance fixtures now exercise the supported specification layout and task-response protocol.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 212
+    end_line: 212
+  summary: Use canonical specification paths and Procedrr step_json in acceptance scenarios.
+  rationale: Acceptance fixtures now exercise the supported specification layout and task-response protocol.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 931
+    end_line: 931
+  summary: Use canonical specification paths and Procedrr step_json in acceptance scenarios.
+  rationale: Acceptance fixtures now exercise the supported specification layout and task-response protocol.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 1065
+    end_line: 1075
+  summary: Use canonical specification paths and Procedrr step_json in acceptance scenarios.
+  rationale: Acceptance fixtures now exercise the supported specification layout and task-response protocol.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 1088
+    end_line: 1088
+  summary: Use canonical specification paths and Procedrr step_json in acceptance scenarios.
+  rationale: Acceptance fixtures now exercise the supported specification layout and task-response protocol.
+- path: src/powdrr_lift/workrr/llm.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Require an ExecutionRuntime for workflow-step execution.
+  rationale: Remove the runtime-less compatibility mode so execution always uses its durable kernel.
+- path: src/powdrr_lift/workrr/llm.py
+  type: modified
+  span:
+    start_line: 864
+    end_line: 864
+  summary: Require an ExecutionRuntime for workflow-step execution.
+  rationale: Remove the runtime-less compatibility mode so execution always uses its durable kernel.
+- path: src/powdrr_lift/workrr/llm.py
+  type: modified
+  span:
+    start_line: 878
+    end_line: 878
+  summary: Require an ExecutionRuntime for workflow-step execution.
+  rationale: Remove the runtime-less compatibility mode so execution always uses its durable kernel.
+- path: src/powdrr_lift/workrr/llm.py
+  type: modified
+  span:
+    start_line: 882
+    end_line: 882
+  summary: Require an ExecutionRuntime for workflow-step execution.
+  rationale: Remove the runtime-less compatibility mode so execution always uses its durable kernel.
+- path: src/powdrr_lift/workrr/llm.py
+  type: modified
+  span:
+    start_line: 884
+    end_line: 884
+  summary: Require an ExecutionRuntime for workflow-step execution.
+  rationale: Remove the runtime-less compatibility mode so execution always uses its durable kernel.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 105
+  summary: Remove translation of legacy action-shaped responses in scenario clients.
+  rationale: Scenario exchanges now pass the current Procedrr response contract through unchanged.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 58
+  summary: Remove translation of legacy action-shaped responses in scenario clients.
+  rationale: Scenario exchanges now pass the current Procedrr response contract through unchanged.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 63
+    end_line: 63
+  summary: Remove translation of legacy action-shaped responses in scenario clients.
+  rationale: Scenario exchanges now pass the current Procedrr response contract through unchanged.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 103
+  summary: Remove translation of legacy action-shaped responses in scenario clients.
+  rationale: Scenario exchanges now pass the current Procedrr response contract through unchanged.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 106
+    end_line: 106
+  summary: Remove translation of legacy action-shaped responses in scenario clients.
+  rationale: Scenario exchanges now pass the current Procedrr response contract through unchanged.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 348
+    end_line: 348
+  summary: Remove translation of legacy action-shaped responses in scenario clients.
+  rationale: Scenario exchanges now pass the current Procedrr response contract through unchanged.
+- path: src/powdrr_lift/workrr/task_scenario.py
+  type: modified
+  span:
+    start_line: 351
+    end_line: 355
+  summary: Remove translation of legacy action-shaped responses in scenario clients.
+  rationale: Scenario exchanges now pass the current Procedrr response contract through unchanged.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 82
+  summary: Place architecture fixtures under the current specification root.
+  rationale: Keep validation tests on canonical paths after removing docs/specs discovery.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 584
+    end_line: 588
+  summary: Place architecture fixtures under the current specification root.
+  rationale: Keep validation tests on canonical paths after removing docs/specs discovery.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 204
+    end_line: 204
+  summary: Use the canonical proposal path in changelog template fixtures.
+  rationale: Keep test input aligned with supported specification locations.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 151
+    end_line: 151
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 153
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 165
+    end_line: 165
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 168
+    end_line: 172
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 182
+    end_line: 182
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 187
+    end_line: 187
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 209
+    end_line: 209
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 231
+    end_line: 233
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 340
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 347
+    end_line: 349
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 792
+    end_line: 792
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 794
+    end_line: 794
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 892
+    end_line: 892
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 894
+    end_line: 894
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 979
+    end_line: 979
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 981
+    end_line: 981
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1109
+    end_line: 1109
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1113
+    end_line: 1113
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1130
+    end_line: 1130
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1144
+    end_line: 1144
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1232
+    end_line: 1232
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1236
+    end_line: 1236
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1253
+    end_line: 1253
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1265
+    end_line: 1265
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1314
+    end_line: 1314
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1316
+    end_line: 1316
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1327
+    end_line: 1327
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1340
+    end_line: 1340
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1373
+    end_line: 1373
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1377
+    end_line: 1377
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1394
+    end_line: 1394
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 1412
+    end_line: 1412
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 2197
+    end_line: 2197
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 2199
+    end_line: 2199
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 2233
+    end_line: 2233
+  summary: Move structured specification fixtures to current and proposal roots.
+  rationale: Validation tests now cover the supported paths and nested proposal detail discovery.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 931
+    end_line: 931
+  summary: Use docs/proposals in CLI plan fixtures.
+  rationale: Exercise planning against the canonical proposal root.
+- path: tests/test_current_state_specification.py
+  type: modified
+  span:
+    start_line: 135
+    end_line: 135
+  summary: Store baseline specifications under docs/current.
+  rationale: Current-state tests no longer depend on the removed legacy root.
+- path: tests/test_current_state_specification.py
+  type: modified
+  span:
+    start_line: 137
+    end_line: 137
+  summary: Store baseline specifications under docs/current.
+  rationale: Current-state tests no longer depend on the removed legacy root.
+- path: tests/test_current_state_specification.py
+  type: modified
+  span:
+    start_line: 188
+    end_line: 188
+  summary: Store baseline specifications under docs/current.
+  rationale: Current-state tests no longer depend on the removed legacy root.
+- path: tests/test_current_state_specification.py
+  type: modified
+  span:
+    start_line: 190
+    end_line: 190
+  summary: Store baseline specifications under docs/current.
+  rationale: Current-state tests no longer depend on the removed legacy root.
+- path: tests/test_current_state_specification.py
+  type: modified
+  span:
+    start_line: 214
+    end_line: 218
+  summary: Store baseline specifications under docs/current.
+  rationale: Current-state tests no longer depend on the removed legacy root.
+- path: tests/test_current_state_specification.py
+  type: modified
+  span:
+    start_line: 266
+    end_line: 266
+  summary: Store baseline specifications under docs/current.
+  rationale: Current-state tests no longer depend on the removed legacy root.
+- path: tests/test_execution_error_taxonomy.py
+  type: modified
+  span:
+    start_line: 61
+    end_line: 61
+  summary: Provide an ExecutionRuntime in runner error tests.
+  rationale: The runner no longer has a runtime-less test or production path.
+- path: tests/test_execution_error_taxonomy.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 90
+  summary: Provide an ExecutionRuntime in runner error tests.
+  rationale: The runner no longer has a runtime-less test or production path.
+- path: tests/test_feature_planning_specification.py
+  type: modified
+  span:
+    start_line: 471
+    end_line: 471
+  summary: Move specification fixtures to docs/current.
+  rationale: Keep feature-planning tests on the supported current-state layout.
+- path: tests/test_feature_planning_specification.py
+  type: modified
+  span:
+    start_line: 473
+    end_line: 473
+  summary: Move specification fixtures to docs/current.
+  rationale: Keep feature-planning tests on the supported current-state layout.
+- path: tests/test_feature_planning_specification.py
+  type: modified
+  span:
+    start_line: 521
+    end_line: 521
+  summary: Move specification fixtures to docs/current.
+  rationale: Keep feature-planning tests on the supported current-state layout.
+- path: tests/test_feature_planning_specification.py
+  type: modified
+  span:
+    start_line: 523
+    end_line: 523
+  summary: Move specification fixtures to docs/current.
+  rationale: Keep feature-planning tests on the supported current-state layout.
+- path: tests/test_feature_planning_specification.py
+  type: modified
+  span:
+    start_line: 541
+    end_line: 545
+  summary: Move specification fixtures to docs/current.
+  rationale: Keep feature-planning tests on the supported current-state layout.
+- path: tests/test_feature_planning_specification.py
+  type: modified
+  span:
+    start_line: 601
+    end_line: 601
+  summary: Move specification fixtures to docs/current.
+  rationale: Keep feature-planning tests on the supported current-state layout.
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 78
+  summary: Use canonical current-state specification paths in changelog fixtures.
+  rationale: Parser examples reflect the supported specification layout.
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 165
+    end_line: 165
+  summary: Use canonical current-state specification paths in changelog fixtures.
+  rationale: Parser examples reflect the supported specification layout.
+- path: tests/test_plan_diff_specification.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 36
+  summary: Use docs/proposals for proposed feature specifications.
+  rationale: Plan-diff fixtures no longer refer to docs/specs.
+- path: tests/test_plan_diff_specification.py
+  type: modified
+  span:
+    start_line: 95
+    end_line: 99
+  summary: Use docs/proposals for proposed feature specifications.
+  rationale: Plan-diff fixtures no longer refer to docs/specs.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 105
+    end_line: 105
+  summary: Move proposed-PR and implementation specification fixtures to supported roots.
+  rationale: PR specification tests no longer rely on the legacy docs/specs directory.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 131
+    end_line: 131
+  summary: Move proposed-PR and implementation specification fixtures to supported roots.
+  rationale: PR specification tests no longer rely on the legacy docs/specs directory.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 1091
+    end_line: 1091
+  summary: Move proposed-PR and implementation specification fixtures to supported roots.
+  rationale: PR specification tests no longer rely on the legacy docs/specs directory.
+- path: tests/test_pr_specification.py
+  type: modified
+  span:
+    start_line: 1200
+    end_line: 1200
+  summary: Move proposed-PR and implementation specification fixtures to supported roots.
+  rationale: PR specification tests no longer rely on the legacy docs/specs directory.
+- path: tests/test_spec_context.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 36
+  summary: Verify current specifications are gathered and legacy-root proposals are ignored.
+  rationale: Protect the removal of docs/specs from context discovery.
+- path: tests/test_spec_context.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 40
+  summary: Verify current specifications are gathered and legacy-root proposals are ignored.
+  rationale: Protect the removal of docs/specs from context discovery.
+- path: tests/test_spec_context.py
+  type: modified
+  span:
+    start_line: 46
+    end_line: 46
+  summary: Verify current specifications are gathered and legacy-root proposals are ignored.
+  rationale: Protect the removal of docs/specs from context discovery.
+- path: tests/test_start_planning_feature.py
+  type: modified
+  span:
+    start_line: 59
+    end_line: 59
+  summary: Update planning instructions to name docs/proposals.
+  rationale: The documented work-item path matches the canonical proposal root.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 371
+    end_line: 371
+  summary: Store system specification fixtures under docs/current.
+  rationale: Keep system validation tests on the supported current-state path.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 10
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 46
+    end_line: 54
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 798
+    end_line: 800
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 802
+    end_line: 804
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 807
+    end_line: 807
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 822
+    end_line: 824
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 835
+    end_line: 838
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 847
+    end_line: 847
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 872
+    end_line: 875
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 882
+    end_line: 884
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 905
+    end_line: 908
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 921
+    end_line: 921
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 945
+    end_line: 945
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 958
+    end_line: 960
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_llm.py
+  type: modified
+  span:
+    start_line: 982
+    end_line: 983
+  summary: Construct an ExecutionRuntime in workflow runner tests and assert it is required.
+  rationale: Runner tests now exercise the supported durable execution boundary.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 3584
+    end_line: 3584
+  summary: Move task-agent specification fixture to docs/proposals.
+  rationale: Keep workflow context tests on the canonical proposal path.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Use Procedrr step_json responses in scripted and live scenario tests.
+  rationale: Exercise the current task-response protocol directly without a legacy translator.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 28
+  summary: Use Procedrr step_json responses in scripted and live scenario tests.
+  rationale: Exercise the current task-response protocol directly without a legacy translator.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 50
+    end_line: 50
+  summary: Use Procedrr step_json responses in scripted and live scenario tests.
+  rationale: Exercise the current task-response protocol directly without a legacy translator.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 89
+  summary: Use Procedrr step_json responses in scripted and live scenario tests.
+  rationale: Exercise the current task-response protocol directly without a legacy translator.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 124
+    end_line: 126
+  summary: Use Procedrr step_json responses in scripted and live scenario tests.
+  rationale: Exercise the current task-response protocol directly without a legacy translator.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span:
+    start_line: 161
+    end_line: 163
+  summary: Use Procedrr step_json responses in scripted and live scenario tests.
+  rationale: Exercise the current task-response protocol directly without a legacy translator.
+- path: workflow-evals/scenarios/execute-proposed-pr/human-handoff.yaml
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Encode the handoff as a Procedrr task_handoff step.
+  rationale: The checked-in evaluation uses the current task response contract.
+- path: workflow-evals/scenarios/execute-proposed-pr/no-change-recovery.yaml
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Encode recovery operations as Procedrr steps.
+  rationale: The evaluation no longer depends on action-shaped legacy responses.
+- path: workflow-evals/scenarios/execute-proposed-pr/scope-repair.yaml
+  type: modified
+  span:
+    start_line: 10
+    end_line: 11
+  summary: Encode file cleanup and task completion as Procedrr steps.
+  rationale: The evaluation uses the current task response protocol.
+- path: workflow-evals/scenarios/execute-proposed-pr/task-001-context.yaml
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Encode context task completion as a Procedrr step.
+  rationale: Keep the deterministic scenario on the current response contract.
+- path: workflow-evals/scenarios/execute-proposed-pr/task-001-invalid-output.yaml
+  type: modified
+  span:
+    start_line: 10
+    end_line: 11
+  summary: Encode invalid and corrected output attempts as Procedrr steps.
+  rationale: Keep recovery evaluation coverage while dropping action-shaped fixtures.
+- path: workflow-evals/scenarios/execute-proposed-pr/task-001-malformed-action.yaml
+  type: modified
+  span:
+    start_line: 10
+    end_line: 11
+  summary: Represent the invalid tool proposal and recovery as Procedrr steps.
+  rationale: Preserve malformed-action recovery coverage under the current protocol.
+- path: workflow-evals/scenarios/execute-proposed-pr/task-002-plan.yaml
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Encode plan task completion as a Procedrr step.
+  rationale: The checked-in plan evaluation uses the current response contract.
+- path: workflow-evals/scenarios/execute-proposed-pr/task-all.yaml
+  type: modified
+  span:
+    start_line: 11
+    end_line: 26
+  summary: Encode each full-workflow task response as a Procedrr step.
+  rationale: The full execution evaluation no longer depends on legacy response translation.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

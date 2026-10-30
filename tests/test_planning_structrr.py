@@ -638,6 +638,58 @@ def test_existing_projected_file_path_is_a_valid_structural_subject() -> None:
     assert page.records[0].planned_path == path
 
 
+@pytest.mark.parametrize("reference_prefix", ["path::", "file:"])
+def test_absent_planned_file_reference_is_bound_as_a_new_subject(
+    reference_prefix: str,
+) -> None:
+    path = "src/yaml_strict.py"
+    unit = _unit(
+        writes=(PlannedWrite(path, "implementation", "python", ("anchor-01",), ()),)
+    )
+    candidate = {
+        "section": "files",
+        "subject_ref": f"{reference_prefix}{path}",
+        "new_identity_description": None,
+        "action": "changed",
+        "requirement_ids": ["req-01"],
+        "unit_ids": [unit.id],
+        "source_refs": ["anchor-01"],
+    }
+
+    page = _parse_page(
+        _candidate_page([candidate], has_more=False, next_anchor=None),
+        units=(unit,),
+        baseline={"files": [], "source_subjects": []},
+    )
+
+    subject = page.records[0]
+    assert subject.subject_id == f"path::{path}"
+    assert subject.action == "added"
+    assert subject.is_new is True
+    assert subject.planned_path == path
+
+
+def test_absent_unplanned_file_reference_is_still_rejected() -> None:
+    path = "src/unplanned.py"
+    candidate = {
+        "section": "files",
+        "subject_ref": f"path::{path}",
+        "new_identity_description": None,
+        "action": "changed",
+        "requirement_ids": ["req-01"],
+        "unit_ids": ["unit-01"],
+        "source_refs": ["anchor-01"],
+    }
+
+    with pytest.raises(
+        PlanningContractError, match="absent from the projected baseline"
+    ):
+        _parse_page(
+            _candidate_page([candidate], has_more=False, next_anchor=None),
+            baseline={"files": [], "source_subjects": []},
+        )
+
+
 def test_change_response_rejects_model_assigned_identity_fields() -> None:
     subject = BoundStructuralSubject(
         "entity-01",

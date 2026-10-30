@@ -162,6 +162,30 @@ def parse_structural_subject_page(
             raise PlanningContractError(
                 f"{pointer}/action", "unsupported Structrr action"
             )
+        # The model sometimes labels a planned, baseline-absent file as an
+        # existing subject. Resolve that ambiguity deterministically from the
+        # plan's write set and projected baseline instead of asking the model
+        # to assign new-identity syntax correctly. Only the two known file
+        # reference forms are eligible, and the path must be an allocated
+        # planned write that is genuinely absent from the baseline.
+        if section == "files" and subject_ref is not None:
+            referenced_path = _file_reference_path(subject_ref)
+            if referenced_path is not None and referenced_path in planned_paths:
+                try:
+                    _existing_subject_id(section, subject_ref, projected_baseline)
+                except PlanningContractError as error:
+                    if (
+                        "subject reference is absent from the projected baseline"
+                        not in str(error)
+                    ):
+                        raise
+                    new_description = _validate_planned_path(
+                        referenced_path,
+                        planned_paths,
+                        f"{pointer}/subject_ref",
+                    )
+                    subject_ref = None
+                    action = "added"
         requirements = _refs(
             raw["requirement_ids"],
             f"{pointer}/requirement_ids",
@@ -1151,6 +1175,14 @@ def _existing_subject_id(
     raise PlanningContractError(
         "/subject_ref", "subject reference is absent from the projected baseline"
     )
+
+
+def _file_reference_path(subject_ref: str) -> str | None:
+    if subject_ref.startswith("path::"):
+        return subject_ref.removeprefix("path::")
+    if subject_ref.startswith("file:"):
+        return subject_ref.removeprefix("file:")
+    return None
 
 
 def _subject_exists(section: str, subject_id: str, snapshot: Mapping[str, Any]) -> bool:

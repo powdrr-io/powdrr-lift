@@ -157,6 +157,28 @@ def parse_structural_subject_page(
                 pointer,
                 "exactly one of subject_ref and new_identity_description is required",
             )
+        if section == "entities" and subject_ref is not None:
+            try:
+                _existing_subject_id("entities", subject_ref, projected_baseline)
+            except PlanningContractError as entity_error:
+                if "subject reference is absent from the projected baseline" not in str(
+                    entity_error
+                ):
+                    raise
+                try:
+                    _existing_subject_id("files", subject_ref, projected_baseline)
+                except PlanningContractError as file_error:
+                    if (
+                        "subject reference is absent from the projected baseline"
+                        not in str(file_error)
+                    ):
+                        raise
+                else:
+                    # Models sometimes place a known file or source-symbol
+                    # reference in the entities section. Resolve its section
+                    # from the projected baseline rather than asking the model
+                    # to repeat a large inventory answer.
+                    section = "files"
         action = _text(raw["action"], f"{pointer}/action", max_length=20)
         if action not in _ACTIONS:
             raise PlanningContractError(

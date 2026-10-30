@@ -1,0 +1,26 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1211
+title: Resolve file references placed in the entities section
+intent:
+  problem: Structural enumeration could reject a known file when the model classified its valid file reference under entities, and repeated semantic corrections did not reliably fix the section.
+  goal: Resolve a reference against projected files when it is absent from entities, while continuing to reject references absent from both sections.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 160, end_line: 181}
+    summary: Reclassify a known projected file reference from entities to files.
+    rationale: Correct a section mismatch deterministically before validating the structural subject.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 540, end_line: 560}
+    summary: "Cover path:: and file: references placed in the entities section."
+    rationale: Verify known files are resolved as files and unknown references remain rejected.
+entities: []
+entity_relationships: []
+invariants:
+  - id: projected-file-reference-has-file-section
+    description: A subject reference absent from entities but resolvable as a projected file is parsed in the files section.
+    action: altered
+guidance: []

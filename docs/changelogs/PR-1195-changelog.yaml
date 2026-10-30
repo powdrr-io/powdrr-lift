@@ -77,81 +77,81 @@ files:
     span: {start_line: 1080, end_line: 1092}
     summary: Resolve file entity IDs with paths to their canonical file subject IDs.
     rationale: Accept references already represented in the projected baseline.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 36, end_line: 37}
-    summary: Import the human setup requirement and manual setup model types.
-    rationale: Compile explicit human setup requirements through the existing typed setup contract.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 45, end_line: 46}
+    summary: Import human setup types used by the service planner.
+    rationale: Represent manual setup requirements through typed planning contracts.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 40, end_line: 40}
-    summary: Import the manual setup binder.
-    rationale: Convert accepted setup proposals into typed plan prerequisites.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 49, end_line: 49}
+    summary: Import the binder for accepted manual setup answers.
+    rationale: Convert setup proposals into typed prerequisites.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 42, end_line: 42}
-    summary: Import the human setup question builder.
-    rationale: Ask for structured details for each manual prerequisite.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 51, end_line: 51}
+    summary: Import the structured human setup question builder.
+    rationale: Ask for concrete instructions and a verification condition.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 133, end_line: 133}
-    summary: Track accepted question input digests and invalidated answer IDs.
-    rationale: Revisit answers when the question context changes or parsing fails.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 130, end_line: 130}
+    summary: Track the input digests associated with accepted answers.
+    rationale: Reask a saved answer if the context used to produce it changes.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 152, end_line: 157}
-    summary: Add a setter for the accepted question input digests.
-    rationale: Restore digest metadata from the issue journal on resume.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 149, end_line: 154}
+    summary: Restore accepted input digests on the planning question machine.
+    rationale: Let resumed planning detect stale answers from the durable journal.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 331, end_line: 334}
-    summary: Prioritize explicit human setup description questions.
-    rationale: Collect manual prerequisite details before plan compilation.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 290, end_line: 292}
+    summary: Ask explicit human setup questions before evidence and structural planning.
+    rationale: Resolve manual prerequisites as part of the normal plan flow.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 338, end_line: 349}
-    summary: Keep invalidated accepted questions pending.
-    rationale: Ensure changed or unparseable responses are asked again.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 330, end_line: 341}
+    summary: Keep invalidated questions pending and create requirement-specific setup questions.
+    rationale: Ensure changed responses are reasked and setup items remain distinct.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 352, end_line: 402}
-    summary: Build unique setup questions for human_setup requirements and detect stale answers.
-    rationale: Make each manual prerequisite explicit and recoverable.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 344, end_line: 394}
+    summary: Validate previously accepted setup answers against their current question context.
+    rationale: Reopen stale or malformed setup responses instead of compiling them.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 986, end_line: 994}
-    summary: Compare structural enumeration answers against the current input digest.
-    rationale: Discard accepted answers produced from an older projected baseline.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 978, end_line: 986}
+    summary: Compare structural subject answers to the current input digest.
+    rationale: Discard answers generated against an earlier projected baseline.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 998, end_line: 1003}
-    summary: Reopen structural enumeration when an accepted answer no longer parses.
-    rationale: Recover from malformed durable responses without aborting the whole plan.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 990, end_line: 995}
+    summary: Reopen structural enumeration when the accepted answer fails parsing.
+    rationale: Recover from malformed durable responses without stopping the plan.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 1105, end_line: 1108}
-    summary: Remove the previous compilation failure for explicit human setup requirements.
-    rationale: Route these requirements through setup elicitation and binding.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 1177, end_line: 1244}
+    summary: Bind accepted human setup descriptions to validation and their owning plan item.
+    rationale: Preserve manual instructions as explicit workflow prerequisites.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 1185, end_line: 1252}
-    summary: Bind accepted setup answers to validation and the owning plan item.
-    rationale: Represent human intervention as a typed prerequisite in the generated plan.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 1098, end_line: 1101}
+    summary: Remove the compilation stop for human_setup requirements.
+    rationale: Let the setup planning stage represent these requirements in the plan.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 1301, end_line: 1338}
-    summary: Add setup records and manual prerequisite details to the compiled plan.
-    rationale: Preserve human instructions and validation dependencies in the durable plan.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 1317, end_line: 1355}
+    summary: Attach setup records and manual prerequisite details to the compiled plan.
+    rationale: Keep human actions, verification, and blocked validation state durable.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 1431, end_line: 1431}
-    summary: Store accepted setup records in the planning manifest.
-    rationale: Keep manual setup decisions available in the generated plan metadata.
-  - path: src/powdrr_lift/workrr/planning/driver.py
+    span: {start_line: 1424, end_line: 1424}
+    summary: Store human setup records in the planning manifest.
+    rationale: Make setup decisions available to subsequent workflow steps.
+  - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 1440, end_line: 1440}
-    summary: Compile the plan with its manual prerequisite annotations.
-    rationale: Attach the human setup information to the workflow items it blocks.
+    span: {start_line: 1433, end_line: 1433}
+    summary: Compile plan items with their manual prerequisite annotations.
+    rationale: Attach setup instructions to the item that requires them.
   - path: tests/test_planning_service.py
     type: modified
     span: {start_line: 176, end_line: 181}

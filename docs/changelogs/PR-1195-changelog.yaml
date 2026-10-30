@@ -1,0 +1,143 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1195
+title: Move multi-PR Structrr proposal policy into service package
+intent:
+  problem: Service planning policy imported plan-wide Structrr proposal, partitioning, and reconciliation logic from the legacy agent workrr module.
+  goal: Make multi-PR proposal policy service-owned while preserving the existing import path for callers during migration.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/architecture/agent-service-legacy-import-allowlist.json
+    type: modified
+    span: {start_line: 29, end_line: 33}
+    summary: Allow the service-owned proposal module to use the legacy Structrr diff record.
+    rationale: Track the remaining Structrr dependency scheduled for later extraction.
+  - path: docs/architecture/agent-service-legacy-import-allowlist.json
+    type: modified
+    span: {start_line: 39, end_line: 58}
+    summary: Record the service proposal module's remaining Structrr compiler and comparison dependencies.
+    rationale: Keep every cross-package import explicitly assigned during staged migration.
+  - path: docs/architecture/agent-service-legacy-import-allowlist.json
+    type: modified
+    span: {start_line: 94, end_line: 108}
+    summary: Remove allowlist entries for service imports of the legacy multi-PR module.
+    rationale: Planning modules now import proposal policy from the service package.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 413, end_line: 414}
+    summary: Point service compiler ownership metadata at the new proposal module.
+    rationale: Keep the inventory aligned with direct imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 500, end_line: 500}
+    summary: Point the repair service inventory at service-owned proposal loading.
+    rationale: Track the updated service import.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 529, end_line: 529}
+    summary: Remove the legacy proposal module from the service driver imports.
+    rationale: The driver now consumes the service-owned proposal record.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 535, end_line: 535}
+    summary: Point Structrr planning to service-owned multi-PR proposal policy.
+    rationale: Keep ownership metadata aligned with the service module boundary.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 564, end_line: 578}
+    summary: Register service-owned multi-PR proposal compilation and reconciliation.
+    rationale: Keep the ownership inventory complete after extraction.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 581, end_line: 581}
+    summary: Remove the legacy proposal module import from service planning metadata.
+    rationale: Document the new owner for this policy.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 598, end_line: 598}
+    summary: Point service repair metadata at the service-owned proposal module.
+    rationale: Keep module import ownership accurate.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2923, end_line: 2923}
+    summary: Assign the legacy multi-PR module to its compatibility role.
+    rationale: Record that the policy implementation moved to service.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2925, end_line: 2925}
+    summary: Point the compatibility shim at the service implementation.
+    rationale: Preserve the legacy import surface without duplicating policy.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2928, end_line: 2928}
+    summary: Mark the legacy multi-PR module as an agent-side compatibility re-export.
+    rationale: Reflect the new module ownership.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2930, end_line: 2931}
+    summary: Document the compatibility re-export and its review status.
+    rationale: Keep migration tracking current.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 27, end_line: 27}
+    summary: Remove the legacy multi-PR Structrr import from plan compilation.
+    rationale: Keep service compilation independent of the agent workrr module.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 28, end_line: 28}
+    summary: Import the proposal record from the service planning package.
+    rationale: Use the service-owned model during plan compilation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Remove the legacy multi-PR proposal import from the planning driver.
+    rationale: Keep the service driver independent of the agent workrr module.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 51, end_line: 51}
+    summary: Import the proposal record from service-owned planning code.
+    rationale: Use the service owner when assembling plan artifacts.
+  - path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+    type: added
+    span: {start_line: 1, end_line: 590}
+    summary: Own multi-PR Structrr proposal partitioning, loading, rebasing, and reconciliation in the service package.
+    rationale: Keep proprietary plan-wide structural policy with service-owned planning code.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 22, end_line: 22}
+    summary: Load multi-PR proposal state from the service-owned module.
+    rationale: Keep plan repair preparation within the service package boundary.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 14, end_line: 17}
+    summary: Remove legacy imports of multi-PR proposal policy.
+    rationale: Avoid depending on the agent workrr module for service Structrr planning.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 21, end_line: 24}
+    summary: Import multi-PR proposal records and compilation from the service package.
+    rationale: Keep service structural planning within its package owner.
+  - path: src/powdrr_lift/workrr/multipr_structrr.py
+    type: modified
+    span: {start_line: 1, end_line: 1}
+    summary: Identify the legacy module as a compatibility re-export.
+    rationale: Preserve old import paths as policy moves to service.
+  - path: src/powdrr_lift/workrr/multipr_structrr.py
+    type: modified
+    span: {start_line: 5, end_line: 16}
+    summary: Re-export the supported service-owned proposal API.
+    rationale: Preserve existing callers without keeping a second implementation.
+  - path: src/powdrr_lift/workrr/multipr_structrr.py
+    type: modified
+    span: {start_line: 16, end_line: 576}
+    summary: Remove the legacy proposal compiler, reconciliation, and loader implementations.
+    rationale: Leave one canonical multi-PR Structrr policy implementation.
+  - path: tests/test_agent_service_contracts.py
+    type: modified
+    span: {start_line: 250, end_line: 259}
+    summary: Verify every legacy multi-PR export is the service-owned object.
+    rationale: Prevent the compatibility module from drifting from service policy.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

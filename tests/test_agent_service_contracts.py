@@ -247,6 +247,28 @@ def test_legacy_plan_record_names_reexport_service_owned_models() -> None:
     assert LegacyReviewedExecutionPlan is ReviewedExecutionPlan
 
 
+def test_legacy_plan_document_helpers_reexport_service_owned_codec() -> None:
+    from powdrr_service.planning import plan_document
+
+    from powdrr_lift.workrr import github_issue_queue
+
+    assert (
+        github_issue_queue._parse_reviewed_plan_yaml
+        is plan_document.parse_reviewed_plan_yaml
+    )
+    assert (
+        github_issue_queue.serialize_reviewed_plan_yaml
+        is plan_document.serialize_reviewed_plan_yaml
+    )
+    assert (
+        github_issue_queue.render_plan_repair_metadata
+        is plan_document.render_plan_repair_metadata
+    )
+    assert (
+        github_issue_queue.GitHubIssueQueueError is not plan_document.PlanDocumentError
+    )
+
+
 def test_legacy_multipr_structrr_reexports_service_owned_policy() -> None:
     from powdrr_service.planning import multipr_structrr as service_multipr
 

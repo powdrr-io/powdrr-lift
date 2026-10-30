@@ -15,13 +15,15 @@ from powdrr_service.planning.compiler import (
     serialize_reviewed_plan_yaml,
     validate_compiled_plan,
 )
+from powdrr_service.planning.plan_document import (
+    PlanDocumentError,
+    parse_reviewed_plan_yaml,
+)
 
 from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.workrr.github_issue_queue import (
-    GitHubIssueQueueError,
     PlannedWorkItem,
     ReviewedExecutionPlan,
-    parse_reviewed_plan_yaml,
 )
 from powdrr_lift.workrr.multipr_structrr import compile_multi_pr_proposal
 
@@ -304,7 +306,7 @@ def test_plan_parser_rejects_a_forged_manifest_digest() -> None:
         manifest.data["semantic_revision_digest"], "sha256:" + "0" * 64
     )
 
-    with pytest.raises(GitHubIssueQueueError, match="semantic revision digest"):
+    with pytest.raises(PlanDocumentError, match="semantic revision digest"):
         parse_reviewed_plan_yaml(rendered)
 
 

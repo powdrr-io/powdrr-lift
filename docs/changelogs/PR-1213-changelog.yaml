@@ -1,11 +1,11 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1213
-title: Add durable conversation and job workspace storage
+title: Plan the browser workspace and establish durable storage
 intent:
   problem: The planned browser interface needs persistent chat history, job state,
     and reconnectable progress instead of transient terminal presentation state.
-  goal: Establish local durable records and ordered events for the upcoming browser
-    API and execution adapters.
+  goal: Specify the complete cross-platform browser workspace implementation and establish
+    local durable records for its upcoming API and execution adapters.
 human-decisions: []
 structured_files: []
 files:
@@ -13,10 +13,12 @@ files:
   type: added
   span:
     start_line: 1
-    end_line: 84
-  summary: Record the browser UI delivery plan, local storage boundary, and job lifecycle.
-  rationale: Keep the approved cross-platform interface and recovery requirements
-    reviewable across implementation increments.
+    end_line: 656
+  summary: Document the complete browser workspace implementation plan, with ordered
+    work packages, API contracts, execution recovery, UI behavior, platform support,
+    and acceptance criteria.
+  rationale: Give a follow-on implementation agent concrete steps, existing code locations,
+    scope boundaries, and verifiable completion criteria for every remaining increment.
 - path: packages/contracts/src/powdrr_contracts/workspace.py
   type: added
   span:

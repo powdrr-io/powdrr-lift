@@ -1,0 +1,31 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1198
+title: Resolve file subject references from projected file paths
+intent:
+  problem: The planner rejected a valid file:<path> subject reference when the projected baseline listed the file path but did not include a matching file entity ID.
+  goal: Resolve such references through the baseline file list and preserve any source subject's stable identity.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1080, end_line: 1087}
+    summary: Resolve file:<path> references through projected source subjects when available.
+    rationale: Preserve the baseline's stable source identity even when the entity list lacks a matching file ID.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1107, end_line: 1111}
+    summary: Resolve file:<path> references through the projected files list.
+    rationale: Accept only paths that exist in the baseline and canonicalize them to path::<path>.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 475, end_line: 475}
+    summary: Model a projected file that has no matching file entity ID.
+    rationale: Reproduce the persisted Gaterr answer that exposed the previous parser assumption.
+entities: []
+entity_relationships: []
+invariants:
+  - id: projected-file-subject-identity
+    description: A file:<path> reference is accepted only when the projected baseline contains that path and is mapped to its stable source identity or canonical path identity.
+    action: altered
+guidance: []

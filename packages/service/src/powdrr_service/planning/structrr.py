@@ -1077,6 +1077,14 @@ def _existing_subject_id(
                         stable_key = record.get("stable_key")
                         if isinstance(stable_key, str) and stable_key:
                             return stable_key
+                    path = record.get("path")
+                    if isinstance(path, str) and subject_ref == f"file:{path}":
+                        stable_key = record.get("stable_key")
+                        return (
+                            stable_key
+                            if isinstance(stable_key, str) and stable_key
+                            else f"path::{path}"
+                        )
         entities = snapshot.get("entities", [])
         if isinstance(entities, list):
             for record in entities:
@@ -1096,8 +1104,11 @@ def _existing_subject_id(
                 if not isinstance(record, Mapping):
                     continue
                 path = record.get("path")
-                if isinstance(path, str) and f"path::{path}" == subject_ref:
-                    return subject_ref
+                if isinstance(path, str):
+                    if f"path::{path}" == subject_ref:
+                        return subject_ref
+                    if f"file:{path}" == subject_ref:
+                        return f"path::{path}"
         raise PlanningContractError(
             "/subject_ref", "subject reference is absent from the projected baseline"
         )

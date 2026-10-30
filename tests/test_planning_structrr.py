@@ -472,7 +472,7 @@ def test_structural_subject_pages_cover_all_subjects_and_require_final_page() ->
 
 def test_file_subject_can_reference_projected_file_entity_id() -> None:
     baseline = {
-        "entities": [{"id": "file:src/existing.py", "path": "src/existing.py"}],
+        "entities": [],
         "entity_relationships": [],
         "files": [{"path": "src/existing.py"}],
         "source_subjects": [],

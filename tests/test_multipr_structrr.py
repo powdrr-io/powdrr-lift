@@ -76,6 +76,35 @@ def test_multi_pr_proposal_partitions_operations_over_projected_states() -> None
     )
 
 
+def test_changed_existing_file_materializes_missing_source_subject() -> None:
+    path = "attestation/scripts/verify-all.sh"
+    proposal = compile_multi_pr_proposal(
+        plan_id="feature-v1",
+        baseline_snapshot={
+            "entities": [],
+            "entity_relationships": [],
+            "files": [{"path": path}],
+            "source_subjects": [],
+        },
+        items=[_plan_item("first"), _plan_item("second")],
+        proposed_operations=[
+            {
+                "operation_id": "first-change-file",
+                "item_id": "first",
+                "section": "files",
+                "subject_id": f"path::{path}",
+                "action": "changed",
+                "content": {"stable_key": f"path::{path}", "path": path},
+            }
+        ],
+        source_ref="docs/plans/feature.md",
+    )
+
+    assert proposal.item_baselines["second"]["source_subjects"] == [
+        {"stable_key": f"path::{path}", "path": path}
+    ]
+
+
 def test_rebase_ignores_interlaced_unrelated_change_but_reports_target_conflict() -> (
     None
 ):

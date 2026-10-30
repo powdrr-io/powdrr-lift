@@ -512,6 +512,35 @@ def _apply_sections(
                 records.append(record)
             elif action == "changed":
                 if current_index is None:
+                    path = (
+                        identity.removeprefix("path::")
+                        if section == "files" and identity.startswith("path::")
+                        else None
+                    )
+                    raw_files = result.get("files", [])
+                    file_exists = (
+                        isinstance(raw_files, list)
+                        and path is not None
+                        and operation.get("path") == path
+                        and any(
+                            isinstance(record, Mapping) and record.get("path") == path
+                            for record in raw_files
+                        )
+                    )
+                    if file_exists:
+                        # A repository file can exist in the baseline without
+                        # having a Structrr source_subject entry yet. A change
+                        # to that known path materializes its source subject in
+                        # the projection so later plan items can see it.
+                        by_id[identity] = len(records)
+                        records.append(
+                            {
+                                key: value
+                                for key, value in operation.items()
+                                if key != "action"
+                            }
+                        )
+                        continue
                     raise ValueError(
                         f"cannot project changed {section} subject absent from "
                         f"baseline: {identity}"

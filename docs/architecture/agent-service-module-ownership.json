@@ -408,10 +408,10 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.github_issue_plan_generation",
         "powdrr_service.planning.evidence",
         "powdrr_service.planning.multipr_structrr",
-        "powdrr_service.planning.plan_document"
+        "powdrr_service.planning.plan_document",
+        "powdrr_service.planning.workflow_instance"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -495,9 +495,9 @@
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_lift.workrr.git",
-        "powdrr_lift.workrr.github_issue_plan_generation",
         "powdrr_service.planning.multipr_structrr",
         "powdrr_service.planning.plan_document",
+        "powdrr_service.planning.workflow_instance",
         "powdrr_service.planning.repair"
       ],
       "kind": "python_module",
@@ -571,6 +571,17 @@
       "owner": "service",
       "path": "packages/service/src/powdrr_service/planning/plan_document.py",
       "rationale": "Service-owned reviewed plan validation, serialization, and repair metadata format.",
+      "reviewed": true
+    },
+    {
+      "extraction_pr": "1200",
+      "internal_imports": [
+        "powdrr_service.planning.plan_document"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/workflow_instance.py",
+      "rationale": "Service-owned plan workflow descriptor schema, record, and validation.",
       "reviewed": true
     },
     {
@@ -2833,7 +2844,8 @@
         "powdrr_lift.workrr.github_issue_queue",
         "powdrr_lift.workrr.llm",
         "powdrr_lift.workrr.multipr_structrr",
-        "powdrr_lift.workrr.plan_sizing"
+        "powdrr_lift.workrr.plan_sizing",
+        "powdrr_service.planning.workflow_instance"
       ],
       "kind": "python_module",
       "owner": "split",

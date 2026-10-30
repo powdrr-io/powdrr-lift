@@ -269,6 +269,29 @@ def test_legacy_plan_document_helpers_reexport_service_owned_codec() -> None:
     )
 
 
+def test_legacy_plan_workflow_parser_uses_service_owned_validation() -> None:
+    from powdrr_service.planning import workflow_instance
+
+    from powdrr_lift.workrr import github_issue_plan_generation
+
+    assert (
+        github_issue_plan_generation.PLAN_WORKFLOW_SCHEMA
+        is workflow_instance.PLAN_WORKFLOW_SCHEMA
+    )
+    assert (
+        github_issue_plan_generation.PLAN_WORKFLOW_PROCESS
+        is workflow_instance.PLAN_WORKFLOW_PROCESS
+    )
+    assert (
+        github_issue_plan_generation.PlanWorkflowInstance
+        is workflow_instance.PlanWorkflowInstance
+    )
+    assert (
+        github_issue_plan_generation._parse_plan_workflow_instance_yaml
+        is workflow_instance.parse_plan_workflow_instance_yaml
+    )
+
+
 def test_legacy_multipr_structrr_reexports_service_owned_policy() -> None:
     from powdrr_service.planning import multipr_structrr as service_multipr
 

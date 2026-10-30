@@ -11,9 +11,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.workrr.github_issue_plan_generation import (
-    parse_plan_workflow_instance_yaml,
-)
 from powdrr_service.planning.multipr_structrr import load_multi_pr_proposal
 from powdrr_service.planning.plan_document import (
     parse_reviewed_plan_yaml,
@@ -31,6 +28,9 @@ from powdrr_service.planning.repair import (
     expand_repair_impact,
     item_content_digest,
     plan_revision_digest,
+)
+from powdrr_service.planning.workflow_instance import (
+    parse_plan_workflow_instance_yaml,
 )
 
 

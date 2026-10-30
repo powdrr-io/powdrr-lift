@@ -13,12 +13,6 @@ from typing import Any
 import yaml
 
 from powdrr_lift.workrr.git import slugify_workflow_id
-from powdrr_lift.workrr.github_issue_plan_generation import (
-    PLAN_WORKFLOW_PROCESS,
-    PLAN_WORKFLOW_SCHEMA,
-    PlanGenerationError,
-    parse_plan_workflow_instance_yaml,
-)
 from powdrr_service.planning.evidence import Evidence, EvidenceError
 from powdrr_service.planning.multipr_structrr import MultiPRStructrrProposal
 from powdrr_service.planning.plan_document import (
@@ -27,6 +21,12 @@ from powdrr_service.planning.plan_document import (
     serialize_reviewed_plan_yaml,
 )
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_service.planning.workflow_instance import (
+    PLAN_WORKFLOW_PROCESS,
+    PLAN_WORKFLOW_SCHEMA,
+    PlanWorkflowInstanceError,
+    parse_plan_workflow_instance_yaml,
+)
 
 PLANNING_MANIFEST_SCHEMA = "https://powdrr.io/schemas/planning-manifest-v1"
 _SHA1_RE = re.compile(r"^[0-9a-f]{40,64}$")
@@ -207,7 +207,7 @@ def compile_plan(
         rendered = yaml.safe_dump(definition, sort_keys=False, allow_unicode=True)
         try:
             parsed = parse_plan_workflow_instance_yaml(rendered)
-        except PlanGenerationError as error:
+        except PlanWorkflowInstanceError as error:
             raise PlanningCompilationError(
                 f"generated workflow {item.workflow_id!r} failed validation: {error}"
             ) from error
@@ -339,7 +339,7 @@ def validate_compiled_plan(
         KeyError,
         TypeError,
         ValueError,
-        PlanGenerationError,
+        PlanWorkflowInstanceError,
     ) as error:
         errors.append(str(error))
     ready, blocked = _dependency_readiness(compiled.plan)

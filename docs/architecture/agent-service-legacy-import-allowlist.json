@@ -72,26 +72,6 @@
       "rationale": "Planning uses the established workflow slug function for stable work-item IDs; moving that deterministic policy must preserve IDs stored in plans and issues."
     },
     {
-      "import": "powdrr_lift.workrr.github_issue_plan_generation.PLAN_WORKFLOW_PROCESS",
-      "owner_pr": 4,
-      "rationale": "Planning reuses the established workflow process/schema parser to preserve persisted plan artifact compatibility while the GitHub planning adapter is extracted."
-    },
-    {
-      "import": "powdrr_lift.workrr.github_issue_plan_generation.PLAN_WORKFLOW_SCHEMA",
-      "owner_pr": 4,
-      "rationale": "Planning reuses the established workflow process/schema parser to preserve persisted plan artifact compatibility while the GitHub planning adapter is extracted."
-    },
-    {
-      "import": "powdrr_lift.workrr.github_issue_plan_generation.PlanGenerationError",
-      "owner_pr": 4,
-      "rationale": "Planning reuses the established workflow process/schema parser to preserve persisted plan artifact compatibility while the GitHub planning adapter is extracted."
-    },
-    {
-      "import": "powdrr_lift.workrr.github_issue_plan_generation.parse_plan_workflow_instance_yaml",
-      "owner_pr": 4,
-      "rationale": "Planning reuses the established workflow process/schema parser to preserve persisted plan artifact compatibility while the GitHub planning adapter is extracted."
-    },
-    {
       "import": "powdrr_lift.workrr.llm.complete_json_with_timeout_retry",
       "owner_pr": 6,
       "rationale": "The legacy bounded JSON completion helper owns provider retry behavior; planning will consume the service inference contract after provider extraction."

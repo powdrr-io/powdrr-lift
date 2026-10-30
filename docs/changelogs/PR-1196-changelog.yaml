@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1195
+change_id: 1196
 title: Move multi-PR Structrr proposal policy into service package
 intent:
   problem: Service planning policy imported plan-wide Structrr proposal, partitioning, and reconciliation logic from the legacy agent workrr module.

@@ -9,7 +9,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.core.instruction_ledger import compile_instruction_ledger
+from powdrr_service.planning.instruction_ledger import compile_instruction_ledger
+
 from powdrr_lift.errors import ProviderExecutionError
 from powdrr_lift.workrr.llm import complete_json
 from powdrr_lift.workrr.providers import (

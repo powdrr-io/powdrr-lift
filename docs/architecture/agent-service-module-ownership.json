@@ -1228,7 +1228,7 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.core.instruction_ledger",
+        "powdrr_service.planning.instruction_ledger",
         "powdrr_lift.core.semantic_contract"
       ],
       "kind": "python_module",
@@ -1301,17 +1301,6 @@
       "path": "src/powdrr_lift/core/instruction_context.py",
       "rationale": "classify each symbol as service policy or public exchanged data",
       "reviewed": false
-    },
-    {
-      "extraction_pr": "1203",
-      "internal_imports": [
-        "powdrr_service.planning.instruction_ledger"
-      ],
-      "kind": "python_module",
-      "owner": "agent",
-      "path": "src/powdrr_lift/core/instruction_ledger.py",
-      "rationale": "Compatibility re-exports for the service-owned deterministic instruction ledger.",
-      "reviewed": true
     },
     {
       "extraction_pr": "3/8",
@@ -2576,7 +2565,7 @@
         "powdrr_lift.core.behavior_contract",
         "powdrr_lift.core.decision_obligation",
         "powdrr_lift.core.feature_obligation",
-        "powdrr_lift.core.instruction_ledger",
+        "powdrr_service.planning.instruction_ledger",
         "powdrr_lift.core.repository_inventory",
         "powdrr_lift.core.semantic_contract",
         "powdrr_lift.core.semantic_decision",

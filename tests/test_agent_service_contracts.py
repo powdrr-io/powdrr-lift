@@ -292,16 +292,6 @@ def test_legacy_plan_workflow_parser_uses_service_owned_validation() -> None:
     )
 
 
-def test_legacy_instruction_ledger_reexports_service_owned_policy() -> None:
-    from powdrr_service.planning import instruction_ledger as service_ledger
-
-    from powdrr_lift.core import instruction_ledger as legacy_ledger
-
-    assert legacy_ledger.__all__ == service_ledger.__all__
-    for name in service_ledger.__all__:
-        assert getattr(legacy_ledger, name) is getattr(service_ledger, name)
-
-
 def test_legacy_multipr_structrr_reexports_service_owned_policy() -> None:
     from powdrr_service.planning import multipr_structrr as service_multipr
 

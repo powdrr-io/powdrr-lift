@@ -61,7 +61,7 @@ base; line numbers and function placement will change.
 | Location | Current role | Planned use |
 | --- | --- | --- |
 | `docs/procedrr/processes/design-interview.yaml` | Atomicity split instructions, scenario generation, capability matrices, and benchmark assumptions. | Change semantic questions and generation rules; keep JSON schemas and runtime bindings synchronized. |
-| `src/powdrr_lift/core/instruction_ledger.py` | Deterministic source capture; bounded model splits; compiler-owned IDs/spans; validation groups. | Preserve source modifiers and separate semantic relationships from test grouping. |
+| `packages/service/src/powdrr_service/planning/instruction_ledger.py` | Deterministic source capture; bounded model splits; compiler-owned IDs/spans; validation groups. | Preserve source modifiers and separate semantic relationships from test grouping. |
 | `src/powdrr_lift/workrr/command_catalog.py` | Prepares/binds atomicity, source decisions, extracted contracts, and scenario artifacts. | Carry new bounded context and decisions through workflow command boundaries. |
 | `src/powdrr_lift/workrr/semantic_contract_compiler.py` | Routing and dependent classifiers; exact subject/behavior/modifier extraction; partial-contract compilation. | Improve inputs and targeted semantic questions without replacing the compiler. |
 | `src/powdrr_lift/core/classifier_input.py` | Serializes optional containing/neighboring source context. | Reuse for bounded context; currently available helper does not prove context is wired into each decision. |

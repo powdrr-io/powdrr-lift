@@ -11,6 +11,13 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_service.planning.instruction_ledger import (
+    InstructionLedger,
+    InstructionLedgerError,
+    apply_atomicity_decisions,
+    compile_instruction_ledger,
+)
+
 from powdrr_lift.core.behavior_contract import (
     BEHAVIOR_DIMENSIONS,
     SUPPORTED_ASSUMPTION_DIMENSIONS,
@@ -22,12 +29,6 @@ from powdrr_lift.core.feature_obligation import (
     SEMANTIC_KINDS,
     FeatureObligationError,
     compile_feature_design,
-)
-from powdrr_lift.core.instruction_ledger import (
-    InstructionLedger,
-    InstructionLedgerError,
-    apply_atomicity_decisions,
-    compile_instruction_ledger,
 )
 from powdrr_lift.core.repository_inventory import (
     CandidateSet,

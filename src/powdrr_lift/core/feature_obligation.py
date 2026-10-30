@@ -15,7 +15,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from powdrr_lift.core.instruction_ledger import InstructionLedger
+from powdrr_service.planning.instruction_ledger import InstructionLedger
+
 from powdrr_lift.core.semantic_contract import PartialSemanticContract
 
 

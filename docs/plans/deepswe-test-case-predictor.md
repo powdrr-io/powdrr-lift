@@ -24,7 +24,7 @@ Predict **test scenarios**, not exact test function names. A scenario states the
 
 - `src/powdrr_lift/integrations/harbor/powdrr_agent.py` receives Harbor's task instruction and passes it to the Powdrr feature flow.
 - `src/powdrr_lift/structrr/validation.py` discovers validation commands from repository configuration and CI files.
-- `src/powdrr_lift/core/instruction_ledger.py` provides a way to preserve and identify instruction clauses.
+- `packages/service/src/powdrr_service/planning/instruction_ledger.py` provides a way to preserve and identify instruction clauses.
 - `src/powdrr_lift/core/behavior_contract.py` defines a richer behavior-scenario structure. Reuse its ideas where useful, but keep the predictor's first output schema small.
 - `docs/harbor/deepswe-python-statemachine-state-data-scoping.md` describes a task where concrete API requirements were present in the instruction but lost during planning. Use it as a qualitative example, not as the sole evaluation set.
 

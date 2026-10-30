@@ -13,12 +13,12 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
-from powdrr_lift.core.instruction_ledger import (
+from powdrr_service.planning.instruction_ledger import (
     InstructionLedger,
     apply_atomicity_decisions,
     compile_instruction_ledger,
 )
+
 from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.semantic_contract_compiler import (

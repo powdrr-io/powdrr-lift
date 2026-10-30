@@ -473,7 +473,7 @@ The current `_decompose_feature_description` in
 this responsibility into a dedicated module, for example:
 
 ```text
-src/powdrr_lift/core/instruction_ledger.py
+packages/service/src/powdrr_service/planning/instruction_ledger.py
 ```
 
 ### Stage 2: bounded atomicity decision
@@ -725,7 +725,7 @@ form concerns the input decision boundary, not merely a small output schema.
 Create focused modules rather than expanding `feature_endpoint.py` indefinitely:
 
 ```text
-src/powdrr_lift/core/instruction_ledger.py
+packages/service/src/powdrr_service/planning/instruction_ledger.py
 src/powdrr_lift/core/feature_obligation.py
 src/powdrr_lift/core/implementation_packet.py
 src/powdrr_lift/core/obligation_review.py

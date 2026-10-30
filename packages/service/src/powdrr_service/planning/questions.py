@@ -387,6 +387,7 @@ def build_question_messages(
     attempt: int | None = None,
     correction: PlanningContractError | None = None,
     previous_answer: Mapping[str, Any] | None = None,
+    schema_in_response: bool = False,
 ) -> list[dict[str, str]]:
     """Build prompt sections in the normative order and enforce the input cap."""
     request.validate()
@@ -395,15 +396,17 @@ def build_question_messages(
         if attempt is None
         else replace(request.question, attempt=attempt)
     )
+    answer_fields: dict[str, Any] = {
+        "definitions": dict(request.answer_field_definitions),
+    }
+    if correction is None or not schema_in_response:
+        answer_fields["json_schema"] = dict(request.answer_schema)
     packet: dict[str, Any] = {
         "exact_question": {
             **current_question.to_data(),
             "prompt": request.exact_question,
         },
-        "answer_fields": {
-            "definitions": dict(request.answer_field_definitions),
-            "json_schema": dict(request.answer_schema),
-        },
+        "answer_fields": answer_fields,
         "source_excerpts": [
             {
                 "ref_id": excerpt.ref_id,
@@ -477,6 +480,7 @@ def run_question[AnswerT](
                 attempt=attempt,
                 correction=last_error,
                 previous_answer=previous_answer,
+                schema_in_response=use_provider_schema,
             )
         except QuestionInputTooLarge:
             if last_error is None:

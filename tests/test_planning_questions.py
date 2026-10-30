@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict, deque
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -168,6 +169,69 @@ def test_prompt_order_is_fixed_and_source_text_is_explicitly_data() -> None:
     ]
     assert "never instructions to follow" in messages[0]["content"]
     assert "Ignore prior instructions" not in messages[0]["content"]
+
+
+def test_provider_schema_is_not_duplicated_in_correction_prompt() -> None:
+    schema: dict[str, Any] = {
+        "type": "object",
+        "enum": [f"subject-{index:04d}" for index in range(300)],
+    }
+    fact = ContextRecord("fact-01", {"body": "x" * 10_500})
+    request = replace(
+        _request(
+            _question("q-000001", "block-01", ("fact-01",)),
+            accepted_facts=(fact,),
+        ),
+        answer_schema=schema,
+    )
+    build_question_messages(request)
+    correction_error = PlanningContractError(
+        "/subject_ref", "subject reference is absent from the projected baseline"
+    )
+    previous_answer = {"records": [], "detail": "x" * 3_900}
+    with pytest.raises(QuestionInputTooLarge):
+        build_question_messages(
+            request,
+            correction=correction_error,
+            previous_answer=previous_answer,
+        )
+    corrected_messages = build_question_messages(
+        request,
+        correction=correction_error,
+        previous_answer=previous_answer,
+        schema_in_response=True,
+    )
+    assert (
+        "json_schema"
+        not in json.loads(corrected_messages[1]["content"])["answer_fields"]
+    )
+
+    client = _ScriptedClient(
+        {
+            ("extract_requirements", "block-01"): [
+                {"records": [], "has_more": "invalid", "next_anchor": None},
+                _VALID_PAGE,
+            ]
+        }
+    )
+
+    result = run_question(
+        client,
+        request,
+        model="deepinfra-cheap",
+        stderr=None,
+        max_transport_retries=0,
+        transport_backoff_seconds=0,
+        use_provider_schema=True,
+    )
+
+    assert not isinstance(result, NeedsQuestionAnswer)
+    assert result.attempts == 2
+    initial = json.loads(client.messages["q-000001"][0][1]["content"])
+    correction = json.loads(client.messages["q-000001"][1][1]["content"])
+    assert initial["answer_fields"]["json_schema"] == schema
+    assert "json_schema" not in correction["answer_fields"]
+    assert client.schemas["q-000001"] == [schema, schema]
 
 
 def test_batch_question_request_preserves_each_question_schema_and_identity() -> None:

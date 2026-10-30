@@ -1,0 +1,268 @@
+{
+  "schema": "https://powdrr.io/schema/changelog-v2",
+  "change_id": 1221,
+  "title": "Persist conversation turns and resumable questions",
+  "intent": {
+    "problem": "Chat transcripts alone cannot safely represent an in-progress interview, preserve a question across restart, or ensure its answer reaches the same workflow continuation once.",
+    "goal": "Persist revisioned turns and questions, validate answers, recover undelivered responses, and bind delivery to the original run and attempt."
+  },
+  "human-decisions": [],
+  "structured_files": [],
+  "files": [
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 62,
+        "end_line": 65
+      },
+      "summary": "Define typed, versioned turn and question records.",
+      "rationale": "Represent resumable chat interactions and validated user answers independently of API or browser frameworks."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 397,
+        "end_line": 557
+      },
+      "summary": "Define typed, versioned turn and question records.",
+      "rationale": "Represent resumable chat interactions and validated user answers independently of API or browser frameworks."
+    },
+    {
+      "path": "packages/local/pyproject.toml",
+      "type": "modified",
+      "span": {
+        "start_line": 6,
+        "end_line": 11
+      },
+      "summary": "Declare JSON Schema validation as a local workspace dependency.",
+      "rationale": "Validate stored interview response shapes and user answers at the persistence boundary."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 20,
+        "end_line": 20
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 29,
+        "end_line": 30
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 32,
+        "end_line": 32
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 34,
+        "end_line": 34
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 61,
+        "end_line": 82
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 126,
+        "end_line": 150
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 159,
+        "end_line": 181
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 200,
+        "end_line": 206
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 256,
+        "end_line": 256
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 258,
+        "end_line": 269
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 427,
+        "end_line": 1142
+      },
+      "summary": "Persist active turns, questions, answers, and delivery receipts transactionally.",
+      "rationale": "Recover interrupted question delivery to the originating run and attempt while preventing duplicate active turns or answer advancement."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 15,
+        "end_line": 16
+      },
+      "summary": "Verify turn lifecycle, answer validation, recovery, and schema migration.",
+      "rationale": "Protect resumability, single-active-turn constraints, idempotent answers, and delivery receipts."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 19,
+        "end_line": 19
+      },
+      "summary": "Verify turn lifecycle, answer validation, recovery, and schema migration.",
+      "rationale": "Protect resumability, single-active-turn constraints, idempotent answers, and delivery receipts."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 21,
+        "end_line": 21
+      },
+      "summary": "Verify turn lifecycle, answer validation, recovery, and schema migration.",
+      "rationale": "Protect resumability, single-active-turn constraints, idempotent answers, and delivery receipts."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 257,
+        "end_line": 257
+      },
+      "summary": "Verify turn lifecycle, answer validation, recovery, and schema migration.",
+      "rationale": "Protect resumability, single-active-turn constraints, idempotent answers, and delivery receipts."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 444,
+        "end_line": 444
+      },
+      "summary": "Verify turn lifecycle, answer validation, recovery, and schema migration.",
+      "rationale": "Protect resumability, single-active-turn constraints, idempotent answers, and delivery receipts."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 455,
+        "end_line": 455
+      },
+      "summary": "Verify turn lifecycle, answer validation, recovery, and schema migration.",
+      "rationale": "Protect resumability, single-active-turn constraints, idempotent answers, and delivery receipts."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 457,
+        "end_line": 609
+      },
+      "summary": "Verify turn lifecycle, answer validation, recovery, and schema migration.",
+      "rationale": "Protect resumability, single-active-turn constraints, idempotent answers, and delivery receipts."
+    }
+  ],
+  "entities": [
+    {
+      "id": "ui-workspace-records",
+      "type": "Module",
+      "action": "modified"
+    },
+    {
+      "id": "workspace-turn-contract",
+      "type": "Class",
+      "action": "added"
+    },
+    {
+      "id": "workspace-question-contract",
+      "type": "Class",
+      "action": "added"
+    },
+    {
+      "id": "local-ui-workspace-store",
+      "type": "Class",
+      "action": "modified"
+    },
+    {
+      "id": "workspace-turn-table",
+      "type": "Table",
+      "action": "added"
+    },
+    {
+      "id": "workspace-question-table",
+      "type": "Table",
+      "action": "added"
+    },
+    {
+      "id": "workspace-schema-v5-migration",
+      "type": "Migration",
+      "action": "added"
+    },
+    {
+      "id": "workspace-event-type",
+      "type": "Enum",
+      "action": "modified"
+    }
+  ],
+  "entity_relationships": [],
+  "invariants": [],
+  "guidance": []
+}

@@ -77,7 +77,7 @@ useful diagnostics; their weights are not production artifacts.
 | `src/powdrr_lift/workrr/jev_classifier.py` | `_classifier_request`, `_call_jev`, `_format_classifier_result`, `complete_json`, and fallback behavior. |
 | `src/powdrr_lift/core/semantic_decision.py` | Routing labels, result envelopes, provider metadata, input fingerprints, revision validation. |
 | `src/powdrr_lift/core/classifier_input.py` | Stable target/context serialization. |
-| `src/powdrr_lift/core/instruction_context.py` | Existing helper for containing and adjacent source context. |
+| `packages/service/src/powdrr_service/planning/instruction_context.py` | Service-owned helper for containing and adjacent source context. |
 | `packages/service/src/powdrr_service/planning/instruction_ledger.py` | Original spans and atomic clause derivation. |
 | `src/powdrr_lift/workrr/command_catalog.py` | Runtime root request preparation, source-text plumbing, and context retention. |
 | `docs/procedrr/processes/design-interview.yaml` | Jev-backed root decision invocation and dependent branches. |
@@ -263,7 +263,7 @@ collection, annotation, Jev evaluation, and local inference.
 - Include the exact target, containing original sentence when useful, containing
   section heading when available, and immediate previous/next source sentences.
 - Extend the current `_bounded_source_context` path and reuse compatible helpers
-  in `instruction_context.py` and `format_classifier_input`; inspect their span
+  in `powdrr_service.planning.instruction_context` and `format_classifier_input`; inspect their span
   assumptions before extending them. Derive neighbors from the original source,
   not from an arbitrary order of split clauses.
 - Carry additional inputs through `command_catalog.py` and workflow bindings only

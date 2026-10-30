@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1219
+change_id: 1220
 title: Move Structrr snapshot digest into service
 intent:
   problem: Canonical Structrr snapshot normalization and fingerprinting still lived in the legacy agent package

@@ -57,11 +57,6 @@
       "rationale": "Actual Structrr diff compilation still uses the existing source-manifest type; move the type with the service-owned Structrr implementation."
     },
     {
-      "import": "powdrr_lift.workrr.git.slugify_workflow_id",
-      "owner_pr": 4,
-      "rationale": "Planning uses the established workflow slug function for stable work-item IDs; moving that deterministic policy must preserve IDs stored in plans and issues."
-    },
-    {
       "import": "powdrr_lift.workrr.llm.complete_json_with_timeout_retry",
       "owner_pr": 6,
       "rationale": "The legacy bounded JSON completion helper owns provider retry behavior; planning will consume the service inference contract after provider extraction."

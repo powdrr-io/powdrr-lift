@@ -359,7 +359,7 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.git"
+        "powdrr_service.planning.workflow_ids"
       ],
       "kind": "python_module",
       "owner": "agent",
@@ -411,7 +411,8 @@
         "powdrr_service.planning.evidence",
         "powdrr_service.planning.multipr_structrr",
         "powdrr_service.planning.plan_document",
-        "powdrr_service.planning.workflow_instance"
+        "powdrr_service.planning.workflow_instance",
+        "powdrr_service.planning.workflow_ids"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -483,7 +484,7 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.workrr.git"
+        "powdrr_service.planning.workflow_ids"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -525,7 +526,6 @@
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_lift.structrr.rebase",
-        "powdrr_lift.workrr.git",
         "powdrr_service.planning.assembly",
         "powdrr_service.planning.compiler",
         "powdrr_service.planning.contracts",
@@ -535,7 +535,8 @@
         "powdrr_service.planning.multipr_structrr",
         "powdrr_service.planning.questions",
         "powdrr_service.planning.source",
-        "powdrr_service.planning.structrr"
+        "powdrr_service.planning.structrr",
+        "powdrr_service.planning.workflow_ids"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -739,7 +740,8 @@
       "internal_imports": [
         "powdrr_lift.process.tasks",
         "powdrr_lift.process.templates",
-        "powdrr_lift.workrr.git"
+        "powdrr_lift.workrr.git",
+        "powdrr_service.planning.workflow_ids"
       ],
       "kind": "python_module",
       "owner": "agent",
@@ -995,7 +997,8 @@
         "powdrr_lift.workrr.task_agent",
         "powdrr_lift.workrr.workflow_provider_selection",
         "procedrr",
-        "procedrr.catalog"
+        "procedrr.catalog",
+        "powdrr_service.planning.workflow_ids"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2806,7 +2809,8 @@
         "powdrr_lift.workrr.verification_provider",
         "procedrr",
         "procedrr_evaluator.evaluator",
-        "procedrr_evaluator.runtime"
+        "procedrr_evaluator.runtime",
+        "powdrr_service.planning.workflow_ids"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2826,7 +2830,8 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.errors"
+        "powdrr_lift.errors",
+        "powdrr_service.planning.workflow_ids"
       ],
       "kind": "python_module",
       "owner": "agent",
@@ -2840,12 +2845,12 @@
         "powdrr_lift.basedpyright_tools",
         "powdrr_lift.errors",
         "powdrr_lift.structrr.rebase",
-        "powdrr_lift.workrr.git",
         "powdrr_lift.workrr.github_issue_queue",
         "powdrr_lift.workrr.llm",
         "powdrr_lift.workrr.multipr_structrr",
         "powdrr_lift.workrr.plan_sizing",
-        "powdrr_service.planning.workflow_instance"
+        "powdrr_service.planning.workflow_instance",
+        "powdrr_service.planning.workflow_ids"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3459,7 +3464,8 @@
         "powdrr_lift.workrr.test_obligations",
         "procedrr",
         "procedrr.fragments",
-        "procedrr_evaluator"
+        "procedrr_evaluator",
+        "powdrr_service.planning.workflow_ids"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3658,6 +3664,15 @@
       "path": "src/procedrr_evaluator/runtime.py",
       "rationale": "private process-language runtime",
       "reviewed": false
+    },
+    {
+      "extraction_pr": "1212",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/planning/workflow_ids.py",
+      "rationale": "Service-owned stable workflow identifier slug policy used by plans, workflow files, and issue references.",
+      "reviewed": true
     }
   ],
   "inventory_scope": [

@@ -12,7 +12,6 @@ from typing import Any
 
 import yaml
 
-from powdrr_lift.workrr.git import slugify_workflow_id
 from powdrr_service.planning.evidence import Evidence, EvidenceError
 from powdrr_service.planning.multipr_structrr import MultiPRStructrrProposal
 from powdrr_service.planning.plan_document import (
@@ -21,6 +20,7 @@ from powdrr_service.planning.plan_document import (
     serialize_reviewed_plan_yaml,
 )
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.planning.workflow_instance import (
     PLAN_WORKFLOW_PROCESS,
     PLAN_WORKFLOW_SCHEMA,

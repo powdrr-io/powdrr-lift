@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from powdrr_service.planning.workflow_ids import slugify_workflow_id
 
 from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.core.behavior_contract import (
@@ -126,7 +127,7 @@ from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_ev
 from powdrr_lift.workrr.external_contract_research import (
     redact_external_contract_search_event,
 )
-from powdrr_lift.workrr.git import integration_branch_name, slugify_workflow_id
+from powdrr_lift.workrr.git import integration_branch_name
 from powdrr_lift.workrr.jev_classifier import (
     preferred_semantic_classifier_client,
 )

@@ -1,4 +1,5 @@
 import sqlite3
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from math import nan
 from pathlib import Path
@@ -13,6 +14,7 @@ from powdrr_contracts.workspace import (
     MessageRole,
     WorkspaceContractError,
     WorkspaceEvent,
+    WorkspaceRepository,
 )
 from powdrr_local.workspace import WorkspaceConflict, WorkspaceStore
 
@@ -248,7 +250,7 @@ def test_version_one_database_migrates_without_changing_existing_records(
     with sqlite3.connect(path) as db:
         version = db.execute("PRAGMA user_version").fetchone()[0]
         sequence = db.execute("SELECT sequence FROM events").fetchone()[0]
-    assert version == 3
+    assert version == 4
     assert sequence == 7
     assert conversation.revision == 1
     assert conversation.specification_refs == ("docs/old.yaml",)
@@ -394,3 +396,57 @@ def test_concurrent_identical_create_requests_produce_one_job(
     store = WorkspaceStore(path)
     assert store.list_jobs("repo") == (jobs[0],)
     assert len(store.read_events("repo")) == 1
+
+
+def test_repository_registration_returns_opaque_id_and_canonical_root(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo with spaces"
+    root.mkdir()
+    subprocess.run(
+        ["git", "init", str(root)], check=True, capture_output=True, text=True
+    )
+    nested = root / "src" / "feature"
+    nested.mkdir(parents=True)
+    store = WorkspaceStore(tmp_path / "workspace.db")
+
+    registered = store.register_repository(root, request_id="register-repo")
+    retried = store.register_repository(root, request_id="register-repo")
+    from_nested_path = store.register_repository(nested)
+
+    assert registered == retried == from_nested_path
+    assert registered.canonical_root == str(root.resolve())
+    assert registered.repository_id != registered.canonical_root
+    assert WorkspaceRepository.from_dict(registered.to_dict()) == registered
+    assert "canonical_root" not in registered.to_public_dict()
+    assert store.list_repositories() == (registered,)
+    assert store.resolve_repository_root(registered.repository_id) == root.resolve()
+    events = store.read_events(registered.repository_id)
+    assert len(events) == 1
+    assert events[0].event_type == EventType.REPOSITORY_REGISTERED
+
+
+def test_repository_registry_rejects_non_git_paths_and_unknown_ids(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    with pytest.raises(ValueError, match="Git working tree"):
+        store.register_repository(tmp_path)
+    assert store.list_repositories() == ()
+    with pytest.raises(KeyError, match="not registered"):
+        store.resolve_repository_root("unknown-repository")
+
+
+def test_schema_v3_migrates_to_repository_registry(tmp_path: Path) -> None:
+    path = tmp_path / "workspace-v3.db"
+    with sqlite3.connect(path) as db:
+        db.execute("PRAGMA user_version = 3")
+    WorkspaceStore(path)
+    with sqlite3.connect(path) as db:
+        version = db.execute("PRAGMA user_version").fetchone()[0]
+        tables = {
+            row[0]
+            for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+    assert version == 4
+    assert "repositories" in tables

@@ -30,13 +30,13 @@ from powdrr_service.planning.service import (
     load_planning_session,
     run_planning_procedrr,
 )
-
-from powdrr_lift.workrr.github_issue_queue import QueueIssue
-from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
-from powdrr_lift.workrr.planning.source import (
+from powdrr_service.planning.source import (
     PinnedSourceDocument,
     segment_markdown_source,
 )
+
+from powdrr_lift.workrr.github_issue_queue import QueueIssue
+from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
 from procedrr.catalog import ProcessCatalog
 
 

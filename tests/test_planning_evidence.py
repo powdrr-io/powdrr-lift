@@ -15,6 +15,11 @@ from powdrr_service.planning.questions import (
     MAX_QUESTION_INPUT_CHARS,
     build_question_messages,
 )
+from powdrr_service.planning.source import (
+    PinnedSourceDocument,
+    Requirement,
+    segment_markdown_source,
+)
 
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.planning import evidence as evidence_module
@@ -28,11 +33,6 @@ from powdrr_lift.workrr.planning.evidence import (
     read_pinned_code_file,
     record_file_evidence,
     search_requirement_evidence,
-)
-from powdrr_lift.workrr.planning.source import (
-    PinnedSourceDocument,
-    Requirement,
-    segment_markdown_source,
 )
 
 

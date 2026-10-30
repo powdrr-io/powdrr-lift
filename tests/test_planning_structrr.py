@@ -9,6 +9,10 @@ import pytest
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.dependencies import Validation
+from powdrr_service.planning.driver import (
+    SourceLedger,
+    SourceLedgerQuestionMachine,
+)
 from powdrr_service.planning.questions import build_question_messages
 from powdrr_service.planning.source import (
     PinnedSourceDocument,
@@ -27,11 +31,6 @@ from powdrr_service.planning.structrr import (
     complete_subject_enumeration,
     parse_structural_change,
     parse_structural_subject_page,
-)
-
-from powdrr_lift.workrr.planning.driver import (
-    SourceLedger,
-    SourceLedgerQuestionMachine,
 )
 
 

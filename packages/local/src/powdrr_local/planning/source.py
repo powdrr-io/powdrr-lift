@@ -1,17 +1,13 @@
-"""Compatibility imports for service-owned planning source semantics."""
+"""Compose local pinned-file reads with service-owned planning semantics."""
 
 from __future__ import annotations
 
 from powdrr_agent.repository import LocalActionError, read_pinned_file
-from powdrr_service.planning import source as _source
-from powdrr_service.planning.source import *  # noqa: F403
 from powdrr_service.planning.source import (
     PinnedSourceDocument,
     PlanningSourceError,
     pinned_source_document,
 )
-
-__all__ = [*_source.__all__, "read_pinned_source"]
 
 
 def read_pinned_source(
@@ -21,7 +17,7 @@ def read_pinned_source(
     *,
     repository_id: str | None = None,
 ) -> PinnedSourceDocument:
-    """Compatibility adapter: capture pinned Git bytes locally, then parse."""
+    """Read a pinned Git blob locally and construct the service source record."""
     if (
         not path
         or path.startswith("/")

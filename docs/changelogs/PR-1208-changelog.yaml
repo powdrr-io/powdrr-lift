@@ -1,0 +1,251 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1208
+title: Move semantic design contracts into service
+intent:
+  problem: Semantic decisions, source-bound contracts, and canonical feature obligation compilation remained in agent core despite being private planning policy.
+  goal: Make these algorithms service-owned, update every caller to the service paths, and remove the old agent modules without compatibility shims.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/feature_obligation.py
+    type: modified
+    span: {start_line: 1, end_line: 456}
+    summary: Resolve partial semantic contracts through the service-owned module.
+    rationale: Keep canonical feature design compilation inside the service package.
+  - path: packages/service/src/powdrr_service/planning/semantic_contract.py
+    type: modified
+    span: {start_line: 1, end_line: 698}
+    summary: Import semantic decision contracts from the service package.
+    rationale: Keep semantic source extraction independent of agent-owned modules.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 633, end_line: 664}
+    summary: Register the semantic decision, source contract, and feature obligation modules as service-owned.
+    rationale: Keep the ownership inventory aligned with their new package locations.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 1091, end_line: 1091}
+    summary: Update an internal dependency to the service semantic decision module.
+    rationale: Keep ownership metadata aligned with source imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 1237, end_line: 1248}
+    summary: Remove the old feature obligation module ownership record.
+    rationale: Keep the inventory free of deleted agent paths.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 1439, end_line: 1440}
+    summary: Update semantic faithfulness dependencies to service modules.
+    rationale: Keep ownership metadata aligned with source imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2567, end_line: 2567}
+    summary: Update the feature obligation dependency to the service module.
+    rationale: Keep the module graph aligned with source imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2570, end_line: 2571}
+    summary: Update semantic contract and decision dependencies to service modules.
+    rationale: Keep the module graph aligned with source imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 3185, end_line: 3185}
+    summary: Update semantic contract dependency ownership metadata.
+    rationale: Keep the module graph aligned with source imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 3328, end_line: 3329}
+    summary: Update semantic compiler dependencies to service modules.
+    rationale: Keep the module graph aligned with source imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 3384, end_line: 3385}
+    summary: Update probe repair dependencies to service modules.
+    rationale: Keep the module graph aligned with source imports.
+  - path: docs/design/source-anchored-semantic-contract-compilation.md
+    type: modified
+    span: {start_line: 2149, end_line: 2150}
+    summary: Update semantic module locations to their service package paths.
+    rationale: Keep the design document consistent with current ownership.
+  - path: docs/plans/bounded-coding-worker-implementation-plan.md
+    type: modified
+    span: {start_line: 964, end_line: 965}
+    summary: Update semantic module locations to their service package paths.
+    rationale: Keep the implementation plan consistent with current ownership.
+  - path: docs/plans/bounded-llm-instruction-compiler.md
+    type: modified
+    span: {start_line: 729, end_line: 729}
+    summary: Update feature obligation compilation to its service path.
+    rationale: Keep the compiler plan consistent with current ownership.
+  - path: docs/plans/bounded-llm-instruction-compiler.md
+    type: modified
+    span: {start_line: 741, end_line: 741}
+    summary: Update the feature obligation responsibility reference.
+    rationale: Keep the compiler plan consistent with current ownership.
+  - path: docs/plans/bounded-planning-and-plan-repair.md
+    type: modified
+    span: {start_line: 75, end_line: 75}
+    summary: Update the semantic contract location to its service path.
+    rationale: Keep the planning guide consistent with current ownership.
+  - path: docs/plans/checkable-acceptance-criteria-implementation-handoff.md
+    type: modified
+    span: {start_line: 108, end_line: 108}
+    summary: Update semantic decision implementation guidance to the service path.
+    rationale: Keep the handoff consistent with current ownership.
+  - path: docs/plans/checkable-acceptance-criteria-implementation-handoff.md
+    type: modified
+    span: {start_line: 110, end_line: 110}
+    summary: Update semantic contract implementation guidance to the service path.
+    rationale: Keep the handoff consistent with current ownership.
+  - path: docs/plans/classifier-semantic-quality-handoff.md
+    type: modified
+    span: {start_line: 68, end_line: 69}
+    summary: Update semantic decision and contract references to the service package.
+    rationale: Keep the classifier handoff consistent with current ownership.
+  - path: docs/plans/routing-classifier-jev-and-dedicated-model-handoff.md
+    type: modified
+    span: {start_line: 78, end_line: 78}
+    summary: Update semantic decision references to the service package.
+    rationale: Keep the classifier handoff consistent with current ownership.
+  - path: science/classifications/compare_jev_other_classifiers.py
+    type: modified
+    span: {start_line: 25, end_line: 26}
+    summary: Import decision labels from service planning.
+    rationale: Use the canonical semantic decision module.
+  - path: science/classifications/root_disposition/build_dataset.py
+    type: modified
+    span: {start_line: 31, end_line: 31}
+    summary: Import decision labels from service planning.
+    rationale: Use the canonical semantic decision module.
+  - path: science/classifications/root_disposition/build_dataset.py
+    type: modified
+    span: {start_line: 32, end_line: 32}
+    summary: Import decision labels from service planning.
+    rationale: Use the canonical semantic decision module.
+  - path: science/classifications/routing/evaluate_jev_smoke.py
+    type: modified
+    span: {start_line: 19, end_line: 20}
+    summary: Import the semantic decision specification from service planning.
+    rationale: Use the canonical semantic decision module.
+  - path: src/powdrr_lift/core/behavior_contract.py
+    type: modified
+    span: {start_line: 10, end_line: 10}
+    summary: Import semantic decision types from the service package.
+    rationale: Remove a dependency on the deleted agent module.
+  - path: src/powdrr_lift/core/semantic_faithfulness.py
+    type: modified
+    span: {start_line: 12, end_line: 13}
+    summary: Import semantic contracts and decisions from service planning.
+    rationale: Keep faithfulness checks on canonical service types.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 14, end_line: 18}
+    summary: Import feature obligation compilation from service planning.
+    rationale: Keep runtime commands on service-owned design policy.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 25, end_line: 34}
+    summary: Import semantic contracts and decisions from service planning.
+    rationale: Keep runtime commands on canonical service types.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 28, end_line: 32}
+    summary: Remove feature obligation imports from the old agent module.
+    rationale: Remove stale imports after relocating the implementation.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 44, end_line: 53}
+    summary: Remove semantic contract and decision imports from old agent modules.
+    rationale: Remove stale imports after relocating the implementations.
+  - path: src/powdrr_lift/workrr/probe_repair.py
+    type: modified
+    span: {start_line: 10, end_line: 11}
+    summary: Import partial semantic contracts from the service package.
+    rationale: Keep repair validation on canonical service types.
+  - path: src/powdrr_lift/workrr/probe_repair.py
+    type: modified
+    span: {start_line: 15, end_line: 15}
+    summary: Remove the import from the old agent semantic contract module.
+    rationale: Remove the stale dependency on agent core.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 13, end_line: 19}
+    summary: Import semantic contracts and decisions from service planning.
+    rationale: Keep repository subject binding on canonical service types.
+  - path: src/powdrr_lift/workrr/repository_subject_binding.py
+    type: modified
+    span: {start_line: 22, end_line: 27}
+    summary: Remove imports from the old agent semantic modules.
+    rationale: Remove stale imports after relocating the implementations.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 11, end_line: 11}
+    summary: Import semantic contract types from service planning.
+    rationale: Keep semantic compilation on canonical service types.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 18, end_line: 18}
+    summary: Import semantic decisions from service planning.
+    rationale: Keep semantic compilation on canonical service types.
+  - path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 25, end_line: 26}
+    summary: Retain the agent's classifier input formatter after sorting imports.
+    rationale: Keep transport formatting local while using service-owned semantic contracts.
+  - path: tests/test_feature_obligation.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Import feature obligation compilation from service planning.
+    rationale: Exercise the canonical service implementation directly.
+  - path: tests/test_feature_obligation.py
+    type: modified
+    span: {start_line: 8, end_line: 9}
+    summary: Import the instruction ledger and semantic contract fixtures from service modules.
+    rationale: Keep tests aligned with direct service imports.
+  - path: tests/test_feature_obligation.py
+    type: modified
+    span: {start_line: 14, end_line: 14}
+    summary: Import the instruction ledger, semantic contract, and decision fixtures from service modules.
+    rationale: Keep tests aligned with direct service imports.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 16, end_line: 16}
+    summary: Import semantic decision labels from the service package.
+    rationale: Keep end-to-end coverage on the canonical service module.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span: {start_line: 18, end_line: 18}
+    summary: Remove the import from the old agent decision module.
+    rationale: Keep end-to-end coverage on the canonical service module.
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 10, end_line: 10}
+    summary: Import semantic contracts from the service package.
+    rationale: Keep compiler tests on canonical service types.
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 15, end_line: 15}
+    summary: Import semantic decisions from the service package.
+    rationale: Keep compiler tests on canonical service types.
+  - path: tests/test_semantic_contract_compiler.py
+    type: modified
+    span: {start_line: 20, end_line: 20}
+    summary: Retain test imports after reordering the service-owned types.
+    rationale: Keep compiler tests on canonical service types.
+  - path: tests/test_semantic_decision.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Import decision types and validation from the service package.
+    rationale: Test the service-owned semantic decision implementation directly.
+  - path: tests/test_semantic_decision.py
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Remove the import from the old agent decision module.
+    rationale: Test the service-owned semantic decision implementation directly.
+entities: []
+entity_relationships: []
+invariants:
+  - id: semantic-design-contracts-owned-by-service
+    description: Semantic decision validation, source-bound contracts, and canonical feature obligation compilation have service-owned implementations; all callers import those modules directly.
+    action: added
+guidance: []

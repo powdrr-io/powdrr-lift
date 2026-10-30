@@ -1,0 +1,217 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1195
+title: Reask stale planning inputs and preserve manual setup requirements
+intent:
+  problem: Resumed planning could treat answers from obsolete question context as current, reject valid file references returned by the model, and fail when a plan included explicit human setup requirements.
+  goal: Replay checkpoint state consistently, reask invalidated questions, constrain structural subject references to supplied identifiers, and compile human setup requirements into their owning plan item.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 1169, end_line: 1169}
+    summary: Add an optional setup identifier to the human setup question builder.
+    rationale: Keep multiple human setup questions distinct and resumable.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 1214, end_line: 1214}
+    summary: Use the supplied setup identifier in the question ID when available.
+    rationale: Keep each requirement's setup question independently identifiable.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 15, end_line: 15}
+    summary: Import the sequence type used by shared journal replay.
+    rationale: Type the ordered planning event input.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 214, end_line: 250}
+    summary: Add shared replay for accepted answers, invalidations, input digests, and oversized work unit groups.
+    rationale: Restore the same current planning state from the durable issue journal in every entry point.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 405, end_line: 407}
+    summary: Replace inline answer reduction with the shared journal replay helper.
+    rationale: Keep answer invalidation semantics consistent while advancing planning.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 415, end_line: 420}
+    summary: Restore accepted question input digests on the question machine.
+    rationale: Allow the planner to detect when a previously accepted answer is stale.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 654, end_line: 655}
+    summary: Rebuild accepted planning answers during operation initialization.
+    rationale: Apply the same invalidation rules when a worker starts or resumes.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 657, end_line: 673}
+    summary: Restore question metadata and determine completion from all ready questions.
+    rationale: Prevent resume initialization from treating stale or pending questions as completed.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 427, end_line: 427}
+    summary: Build the projected subject index once for the enumeration request.
+    rationale: Reuse the exact index when creating its allowed identifier list.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 430, end_line: 430}
+    summary: Store the precomputed subject index as the baseline fact.
+    rationale: Keep prompt context and allowed subject references aligned.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 504, end_line: 505}
+    summary: Tell the model to copy exactly one allowed subject reference.
+    rationale: Prevent malformed identifiers assembled from file paths and other context.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 540, end_line: 540}
+    summary: Attach an enum of known subject references to the answer schema.
+    rationale: Constrain model output to identifiers present in the projected baseline.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 815, end_line: 856}
+    summary: Derive canonical known references and build a per-question schema enum.
+    rationale: Make valid identifiers explicit and machine-validated.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1080, end_line: 1092}
+    summary: Resolve file entity IDs with paths to their canonical file subject IDs.
+    rationale: Accept references already represented in the projected baseline.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 36, end_line: 37}
+    summary: Import the human setup requirement and manual setup model types.
+    rationale: Compile explicit human setup requirements through the existing typed setup contract.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 40, end_line: 40}
+    summary: Import the manual setup binder.
+    rationale: Convert accepted setup proposals into typed plan prerequisites.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 42, end_line: 42}
+    summary: Import the human setup question builder.
+    rationale: Ask for structured details for each manual prerequisite.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 133, end_line: 133}
+    summary: Track accepted question input digests and invalidated answer IDs.
+    rationale: Revisit answers when the question context changes or parsing fails.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 152, end_line: 157}
+    summary: Add a setter for the accepted question input digests.
+    rationale: Restore digest metadata from the issue journal on resume.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 331, end_line: 334}
+    summary: Prioritize explicit human setup description questions.
+    rationale: Collect manual prerequisite details before plan compilation.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 338, end_line: 349}
+    summary: Keep invalidated accepted questions pending.
+    rationale: Ensure changed or unparseable responses are asked again.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 352, end_line: 402}
+    summary: Build unique setup questions for human_setup requirements and detect stale answers.
+    rationale: Make each manual prerequisite explicit and recoverable.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 986, end_line: 994}
+    summary: Compare structural enumeration answers against the current input digest.
+    rationale: Discard accepted answers produced from an older projected baseline.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 998, end_line: 1003}
+    summary: Reopen structural enumeration when an accepted answer no longer parses.
+    rationale: Recover from malformed durable responses without aborting the whole plan.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 1105, end_line: 1108}
+    summary: Remove the previous compilation failure for explicit human setup requirements.
+    rationale: Route these requirements through setup elicitation and binding.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 1185, end_line: 1252}
+    summary: Bind accepted setup answers to validation and the owning plan item.
+    rationale: Represent human intervention as a typed prerequisite in the generated plan.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 1301, end_line: 1338}
+    summary: Add setup records and manual prerequisite details to the compiled plan.
+    rationale: Preserve human instructions and validation dependencies in the durable plan.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 1431, end_line: 1431}
+    summary: Store accepted setup records in the planning manifest.
+    rationale: Keep manual setup decisions available in the generated plan metadata.
+  - path: src/powdrr_lift/workrr/planning/driver.py
+    type: modified
+    span: {start_line: 1440, end_line: 1440}
+    summary: Compile the plan with its manual prerequisite annotations.
+    rationale: Attach the human setup information to the workflow items it blocks.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 176, end_line: 181}
+    summary: Add a fake machine setter for accepted question input digests.
+    rationale: Keep service tests aligned with the resumable question machine interface.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 292, end_line: 294}
+    summary: Assert that accepted answers are not requested again during a healthy resume.
+    rationale: Preserve the existing no-repeat behavior under shared replay.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 496, end_line: 559}
+    summary: Test that a later needs-answer event removes the earlier accepted answer.
+    rationale: Prevent stale historical responses from returning after resume.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Import hashing utilities for planning source fixtures.
+    rationale: Build deterministic input digests in regression cases.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 10, end_line: 10}
+    summary: Import planning assembly types for structural fixtures.
+    rationale: Model the work units used by structural question tests.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 12, end_line: 16}
+    summary: Import source planning types used to construct a pinned plan source.
+    rationale: Exercise stale question handling against reproducible source context.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 32, end_line: 35}
+    summary: Import the planning driver types used by setup and replay tests.
+    rationale: Verify the integrated planner behavior at its question machine boundary.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 217, end_line: 222}
+    summary: Assert structural subject references are enumerated in the answer schema.
+    rationale: Keep the model's identifiers constrained to actual baseline subjects.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 230, end_line: 339}
+    summary: Cover reasking stale structural answers and converting human setup requirements into item prerequisites.
+    rationale: Prevent old question context and unrepresented manual tasks from blocking a plan.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 473, end_line: 491}
+    summary: Accept a projected file entity ID as an existing file subject reference.
+    rationale: Cover the malformed reference that blocked the current Gaterr plan resume.
+entities: []
+entity_relationships: []
+invariants:
+  - id: planning-resume-uses-current-journal-state
+    description: Later needs-answer events supersede earlier accepted answers, and answers whose input digest no longer matches are requested again.
+    action: added
+  - id: structural-subject-references-use-baseline-identities
+    description: Existing structural subjects are selected from identifiers supplied by the projected baseline and file entity IDs resolve to their canonical file subject.
+    action: added
+  - id: human-setup-requirements-compile-into-plan
+    description: Explicit human_setup requirements produce bounded setup questions and are attached as manual prerequisites to a plan item.
+    action: added
+guidance: []

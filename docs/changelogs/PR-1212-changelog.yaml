@@ -1,0 +1,347 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1212
+title: Move workflow slug policy into service
+intent:
+  problem: Stable workflow identifiers were normalized in the agent's Git module even though planning
+    creates and repairs those identifiers as service-owned behavior.
+  goal: Give the service ownership of workflow slug normalization and have agent and planning callers
+    import that policy directly.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 59
+    end_line: 63
+  summary: Remove the legacy Git-module import exception for workflow slug policy.
+  rationale: The policy now has a service-owned module and callers import it directly.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 362
+    end_line: 362
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 414
+    end_line: 415
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 487
+    end_line: 487
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 528
+    end_line: 528
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 538
+    end_line: 539
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 743
+    end_line: 744
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1000
+    end_line: 1001
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2812
+    end_line: 2813
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2833
+    end_line: 2834
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2843
+    end_line: 2843
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2852
+    end_line: 2853
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3467
+    end_line: 3468
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3667
+    end_line: 3675
+  summary: Assign workflow slug policy and its call sites to the service ownership inventory.
+  rationale: Keep the architecture inventory aligned with the direct service imports and new module.
+- path: packages/local/src/powdrr_local/planning/repair_publication.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Import workflow slug normalization from the service package.
+  rationale: Publication repair must use the canonical service-owned identifier policy.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Use the service-owned workflow identifier normalizer.
+  rationale: Planning compilation belongs to the service boundary.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 23
+  summary: Use the service-owned workflow identifier normalizer.
+  rationale: Planning compilation belongs to the service boundary.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Use the service-owned workflow identifier normalizer.
+  rationale: Planning driver behavior must use the service policy directly.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 76
+    end_line: 76
+  summary: Use the service-owned workflow identifier normalizer.
+  rationale: Planning driver behavior must use the service policy directly.
+- path: packages/service/src/powdrr_service/planning/repair.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Use the service-owned workflow identifier normalizer.
+  rationale: Plan repair must use the same canonical workflow identifier policy.
+- path: packages/service/src/powdrr_service/planning/repair.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Use the service-owned workflow identifier normalizer.
+  rationale: Plan repair must use the same canonical workflow identifier policy.
+- path: packages/service/src/powdrr_service/planning/workflow_ids.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 13
+  summary: Define stable workflow identifier normalization in the service package.
+  rationale: The service owns persistent workflow identifiers while preserving existing slug behavior.
+- path: scripts/workflow-task-error-harness.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 21
+  summary: Import the workflow identifier policy from the service package.
+  rationale: The harness must follow the same service boundary as production callers.
+- path: scripts/workflow-task-error-harness.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Import the workflow identifier policy from the service package.
+  rationale: The harness must follow the same service boundary as production callers.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 45
+  summary: Import workflow slug normalization from the service package.
+  rationale: The agent CLI must depend directly on service-owned planning policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 238
+    end_line: 238
+  summary: Import workflow slug normalization from the service package.
+  rationale: The agent CLI must depend directly on service-owned planning policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Import workflow slug normalization from the service package.
+  rationale: Feature workflow creation must use the canonical service-owned policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 130
+  summary: Import workflow slug normalization from the service package.
+  rationale: Feature workflow creation must use the canonical service-owned policy.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 16
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 129
+    end_line: 129
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 200
+    end_line: 206
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 203
+    end_line: 203
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 219
+    end_line: 219
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 221
+    end_line: 221
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 266
+    end_line: 267
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 273
+    end_line: 273
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 285
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 496
+    end_line: 497
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 656
+    end_line: 656
+  summary: Remove the public workflow slug policy from the agent Git module and use a private local alias
+    where needed.
+  rationale: Workflow identifier normalization is service-owned; the agent Git module must not expose
+    it as a public API.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Import workflow slug normalization from the service package.
+  rationale: Issue plan generation must use service-owned workflow identifier policy.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Import workflow slug normalization from the service package.
+  rationale: Issue plan generation must use service-owned workflow identifier policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Import workflow slug normalization from the service package.
+  rationale: Task planning and execution must use the same service-owned identifier policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 121
+  summary: Import workflow slug normalization from the service package.
+  rationale: Task planning and execution must use the same service-owned identifier policy.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

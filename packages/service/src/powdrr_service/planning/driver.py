@@ -42,9 +42,13 @@ from powdrr_service.planning.coverage import (
 from powdrr_service.planning.dependencies import (
     DependencyCandidateDiscovery,
     DependencyGraph,
+    HumanSetupNeed,
+    ManualSetup,
     UnitDependencyEdge,
     Validation,
+    bind_manual_setup,
     build_dependency_confirmation_request,
+    build_human_setup_description_request,
     compile_dependency_graph,
     discover_dependency_candidates,
 )
@@ -123,6 +127,7 @@ class SourceLedgerQuestionMachine:
         )
         self.taxonomy_entity_types = taxonomy_entity_types
         self._invalid_accepted_question_ids: set[str] = set()
+        self._accepted_question_input_digests: dict[str, str] | None = None
         self._oversized_work_unit_groups: set[tuple[str, ...]] = set()
         self._single_proposal_requirements: set[str] = set()
         self._supplemental_work_unit_requirements: set[str] = set()
@@ -140,6 +145,12 @@ class SourceLedgerQuestionMachine:
         self._single_proposal_requirements = {
             group[0] for group in groups if len(group) == 1
         }
+
+    def set_accepted_question_input_digests(
+        self, input_digests: Mapping[str, str]
+    ) -> None:
+        """Set digests recorded with answers so changed question inputs are reasked."""
+        self._accepted_question_input_digests = dict(input_digests)
 
     def _next_source_question(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -276,6 +287,9 @@ class SourceLedgerQuestionMachine:
         if source_requests:
             return source_requests
         ledger = self._parse_source_ledger(accepted_answers)
+        setup_requests = self._explicit_human_setup_requests(ledger, accepted_answers)
+        if setup_requests:
+            return setup_requests
         self._search_requirements_evidence(ledger.requirements)
         coverage_requests: list[QuestionRequest[Any]] = []
         for requirement in ledger.requirements:
@@ -313,8 +327,70 @@ class SourceLedgerQuestionMachine:
         return tuple(
             request
             for request in self._structrr_requests(accepted_answers)
-            if request.question.question_id not in accepted_answers
+            if self._request_is_pending(request, accepted_answers)
         )
+
+    def _request_is_pending(
+        self,
+        request: QuestionRequest[Any],
+        accepted_answers: Mapping[str, Mapping[str, Any]],
+    ) -> bool:
+        question_id = request.question.question_id
+        return (
+            question_id not in accepted_answers
+            or question_id in self._invalid_accepted_question_ids
+        )
+
+    def _explicit_human_setup_requests(
+        self,
+        ledger: SourceLedger,
+        accepted_answers: Mapping[str, Mapping[str, Any]],
+    ) -> tuple[QuestionRequest[Any], ...]:
+        requests: list[QuestionRequest[Any]] = []
+        for requirement in ledger.requirements:
+            if requirement.kind != "human_setup":
+                continue
+            validation = Validation(
+                "validation-0001",
+                "Run the configured repository verification command.",
+                "local_command",
+                self.verification_command,
+                (requirement.id,),
+                requirement.source_refs,
+                (),
+            )
+            need = HumanSetupNeed(
+                True,
+                requirement.statement,
+                requirement.source_refs,
+                (),
+            )
+            request = build_human_setup_description_request(
+                validation,
+                need,
+                source=self.source,
+                evidence={},
+                setup_id=requirement.id,
+            )
+            question_id = request.question.question_id
+            answer = accepted_answers.get(question_id)
+            if answer is None:
+                requests.append(request)
+                continue
+            if (
+                self._accepted_question_input_digests is not None
+                and self._accepted_question_input_digests.get(question_id)
+                != request.question.input_digest
+            ):
+                self._invalid_accepted_question_ids.add(question_id)
+                requests.append(request)
+                continue
+            try:
+                request.parse_answer(answer)
+            except PlanningContractError:
+                self._invalid_accepted_question_ids.add(question_id)
+                requests.append(request)
+        return tuple(requests)
 
     def _search_requirements_evidence(
         self, requirements: Sequence[Requirement]
@@ -899,10 +975,24 @@ class SourceLedgerQuestionMachine:
                     answer = accepted_answers.get(
                         enumeration_request.question.question_id
                     )
+                    question_id = enumeration_request.question.question_id
+                    if (
+                        answer is not None
+                        and self._accepted_question_input_digests is not None
+                        and self._accepted_question_input_digests.get(question_id)
+                        != enumeration_request.question.input_digest
+                    ):
+                        self._invalid_accepted_question_ids.add(question_id)
+                        answer = None
                     if answer is None:
                         pending_enumerations.append(enumeration_request)
                         break
-                    page = enumeration_request.parse_answer(answer)
+                    try:
+                        page = enumeration_request.parse_answer(answer)
+                    except PlanningContractError:
+                        self._invalid_accepted_question_ids.add(question_id)
+                        pending_enumerations.append(enumeration_request)
+                        break
                     item_subjects.extend(page.records)
                     if not page.has_more:
                         subjects_by_item[item_id] = tuple(item_subjects)
@@ -1084,6 +1174,74 @@ class SourceLedgerQuestionMachine:
             source_ref=self._structrr_source_ref(),
         )
 
+    def _accepted_human_setups(
+        self,
+        ledger: SourceLedger,
+        accepted_answers: Mapping[str, Mapping[str, Any]],
+        assembly: PlanningAssembly,
+        validation: Validation,
+    ) -> tuple[tuple[ManualSetup, str], ...]:
+        requirements = tuple(
+            item for item in ledger.requirements if item.kind == "human_setup"
+        )
+        if not requirements:
+            return ()
+        known_requirement_ids = {item.id for item in ledger.requirements}
+        unit_by_id = {unit.id: unit for unit in assembly.units}
+        setups: list[tuple[ManualSetup, str]] = []
+        for ordinal, requirement in enumerate(requirements, start=1):
+            need = HumanSetupNeed(
+                True,
+                requirement.statement,
+                requirement.source_refs,
+                (),
+            )
+            setup_validation = Validation(
+                validation.id,
+                validation.description,
+                validation.kind,
+                validation.target,
+                (requirement.id,),
+                requirement.source_refs,
+                (),
+            )
+            request = build_human_setup_description_request(
+                setup_validation,
+                need,
+                source=self.source,
+                evidence={},
+                setup_id=requirement.id,
+            )
+            answer = accepted_answers.get(request.question.question_id)
+            if answer is None:
+                raise PlanningCompilationError(
+                    "human setup description is incomplete at "
+                    f"{request.question.question_id}"
+                )
+            proposal = request.parse_answer(answer)
+            setup = bind_manual_setup(
+                f"setup-{ordinal:04d}",
+                proposal,
+                need=need,
+                requirement_ids=(requirement.id,),
+                known_requirement_ids=known_requirement_ids,
+                validation_ids=(validation.id,),
+                known_validation_ids={validation.id},
+            )
+            owner_item_id = next(
+                (
+                    item.item_id
+                    for item in assembly.plan.items
+                    if any(
+                        requirement.id in unit_by_id[unit_id].requirement_ids
+                        for unit_id in assembly.item_unit_ids[item.item_id]
+                    )
+                ),
+                assembly.plan.items[0].item_id,
+            )
+            setups.append((setup, owner_item_id))
+        return tuple(setups)
+
     def compile_accepted_plan(
         self,
         accepted_answers: Mapping[str, Mapping[str, Any]],
@@ -1095,10 +1253,6 @@ class SourceLedgerQuestionMachine:
         """Compile accepted bounded answers into a validated artifact bundle."""
         ledger = self.accepted_ledger(accepted_answers)
         coverage = self.accepted_coverage(accepted_answers)
-        if any(item.kind == "human_setup" for item in ledger.requirements):
-            raise PlanningCompilationError(
-                "explicit human setup requirements need the setup planning stage"
-            )
         assembly = self.accepted_assembly(accepted_answers, plan_id=plan_id)
         if not assembly.units:
             raise PlanningCompilationError(
@@ -1159,6 +1313,45 @@ class SourceLedgerQuestionMachine:
                         ),
                     }
                 )
+
+        human_setups = self._accepted_human_setups(
+            ledger, accepted_answers, assembly, validation
+        )
+        setup_records = [
+            {**setup.to_data(), "owner_item_id": owner_item_id}
+            for setup, owner_item_id in human_setups
+        ]
+        setups_by_owner: dict[str, list[ManualSetup]] = {}
+        for setup, owner_item_id in human_setups:
+            setups_by_owner.setdefault(owner_item_id, []).append(setup)
+        plan_items = tuple(
+            replace(
+                item,
+                manual_prerequisite={
+                    "title": "; ".join(
+                        dict.fromkeys(
+                            setup.title for setup in setups_by_owner[item.item_id]
+                        )
+                    ),
+                    "instructions": [
+                        instruction
+                        for setup in setups_by_owner[item.item_id]
+                        for instruction in setup.instructions
+                    ],
+                    "verification": "; ".join(
+                        dict.fromkeys(
+                            setup.verification
+                            for setup in setups_by_owner[item.item_id]
+                        )
+                    ),
+                    "trigger": setups_by_owner[item.item_id][0].trigger,
+                    "unblocks": validation.target,
+                },
+            )
+            if item.item_id in setups_by_owner
+            else item
+            for item in assembly.plan.items
+        )
 
         source_record = {
             "repository": self.source.document.repository,
@@ -1228,7 +1421,7 @@ class SourceLedgerQuestionMachine:
                     for write in unit.planned_writes
                 ],
                 "validations": [validation.to_data()],
-                "setups": [],
+                "setups": setup_records,
                 "structrr": {
                     "baseline_fingerprint": proposal.to_data()["baseline_fingerprint"],
                     "proposal_path": proposal_path,
@@ -1237,7 +1430,7 @@ class SourceLedgerQuestionMachine:
                 "latest_repair": None,
             }
         )
-        plan = replace(assembly.plan, planning=manifest.to_data())
+        plan = replace(assembly.plan, items=plan_items, planning=manifest.to_data())
         repository_snapshot = {"source": source_record, "base": base_record}
         compiled = compile_plan(
             plan=plan,

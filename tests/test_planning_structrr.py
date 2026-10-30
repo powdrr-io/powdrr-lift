@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import hashlib
+from types import SimpleNamespace
 from typing import Any
 
 import powdrr_service.planning.structrr as structrr_module
 import pytest
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
+from powdrr_service.planning.dependencies import Validation
 from powdrr_service.planning.questions import build_question_messages
-from powdrr_service.planning.source import PinnedSourceDocument, segment_markdown_source
+from powdrr_service.planning.source import (
+    PinnedSourceDocument,
+    Requirement,
+    segment_markdown_source,
+)
 from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
     StructrrPlanningError,
@@ -23,6 +29,10 @@ from powdrr_service.planning.structrr import (
 )
 
 from powdrr_lift.workrr.planning.contracts import PlanningContractError
+from powdrr_lift.workrr.planning.driver import (
+    SourceLedger,
+    SourceLedgerQuestionMachine,
+)
 
 
 def _unit(
@@ -204,11 +214,127 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
     assert "Never describe an existing file subject as new" in (
         enumeration.exact_question
     )
+    allowed_subject_refs = enumeration.answer_schema["properties"]["records"]["items"][
+        "properties"
+    ]["subject_ref"]["enum"]
+    assert "path::src/projected.py" in allowed_subject_refs
+    assert "path::src/relevant.py" in allowed_subject_refs
+    assert "src/relevant.py::src/relevant.py" not in allowed_subject_refs
     assert "python::unrelated_0" not in enumeration_input
     assert unrelated_payload not in enumeration_input
     assert "python::relevant" in change_input
     assert "python::unrelated_0" not in change_input
     assert unrelated_payload not in change_input
+
+
+def test_structural_subject_answer_is_reasked_when_projected_context_changes() -> None:
+    text = "# Plan\n\nImplement the requested behavior.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    machine: Any = SourceLedgerQuestionMachine(
+        source,
+        plan_id="plan-01",
+        structrr_baseline={"entities": [], "entity_relationships": [], "files": []},
+    )
+    unit = _unit(
+        writes=(PlannedWrite("src/new.py", "implementation", "python", (), ()),)
+    )
+    item_record = {
+        "id": "item-0001",
+        "dependencies": [],
+        "allowed_paths": ["src/new.py"],
+        "acceptance_criteria": [],
+        "unit_ids": [unit.id],
+        "units": [unit],
+    }
+    machine._structrr_item_records = lambda _answers: (item_record,)
+    machine.accepted_assembly = lambda _answers, *, plan_id: SimpleNamespace(
+        dependency_graph=SimpleNamespace(item_order=("item-0001",), item_edges=())
+    )
+    machine.accepted_ledger = lambda _answers: SimpleNamespace(
+        requirements=(SimpleNamespace(id="req-01", source_refs=(source_ref,)),)
+    )
+
+    first_request = machine._structrr_requests({})[0]
+    question_id = first_request.question.question_id
+    machine.set_accepted_question_input_digests({question_id: "sha256:" + "0" * 64})
+    stale_answer = {"records": [], "has_more": False, "next_anchor": None}
+
+    requests = machine._structrr_requests({question_id: stale_answer})
+
+    assert [request.question.question_id for request in requests] == [question_id]
+    assert machine.invalid_accepted_question_ids == frozenset({question_id})
+    assert machine._request_is_pending(requests[0], {question_id: stale_answer})
+
+
+def test_explicit_human_setup_requirement_becomes_an_item_prerequisite() -> None:
+    text = "# Plan\n\nA maintainer must install the signed provider.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    requirement = Requirement(
+        "req-0001",
+        "A maintainer must install the signed provider.",
+        "human_setup",
+        (source_ref,),
+        (),
+        (),
+    )
+    ledger = SourceLedger((requirement,), ())
+    machine: Any = SourceLedgerQuestionMachine(source, plan_id="plan-01")
+
+    requests = machine._explicit_human_setup_requests(ledger, {})
+
+    assert len(requests) == 1
+    request = requests[0]
+    assert request.question.kind == "describe_human_setup"
+    assert request.question.question_id == "describe-human-setup-req-0001"
+    answer = dict(request.valid_example)
+    validation = Validation(
+        "validation-0001",
+        "Run the verification command.",
+        "local_command",
+        "make test",
+        (requirement.id,),
+        (source_ref,),
+        (),
+    )
+    assembly = SimpleNamespace(
+        plan=SimpleNamespace(items=(SimpleNamespace(item_id="item-0001"),)),
+        item_unit_ids={"item-0001": ("unit-0001",)},
+        units=(SimpleNamespace(id="unit-0001", requirement_ids=(requirement.id,)),),
+    )
+
+    setups = machine._accepted_human_setups(
+        ledger,
+        {request.question.question_id: answer},
+        assembly,
+        validation,
+    )
+
+    assert len(setups) == 1
+    setup, owner_item_id = setups[0]
+    assert owner_item_id == "item-0001"
+    assert setup.title == answer["title"]
+    assert setup.trigger == "after_implementation_before_validation"
+    assert setup.unblocks_validation_ids == (validation.id,)
 
 
 def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
@@ -342,6 +468,25 @@ def test_structural_subject_pages_cover_all_subjects_and_require_final_page() ->
     assert len(complete_subject_enumeration((first, second))) == 12
     with pytest.raises(StructrrPlanningError, match="incomplete"):
         complete_subject_enumeration((first,))
+
+
+def test_file_subject_can_reference_projected_file_entity_id() -> None:
+    baseline = {
+        "entities": [{"id": "file:src/existing.py", "path": "src/existing.py"}],
+        "entity_relationships": [],
+        "files": [{"path": "src/existing.py"}],
+        "source_subjects": [],
+    }
+    record = _record("file:src/existing.py")
+    record["section"] = "files"
+
+    page = _parse_page(
+        _candidate_page([record], has_more=False, next_anchor=None),
+        baseline=baseline,
+    )
+
+    assert len(page.records) == 1
+    assert page.records[0].subject_id == "path::src/existing.py"
 
 
 def test_subject_page_accepts_all_known_source_references() -> None:

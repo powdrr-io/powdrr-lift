@@ -173,6 +173,12 @@ class _PlanningScriptClient:
 class _Machine:
     def __init__(self) -> None:
         self.request = _request()
+        self.accepted_input_digests: dict[str, str] = {}
+
+    def set_accepted_question_input_digests(
+        self, input_digests: Mapping[str, str]
+    ) -> None:
+        self.accepted_input_digests = dict(input_digests)
 
     def next_question(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -283,6 +289,9 @@ def test_accepted_question_is_durable_and_not_called_again() -> None:
     assert accepted.status == "question_accepted"
     assert resumed.status == "complete"
     assert client.calls == 1
+    assert machine.accepted_input_digests == {
+        machine.request.question.question_id: machine.request.question.input_digest
+    }
     assert [event.event_type for event in store.load().events] == [
         "answer_accepted",
     ]
@@ -482,6 +491,70 @@ def test_needs_answer_event_supersedes_an_older_accepted_answer() -> None:
     assert transition.status == "question_accepted"
     assert client.calls == 1
     assert len(store.load().events) == 3
+
+
+def test_procedrr_initialize_reopens_answer_invalidated_by_later_checkpoint() -> None:
+    session_id = "session-initialize-reopened-answer"
+    store = InMemoryCheckpointStore(session_id=session_id)
+    machine = _Machine()
+    session = PlanningSession(
+        session_id=session_id,
+        plan_id="bounded-plan",
+        repository="powdrr-io/example",
+        base_commit="a" * 40,
+        source_path="docs/plan.md",
+        source_blob_sha="b" * 40,
+        verification_command="make test",
+        issue=QueueIssue(
+            47, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
+        ),
+    )
+    accepted = PlanningCheckpoint.answer_accepted(
+        session_id=session_id,
+        event_id="answer-accepted-000001",
+        sequence=1,
+        parent_digest=None,
+        question=machine.request.question,
+        accepted_answer={"records": [{"statement": "Old answer."}]},
+        validation_result={"accepted": True, "attempts": 1},
+        id_counters={},
+    )
+    store.append(accepted, expected_parent_digest=None)
+    reopened = PlanningCheckpoint.needs_answer(
+        session_id=session_id,
+        event_id="needs-answer-000002",
+        sequence=2,
+        parent_digest=accepted.digest,
+        question=machine.request.question,
+        error=PlanningContractError("/records", "needs correction"),
+        previous_answer={"records": [{"statement": "Old answer."}]},
+        id_counters={},
+    )
+    store.append(reopened, expected_parent_digest=accepted.digest)
+
+    client = _Client()
+    run_planning_procedrr(
+        process_directory=(
+            Path(__file__).resolve().parents[1] / "docs" / "procedrr" / "processes"
+        ),
+        session=session,
+        state_machine=machine,
+        checkpoint_store=store,
+        client=client,
+        options=PlanningOptions(model="test-model"),
+        stderr=None,
+    )
+
+    assert client.calls == 1
+    assert [event.event_type for event in store.load().events] == [
+        "answer_accepted",
+        "needs_answer",
+        "answer_accepted",
+    ]
+    assert (
+        store.load().events[-1].payload["accepted_answer"]["records"][0]["statement"]
+        == "The issue state is durable."
+    )
 
 
 def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> None:

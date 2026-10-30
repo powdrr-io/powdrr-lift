@@ -1,0 +1,51 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1210
+title: Bound structural subject reference schemas
+intent:
+  problem: Structural subject enumeration embedded every known subject reference in the JSON Schema enum, causing large correction prompts to exceed the planning input limit.
+  goal: Keep the subject-reference schema bounded while supplying allowed references as context and validating them deterministically against the projected baseline.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 529, end_line: 530}
+    summary: Instruct the model to copy references from accepted facts rather than a schema enum.
+    rationale: Keep identifier selection grounded in the relevant supplied subject index.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 565, end_line: 565}
+    summary: Use a fixed-size structural subject page schema.
+    rationale: Prevent schema size from growing with the repository's subject count.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 857, end_line: 857}
+    summary: Use a fixed structural subject page schema without repository-specific IDs.
+    rationale: Prevent the response schema from growing with the repository's subject count.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 883, end_line: 883}
+    summary: Remove the dynamic subject reference enum.
+    rationale: Let the parser enforce reference membership using the projected baseline.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 217, end_line: 217}
+    summary: Inspect the bounded subject reference field schema.
+    rationale: Ensure the subject field is defined independently of repository IDs.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 219, end_line: 221}
+    summary: Assert the subject reference field is nullable and has no dynamic enum.
+    rationale: Ensure known IDs remain contextual data instead of a schema enum.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 570, end_line: 581}
+    summary: Verify unknown existing references are rejected by the parser.
+    rationale: Preserve deterministic validation after removing the schema enum.
+entities: []
+entity_relationships: []
+invariants:
+  - id: structural-reference-schema-is-bounded
+    description: Structural subject schemas do not enumerate repository-specific IDs; the parser validates an existing reference against the projected baseline.
+    action: altered
+guidance: []

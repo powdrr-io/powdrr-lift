@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1214
+change_id: 1215
 title: Remove planning compatibility re-exports
 intent:
   problem: Agent modules and tests still depended on service-owned planning through legacy powdrr_lift

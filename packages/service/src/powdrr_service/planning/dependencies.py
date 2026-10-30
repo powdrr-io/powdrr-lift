@@ -1166,6 +1166,7 @@ def build_human_setup_description_request(
     *,
     source: SegmentedSource,
     evidence: Mapping[str, Evidence],
+    setup_id: str | None = None,
 ) -> QuestionRequest[ManualSetupProposal]:
     if not need.required:
         raise DependencyError(
@@ -1210,7 +1211,7 @@ def build_human_setup_description_request(
     }
     return QuestionRequest(
         question=Question(
-            f"describe-human-setup-{validation.id}",
+            f"describe-human-setup-{setup_id or validation.id}",
             "describe_human_setup",
             1,
             (validation.id,),

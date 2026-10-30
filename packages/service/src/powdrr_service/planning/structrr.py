@@ -424,9 +424,10 @@ def build_subject_enumeration_request(
     unit_facts = tuple(
         ContextRecord(f"unit:{unit.id}", unit.to_data()) for unit in units
     )
+    subject_index = _structural_subject_index(projected_baseline, units)
     baseline_fact = ContextRecord(
         f"projected-structrr:{item_id}:{snapshot_digest(projected_baseline)[:20]}",
-        _structural_subject_index(projected_baseline, units),
+        subject_index,
     )
     prior_facts = tuple(
         ContextRecord(
@@ -500,6 +501,8 @@ def build_subject_enumeration_request(
             "file subject. For a projected file without a source_subjects record, "
             "use its supplied path::<path> key. Never describe an existing file "
             "subject as new. "
+            "For an existing subject, copy exactly one value from the supplied "
+            "subject_ref schema enum; never combine or construct identifiers. "
             "Whenever new_identity_description is non-null, action must be added. "
             "Use changed, deleted, or removed only with a supplied subject_ref. "
             "Return at most eight subjects. An empty final page means no "
@@ -534,7 +537,7 @@ def build_subject_enumeration_request(
         accepted_facts=facts,
         valid_example=example,
         empty_example={"records": [], "has_more": False, "next_anchor": None},
-        answer_schema=SUBJECT_PAGE_SCHEMA,
+        answer_schema=_subject_page_schema(_known_subject_refs(subject_index)),
         parse_answer=parse,
     )
 
@@ -809,6 +812,48 @@ def _structural_subject_index(
     }
 
 
+def _known_subject_refs(subject_index: Mapping[str, Any]) -> tuple[str, ...]:
+    refs = {
+        str(record[field])
+        for section, field in (
+            ("entities", "id"),
+            ("entity_relationships", "id"),
+            ("source_subjects", "stable_key"),
+        )
+        for record in _mapping_records(subject_index.get(section))
+        if isinstance(record.get(field), str)
+    }
+    refs.update(
+        f"path::{record['path']}"
+        for record in _mapping_records(subject_index.get("source_subjects"))
+        if isinstance(record.get("path"), str)
+    )
+    return tuple(sorted(refs))
+
+
+def _subject_page_schema(known_subject_refs: Sequence[str]) -> dict[str, Any]:
+    record_schema = {
+        **SUBJECT_RECORD_SCHEMA,
+        "properties": {
+            **SUBJECT_RECORD_SCHEMA["properties"],
+            "subject_ref": {
+                "type": ["string", "null"],
+                "enum": [None, *known_subject_refs],
+            },
+        },
+    }
+    return {
+        **SUBJECT_PAGE_SCHEMA,
+        "properties": {
+            **SUBJECT_PAGE_SCHEMA["properties"],
+            "records": {
+                **SUBJECT_PAGE_SCHEMA["properties"]["records"],
+                "items": record_schema,
+            },
+        },
+    }
+
+
 def _structural_change_baseline_context(
     snapshot: Mapping[str, Any], subject: BoundStructuralSubject
 ) -> dict[str, Any]:
@@ -1032,6 +1077,19 @@ def _existing_subject_id(
                         stable_key = record.get("stable_key")
                         if isinstance(stable_key, str) and stable_key:
                             return stable_key
+        entities = snapshot.get("entities", [])
+        if isinstance(entities, list):
+            for record in entities:
+                if not isinstance(record, Mapping) or record.get("id") != subject_ref:
+                    continue
+                path = record.get("path")
+                if isinstance(path, str) and subject_ref == f"file:{path}":
+                    stable_key = record.get("stable_key")
+                    return (
+                        stable_key
+                        if isinstance(stable_key, str) and stable_key
+                        else f"path::{path}"
+                    )
         files = snapshot.get("files", [])
         if isinstance(files, list):
             for record in files:

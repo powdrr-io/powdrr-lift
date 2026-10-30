@@ -65,6 +65,44 @@ The real-checkout bootstrap now runs once; repeatability remains covered by the
 focused fixture-repository test, avoiding a second scan of the Powdrr checkout.
 This saves runtime but does not reduce the collected case count.
 
+## Second audit pass: duplicate tests and dead code
+
+The latest branch collects 1,918 test cases. A duplicate scenario test was
+removed: it loaded `live-task-all.yaml`, replaced its live provider and
+expectations with those from `task-all.yaml`, and ran the same `run_all` fixture
+already included in the checked-in scenario suite. In the preceding timing run,
+this duplicate execution took 2.52 seconds.
+
+The same test module contained a 177-line live coding-loop test helper whose
+name began with `_`. Pytest never collected it, so its API calls, assertions,
+and environment-gated skip path never ran. The helper and imports used only by
+it were removed. This removes dead test code, not a collected case.
+
+A static reference scan initially flagged 41 private functions. Manual checks
+excluded workflow command handlers resolved with `getattr`, Textual event
+handlers registered by decorators, and other dynamically registered callbacks.
+Thirty private function definitions had no call sites in Python, tests, or
+checked-in workflows and were removed. These included stale wrappers, parsers,
+validators, output helpers, an unused gate runner, and the unused workflow-step
+checkpoint snapshot/restore subsystem. The changed-path reader used by
+`procedrr_chat` was retained after mypy exposed its local import. No behavior
+was moved because the removed functions were unreachable.
+
+The public `--context-compaction-threshold` option and its config field still
+have no runtime reader; their compatibility should be decided separately before
+removing that CLI option.
+
+An AST check found no duplicate literal parameter rows across 179 inspected
+`pytest.mark.parametrize` entries. Two test functions have no syntactic
+`assert`, but each calls a validator that raises for invalid input, so they are
+not dead tests based on that signal.
+
+After cleanup, pytest collected 1,918 cases and passed 1,912 with 6 skipped in
+168.72 seconds. The duplicate scenario removal is the only collected-case
+reduction in this pass. The other cleanup removes uncollected code. This pass
+still does not support deleting 400 collected cases; the 400-case goal needs a
+selector-level removal ledger showing equivalent input classes and outcomes.
+
 ## Reduction plan
 
 The requested 400-case reduction is a target, not yet a safe deletion list. The

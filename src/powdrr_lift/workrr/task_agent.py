@@ -9,7 +9,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
@@ -314,14 +313,6 @@ class WorkflowTaskAgentConfig:
     task_checkpoint_callback: Callable[[str, str, Any, str | None], None] | None = None
     github_issue_number: int | None = None
     github_repository: str | None = None
-
-
-def _context_compaction_threshold(context_window: int, fraction: float) -> int:
-    if not 0 < fraction <= 1:
-        raise ValueError(
-            "context_compaction_threshold must be greater than 0 and at most 1."
-        )
-    return max(1, int(context_window * fraction))
 
 
 def _issue_worker_string_list(value: object) -> tuple[str, ...]:
@@ -2445,16 +2436,6 @@ class _TaskWorkflowExecutionStrategy:
     repair_prompt_manifest: RepairPromptManifest | None = None
     terminalized: bool = False
     terminal_exit_code: int | None = None
-
-    def _record_prompt_timing(self, stage: str, started: float) -> None:
-        """Attach prompt preparation timing to the workflow event stream."""
-        self.events.append(
-            {
-                "kind": "prompt_timing",
-                "stage": stage,
-                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
-            }
-        )
 
     def material_state(self, action: WorkflowAction) -> object:
         return _task_action_material_state(action, self.repo_root)
@@ -6086,25 +6067,6 @@ def _handle_exhausted_timeout(
     return 2
 
 
-def _delete_workflow_task_worktree(repo_root: Path, *, stderr: TextIO) -> None:
-    project_root = resolve_project_root(repo_root, repo_root)
-    result = subprocess.run(
-        ["git", "worktree", "remove", "--force", str(repo_root)],
-        cwd=project_root,
-        capture_output=True,
-        env=_noninteractive_environment(),
-        stdin=subprocess.DEVNULL,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        print(
-            f"Failed to delete dedicated workflow worktree: {result.stderr.strip()}",
-            file=stderr,
-            flush=True,
-        )
-
-
 def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
     message = str(exc).casefold()
     return any(
@@ -6131,67 +6093,6 @@ def _is_repairable_task_response_error(exc: RuntimeError) -> bool:
             "workflow edit action end_line must be a positive integer",
         )
     )
-
-
-def _nested_action_response_correction(
-    error: RuntimeError,
-    *,
-    allowed_actions: Sequence[str] = (),
-    rejected_action: str | None = None,
-    required_outputs: Sequence[str] = (),
-) -> str:
-    """Return actionable repair guidance for a nested process response."""
-    allowed = ", ".join((*allowed_actions, "next_step")) or "next_step"
-    correction = (
-        f"The nested process response was invalid: {error} "
-        "Return exactly one corrected JSON object for the current nested step. "
-        f'The top-level "action" must be one of: {allowed}. '
-        "Do not repeat the rejected action or its arguments. "
-        "Follow the current step details and output contract exactly. "
-        "Do not return markdown, prose, or a nested action object."
-    )
-    if rejected_action is not None:
-        correction += f" Rejected action signature: {rejected_action}."
-    if required_outputs:
-        correction += (
-            " If choosing next_step, outputs must contain exactly these declared "
-            "names: " + ", ".join(required_outputs) + "."
-        )
-    if isinstance(error, PowdrrExecutionError):
-        correction += _typed_error_guidance(error) + error.correction_notes()
-    return correction
-
-
-def _materialize_interview_input(
-    *,
-    repo_root: Path,
-    step: Any,
-    handoff_records: dict[str, dict[str, Any]],
-    step_index: int,
-) -> Path | None:
-    """Build the small generated JSON handoff without a large line edit."""
-    work_item = handoff_records.get("work_item_name", {}).get("value")
-    if not isinstance(work_item, str) or not work_item.strip():
-        return None
-    values: dict[str, Any] = {"work_item_name": work_item}
-    for input_spec in getattr(step, "inputs", ()):
-        name = input_spec.name
-        if name == "work_item_name":
-            continue
-        record = handoff_records.get(name)
-        if record is not None:
-            values[name] = record.get("value")
-    path = repo_root / "docs" / "proposals" / work_item / "design-interview-input.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(values, indent=2) + "\n", encoding="utf-8")
-    handoff_records["interview_input"] = {
-        "name": "interview_input",
-        "type": "any",
-        "value": values,
-        "produced_by": {"step_index": step_index, "action": "json_update"},
-        "scope": "process",
-    }
-    return path
 
 
 def _action_response_correction(
@@ -6349,27 +6250,6 @@ def _require_staged_pull_request_files(repo_root: Path) -> None:
         action_kind="next_step",
         remediation="Stage every approved change before advancing the task.",
     )
-
-
-def _task_action_failure_reached(
-    action_engine: WorkflowLLMActionEngine,
-    action: WorkflowAction,
-    *,
-    stderr: TextIO,
-) -> bool:
-    if (
-        action_engine.record_action_failure(
-            action,
-            signature=workflow_action_signature,
-        )
-        != ProgressDecision.THRESHOLD
-    ):
-        return False
-    print(
-        "Workflow task stopped after repeated corrective-action failures.",
-        file=stderr,
-    )
-    return True
 
 
 def _run_task_deterministic_pre_step(
@@ -6552,26 +6432,6 @@ def _repair_workflow_file_command(
     repaired_parameters = dict(parameters)
     repaired_parameters["command"] = repaired_command
     return repaired_parameters
-
-
-def _record_task_action_outputs(
-    action: WorkflowAction,
-    records: dict[str, dict[str, Any]],
-    step: Any,
-    step_index: int,
-) -> None:
-    if not action.outputs:
-        return
-    declarations = {output.name: output for output in step.outputs}
-    for name, value in action.outputs.items():
-        declaration = declarations.get(name)
-        records[name] = {
-            "name": name,
-            "type": declaration.type if declaration is not None else "any",
-            "value": value,
-            "produced_by": {"step_index": step_index, "action": action.kind},
-            "scope": declaration.scope if declaration is not None else "process",
-        }
 
 
 def _read_task_document(

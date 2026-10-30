@@ -1941,77 +1941,6 @@ def _normalize_related_reference_value(raw_value: object) -> str | None:
     return _normalize_entity_id(str(raw_value))
 
 
-def _validate_related_reference_list(
-    *,
-    related: Mapping[str, Any],
-    related_key: str,
-    available_ids: set[str],
-    issues: list[ValidationIssue],
-    item_label: str,
-    path: str | None,
-) -> None:
-    if related_key not in related:
-        return
-
-    raw_values = related.get(related_key)
-    if raw_values is None:
-        issues.append(
-            ValidationIssue(
-                code="related_reference_missing",
-                message=(f"{item_label} related.{related_key} must be a list of ids."),
-                path=path,
-            )
-        )
-        return
-
-    if not isinstance(raw_values, Sequence) or isinstance(raw_values, (str, bytes)):
-        issues.append(
-            ValidationIssue(
-                code="related_reference_invalid",
-                message=(f"{item_label} related.{related_key} must be a list of ids."),
-                path=path,
-            )
-        )
-        return
-
-    if len(raw_values) == 0:
-        issues.append(
-            ValidationIssue(
-                code="related_reference_empty",
-                message=(
-                    f"{item_label} related.{related_key} is empty. Remove it "
-                    "unless it points at a real current id."
-                ),
-                path=path,
-            )
-        )
-        return
-
-    for raw_value in raw_values:
-        related_id = _normalize_related_reference_value(raw_value)
-        if related_id is None:
-            issues.append(
-                ValidationIssue(
-                    code="related_reference_missing_id",
-                    message=(f"{item_label} related.{related_key} must contain ids."),
-                    path=path,
-                )
-            )
-            continue
-
-        if related_id not in available_ids:
-            issues.append(
-                ValidationIssue(
-                    code="unknown_related_reference",
-                    message=(
-                        f"{item_label} related.{related_key} references id "
-                        f"{related_id!r}, but that id is not current."
-                    ),
-                    path=path,
-                )
-            )
-
-
 def _validate_v2_lifecycle_item(
     *,
     issues: list[ValidationIssue],
@@ -2241,17 +2170,3 @@ def _load_known_proposed_pr_ids(repo_root: Path) -> set[str]:
         for proposed_pr_id in _load_specification_ids(repo_root, "proposed_pr")
         if proposed_pr_id is not None
     }
-
-
-def _parse_related_pr_reference(raw_value: object) -> tuple[str | None, str | None]:
-    if isinstance(raw_value, Mapping):
-        related_id = _normalize_related_reference_value(raw_value.get("id"))
-        related_state_raw = raw_value.get("state")
-        related_state = (
-            None
-            if related_state_raw is None
-            else str(related_state_raw).strip() or None
-        )
-        return related_id, related_state
-
-    return _normalize_related_reference_value(raw_value), None

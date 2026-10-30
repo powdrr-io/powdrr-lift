@@ -642,9 +642,6 @@ class WorkflowChatApp(App[None]):
         self._active_process_path = path
         return path
 
-    def _output_prompt(self, prompt: str) -> None:
-        self.call_from_thread(self._show_prompt, prompt)
-
     def _output_initial_prompt(self, prompt: str) -> None:
         self.call_from_thread(self._show_initial_prompt, prompt)
 

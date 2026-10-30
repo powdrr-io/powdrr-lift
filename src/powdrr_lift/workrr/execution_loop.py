@@ -174,17 +174,6 @@ def _is_feature_context_command(command: object) -> bool:
     return command_items[:2] == ["powdrr-lift", "resolve-feature-context"]
 
 
-def _gate_outcome_matches(
-    result: Mapping[str, Any], outcome: Mapping[str, Any]
-) -> bool:
-    value: Any = result
-    for component in str(outcome["path"]).split("."):
-        if not isinstance(value, Mapping) or component not in value:
-            return False
-        value = value[component]
-    return value == outcome["equals"]
-
-
 def _normalize_noop_git_commit_result(
     process: subprocess.CompletedProcess[str],
     command: str | Sequence[str],
@@ -583,71 +572,6 @@ def _run_deterministic_pre_step(
     )
 
 
-def _run_gate(
-    step: Any,
-    *,
-    process_id: str,
-    worktree_root: Path,
-    execution_events: list[dict[str, Any]],
-    execution_context: list[str],
-    handoff_records: Mapping[str, Mapping[str, Any]],
-    step_index: int,
-    workflow_context: WorkflowContext | None,
-    stdout: TextIO,
-    stderr: TextIO,
-    verbose: bool,
-    runtime: ExecutionRuntime | None = None,
-) -> bool:
-    if step.gate is None or step.pre_step is None:
-        raise PowdrrExecutionError(
-            "gate steps require gate and invoke_tool pre_step settings."
-        )
-    before = len(execution_events)
-    _run_deterministic_pre_step(
-        step,
-        process_id=process_id,
-        worktree_root=worktree_root,
-        execution_events=execution_events,
-        execution_context=execution_context,
-        handoff_records=handoff_records,
-        step_index=step_index,
-        workflow_context=workflow_context,
-        stdout=stdout,
-        stderr=stderr,
-        verbose=verbose,
-        force=True,
-        runtime=runtime,
-    )
-    event = execution_events[-1] if len(execution_events) > before else None
-    if not isinstance(event, Mapping) or not isinstance(event.get("result"), Mapping):
-        raise PowdrrExecutionError("Gate tool did not produce a structured result.")
-    passed = _gate_outcome_matches(event["result"], step.gate.outcome)
-    gate_event = {
-        "kind": "gate",
-        "process_id": process_id,
-        "step_index": step_index,
-        "passed": passed,
-        "outcome": dict(step.gate.outcome),
-        "result": event["result"],
-    }
-    execution_events.append(gate_event)
-    step_id = getattr(step, "id", None) or f"step-{step_index + 1}"
-    status = "passed" if passed else "failed"
-    print(
-        f"Workflow gate evaluation ({process_id}/{step_id}): {status}\n"
-        "Workflow gate result: "
-        + json.dumps(event["result"], ensure_ascii=False, sort_keys=True),
-        file=stderr,
-        flush=True,
-    )
-    if not passed:
-        execution_context.append(
-            f"Gate failed: {json.dumps(event['result'], ensure_ascii=False)}. "
-            + step.gate.retry_context
-        )
-    return passed
-
-
 def _execute_shell_tool(
     parameters: dict[str, Any],
     *,
@@ -932,22 +856,6 @@ def _coding_loop_worktree_fingerprint(worktree_root: Path) -> str:
     return digest.hexdigest()
 
 
-def _require_coding_loop_verification(
-    step: Any,
-    events: Sequence[Mapping[str, Any]],
-    *,
-    step_index: int | None = None,
-    worktree_root: Path | None = None,
-) -> None:
-    _validate_coding_loop_action(
-        step,
-        events,
-        action_kind="next_step",
-        step_index=step_index,
-        worktree_root=worktree_root,
-    )
-
-
 def _validate_coding_loop_action(
     step: Any,
     events: Sequence[Mapping[str, Any]],
@@ -999,7 +907,3 @@ def _validate_coding_loop_action(
                 "changed after the checks passed. Run the declared verification "
                 "commands again before choosing next_step."
             )
-
-
-def _print_waiting_for_model(stderr: TextIO, model: str) -> None:
-    print(f"waiting for {model} LLM response...", file=stderr, flush=True)

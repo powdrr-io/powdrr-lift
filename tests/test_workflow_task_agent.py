@@ -3383,15 +3383,10 @@ def test_workflow_retries_dropped_provider_connection(
 
 def test_exhausted_timeout_keeps_workflow_worktree_for_resume(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    deleted: list[Path] = []
-    monkeypatch.setattr(
-        "powdrr_lift.workrr.task_agent._delete_workflow_task_worktree",
-        lambda path, *, stderr: deleted.append(path),
-    )
     task = _workflow(tmp_path).tasks[0]
     dedicated_worktree = tmp_path / ".worktrees" / "timed-out-task"
+    dedicated_worktree.mkdir(parents=True)
 
     result = _handle_exhausted_timeout(
         dedicated_worktree,
@@ -3402,7 +3397,7 @@ def test_exhausted_timeout_keeps_workflow_worktree_for_resume(
     )
 
     assert result == 2
-    assert deleted == []
+    assert dedicated_worktree.is_dir()
 
 
 def test_process_workflow_task_repairs_invalid_fragment_step(

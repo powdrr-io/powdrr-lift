@@ -918,10 +918,6 @@ def _related_section_matches(
     )
 
 
-def _dedupe_strings(values: Iterable[str]) -> tuple[str, ...]:
-    return _dedupe_string_values(values)
-
-
 def _dedupe_string_values(values: Iterable[str]) -> tuple[str, ...]:
     seen_values: set[str] = set()
     deduped_values: list[str] = []
@@ -1052,25 +1048,6 @@ def _collect_branch_diff_entries(
             )
 
     return entries
-
-
-def _group_branch_diff_entries_by_path(
-    diff_entries: Sequence[BranchDiffEntry],
-) -> list[list[BranchDiffEntry]]:
-    grouped_entries: list[list[BranchDiffEntry]] = []
-    grouped_by_path: dict[str, list[BranchDiffEntry]] = {}
-    for entry in diff_entries:
-        grouped_by_path.setdefault(entry.path, []).append(entry)
-
-    seen_paths: set[str] = set()
-    for entry in diff_entries:
-        if entry.path in seen_paths:
-            continue
-
-        grouped_entries.append(grouped_by_path[entry.path])
-        seen_paths.add(entry.path)
-
-    return grouped_entries
 
 
 def _collect_file_spans(

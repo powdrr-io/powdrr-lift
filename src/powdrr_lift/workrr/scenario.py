@@ -781,12 +781,6 @@ def _optional_positive_int(value: Any, *, default: int) -> int:
     return value
 
 
-def _optional_positive_int_or_none(value: Any) -> int | None:
-    if value is None:
-        return None
-    return _optional_positive_int(value, default=1)
-
-
 def _optional_non_negative_int(value: Any, *, default: int) -> int:
     if value is None:
         return default

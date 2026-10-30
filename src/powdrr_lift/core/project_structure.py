@@ -211,22 +211,6 @@ def _check_unknown_fields(
         )
 
 
-def _check_required_fields(
-    data: dict[str, Any],
-    required: set[str],
-    path: str,
-    issues: list[ProjectStructureValidationIssue],
-) -> None:
-    for key in sorted(required - set(data)):
-        issues.append(
-            ProjectStructureValidationIssue(
-                "missing_field",
-                f"Missing required field {key!r}.",
-                f"{path}.{key}" if path else key,
-            )
-        )
-
-
 def create_project_structure_template(
     *,
     output_path: str | Path = "docs/project_structure/project-structure.yaml",

@@ -28,8 +28,7 @@ from powdrr_service.planning.plan_sizing import (
     ExplicitWorkUnit,
     allocate_explicit_work_units,
 )
-
-from powdrr_lift.workrr.planning.source import (
+from powdrr_service.planning.source import (
     PinnedSourceDocument,
     Requirement,
     segment_markdown_source,

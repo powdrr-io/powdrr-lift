@@ -5,11 +5,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from powdrr_local.planning.source import read_pinned_source
 from powdrr_service.planning.source import (
-    pinned_source_document as service_pinned_source_document,
-)
-
-from powdrr_lift.workrr.planning.source import (
     EquivalenceDecision,
     PinnedSourceDocument,
     PlanningSourceError,
@@ -24,10 +21,12 @@ from powdrr_lift.workrr.planning.source import (
     parse_equivalence_decision,
     parse_fidelity_decision,
     parse_requirement_page,
-    read_pinned_source,
     segment_markdown_source,
     source_block_input_digest,
     validate_source_coverage,
+)
+from powdrr_service.planning.source import (
+    pinned_source_document as service_pinned_source_document,
 )
 
 

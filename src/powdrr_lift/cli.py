@@ -33,6 +33,7 @@ from powdrr_local.planning.repair_publication import (
     publish_repair_pull_request,
 )
 from powdrr_local.planning.sessions import GitHubPlanningIssueStore
+from powdrr_local.planning.source import read_pinned_source
 from powdrr_service.planning.assembly import PathFact
 from powdrr_service.planning.compiler import PlanningCompilationError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
@@ -43,6 +44,7 @@ from powdrr_service.planning.service import (
     PlanningSession,
     run_planning_procedrr,
 )
+from powdrr_service.planning.source import segment_markdown_source
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 
 from powdrr_lift.agent_bootstrap import (
@@ -264,10 +266,6 @@ from powdrr_lift.workrr.local_model import download_local_qwen_model
 from powdrr_lift.workrr.planning.evidence import (
     read_evidence_excerpt,
     search_requirements_evidence,
-)
-from powdrr_lift.workrr.planning.source import (
-    read_pinned_source,
-    segment_markdown_source,
 )
 from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
 from powdrr_lift.workrr.prompt_benchmark_comparison import (

@@ -1,0 +1,239 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1216
+title: Remove legacy planning source adapters
+intent:
+  problem: Agent-side planning modules still re-export service source, driver, and checkpoint APIs, while
+    a pinned repository read adapter lives in the legacy package.
+  goal: Put pinned-source composition in the local package, import service policy directly, and remove
+    the remaining planning facades.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 982
+    end_line: 982
+  summary: Remove legacy planning modules and classify the local pinned-source adapter.
+  rationale: Keep source ownership and direct package dependencies accurate after removing the old facades.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2995
+    end_line: 2995
+  summary: Remove legacy planning modules and classify the local pinned-source adapter.
+  rationale: Keep source ownership and direct package dependencies accurate after removing the old facades.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3037
+    end_line: 3048
+  summary: Remove legacy planning modules and classify the local pinned-source adapter.
+  rationale: Keep source ownership and direct package dependencies accurate after removing the old facades.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3516
+    end_line: 3539
+  summary: Remove legacy planning modules and classify the local pinned-source adapter.
+  rationale: Keep source ownership and direct package dependencies accurate after removing the old facades.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 36
+  summary: Load pinned plan text through local composition and import segmentation policy directly from
+    service.
+  rationale: The CLI must not rely on a legacy planning facade for local I/O or service policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 47
+  summary: Load pinned plan text through local composition and import segmentation policy directly from
+    service.
+  rationale: The CLI must not rely on a legacy planning facade for local I/O or service policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 271
+  summary: Load pinned plan text through local composition and import segmentation policy directly from
+    service.
+  rationale: The CLI must not rely on a legacy planning facade for local I/O or service policy.
+- path: src/powdrr_lift/workrr/planning/checkpoints.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 18
+  summary: Delete the legacy planning facade after migrating its callers.
+  rationale: Planning policy belongs to service, repository reads belong to the agent, and composition
+    belongs to local.
+- path: src/powdrr_lift/workrr/planning/driver.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 40
+  summary: Delete the legacy planning facade after migrating its callers.
+  rationale: Planning policy belongs to service, repository reads belong to the agent, and composition
+    belongs to local.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 201
+    end_line: 212
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 215
+    end_line: 217
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 304
+    end_line: 313
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 298
+    end_line: 302
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1623
+    end_line: 1623
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 45
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 53
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 22
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 36
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 33
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 39
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 12
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 30
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 15
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 36
+  summary: Use direct package imports and assert that obsolete planning facades remain absent.
+  rationale: Tests exercise the owning modules and protect the package boundary.
+- path: packages/local/src/powdrr_local/planning/source.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 42
+  summary: Compose a pinned local Git read with the service-owned planning source record.
+  rationale: Local composition coordinates repository I/O and service semantics without giving the service
+    repository access.
+- path: tests/test_opencode_monitor.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 171
+  summary: Delay the first progress event and exercise timeout reset with a scheduling margin.
+  rationale: Keep the assertion that a later event arrives after the original deadline while avoiding
+    a 100ms startup and scheduling race.
+- path: tests/test_opencode_monitor.py
+  type: modified
+  span:
+    start_line: 173
+    end_line: 173
+  summary: Make the post-progress wait longer than the old inactivity timeout.
+  rationale: Ensure the test proves that progress resets the inactivity deadline.
+- path: tests/test_opencode_monitor.py
+  type: modified
+  span:
+    start_line: 180
+    end_line: 180
+  summary: Give the reset inactivity window enough time for process scheduling.
+  rationale: Avoid flaky CI timeouts while retaining the timeout-reset behavior under test.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

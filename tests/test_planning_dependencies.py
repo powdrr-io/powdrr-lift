@@ -42,14 +42,14 @@ from powdrr_service.planning.dependencies import (
     parse_validation_proposal,
     parse_validation_record,
 )
-
-from powdrr_lift.workrr.planning.evidence import Evidence
-from powdrr_lift.workrr.planning.source import (
+from powdrr_service.planning.source import (
     PinnedSourceDocument,
     Requirement,
     SegmentedSource,
     segment_markdown_source,
 )
+
+from powdrr_lift.workrr.planning.evidence import Evidence
 
 
 def _context() -> tuple[SegmentedSource, dict[str, Requirement], str, Evidence]:

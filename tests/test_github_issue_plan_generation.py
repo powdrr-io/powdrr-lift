@@ -1620,8 +1620,7 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     tmp_path: Any, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     from powdrr_service.planning.checkpoints import InMemoryCheckpointStore
-
-    from powdrr_lift.workrr.planning.source import PinnedSourceDocument
+    from powdrr_service.planning.source import PinnedSourceDocument
 
     source = tmp_path / "proposal.md"
     source.write_text("# Proposal\nAdd a foundation.", encoding="utf-8")

@@ -198,18 +198,6 @@ def test_legacy_service_imports_are_explicitly_owned() -> None:
     assert all(entry["owner_pr"] > 0 for entry in allowlist["entries"])
 
 
-def test_legacy_planning_driver_adapts_the_service_owned_machine() -> None:
-    from powdrr_service.planning.driver import (
-        SourceLedgerQuestionMachine as ServiceQuestionMachine,
-    )
-
-    from powdrr_lift.workrr.planning.driver import (
-        SourceLedgerQuestionMachine as LegacyQuestionMachine,
-    )
-
-    assert issubclass(LegacyQuestionMachine, ServiceQuestionMachine)
-
-
 def test_service_owned_planning_has_no_agent_reexport_modules() -> None:
     repository = Path(__file__).parents[1]
     legacy_reexports = (
@@ -224,6 +212,9 @@ def test_service_owned_planning_has_no_agent_reexport_modules() -> None:
         "src/powdrr_lift/workrr/planning/repair_service.py",
         "src/powdrr_lift/workrr/planning/service.py",
         "src/powdrr_lift/workrr/planning/structrr.py",
+        "src/powdrr_lift/workrr/planning/checkpoints.py",
+        "src/powdrr_lift/workrr/planning/driver.py",
+        "src/powdrr_lift/workrr/planning/source.py",
     )
 
     assert all(
@@ -301,22 +292,14 @@ def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
     )
     from powdrr_service.planning import checkpoints as service_checkpoints
 
-    from powdrr_lift.workrr.planning.checkpoints import (
-        GitHubCommentCheckpointStore as LegacyGitHubCheckpointStore,
-    )
-    from powdrr_lift.workrr.planning.checkpoints import (
-        LocalCheckpointStore as LegacyLocalCheckpointStore,
-    )
-    from powdrr_lift.workrr.planning.checkpoints import (
-        LocalDiagnosticCache as LegacyLocalDiagnosticCache,
-    )
-
     assert not hasattr(service_checkpoints, "LocalCheckpointStore")
     assert not hasattr(service_checkpoints, "LocalDiagnosticCache")
     assert not hasattr(service_checkpoints, "GitHubCommentCheckpointStore")
-    assert LegacyLocalCheckpointStore is LocalCheckpointStore
-    assert LegacyLocalDiagnosticCache is LocalDiagnosticCache
-    assert LegacyGitHubCheckpointStore is GitHubCommentCheckpointStore
+    assert LocalCheckpointStore.__module__ == "powdrr_local.planning.checkpoints"
+    assert LocalDiagnosticCache.__module__ == "powdrr_local.planning.checkpoints"
+    assert (
+        GitHubCommentCheckpointStore.__module__ == "powdrr_local.planning.checkpoints"
+    )
 
 
 def test_planning_service_uses_issue_store_protocol_not_github_client() -> None:

@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from powdrr_lift.workrr.git import slugify_workflow_id
+from powdrr_service.planning.workflow_ids import slugify_workflow_id
 
 
 class RepairPublicationError(RuntimeError):

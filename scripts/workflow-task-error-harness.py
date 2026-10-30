@@ -17,6 +17,8 @@ import time
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_service.planning.workflow_ids import slugify_workflow_id
+
 from powdrr_lift.process.tasks import (
     AssigneeType,
     TaskStatus,
@@ -28,7 +30,6 @@ from powdrr_lift.process.templates import load_workflow_template
 from powdrr_lift.workrr.git import (
     load_workflow_git_state,
     resolve_git_repository_root,
-    slugify_workflow_id,
     workflow_dependencies_completion,
     workflow_worktree_path,
 )

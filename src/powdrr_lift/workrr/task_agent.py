@@ -16,6 +16,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, TextIO
 
 import yaml
+from powdrr_service.planning.workflow_ids import slugify_workflow_id
 
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.core import resolve_repo_root
@@ -118,7 +119,6 @@ from powdrr_lift.workrr.git import (
     load_workflow_git_states,
     publication_branch_name,
     resolve_git_repository_root,
-    slugify_workflow_id,
     validate_workflow_git_state,
     workflow_dependencies_completion,
     workflow_id_from_task_id,

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.planning.workflow_instance import (
     PLAN_WORKFLOW_PROCESS,
     PLAN_WORKFLOW_SCHEMA,
@@ -26,7 +27,6 @@ from powdrr_service.planning.workflow_instance import (
 
 from powdrr_lift.basedpyright_tools import find_workspace_symbols
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.git import slugify_workflow_id
 from powdrr_lift.workrr.github_issue_queue import (
     MANUAL_PREREQUISITE_TRIGGER,
     QUEUE_SCHEMA,

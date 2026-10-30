@@ -42,6 +42,7 @@ from powdrr_service.planning.service import (
     PlanningSession,
     run_planning_procedrr,
 )
+from powdrr_service.planning.workflow_ids import slugify_workflow_id
 
 from powdrr_lift.agent_bootstrap import (
     BootstrapTaskConfig,
@@ -235,7 +236,6 @@ from powdrr_lift.workrr.git import (
     new_publication_id,
     resolve_git_repository_root,
     save_workflow_git_state,
-    slugify_workflow_id,
     synchronize_workflow_initialization,
 )
 from powdrr_lift.workrr.github_issue_plan_generation import (

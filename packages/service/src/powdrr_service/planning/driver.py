@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_lift.structrr.rebase import snapshot_digest
-from powdrr_lift.workrr.git import slugify_workflow_id
 from powdrr_service.planning.assembly import (
     MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
     MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
@@ -74,6 +73,7 @@ from powdrr_service.planning.structrr import (
     build_subject_enumeration_request,
     compile_structrr_plan,
 )
+from powdrr_service.planning.workflow_ids import slugify_workflow_id
 
 
 @dataclass(frozen=True, slots=True)

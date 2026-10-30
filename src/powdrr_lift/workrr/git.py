@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import uuid
 from collections.abc import Mapping
@@ -12,6 +11,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.planning.workflow_ids import (
+    slugify_workflow_id as _slugify_workflow_id,
+)
 
 from powdrr_lift.errors import PowdrrExecutionError
 
@@ -124,7 +126,7 @@ def _read_relationship_metadata(
 
 
 def workflow_git_state_filename(workflow_id: str) -> str:
-    return f"{slugify_workflow_id(workflow_id)}{WORKFLOW_GIT_STATE_SUFFIX}"
+    return f"{_slugify_workflow_id(workflow_id)}{WORKFLOW_GIT_STATE_SUFFIX}"
 
 
 def workflow_id_from_task_id(task_id: str) -> str | None:
@@ -197,15 +199,8 @@ def save_workflow_git_state(
     return path
 
 
-def slugify_workflow_id(value: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", value.strip().casefold()).strip("-")
-    if not slug:
-        raise ValueError("The proposed PR id must contain a letter or digit.")
-    return slug
-
-
 def integration_branch_name(proposed_pr_id: str) -> str:
-    return f"powdrr/{slugify_workflow_id(proposed_pr_id)}"
+    return f"powdrr/{_slugify_workflow_id(proposed_pr_id)}"
 
 
 def new_publication_id() -> str:
@@ -221,9 +216,9 @@ def publication_branch_name(
     """Build a publication branch, retaining legacy names for old workflow state."""
     if publication_kind not in {"implementation", "plan-amendment"}:
         raise ValueError("publication_kind must be implementation or plan-amendment")
-    branch = f"powdrr/{slugify_workflow_id(proposed_pr_id)}-{publication_kind}"
+    branch = f"powdrr/{_slugify_workflow_id(proposed_pr_id)}-{publication_kind}"
     if publication_id:
-        branch = f"{branch}-{slugify_workflow_id(publication_id)}"
+        branch = f"{branch}-{_slugify_workflow_id(publication_id)}"
     return branch
 
 
@@ -268,14 +263,14 @@ def workflow_dependencies_completion(
 
 def task_branch_name(proposed_pr_id: str, task_id: str) -> str:
     return (
-        f"powdrr/{slugify_workflow_id(proposed_pr_id)}-task/"
-        f"{slugify_workflow_id(task_id)}"
+        f"powdrr/{_slugify_workflow_id(proposed_pr_id)}-task/"
+        f"{_slugify_workflow_id(task_id)}"
     )
 
 
 def workflow_worktree_path(repo_root: str | Path, proposed_pr_id: str) -> Path:
     return (
-        Path(repo_root) / ".worktrees" / "powdrr" / slugify_workflow_id(proposed_pr_id)
+        Path(repo_root) / ".worktrees" / "powdrr" / _slugify_workflow_id(proposed_pr_id)
     )
 
 
@@ -287,7 +282,7 @@ def task_worktree_path(
     return (
         workflow_worktree_path(repo_root, proposed_pr_id)
         / "tasks"
-        / slugify_workflow_id(task_id)
+        / _slugify_workflow_id(task_id)
     )
 
 
@@ -498,8 +493,8 @@ def claim_workflow_task(
         ["rev-parse", state.integration_branch],
     )
     claim_ref = (
-        f"refs/agents/claims/{slugify_workflow_id(state.proposed_pr_id)}/"
-        f"{slugify_workflow_id(task_id)}"
+        f"refs/agents/claims/{_slugify_workflow_id(state.proposed_pr_id)}/"
+        f"{_slugify_workflow_id(task_id)}"
     )
     result = _git(
         repo_root_path,
@@ -658,7 +653,7 @@ def inspect_workflow_run(
 ) -> dict[str, Any]:
     """Collect Git-backed state for one workflow run without changing it."""
     repo_root_path = Path(repo_root).resolve()
-    slug = slugify_workflow_id(proposed_pr_id)
+    slug = _slugify_workflow_id(proposed_pr_id)
     integration_branch = integration_branch or integration_branch_name(proposed_pr_id)
     task_prefix = f"powdrr/{slug}-task/"
     claim_prefix = f"refs/agents/claims/{slug}/"

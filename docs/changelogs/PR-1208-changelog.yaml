@@ -1,0 +1,46 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1208
+title: Keep provider schemas out of correction prompt duplicates
+intent:
+  problem: A semantic correction could exceed the planning input limit because the full JSON schema was included both in the prompt and as the provider response schema, alongside the prior answer.
+  goal: Omit the duplicate prompt copy of the schema during corrections when the provider already receives it, preserving the schema contract while keeping correction context within bounds.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 390, end_line: 390}
+    summary: Add provider schema availability to prompt construction.
+    rationale: Keep prompt assembly aware of schemas supplied through the model call.
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 399, end_line: 403}
+    summary: Build answer fields without repeating the provider-supplied schema in correction prompts.
+    rationale: Reduce correction input size while retaining the schema through structured response mode.
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 409, end_line: 409}
+    summary: Use the prepared answer fields in the prompt packet.
+    rationale: Keep the inline schema conditional on provider support.
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 483, end_line: 483}
+    summary: Pass provider schema availability into prompt construction.
+    rationale: Omit the inline schema only when the model call receives it separately.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Import dataclass replacement for a large schema fixture.
+    rationale: Construct a bounded-input regression scenario with a custom response schema.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 174, end_line: 236}
+    summary: Reproduce correction overflow from a duplicated schema and verify the corrected provider-schema path fits.
+    rationale: Ensure prior answer context is retained while the structured response schema remains active.
+entities: []
+entity_relationships: []
+invariants:
+  - id: correction-schema-is-not-duplicated
+    description: When a provider receives the JSON response schema separately, semantic correction prompts omit the duplicate inline schema.
+    action: altered
+guidance: []

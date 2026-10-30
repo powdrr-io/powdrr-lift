@@ -574,7 +574,7 @@
       "reviewed": true
     },
     {
-      "extraction_pr": "1200",
+      "extraction_pr": "1201",
       "internal_imports": [
         "powdrr_service.planning.plan_document"
       ],

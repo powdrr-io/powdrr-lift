@@ -1,0 +1,130 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1201
+title: Move plan workflow descriptor validation into service
+intent:
+  problem: Service compilation and repair imported workflow descriptor schema and validation from the legacy plan generation module.
+  goal: Make the plan workflow descriptor record and validation service-owned while keeping the generation module's compatibility API.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/workflow_instance.py
+    type: added
+    span: {start_line: 1, end_line: 183}
+    summary: Own the plan workflow descriptor schema, record, and strict YAML validation.
+    rationale: Keep planning artifact contracts in service-owned planning code.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 16, end_line: 21}
+    summary: Import workflow descriptor rules from the service module.
+    rationale: Remove compiler dependency on legacy plan generation.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 24, end_line: 29}
+    summary: Import the workflow descriptor codec and service validation error.
+    rationale: Keep compilation tied to service-owned plan artifact contracts.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 210, end_line: 210}
+    summary: Catch workflow descriptor validation errors from the service codec.
+    rationale: Preserve useful compilation diagnostics after extraction.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 342, end_line: 342}
+    summary: Report service workflow descriptor errors during compiled plan validation.
+    rationale: Preserve validation reporting after extraction.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 14, end_line: 16}
+    summary: Validate repair workflow artifacts through the service codec.
+    rationale: Remove the repair service's direct plan generation dependency.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 32, end_line: 34}
+    summary: Add service workflow descriptor validation to repair imports.
+    rationale: Keep repair workflow parsing within the service package.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 17, end_line: 25}
+    summary: Re-export workflow descriptor types and schema from the service module.
+    rationale: Preserve existing imports during the staged migration.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 54, end_line: 55}
+    summary: Remove duplicate workflow schema and process constants.
+    rationale: Keep one canonical schema definition.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 1311, end_line: 1320}
+    summary: Remove the legacy duplicate workflow descriptor record.
+    rationale: Return the service-owned record through the compatibility module.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 1322, end_line: 1322}
+    summary: Keep local workflow descriptor file loading in the legacy integration module.
+    rationale: Preserve its existing repository file access and error behavior.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 1330, end_line: 1330}
+    summary: Retain the parser entry point and translate service validation errors.
+    rationale: Preserve the existing PlanGenerationError contract for callers.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 1332, end_line: 1334}
+    summary: Remove duplicate workflow descriptor YAML validation.
+    rationale: Ensure generation, compilation, and repair share the service validator.
+  - path: docs/architecture/agent-service-legacy-import-allowlist.json
+    type: modified
+    span: {start_line: 74, end_line: 93}
+    summary: Remove compiler and repair imports of the legacy workflow descriptor parser.
+    rationale: Align the service import allowlist with its direct dependencies.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 411, end_line: 411}
+    summary: Remove the compiler's legacy plan generation dependency.
+    rationale: Keep ownership metadata synchronized with source imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 413, end_line: 414}
+    summary: Register the compiler's service workflow descriptor dependency.
+    rationale: Keep ownership metadata synchronized with source imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 498, end_line: 498}
+    summary: Remove the repair service's legacy generation dependency.
+    rationale: Reflect service-owned workflow validation.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 500, end_line: 500}
+    summary: Register the repair service's service workflow descriptor dependency.
+    rationale: Reflect service-owned workflow validation.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 576, end_line: 586}
+    summary: Register workflow descriptor validation as service-owned planning code.
+    rationale: Track the canonical schema, record, and validator.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2847, end_line: 2848}
+    summary: Record the compatibility generation module's service codec dependency.
+    rationale: Track the retained legacy import adapter.
+  - path: tests/test_agent_service_contracts.py
+    type: modified
+    span: {start_line: 272, end_line: 294}
+    summary: Verify the legacy workflow parser and exported descriptor names route to service-owned definitions.
+    rationale: Prevent compatibility imports from growing a second validation implementation.
+entities:
+  - id: plan-workflow-descriptor-codec
+    type: Module
+    action: added
+entity_relationships: []
+invariants:
+  - id: service-owns-plan-workflow-validation
+    description: Workflow descriptor validation and its data record have one canonical service-owned implementation.
+    action: added
+  - id: legacy-plan-workflow-errors-remain-compatible
+    description: Legacy generation callers continue to receive PlanGenerationError for invalid workflow descriptors.
+    action: altered
+guidance:
+  - id: route-workflow-descriptor-callers-through-service
+    description: New planning and repair code should import workflow descriptor validation from powdrr_service.planning.workflow_instance.
+    action: added

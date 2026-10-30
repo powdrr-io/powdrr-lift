@@ -1,0 +1,333 @@
+{
+  "schema": "https://powdrr.io/schema/changelog-v2",
+  "change_id": 1218,
+  "title": "Make workspace mutations request-idempotent",
+  "intent": {
+    "problem": "Clients can lose a response after a mutation commits and retry, which can create duplicate chats/jobs or advance a job more than once.",
+    "goal": "Persist request payload digests and original typed results atomically with workspace mutations so identical retries replay safely and conflicting reuse is rejected."
+  },
+  "human-decisions": [],
+  "structured_files": [],
+  "files": [
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 9,
+        "end_line": 9
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 87,
+        "end_line": 93
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 107,
+        "end_line": 113
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 137,
+        "end_line": 156
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 196,
+        "end_line": 246
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 249,
+        "end_line": 249
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 252,
+        "end_line": 257
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 271,
+        "end_line": 285
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 328,
+        "end_line": 328
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 337,
+        "end_line": 343
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 352,
+        "end_line": 356
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 380,
+        "end_line": 395
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 404,
+        "end_line": 404
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 415,
+        "end_line": 421
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 424,
+        "end_line": 434
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 445,
+        "end_line": 445
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 453,
+        "end_line": 462
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 481,
+        "end_line": 481
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 484,
+        "end_line": 493
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 548,
+        "end_line": 548
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 556,
+        "end_line": 562
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 566,
+        "end_line": 568
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 623,
+        "end_line": 633
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 665,
+        "end_line": 665
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 673,
+        "end_line": 680
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 684,
+        "end_line": 688
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 724,
+        "end_line": 734
+      },
+      "summary": "Persist idempotency keys and original mutation results in SQLite schema v3.",
+      "rationale": "Make identical command retries replay the original typed result and reject request ID reuse with a different payload."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 10,
+        "end_line": 10
+      },
+      "summary": "Verify durable retry replay, conflicting reuse, concurrent requests, and migration compatibility.",
+      "rationale": "Ensure request handling remains exactly-once across transactions, retries, and concurrent callers."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 251,
+        "end_line": 251
+      },
+      "summary": "Verify durable retry replay, conflicting reuse, concurrent requests, and migration compatibility.",
+      "rationale": "Ensure request handling remains exactly-once across transactions, retries, and concurrent callers."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 296,
+        "end_line": 396
+      },
+      "summary": "Verify durable retry replay, conflicting reuse, concurrent requests, and migration compatibility.",
+      "rationale": "Ensure request handling remains exactly-once across transactions, retries, and concurrent callers."
+    }
+  ],
+  "entities": [
+    {
+      "id": "local-ui-workspace-store",
+      "type": "Class",
+      "action": "modified"
+    },
+    {
+      "id": "workspace-command-request-table",
+      "type": "Table",
+      "action": "added"
+    },
+    {
+      "id": "workspace-schema-v3-migration",
+      "type": "Migration",
+      "action": "added"
+    }
+  ],
+  "entity_relationships": [],
+  "invariants": [],
+  "guidance": []
+}

@@ -208,6 +208,45 @@ def test_legacy_planning_imports_reexport_service_owned_implementations() -> Non
     assert legacy_compile_plan is compile_plan
 
 
+def test_legacy_planning_driver_adapts_the_service_owned_machine() -> None:
+    from powdrr_service.planning.driver import (
+        SourceLedgerQuestionMachine as ServiceQuestionMachine,
+    )
+
+    from powdrr_lift.workrr.planning.driver import (
+        SourceLedgerQuestionMachine as LegacyQuestionMachine,
+    )
+
+    assert issubclass(LegacyQuestionMachine, ServiceQuestionMachine)
+
+
+def test_legacy_plan_sizing_reexports_service_owned_policy() -> None:
+    from powdrr_service.planning import plan_sizing as service_plan_sizing
+
+    from powdrr_lift.workrr import plan_sizing as legacy_plan_sizing
+
+    assert legacy_plan_sizing.__all__ == service_plan_sizing.__all__
+    for name in service_plan_sizing.__all__:
+        assert getattr(legacy_plan_sizing, name) is getattr(service_plan_sizing, name)
+
+
+def test_legacy_plan_record_names_reexport_service_owned_models() -> None:
+    from powdrr_service.planning.plan_models import (
+        PlannedWorkItem,
+        ReviewedExecutionPlan,
+    )
+
+    from powdrr_lift.workrr.github_issue_queue import (
+        PlannedWorkItem as LegacyPlannedWorkItem,
+    )
+    from powdrr_lift.workrr.github_issue_queue import (
+        ReviewedExecutionPlan as LegacyReviewedExecutionPlan,
+    )
+
+    assert LegacyPlannedWorkItem is PlannedWorkItem
+    assert LegacyReviewedExecutionPlan is ReviewedExecutionPlan
+
+
 def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:
     from powdrr_local.planning.checkpoints import (
         GitHubCommentCheckpointStore,

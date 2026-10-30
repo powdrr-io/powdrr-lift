@@ -23,6 +23,7 @@ from typing import Any
 from urllib.parse import quote
 
 import yaml
+from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 
 QUEUE_SCHEMA = "https://powdrr.io/schemas/github-issue-execution-plan-v1"
 QUEUE_LABELS = {
@@ -60,32 +61,6 @@ _PLAN_ADJUSTABLE_FIELDS = {
 }
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 _GITHUB_STATUS_SETTLE_SECONDS = 1.0
-
-
-@dataclass(frozen=True, slots=True)
-class PlannedWorkItem:
-    item_id: str
-    title: str
-    objective: str
-    scope: tuple[str, ...]
-    acceptance_criteria: tuple[str, ...]
-    dependencies: tuple[str, ...]
-    workflow_directory: str | None
-    workflow_id: str
-    workflow_file: str | None = None
-    implementation_steps: tuple[str, ...] = ()
-    allowed_paths: tuple[str, ...] = (".",)
-    manual_prerequisite: Mapping[str, Any] | None = None
-    inline_adjustments: tuple[Mapping[str, Any], ...] = ()
-    github_issue_number: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ReviewedExecutionPlan:
-    plan_id: str
-    items: tuple[PlannedWorkItem, ...]
-    source_document: str | None = None
-    planning: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)

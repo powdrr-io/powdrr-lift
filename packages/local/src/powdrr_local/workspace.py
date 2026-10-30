@@ -6,6 +6,7 @@ job projections, and ordered events; opening it never starts or resumes work.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from collections.abc import Iterator, Sequence
@@ -83,7 +84,13 @@ CREATE INDEX conversation_repository ON conversations(repository_id, updated_at)
 CREATE INDEX message_conversation ON messages(conversation_id, sequence);
 CREATE INDEX job_repository ON jobs(repository_id, state, updated_at);
 CREATE INDEX event_repository ON events(repository_id, sequence);
-PRAGMA user_version = 2;
+CREATE TABLE command_requests (
+    repository_id TEXT NOT NULL, request_id TEXT NOT NULL,
+    payload_digest TEXT NOT NULL, result_type TEXT NOT NULL,
+    result_json TEXT NOT NULL, created_at TEXT NOT NULL,
+    PRIMARY KEY(repository_id, request_id)
+);
+PRAGMA user_version = 3;
 """
 
 
@@ -95,6 +102,13 @@ def _required(value: str, name: str) -> str:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _request_digest(command: dict[str, Any]) -> str:
+    canonical = json.dumps(
+        command, sort_keys=True, separators=(",", ":"), allow_nan=False
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 class WorkspaceStore:
@@ -120,8 +134,26 @@ class WorkspaceStore:
                         "ALTER TABLE conversations ADD COLUMN revision INTEGER "
                         "NOT NULL DEFAULT 1"
                     )
-                    db.execute("PRAGMA user_version = 2")
-            elif version != 2:
+                    db.execute(
+                        "CREATE TABLE command_requests ("
+                        "repository_id TEXT NOT NULL, request_id TEXT NOT NULL, "
+                        "payload_digest TEXT NOT NULL, result_type TEXT NOT NULL, "
+                        "result_json TEXT NOT NULL, created_at TEXT NOT NULL, "
+                        "PRIMARY KEY(repository_id, request_id))"
+                    )
+                    db.execute("PRAGMA user_version = 3")
+            elif version == 2:
+                db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 2:
+                    db.execute(
+                        "CREATE TABLE command_requests ("
+                        "repository_id TEXT NOT NULL, request_id TEXT NOT NULL, "
+                        "payload_digest TEXT NOT NULL, result_type TEXT NOT NULL, "
+                        "result_json TEXT NOT NULL, created_at TEXT NOT NULL, "
+                        "PRIMARY KEY(repository_id, request_id))"
+                    )
+                    db.execute("PRAGMA user_version = 3")
+            elif version != 3:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
 
     @contextmanager
@@ -161,11 +193,68 @@ class WorkspaceStore:
         assert cursor.lastrowid is not None
         return cursor.lastrowid
 
-    def create_conversation(self, repository_id: str, title: str) -> Conversation:
+    @staticmethod
+    def _replay_request(
+        db: sqlite3.Connection,
+        repository_id: str,
+        request_id: str | None,
+        command: dict[str, Any],
+        result_type: str,
+    ) -> dict[str, Any] | None:
+        if request_id is None:
+            return None
+        _required(request_id, "request_id")
+        row = db.execute(
+            "SELECT payload_digest,result_type,result_json FROM command_requests "
+            "WHERE repository_id=? AND request_id=?",
+            (repository_id, request_id),
+        ).fetchone()
+        if row is None:
+            return None
+        if row["payload_digest"] != _request_digest(command):
+            raise WorkspaceConflict("Request ID was reused with different content")
+        if row["result_type"] != result_type:
+            raise WorkspaceConflict("Request ID was reused for a different command")
+        return json.loads(row["result_json"])
+
+    @staticmethod
+    def _record_request(
+        db: sqlite3.Connection,
+        repository_id: str,
+        request_id: str | None,
+        command: dict[str, Any],
+        result_type: str,
+        result: dict[str, Any],
+        timestamp: str,
+    ) -> None:
+        if request_id is None:
+            return
+        db.execute(
+            "INSERT INTO command_requests VALUES (?,?,?,?,?,?)",
+            (
+                repository_id,
+                request_id,
+                _request_digest(command),
+                result_type,
+                json.dumps(result, sort_keys=True, separators=(",", ":")),
+                timestamp,
+            ),
+        )
+
+    def create_conversation(
+        self, repository_id: str, title: str, *, request_id: str | None = None
+    ) -> Conversation:
         _required(repository_id, "repository_id")
         _required(title, "title")
+        command = {"operation": "conversation.create", "title": title}
         identity, timestamp = uuid4().hex, _now()
         with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            replay = self._replay_request(
+                db, repository_id, request_id, command, "conversation"
+            )
+            if replay is not None:
+                return Conversation.from_dict(replay)
             db.execute(
                 "INSERT INTO conversations VALUES (?,?,?,?,?,?,?)",
                 (identity, repository_id, title, "[]", timestamp, timestamp, 1),
@@ -179,7 +268,21 @@ class WorkspaceStore:
                 {"title": title},
                 timestamp,
             )
-        return self.get_conversation(identity)
+            result = self._conversation(
+                db.execute(
+                    "SELECT * FROM conversations WHERE conversation_id=?", (identity,)
+                ).fetchone()
+            )
+            self._record_request(
+                db,
+                repository_id,
+                request_id,
+                command,
+                "conversation",
+                result.to_dict(),
+                timestamp,
+            )
+            return result
 
     @staticmethod
     def _conversation(row: sqlite3.Row | None) -> Conversation:
@@ -222,6 +325,7 @@ class WorkspaceStore:
         title: str,
         expected_revision: int,
         specification_refs: Sequence[str] | None = None,
+        request_id: str | None = None,
     ) -> Conversation:
         _required(title, "title")
         refs = tuple(
@@ -230,6 +334,13 @@ class WorkspaceStore:
                 for ref in (specification_refs or ())
             )
         )
+        command = {
+            "operation": "conversation.update",
+            "conversation_id": conversation_id,
+            "title": title,
+            "expected_revision": expected_revision,
+            "specification_refs": (None if specification_refs is None else list(refs)),
+        }
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
             conversation = self._conversation(
@@ -238,6 +349,11 @@ class WorkspaceStore:
                     (conversation_id,),
                 ).fetchone()
             )
+            replay = self._replay_request(
+                db, conversation.repository_id, request_id, command, "conversation"
+            )
+            if replay is not None:
+                return Conversation.from_dict(replay)
             if conversation.revision != expected_revision:
                 raise WorkspaceConflict("Conversation revision has changed")
             if specification_refs is None:
@@ -261,7 +377,22 @@ class WorkspaceStore:
                 },
                 timestamp,
             )
-        return self.get_conversation(conversation_id)
+            result = self._conversation(
+                db.execute(
+                    "SELECT * FROM conversations WHERE conversation_id=?",
+                    (conversation_id,),
+                ).fetchone()
+            )
+            self._record_request(
+                db,
+                conversation.repository_id,
+                request_id,
+                command,
+                "conversation",
+                result.to_dict(),
+                timestamp,
+            )
+            return result
 
     def append_message(
         self,
@@ -270,6 +401,7 @@ class WorkspaceStore:
         message_id: str,
         role: str,
         content: str,
+        request_id: str | None = None,
     ) -> Message:
         """A retried submission with the same ID creates one message and event."""
         _required(message_id, "message_id")
@@ -280,8 +412,26 @@ class WorkspaceStore:
             raise ValueError("Unsupported message role") from error
         if role not in MessageRole:
             raise ValueError("Unsupported message role")
+        command = {
+            "operation": "message.append",
+            "conversation_id": conversation_id,
+            "message_id": message_id,
+            "role": role.value,
+            "content": content,
+        }
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
+            conversation = self._conversation(
+                db.execute(
+                    "SELECT * FROM conversations WHERE conversation_id=?",
+                    (conversation_id,),
+                ).fetchone()
+            )
+            replay = self._replay_request(
+                db, conversation.repository_id, request_id, command, "message"
+            )
+            if replay is not None:
+                return Message.from_dict(replay)
             row = db.execute(
                 "SELECT * FROM messages WHERE message_id=?", (message_id,)
             ).fetchone()
@@ -292,7 +442,7 @@ class WorkspaceStore:
                     content,
                 ):
                     raise WorkspaceConflict("Message ID already has different content")
-                return Message(
+                result = Message(
                     row["message_id"],
                     row["conversation_id"],
                     MessageRole(row["role"]),
@@ -300,12 +450,16 @@ class WorkspaceStore:
                     row["created_at"],
                     row["sequence"],
                 )
-            conversation = self._conversation(
-                db.execute(
-                    "SELECT * FROM conversations WHERE conversation_id=?",
-                    (conversation_id,),
-                ).fetchone()
-            )
+                self._record_request(
+                    db,
+                    conversation.repository_id,
+                    request_id,
+                    command,
+                    "message",
+                    result.to_dict(),
+                    _now(),
+                )
+                return result
             timestamp = _now()
             sequence = self._event(
                 db,
@@ -324,9 +478,19 @@ class WorkspaceStore:
                 "UPDATE conversations SET updated_at=? WHERE conversation_id=?",
                 (timestamp, conversation_id),
             )
-            return Message(
+            result = Message(
                 message_id, conversation_id, role, content, timestamp, sequence
             )
+            self._record_request(
+                db,
+                conversation.repository_id,
+                request_id,
+                command,
+                "message",
+                result.to_dict(),
+                timestamp,
+            )
+            return result
 
     def list_messages(self, conversation_id: str) -> tuple[Message, ...]:
         with self._connection() as db:
@@ -381,6 +545,7 @@ class WorkspaceStore:
         title: str,
         conversation_id: str | None = None,
         dependency_ids: Sequence[str] = (),
+        request_id: str | None = None,
     ) -> Job:
         _required(repository_id, "repository_id")
         _required(title, "title")
@@ -388,9 +553,19 @@ class WorkspaceStore:
             kind = JobKind(kind)
         except (TypeError, ValueError) as error:
             raise ValueError("Unsupported job kind") from error
+        command = {
+            "operation": "job.create",
+            "kind": kind.value,
+            "title": title,
+            "conversation_id": conversation_id,
+            "dependency_ids": list(dependency_ids),
+        }
         identity, timestamp = uuid4().hex, _now()
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
+            replay = self._replay_request(db, repository_id, request_id, command, "job")
+            if replay is not None:
+                return Job.from_dict(replay)
             if conversation_id is not None:
                 conversation = self._conversation(
                     db.execute(
@@ -445,7 +620,17 @@ class WorkspaceStore:
                 },
                 timestamp,
             )
-            return self._job(db, identity)
+            result = self._job(db, identity)
+            self._record_request(
+                db,
+                repository_id,
+                request_id,
+                command,
+                "job",
+                result.to_dict(),
+                timestamp,
+            )
+            return result
 
     def get_job(self, job_id: str) -> Job:
         with self._connection() as db:
@@ -477,6 +662,7 @@ class WorkspaceStore:
         state: JobState,
         detail: str = "",
         artifact_refs: Sequence[str] | None = None,
+        request_id: str | None = None,
     ) -> Job:
         state = JobState(state)
         refs = tuple(
@@ -484,9 +670,22 @@ class WorkspaceStore:
                 _required(ref, "artifact_ref") for ref in (artifact_refs or ())
             )
         )
+        command = {
+            "operation": "job.transition",
+            "job_id": job_id,
+            "expected_revision": expected_revision,
+            "state": state.value,
+            "detail": detail,
+            "artifact_refs": None if artifact_refs is None else list(refs),
+        }
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
             job = self._job(db, job_id)
+            replay = self._replay_request(
+                db, job.repository_id, request_id, command, "job"
+            )
+            if replay is not None:
+                return Job.from_dict(replay)
             if artifact_refs is None:
                 refs = job.artifact_refs
             if job.revision != expected_revision:
@@ -522,7 +721,17 @@ class WorkspaceStore:
             )
             if state == JobState.SUCCEEDED:
                 self._release_dependents(db, job_id, timestamp)
-            return self._job(db, job_id)
+            result = self._job(db, job_id)
+            self._record_request(
+                db,
+                job.repository_id,
+                request_id,
+                command,
+                "job",
+                result.to_dict(),
+                timestamp,
+            )
+            return result
 
     def _release_dependents(
         self,

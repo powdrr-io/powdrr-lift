@@ -16,6 +16,15 @@ from pathlib import Path, PurePosixPath
 from typing import Any, TextIO
 
 import yaml
+from powdrr_service.planning.multipr_structrr import (
+    active_decision_drift_findings,
+    inherited_decision_records,
+    load_multi_pr_proposal,
+    rebase_final_plan_state,
+    rebase_item_proposal,
+    reconcile_item_candidate,
+    structural_repair_findings,
+)
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
@@ -146,15 +155,6 @@ from powdrr_lift.workrr.llm import (
     workflow_action_failure_signature,
     workflow_action_signature,
     workflow_action_summary,
-)
-from powdrr_lift.workrr.multipr_structrr import (
-    active_decision_drift_findings,
-    inherited_decision_records,
-    load_multi_pr_proposal,
-    rebase_final_plan_state,
-    rebase_item_proposal,
-    reconcile_item_candidate,
-    structural_repair_findings,
 )
 from powdrr_lift.workrr.observer import (
     ObserverActionRecommendation,

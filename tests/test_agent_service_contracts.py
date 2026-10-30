@@ -197,17 +197,6 @@ def test_legacy_service_imports_are_explicitly_owned() -> None:
     assert all(entry["owner_pr"] > 0 for entry in allowlist["entries"])
 
 
-def test_legacy_planning_imports_reexport_service_owned_implementations() -> None:
-    from powdrr_service.planning.assembly import PlannedWrite
-    from powdrr_service.planning.compiler import compile_plan
-
-    from powdrr_lift.workrr.planning.assembly import PlannedWrite as LegacyPlannedWrite
-    from powdrr_lift.workrr.planning.compiler import compile_plan as legacy_compile_plan
-
-    assert LegacyPlannedWrite is PlannedWrite
-    assert legacy_compile_plan is compile_plan
-
-
 def test_legacy_planning_driver_adapts_the_service_owned_machine() -> None:
     from powdrr_service.planning.driver import (
         SourceLedgerQuestionMachine as ServiceQuestionMachine,
@@ -220,14 +209,25 @@ def test_legacy_planning_driver_adapts_the_service_owned_machine() -> None:
     assert issubclass(LegacyQuestionMachine, ServiceQuestionMachine)
 
 
-def test_legacy_plan_sizing_reexports_service_owned_policy() -> None:
-    from powdrr_service.planning import plan_sizing as service_plan_sizing
+def test_service_owned_planning_has_no_agent_reexport_modules() -> None:
+    repository = Path(__file__).parents[1]
+    legacy_reexports = (
+        "src/powdrr_lift/workrr/plan_sizing.py",
+        "src/powdrr_lift/workrr/multipr_structrr.py",
+        "src/powdrr_lift/workrr/planning/assembly.py",
+        "src/powdrr_lift/workrr/planning/compiler.py",
+        "src/powdrr_lift/workrr/planning/contracts.py",
+        "src/powdrr_lift/workrr/planning/dependencies.py",
+        "src/powdrr_lift/workrr/planning/questions.py",
+        "src/powdrr_lift/workrr/planning/repair.py",
+        "src/powdrr_lift/workrr/planning/repair_service.py",
+        "src/powdrr_lift/workrr/planning/service.py",
+        "src/powdrr_lift/workrr/planning/structrr.py",
+    )
 
-    from powdrr_lift.workrr import plan_sizing as legacy_plan_sizing
-
-    assert legacy_plan_sizing.__all__ == service_plan_sizing.__all__
-    for name in service_plan_sizing.__all__:
-        assert getattr(legacy_plan_sizing, name) is getattr(service_plan_sizing, name)
+    assert all(
+        not (repository / relative_path).exists() for relative_path in legacy_reexports
+    )
 
 
 def test_legacy_plan_record_names_reexport_service_owned_models() -> None:
@@ -290,16 +290,6 @@ def test_legacy_plan_workflow_parser_uses_service_owned_validation() -> None:
         github_issue_plan_generation._parse_plan_workflow_instance_yaml
         is workflow_instance.parse_plan_workflow_instance_yaml
     )
-
-
-def test_legacy_multipr_structrr_reexports_service_owned_policy() -> None:
-    from powdrr_service.planning import multipr_structrr as service_multipr
-
-    from powdrr_lift.workrr import multipr_structrr as legacy_multipr
-
-    assert legacy_multipr.__all__ == service_multipr.__all__
-    for name in service_multipr.__all__:
-        assert getattr(legacy_multipr, name) is getattr(service_multipr, name)
 
 
 def test_local_checkpoint_persistence_is_owned_by_local_adapter() -> None:

@@ -5,13 +5,13 @@ import json
 from typing import Any
 
 import pytest
+from powdrr_service.planning.multipr_structrr import inherited_decision_records
 
 from powdrr_lift.workrr.decision_continuity import (
     decision_continuity_findings,
     review_inherited_decisions,
 )
 from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
-from powdrr_lift.workrr.multipr_structrr import inherited_decision_records
 
 
 def test_inherited_decision_inventory_uses_structrr_baseline_only() -> None:

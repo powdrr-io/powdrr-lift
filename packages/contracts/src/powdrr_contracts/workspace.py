@@ -53,6 +53,7 @@ class QuestionState(StrEnum):
 
 
 class EventType(StrEnum):
+    REPOSITORY_REGISTERED = "repository.registered"
     CONVERSATION_CREATED = "conversation.created"
     CONVERSATION_UPDATED = "conversation.updated"
     MESSAGE_CREATED = "message.created"
@@ -348,5 +349,44 @@ class WorkspaceEvent:
             _validate_id(data["entity_id"], "entity_id"),
             event_type,
             data["payload"],
+            _validate_text(data["created_at"], "created_at"),
+        )
+
+
+@dataclass(frozen=True)
+class WorkspaceRepository:
+    repository_id: str
+    display_name: str
+    canonical_root: str
+    created_at: str
+
+    def to_public_dict(self) -> dict[str, Any]:
+        """Return browser-safe fields without the local filesystem path."""
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "repository_id": self.repository_id,
+            "display_name": self.display_name,
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "repository_id": self.repository_id,
+            "display_name": self.display_name,
+            "canonical_root": self.canonical_root,
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {"repository_id", "display_name", "canonical_root", "created_at"},
+            "workspace repository",
+        )
+        return cls(
+            _validate_id(data["repository_id"], "repository_id"),
+            _validate_text(data["display_name"], "display_name"),
+            _validate_text(data["canonical_root"], "canonical_root"),
             _validate_text(data["created_at"], "created_at"),
         )

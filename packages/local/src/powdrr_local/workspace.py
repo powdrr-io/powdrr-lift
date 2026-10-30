@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import subprocess
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -25,6 +26,7 @@ from powdrr_contracts.workspace import (
     Message,
     MessageRole,
     WorkspaceEvent,
+    WorkspaceRepository,
 )
 
 
@@ -90,8 +92,18 @@ CREATE TABLE command_requests (
     result_json TEXT NOT NULL, created_at TEXT NOT NULL,
     PRIMARY KEY(repository_id, request_id)
 );
-PRAGMA user_version = 3;
+CREATE TABLE repositories (
+    repository_id TEXT PRIMARY KEY, display_name TEXT NOT NULL,
+    canonical_root TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL
+);
+PRAGMA user_version = 4;
 """
+
+_REPOSITORY_TABLE = (
+    "CREATE TABLE repositories ("
+    "repository_id TEXT PRIMARY KEY, display_name TEXT NOT NULL, "
+    "canonical_root TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)"
+)
 
 
 def _required(value: str, name: str) -> str:
@@ -141,7 +153,8 @@ class WorkspaceStore:
                         "result_json TEXT NOT NULL, created_at TEXT NOT NULL, "
                         "PRIMARY KEY(repository_id, request_id))"
                     )
-                    db.execute("PRAGMA user_version = 3")
+                    db.execute(_REPOSITORY_TABLE)
+                    db.execute("PRAGMA user_version = 4")
             elif version == 2:
                 db.execute("BEGIN IMMEDIATE")
                 if db.execute("PRAGMA user_version").fetchone()[0] == 2:
@@ -152,8 +165,14 @@ class WorkspaceStore:
                         "result_json TEXT NOT NULL, created_at TEXT NOT NULL, "
                         "PRIMARY KEY(repository_id, request_id))"
                     )
-                    db.execute("PRAGMA user_version = 3")
-            elif version != 3:
+                    db.execute(_REPOSITORY_TABLE)
+                    db.execute("PRAGMA user_version = 4")
+            elif version == 3:
+                db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 3:
+                    db.execute(_REPOSITORY_TABLE)
+                    db.execute("PRAGMA user_version = 4")
+            elif version != 4:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
 
     @contextmanager
@@ -166,6 +185,151 @@ class WorkspaceStore:
                 yield db
         finally:
             db.close()
+
+    @staticmethod
+    def _canonical_git_root(path: str | Path) -> Path:
+        try:
+            candidate = Path(path).expanduser().resolve(strict=True)
+        except OSError as error:
+            raise ValueError("Repository path does not exist") from error
+        if not candidate.is_dir():
+            raise ValueError("Repository path must be a directory")
+        try:
+            result = subprocess.run(
+                ["git", "-C", str(candidate), "rev-parse", "--show-toplevel"],
+                capture_output=True,
+                check=False,
+                encoding="utf-8",
+                errors="replace",
+                timeout=10,
+            )
+        except FileNotFoundError as error:
+            raise RuntimeError(
+                "Git must be installed to register a repository"
+            ) from error
+        except subprocess.TimeoutExpired as error:
+            raise ValueError("Timed out while validating the Git repository") from error
+        if result.returncode != 0:
+            raise ValueError("Path is not inside a Git working tree")
+        try:
+            root = Path(result.stdout.strip()).resolve(strict=True)
+        except OSError as error:
+            raise ValueError(
+                "Git returned a repository root that does not exist"
+            ) from error
+        if not root.is_dir():
+            raise ValueError("Git repository root must be a directory")
+        return root
+
+    @staticmethod
+    def _repository(row: sqlite3.Row | None) -> WorkspaceRepository:
+        if row is None:
+            raise KeyError("Repository is not registered")
+        return WorkspaceRepository(
+            row["repository_id"],
+            row["display_name"],
+            row["canonical_root"],
+            row["created_at"],
+        )
+
+    def register_repository(
+        self,
+        path: str | Path,
+        *,
+        display_name: str | None = None,
+        request_id: str | None = None,
+    ) -> WorkspaceRepository:
+        """Explicitly register a Git working tree and assign its opaque ID."""
+        root = self._canonical_git_root(path)
+        name = _required(
+            root.name or str(root) if display_name is None else display_name,
+            "display_name",
+        )
+        command = {
+            "operation": "repository.register",
+            "canonical_root": str(root),
+            "display_name": name,
+        }
+        timestamp = _now()
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            replay = self._replay_request(
+                db, "__registry__", request_id, command, "repository"
+            )
+            if replay is not None:
+                return WorkspaceRepository.from_dict(replay)
+            existing = db.execute(
+                "SELECT * FROM repositories WHERE canonical_root=?", (str(root),)
+            ).fetchone()
+            if existing is not None:
+                repository = self._repository(existing)
+                if repository.display_name != name:
+                    raise WorkspaceConflict(
+                        "Repository root is already registered with another "
+                        "display name"
+                    )
+                self._record_request(
+                    db,
+                    "__registry__",
+                    request_id,
+                    command,
+                    "repository",
+                    repository.to_dict(),
+                    timestamp,
+                )
+                return repository
+
+            repository_id = uuid4().hex
+            db.execute(
+                "INSERT INTO repositories VALUES (?,?,?,?)",
+                (repository_id, name, str(root), timestamp),
+            )
+            self._event(
+                db,
+                repository_id,
+                "repository",
+                repository_id,
+                EventType.REPOSITORY_REGISTERED,
+                {"display_name": name},
+                timestamp,
+            )
+            repository = WorkspaceRepository(repository_id, name, str(root), timestamp)
+            self._record_request(
+                db,
+                "__registry__",
+                request_id,
+                command,
+                "repository",
+                repository.to_dict(),
+                timestamp,
+            )
+            return repository
+
+    def get_repository(self, repository_id: str) -> WorkspaceRepository:
+        with self._connection() as db:
+            return self._repository(
+                db.execute(
+                    "SELECT * FROM repositories WHERE repository_id=?",
+                    (repository_id,),
+                ).fetchone()
+            )
+
+    def list_repositories(self) -> tuple[WorkspaceRepository, ...]:
+        with self._connection() as db:
+            return tuple(
+                self._repository(row)
+                for row in db.execute(
+                    "SELECT * FROM repositories ORDER BY display_name,repository_id"
+                )
+            )
+
+    def resolve_repository_root(self, repository_id: str) -> Path:
+        """Resolve an opaque registry ID and reject a moved or replaced root."""
+        repository = self.get_repository(repository_id)
+        current_root = self._canonical_git_root(repository.canonical_root)
+        if str(current_root) != repository.canonical_root:
+            raise ValueError("Registered repository root changed; register it again")
+        return current_root
 
     @staticmethod
     def _event(

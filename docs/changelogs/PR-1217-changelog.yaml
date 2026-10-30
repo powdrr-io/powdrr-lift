@@ -1,0 +1,493 @@
+{
+  "schema": "https://powdrr.io/schema/changelog-v2",
+  "change_id": 1217,
+  "title": "Add versioned workspace contracts and migration",
+  "intent": {
+    "problem": "The next browser workspace packages need strict durable records and revision-safe updates while retaining compatibility with existing databases.",
+    "goal": "Add typed versioned workspace contracts and migrate schema v1 conversations to revision-aware schema v2 without changing existing records or event cursors."
+  },
+  "human-decisions": [],
+  "structured_files": [],
+  "files": [
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 1,
+        "end_line": 1
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 3,
+        "end_line": 6
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 9,
+        "end_line": 18
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 26,
+        "end_line": 26
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 33,
+        "end_line": 117
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 126,
+        "end_line": 166
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 173,
+        "end_line": 173
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 178,
+        "end_line": 218
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 224,
+        "end_line": 224
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 235,
+        "end_line": 296
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 304,
+        "end_line": 304
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 307,
+        "end_line": 352
+      },
+      "summary": "Add typed, versioned workspace records with strict JSON validation.",
+      "rationale": "Give future API and worker adapters stable, transport-independent records and reject malformed or unsupported payloads."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 20,
+        "end_line": 20
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 22,
+        "end_line": 22
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 25,
+        "end_line": 25
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 39,
+        "end_line": 39
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 46,
+        "end_line": 46
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 57,
+        "end_line": 57
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 86,
+        "end_line": 86
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 116,
+        "end_line": 124
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 148,
+        "end_line": 148
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 170,
+        "end_line": 171
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 195,
+        "end_line": 195
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 223,
+        "end_line": 223
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 241,
+        "end_line": 242
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 247,
+        "end_line": 248
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 257,
+        "end_line": 261
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 277,
+        "end_line": 281
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 295,
+        "end_line": 302
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 334,
+        "end_line": 341
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 364,
+        "end_line": 364
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 387,
+        "end_line": 390
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 417,
+        "end_line": 417
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 439,
+        "end_line": 440
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 516,
+        "end_line": 516
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 558,
+        "end_line": 558
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 579,
+        "end_line": 579
+      },
+      "summary": "Migrate workspace storage to schema v2 and enforce revision-aware conversation updates.",
+      "rationale": "Preserve existing persisted history while preventing stale clients from overwriting conversation metadata."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 1,
+        "end_line": 1
+      },
+      "summary": "Verify versioned contracts, stale updates, external-wait state, and migration preservation.",
+      "rationale": "Protect storage compatibility and concurrency behavior with observable contract and migration checks."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 3,
+        "end_line": 3
+      },
+      "summary": "Verify versioned contracts, stale updates, external-wait state, and migration preservation.",
+      "rationale": "Protect storage compatibility and concurrency behavior with observable contract and migration checks."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 7,
+        "end_line": 15
+      },
+      "summary": "Verify versioned contracts, stale updates, external-wait state, and migration preservation.",
+      "rationale": "Protect storage compatibility and concurrency behavior with observable contract and migration checks."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 29,
+        "end_line": 29
+      },
+      "summary": "Verify versioned contracts, stale updates, external-wait state, and migration preservation.",
+      "rationale": "Protect storage compatibility and concurrency behavior with observable contract and migration checks."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 32,
+        "end_line": 35
+      },
+      "summary": "Verify versioned contracts, stale updates, external-wait state, and migration preservation.",
+      "rationale": "Protect storage compatibility and concurrency behavior with observable contract and migration checks."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 50,
+        "end_line": 50
+      },
+      "summary": "Verify versioned contracts, stale updates, external-wait state, and migration preservation.",
+      "rationale": "Protect storage compatibility and concurrency behavior with observable contract and migration checks."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 190,
+        "end_line": 294
+      },
+      "summary": "Verify versioned contracts, stale updates, external-wait state, and migration preservation.",
+      "rationale": "Protect storage compatibility and concurrency behavior with observable contract and migration checks."
+    }
+  ],
+  "entities": [
+    {
+      "id": "ui-workspace-records",
+      "type": "Module",
+      "action": "modified"
+    },
+    {
+      "id": "local-ui-workspace-store",
+      "type": "Class",
+      "action": "modified"
+    },
+    {
+      "id": "workspace-job-kind",
+      "type": "Enum",
+      "action": "added"
+    },
+    {
+      "id": "workspace-message-role",
+      "type": "Enum",
+      "action": "added"
+    },
+    {
+      "id": "workspace-turn-state",
+      "type": "Enum",
+      "action": "added"
+    },
+    {
+      "id": "workspace-question-state",
+      "type": "Enum",
+      "action": "added"
+    },
+    {
+      "id": "workspace-event-type",
+      "type": "Enum",
+      "action": "added"
+    }
+  ],
+  "entity_relationships": [],
+  "invariants": [],
+  "guidance": []
+}

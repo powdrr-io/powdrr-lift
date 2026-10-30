@@ -1,8 +1,18 @@
+import sqlite3
 from concurrent.futures import ThreadPoolExecutor
+from math import nan
 from pathlib import Path
 
 import pytest
-from powdrr_contracts.workspace import JobState
+from powdrr_contracts.workspace import (
+    Conversation,
+    EventType,
+    JobState,
+    Message,
+    MessageRole,
+    WorkspaceContractError,
+    WorkspaceEvent,
+)
 from powdrr_local.workspace import WorkspaceConflict, WorkspaceStore
 
 
@@ -16,9 +26,13 @@ def test_conversations_messages_and_spec_links_survive_reopening(
     store.update_conversation(
         chat.conversation_id,
         title="Design search",
+        expected_revision=chat.revision,
         specification_refs=["docs/proposals/search/spec.yaml"],
     )
-    store.update_conversation(chat.conversation_id, title="Design search")
+    updated = store.get_conversation(chat.conversation_id)
+    store.update_conversation(
+        chat.conversation_id, title="Design search", expected_revision=updated.revision
+    )
     first = store.append_message(
         chat.conversation_id, message_id="user-1", role="user", content="Add search."
     )
@@ -33,6 +47,7 @@ def test_conversations_messages_and_spec_links_survive_reopening(
     assert len(chats) == 1
     assert chats[0].title == "Design search"
     assert chats[0].specification_refs == ("docs/proposals/search/spec.yaml",)
+    assert chats[0].revision == 3
     assert reopened.list_messages(chat.conversation_id) == (first, second)
     assert first.sequence < second.sequence
 
@@ -172,3 +187,108 @@ def test_invalid_links_do_not_leave_partial_jobs_or_events(tmp_path: Path) -> No
         )
     assert store.list_jobs("repo") == ()
     assert store.read_events("repo") == ()
+
+
+def test_conversation_updates_require_the_current_revision(tmp_path: Path) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    chat = store.create_conversation("repo", "Feature")
+    store.update_conversation(
+        chat.conversation_id, title="Renamed", expected_revision=chat.revision
+    )
+    before = store.read_events("repo")
+    with pytest.raises(WorkspaceConflict):
+        store.update_conversation(
+            chat.conversation_id, title="Stale rename", expected_revision=chat.revision
+        )
+    assert store.get_conversation(chat.conversation_id).title == "Renamed"
+    assert store.read_events("repo") == before
+
+
+def test_version_one_database_migrates_without_changing_existing_records(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace-v1.db"
+    with sqlite3.connect(path) as db:
+        db.executescript(
+            "CREATE TABLE conversations (conversation_id TEXT PRIMARY KEY, "
+            "repository_id TEXT NOT NULL, title TEXT NOT NULL, "
+            "specification_refs TEXT NOT NULL, created_at TEXT NOT NULL, "
+            "updated_at TEXT NOT NULL); "
+            "CREATE TABLE events (sequence INTEGER PRIMARY KEY AUTOINCREMENT, "
+            "repository_id TEXT NOT NULL, entity_type TEXT NOT NULL, "
+            "entity_id TEXT NOT NULL, event_type TEXT NOT NULL, "
+            "payload TEXT NOT NULL, created_at TEXT NOT NULL); "
+            "PRAGMA user_version = 1;"
+        )
+        db.execute(
+            "INSERT INTO conversations VALUES (?,?,?,?,?,?)",
+            (
+                "chat-old",
+                "repo-old",
+                "Old chat",
+                '["docs/old.yaml"]',
+                "created",
+                "updated",
+            ),
+        )
+        db.execute(
+            "INSERT INTO events VALUES (7,?,?,?,?,?,?)",
+            (
+                "repo-old",
+                "conversation",
+                "chat-old",
+                "conversation.created",
+                "{}",
+                "created",
+            ),
+        )
+    store = WorkspaceStore(path)
+    conversation = store.get_conversation("chat-old")
+    with sqlite3.connect(path) as db:
+        version = db.execute("PRAGMA user_version").fetchone()[0]
+        sequence = db.execute("SELECT sequence FROM events").fetchone()[0]
+    assert version == 2
+    assert sequence == 7
+    assert conversation.revision == 1
+    assert conversation.specification_refs == ("docs/old.yaml",)
+
+
+def test_workspace_contracts_round_trip_and_reject_unknown_fields() -> None:
+    message = Message(
+        "msg-1", "chat-1", MessageRole.USER, "Build search", "2026-01-01T00:00:00Z", 1
+    )
+    assert Message.from_dict(message.to_dict()) == message
+    conversation = Conversation(
+        "chat-1",
+        "repo-a",
+        "Search",
+        ("docs/search.yaml",),
+        "2026-01-01T00:00:00Z",
+        "2026-01-01T00:00:00Z",
+        2,
+    )
+    assert Conversation.from_dict(conversation.to_dict()) == conversation
+    malformed = message.to_dict() | {"debug": "unexpected"}
+    with pytest.raises(WorkspaceContractError, match="unexpected fields"):
+        Message.from_dict(malformed)
+
+
+def test_workspace_contracts_reject_unknown_versions_invalid_ids_and_nan() -> None:
+    message = Message(
+        "msg-1", "chat-1", MessageRole.USER, "Build search", "2026-01-01T00:00:00Z", 1
+    )
+    with pytest.raises(WorkspaceContractError, match="schema version"):
+        Message.from_dict(message.to_dict() | {"schema_version": 2})
+    with pytest.raises(WorkspaceContractError, match="opaque ID"):
+        Message.from_dict(message.to_dict() | {"message_id": "../secret"})
+    event = WorkspaceEvent(
+        1,
+        "repo-a",
+        "job",
+        "job-1",
+        EventType.JOB_UPDATED,
+        {"progress": nan},
+        "2026-01-01T00:00:00Z",
+    )
+    with pytest.raises(WorkspaceContractError, match="finite JSON"):
+        WorkspaceEvent.from_dict(event.to_dict())

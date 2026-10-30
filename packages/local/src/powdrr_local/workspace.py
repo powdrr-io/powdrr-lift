@@ -17,9 +17,12 @@ from uuid import uuid4
 
 from powdrr_contracts.workspace import (
     Conversation,
+    EventType,
     Job,
+    JobKind,
     JobState,
     Message,
+    MessageRole,
     WorkspaceEvent,
 )
 
@@ -33,12 +36,14 @@ _TRANSITIONS = {
     JobState.READY: {JobState.RUNNING, JobState.CANCELLED},
     JobState.RUNNING: {
         JobState.WAITING_FOR_INPUT,
+        JobState.WAITING_FOR_EXTERNAL,
         JobState.INTERRUPTED,
         JobState.SUCCEEDED,
         JobState.FAILED,
         JobState.CANCELLED,
     },
     JobState.WAITING_FOR_INPUT: {JobState.READY, JobState.CANCELLED},
+    JobState.WAITING_FOR_EXTERNAL: {JobState.CANCELLED},
     JobState.INTERRUPTED: {JobState.READY, JobState.CANCELLED},
     JobState.FAILED: {JobState.READY, JobState.CANCELLED},
     JobState.SUCCEEDED: set(),
@@ -49,7 +54,7 @@ _SCHEMA = """
 CREATE TABLE conversations (
     conversation_id TEXT PRIMARY KEY, repository_id TEXT NOT NULL,
     title TEXT NOT NULL, specification_refs TEXT NOT NULL,
-    created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, revision INTEGER NOT NULL
 );
 CREATE TABLE events (
     sequence INTEGER PRIMARY KEY AUTOINCREMENT, repository_id TEXT NOT NULL,
@@ -78,7 +83,7 @@ CREATE INDEX conversation_repository ON conversations(repository_id, updated_at)
 CREATE INDEX message_conversation ON messages(conversation_id, sequence);
 CREATE INDEX job_repository ON jobs(repository_id, state, updated_at);
 CREATE INDEX event_repository ON events(repository_id, sequence);
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 """
 
 
@@ -108,7 +113,15 @@ class WorkspaceStore:
                     for statement in _SCHEMA.split(";"):
                         if statement.strip():
                             db.execute(statement)
-            elif version != 1:
+            elif version == 1:
+                db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 1:
+                    db.execute(
+                        "ALTER TABLE conversations ADD COLUMN revision INTEGER "
+                        "NOT NULL DEFAULT 1"
+                    )
+                    db.execute("PRAGMA user_version = 2")
+            elif version != 2:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
 
     @contextmanager
@@ -132,6 +145,7 @@ class WorkspaceStore:
         payload: dict[str, Any],
         timestamp: str,
     ) -> int:
+        event_type = EventType(event_type).value
         cursor = db.execute(
             "INSERT INTO events(repository_id,entity_type,entity_id,event_type,"
             "payload,created_at) VALUES (?,?,?,?,?,?)",
@@ -153,8 +167,8 @@ class WorkspaceStore:
         identity, timestamp = uuid4().hex, _now()
         with self._connection() as db:
             db.execute(
-                "INSERT INTO conversations VALUES (?,?,?,?,?,?)",
-                (identity, repository_id, title, "[]", timestamp, timestamp),
+                "INSERT INTO conversations VALUES (?,?,?,?,?,?,?)",
+                (identity, repository_id, title, "[]", timestamp, timestamp, 1),
             )
             self._event(
                 db,
@@ -178,6 +192,7 @@ class WorkspaceStore:
             tuple(json.loads(row["specification_refs"])),
             row["created_at"],
             row["updated_at"],
+            row["revision"],
         )
 
     def get_conversation(self, conversation_id: str) -> Conversation:
@@ -205,6 +220,7 @@ class WorkspaceStore:
         conversation_id: str,
         *,
         title: str,
+        expected_revision: int,
         specification_refs: Sequence[str] | None = None,
     ) -> Conversation:
         _required(title, "title")
@@ -222,12 +238,14 @@ class WorkspaceStore:
                     (conversation_id,),
                 ).fetchone()
             )
+            if conversation.revision != expected_revision:
+                raise WorkspaceConflict("Conversation revision has changed")
             if specification_refs is None:
                 refs = conversation.specification_refs
             timestamp = _now()
             db.execute(
-                "UPDATE conversations SET title=?,specification_refs=?,updated_at=? "
-                "WHERE conversation_id=?",
+                "UPDATE conversations SET title=?,specification_refs=?,updated_at=?,"
+                "revision=revision+1 WHERE conversation_id=?",
                 (title, json.dumps(refs), timestamp, conversation_id),
             )
             self._event(
@@ -236,7 +254,11 @@ class WorkspaceStore:
                 "conversation",
                 conversation_id,
                 "conversation.updated",
-                {"title": title, "specification_refs": list(refs)},
+                {
+                    "title": title,
+                    "specification_refs": list(refs),
+                    "revision": conversation.revision + 1,
+                },
                 timestamp,
             )
         return self.get_conversation(conversation_id)
@@ -252,7 +274,11 @@ class WorkspaceStore:
         """A retried submission with the same ID creates one message and event."""
         _required(message_id, "message_id")
         _required(content, "content")
-        if role not in {"user", "assistant", "system"}:
+        try:
+            role = MessageRole(role)
+        except (TypeError, ValueError) as error:
+            raise ValueError("Unsupported message role") from error
+        if role not in MessageRole:
             raise ValueError("Unsupported message role")
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -266,7 +292,14 @@ class WorkspaceStore:
                     content,
                 ):
                     raise WorkspaceConflict("Message ID already has different content")
-                return Message(**dict(row))
+                return Message(
+                    row["message_id"],
+                    row["conversation_id"],
+                    MessageRole(row["role"]),
+                    row["content"],
+                    row["created_at"],
+                    row["sequence"],
+                )
             conversation = self._conversation(
                 db.execute(
                     "SELECT * FROM conversations WHERE conversation_id=?",
@@ -298,7 +331,14 @@ class WorkspaceStore:
     def list_messages(self, conversation_id: str) -> tuple[Message, ...]:
         with self._connection() as db:
             return tuple(
-                Message(**dict(row))
+                Message(
+                    row["message_id"],
+                    row["conversation_id"],
+                    MessageRole(row["role"]),
+                    row["content"],
+                    row["created_at"],
+                    row["sequence"],
+                )
                 for row in db.execute(
                     "SELECT * FROM messages WHERE conversation_id=? ORDER BY sequence",
                     (conversation_id,),
@@ -321,7 +361,7 @@ class WorkspaceStore:
         return Job(
             row["job_id"],
             row["repository_id"],
-            row["kind"],
+            JobKind(row["kind"]),
             row["title"],
             JobState(row["state"]),
             row["conversation_id"],
@@ -344,8 +384,10 @@ class WorkspaceStore:
     ) -> Job:
         _required(repository_id, "repository_id")
         _required(title, "title")
-        if kind not in {"planning", "pr_execution"}:
-            raise ValueError("Unsupported job kind")
+        try:
+            kind = JobKind(kind)
+        except (TypeError, ValueError) as error:
+            raise ValueError("Unsupported job kind") from error
         identity, timestamp = uuid4().hex, _now()
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -372,7 +414,7 @@ class WorkspaceStore:
                 (
                     identity,
                     repository_id,
-                    kind,
+                    kind.value,
                     title,
                     state,
                     conversation_id,
@@ -394,8 +436,8 @@ class WorkspaceStore:
                 identity,
                 "job.created",
                 {
-                    "state": state,
-                    "kind": kind,
+                    "state": state.value,
+                    "kind": JobKind(kind).value,
                     "title": title,
                     "conversation_id": conversation_id,
                     "dependency_ids": list(dependencies),
@@ -471,7 +513,7 @@ class WorkspaceStore:
                 job_id,
                 "job.updated",
                 {
-                    "state": state,
+                    "state": state.value,
                     "detail": detail,
                     "artifact_refs": list(refs),
                     "revision": job.revision + 1,
@@ -513,7 +555,7 @@ class WorkspaceStore:
                 "job",
                 identity,
                 "job.updated",
-                {"state": JobState.READY, "revision": job.revision + 1},
+                {"state": JobState.READY.value, "revision": job.revision + 1},
                 timestamp,
             )
 
@@ -534,7 +576,7 @@ class WorkspaceStore:
                     row["repository_id"],
                     row["entity_type"],
                     row["entity_id"],
-                    row["event_type"],
+                    EventType(row["event_type"]),
                     json.loads(row["payload"]),
                     row["created_at"],
                 )

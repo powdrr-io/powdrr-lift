@@ -214,12 +214,11 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
     assert "Never describe an existing file subject as new" in (
         enumeration.exact_question
     )
-    allowed_subject_refs = enumeration.answer_schema["properties"]["records"]["items"][
+    subject_ref_schema = enumeration.answer_schema["properties"]["records"]["items"][
         "properties"
-    ]["subject_ref"]["enum"]
-    assert "path::src/projected.py" in allowed_subject_refs
-    assert "path::src/relevant.py" in allowed_subject_refs
-    assert "src/relevant.py::src/relevant.py" not in allowed_subject_refs
+    ]["subject_ref"]
+    assert subject_ref_schema["type"] == ["string", "null"]
+    assert "enum" not in subject_ref_schema
     assert "python::unrelated_0" not in enumeration_input
     assert unrelated_payload not in enumeration_input
     assert "python::relevant" in change_input
@@ -565,6 +564,18 @@ def test_subject_page_rejects_wrong_cursor_and_duplicate_subject() -> None:
             _candidate_page([_record("entity-01")], has_more=False, next_anchor=None),
             baseline=baseline,
             prior={("entities", "entity-01")},
+        )
+
+
+def test_subject_page_parser_rejects_unknown_existing_reference() -> None:
+    with pytest.raises(
+        PlanningContractError, match="absent from the projected baseline"
+    ):
+        _parse_page(
+            _candidate_page(
+                [_record("invented-entity")], has_more=False, next_anchor=None
+            ),
+            baseline={"entities": []},
         )
 
 

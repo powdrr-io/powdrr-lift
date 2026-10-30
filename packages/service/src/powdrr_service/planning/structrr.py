@@ -526,8 +526,8 @@ def build_subject_enumeration_request(
             "file subject. For a projected file without a source_subjects record, "
             "use its supplied path::<path> key. Never describe an existing file "
             "subject as new. "
-            "For an existing subject, copy exactly one value from the supplied "
-            "subject_ref schema enum; never combine or construct identifiers. "
+            "For an existing subject, copy exactly one supplied subject_ref "
+            "from accepted facts; never combine or construct identifiers. "
             "Whenever new_identity_description is non-null, action must be added. "
             "Use changed, deleted, or removed only with a supplied subject_ref. "
             "Return at most eight subjects. An empty final page means no "
@@ -562,7 +562,7 @@ def build_subject_enumeration_request(
         accepted_facts=facts,
         valid_example=example,
         empty_example={"records": [], "has_more": False, "next_anchor": None},
-        answer_schema=_subject_page_schema(_known_subject_refs(subject_index)),
+        answer_schema=_subject_page_schema(),
         parse_answer=parse,
     )
 
@@ -854,33 +854,13 @@ def _structural_subject_index(
     }
 
 
-def _known_subject_refs(subject_index: Mapping[str, Any]) -> tuple[str, ...]:
-    refs = {
-        str(record[field])
-        for section, field in (
-            ("entities", "id"),
-            ("entity_relationships", "id"),
-            ("source_subjects", "stable_key"),
-        )
-        for record in _mapping_records(subject_index.get(section))
-        if isinstance(record.get(field), str)
-    }
-    refs.update(
-        f"path::{record['path']}"
-        for record in _mapping_records(subject_index.get("source_subjects"))
-        if isinstance(record.get("path"), str)
-    )
-    return tuple(sorted(refs))
-
-
-def _subject_page_schema(known_subject_refs: Sequence[str]) -> dict[str, Any]:
+def _subject_page_schema() -> dict[str, Any]:
     record_schema = {
         **SUBJECT_RECORD_SCHEMA,
         "properties": {
             **SUBJECT_RECORD_SCHEMA["properties"],
             "subject_ref": {
                 "type": ["string", "null"],
-                "enum": [None, *known_subject_refs],
             },
         },
     }

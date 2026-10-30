@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1208
+change_id: 1209
 title: Move semantic design contracts into service
 intent:
   problem: Semantic decisions, source-bound contracts, and canonical feature obligation compilation remained in agent core despite being private planning policy.

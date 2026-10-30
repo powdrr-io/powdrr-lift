@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1205
+change_id: 1206
 title: Project changes to existing files without source subjects
 intent:
   problem: Planning accepted a changed file path present in the repository snapshot even when no Structrr source_subject record existed, but projecting that operation failed because projection indexed only source_subjects.

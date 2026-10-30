@@ -1,0 +1,26 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1205
+title: Project changes to existing files without source subjects
+intent:
+  problem: Planning accepted a changed file path present in the repository snapshot even when no Structrr source_subject record existed, but projecting that operation failed because projection indexed only source_subjects.
+  goal: Materialize a source_subject entry when a changed operation targets a known repository file path so later plan items see a consistent projected baseline.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+    type: modified
+    span: {start_line: 515, end_line: 543}
+    summary: Materialize a missing source subject for a changed file that exists in the snapshot.
+    rationale: Align file reference resolution with sequential multi-PR projection.
+  - path: tests/test_multipr_structrr.py
+    type: modified
+    span: {start_line: 79, end_line: 107}
+    summary: Verify a changed existing file becomes visible to later plan items.
+    rationale: Prevent planning from failing when an existing path has no prior Structrr source record.
+entities: []
+entity_relationships: []
+invariants:
+  - id: changed-existing-files-project
+    description: A changed file subject whose path exists in the repository files snapshot is materialized into source_subjects when no source_subject record exists yet.
+    action: altered
+guidance: []

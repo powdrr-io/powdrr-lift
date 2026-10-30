@@ -1,0 +1,67 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1213
+title: Plan the browser workspace and establish durable storage
+intent:
+  problem: The planned browser interface needs persistent chat history, job state,
+    and reconnectable progress instead of transient terminal presentation state.
+  goal: Specify the complete cross-platform browser workspace implementation and establish
+    local durable records for its upcoming API and execution adapters.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/browser-workspace.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 656
+  summary: Document the complete browser workspace implementation plan, with ordered
+    work packages, API contracts, execution recovery, UI behavior, platform support,
+    and acceptance criteria.
+  rationale: Give a follow-on implementation agent concrete steps, existing code locations,
+    scope boundaries, and verifiable completion criteria for every remaining increment.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 63
+  summary: Define conversation, message, job, state, and event records.
+  rationale: Give the UI and local adapters a transport-independent vocabulary without
+    provider or runtime dependencies.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 546
+  summary: Persist workspace history and job projections transactionally in SQLite.
+  rationale: Preserve history and event cursors across restarts, deduplicate messages,
+    reject stale claims, and release jobs after dependencies succeed.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 141
+  summary: Allow the standard-library enum module in public contracts.
+  rationale: Job states use the standard-library StrEnum while retaining the existing
+    package dependency boundary.
+- path: tests/test_ui_workspace.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 174
+  summary: Exercise persistence, message retries, competing claims, dependency release,
+    replay, and rollback.
+  rationale: Verify observable durability and concurrency behavior at the local workspace
+    boundary.
+entities:
+- id: ui-workspace-records
+  type: Module
+  action: added
+- id: local-ui-workspace-store
+  type: Class
+  action: added
+- id: browser-workspace-plan
+  type: Design doc
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

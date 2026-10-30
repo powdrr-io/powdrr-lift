@@ -138,6 +138,7 @@ def test_contract_package_imports_without_application_dependencies() -> None:
         "math",
         "re",
         "dataclasses",
+        "enum",
         "typing",
     }
     for source in root.glob("*.py"):

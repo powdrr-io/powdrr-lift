@@ -1,0 +1,407 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1219
+title: Move Structrr snapshot digest into service
+intent:
+  problem: Canonical Structrr snapshot normalization and fingerprinting still lived in the legacy agent package
+    and was imported by service planning.
+  goal: Make snapshot digest policy service-owned, migrate callers directly, and remove the legacy export and allowlist
+    exception.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 49
+    end_line: 53
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 539
+    end_line: 540
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 596
+    end_line: 597
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 676
+    end_line: 677
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2150
+    end_line: 2151
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2184
+    end_line: 2185
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2222
+    end_line: 2223
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2258
+    end_line: 2259
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2291
+    end_line: 2293
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2819
+    end_line: 2820
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2823
+    end_line: 2823
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2862
+    end_line: 2862
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2864
+    end_line: 2864
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3293
+    end_line: 3293
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3297
+    end_line: 3297
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3314
+    end_line: 3317
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3320
+    end_line: 3320
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3552
+    end_line: 3560
+  summary: Update package ownership and remove the obsolete legacy import exception.
+  rationale: Keep the agent/service ownership inventory aligned with the service-owned snapshot module.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 76
+    end_line: 76
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 30
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: packages/service/src/powdrr_service/structrr/__init__.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Add the service-owned canonical Structrr snapshot fingerprint implementation.
+  rationale: Keep snapshot normalization and digest identity within the service package.
+- path: packages/service/src/powdrr_service/structrr/snapshot.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 56
+  summary: Add the service-owned canonical Structrr snapshot fingerprint implementation.
+  rationale: Keep snapshot normalization and digest identity within the service package.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 94
+  summary: Remove the legacy package-level snapshot digest export.
+  rationale: Keep agent-facing package exports from exposing service-owned policy.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 172
+  summary: Remove the legacy package-level snapshot digest export.
+  rationale: Keep agent-facing package exports from exposing service-owned policy.
+- path: src/powdrr_lift/structrr/actual_diff.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/structrr/actual_diff.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/structrr/candidate_comparison.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 11
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/structrr/candidate_comparison.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/structrr/intent_lineage.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 11
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/structrr/intent_lineage.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 11
+  summary: Remove digest policy from the legacy Structrr module and route rebase through service.
+  rationale: Ensure callers share the canonical service implementation without a legacy digest export.
+- path: src/powdrr_lift/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Remove digest policy from the legacy Structrr module and route rebase through service.
+  rationale: Ensure callers share the canonical service implementation without a legacy digest export.
+- path: src/powdrr_lift/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 119
+    end_line: 131
+  summary: Remove digest policy from the legacy Structrr module and route rebase through service.
+  rationale: Ensure callers share the canonical service implementation without a legacy digest export.
+- path: src/powdrr_lift/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 164
+    end_line: 165
+  summary: Remove digest policy from the legacy Structrr module and route rebase through service.
+  rationale: Ensure callers share the canonical service implementation without a legacy digest export.
+- path: src/powdrr_lift/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 605
+    end_line: 640
+  summary: Remove digest policy from the legacy Structrr module and route rebase through service.
+  rationale: Ensure callers share the canonical service implementation without a legacy digest export.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 561
+    end_line: 561
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 70
+  summary: Import canonical Structrr snapshot fingerprints from the service package.
+  rationale: Route planning and workflow fingerprinting through service-owned snapshot semantics.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 28
+    end_line: 29
+  summary: Refresh the golden Structrr source-symbol spans after relocating digest code.
+  rationale: Keep source bootstrap expectations accurate after the implementation moved.
+- path: tests/test_intent_lineage.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Import and verify snapshot digests through the service-owned API.
+  rationale: Protect digest identity and prevent the legacy module from exporting service policy.
+- path: tests/test_intent_lineage.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Import and verify snapshot digests through the service-owned API.
+  rationale: Protect digest identity and prevent the legacy module from exporting service policy.
+- path: tests/test_multipr_structrr.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Import and verify snapshot digests through the service-owned API.
+  rationale: Protect digest identity and prevent the legacy module from exporting service policy.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 23
+  summary: Import and verify snapshot digests through the service-owned API.
+  rationale: Protect digest identity and prevent the legacy module from exporting service policy.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Import and verify snapshot digests through the service-owned API.
+  rationale: Protect digest identity and prevent the legacy module from exporting service policy.
+- path: tests/test_structrr_bootstrap.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Import and verify snapshot digests through the service-owned API.
+  rationale: Protect digest identity and prevent the legacy module from exporting service policy.
+- path: tests/test_structrr_bootstrap.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Import and verify snapshot digests through the service-owned API.
+  rationale: Protect digest identity and prevent the legacy module from exporting service policy.
+- path: tests/test_structrr_bootstrap.py
+  type: modified
+  span:
+    start_line: 638
+    end_line: 639
+  summary: Import and verify snapshot digests through the service-owned API.
+  rationale: Protect digest identity and prevent the legacy module from exporting service policy.
+- path: tests/test_structrr_bootstrap.py
+  type: modified
+  span:
+    start_line: 645
+    end_line: 645
+  summary: Import and verify snapshot digests through the service-owned API.
+  rationale: Protect digest identity and prevent the legacy module from exporting service policy.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 925
+    end_line: 927
+  summary: Import and verify snapshot digests through the service-owned API.
+  rationale: Protect digest identity and prevent the legacy module from exporting service policy.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
